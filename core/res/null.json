@@ -1,0 +1,36 @@
+{
+	"name": "Null",
+	"engine": {
+		"null": {
+			"params": {}
+		}
+	},
+	"params": {
+		"gasLimitBoundDivisor": "0x0400",
+		"maximumExtraDataSize": "0x20",
+		"minGasLimit": "0x1388"
+	},
+	"genesis": {
+		"seal": {
+			"ethereum": {
+				"nonce": "0x00006d6f7264656e",
+				"mixHash": "0x00000000000000000000000000000000000000647572616c65787365646c6578"
+			}
+		},
+		"difficulty": "0x20000",
+		"author": "0x0000000000000000000000000000000000000000000000000000000000000000",
+		"timestamp": "0x00",
+		"parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
+		"extraData": "0x",
+		"gasLimit": "0x2fefd8"
+	},
+	"accounts": {
+		"a023b355fce098b0024f0877e20adf7d76099181ad56a00fecdb293b99174bb7": { "balance": "1606938044258990275541962092341162602522202993782792835301376", "nonce": "0" },
+		"a07bfd7baa8497fd43258a5442a26f277206f62a98668ae2212ab3f4c71a10c8": {
+			"balance": "1337000000000000000000"
+		},
+		"a0f337cf1216ea5f23364dfffdf47f2e1c35e31dde5fa4c1e0fb598f58951066": {
+			"balance": "1337000000000000000000"
+		}
+	}
+}

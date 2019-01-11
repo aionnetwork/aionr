@@ -1,0 +1,10 @@
+[package]
+description = "Aion custom panic hook"
+homepage = "https://aion.network"
+license = "GPL-3.0"
+name = "panic_hook"
+version = "0.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+
+[dependencies]
+backtrace = "0.3.2"

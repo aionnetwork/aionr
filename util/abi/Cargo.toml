@@ -1,0 +1,20 @@
+[package]
+name = "abi"
+version = "1.0.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+description = "Easy to use conversion of contract calls to bytecode."
+keywords = ["abi", "solidity", "cli"]
+[dependencies.error-chain]
+version = "0.12"
+default-features = false
+
+[dependencies]
+aion-types = { path = "../aion-types" }
+rustc-hex = "1.0"
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+blake2b = { path = "../blake2b"}
+
+[features]
+backtrace = ["error-chain/backtrace"]

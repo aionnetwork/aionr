@@ -1,0 +1,22 @@
+[package]
+description = "core stratum lib"
+name = "acore-stratum"
+version = "0.1.0"
+license = "GPL-3.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+
+[dependencies]
+logger = { path = "../util/logger" }
+aion-types = { path = "../util/aion-types"}
+blake2b = { path = "../util/blake2b" }
+jsonrpc-core = { git = "https://github.com/paritytech/jsonrpc.git", branch = "parity-2.2" }
+jsonrpc-macros = { git = "https://github.com/paritytech/jsonrpc.git", branch = "parity-2.2" }
+jsonrpc-tcp-server = { git = "https://github.com/paritytech/jsonrpc.git", branch = "parity-2.2" }
+log = "0.3"
+parking_lot = "0.5"
+
+[dev-dependencies]
+env_logger = "0.4"
+tokio-core = "0.1"
+tokio-io = "0.1"
+logger = { path = "../util/logger" }

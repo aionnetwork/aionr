@@ -1,0 +1,17 @@
+[package]
+name = "aion-local-store"
+description = "Manages persistent local node data."
+version = "0.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+
+[dependencies]
+acore = { path = "../core" }
+acore-io = { path = "../util/io" }
+log = "0.3"
+rlp = { path = "../util/rlp" }
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = "1.0"
+db = { path = "../db/core" }
+[dev-dependencies]
+key = { path = "../keystore/key" }

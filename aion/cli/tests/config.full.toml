@@ -1,0 +1,85 @@
+[aion]
+no_persistent_txqueue = false
+chain = "homestead"
+base_path = "$HOME/.aion"
+db_path = "$HOME/.aion/chains"
+keys_path = "$HOME/.aion/keys"
+
+[account]
+unlock = ["0xdeadbeefcafe0000000000000000000000000000"]
+password = ["~/.safe/password.file"]
+keys_iterations = 10240
+
+[network]
+max_peers = 50
+net_id = 128
+local_node = "p2p://12345678-9abc-def0-1234-56789abcdef0@2.3.3.3:3333"
+boot_nodes = [
+    "p2p://22345678-9abc-def0-1234-56789abcdef0@3.4.4.4:4444",
+    "p2p://32345678-9abc-def0-1234-56789abcdef0@4.5.5.5:5555"
+]
+sync_from_boot_nodes_only = false
+ip_black_list = []
+
+[rpc]
+disable = false
+port = 8545
+interface = "local"
+cors = ["null"]
+apis = ["all"]
+hosts = ["none"]
+
+[websockets]
+disable = false
+port = 8546
+interface = "local"
+origins = ["none"]
+apis = ["all"]
+hosts = ["none"]
+
+[ipc]
+disable = false
+path = "$HOME/.aion/jsonrpc.ipc"
+apis = ["all"]
+
+
+[mining]
+author = "0xdeadbeefcafe0000000000000000000000000001"
+force_sealing = true
+reseal_on_txs = "all"
+reseal_min_period = 4000
+reseal_max_period = 60000
+work_queue_size = 20
+relay_set = "cheap"
+min_gas_price = 10000000000
+max_gas_price = 9000000000000000000
+gas_floor_target = "4700000"
+gas_cap = "6283184"
+tx_queue_strategy = "gas_factor"
+tx_queue_ban_count = 1
+tx_queue_ban_time = 180 #s
+tx_gas_limit = "6283184"
+tx_time_limit = 100 #ms
+extra_data = "Aion"
+remove_solved = false
+
+[stratum]
+disable = false
+interface = "127.0.0.2"
+port = 8089
+
+[db]
+pruning = "auto"
+pruning_history = 64
+pruning_memory = 500
+#cache_size_db = 64
+cache_size_blocks = 8
+cache_size_queue = 50
+cache_size_state = 25
+cache_size = 128 # Overrides above caches with total size
+disable_wal = false
+db_compaction = "ssd"
+fat_db = "auto"
+scale_verifiers = true
+num_verifiers = 6
+

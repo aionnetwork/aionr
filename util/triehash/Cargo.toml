@@ -1,0 +1,14 @@
+[package]
+name = "triehash"
+version = "0.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+description = "in memory patricia trie operations"
+license = "GPL-3.0"
+
+[dependencies]
+rlp = { version = "0.2.1", path = "../rlp" }
+aion-types = { path = "../../util/aion-types"}
+blake2b = { path = "../blake2b" }
+
+[dev-dependencies]
+trie-standardmap = { path = "../trie-standardmap" }

@@ -1,0 +1,1029 @@
+syntax = "proto3";
+
+// aion_api
+//package org.aion.api.impl.internal;
+// api server
+//package org.aion.api.server.pb;
+// rust
+package bp_api;
+
+enum Servs {
+    s_hb        = 0;
+    s_admin     = 1;
+    s_chain     = 2;
+    s_account   = 3;
+    s_tx	    = 4;
+    s_net	    = 5;
+    s_mine	    = 6;
+    s_privilege	= 7;
+    s_wallet	= 8;
+    s_NA	    = 9;
+}
+
+enum Funcs	 {
+	f_protocolVersion                       = 0;
+	f_minerAddress                          = 1;
+	f_accounts                              = 2;
+	f_blockNumber                           = 3;
+	f_getBalance                            = 4;
+	f_getStorageAt                          = 5;
+	f_unlockAccount                         = 6;
+	f_sendTransaction                       = 7;
+	f_getTransactionByHash                  = 8;
+	f_compile                               = 9;
+	f_contractDeploy                        = 10;
+	f_getTransactionCount                   = 11;
+	f_getBlockTransactionCountByHash        = 12;
+	f_getBlockTransactionCountByNumber      = 13;
+	f_getCode                               = 14;
+	f_call                                  = 15;
+	f_getBlockByHash                        = 16;
+	f_getBlockByNumber                      = 17;
+	f_getTransactionByBlockHashAndIndex     = 18;
+	f_getTransactionByBlockNumberAndIndex   = 19;
+	f_getTransactionReceipt                 = 20;
+	f_getCompilers                          = 21;
+	f_compileSolidity                       = 22;
+	f_getWork                               = 23;
+	f_submitWork                            = 24;
+	f_fetchQueuedTransactions               = 25;
+	f_signedTransaction                     = 26;
+	f_rawTransaction                    	= 27;
+ 	f_estimateNrg                           = 28;
+	f_mining                                = 29;
+	f_hashrate                              = 30;
+	f_getActiveNodes                        = 31;
+	f_getSolcVersion                        = 32;
+	f_isSyncing	                            = 33;
+	f_syncInfo                              = 34;
+	f_getSystemInfo                         = 35;
+    f_eventRegister				            = 36;
+	f_eventDeregister			            = 37;
+    f_accountCreate                         = 38;
+	f_accountLock                           = 39;
+	f_userPrivilege                         = 40;
+	f_eventQuery				            = 41;
+	f_importAccounts			            = 42;
+	f_exportAccounts			            = 43;
+	f_getBlockHeaderByNumber		        = 44;
+	f_getBlockHeaderByHash			        = 45;
+	f_getCurrentTotalDifficulty		        = 46;
+	f_getStaticNodes                        = 47;
+	f_getBlockDetailsByNumber		        = 48;
+	f_getBlockDetailsByLatest		        = 49;
+	f_getBlocksByLatest		        		= 50;
+	f_getAccountDetailsByAddressList  		= 51;
+	f_backupAccounts			            = 52;
+    f_NA                                    = 53;
+    f_getBlockSqlByRange					= 54;
+    f_getBlockDetailsByRange				= 55;
+    f_getNonce                              = 56;
+    f_getNrgPrice                           = 57;
+    f_getBlockDetailsByHash 		    = 58;
+    f_listening                             = 59;
+    f_peerCount                             = 60;
+}
+
+enum Retcode {
+    r_fail                          = 0;
+    r_success                       = 1;
+    r_wallet_nullcb                 = 2;
+    r_heartbeatReturn               = 3;
+    r_privilegeReturn               = 4;
+    r_tx_Init                       = 100;
+    r_tx_Recved                     = 101;
+    r_tx_Dropped                    = 102;
+    r_tx_NewPending                 = 103;
+    r_tx_Pending                    = 104;
+    r_tx_Included                   = 105;
+    r_tx_eventCb                    = 106;
+    r_NA                            = 107;
+
+    r_fail_header_len	            = -1;
+    r_fail_service_call	            = -2;
+    r_fail_function_call            = -3;
+    r_fail_function_exception       = -4;
+    r_fail_api_version	            = -5;
+    r_fail_ct_bytecode	            = -6;
+    r_fail_null_rsp                 = -7;
+    r_fail_invalid_addr	            = -8;
+    r_fail_null_compile_source      = -9;
+    r_fail_compile_contract	        = -10;
+    r_fail_sendTx_null_rep	        = -11;
+    r_fail_getcode_to	            = -12;
+    r_fail_getTxReceipt_null_recp   = -13;
+    r_fail_zmqHandler_exception     = -14;
+    r_fail_hit_pending_tx_limit	    = -15;
+    r_fail_txqueue_exception	    = -16;
+    r_fail_function_arguments	    = -17;
+    r_fail_unsupport_api	        = -18;
+    r_fail_unknown		            = -19;
+}
+
+message t_Contract {
+	string code             = 1;
+	string error            = 2;
+	string source           = 3;
+	string compilerVersion  = 4;
+	string compilerOptions  = 5;
+	bytes abiDef            = 6;
+	bytes userDoc           = 7;
+	bytes devDoc            = 8;
+}
+
+
+message t_AionTx {
+	bytes txHash	       = 1;
+        bytes from         = 2;
+        bytes to           = 3;
+        bytes value        = 4;
+        bytes data         = 5;
+        bytes nonce        = 6;
+        uint64 nrgConsumed = 7;
+        uint64 nrgPrice    = 8;
+}
+
+message t_Node {
+    uint64 blockNumber     = 1;
+    string nodeId          = 2;
+	string remote_p2p_ip   = 3;
+	uint32 remote_p2p_port = 4;
+    uint32 latency         = 5;
+}
+
+message t_LgEle {
+	bytes address          = 1;
+	bytes data             = 2;
+	repeated string topics = 3;	
+}
+
+message t_FilterCt {
+	string from              = 1;
+	string to                = 2;
+    bytes contractAddr       = 3;
+	repeated bytes addresses = 4;
+	repeated string topics   = 5;
+	uint64 expireTime        = 6;
+}
+
+message t_EventCt {
+    bytes address		= 1;
+    bytes data          = 2;
+    bytes blockHash		= 3;
+	uint64 blockNumber  = 4;
+    uint32 logIndex		= 5;
+	string eventName	= 6;
+	bool removed		= 7;
+	uint32 txIndex		= 8;
+	bytes txHash		= 9;
+}
+
+message t_BlockDetail {
+    uint64 blockNumber          = 1;
+    uint64 timestamp            = 2;
+    uint64 nrgConsumed          = 3;
+    uint64 nrgLimit             = 4;
+    bytes parentHash            = 5;
+    bytes minerAddress          = 6;
+    bytes stateRoot             = 7;
+    bytes txTrieRoot            = 8;
+    bytes receiptTrieRoot       = 9;
+    bytes logsBloom             = 10;
+    bytes difficulty            = 11;
+	bytes totalDifficulty	    = 12;
+    bytes extraData             = 13;
+    bytes nonce                 = 14;
+    bytes solution              = 15;
+    bytes hash                  = 16;
+    uint32 size                 = 17;
+	repeated t_TxDetail tx	    = 18;
+	uint64 blockTime			= 19;
+}
+
+message t_TxDetail {
+    bytes txHash    		= 1;
+    bytes from      		= 2;
+    bytes to        		= 3;
+    bytes value     		= 4;
+    bytes data      		= 5;
+    bytes nonce     		= 6;
+    uint64 nrgConsumed 		= 7;
+    uint64 nrgPrice    		= 8;
+    uint32 txIndex     		= 9;
+    bytes contract 			= 10;
+	repeated t_LgEle logs 	= 11;
+	uint64 timestamp		= 12;
+	string error			= 13;
+}
+
+message t_AccountDetail {
+    bytes address    		= 1;
+    bytes balance 			= 2;
+}
+
+message t_Block {
+    uint64 blockNumber          = 1;
+    uint64 timestamp            = 2;
+    uint64 nrgConsumed          = 3;
+    uint64 nrgLimit             = 4;
+    bytes parentHash            = 5;
+	bytes minerAddress          = 6;
+	bytes stateRoot             = 7;
+	bytes txTrieRoot            = 8;
+    bytes receiptTrieRoot       = 9;
+    bytes logsBloom             = 10;
+    bytes difficulty            = 11;
+	bytes totalDifficulty	    = 12;
+	bytes extraData             = 13;
+	bytes nonce		    		= 14;
+	bytes solution		    	= 15;
+	bytes hash		    		= 16;
+	uint32 size		    		= 17;
+	repeated bytes txHash	    = 18;
+}
+
+message t_BlockSql {
+	uint64 blockNumber          = 1;
+	string blockHash            = 2;
+	string parentHash			= 3;
+	string block 				= 4;
+	repeated string tx			= 5;
+}
+
+// for demo, in protocol, it's all one byte per field instead of int32
+//	message req_header{
+//	  int32 ver = 1;
+//	  Servs serv = 2;
+//	  Funcs func = 3;
+//}
+
+// for demo, in protocol, it's all one byte per field instead of int32
+//	message rsp_header{
+//	  returnCode = 1;
+//	optional withErrorMsg = 2;  // only when call failed.
+//}
+
+message rsp_errormsg {
+	string errormsg = 1;
+}
+
+
+//*****************************************************************************
+//	protocalVersion
+//*****************************************************************************
+
+message rsp_protocolVersion{
+	string kernel = 1;
+	string net = 2;
+	string api = 3;
+	string vm = 4;
+	string db = 5;
+	string miner = 6;
+	string txpool = 7;
+}
+
+//*****************************************************************************
+//	minerAddress
+//*****************************************************************************
+
+message rsp_minerAddress{
+	bytes minerAddr = 1;
+}
+
+//*****************************************************************************
+//	getBlockByNumber
+//*****************************************************************************
+
+message req_getBlockByNumber {
+	uint64 blockNumber = 1;
+}
+
+message rsp_getBlock {
+    uint64 blockNumber          = 1;
+    uint64 timestamp            = 2;
+    uint64 nrgConsumed          = 3;
+    uint64 nrgLimit             = 4;
+    bytes parentHash            = 5;
+	bytes minerAddress          = 6;
+	bytes stateRoot             = 7;
+	bytes txTrieRoot            = 8;
+    bytes receiptTrieRoot       = 9;
+    bytes logsBloom             = 10;
+    bytes difficulty            = 11;
+	bytes totalDifficulty	    = 12;
+	bytes extraData             = 13;
+	bytes nonce		    		= 14;
+	bytes solution		    	= 15;
+	bytes hash		    		= 16;
+	uint32 size		    		= 17;
+	repeated bytes txHash	    = 18;
+	
+}
+
+//*****************************************************************************
+//      getBlockHeaderByNumber
+//*****************************************************************************
+
+message req_getBlockHeaderByNumber {
+        uint64 blockNumber = 1;
+}
+
+message rsp_getBlockHeader {
+    uint64 blockNumber          = 1;
+    uint64 timestamp            = 2;
+    uint64 nrgConsumed          = 3;
+    uint64 nrgLimit             = 4;
+    bytes parentHash            = 5;
+    bytes minerAddress          = 6;
+    bytes stateRoot             = 7;
+    bytes txTrieRoot            = 8;
+    bytes receiptTrieRoot       = 9;
+    bytes logsBloom             = 10;
+    bytes difficulty            = 11;
+    bytes extraData             = 12;
+    bytes nonce                 = 13;
+    bytes solution              = 14;
+	bytes hash		    		= 15;
+	uint32 size		   		 	= 16;
+}
+
+
+//*****************************************************************************
+//	sendTransaction
+//*****************************************************************************
+
+message req_sendTransaction {
+	bytes from      = 1;
+	bytes to        = 2;
+	bytes value	    = 3;
+	bytes data      = 4;
+	bytes nonce     = 5;
+	uint64 nrg      = 6;
+	uint64 nrgPrice = 7;
+}
+
+message rsp_sendTransaction {
+	bytes txHash = 1;
+}
+
+//*****************************************************************************
+//	getTransactionByHash
+//*****************************************************************************
+
+message req_getTransactionByHash {
+	bytes txHash = 1;
+}
+
+message rsp_getTransaction {
+    uint32 txIndex      = 1;
+    uint64 blocknumber  = 2;
+    uint64 timeStamp    = 3;
+    uint64 nrgConsume   = 4;
+    uint64 nrgPrice     = 5;
+	bytes blockhash		= 6;
+	bytes from		    = 7;
+	bytes txHash		= 8;
+	bytes data			= 9;
+	bytes nonce			= 10;
+	bytes to			= 11;
+	bytes value			= 12;
+}
+
+//*****************************************************************************
+//	unlockAccount
+//*****************************************************************************
+
+message req_unlockAccount {
+	bytes account   = 1;
+	string password = 2;
+	uint32 duration = 3;
+}
+
+// unlock account return ture or false, in rsp_header.
+// message rsp_unlockAccount {}
+
+//*****************************************************************************
+//	accounts
+//*****************************************************************************
+
+message rsp_accounts {
+	repeated bytes accout = 1;
+}
+
+//*****************************************************************************
+//	compile
+//*****************************************************************************
+
+message req_compile {
+	string code = 1;
+}
+
+message rsp_compile {
+	map<string, t_Contract> constracts = 1;
+}
+
+//*****************************************************************************
+//	getCode
+//*****************************************************************************
+
+message req_getCode {
+	bytes address		= 1;
+	uint64 blocknumber	= 2;
+}
+
+message rsp_getCode {
+	bytes code = 1;
+}
+
+//*****************************************************************************
+//	contractDeploy
+//*****************************************************************************
+
+message req_contractDeploy {
+	uint64 nrgLimit = 1;
+	uint64 nrgPrice = 2;
+    bytes from      = 3;
+    bytes data      = 4;
+    bytes value     = 5;
+}
+
+message rsp_contractDeploy {
+	bytes txHash            = 1;
+	bytes contractAddress   = 2;
+}
+
+//*****************************************************************************
+//	call
+//*****************************************************************************
+
+message req_call {
+	bytes from      = 1;
+	bytes to        = 2;
+    bytes data      = 3;
+    bytes value     = 4;
+	uint64 nrg      = 5;
+	uint64 nrgPrice = 6;
+}
+
+message rsp_call {
+	bytes result = 1;
+}
+
+//*****************************************************************************
+//	getBlockByHash
+//*****************************************************************************
+
+message req_getBlockByHash {
+	bytes blockHash = 1;
+}
+
+//message rsp_getBlockByHash
+//just call rsp_getBlock
+
+
+//*****************************************************************************
+//      getBlockHeaderByHash
+//*****************************************************************************
+
+message req_getBlockHeaderByHash {
+    bytes blockHash = 1;
+}
+
+//message rsp_getBlockHeaderByHash
+//just call rsp_getBlockHeader
+
+
+//*****************************************************************************
+//	getTransactionCount
+//*****************************************************************************
+
+message req_getTransactionCount {
+	bytes address       = 1;
+	uint64 blocknumber  = 2;
+}
+
+message rsp_getTransactionCount {
+	uint64 txCount = 1;
+}
+
+//*****************************************************************************
+//      getTransactionCountByHash
+//*****************************************************************************
+
+message req_getTransactionCountByHash {
+    bytes txHash = 1;
+}
+
+//*****************************************************************************
+//	blockNumber
+//*****************************************************************************
+
+message rsp_blockNumber {
+	uint64 blocknumber = 1;
+}
+
+//*****************************************************************************
+//	getBalance
+//*****************************************************************************
+
+message req_getBalance {
+	bytes address       = 1;
+	uint64 blockNumber  = 2;
+}
+
+message rsp_getBalance {
+	bytes balance = 1;
+}
+
+//*****************************************************************************
+//	getStorageAt
+//*****************************************************************************
+
+message req_getStorageAt {
+	bytes address       = 1;
+	uint32 position     = 2;
+	uint64 blocknumber  = 3;
+}
+
+message rsp_getStorageAt {
+	string storage = 1;
+}
+
+//*****************************************************************************
+//	getBlockTransactionCountByHash
+//*****************************************************************************
+
+message req_getBlockTransactionCountByHash {
+	bytes blockHash = 1;
+}
+
+message rsp_getBlockTransactionCount {
+	uint32 txCount = 1;
+}
+
+//*****************************************************************************
+//	getBlockTransactionCountByNumber
+//*****************************************************************************
+
+message req_getBlockTransactionCountByNumber {
+	uint64 blockNumber = 1;
+}
+
+// message rsp_getBlockTransactionCountByNumber
+// just call rsp_getBlockTransactionCount
+
+
+//*****************************************************************************
+//	getTransactionByBlockHashAndIndex
+//*****************************************************************************
+
+message req_getTransactionByBlockHashAndIndex {
+	bytes blockHash	= 1;
+	uint32 txIndex	= 2;
+}
+
+//message rsp_getTransactionByBlockHashAndIndex
+//just call rsp_getTransaction
+
+//*****************************************************************************
+//	getTransactionByBlockNumberAndIndex
+//*****************************************************************************
+
+message req_getTransactionByBlockNumberAndIndex {
+	uint64 blockNumber  = 1;
+	uint32 txIndex      = 2;
+}
+
+//message rsp_getTransactionByBlockNumberAndIndex
+//just call rsp_getTransaction
+
+//*****************************************************************************
+//	getTransactionReceipt
+//*****************************************************************************
+
+message req_getTransactionReceipt {
+	bytes txHash = 1;
+}
+
+message rsp_getTransactionReceipt {
+    uint32  txIndex           = 1;
+	uint64  blockNumber       = 2;
+    uint64  nrgConsumed       = 3;
+	uint64  cumulativeNrgUsed = 4;
+	bytes  blockHash	      = 5;
+	bytes  txHash	  	      = 6;
+	bytes  from		          = 7;
+	bytes  to		          = 8;
+	bytes  contractAddress	  = 9;
+	repeated t_LgEle logs	  = 10;
+}
+
+//*****************************************************************************
+//	getUncleByBlockHashAndIndex
+//*****************************************************************************
+
+message req_getUncleByBlockHashAndIndex {
+	bytes blockHash	= 1;
+	uint32 index	= 2;
+}
+
+
+//*****************************************************************************
+//	getCompilers
+//*****************************************************************************
+
+message rsp_getCompilers {
+	repeated string compiler = 1;
+}
+
+//*****************************************************************************
+//	compileSolidity
+//*****************************************************************************
+
+message req_compileSolidity {
+	string source = 1;
+}
+
+message rsp_compileSolidity {
+	string code	= 1;
+	t_Contract info = 2;
+}
+
+//*****************************************************************************
+//	getWork
+//*****************************************************************************
+
+message rsp_getWork {
+	repeated string work = 1;
+}
+
+//*****************************************************************************
+//	submitWork
+//*****************************************************************************
+
+message req_submitWork {
+	bytes nonce	= 1;
+	bytes solution	= 2;
+	bytes digest	= 3;
+}
+
+message rsp_submitWork {
+	bool workAccepted = 1;
+}
+
+//*****************************************************************************
+//	fetchQueuedTransactions
+//*****************************************************************************
+
+message rsp_fetchQueuedTransactions {
+	repeated t_AionTx tx = 1;
+}
+
+
+//*****************************************************************************
+//      rawTransaction
+//*****************************************************************************
+
+message req_rawTransaction {
+    bytes encodedTx	= 1;
+}
+
+//*****************************************************************************
+//	estimateNrg
+//*****************************************************************************
+
+message req_estimateNrg {
+	bytes from		= 1;
+	bytes to		= 2;
+	bytes value		= 3;
+	bytes data		= 4;
+    uint64 nrg      = 5;
+    uint64 nrgPrice = 6;
+}
+
+message rsp_estimateNrg {
+	uint64 nrg = 1;
+}
+
+//*****************************************************************************
+//	mining
+//*****************************************************************************
+
+message rsp_mining{
+	bool mining = 1;
+}
+
+//*****************************************************************************
+//      hashrate
+//*****************************************************************************
+
+message rsp_hashrate{
+    uint64 hashrate = 1;
+}
+
+
+//*****************************************************************************
+//      getActiveNodes
+//*****************************************************************************
+
+message rsp_getActiveNodes{
+	repeated t_Node node = 1;
+}
+
+//*****************************************************************************
+//      getStaticNodes
+//*****************************************************************************
+
+message rsp_getStaticNodes{
+    repeated t_Node node = 1;
+}
+
+
+
+//*****************************************************************************
+//      getSolcVersion
+//*****************************************************************************
+
+message rsp_getSolcVersion{
+    string ver = 1;
+}
+
+//*****************************************************************************
+//      isSyncing
+//*****************************************************************************
+
+message rsp_isSyncing{
+    bool syncing = 1;
+}
+
+//*****************************************************************************
+//      syncInfo
+//*****************************************************************************
+
+message rsp_syncInfo{
+    bool syncing            = 1;
+    uint64 networkBestBlock = 2;
+    uint64 chainBestBlock   = 3;
+    uint32 maxImportBlocks  = 4;
+    uint64 startingBlock    = 5;
+}
+
+//*****************************************************************************
+//      systemInfo
+//*****************************************************************************
+
+message rsp_systemInfo{
+    float cpuUsage      = 1;
+    uint64 memoryUsage  = 2;
+    uint64 DBSize       = 3;
+}
+
+//*****************************************************************************
+//      eventRegister
+//*****************************************************************************
+
+message req_eventRegister{
+	repeated string events	= 1;
+	t_FilterCt filter	= 2;         
+}
+
+message rsp_eventRegister{
+	bool result = 1;
+}
+
+
+//*****************************************************************************
+//      eventDeregister
+//*****************************************************************************
+
+message req_eventDeregister{
+	repeated string events	= 1;
+	bytes contractAddr	= 2;
+}
+
+message rsp_eventDeregister{
+	bool result = 1;
+}
+
+message rsp_EventCtCallback{
+	repeated t_EventCt ec = 1;
+}
+
+//*****************************************************************************
+//      accountCreate
+//*****************************************************************************
+
+message req_accountCreate{
+    repeated string password = 1;
+    bool privateKey = 2;
+}
+
+message rsp_accountCreate{
+	repeated bytes address = 1;
+	repeated bytes privateKey = 2;
+}
+
+
+//*****************************************************************************
+//      accountlock
+//*****************************************************************************
+
+message req_accountlock{
+    bytes  account  = 1;
+    string password	= 2;
+}
+
+message rsp_accountlock{
+    bool locked   = 1;
+}
+
+
+//*****************************************************************************
+//      checkUserPrivilege
+//*****************************************************************************
+
+message req_userPrivilege {
+    string username = 1;
+    string password = 2;
+}
+
+message rsp_userPrivilege {
+    repeated string privilege = 1;
+}
+
+message req_queryCtEvents{
+	t_FilterCt filter	= 1;
+}
+
+message rsp_queryCtEvents{
+    repeated t_EventCt ec	= 1;
+}
+
+
+//*****************************************************************************
+//      importAccounts
+//*****************************************************************************
+
+message t_PrivateKey {
+    string privateKey = 1;
+    string password   = 2;
+}
+
+message req_importAccounts{
+    repeated t_PrivateKey privateKey = 1;
+}
+
+message rsp_importAccounts{
+    repeated string invalidKey = 1;
+}
+
+//*****************************************************************************
+//      exportAccounts    
+//*****************************************************************************
+
+//      export/backup use same message structure
+
+message t_Key {
+	bytes address = 1;
+	string password = 2;
+}
+
+message req_exportAccounts{
+    repeated t_Key keyFile       = 1;
+}
+
+message rsp_exportAccounts{
+    repeated bytes keyFile		= 1;
+	repeated bytes failedKey	= 2;
+}
+
+//*****************************************************************************
+//      getCurrentTotalDifficulty
+//*****************************************************************************
+
+message rsp_getCurrentTotalDifficulty{
+    bytes totalDiff = 1;
+}
+
+//*****************************************************************************
+//      getBlockDetailsByNumber
+//*****************************************************************************
+
+message req_getBlockDetailsByNumber{
+	repeated uint64 blkNumbers = 1;
+}
+
+message rsp_getBlockDetailsByNumber{
+    repeated t_BlockDetail blkDetails = 1;
+}
+
+//*****************************************************************************
+//      getBlockDetailsByLatest
+//*****************************************************************************
+
+message req_getBlockDetailsByLatest{
+	uint64 count = 1;
+}
+
+message rsp_getBlockDetailsByLatest{
+    repeated t_BlockDetail blkDetails = 1;
+}
+
+//*****************************************************************************
+//      getBlocksByLatest
+//*****************************************************************************
+
+message req_getBlocksByLatest{
+	uint64 count = 1;
+}
+
+message rsp_getBlocksByLatest{
+    repeated t_Block blks = 1;
+}
+
+//*****************************************************************************
+//      getAccountDetailsByAddressList
+//*****************************************************************************
+
+message req_getAccountDetailsByAddressList{
+	repeated bytes addresses = 1;
+}
+
+message rsp_getAccountDetailsByAddressList{
+    repeated t_AccountDetail accounts = 1;
+}
+
+//*****************************************************************************
+//      f_getBlockSqlByRange
+//*****************************************************************************
+
+message req_getBlockSqlByRange{
+	uint64 blkNumberStart 	= 1;
+	uint64 blkNumberEnd 	= 2;
+}
+
+message rsp_getBlockSqlByRange{
+	repeated t_BlockSql blkSql = 1;
+}
+
+//*****************************************************************************
+//      f_getBlockDetailsByRange
+//*****************************************************************************
+
+message req_getBlockDetailsByRange{
+	uint64 blkNumberStart 	= 1;
+	uint64 blkNumberEnd 	= 2;
+}
+
+message rsp_getBlockDetailsByRange{
+	repeated t_BlockDetail blkDetails = 1;
+}
+
+//*****************************************************************************
+//      f_getNonce
+//*****************************************************************************
+
+message req_getNonce {
+    bytes address = 1;
+}
+
+message rsp_getNonce {
+    bytes nonce = 1;
+}
+
+//*****************************************************************************
+//      f_getNrgPrice
+//*****************************************************************************
+
+message rsp_getNrgPrice {
+    uint64 nrgPrice = 1;
+}
+
+//*****************************************************************************
+//      f_getBlockDetailsByHash
+//*****************************************************************************
+
+message req_getBlockDetailsByHash {
+    bytes blockHash = 1;
+}
+
+message rsp_getBlockDetailsByHash {
+	t_BlockDetail blkDetails = 1;
+}
+
+//*****************************************************************************
+//      f_listening
+//*****************************************************************************
+
+message rsp_listening {
+    bool isListening = 1;	    
+}
+
+
+//*****************************************************************************
+//      f_peerCount
+//*****************************************************************************
+
+message rsp_peerCount {
+    uint32 peers = 1;
+}

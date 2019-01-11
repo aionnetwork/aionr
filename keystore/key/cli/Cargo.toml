@@ -1,0 +1,18 @@
+[package]
+name = "keygen"
+version = "0.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+
+[dependencies]
+key = { path = "../" }
+panic_hook = { path = "../../../util/panic_hook" }
+docopt = "0.8"
+rustc-hex = "1.0"
+serde = "1.0"
+serde_derive = "1.0"
+threadpool = "1.7"
+
+[[bin]]
+name = "keygen"
+path = "src/main.rs"
+doc = false

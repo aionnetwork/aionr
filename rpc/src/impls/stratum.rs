@@ -1,0 +1,256 @@
+/*******************************************************************************
+ * Copyright (c) 2015-2018 Parity Technologies (UK) Ltd.
+ * Copyright (c) 2018-2019 Aion foundation.
+ *
+ *     This file is part of the aion network project.
+ *
+ *     The aion network project is free software: you can redistribute it
+ *     and/or modify it under the terms of the GNU General Public License
+ *     as published by the Free Software Foundation, either version 3 of
+ *     the License, or any later version.
+ *
+ *     The aion network project is distributed in the hope that it will
+ *     be useful, but WITHOUT ANY WARRANTY; without even the implied
+ *     warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *     See the GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with the aion network project source files.
+ *     If not, see <https://www.gnu.org/licenses/>.
+ *
+ ******************************************************************************/
+
+//! Stratum rpc implementation.
+
+use std::thread;
+use std::time::{Instant, Duration};
+use std::sync::Arc;
+use rustc_hex::FromHex;
+use rustc_hex::ToHex;
+
+use sync::sync::SyncProvider;
+use jsonrpc_macros::Trailing;
+use aion_types::{H256, U256};
+use acore::block::IsBlock;
+use acore::client::{MiningBlockChainClient, BlockId};
+use acore::miner::MinerService;
+use acore::account_provider::AccountProvider;
+use jsonrpc_core::{Error, Result};
+
+use helpers::errors;
+use helpers::accounts::unwrap_provider;
+use traits::Stratum;
+use types::{
+    Work, Info, AddressValidation, MiningInfo, TemplateParam, Bytes, StratumHeader, SimpleHeader, BlockNumber
+};
+use aion_types::clean_0x;
+
+/// Stratum rpc implementation.
+pub struct StratumClient<C, S: ?Sized, M>
+where
+    C: MiningBlockChainClient,
+    S: SyncProvider,
+    M: MinerService,
+{
+    client: Arc<C>,
+    sync: Arc<S>,
+    miner: Arc<M>,
+    account_provider: Option<Arc<AccountProvider>>,
+}
+
+impl<C, S: ?Sized, M> StratumClient<C, S, M>
+where
+    C: MiningBlockChainClient,
+    S: SyncProvider,
+    M: MinerService,
+{
+    /// Creates new StratumClient.
+    pub fn new(
+        client: &Arc<C>,
+        sync: &Arc<S>,
+        miner: &Arc<M>,
+        account_provider: &Option<Arc<AccountProvider>>,
+    ) -> Self
+    {
+        StratumClient {
+            client: client.clone(),
+            sync: sync.clone(),
+            miner: miner.clone(),
+            account_provider: account_provider.clone(),
+        }
+    }
+
+    fn account_provider(&self) -> Result<Arc<AccountProvider>> {
+        unwrap_provider(&self.account_provider)
+    }
+}
+
+const MAX_QUEUE_SIZE_TO_MINE_ON: usize = 4;
+
+impl<C, S: ?Sized, M> Stratum for StratumClient<C, S, M>
+where
+    C: MiningBlockChainClient + 'static,
+    S: SyncProvider + 'static,
+    M: MinerService + 'static,
+{
+    /// Returns the work of current block
+    fn work(&self, _tpl_param: Trailing<TemplateParam>) -> Result<Work> {
+        if !self.miner.can_produce_work_package() {
+            warn!(target: "miner", "Cannot give work package - engine seals internally.");
+            return Err(errors::no_work_required());
+        }
+
+        // check if we're still syncing and return empty strings in that case
+        {
+            //TODO: check if initial sync is complete here
+            //let sync = self.sync;
+            if
+            /*sync.status().state != SyncState::Idle ||*/
+            self.client.queue_info().total_queue_size() > MAX_QUEUE_SIZE_TO_MINE_ON {
+                trace!(target: "miner", "Syncing. Cannot give any work.");
+                return Err(errors::no_work());
+            }
+
+            // Otherwise spin until our submitted block has been included.
+            let timeout = Instant::now() + Duration::from_millis(1000);
+            while Instant::now() < timeout && self.client.queue_info().total_queue_size() > 0 {
+                thread::sleep(Duration::from_millis(1));
+            }
+        }
+
+        if self.miner.author().is_zero() {
+            warn!(target: "miner", "Cannot give work package - no author is configured. Use --author to configure!");
+            return Err(errors::no_author());
+        }
+        self.miner
+            .map_sealing_work(&*self.client, |b| {
+                let pow_hash = b.block().header().mine_hash();
+                let target = b.block().header().boundary();
+                let parent_hash = b.header().parent_hash().clone();
+                let transaction_fee = b.header().transaction_fee().clone();
+                let block_number = b.block().header().number();
+                let reward = b.header().reward().clone();
+
+                Ok(Work {
+                    pow_hash: pow_hash,
+                    parent_hash: parent_hash,
+                    target: target,
+                    number: block_number,
+                    reward: reward,
+                    transaction_fee: transaction_fee,
+                })
+            })
+            .unwrap_or(Err(errors::internal("No work found.", "")))
+    }
+
+    /// get block header by number
+    fn get_block_by_number(&self, num: BlockNumber) -> Result<StratumHeader> {
+        let client = &self.client;
+        let mut stratum_header = StratumHeader::default();
+        match client.block(num.clone().into()) {
+            Some(b) => {
+                let header = b.decode_header();
+                let simple_header = SimpleHeader::from(header.clone());
+                stratum_header.code = 0;
+                let seal = header.seal();
+                if seal.len() == 2 {
+                    stratum_header.nonce = Some(seal[0].to_hex());
+                    stratum_header.solution = Some(seal[1].to_hex());
+                    stratum_header.header_hash =
+                        Some(clean_0x(&format!("{:?}", header.mine_hash())).to_owned());
+                    stratum_header.block_header = Some(simple_header);
+                } else {
+                    stratum_header.code = -4;
+                    stratum_header.message = Some("No nonce or solution.".into());
+                }
+            }
+            None => {
+                stratum_header.code = -2;
+                stratum_header.message = Some(format!("Fail - Unable to find block{:?}", num));
+            }
+        }
+        Ok(stratum_header)
+    }
+
+    /// Submit a proof-of-work solution
+    fn submit_work(
+        &self,
+        nonce_str: String,
+        solution_str: String,
+        pow_hash_str: String,
+    ) -> Result<bool>
+    {
+        let nonce: H256 = clean_0x(nonce_str.as_str())
+            .parse()
+            .map_err(|_e| Error::invalid_params("invalid nonce"))?;
+
+        let solution = Bytes(
+            clean_0x(solution_str.as_str())
+                .from_hex()
+                .map_err(|_e| Error::invalid_params("invalid solution"))?,
+        );
+
+        let pow_hash: H256 = clean_0x(pow_hash_str.as_str())
+            .parse()
+            .map_err(|_e| Error::invalid_params("invalid pow_hash"))?;
+
+        if !self.miner.can_produce_work_package() {
+            warn!(target: "miner", "Cannot submit work - engine seals internally.");
+            return Err(errors::no_work_required());
+        }
+
+        trace!(target: "miner", "submit_work: Decoded: nonce={}, pow_hash={}, solution={:?}", nonce, pow_hash, solution);
+
+        let seal = vec![nonce.to_vec(), solution.0];
+        Ok(self
+            .miner
+            .submit_seal(&*self.client, pow_hash, seal)
+            .is_ok())
+    }
+
+    /// Get information
+    fn get_info(&self) -> Result<Info> {
+        Ok(Info {
+            balance: 0,
+            blocks: 0,
+            connections: self.sync.status().num_peers as u64,
+            proxy: String::default(),
+            generate: true,
+            genproclimit: 100,
+            difficulty: 0,
+        })
+    }
+
+    /// Check if address is valid
+    fn validate_address(&self, address: H256) -> Result<AddressValidation> {
+        let isvalid: bool = address.0[0] == 0xa0 as u8;
+        let account_provider = self.account_provider()?;
+        let ismine = match account_provider.has_account(address) {
+            Ok(true) => true,
+            _ => false,
+        };
+        Ok(AddressValidation {
+            isvalid,
+            address,
+            ismine,
+        })
+    }
+
+    /// Get the highest known difficulty
+    fn get_difficulty(&self) -> Result<U256> {
+        let best_block = self.client.block(BlockId::Latest).expect("db crashed");
+        Ok(best_block.difficulty())
+    }
+
+    /// Get mining information
+    fn get_mining_info(&self) -> Result<MiningInfo> {
+        let best_block = self.client.block(BlockId::Latest).expect("db crashed");
+        Ok(MiningInfo {
+            blocks: best_block.number(),
+            currentblocksize: best_block.0.len(),
+            currentblocktx: best_block.transactions_count(),
+            difficulty: best_block.difficulty(),
+            testnet: true,
+        })
+    }
+}

@@ -1,0 +1,6 @@
+[package]
+name = "abi-contract"
+version = "1.0.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+keywords = ["abi", "solidity", "derive"]
+description = "Easy to use conversion of contract calls to bytecode."

@@ -1,0 +1,20 @@
+[package]
+name = "abi-derive"
+version = "1.0.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+description = "Easy to use conversion of contract calls to bytecode."
+keywords = ["abi", "solidity", "derive"]
+
+[lib]
+proc-macro = true
+[dependencies]
+abi = { path = ".." }
+
+[dependencies.heck]
+version = "0.3"
+
+[dependencies.quote]
+version = "0.4.2"
+
+[dependencies.syn]
+version = "0.12.12"

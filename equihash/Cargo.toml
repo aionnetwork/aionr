@@ -1,0 +1,9 @@
+[package]
+name = "equihash"
+version = "0.0.0"
+
+[dependencies]
+blake2b = { path = "../util/blake2b" }
+acore-bytes = { path = "../util/bytes" }
+log = "0.3"
+rustc-hex = "1.0"

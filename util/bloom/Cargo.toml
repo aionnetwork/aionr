@@ -1,0 +1,12 @@
+[package]
+name = "acore-bloom-journal"
+version = "0.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+description = "Journaling bloom filter"
+license = "GPL3"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+siphasher = "0.1.1"

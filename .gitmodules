@@ -1,0 +1,3 @@
+[submodule "vms/solidity/native/aion_fastvm"]
+	path = vms/solidity/native/aion_fastvm
+	url = https://github.com/aionnetwork/aion_fastvm.git

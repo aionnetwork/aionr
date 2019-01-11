@@ -1,0 +1,20 @@
+[package]
+name = "patricia-trie"
+version = "0.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+description = "Merkle-Patricia Trie (Ethereum Style)"
+license = "GPL-3.0"
+
+[dependencies]
+elastic-array = "0.9"
+log = "0.3"
+rand = "0.4"
+acore-bytes = { version = "0.1.0", path = "../bytes" }
+aion-types = { path = "../../util/aion-types"}
+blake2b = { path = "../blake2b" }
+rlp = { version = "0.2.1", path = "../rlp" }
+triehash = { version = "0.1.0", path = "../triehash" }
+logger = { path = "../../util/logger" }
+db = {path = "../../db/core" }
+[dev-dependencies]
+trie-standardmap = { path = "../trie-standardmap" }

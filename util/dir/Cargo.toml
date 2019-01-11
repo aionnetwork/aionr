@@ -1,0 +1,8 @@
+[package]
+name = "dir"
+version = "0.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+
+[dependencies]
+aion-types = { path = "../../util/aion-types"}
+journaldb = { path = "../../db/journaldb" }

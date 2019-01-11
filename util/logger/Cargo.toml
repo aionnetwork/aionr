@@ -1,0 +1,16 @@
+[package]
+description = "Log implementation for Aion"
+name = "logger"
+version = "1.0.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+
+[dependencies]
+log = "0.3"
+env_logger = "0.4"
+isatty = "0.1"
+lazy_static = "1.0"
+regex = "0.2"
+time = "0.1"
+parking_lot = "0.5"
+arrayvec = "0.4"
+ansi_term = "0.10"
