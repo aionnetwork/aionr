@@ -81,7 +81,7 @@ cd aion_rust
 # Build the Kernel
 ./scripts/package.sh aionr-0.1.0-rc1
 ```
-Executive binary will be found under `./package/aionr-0.1.0-rc1`
+Executive binary will be found under `aion_rust/package/aionr-0.1.0-rc1`
 
 #### Launch Aion Rust Kernel
 
