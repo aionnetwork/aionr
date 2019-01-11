@@ -79,7 +79,7 @@ git clone https://github.com/aionnetworkp/aion_rust.git
 cd aion_rust
 
 # Build the Kernel
-./script/package aionr-0.1.0-rc1
+./scripts/package.sh aionr-0.1.0-rc1
 ```
 Executive binary will be found under `./package/aionr-0.1.0-rc1`
 
