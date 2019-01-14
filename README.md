@@ -1,9 +1,9 @@
 # AionR
 
-[![version](https://img.shields.io/github/tag/aionnetwork/aionr.svg)](https://github.com/aionnetworkp/aion_rust/releases/latest)
+[![version](https://img.shields.io/github/tag/aionnetwork/aionr.svg)](https://github.com/aionnetwork/aionr/releases/latest)
 [![Join the chat at https://gitter.im/aionnetwork](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/aionnetwork)
-[![license](https://img.shields.io/github/license/aionnetwork/aion.svg)](https://github.com/aionnetworkp/aion_rust/blob/dev/LICENSE)
-[![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/aionnetworkp/aion_rust/issues)  
+[![license](https://img.shields.io/github/license/aionnetwork/aion.svg)](https://github.com/aionnetwork/aionr/blob/dev/LICENSE)
+[![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/aionnetwork/aionr/issues)  
 
 Mainstream adoption of blockchains has been limited because of scalability, privacy, and interoperability challenges. Aion is a multi-tier blockchain network designed to address these challenges. 
 
@@ -21,8 +21,8 @@ This repository contains the rust kernel implementation and releases for the Aio
 ## Getting Started
 ### Developers
 
-- [Build Rust Kernel](https://github.com/aionnetworkp/aion_rust/wiki/Build-Rust-Kernel) wiki provides the details of building Aion(Rust) Kernel from source code on Ubuntu and MacOS.
-- [User Manual](https://github.com/aionnetworkp/aion_rust/wiki/User-Manual) wiki provides the instructions of starting Aion(Rust) Kernel.
+- [Build Rust Kernel](https://github.com/aionnetwork/aionr/wiki/Build-Rust-Kernel) wiki provides the details of building Aion(Rust) Kernel from source code on Ubuntu and MacOS.
+- [User Manual](https://github.com/aionnetwork/aionr/wiki/User-Manual) wiki provides the instructions of starting Aion(Rust) Kernel.
 
 #### Requirements
  - Ubuntu
@@ -68,24 +68,24 @@ This repository contains the rust kernel implementation and releases for the Aio
 	  Only if you want to modify wallet protobuf message, then you should install Google Protobuf. Make sure protoc is in PATH environment.
  
  - MacOS: 
-   - [User Manual](https://github.com/aionnetworkp/aion_rust/wiki/User-Manual#dependent-libraries) gives the system environment requirements for the binary package. 
-   - And [Build Rust Kernel](https://github.com/aionnetworkp/aion_rust/wiki/User-Manual#for-macos) gives system environment requirements for building Aion Rust Kernel from the source code.
+   - [User Manual](https://github.com/aionnetwork/aionr/wiki/User-Manual#dependent-libraries) gives the system environment requirements for the binary package. 
+   - And [Build Rust Kernel](https://github.com/aionnetwork/aionr/wiki/User-Manual#for-macos) gives system environment requirements for building Aion Rust Kernel from the source code.
 
 #### Build From Source
 
 ```bash
 # download Aion Rust code
-git clone https://github.com/aionnetworkp/aion_rust.git
-cd aion_rust
+git clone https://github.com/aionnetwork/aionr.git
+cd aionr
 
 # Build the Kernel
 ./scripts/package.sh aionr-0.1.0-rc1
 ```
-Executive binary will be found under `aion_rust/package/aionr-0.1.0-rc1`
+Executive binary will be found under `aionr/package/aionr-0.1.0-rc1`
 
 #### Launch Aion Rust Kernel
 
-Navigate to `package/aionr-0.1.0-rc1` directory, follow the [Launch Rust Kernel](https://github.com/aionnetworkp/aion_rust/wiki/User-Manual#launch-rust-kernel) section in [User Manual](https://github.com/aionnetworkp/aion_rust/wiki/User-Manual) to Aion Rust Kernel.
+Navigate to `package/aionr-0.1.0-rc1` directory, follow the [Launch Rust Kernel](https://github.com/aionnetwork/aionr/wiki/User-Manual#launch-rust-kernel) section in [User Manual](https://github.com/aionnetwork/aionr/wiki/User-Manual) to Aion Rust Kernel.
 
 ### JSON rpc service
 
@@ -95,17 +95,16 @@ RPC service can be connected from:
 +	websocket: port 8546
 +	ipc: $HOME/.aion/jsonrpc.ipc
 
-Go to [User Manual](https://github.com/aionnetworkp/aion_rust/wiki/User-Manual) or [CMD & Config](https://github.com/aionnetworkp/aion_rust/wiki/CMD-&-Config) wiki to find how to change RPC port settings.
+Go to [User Manual](https://github.com/aionnetwork/aionr/wiki/User-Manual) or [CMD & Config](https://github.com/aionnetwork/aionr/wiki/CMD-&-Config) wiki to find how to change RPC port settings.
 
 ### Miners
 If you're interested in mining on the Aion networks, refer to our [Aion Mining Docs](https://docs.aion.network/docs/aion-mining-overview)
 
 ### Users
-If you're interested in interacting with dApps and _using_ Aion, refer to our [Aion Desktop Wallet Docs](https://docs.aion.network/docs/aion-desktop-wallet)
+If you're interested in interacting with dApps and _using_ Aion, refer to our [Aion Docs](https://aiondocs.netlify.com/en/)
 
 
-
-**Please refer to the [wiki pages](https://github.com/aionnetworkp/aion_rust/wiki) for further documentation and tutorials.**
+**Please refer to the [wiki pages](https://github.com/aionnetwork/aionr/wiki) for further documentation and tutorials.**
 
 ## Contact
 
@@ -124,4 +123,4 @@ If you are interested in being part of the Aion project, check out our available
 
 ## License
 
-Aion is released under the [GPL-V3 license](https://github.com/aionnetworkp/aion_rust/blob/dev/LICENSE)
+Aion is released under the [GPL-V3 license](https://github.com/aionnetwork/aionr/blob/dev/LICENSE)
