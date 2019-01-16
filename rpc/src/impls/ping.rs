@@ -1,5 +1,4 @@
 /*******************************************************************************
- * Copyright (c) 2015-2018 Parity Technologies (UK) Ltd.
  * Copyright (c) 2018-2019 Aion foundation.
  *
  *     This file is part of the aion network project.
@@ -20,26 +19,18 @@
  *
  ******************************************************************************/
 
-//! Ethereum rpc interfaces.
+//! Ping rpc implementation.
+use jsonrpc_core::Result;
+use traits::Ping;
 
-pub mod web3;
-pub mod eth;
-pub mod stratum;
-pub mod eth_pubsub;
-pub mod eth_signing;
-pub mod net;
-pub mod personal;
-pub mod rpc;
-pub mod pb;
-pub mod ping;
+/// Ping rpc implementation.
+pub struct PingClient;
 
-pub use self::web3::Web3;
-pub use self::eth::{Eth, EthFilter};
-pub use self::stratum::Stratum;
-pub use self::eth_pubsub::EthPubSub;
-pub use self::eth_signing::EthSigning;
-pub use self::net::Net;
-pub use self::personal::Personal;
-pub use self::rpc::Rpc;
-pub use self::pb::Pb;
-pub use self::ping::Ping;
+impl PingClient {
+    /// Creates new PingClient.
+    pub fn new() -> Self { PingClient }
+}
+
+impl Ping for PingClient {
+    fn ping(&self) -> Result<String> { Ok("pong".into()) }
+}

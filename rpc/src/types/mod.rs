@@ -77,4 +77,4 @@ pub use self::transaction::{Transaction, RichRawTransaction};
 pub use self::transaction_request::TransactionRequest;
 pub use self::transaction_condition::TransactionCondition;
 pub use self::uint::{U128, U256, U64};
-pub use self::mining::{Work, Info, AddressValidation, MiningInfo};
+pub use self::mining::{Work, Info, AddressValidation, MiningInfo, MinerStats};

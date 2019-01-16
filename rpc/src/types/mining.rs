@@ -92,3 +92,30 @@ pub struct MiningInfo {
     pub difficulty: U256,
     pub testnet: bool,
 }
+
+// Miner stats
+#[derive(Debug, PartialEq)]
+pub struct MinerStats {
+    pub miner_hashrate_share: f64,
+    pub miner_hashrate: f64,
+    pub network_hashrate: f64,
+}
+
+impl Serialize for MinerStats {
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        let mut stats = serializer.serialize_struct("MinerStats", 3)?;
+        stats.serialize_field(
+            "minerHashrateShare",
+            &format!("{:.4}", self.miner_hashrate_share),
+        )?;
+        stats.serialize_field("minerHashrate", &format!("{:.4}", self.miner_hashrate))?;
+        stats.serialize_field("networkHashrate", &format!("{:.4}", self.network_hashrate))?;
+        stats.end()
+    }
+}

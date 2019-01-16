@@ -1,5 +1,4 @@
 /*******************************************************************************
- * Copyright (c) 2015-2018 Parity Technologies (UK) Ltd.
  * Copyright (c) 2018-2019 Aion foundation.
  *
  *     This file is part of the aion network project.
@@ -41,7 +40,7 @@ use helpers::errors;
 use helpers::accounts::unwrap_provider;
 use traits::Stratum;
 use types::{
-    Work, Info, AddressValidation, MiningInfo, TemplateParam, Bytes, StratumHeader, SimpleHeader, BlockNumber
+    Work, Info, AddressValidation, MiningInfo, MinerStats, TemplateParam, Bytes, StratumHeader, SimpleHeader, BlockNumber
 };
 use aion_types::clean_0x;
 
@@ -86,6 +85,7 @@ where
 }
 
 const MAX_QUEUE_SIZE_TO_MINE_ON: usize = 4;
+const STRATUM_BLKTIME_INCLUDED_COUNT: usize = 32;
 
 impl<C, S: ?Sized, M> Stratum for StratumClient<C, S, M>
 where
@@ -251,6 +251,72 @@ where
             currentblocktx: best_block.transactions_count(),
             difficulty: best_block.difficulty(),
             testnet: true,
+        })
+    }
+
+    /// Get miner stats
+    fn get_miner_stats(&self, address: H256) -> Result<MinerStats> {
+        let account_provider = self.account_provider()?;
+        let is_miner = account_provider.has_account(address).unwrap_or(false);
+
+        if is_miner != true {
+            return Err(errors::internal("Can't find the miner.", ""));
+        }
+
+        let mut header = self
+            .client
+            .block_header(BlockId::Latest)
+            .expect("db crashed");
+        let last_difficulty = header.difficulty();
+        let mut parent_hash = header.parent_hash();
+        let mut index = 0;
+        let mut last_block_timestamp = 0;
+        let mut block_time_accumulator = 0;
+        let mut block_time_accumulated = 0;
+        let mut mined_by_miner = 0;
+
+        while index < STRATUM_BLKTIME_INCLUDED_COUNT {
+            if last_block_timestamp != 0 {
+                block_time_accumulator =
+                    block_time_accumulator + (last_block_timestamp - header.timestamp());
+                block_time_accumulated = block_time_accumulated + 1;
+            }
+            last_block_timestamp = header.timestamp();
+
+            if header.author() == address {
+                mined_by_miner = mined_by_miner + 1;
+            }
+
+            match self.client.block_header(BlockId::Hash(parent_hash.into())) {
+                Some(h) => header = h,
+                None => break,
+            }
+            parent_hash = header.parent_hash();
+            index = index + 1;
+        }
+
+        let mut block_time = 0;
+        if block_time_accumulator > 0 {
+            block_time = block_time_accumulator / block_time_accumulated;
+        }
+
+        let mut network_hashrate = 0_f64;
+        let mut miner_hashrate_share = 0_f64;
+        let mut miner_hashrate = 0_f64;
+
+        if block_time > 0 {
+            network_hashrate = last_difficulty.as_u64() as f64 / block_time as f64;
+        }
+
+        if index > 0 && mined_by_miner > 0 {
+            miner_hashrate_share = mined_by_miner as f64 / index as f64;
+            miner_hashrate = network_hashrate * miner_hashrate_share;
+        }
+
+        Ok(MinerStats {
+            miner_hashrate_share: miner_hashrate_share,
+            miner_hashrate: miner_hashrate,
+            network_hashrate: network_hashrate,
         })
     }
 }
