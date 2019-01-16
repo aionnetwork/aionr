@@ -52,6 +52,8 @@ pub enum Api {
     Personal,
     /// Rpc (Safe)
     Rpc,
+    /// Ping (Safe)
+    Ping,
 }
 
 impl FromStr for Api {
@@ -68,6 +70,7 @@ impl FromStr for Api {
             "pubsub" => Ok(EthPubSub),
             "personal" => Ok(Personal),
             "rpc" => Ok(Rpc),
+            "ping" => Ok(Ping),
             api => Err(format!("Unknown api: {}", api)),
         }
     }
@@ -131,6 +134,7 @@ fn to_modules(apis: &HashSet<Api>) -> BTreeMap<String, String> {
             Api::EthPubSub => ("pubsub", "1.0"),
             Api::Personal => ("personal", "1.0"),
             Api::Rpc => ("rpc", "1.0"),
+            Api::Ping => ("ping", "1.0"),
         };
         modules.insert(name.into(), version.into());
     }
@@ -261,6 +265,9 @@ impl FullDependencies {
                     let modules = to_modules(&apis);
                     handler.extend_with(RpcClient::new(modules).to_delegate());
                 }
+                Api::Ping => {
+                    handler.extend_with(PingClient::new().to_delegate());
+                }
             }
         }
     }
@@ -291,6 +298,7 @@ impl ApiSet {
             Api::Rpc,
             Api::Personal,
             Api::EthPubSub,
+            Api::Ping,
         ]
             .into_iter()
             .cloned()
@@ -303,6 +311,7 @@ impl ApiSet {
             Api::Stratum,
             Api::Rpc,
             Api::Personal,
+            Api::Ping,
         ]
             .into_iter()
             .cloned()
@@ -351,6 +360,7 @@ mod test {
             Api::Stratum,
             Api::Rpc,
             Api::Personal,
+            Api::Ping,
         ]
         .into_iter()
         .collect();
@@ -369,7 +379,8 @@ mod test {
                     Api::Stratum,
                     Api::Rpc,
                     Api::Personal,
-                    Api::EthPubSub
+                    Api::EthPubSub,
+                    Api::Ping
                 ]
                 .into_iter()
                 .collect()
@@ -388,7 +399,8 @@ mod test {
                     Api::Eth,
                     Api::Stratum,
                     Api::Rpc,
-                    Api::EthPubSub
+                    Api::EthPubSub,
+                    Api::Ping
                 ]
                 .into_iter()
                 .collect()

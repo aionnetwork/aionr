@@ -1,5 +1,4 @@
 /*******************************************************************************
- * Copyright (c) 2015-2018 Parity Technologies (UK) Ltd.
  * Copyright (c) 2018-2019 Aion foundation.
  *
  *     This file is part of the aion network project.
@@ -25,7 +24,7 @@ use jsonrpc_core::Result;
 use aion_types::{H256, U256};
 use jsonrpc_macros::Trailing;
 
-use types::{Work, AddressValidation, Info, MiningInfo, TemplateParam, StratumHeader, BlockNumber};
+use types::{Work, AddressValidation, Info, MiningInfo, MinerStats, TemplateParam, StratumHeader, BlockNumber};
 
 build_rpc_trait! {
     /// Stratum rpc interface.
@@ -53,6 +52,10 @@ build_rpc_trait! {
         /// Get mining information
         #[rpc(name = "getmininginfo")]
         fn get_mining_info(&self) -> Result<MiningInfo>;
+
+        /// Get miner stats
+        #[rpc(name = "getMinerStats")]
+        fn get_miner_stats(&self, H256) -> Result<MinerStats>;
 
         /// Get block header by number
         #[rpc(name = "getHeaderByBlockNumber")]

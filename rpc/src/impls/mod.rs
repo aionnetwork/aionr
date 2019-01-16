@@ -40,6 +40,7 @@ mod signing;
 mod rpc;
 mod stratum;
 mod web3;
+mod ping;
 
 pub use self::eth::EthClient;
 pub use self::eth_filter::EthFilterClient;
@@ -50,3 +51,4 @@ pub use self::signing::SigningClient;
 pub use self::web3::Web3Client;
 pub use self::rpc::RpcClient;
 pub use self::stratum::StratumClient;
+pub use self::ping::PingClient;
