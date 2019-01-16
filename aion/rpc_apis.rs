@@ -360,6 +360,7 @@ mod test {
             Api::Stratum,
             Api::Rpc,
             Api::Personal,
+            Api::Ping,
         ]
         .into_iter()
         .collect();
@@ -378,7 +379,8 @@ mod test {
                     Api::Stratum,
                     Api::Rpc,
                     Api::Personal,
-                    Api::EthPubSub
+                    Api::EthPubSub,
+                    Api::Ping
                 ]
                 .into_iter()
                 .collect()
@@ -397,7 +399,8 @@ mod test {
                     Api::Eth,
                     Api::Stratum,
                     Api::Rpc,
-                    Api::EthPubSub
+                    Api::EthPubSub,
+                    Api::Ping
                 ]
                 .into_iter()
                 .collect()
