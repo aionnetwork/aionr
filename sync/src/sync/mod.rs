@@ -148,7 +148,7 @@ impl SyncMgr {
                     P2pMgr::get_nodes_count(CONNECTED),
                     active_nodes_count,
                 );
-                info!(target: "sync","Total difficulty  Blk No.    Blk hash    Address                 Seed    LstReq No.  Mode");
+                info!(target: "sync","    Total diff      Blk No.    Blk hash          Address             Revision      Direction   Seed   LstReq No.    Mode");
                 active_nodes.sort_by(|a,b|{
                     if a.target_total_difficulty != b.target_total_difficulty{
                         b.target_total_difficulty.cmp(&a.target_total_difficulty)
@@ -160,11 +160,16 @@ impl SyncMgr {
                 for node in active_nodes.iter() {
                     if let Ok(_) = node.last_request_timestamp.elapsed() {
                         info!(target: "sync",
-                            "{:<18}{:<11}{:<12}{:<24}{:<8}{:<12}{}",
+                            "{:>16}{:>11}{:>12}{:>24}{:>17}{:>11}{:>8}{:>12}    {}",
                             format!("{}",node.target_total_difficulty),
                             node.best_block_num,
                             format!("{}",node.best_hash),
                             node.get_display_ip_addr(),
+                            String::from_utf8_lossy(&node.revision).trim(),
+                            match node.ip_addr.is_server{
+                                true => "Outbound",
+                                _=>"Inbound"
+                            },
                             node.is_from_boot_list,
                             node.last_request_num,
                             node.mode

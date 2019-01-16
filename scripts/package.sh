@@ -1,4 +1,10 @@
 #!/bin/bash
+
+if [ ! -n "$1" ] ; then
+    echo "Error: You need to give a package name"
+    exit 1
+fi
+
 MAINT="package/$1/mainnet/mainnet.toml"
 MAINJ="package/$1/mainnet/mainnet.json"
 MASTT="package/$1/mastery/mastery.toml"

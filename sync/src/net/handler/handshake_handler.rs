@@ -27,8 +27,8 @@ use super::super::action::NetAction;
 use super::super::event::NetEvent;
 use p2p::*;
 
-const REVISION: &str = "AS_SH";
-const VERSION: &str = "02";
+const REVISION: &str = "0.1.0(R)";
+const VERSION: &str = "rc1";
 
 pub struct HandshakeHandler;
 
@@ -52,11 +52,9 @@ impl HandshakeHandler {
         BigEndian::write_u32(&mut port, local_node.ip_addr.port);
         req.body.put_slice(&port);
         req.body.push(REVISION.len() as u8);
-        req.body
-            .put_slice(REVISION.to_string().into_bytes().as_slice());
+        req.body.put_slice(REVISION.as_bytes());
         req.body.push((VERSION.len() / 2) as u8);
-        req.body
-            .put_slice(VERSION.to_string().into_bytes().as_slice());
+        req.body.put_slice(VERSION.as_bytes());
 
         req.head.len = req.body.len() as u32;
 
@@ -91,6 +89,7 @@ impl HandshakeHandler {
 
         node.node_id.copy_from_slice(node_id);
         node.ip_addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
+        node.revision[0..revision_len].copy_from_slice(revision);
 
         let mut res = ChannelBuffer::new();
         let mut res_body = Vec::new();
@@ -99,8 +98,8 @@ impl HandshakeHandler {
         res.head.set_control(Control::NET);
         res.head.action = NetAction::HANDSHAKERES.value();
         res_body.push(1 as u8);
-        res_body.push(revision.len() as u8);
-        res_body.put_slice(revision);
+        res_body.push(REVISION.len() as u8);
+        res_body.put_slice(REVISION.as_bytes());
         res.body.put_slice(res_body.as_slice());
         res.head.set_length(res.body.len() as u32);
 
@@ -120,8 +119,14 @@ impl HandshakeHandler {
         P2pMgr::remove_peer(old_node_hash);
     }
 
-    pub fn handle_handshake_res(node: &mut Node) {
+    pub fn handle_handshake_res(node: &mut Node, req: ChannelBuffer) {
         trace!(target: "net", "HANDSHAKERES received.");
+
+        let (_, revision) = req.body.split_at(1);
+        let (revision_len, rest) = revision.split_at(1);
+        let revision_len = revision_len[0] as usize;
+        let (revision, _rest) = rest.split_at(revision_len);
+        node.revision[0..revision_len].copy_from_slice(revision);
 
         NetEvent::update_node_state(node, NetEvent::OnHandshakeRes);
         P2pMgr::update_node(node.node_hash, node);

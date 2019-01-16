@@ -170,7 +170,7 @@ impl ImportHandler {
 
                     let mut offset = 0;
                     for block in blocks_to_import.iter() {
-                        // offset += 1;
+                        offset += 1;
                         let block_view = BlockView::new(block);
                         let (hash, number, parent, difficulty) = {
                             let header_view = block_view.header_view();

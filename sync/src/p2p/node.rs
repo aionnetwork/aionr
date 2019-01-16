@@ -38,9 +38,10 @@ pub const NODE_ID_LENGTH: usize = 36;
 pub const PROTOCOL_LENGTH: usize = 6;
 pub const IP_LENGTH: usize = 8;
 pub const DIFFICULTY_LENGTH: usize = 16;
+pub const MAX_REVISION_LENGTH: usize = 16;
 
 pub const CONNECTED: u32 = 1;
-pub const ISSERVER: u32 = 1 << 1;
+pub const IS_SERVER: u32 = 1 << 1;
 pub const ALIVE: u32 = 1 << 3;
 pub const DISCONNECTED: u32 = 1 << 10;
 
@@ -92,7 +93,7 @@ impl IpAddr {
 
     pub fn get_display_addr(&self) -> String {
         format!(
-            "{:<3}.{:<3}.{:<3}.{:<3}:{}",
+            "{:>3}.{:>3}.{:>3}.{:>3}:{}",
             self.ip[1], self.ip[3], self.ip[5], self.ip[7], self.port
         )
         .to_string()
@@ -139,6 +140,7 @@ pub struct Node {
     pub tx: Option<Tx>,
     pub is_from_boot_list: bool,
     pub repeated: u8,
+    pub revision: [u8; MAX_REVISION_LENGTH],
 }
 
 impl Node {
@@ -163,6 +165,7 @@ impl Node {
             tx: None,
             is_from_boot_list: false,
             repeated: 0,
+            revision: [b' '; MAX_REVISION_LENGTH],
         }
     }
 
@@ -237,6 +240,7 @@ impl Node {
         self.is_from_boot_list = node_new.is_from_boot_list;
         self.tx = node_new.tx.clone();
         self.repeated = node_new.repeated;
+        self.revision = node_new.revision;
     }
 
     pub fn set_ip_addr(&mut self, addr: SocketAddr) {
@@ -269,9 +273,11 @@ impl Node {
 impl fmt::Display for Node {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "Node information: \n    Node id: ")?;
-        for c in self.node_id.iter() {
-            write!(f, "{}", *c as char)?;
-        }
+        write!(
+            f,
+            "    revision:{}\n",
+            String::from_utf8_lossy(&self.node_id)
+        )?;
         write!(f, "\n    net_id: {}\n", self.net_id)?;
         write!(f, "    {}\n", self.ip_addr)?;
         write!(f, "    node hash: {:064X}\n", self.node_hash)?;
@@ -294,11 +300,20 @@ impl fmt::Display for Node {
         write!(f, "    best hash: {:?}\n", self.best_hash)?;
         write!(f, "    genesis hash: {:?}\n", self.genesis_hash)?;
         write!(f, "    repeated: {:?}\n", self.repeated)?;
-        write!(f, "total difficulty: {}\n", self.target_total_difficulty)?;
         write!(
             f,
-            "current total difficulty: {}",
+            "    total difficulty: {}\n",
+            self.target_total_difficulty
+        )?;
+        write!(
+            f,
+            "    current total difficulty: {}\n",
             self.current_total_difficulty
+        )?;
+        write!(
+            f,
+            "    revision:{}\n",
+            String::from_utf8_lossy(&self.revision)
         )
     }
 }
@@ -306,11 +321,9 @@ impl fmt::Display for Node {
 pub fn convert_ip_string(ip_str: String) -> Vec<u8> {
     let mut ip = Vec::new();
     let ip_vec: Vec<&str> = ip_str.split(".").collect();
-    let mut pos = 0;
     for sec in ip_vec.iter() {
         ip.push(0);
         ip.push(sec.parse::<u8>().unwrap_or(0));
-        pos = pos + 1;
     }
     ip
 }

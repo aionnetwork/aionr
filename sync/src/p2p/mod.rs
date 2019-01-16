@@ -49,7 +49,7 @@ pub use self::msg::*;
 pub use self::node::*;
 
 lazy_static! {
-    pub static ref LOCAL_NODE: Storage<Node> = Storage::new();
+    static ref LOCAL_NODE: Storage<Node> = Storage::new();
     static ref NETWORK_CONFIG: Storage<NetworkConfig> = Storage::new();
     static ref SOCKETS_MAP: Storage<Mutex<HashMap<u64, TcpStream>>> = Storage::new();
     static ref GLOBAL_NODES_MAP: Storage<RwLock<HashMap<u64, Node>>> = Storage::new();
@@ -457,7 +457,7 @@ impl P2pMgr {
 
         let (tx, rx) = mpsc::channel(409600);
         peer_node.tx = Some(tx);
-        peer_node.state_code = CONNECTED | ISSERVER;
+        peer_node.state_code = CONNECTED | IS_SERVER;
         peer_node.ip_addr.is_server = true;
         let peer_ip = peer_node.get_ip_addr().clone();
         trace!(target: "net", "A new peer added: {}@{}", peer_node.get_node_id(), peer_node.get_ip_addr());

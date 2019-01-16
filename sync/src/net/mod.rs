@@ -179,7 +179,7 @@ impl NetManager {
                                 HandshakeHandler::handle_handshake_req(node, req);
                             }
                             NetAction::HANDSHAKERES => {
-                                HandshakeHandler::handle_handshake_res(node);
+                                HandshakeHandler::handle_handshake_res(node, req);
                             }
                             NetAction::PING => {
                                 PingPongHandler::handle_ping(node, req);

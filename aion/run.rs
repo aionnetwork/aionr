@@ -48,7 +48,7 @@ use parking_lot::{Condvar, Mutex};
 use pb::{new_pb, WalletApiConfiguration};
 use rpc;
 use rpc_apis;
-use sync::p2p::{NetworkConfig, LOCAL_NODE};
+use sync::p2p::{NetworkConfig, P2pMgr};
 use sync::sync::SyncConfig;
 use tokio;
 use tokio::prelude::*;
@@ -380,12 +380,13 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // enable Sync module
     network_manager.start_network();
+    let local_node = P2pMgr::get_local_node();
     fill_back_local_node(
         cmd.dirs.config,
         format!(
             "p2p://{}@{}",
-            LOCAL_NODE.get().get_node_id(),
-            LOCAL_NODE.get().get_ip_addr()
+            local_node.get_node_id(),
+            local_node.get_ip_addr()
         ),
     );
 
