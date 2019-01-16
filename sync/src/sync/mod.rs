@@ -137,7 +137,7 @@ impl SyncMgr {
                 let mut active_nodes = P2pMgr::get_nodes(ALIVE);
                 let active_nodes_count = active_nodes.len();
 
-                info!(target: "sync", "==================== Sync Statics ====================");
+                info!(target: "sync", "{:=^119}", " Sync Statics ");
                 info!(target: "sync", "Best block number: {}, hash: {}", chain_info.best_block_number, chain_info.best_block_hash);
                 info!(target: "sync", "Network Best block number: {}, hash: {}", SyncStorage::get_network_best_block_number(), SyncStorage::get_network_best_block_hash());
                 info!(target: "sync", "Max staged block number: {}", SyncStorage::get_max_staged_block_number());
@@ -148,7 +148,9 @@ impl SyncMgr {
                     P2pMgr::get_nodes_count(CONNECTED),
                     active_nodes_count,
                 );
-                info!(target: "sync","    Total diff      Blk No.    Blk hash          Address             Revision      Direction   Seed   LstReq No.    Mode");
+                info!(target: "sync", "{:-^119}","");
+                info!(target: "sync","      Total Diff    Blk No.    Blk Hash                 Address         Revision      Conn  Seed  LstReq No.       Mode");
+                info!(target: "sync", "{:-^119}","");
                 active_nodes.sort_by(|a,b|{
                     if a.target_total_difficulty != b.target_total_difficulty{
                         b.target_total_difficulty.cmp(&a.target_total_difficulty)
@@ -157,10 +159,11 @@ impl SyncMgr {
                         b.best_block_num.cmp(&a.best_block_num)
                     }
                 });
+
                 for node in active_nodes.iter() {
                     if let Ok(_) = node.last_request_timestamp.elapsed() {
                         info!(target: "sync",
-                            "{:>16}{:>11}{:>12}{:>24}{:>17}{:>11}{:>8}{:>12}    {}",
+                            "{:>16}{:>11}{:>12}{:>24}{:>17}{:>10}{:>6}{:>12}{:>11}",
                             format!("{}",node.target_total_difficulty),
                             node.best_block_num,
                             format!("{}",node.best_hash),
@@ -170,12 +173,16 @@ impl SyncMgr {
                                 true => "Outbound",
                                 _=>"Inbound"
                             },
-                            node.is_from_boot_list,
+                            match node.is_from_boot_list{
+                                true => "Y",
+                                _ => ""
+                            },
                             node.last_request_num,
-                            node.mode
+                            format!("{}",node.mode)
                         );
                     }
                 }
+                info!(target: "sync", "{:-^119}","");
 
                 if block_number_now + 8 < SyncStorage::get_network_best_block_number()
                     && block_number_now - block_number_last_time < 2
@@ -498,9 +505,11 @@ impl ChainNotify for Sync {
                 if let Some(block_hash) = client.block_hash(block_id) {
                     ImportHandler::import_staged_blocks(&block_hash);
                     if let Some(time) = SyncStorage::get_requested_time(block_hash) {
-                        info!(target: "sync",
-                            "New block #{} {}, added in chain, time elapsed: {:?}.",
-                            block_number, block_hash, SystemTime::now().duration_since(time).expect("importing duration"));
+                        if let Some(blk) = client.block(block_id) {
+                            info!(target: "sync",
+                                "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
+                                block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
+                        }
                     }
                 }
             }
