@@ -253,11 +253,8 @@ impl Node {
     }
 
     pub fn get_node_id(&self) -> String {
-        let mut node_id = String::new();
-        for c in self.node_id.iter() {
-            node_id.push(*c as char);
-        }
-        node_id
+        let node_id = String::from_utf8_lossy(&self.node_id);
+        node_id.into()
     }
 
     pub fn get_ip_addr(&self) -> String { self.ip_addr.get_addr() }

@@ -41,7 +41,7 @@ pub fn set() {
 static ABOUT_PANIC: &str = "
 This is a bug. Please report it at:
 
-    https://github.com/aionnetworkp/aion_rust/issues/new
+    https://github.com/aionnetwork/aionr/issues/new
 ";
 
 fn panic_hook(info: &PanicInfo) {
