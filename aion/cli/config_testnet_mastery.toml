@@ -12,7 +12,7 @@ ip_black_list = []
 [websockets]
 disable = false
 
-[rpc]
+[http]
 disable = false
 port = 8545
 

@@ -1,5 +1,4 @@
 [aion]
-no_persistent_txqueue = false
 chain = "core/res/aion/custom.json"
 #keys_path = None
 #base_path = None
@@ -21,6 +20,9 @@ boot_nodes = []
 ip_black_list = []
 
 [rpc]
+#processing_threads = None
+
+[http]
 disable = false
 port = 8545
 interface = "local"
@@ -28,7 +30,6 @@ apis = ["all", "-pubsub"]
 hosts = ["none"]
 cors = ["none"]
 #server_threads = None
-#processing_threads = None
 
 [websockets]
 disable = false
@@ -85,6 +86,7 @@ gas_price_percentile = 60
 #extra_data = None
 
 [db]
+no_persistent_txqueue = false
 disable_wal = false
 scale_verifiers = false
 pruning = "archive"

@@ -548,7 +548,7 @@ macro_rules! usage {
                         $(
                             let mut add_flag = &stringify!($flag)[5..];
                             add_flag = match (title,add_flag){
-                                ("rpc","no_jsonrpc") | ("websockets","no_ws") | ("ipc","no_ipc") | ("stratum","no_stratum") | ("wallet", "enable_wallet") => "disable",
+                                ("http","no_http") | ("websockets","no_ws") | ("ipc","no_ipc") | ("stratum","no_stratum") | ("wallet", "enable_wallet") => "disable",
                                 (_,_) => add_flag,
                             };
                             let add_default=match (title,add_flag) {
@@ -560,9 +560,10 @@ macro_rules! usage {
                         $(
                             let mut add_arg = &stringify!($arg)[4..];
                             add_arg = match title{
-                                "rpc"| "stratum" => &add_arg[8..],
+                                "stratum" => &add_arg[8..],
                                 "websockets" => &add_arg[3..],
-                                "ipc" => &add_arg[4..],
+                                "rpc" | "ipc" => &add_arg[4..],
+                                "http" => &add_arg[5..],
                                 "wallet" if add_arg != "zmq_key_path" => &add_arg[7..],
                                 "log" if add_arg != "log_file" => &add_arg[4..],
                                 _ => add_arg,

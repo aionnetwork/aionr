@@ -133,10 +133,6 @@ usage! {
     {
         // Global flags and arguments
         ["Operating Options"]
-            FLAG flag_no_persistent_txqueue: (bool) = false, or |c: &Config| c.aion.as_ref()?.no_persistent_txqueue,
-            "--no-persistent-txqueue",
-            "Don't save pending local transactions to disk to be restored whenever the node restarts.",
-
             ARG arg_chain: (String) = "mainnet", or |c: &Config| c.aion.as_ref()?.chain.clone(),
             "--chain=[CHAIN]",
             "Specify the blockchain type. CHAIN may be a JSON chain specification file.",
@@ -197,7 +193,7 @@ usage! {
 
             ARG arg_password: (Vec<String>) = Vec::new(), or |c: &Config| c.account.as_ref()?.password.clone(),
             "--password=[FILE]...",
-            "Provide a file containing a password for unlocking an account. Leading and trailing whitespace is trimmed.",
+            "Provide a list of files containing passwords for unlocking accounts. Leading and trailing whitespace is trimmed.",
 
         ["Network Options"]
             FLAG flag_sync_from_boot_nodes_only: (bool) = false, or |c: &Config| c.network.as_ref()?.sync_from_boot_nodes_only.clone(),
@@ -225,38 +221,39 @@ usage! {
             "--black_ip_list=[IPs]",
             "IP list whose connecting requests are to be rejected.",
 
-        ["RPC Options"]
-            FLAG flag_no_jsonrpc: (bool) = false, or |c: &Config| c.rpc.as_ref()?.disable.clone(),
-            "--no-jsonrpc",
-            "Disable the JSON-RPC API server.",
+        ["Rpc Options"]
+            ARG arg_rpc_processing_threads: (Option<usize>) = None, or |c: &Config| c.rpc.as_ref()?.processing_threads,
+            "--rpc--processing-threads=[NUM]",
+            "Turn on additional processing threads for JSON-RPC servers (for all severs i.e for websocket and ipc). Setting this to a non-zero value allows parallel execution of cpu-heavy queries.",
 
-            ARG arg_jsonrpc_port: (u16) = 8545u16, or |c: &Config| c.rpc.as_ref()?.port.clone(),
-            "--jsonrpc-port=[PORT]",
-            "Specify the port portion of the JSONRPC API server.",
+        ["Http Options"]
+            FLAG flag_no_http: (bool) = false, or |c: &Config| c.http.as_ref()?.disable.clone(),
+            "--no-http",
+            "Disable the HTTP API server.",
 
-            ARG arg_jsonrpc_interface: (String)  = "local", or |c: &Config| c.rpc.as_ref()?.interface.clone(),
-            "--jsonrpc-interface=[IP]",
-            "Specify the hostname portion of the JSONRPC API server, IP should be an interface's IP address, or all (all interfaces) or local.",
+            ARG arg_http_port: (u16) = 8545u16, or |c: &Config| c.http.as_ref()?.port.clone(),
+            "--http-port=[PORT]",
+            "Specify the port portion of the HTTP API server.",
 
-            ARG arg_jsonrpc_apis: (Vec<String>) = vec!["all".into(),"-pubsub".into()], or |c: &Config| c.rpc.as_ref()?.apis.clone(),
-            "--jsonrpc-apis=[APIS]...",
-            "Specify the APIs available through the JSONRPC interface. APIS is a comma-delimited list of API name. Possible name are all, web3, eth, stratum, net, personal, rpc. You can also disable a specific API by putting '-' in the front: all,-personal.NOTE that rpc doesn’t support pubsub",
+            ARG arg_http_interface: (String)  = "local", or |c: &Config| c.http.as_ref()?.interface.clone(),
+            "--http-interface=[IP]",
+            "Specify the hostname portion of the HTTP API server, IP should be an interface's IP address, or all (all interfaces) or local.",
 
-            ARG arg_jsonrpc_hosts: (Vec<String>) = vec!["none".into()], or |c: &Config| c.rpc.as_ref()?.hosts.clone(),
-            "--jsonrpc-hosts=[HOSTS]...",
+            ARG arg_http_apis: (Vec<String>) = vec!["all".into(),"-pubsub".into()], or |c: &Config| c.http.as_ref()?.apis.clone(),
+            "--http-apis=[APIS]...",
+            "Specify the APIs available through the HTTP interface. APIS is a comma-delimited list of API name. Possible name are all, web3, eth, stratum, net, personal, rpc. You can also disable a specific API by putting '-' in the front: all,-personal.NOTE that rpc doesn’t support pubsub",
+
+            ARG arg_http_hosts: (Vec<String>) = vec!["none".into()], or |c: &Config| c.http.as_ref()?.hosts.clone(),
+            "--http-hosts=[HOSTS]...",
             "List of allowed Host header values. This option will validate the Host header sent by the browser, it is additional security against some attack vectors. Special options: \"all\", \"none\",.",
 
-            ARG arg_jsonrpc_cors: (Vec<String>) = vec!["none".into()], or |c: &Config| c.rpc.as_ref()?.cors.clone(),
-            "--jsonrpc-cors=[URL]...",
-            "Specify CORS header for JSON-RPC API responses. Special options: \"all\", \"none\".",
+            ARG arg_http_cors: (Vec<String>) = vec!["none".into()], or |c: &Config| c.http.as_ref()?.cors.clone(),
+            "--http-cors=[URL]...",
+            "Specify CORS header for HTTP JSON-RPC API responses. Special options: \"all\", \"none\".",
 
-            ARG arg_jsonrpc_server_threads: (Option<usize>) = None, or |c: &Config| c.rpc.as_ref()?.server_threads,
-            "--jsonrpc-server-threads=[NUM]",
+            ARG arg_http_server_threads: (Option<usize>) = None, or |c: &Config| c.http.as_ref()?.server_threads,
+            "--http-server-threads=[NUM]",
             "Enables multiple threads handling incoming connections for HTTP JSON-RPC server.",
-
-            ARG arg_jsonrpc_processing_threads: (Option<usize>) = None, or |c: &Config| c.rpc.as_ref()?.processing_threads,
-            "--jsonrpc--processing-threads=[NUM]",
-            "Turn on additional processing threads for JSON-RPC servers (for all severs i.e for websocket and ipc). Setting this to a non-zero value allows parallel execution of cpu-heavy queries.",
 
         ["WebSockets Options"]
             FLAG flag_no_ws: (bool) = false, or |c: &Config| c.websockets.as_ref()?.disable.clone(),
@@ -440,6 +437,10 @@ usage! {
             "Specify a custom extra-data for authored blocks, no more than 32 characters.",
 
         ["Database Options"]
+            FLAG flag_no_persistent_txqueue: (bool) = false, or |c: &Config| c.db.as_ref()?.no_persistent_txqueue,
+            "--no-persistent-txqueue",
+            "Don't save pending local transactions to disk to be restored whenever the node restarts.",
+
             FLAG flag_disable_wal: (bool) = false, or |c: &Config| c.db.as_ref()?.disable_wal.clone(),
             "--disable-wal",
             "Disables DB WAL, which gives a significant speed up but means an unclean exit is unrecoverable.",
@@ -520,6 +521,7 @@ struct Config {
     account: Option<Account>,
     network: Option<Network>,
     rpc: Option<Rpc>,
+    http: Option<Http>,
     websockets: Option<Ws>,
     ipc: Option<Ipc>,
     wallet: Option<WalletApi>,
@@ -536,7 +538,6 @@ struct Operating {
     base_path: Option<String>,
     db_path: Option<String>,
     keys_path: Option<String>,
-    no_persistent_txqueue: Option<bool>,
 }
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
@@ -563,6 +564,12 @@ struct Network {
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Rpc {
+    processing_threads: Option<usize>,
+}
+
+#[derive(Default, Debug, PartialEq, Deserialize)]
+#[serde(deny_unknown_fields)]
+struct Http {
     disable: Option<bool>,
     port: Option<u16>,
     interface: Option<String>,
@@ -570,7 +577,6 @@ struct Rpc {
     apis: Option<Vec<String>>,
     hosts: Option<Vec<String>>,
     server_threads: Option<usize>,
-    processing_threads: Option<usize>,
 }
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
@@ -645,6 +651,7 @@ struct Stratum {
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Database {
+    no_persistent_txqueue: Option<bool>,
     pruning: Option<String>,
     pruning_history: Option<u64>,
     pruning_memory: Option<usize>,
@@ -673,7 +680,7 @@ struct Log {
 mod tests {
     use super::{
 		Args, ArgsError,
-		Config, Operating, Account, Network, Ws, Rpc, Ipc, WalletApi, Mining, Database,
+		Config, Operating, Account, Network, Ws, Ipc, WalletApi, Mining, Database, Http
 };
     use toml;
     use clap::{ErrorKind as ClapErrorKind};
@@ -826,7 +833,8 @@ mod tests {
                 arg_import_format: None,
                 arg_export_blocks_file: None,
                 arg_export_blocks_format: None,
-
+                arg_export_blocks_from: "1".into(),
+                arg_export_blocks_to: "latest".into(),
                 arg_account_import_path: None,
                 arg_account_private_key: None,
                 arg_account_address: None,
@@ -834,17 +842,16 @@ mod tests {
 
                 // -- Operating Options
                 arg_chain: "xyz".into(),
-                arg_base_path: Some("$HOME/.aion".into()),
-                arg_db_path: Some("$HOME/.aion/chains".into()),
-                arg_keys_path: Some("$HOME/.aion/keys".into()),
-                flag_no_persistent_txqueue: false,
+                arg_base_path: Some("base".into()),
+                arg_db_path: Some("db".into()),
+                arg_keys_path: Some("keys".into()),
 
                 // -- Account Options
                 arg_unlock: vec!["0xdeadbeefcafe0000000000000000000000000000".into()],
                 arg_password: vec!["~/.safe/password.file".into()],
                 arg_keys_iterations: 10240u32,
-                arg_refresh_time: 5u64,
-                flag_fast_unlock: false,
+                arg_refresh_time: 2,
+                flag_fast_unlock: true,
 
                 // -- Networking Options
                 arg_max_peers: 50u32,
@@ -854,40 +861,42 @@ mod tests {
                 ],
                 arg_local_node: "p2p://12345678-9abc-def0-1234-56789abcdef0@2.3.3.3:3333".into(),
                 arg_net_id: 128u32,
-                flag_sync_from_boot_nodes_only: false,
-                arg_ip_black_list: Vec::new(),
+                flag_sync_from_boot_nodes_only: true,
+                arg_ip_black_list: vec!["ip1".into(), "ip2".into()],
 
                 // -- API and Console Options
                 // RPC
-                flag_no_jsonrpc: false,
-                arg_jsonrpc_port: 8545u16,
-                arg_jsonrpc_interface: "local".into(),
-                arg_jsonrpc_cors: vec!["null".into()],
-                arg_jsonrpc_apis: vec!["all".into()],
-                arg_jsonrpc_hosts: vec!["none".into()],
-                arg_jsonrpc_server_threads: None,
-                arg_jsonrpc_processing_threads: None,
+                arg_rpc_processing_threads: Some(3usize),
+
+                // Http
+                flag_no_http: true,
+                arg_http_port: 8545u16,
+                arg_http_interface: "local".into(),
+                arg_http_cors: vec!["cor1".into(), "cor2".into()],
+                arg_http_apis: vec!["api1".into(), "api2".into()],
+                arg_http_hosts: vec!["host1".into(), "host2".into()],
+                arg_http_server_threads: Some(5usize),
 
                 // WS
-                flag_no_ws: false,
+                flag_no_ws: true,
                 arg_ws_port: 8546u16,
                 arg_ws_interface: "local".into(),
-                arg_ws_apis: vec!["all".into()],
-                arg_ws_origins: vec!["none".into()],
-                arg_ws_hosts: vec!["none".into()],
-                arg_ws_max_connections: 100usize,
+                arg_ws_apis: vec!["api1".into(), "api2".into()],
+                arg_ws_origins: vec!["origin1".into(), "origin2".into()],
+                arg_ws_hosts: vec!["host1".into(), "host2".into()],
+                arg_ws_max_connections: 12usize,
 
                 // IPC
-                flag_no_ipc: false,
+                flag_no_ipc: true,
                 arg_ipc_path: "$HOME/.aion/jsonrpc.ipc".into(),
-                arg_ipc_apis: vec!["all".into()],
+                arg_ipc_apis: vec!["api1".into(), "api2".into()],
 
                 // Wallet
                 arg_wallet_interface: "local".into(),
                 arg_wallet_port: 8547u16,
                 flag_enable_wallet: false,
-                flag_secure_connect: false,
-                arg_zmq_key_path: None,
+                flag_secure_connect: true,
+                arg_zmq_key_path: Some("zmq".into()),
 
                 // -- Sealing/Mining Options
                 arg_author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
@@ -909,20 +918,21 @@ mod tests {
                 arg_tx_queue_strategy: "gas_factor".into(),
                 arg_tx_queue_ban_count: 1u16,
                 arg_tx_queue_ban_time: 180u64,
-                flag_remove_solved: false,
-                flag_infinite_pending_block: false,
+                flag_remove_solved: true,
+                flag_infinite_pending_block: true,
                 arg_max_blk_traverse: 64usize,
                 arg_blk_price_window: 20usize,
-                flag_dynamic_gas_price: false,
+                flag_dynamic_gas_price: true,
                 arg_local_max_gas_price: 100000000000u64,
 
                 // -- Stratum Options
-                flag_no_stratum: false,
+                flag_no_stratum: true,
                 arg_stratum_interface: "127.0.0.2".to_owned(),
                 arg_stratum_port: 8089u16,
-                arg_stratum_secret: None,
+                arg_stratum_secret: Some("secret".into()),
 
                 // -- Database Options
+                flag_no_persistent_txqueue: true,
                 arg_pruning: "auto".into(),
                 arg_pruning_history: 64u64,
                 arg_pruning_memory: 500usize,
@@ -931,18 +941,14 @@ mod tests {
                 arg_cache_size_queue: 50u32,
                 arg_cache_size_state: 25u32,
                 arg_cache_size: Some(128),
-                flag_disable_wal: false,
+                flag_disable_wal: true,
                 arg_db_compaction: "ssd".into(),
                 arg_fat_db: "auto".into(),
                 flag_scale_verifiers: true,
                 arg_num_verifiers: Some(6),
 
-                // -- Import/Export Options
-                arg_export_blocks_from: "1".into(),
-                arg_export_blocks_to: "latest".into(),
-                flag_no_seal_check: false,
-
                 // -- Miscellaneous Options
+                flag_no_seal_check: false,
                 flag_no_config: false,
                 flag_version: false,
                 flag_default_config: false,
@@ -950,10 +956,10 @@ mod tests {
                 arg_config: "$HOME/.aion/config.toml".into(),
 
                 // -- Log Options
-                flag_no_color: false,
-                arg_log_file: None,
-                arg_log_level: "info".into(),
-                arg_log_targets: Vec::new(),
+                flag_no_color: true,
+                arg_log_file: Some("log file".into()),
+                arg_log_level: "level".into(),
+                arg_log_targets: vec!["target1".into(), "target2".into()],
             }
         );
     }
@@ -994,7 +1000,6 @@ mod tests {
                     base_path: None,
                     db_path: None,
                     keys_path: None,
-                    no_persistent_txqueue: None,
                 }),
                 account: Some(Account {
                     unlock: Some(vec!["0x1".into(), "0x2".into(), "0x3".into()]),
@@ -1020,7 +1025,8 @@ mod tests {
                     hosts: None,
                     max_connections: None,
                 }),
-                rpc: Some(Rpc {
+                rpc: None,
+                http: Some(Http {
                     disable: Some(true),
                     port: Some(8180),
                     interface: None,
@@ -1028,7 +1034,6 @@ mod tests {
                     apis: None,
                     hosts: None,
                     server_threads: None,
-                    processing_threads: None,
                 }),
                 ipc: Some(Ipc {
                     disable: None,
@@ -1070,6 +1075,7 @@ mod tests {
                     local_max_gas_price: None,
                 }),
                 db: Some(Database {
+                    no_persistent_txqueue: None,
                     pruning: Some("fast".into()),
                     pruning_history: Some(64),
                     pruning_memory: None,

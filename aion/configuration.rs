@@ -425,7 +425,7 @@ impl Configuration {
         Ok(ret)
     }
 
-    fn rpc_apis(&self) -> String { self.args.arg_jsonrpc_apis.clone().join(",") }
+    fn rpc_apis(&self) -> String { self.args.arg_http_apis.clone().join(",") }
 
     fn cors(cors: &str) -> Option<Vec<String>> {
         match cors {
@@ -438,7 +438,7 @@ impl Configuration {
     }
 
     fn rpc_cors(&self) -> Option<Vec<String>> {
-        let cors = self.args.arg_jsonrpc_cors.to_owned().join(",");
+        let cors = self.args.arg_http_cors.to_owned().join(",");
         Self::cors(&cors)
     }
 
@@ -462,7 +462,7 @@ impl Configuration {
 
     fn rpc_hosts(&self) -> Option<Vec<String>> {
         self.hosts(
-            &self.args.arg_jsonrpc_hosts.clone().join(","),
+            &self.args.arg_http_hosts.clone().join(","),
             &self.rpc_interface(),
         )
     }
@@ -501,15 +501,15 @@ impl Configuration {
         let conf = HttpConfiguration {
             enabled: self.rpc_enabled(),
             interface: self.rpc_interface(),
-            port: self.args.arg_jsonrpc_port,
+            port: self.args.arg_http_port,
             apis: self.rpc_apis().parse()?,
             hosts: self.rpc_hosts(),
             cors: self.rpc_cors(),
-            server_threads: match self.args.arg_jsonrpc_server_threads {
+            server_threads: match self.args.arg_http_server_threads {
                 Some(threads) if threads > 0 => threads,
                 _ => 1,
             },
-            processing_threads: match self.args.arg_jsonrpc_processing_threads {
+            processing_threads: match self.args.arg_rpc_processing_threads {
                 Some(threads) if threads > 0 => threads,
                 _ => 4,
             },
@@ -607,7 +607,7 @@ impl Configuration {
     }
 
     fn rpc_interface(&self) -> String {
-        let rpc_interface = self.args.arg_jsonrpc_interface.clone();
+        let rpc_interface = self.args.arg_http_interface.clone();
         self.interface(&rpc_interface)
     }
 
@@ -615,7 +615,7 @@ impl Configuration {
 
     fn stratum_interface(&self) -> String { self.interface(&self.args.arg_stratum_interface) }
 
-    fn rpc_enabled(&self) -> bool { !self.args.flag_no_jsonrpc }
+    fn rpc_enabled(&self) -> bool { !self.args.flag_no_http }
 
     fn ws_enabled(&self) -> bool { !self.args.flag_no_ws }
 
@@ -840,9 +840,9 @@ mod tests {
 
         // when
         let conf0 = parse(&["aion"]);
-        let conf1 = parse(&["aion", "--jsonrpc-hosts", "none"]);
-        let conf2 = parse(&["aion", "--jsonrpc-hosts", "all"]);
-        let conf3 = parse(&["aion", "--jsonrpc-hosts", "aion.io,something.io"]);
+        let conf1 = parse(&["aion", "--http-hosts", "none"]);
+        let conf2 = parse(&["aion", "--http-hosts", "all"]);
+        let conf3 = parse(&["aion", "--http-hosts", "aion.io,something.io"]);
 
         // then
         assert_eq!(conf0.rpc_hosts(), Some(Vec::new()));

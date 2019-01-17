@@ -11,7 +11,7 @@ boot_nodes = []
 ip_black_list = []
 
 
-[rpc]
+[http]
 port = 8545
 interface = "0.0.0.0"
 

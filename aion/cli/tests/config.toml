@@ -12,7 +12,7 @@ max_peers = 20
 disable = true
 origins = ["none"]
 
-[rpc]
+[http]
 disable = true
 port = 8180
 
