@@ -322,9 +322,9 @@ impl SyncStorage {
         }
     }
 
-    pub fn get_requested_time(hash: H256) -> Option<SystemTime> {
+    pub fn get_requested_time(hash: &H256) -> Option<SystemTime> {
         if let Ok(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().lock() {
-            if let Some(time) = requested_block_hashes.get_mut(&hash) {
+            if let Some(time) = requested_block_hashes.get_mut(hash) {
                 return Some(time.clone());
             }
         }

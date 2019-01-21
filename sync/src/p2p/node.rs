@@ -38,7 +38,7 @@ pub const NODE_ID_LENGTH: usize = 36;
 pub const PROTOCOL_LENGTH: usize = 6;
 pub const IP_LENGTH: usize = 8;
 pub const DIFFICULTY_LENGTH: usize = 16;
-pub const MAX_REVISION_LENGTH: usize = 16;
+pub const MAX_REVISION_LENGTH: usize = 24;
 
 pub const CONNECTED: u32 = 1;
 pub const IS_SERVER: u32 = 1 << 1;

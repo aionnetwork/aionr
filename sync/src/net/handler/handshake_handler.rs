@@ -27,7 +27,7 @@ use super::super::action::NetAction;
 use super::super::event::NetEvent;
 use p2p::*;
 
-const REVISION: &str = "0.1.0(R)";
+const REVISION: &str = "r-0.1.0-rc1";
 const VERSION: &str = "rc1";
 
 pub struct HandshakeHandler;
@@ -89,7 +89,11 @@ impl HandshakeHandler {
 
         node.node_id.copy_from_slice(node_id);
         node.ip_addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
-        node.revision[0..revision_len].copy_from_slice(revision);
+        if revision_len > MAX_REVISION_LENGTH {
+            node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
+        } else {
+            node.revision[0..revision_len].copy_from_slice(revision);
+        }
 
         let mut res = ChannelBuffer::new();
         let mut res_body = Vec::new();

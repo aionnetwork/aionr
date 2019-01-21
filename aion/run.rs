@@ -380,15 +380,18 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // enable Sync module
     network_manager.start_network();
-    let local_node = P2pMgr::get_local_node();
-    fill_back_local_node(
-        cmd.dirs.config,
-        format!(
-            "p2p://{}@{}",
-            local_node.get_node_id(),
-            local_node.get_ip_addr()
-        ),
-    );
+
+    if let Some(config_path) = cmd.dirs.config {
+        let local_node = P2pMgr::get_local_node();
+        fill_back_local_node(
+            config_path,
+            format!(
+                "p2p://{}@{}",
+                local_node.get_node_id(),
+                local_node.get_ip_addr()
+            ),
+        );
+    }
 
     // Create a weak reference to the client so that we can wait on shutdown until it is dropped
     let weak_client = Arc::downgrade(&client);
@@ -581,6 +584,7 @@ fn fill_back_local_node(path: String, local_node_info: String) {
     use std::io::BufReader;
     let file = fs::File::open(&path).expect("Cannot open config file");
     let reader = BufReader::new(file);
+    let mut no_change = true;
     let mut ret: String = reader
         .lines()
         .filter_map(|l| l.ok())
@@ -591,6 +595,7 @@ fn fill_back_local_node(path: String, local_node_info: String) {
                 .find("00000000-0000-0000-0000-000000000000")
                 .is_some()
             {
+                no_change = false;
                 format!("local_node = {:?}", local_node_info)
             } else {
                 config.trim().into()
@@ -607,7 +612,7 @@ fn fill_back_local_node(path: String, local_node_info: String) {
                 &format!("[network]\nlocal_node = {:?}\n\n", local_node_info),
             );
         }
-    } else {
+    } else if no_change {
         return;
     }
     let _ = fs::write(&path, ret).expect("Rewrite failed");

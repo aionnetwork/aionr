@@ -577,7 +577,15 @@ impl Configuration {
         let cache_path = replace_home_and_local(&data_path, &local_path, cache_path);
         let keys_path = replace_home_and_local(&data_path, &local_path, base_keys_path);
         let zmq_path = replace_home_and_local(&data_path, &local_path, base_zmq_path);
-        let config_path = replace_home_and_local(&data_path, &local_path, &self.args.arg_config);
+        let config_path = if self.args.flag_no_config {
+            None
+        } else {
+            Some(replace_home_and_local(
+                &data_path,
+                &local_path,
+                &self.args.arg_config,
+            ))
+        };
         Directories {
             keys: keys_path,
             base: data_path,

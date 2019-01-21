@@ -84,7 +84,7 @@ pub struct Directories {
     /// zmq key dir
     pub zmq: String,
     /// config dir
-    pub config: String,
+    pub config: Option<String>,
 }
 
 impl Default for Directories {
@@ -97,7 +97,7 @@ impl Default for Directories {
             cache: replace_home_and_local(&data_dir, &local_dir, CACHE_PATH),
             keys: replace_home_and_local(&data_dir, &local_dir, KEYS_PATH),
             zmq: replace_home_and_local(&data_dir, &local_dir, ZMQ_PATH),
-            config: replace_home_and_local(&data_dir, &local_dir, CONFIG_PATH),
+            config: Some(replace_home_and_local(&data_dir, &local_dir, CONFIG_PATH)),
         }
     }
 }
