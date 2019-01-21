@@ -288,7 +288,7 @@ mod tests {
             ),
             keys: replace_home(&data_dir, "$BASE/keys"),
             zmq: replace_home(&data_dir, "$BASE/zmq"),
-            config: replace_home(&data_dir, "$BASE/config.toml"),
+            config: Some(replace_home(&data_dir, "$BASE/config.toml")),
         };
         assert_eq!(expected, Directories::default());
     }
