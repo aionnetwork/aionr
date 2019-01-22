@@ -257,7 +257,10 @@ impl FullDependencies {
                 }
                 Api::Personal => {
                     handler.extend_with(
-                        PersonalClient::new(self.account_store.clone(), dispatcher.clone(), true)
+                        // Permenant unlock is for internal test. Disabled in official release.
+                        // PersonalClient::new(self.account_store.clone(), dispatcher.clone(), true)
+                        //     .to_delegate(),
+                        PersonalClient::new(self.account_store.clone(), dispatcher.clone(), false)
                             .to_delegate(),
                     );
                 }

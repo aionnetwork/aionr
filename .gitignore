@@ -2,6 +2,7 @@
 .vscode/
 build/
 target/
+package/
 rpc/manual_test
 testTMP/
 db/core/temp/

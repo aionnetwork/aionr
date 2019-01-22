@@ -360,7 +360,6 @@ macro_rules! usage {
                 match fs::File::open(&config_file) {
                     // Load config file
                     Ok(mut file) => {
-                        println_stderr!("Loading config file from {}", &config_file);
                         let mut config = String::new();
                         file.read_to_string(&mut config).map_err(|e| ArgsError::Config(config_file, e))?;
                         Ok(raw_args.into_args(Self::parse_config(&config)?))

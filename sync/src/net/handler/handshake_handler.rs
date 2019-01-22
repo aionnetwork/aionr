@@ -130,7 +130,11 @@ impl HandshakeHandler {
         let (revision_len, rest) = revision.split_at(1);
         let revision_len = revision_len[0] as usize;
         let (revision, _rest) = rest.split_at(revision_len);
-        node.revision[0..revision_len].copy_from_slice(revision);
+        if revision_len > MAX_REVISION_LENGTH {
+            node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
+        } else {
+            node.revision[0..revision_len].copy_from_slice(revision);
+        }
 
         NetEvent::update_node_state(node, NetEvent::OnHandshakeRes);
         P2pMgr::update_node(node.node_hash, node);

@@ -60,6 +60,7 @@ const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
 const BLOCKS_IMPORT_INTERVAL: u64 = 50;
 const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
+const SYNC_STATIC_CAPACITY: usize = 25;
 
 #[derive(Clone)]
 struct SyncMgr;
@@ -159,7 +160,7 @@ impl SyncMgr {
                         b.best_block_num.cmp(&a.best_block_num)
                     }
                 });
-
+                let mut count = 0;
                 for node in active_nodes.iter() {
                     if let Ok(_) = node.last_request_timestamp.elapsed() {
                         info!(target: "sync",
@@ -180,6 +181,10 @@ impl SyncMgr {
                             node.last_request_num,
                             format!("{}",node.mode)
                         );
+                        count += 1;
+                        if count == SYNC_STATIC_CAPACITY {
+                            break;
+                        }
                     }
                 }
                 info!(target: "sync", "{:-^127}","");

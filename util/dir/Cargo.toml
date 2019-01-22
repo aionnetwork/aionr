@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["Aion Foundation <admin@aion.network>"]
 
 [dependencies]
+log = "0.3"
 aion-types = { path = "../../util/aion-types"}
 journaldb = { path = "../../db/journaldb" }

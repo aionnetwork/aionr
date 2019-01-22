@@ -46,3 +46,21 @@ pub fn replace_home_and_local(base: &str, local: &str, arg: &str) -> String {
     let r = replace_home(base, arg);
     r.replace("$LOCAL", local)
 }
+
+pub fn absolute(path: String) -> String {
+    if path.find("/") != Some(0) {
+        format!(
+            "{}/{}",
+            match env::current_dir() {
+                Ok(ref path) => path.to_string_lossy(),
+                Err(e) => {
+                    error!(target: "dir","Cannot get current dir path!! err:{}", e);
+                    return path;
+                }
+            },
+            path
+        )
+    } else {
+        path
+    }
+}

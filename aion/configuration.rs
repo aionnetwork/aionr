@@ -35,7 +35,7 @@ use aion_rpc::dispatch::DynamicGasPrice;
 use cache::CacheConfig;
 use helpers::{to_block_id, to_u256, to_pending_set, aion_ipc_path,parse_log_target,
 to_addresses, to_address, to_queue_strategy,validate_log_level};
-use dir::helpers::{replace_home, replace_home_and_local};
+use dir::helpers::{replace_home, replace_home_and_local, absolute};
 use params::{ResealPolicy, AccountsConfig, MinerExtras, SpecType};
 use logger::{LogConfig};
 use dir::{self, Directories, default_local_path, default_data_path};
@@ -573,18 +573,30 @@ impl Configuration {
                 .map_or(dir::ZMQ_PATH, |s| &s)
         };
 
-        let db_path = replace_home_and_local(&data_path, &local_path, base_db_path);
-        let cache_path = replace_home_and_local(&data_path, &local_path, cache_path);
-        let keys_path = replace_home_and_local(&data_path, &local_path, base_keys_path);
-        let zmq_path = replace_home_and_local(&data_path, &local_path, base_zmq_path);
+        let db_path = absolute(replace_home_and_local(
+            &data_path,
+            &local_path,
+            base_db_path,
+        ));
+        let cache_path = absolute(replace_home_and_local(&data_path, &local_path, cache_path));
+        let keys_path = absolute(replace_home_and_local(
+            &data_path,
+            &local_path,
+            base_keys_path,
+        ));
+        let zmq_path = absolute(replace_home_and_local(
+            &data_path,
+            &local_path,
+            base_zmq_path,
+        ));
         let config_path = if self.args.flag_no_config {
             None
         } else {
-            Some(replace_home_and_local(
+            Some(absolute(replace_home_and_local(
                 &data_path,
                 &local_path,
                 &self.args.arg_config,
-            ))
+            )))
         };
         Directories {
             keys: keys_path,

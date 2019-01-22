@@ -39,6 +39,7 @@ use ctrlc::CtrlC;
 use dir::{DatabaseDirectories, Directories};
 use fdlimit::raise_fd_limit;
 use helpers::{passwords_from_files, to_client_config};
+use dir::helpers::absolute;
 use io::{IoChannel, IoService};
 use logger::LogConfig;
 use modules;
@@ -145,7 +146,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     }
 
     //print out running aion environment
-    print_running_environment(&spec.data_dir, &cmd.dirs, &db_dirs);
+    print_running_environment(&cmd.spec, &spec.data_dir, &cmd.dirs, &db_dirs);
 
     print_logo();
 
@@ -458,11 +459,37 @@ fn daemonize(_pid_file: String) -> Result<(), String> {
 }
 
 fn print_running_environment(
+    spec: &SpecType,
     spec_data_dir: &String,
     dirs: &Directories,
     db_dirs: &DatabaseDirectories,
 )
 {
+    if let Some(config) = &dirs.config {
+        info!(
+            target: "run",
+            "Config path {}",
+            Colour::White
+                .bold()
+                .paint(config)
+        );
+    } else {
+        info!(target: "run", "Start without config.");
+    }
+    match spec {
+        SpecType::Foundation => {
+            info!(target: "run", "Load built-in Mainnet Genesis Spec.");
+        }
+        SpecType::Custom(ref filename) => {
+            info!(
+                target: "run",
+                "Genesis spec path {}",
+            Colour::White
+                .bold()
+                .paint(absolute(filename.to_string()))
+            );
+        }
+    }
     info!(
         target: "run",
         "Keys path {}",

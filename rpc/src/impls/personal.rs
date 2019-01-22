@@ -121,21 +121,11 @@ impl<D: Dispatcher + 'static> Personal for PersonalClient<D> {
         let account: Address = account.into();
         let store = self.account_provider()?;
         let r = match (self.allow_perm_unlock, duration) {
-            (false, None) => store.unlock_account_temporarily(account, account_pass),
-            (false, _) => {
-                return Err(errors::unsupported(
-                    "Time-unlocking is only supported in --geth compatibility mode.",
-                    Some(
-                        "Restart your client with --geth flag or use personal_sendTransaction \
-                         instead.",
-                    ),
-                ))
-            }
             (true, Some(0)) => store.unlock_account_permanently(account, account_pass),
-            (true, Some(d)) => store.unlock_account_timed(account, account_pass, d * 1000),
-            // (true, None) => store.unlock_account_timed(account, account_pass, 300_000),
-            // [FZH] change default duration to one time unlock
-            (true, None) => store.unlock_account_temporarily(account, account_pass),
+            (_, Some(d)) => store.unlock_account_timed(account, account_pass, d * 1000),
+            (_, None) => store.unlock_account_timed(account, account_pass, 300_000),
+            // Temporarily unlock is for one time use (lock after once used). Disabled in official release to be align with Aion Java kernel.
+            // (_, None) => store.unlock_account_temporarily(account, account_pass),
         };
         match r {
             Ok(_) => Ok(true),

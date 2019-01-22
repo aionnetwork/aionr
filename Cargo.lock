@@ -736,6 +736,7 @@ version = "0.1.0"
 dependencies = [
  "aion-types 0.1.0",
  "journaldb 0.1.0",
+ "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]

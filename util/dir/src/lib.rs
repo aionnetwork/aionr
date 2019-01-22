@@ -25,6 +25,8 @@
 //! Dir utilities for platform-specific operations
 extern crate aion_types;
 extern crate journaldb;
+#[macro_use]
+extern crate log;
 
 pub mod helpers;
 use std::{env, fs};
@@ -182,9 +184,6 @@ impl DatabaseDirectories {
 
     /// Get user defauls path
     pub fn user_defaults_path(&self) -> PathBuf { self.spec_root_path().join("user_defaults") }
-
-    /// Get the path for the network directory.
-    pub fn network_path(&self) -> PathBuf { self.spec_root_path().join("network") }
 }
 
 /// Default data path
