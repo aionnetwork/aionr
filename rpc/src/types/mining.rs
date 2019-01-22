@@ -110,10 +110,7 @@ impl Serialize for MinerStats {
         S: Serializer,
     {
         let mut stats = serializer.serialize_struct("MinerStats", 3)?;
-        stats.serialize_field(
-            "minerHashrateShare",
-            &format!("{:.4}", self.miner_hashrate_share),
-        )?;
+        stats.serialize_field("minerHashrateShare", &self.miner_hashrate_share)?;
         stats.serialize_field("minerHashrate", &format!("{:.4}", self.miner_hashrate))?;
         stats.serialize_field("networkHashrate", &format!("{:.4}", self.network_hashrate))?;
         stats.end()
