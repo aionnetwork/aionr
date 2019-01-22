@@ -23,7 +23,8 @@
 
 use std::thread;
 use std::time::{Instant, Duration};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
+use std::collections::{HashMap, LinkedList};
 use rustc_hex::FromHex;
 use rustc_hex::ToHex;
 
@@ -55,6 +56,8 @@ where
     sync: Arc<S>,
     miner: Arc<M>,
     account_provider: Option<Arc<AccountProvider>>,
+    recent_block_hash: Mutex<LinkedList<H256>>,
+    recent_block_header: Mutex<HashMap<H256, (H256, u64)>>,
 }
 
 impl<C, S: ?Sized, M> StratumClient<C, S, M>
@@ -76,6 +79,8 @@ where
             sync: sync.clone(),
             miner: miner.clone(),
             account_provider: account_provider.clone(),
+            recent_block_hash: Mutex::new(LinkedList::new()),
+            recent_block_header: Mutex::new(HashMap::with_capacity(STRATUM_RECENT_BLK_COUNT)),
         }
     }
 
@@ -86,6 +91,7 @@ where
 
 const MAX_QUEUE_SIZE_TO_MINE_ON: usize = 4;
 const STRATUM_BLKTIME_INCLUDED_COUNT: usize = 32;
+const STRATUM_RECENT_BLK_COUNT: usize = 128;
 
 impl<C, S: ?Sized, M> Stratum for StratumClient<C, S, M>
 where
@@ -256,42 +262,73 @@ where
 
     /// Get miner stats
     fn get_miner_stats(&self, address: H256) -> Result<MinerStats> {
-        let account_provider = self.account_provider()?;
-        let is_miner = account_provider.has_account(address).unwrap_or(false);
-
-        if is_miner != true {
-            return Err(errors::internal("Can't find the miner.", ""));
-        }
-
         let mut header = self
             .client
             .block_header(BlockId::Latest)
             .expect("db crashed");
-        let last_difficulty = header.difficulty();
-        let mut parent_hash = header.parent_hash();
+        let latest_difficulty = header.difficulty();
         let mut index = 0;
+        let mut new_blk_headers = Vec::new();
+        let mut recent_block_hash = self.recent_block_hash.lock().unwrap();
+
+        if let Some(last_blk_hash) = recent_block_hash.front() {
+            while *last_blk_hash != header.hash()
+                && index < STRATUM_RECENT_BLK_COUNT
+                && header.number() > 2
+            {
+                let parent_hash = header.parent_hash();
+                new_blk_headers.push(header);
+                match self.client.block_header(BlockId::Hash(parent_hash.into())) {
+                    Some(h) => header = h,
+                    None => break,
+                }
+                index = index + 1;
+            }
+        } else {
+            while index < STRATUM_RECENT_BLK_COUNT && header.number() > 2 {
+                let parent_hash = header.parent_hash();
+                new_blk_headers.push(header);
+                match self.client.block_header(BlockId::Hash(parent_hash.into())) {
+                    Some(h) => header = h,
+                    None => break,
+                }
+                index = index + 1;
+            }
+        }
+
+        let mut recent_block_header = self.recent_block_header.lock().unwrap();
+        while let Some(top) = new_blk_headers.pop() {
+            if recent_block_hash.len() == STRATUM_RECENT_BLK_COUNT {
+                if let Some(hash) = recent_block_hash.pop_back() {
+                    recent_block_header.remove(&hash);
+                }
+            }
+            recent_block_hash.push_front(top.hash());
+            recent_block_header.insert(top.hash(), (top.author(), top.timestamp()));
+        }
+
         let mut last_block_timestamp = 0;
         let mut block_time_accumulator = 0;
         let mut block_time_accumulated = 0;
         let mut mined_by_miner = 0;
 
-        while index < STRATUM_BLKTIME_INCLUDED_COUNT {
-            if last_block_timestamp != 0 {
-                block_time_accumulator =
-                    block_time_accumulator + (last_block_timestamp - header.timestamp());
-                block_time_accumulated = block_time_accumulated + 1;
-            }
-            last_block_timestamp = header.timestamp();
+        index = 0;
+        for hash in recent_block_hash.iter() {
+            if let Some((author, timestamp)) = recent_block_header.get(hash) {
+                if index <= STRATUM_BLKTIME_INCLUDED_COUNT {
+                    if last_block_timestamp != 0 {
+                        block_time_accumulator =
+                            block_time_accumulator + (last_block_timestamp - timestamp);
+                        block_time_accumulated = block_time_accumulated + 1;
+                    }
+                    last_block_timestamp = *timestamp;
+                }
 
-            if header.author() == address {
-                mined_by_miner = mined_by_miner + 1;
+                if *author == address {
+                    mined_by_miner = mined_by_miner + 1;
+                }
             }
 
-            match self.client.block_header(BlockId::Hash(parent_hash.into())) {
-                Some(h) => header = h,
-                None => break,
-            }
-            parent_hash = header.parent_hash();
             index = index + 1;
         }
 
@@ -305,7 +342,7 @@ where
         let mut miner_hashrate = 0_f64;
 
         if block_time > 0 {
-            network_hashrate = last_difficulty.as_u64() as f64 / block_time as f64;
+            network_hashrate = latest_difficulty.as_u64() as f64 / block_time as f64;
         }
 
         if index > 0 && mined_by_miner > 0 {
