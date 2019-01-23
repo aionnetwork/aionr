@@ -1,11 +1,11 @@
 # AionR
 
-[![version](https://img.shields.io/github/tag/aionnetwork/aionr.svg)](https://github.com/aionnetwork/aionr/releases/latest)
 [![Join the chat at https://gitter.im/aionnetwork](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/aionnetwork)
 [![license](https://img.shields.io/github/license/aionnetwork/aion.svg)](https://github.com/aionnetwork/aionr/blob/dev/LICENSE)
 [![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/aionnetwork/aion/issues)
 
-![Aion Rust Logo](aion-rust-logo.png)
+
+<img src="aion-rust-logo.png" alt="drawing" width="500"/>
 
 This repository contains the rust kernel implementation and releases for the Aion Network. This is different from the [Java kernel implementation](https://github.com/aionnetwork/aion).
 
