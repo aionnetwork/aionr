@@ -46,13 +46,12 @@ pipeline {
             	sh 'set -e'
                 echo "building..."
                 sh 'RUSTFLAGS="-D warnings" cargo build --release' 
-
             }
         }
 		stage('Unit Test'){
 			steps{
 					sh 'ls test_results || mkdir test_results'
-					sh 'RUSTFLAGS="-D warnings" cargo +nightly test --all --no-run --release --exclude fastvm --exclude solidity'
+					sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-0.1.1-$(date +%Y%m%d)"'
 					
 					script{
 						try{
@@ -69,7 +68,7 @@ pipeline {
 							throw e
 						}
 					}
-					sh 'rm -rf $HOME/.aion/chains'	
+					
 			}
 		}
 		stage('RPC Test'){
@@ -100,7 +99,7 @@ pipeline {
         }
 
         success{
-			archiveArtifacts artifacts: 'target/release/aion,test_results/*.*',fingerprint:true
+			archiveArtifacts artifacts: '*.tar.gz,test_results/*.*',fingerprint:true
             slackSend channel: '#ci',
                       color: 'good',
                       message: "${currentBuild.fullDisplayName} completed successfully. Grab the generated builds at ${env.BUILD_URL}\nArtifacts: ${env.BUILD_URL}artifact/\n Check BenchTest result: ${env.BUILD_URL}artifact/test_results/report.html \nCommit: ${GIT_COMMIT}\nChanges:${message}"
