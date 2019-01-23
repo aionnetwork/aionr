@@ -46,7 +46,7 @@ pipeline {
             	sh 'set -e'
                 echo "building..."
             
-                sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-$(git tag)-$(date +%Y%m%d)"'
+                sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"'
             }
         }
 		stage('Unit Test'){
