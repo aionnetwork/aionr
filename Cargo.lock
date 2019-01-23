@@ -2352,6 +2352,7 @@ dependencies = [
  "acore-bytes 0.1.0",
  "acore-io 0.1.0",
  "aion-types 0.1.0",
+ "aion-version 0.1.0",
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "blake2b 0.1.0",
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -44,11 +44,16 @@ pub fn platform() -> String {
 
 /// Get the standard version string for this software.
 pub fn version() -> String {
-    let kernel_version = vergen::semver();
     format!(
         "Aion(R)/v{}/{}/rustc-{}",
-        kernel_version,
+        short_version(),
         platform(),
         generated::rustc_version()
     )
+}
+
+pub fn short_version() -> String {
+    let sha3 = vergen::short_sha();
+    let sha3_dot = if sha3.is_empty() { "" } else { "." };
+    format!("{}{}{}", env!("CARGO_PKG_VERSION"), sha3_dot, sha3)
 }

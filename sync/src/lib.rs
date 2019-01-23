@@ -45,6 +45,7 @@ extern crate acore_io;
 extern crate aion_types;
 extern crate rlp;
 extern crate uuid;
+extern crate aion_version as version;
 
 pub mod net;
 pub mod p2p;

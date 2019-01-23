@@ -23,12 +23,13 @@ use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use std::mem;
 
+use version::short_version;
 use super::super::action::NetAction;
 use super::super::event::NetEvent;
 use p2p::*;
 
-const REVISION: &str = "r-0.1.0-rc1";
-const VERSION: &str = "rc1";
+const VERSION: &str = "02";
+const REVISION_PREFIX: &str = "r-";
 
 pub struct HandshakeHandler;
 
@@ -51,8 +52,10 @@ impl HandshakeHandler {
         let mut port = [0; 4];
         BigEndian::write_u32(&mut port, local_node.ip_addr.port);
         req.body.put_slice(&port);
-        req.body.push(REVISION.len() as u8);
-        req.body.put_slice(REVISION.as_bytes());
+        let mut revision = short_version();
+        revision.insert_str(0, REVISION_PREFIX);
+        req.body.push(revision.len() as u8);
+        req.body.put_slice(revision.as_bytes());
         req.body.push((VERSION.len() / 2) as u8);
         req.body.put_slice(VERSION.as_bytes());
 
@@ -102,8 +105,10 @@ impl HandshakeHandler {
         res.head.set_control(Control::NET);
         res.head.action = NetAction::HANDSHAKERES.value();
         res_body.push(1 as u8);
-        res_body.push(REVISION.len() as u8);
-        res_body.put_slice(REVISION.as_bytes());
+        let mut revision = short_version();
+        revision.insert_str(0, REVISION_PREFIX);
+        res_body.push(revision.len() as u8);
+        res_body.put_slice(revision.as_bytes());
         res.body.put_slice(res_body.as_slice());
         res.head.set_length(res.body.len() as u32);
 
