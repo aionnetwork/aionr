@@ -14,6 +14,7 @@ acore = { path = "../core" }
 aion-types = { path = "../util/aion-types"}
 db = { path = "../db/core" }
 rlp = { path = "../util/rlp" }
+aion-version = { path = "../util/version" }
 
 bincode = "1.0.1"
 byteorder = "1.2.7"
