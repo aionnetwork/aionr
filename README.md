@@ -113,7 +113,7 @@ Once you have installed the prerequisites, follow these steps to build the kerne
     cd package/aionr-package
     ```
 
-2. Run the `aion` package. Make sure to include any commands you want the kernel to execute. You can find more information on supplying commands in the [user manual](./wiki/User-Manual#launch-rust-kernel):
+2. Run the `aion` package. Make sure to include any commands you want the kernel to execute. You can find more information on supplying commands in the [user manual](https://github.com/aionnetwork/aionr/wiki/User-Manual#launch-rust-kernel):
 
 ```bash
 $ ./aion
@@ -151,7 +151,7 @@ RPC services can be connected from the following addresses:
 - **WebSocket**: Port `8546`
 - **ICP**: `$Home/.aion/jsonrpc.ipc`
 
-See the [user manual](./wiki/User-Manual) or [CMD & Config](./wiki/CMD-&-Config) wiki to find how to change RPC port settings.
+See the [user manual](./wiki/User-Manual) or [CMD & Config](https://github.com/aionnetwork/aionr/wiki/CMD-&-Config) wiki to find how to change RPC port settings.
 
 ### Miners
 
@@ -174,4 +174,4 @@ For more information about Aion Community please refer to [Aion Community](https
 
 ## License
 
-Aion is released under the [GPL-V3 license](./blob/dev/LICENSE)
+Aion is released under the [GPL-V3 license](LICENSE)
