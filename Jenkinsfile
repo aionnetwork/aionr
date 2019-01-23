@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-def message, lastCommit
+def message, lastCommit,tag
 
 @NonCPS
 def getCommit(){
@@ -45,13 +45,14 @@ pipeline {
             steps{
             	sh 'set -e'
                 echo "building..."
-                sh 'RUSTFLAGS="-D warnings" cargo build --release' 
+            
+                sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-$(git tag)-$(date +%Y%m%d)"'
             }
         }
 		stage('Unit Test'){
 			steps{
 					sh 'ls test_results || mkdir test_results'
-					sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-0.1.1-$(date +%Y%m%d)"'
+					sh 'RUSTFLAGS="-D warnings" cargo +nightly test --all --no-run --release --exclude fastvm --exclude solidity'
 					
 					script{
 						try{
