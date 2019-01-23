@@ -27,10 +27,9 @@ use std::time::Duration;
 use std::ops::{Deref, DerefMut};
 use aion_types::{H256, U256, Address};
 use blake2b::blake2b;
-use transaction::{self, SignedTransaction, Action};
+use transaction::{self, Action};
 use transient_hashmap::TransientHashMap;
-
-use transaction::transaction_queue::{TransactionQueue, TransactionDetailsProvider, TransactionOrigin, QueuingInstant};
+use transaction::transaction_queue::{TransactionQueue, AccountDetails, VerifiedTransaction};
 
 type Count = u16;
 
@@ -80,12 +79,13 @@ impl BanningTransactionQueue {
 
     /// Add to the queue taking bans into consideration.
     /// May reject transaction because of the banlist.
-    pub fn add_with_banlist(
+    pub fn add_with_banlist<F>(
         &mut self,
-        transaction: SignedTransaction,
-        time: QueuingInstant,
-        details_provider: &TransactionDetailsProvider,
+        transaction: VerifiedTransaction,
+        fetch_account: &F,
     ) -> Result<transaction::ImportResult, transaction::Error>
+    where
+        F: Fn(&Address) -> AccountDetails,
     {
         if let Threshold::BanAfter(threshold) = self.ban_threshold {
             // NOTE In all checks use direct query to avoid increasing ban timeout.
@@ -104,7 +104,7 @@ impl BanningTransactionQueue {
             }
 
             // Check recipient
-            if let Action::Call(recipient) = transaction.action {
+            if let Action::Call(recipient) = transaction.transaction().action {
                 let count = self
                     .recipients_bans
                     .direct()
@@ -118,8 +118,8 @@ impl BanningTransactionQueue {
             }
 
             // Check code
-            if let Action::Create = transaction.action {
-                let code_hash = blake2b(&transaction.data);
+            if let Action::Create = transaction.transaction().action {
+                let code_hash = blake2b(&transaction.transaction().data);
                 let count = self
                     .codes_bans
                     .direct()
@@ -132,13 +132,7 @@ impl BanningTransactionQueue {
                 }
             }
         }
-        self.queue.add(
-            transaction,
-            TransactionOrigin::External,
-            time,
-            None,
-            details_provider,
-        )
+        self.queue.add(transaction, fetch_account)
     }
 
     /// Ban transaction with given hash.
@@ -151,7 +145,7 @@ impl BanningTransactionQueue {
             Some(transaction) => {
                 let sender = transaction.sender();
                 // Ban sender
-                let sender_banned = self.ban_sender(sender);
+                let sender_banned = self.ban_sender(sender.clone());
                 // Ban recipient and codehash
                 let recipient_or_code_banned = match transaction.action {
                     Action::Call(recipient) => self.ban_recipient(recipient),
@@ -229,7 +223,8 @@ mod tests {
     use super::*;
     use key::generate_keypair;
     use rustc_hex::FromHex;
-    use transaction::transaction_queue::test::DummyTransactionDetailsProvider;
+    use transaction::transaction_queue::TransactionOrigin;
+    use transaction::transaction_queue::test::default_account_details;
     use aion_types::{U256, Address};
 
     fn queue() -> BanningTransactionQueue {
@@ -240,22 +235,20 @@ mod tests {
         )
     }
 
-    fn default_tx_provider() -> DummyTransactionDetailsProvider {
-        DummyTransactionDetailsProvider::default().with_account_nonce(U256::zero())
-    }
-
-    fn transaction(action: Action) -> SignedTransaction {
+    fn transaction(action: Action, origin: TransactionOrigin) -> VerifiedTransaction {
         let keypair = generate_keypair();
 
-        transaction::Transaction::new(
-            U256::from(0), // nonce
+        let signed_transaction = transaction::Transaction::new(
+            U256::from(123), // nonce
             U256::from(10),
             U256::from(100_000),
             action,
             U256::from(100),
             "3331600055".from_hex().unwrap(),
         )
-        .sign(keypair.secret(), None)
+        .sign(keypair.secret(), None);
+
+        VerifiedTransaction::new(signed_transaction, origin, None, 0, 0)
     }
 
     fn unwrap_err(
@@ -267,19 +260,12 @@ mod tests {
     #[test]
     fn should_allow_to_borrow_the_queue() {
         // given
-        let tx = transaction(Action::Create);
+        let tx = transaction(Action::Create, TransactionOrigin::External);
         let mut txq = queue();
+        let fetch_account = |_: &Address| default_account_details();
 
         // when
-        txq.queue()
-            .add(
-                tx,
-                TransactionOrigin::External,
-                0,
-                None,
-                &default_tx_provider(),
-            )
-            .unwrap();
+        txq.queue().add(tx, &fetch_account).unwrap();
 
         // then
         // should also deref to queue
@@ -290,20 +276,19 @@ mod tests {
     #[test]
     fn should_not_accept_transactions_from_banned_sender() {
         // given
-        let tx = transaction(Action::Create);
+        let tx = transaction(Action::Create, TransactionOrigin::External);
         let mut txq = queue();
+        let fetch_account = |_: &Address| default_account_details();
         // Banlist once (threshold not reached)
-        let banlist1 = txq.ban_sender(tx.sender());
+        let banlist1 = txq.ban_sender(tx.sender().clone());
         assert!(!banlist1, "Threshold not reached yet.");
         // Insert once
-        let import1 = txq
-            .add_with_banlist(tx.clone(), 0, &default_tx_provider())
-            .unwrap();
+        let import1 = txq.add_with_banlist(tx.clone(), &fetch_account).unwrap();
         assert_eq!(import1, transaction::ImportResult::Current);
 
         // when
-        let banlist2 = txq.ban_sender(tx.sender());
-        let import2 = txq.add_with_banlist(tx.clone(), 0, &default_tx_provider());
+        let banlist2 = txq.ban_sender(tx.sender().clone());
+        let import2 = txq.add_with_banlist(tx.clone(), &fetch_account);
 
         // then
         assert!(banlist2, "Threshold should be reached - banned.");
@@ -316,20 +301,19 @@ mod tests {
     fn should_not_accept_transactions_to_banned_recipient() {
         // given
         let recipient = Address::default();
-        let tx = transaction(Action::Call(recipient));
+        let tx = transaction(Action::Call(recipient), TransactionOrigin::External);
         let mut txq = queue();
+        let fetch_account = |_: &Address| default_account_details();
         // Banlist once (threshold not reached)
         let banlist1 = txq.ban_recipient(recipient);
         assert!(!banlist1, "Threshold not reached yet.");
         // Insert once
-        let import1 = txq
-            .add_with_banlist(tx.clone(), 0, &default_tx_provider())
-            .unwrap();
+        let import1 = txq.add_with_banlist(tx.clone(), &fetch_account).unwrap();
         assert_eq!(import1, transaction::ImportResult::Current);
 
         // when
         let banlist2 = txq.ban_recipient(recipient);
-        let import2 = txq.add_with_banlist(tx.clone(), 0, &default_tx_provider());
+        let import2 = txq.add_with_banlist(tx.clone(), &fetch_account);
 
         // then
         assert!(banlist2, "Threshold should be reached - banned.");
@@ -339,21 +323,20 @@ mod tests {
     #[test]
     fn should_not_accept_transactions_with_banned_code() {
         // given
-        let tx = transaction(Action::Create);
-        let codehash = blake2b(&tx.data);
+        let tx = transaction(Action::Create, TransactionOrigin::External);
+        let codehash = blake2b(&tx.transaction().data);
         let mut txq = queue();
+        let fetch_account = |_: &Address| default_account_details();
         // Banlist once (threshold not reached)
         let banlist1 = txq.ban_codehash(codehash);
         assert!(!banlist1, "Threshold not reached yet.");
         // Insert once
-        let import1 = txq
-            .add_with_banlist(tx.clone(), 0, &default_tx_provider())
-            .unwrap();
+        let import1 = txq.add_with_banlist(tx.clone(), &fetch_account).unwrap();
         assert_eq!(import1, transaction::ImportResult::Current);
 
         // when
         let banlist2 = txq.ban_codehash(codehash);
-        let import2 = txq.add_with_banlist(tx.clone(), 0, &default_tx_provider());
+        let import2 = txq.add_with_banlist(tx.clone(), &fetch_account);
 
         // then
         assert!(banlist2, "Threshold should be reached - banned.");

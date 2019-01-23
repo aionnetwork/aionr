@@ -26,10 +26,9 @@ use std::time::{Duration, Instant};
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
 use acore::client::{BlockChainClient, Client, DatabaseCompactionProfile, VMType};
 use acore::miner::external::ExternalMiner;
-use acore::miner::{Miner, MinerOptions, MinerService};
-use acore::miner::{Stratum, StratumOptions};
-use acore::service::ClientService;
+use acore::miner::{Miner, MinerOptions, MinerService, Stratum, StratumOptions};
 use acore::transaction::local_transactions::TxIoMessage;
+use acore::service::{ClientService, run_miner, run_transaction_pool};
 use acore::verification::queue::VerifierSettings;
 use aion_rpc::{dispatch::DynamicGasPrice, impls::EthClient, informant};
 use aion_version::version;
@@ -371,13 +370,23 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     user_defaults.save(&user_defaults_path)?;
 
     // start miner module
-    // let runtime_miner = tokio::runtime::Builder::new()
-    //     .core_threads(1)
-    //     .name_prefix("seal-block-loop #")
-    //     .build()
-    //     .expect("seal block runtime loop init failed");
-    // let executor_miner = runtime_miner.executor();
-    // let close = run_miner(executor_miner.clone(), client.clone());
+    let runtime_transaction_pool = tokio::runtime::Builder::new()
+        .core_threads(1)
+        .name_prefix("transaction-pool-loop #")
+        .build()
+        .expect("seal block runtime loop init failed");
+    let executor_transaction_pool = runtime_transaction_pool.executor();
+    let close_transaction_pool =
+        run_transaction_pool(executor_transaction_pool.clone(), client.clone());
+
+    // start miner module
+    let runtime_miner = tokio::runtime::Builder::new()
+        .core_threads(1)
+        .name_prefix("seal-block-loop #")
+        .build()
+        .expect("seal block runtime loop init failed");
+    let executor_miner = runtime_miner.executor();
+    let close_miner = run_miner(executor_miner.clone(), client.clone());
 
     // enable Sync module
     network_manager.start_network();
@@ -400,7 +409,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // Handle exit
     wait_for_exit();
 
-    // let _ = close.send(());
+    let _ = close_transaction_pool.send(());
+    let _ = close_miner.send(());
 
     info!(target: "run","Finishing work, please wait...");
 
@@ -423,6 +433,14 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .shutdown_now()
         .wait()
         .expect("Failed to shutdown jsonrpc runtime instance!");
+    runtime_transaction_pool
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown transaction pool runtime instance!");
+    runtime_miner
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown miner runtime instance!");
 
     info!(target: "run","Shutdown.");
 
@@ -549,7 +567,7 @@ fn prepare_account_provider(
             .map_err(|e| format!("Could not open keys directory: {}", e))?,
     );
     let account_settings = AccountProviderSettings {
-        unlock_keep_secret: cfg.enable_fast_unlock,
+        unlock_keep_secret: cfg.enable_fast_signing,
         blacklisted_accounts: vec![
             // blacklist accounts for development. since we change account address to 32 bytes,
             // so just append zero to keep it work.
@@ -566,10 +584,10 @@ fn prepare_account_provider(
 
     for a in cfg.unlocked_accounts {
         // Check if the account exists
-        if !account_provider.has_account(a).unwrap_or(false) {
+        if !account_provider.has_account(&a).unwrap_or(false) {
             return Err(format!(
                 "Account {} not found for the current chain. {}",
-                a,
+                &a,
                 build_create_account_hint(spec, &dirs.keys)
             ));
         }
@@ -578,18 +596,18 @@ fn prepare_account_provider(
         if passwords.is_empty() {
             return Err(format!(
                 "No password found to unlock account {}. {}",
-                a, VERIFY_PASSWORD_HINT
+                &a, VERIFY_PASSWORD_HINT
             ));
         }
 
         if !passwords.iter().any(|p| {
             account_provider
-                .unlock_account_permanently(a, (*p).clone())
+                .unlock_account_permanently(&a, (*p).clone())
                 .is_ok()
         }) {
             return Err(format!(
                 "No valid password to unlock account {}. {}",
-                a, VERIFY_PASSWORD_HINT
+                &a, VERIFY_PASSWORD_HINT
             ));
         }
     }

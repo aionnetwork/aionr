@@ -23,7 +23,7 @@
 //! Local Transactions List.
 use std::collections::HashMap;
 use aion_types::{H256, U256};
-use transaction::{self, SignedTransaction, PendingTransaction};
+use transaction::error::Error;
 use parking_lot::Mutex;
 use io::IoChannel;
 
@@ -37,17 +37,17 @@ pub enum Status {
     /// The transaction is in future part of the queue.
     Future,
     /// Transaction is already mined.
-    Mined(SignedTransaction),
+    Mined,
     /// Transaction is dropped because of limit
-    Dropped(SignedTransaction),
+    Dropped,
     /// Replaced because of higher gas price of another transaction.
-    Replaced(SignedTransaction, U256, H256),
+    Replaced,
     /// Transaction was never accepted to the queue.
-    Rejected(SignedTransaction, transaction::Error),
+    Rejected,
     /// Transaction is invalid.
-    Invalid(SignedTransaction),
+    Invalid,
     /// Transaction was canceled.
-    Canceled(PendingTransaction),
+    Canceled,
 }
 
 /// Keeps track of local transactions that are in the queue or were mined/dropped recently.
@@ -91,91 +91,97 @@ impl LocalTransactionsList {
     }
 
     /// Mark given transaction as rejected from the queue.
-    pub fn mark_rejected(&mut self, tx: SignedTransaction, err: transaction::Error) {
-        debug!(target: "own_tx", "Transaction rejected (hash {:?}): {:?}", tx.hash(), err);
-        self.mark_old(tx.hash().clone());
-        self.transactions
-            .insert(tx.hash(), Status::Rejected(tx, err));
+    pub fn mark_rejected(&mut self, hash: H256, err: Error) {
+        debug!(target: "own_tx", "Transaction rejected (hash {:?})", &hash);
+
+        // Send message to signal the status change of the transaction
+        let error_message: String = format!("Transaction rejected: {:?}.", &err.to_string(),);
+        let _ = self.io_channel.lock().send(TxIoMessage::Dropped {
+            txhash: hash,
+            error: error_message,
+        });
+
+        self.mark_old(hash);
+        self.transactions.insert(hash, Status::Rejected);
     }
 
     /// Mark the transaction as replaced by transaction with given hash.
-    pub fn mark_replaced(&mut self, tx: SignedTransaction, gas_price: U256, hash: H256) {
-        debug!(target: "own_tx", "Transaction (hash {:?}) replaced by {:?} (new gas price: {:?})", tx.hash(), hash, gas_price);
+    pub fn mark_replaced(&mut self, hash: H256, hash_replace: H256, gas_price: U256) {
+        debug!(target: "own_tx", "Transaction (hash {:?}) replaced by {:?} (new gas price: {:?})", &hash, &hash_replace, &gas_price);
 
         // Send message to signal the status change of the transaction
         let error_message: String = format!(
             "Transaction replaced by {} with new gas price {}.",
-            &hash.to_string(),
+            &hash_replace.to_string(),
             &gas_price.to_string()
         );
         let _ = self.io_channel.lock().send(TxIoMessage::Dropped {
-            txhash: tx.hash(),
+            txhash: hash,
             error: error_message,
         });
 
-        self.mark_old(tx.hash().clone());
-        self.transactions
-            .insert(tx.hash(), Status::Replaced(tx, gas_price, hash));
+        self.mark_old(hash);
+        self.transactions.insert(hash, Status::Replaced);
     }
 
     /// Mark transaction as invalid.
-    pub fn mark_invalid(&mut self, tx: SignedTransaction) {
-        warn!(target: "own_tx", "Transaction marked invalid (hash {:?})", tx.hash());
+    pub fn mark_invalid(&mut self, hash: H256) {
+        warn!(target: "own_tx", "Transaction marked invalid (hash {:?})", &hash);
 
         // Send message to signal the status change of the transaction
         let error_message: String = String::from("Transaction marked invalid.");
         let _ = self.io_channel.lock().send(TxIoMessage::Dropped {
-            txhash: tx.hash(),
+            txhash: hash,
             error: error_message,
         });
 
-        self.mark_old(tx.hash().clone());
-        self.transactions.insert(tx.hash(), Status::Invalid(tx));
+        self.mark_old(hash);
+        self.transactions.insert(hash, Status::Invalid);
     }
 
     /// Mark transaction as canceled.
-    pub fn mark_canceled(&mut self, tx: PendingTransaction) {
-        warn!(target: "own_tx", "Transaction canceled (hash {:?})", tx.hash());
+    pub fn mark_canceled(&mut self, hash: H256) {
+        warn!(target: "own_tx", "Transaction canceled (hash {:?})", &hash);
 
         // Send message to signal the status change of the transaction
         let error_message: String = String::from("Transaction canceled.");
         let _ = self.io_channel.lock().send(TxIoMessage::Dropped {
-            txhash: tx.hash(),
+            txhash: hash,
             error: error_message,
         });
 
-        self.mark_old(tx.hash().clone());
-        self.transactions.insert(tx.hash(), Status::Canceled(tx));
+        self.mark_old(hash);
+        self.transactions.insert(hash, Status::Canceled);
     }
 
     /// Mark transaction as dropped because of limit.
-    pub fn mark_dropped(&mut self, tx: SignedTransaction) {
-        warn!(target: "own_tx", "Transaction dropped (hash {:?})", tx.hash());
+    pub fn mark_dropped(&mut self, hash: H256) {
+        warn!(target: "own_tx", "Transaction dropped (hash {:?})", &hash);
 
         // Send message to signal the status change of the transaction
         let error_message: String =
             String::from("Transaction with low priority dropped due to limit.");
         let _ = self.io_channel.lock().send(TxIoMessage::Dropped {
-            txhash: tx.hash(),
+            txhash: hash,
             error: error_message,
         });
 
-        self.mark_old(tx.hash().clone());
-        self.transactions.insert(tx.hash(), Status::Dropped(tx));
+        self.mark_old(hash);
+        self.transactions.insert(hash, Status::Dropped);
     }
 
     /// Mark transaction as mined.
-    pub fn mark_mined(&mut self, tx: SignedTransaction) {
-        info!(target: "own_tx", "Transaction mined (hash {:?})", tx.hash());
+    pub fn mark_mined(&mut self, hash: H256) {
+        info!(target: "own_tx", "Transaction mined (hash {:?})", &hash);
 
         // Send message to signal the status change of the transaction
         let _ = self.io_channel.lock().send(TxIoMessage::Included {
-            txhash: tx.hash(),
+            txhash: hash,
             result: vec![0],
         });
 
-        self.mark_old(tx.hash().clone());
-        self.transactions.insert(tx.hash(), Status::Mined(tx));
+        self.mark_old(hash);
+        self.transactions.insert(hash, Status::Mined);
     }
 
     /// Returns true if the transaction is already in local transactions.
@@ -223,6 +229,7 @@ pub enum TxIoMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use transaction::transaction::{Transaction, Action, SignedTransaction};
     use key::generate_keypair;
     use io::IoService;
 
@@ -255,10 +262,10 @@ mod tests {
         let tx2_hash = tx2.hash();
 
         list.mark_pending(10.into());
-        list.mark_invalid(tx1);
-        list.mark_dropped(tx2);
-        assert!(list.contains(&tx2_hash));
-        assert!(!list.contains(&tx1_hash));
+        list.mark_invalid(tx1_hash.clone());
+        list.mark_dropped(tx2_hash.clone());
+        assert!(list.contains(tx2_hash));
+        assert!(!list.contains(tx1_hash));
         assert!(list.contains(&10.into()));
 
         // when
@@ -271,11 +278,11 @@ mod tests {
 
     fn new_tx(nonce: U256) -> SignedTransaction {
         let keypair = generate_keypair();
-        transaction::Transaction::new(
+        Transaction::new(
             nonce,
             U256::from(1245),
             U256::from(10),
-            transaction::Action::Create,
+            Action::Create,
             U256::from(100),
             Default::default(),
         )

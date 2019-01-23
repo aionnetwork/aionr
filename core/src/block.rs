@@ -322,7 +322,7 @@ impl<'x> OpenBlock<'x> {
             Ok(outcome) => {
                 self.block
                     .transactions_set
-                    .insert(h.unwrap_or_else(|| t.hash()));
+                    .insert(h.unwrap_or_else(|| t.hash().clone()));
                 self.block.transactions.push(t.into());
                 self.block
                     .header

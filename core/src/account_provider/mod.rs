@@ -190,9 +190,11 @@ impl AccountProvider {
     }
 
     /// Checks whether an account with a given address is present.
-    pub fn has_account(&self, address: Address) -> Result<bool, Error> {
-        Ok(self.sstore.account_ref(&address).is_ok()
-            && !self.blacklisted_accounts.contains(&address))
+    pub fn has_account(&self, address: &Address) -> Result<bool, Error> {
+        Ok(
+            self.sstore.account_ref(address).is_ok()
+                && !self.blacklisted_accounts.contains(address),
+        )
     }
 
     /// Returns addresses of all accounts.
@@ -260,14 +262,14 @@ impl AccountProvider {
     /// Returns `true` if the password for `account` is `password`. `false` if not.
     pub fn test_password(&self, address: &Address, password: &str) -> Result<bool, Error> {
         self.sstore
-            .test_password(&self.sstore.account_ref(&address)?, password)
+            .test_password(&self.sstore.account_ref(address)?, password)
             .map_err(Into::into)
     }
 
     /// Permanently removes an account.
     pub fn kill_account(&self, address: &Address, password: &str) -> Result<(), Error> {
         self.sstore
-            .remove_account(&self.sstore.account_ref(&address)?, &password)?;
+            .remove_account(&self.sstore.account_ref(address)?, password)?;
         Ok(())
     }
 
@@ -278,8 +280,8 @@ impl AccountProvider {
     }
 
     /// lock a sepcific account.
-    pub fn lock_account(&self, address: Address, password: String) -> Result<(), Error> {
-        let account = self.sstore.account_ref(&address)?;
+    pub fn lock_account(&self, address: &Address, password: String) -> Result<(), Error> {
+        let account = self.sstore.account_ref(address)?;
 
         // remove stored secret if any
         let mut unlocked_secrets = self.unlocked_secrets.write();
@@ -308,12 +310,12 @@ impl AccountProvider {
     /// Unlock a sepcific account.
     fn unlock_account(
         &self,
-        address: Address,
+        address: &Address,
         password: String,
         unlock: Unlock,
     ) -> Result<(), Error>
     {
-        let account = self.sstore.account_ref(&address)?;
+        let account = self.sstore.account_ref(address)?;
 
         // check if account is already unlocked pernamently, if it is, do nothing
         let mut unlocked = self.unlocked.write();
@@ -383,33 +385,33 @@ impl AccountProvider {
     /// Unlocks account permanently.
     pub fn unlock_account_permanently(
         &self,
-        account: Address,
+        address: &Address,
         password: String,
     ) -> Result<(), Error>
     {
-        self.unlock_account(account, password, Unlock::Perm)
+        self.unlock_account(address, password, Unlock::Perm)
     }
 
     /// Unlocks account temporarily (for one signing).
     pub fn unlock_account_temporarily(
         &self,
-        account: Address,
+        address: &Address,
         password: String,
     ) -> Result<(), Error>
     {
-        self.unlock_account(account, password, Unlock::OneTime)
+        self.unlock_account(address, password, Unlock::OneTime)
     }
 
     /// Unlocks account temporarily with a timeout.
     pub fn unlock_account_timed(
         &self,
-        account: Address,
+        address: &Address,
         password: String,
         duration_ms: u64,
     ) -> Result<(), Error>
     {
         self.unlock_account(
-            account,
+            address,
             password,
             Unlock::Timed(Instant::now() + Duration::from_millis(duration_ms)),
         )
@@ -539,11 +541,11 @@ mod tests {
                 .is_ok()
         );
         assert!(
-            ap.unlock_account_temporarily(kp.address(), "test1".into())
+            ap.unlock_account_temporarily(&kp.address(), "test1".into())
                 .is_err()
         );
         assert!(
-            ap.unlock_account_temporarily(kp.address(), "test".into())
+            ap.unlock_account_temporarily(&kp.address(), "test".into())
                 .is_ok()
         );
         assert!(ap.sign(kp.address(), None, Default::default()).is_ok());
@@ -559,17 +561,17 @@ mod tests {
                 .is_ok()
         );
         assert!(
-            ap.unlock_account_permanently(kp.address(), "test1".into())
+            ap.unlock_account_permanently(&kp.address(), "test1".into())
                 .is_err()
         );
         assert!(
-            ap.unlock_account_permanently(kp.address(), "test".into())
+            ap.unlock_account_permanently(&kp.address(), "test".into())
                 .is_ok()
         );
         assert!(ap.sign(kp.address(), None, Default::default()).is_ok());
         assert!(ap.sign(kp.address(), None, Default::default()).is_ok());
         assert!(
-            ap.unlock_account_temporarily(kp.address(), "test".into())
+            ap.unlock_account_temporarily(&kp.address(), "test".into())
                 .is_ok()
         );
         assert!(ap.sign(kp.address(), None, Default::default()).is_ok());
@@ -585,11 +587,11 @@ mod tests {
                 .is_ok()
         );
         assert!(
-            ap.unlock_account_timed(kp.address(), "test1".into(), 60000)
+            ap.unlock_account_timed(&kp.address(), "test1".into(), 60000)
                 .is_err()
         );
         assert!(
-            ap.unlock_account_timed(kp.address(), "test".into(), 60000)
+            ap.unlock_account_timed(&kp.address(), "test".into(), 60000)
                 .is_ok()
         );
         assert!(ap.sign(kp.address(), None, Default::default()).is_ok());

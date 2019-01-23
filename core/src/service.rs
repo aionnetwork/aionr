@@ -22,7 +22,7 @@
 
 //! Creates and registers client and network services.
 
-use std::time::Instant;
+use std::time::{Instant, Duration};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -32,7 +32,8 @@ use tokio::timer::Interval;
 use tokio::prelude::{Future, Stream};
 use ansi_term::Colour;
 use bytes::Bytes;
-use client::{ChainNotify, Client, ClientConfig, MiningBlockChainClient};
+use client::{ChainNotify, Client, ClientConfig, /*MiningBlockChainClient*/
+};
 use db;
 use error::*;
 use io::*;
@@ -49,7 +50,7 @@ use rlp::*;
 pub enum ClientIoMessage {
     /// Best Block Hash in chain has been changed
     NewChainHead,
-    /// A block is ready
+    /// An external block is verified and ready to be imported
     BlockVerified,
     /// New transaction RLPs are ready to be imported
     NewTransactions(Vec<Bytes>, usize),
@@ -60,10 +61,11 @@ pub enum ClientIoMessage {
 /// Run the miner
 pub fn run_miner(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
     let (close, shutdown_signal) = oneshot::channel();
-    let seal_block_task = Interval::new(Instant::now(), client.prepare_block_interval())
+    // let seal_block_task = Interval::new(Instant::now(), client.prepare_block_interval())
+    let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(1))
         .for_each(move |_| {
             let client: Arc<Client> = client.clone();
-            client.miner().try_prepare_block(&*client);
+            client.miner().try_prepare_block(&*client, false);
             Ok(())
         })
         .map_err(|e| panic!("interval err: {:?}", e))
@@ -71,6 +73,23 @@ pub fn run_miner(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender
         .map(|_| ())
         .map_err(|_| ());
     executor.spawn(seal_block_task);
+    close
+}
+
+/// Run the transaction pool
+pub fn run_transaction_pool(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
+    let (close, shutdown_signal) = oneshot::channel();
+    let update_transaction_pool_task = Interval::new(Instant::now(), Duration::from_secs(1))
+        .for_each(move |_| {
+            let client: Arc<Client> = client.clone();
+            client.miner().update_transaction_pool(&*client, false);
+            Ok(())
+        })
+        .map_err(|e| panic!("interval err: {:?}", e))
+        .select(shutdown_signal.map_err(|_| {}))
+        .map(|_| ())
+        .map_err(|_| ());
+    executor.spawn(update_transaction_pool_task);
     close
 }
 
@@ -272,6 +291,12 @@ impl IoHandler<ClientIoMessage> for ClientIoHandler {
                 if let Err(e) = self.client.engine().handle_message(message) {
                     trace!(target: "io", "Invalid message received: {}", e);
                 }
+            }
+            ClientIoMessage::NewChainHead => {
+                debug!(target: "block", "ClientIoMessage::NewChainHead");
+                let client: Arc<Client> = self.client.clone();
+                client.miner().update_transaction_pool(&*client, true);
+                client.miner().try_prepare_block(&*client, true);
             }
             _ => {} // ignore other messages
         }

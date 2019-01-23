@@ -259,8 +259,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     call_type: CallType::None,
                     static_flag: false,
                     params_type: vms::ParamsType::Embedded,
-                    transaction_hash: t.hash(),
-                    original_transaction_hash: t.hash(),
+                    transaction_hash: t.hash().clone(),
+                    original_transaction_hash: t.hash().clone(),
                 };
                 self.create(params, &mut substate)
             }
@@ -279,8 +279,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     call_type: CallType::Call,
                     static_flag: false,
                     params_type: vms::ParamsType::Separate,
-                    transaction_hash: t.hash(),
-                    original_transaction_hash: t.hash(),
+                    transaction_hash: t.hash().clone(),
+                    original_transaction_hash: t.hash().clone(),
                 };
                 self.call(params, &mut substate)
             }

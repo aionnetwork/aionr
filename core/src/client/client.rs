@@ -1036,14 +1036,6 @@ impl Client {
     ) -> SignedTransaction
     {
         let from = Address::default();
-        //        Transaction {
-        //            nonce: self.nonce(&from, block_id).unwrap_or_else(|| self.engine.account_start_nonce(0)),
-        //            action: Action::Call(address),
-        //            gas: U256::from(50_000_000),
-        //            gas_price: U256::default(),
-        //            value: U256::default(),
-        //            data: data,
-        //        }.fake_sign(from)
         Transaction::new(
             self.nonce(&from, block_id)
                 .unwrap_or_else(|| self.engine.account_start_nonce(0)),
@@ -1270,7 +1262,7 @@ impl BlockChainClient for Client {
         let cond = |gas| {
             let mut tx = t.as_unsigned().clone();
             tx.gas = gas;
-            let tx = tx.fake_sign(sender);
+            let tx = tx.fake_sign(sender.clone());
 
             let mut state = original_state.clone();
             Ok(Executive::new(&mut state, &env_info, self.engine.machine())
@@ -1763,6 +1755,13 @@ impl BlockChainClient for Client {
         }
     }
 
+    fn new_block_chained(&self) {
+        let channel = self.io_channel.lock().clone();
+        if let Err(e) = channel.send(ClientIoMessage::NewChainHead) {
+            debug!("Sending new block chained message failed: {:?}", e);
+        }
+    }
+
     fn block_extra_info(&self, id: BlockId) -> Option<BTreeMap<String, String>> {
         self.block_header(id)
             .map(|header| self.engine.extra_info(&header.decode()))
@@ -2028,7 +2027,7 @@ fn transaction_receipt(
         .into_iter()
         .map(|receipt| receipt.logs().len())
         .sum::<usize>();
-    let transaction_hash = tx.hash();
+    let transaction_hash = tx.hash().clone();
     let block_hash = tx.block_hash;
     let block_number = tx.block_number;
     let transaction_index = tx.transaction_index;

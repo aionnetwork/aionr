@@ -236,6 +236,9 @@ pub trait BlockChainClient: Sync + Send {
     /// Queue conensus engine message.
     fn queue_consensus_message(&self, message: Bytes);
 
+    /// New block chained message.
+    fn new_block_chained(&self);
+
     /// List all transactions that are allowed into the next block.
     fn ready_transactions(&self) -> Vec<PendingTransaction>;
 

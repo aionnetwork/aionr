@@ -39,7 +39,7 @@ use bytes::Bytes;
 use rlp::*;
 use key::{generate_keypair, public_to_address_ed25519};
 use tempdir::TempDir;
-use transaction::{self, Transaction, LocalizedTransaction, PendingTransaction, SignedTransaction, Action, DEFAULT_TRANSACTION_TYPE};
+use transaction::{Transaction, LocalizedTransaction, PendingTransaction, SignedTransaction, Action, DEFAULT_TRANSACTION_TYPE};
 use blockchain::{TreeRoute, BlockReceipts};
 use client::{
     BlockChainClient, MiningBlockChainClient, BlockChainInfo, BlockStatus, BlockId,
@@ -332,13 +332,15 @@ impl TestBlockChainClient {
             transaction_type: DEFAULT_TRANSACTION_TYPE,
         };
         let signed_tx = tx.sign(&keypair.secret().0, None);
-        self.set_balance(signed_tx.sender(), 10_000_000_000_000_000_000u64.into());
-        let hash = signed_tx.hash();
+        self.set_balance(
+            signed_tx.sender().clone(),
+            10_000_000_000_000_000_000u64.into(),
+        );
+        let hash = signed_tx.hash().clone();
         let res = self
             .miner
             .import_external_transactions(self, vec![signed_tx.into()]);
-        let res = res.into_iter().next().unwrap().expect("Successful import");
-        assert_eq!(res, transaction::ImportResult::Current);
+        res.into_iter().next().unwrap().expect("Successful import");
         hash
     }
 
@@ -801,6 +803,8 @@ impl BlockChainClient for TestBlockChainClient {
     fn queue_consensus_message(&self, message: Bytes) {
         self.spec.engine.handle_message(&message).unwrap();
     }
+
+    fn new_block_chained(&self) {}
 
     fn ready_transactions(&self) -> Vec<PendingTransaction> {
         let info = self.chain_info();

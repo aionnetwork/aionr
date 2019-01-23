@@ -144,7 +144,7 @@ pub struct AccountsConfig {
     pub refresh_time: u64,
     pub password_files: Vec<String>,
     pub unlocked_accounts: Vec<Address>,
-    pub enable_fast_unlock: bool,
+    pub enable_fast_signing: bool,
 }
 
 impl Default for AccountsConfig {
@@ -154,7 +154,7 @@ impl Default for AccountsConfig {
             refresh_time: 5,
             password_files: Vec::new(),
             unlocked_accounts: Vec::new(),
-            enable_fast_unlock: false,
+            enable_fast_signing: false,
         }
     }
 }

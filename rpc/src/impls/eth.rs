@@ -872,7 +872,7 @@ where
                 match SignedTransaction::new(tx) {
                     Err(_) => None,
                     Ok(tx) => {
-                        let hash = tx.hash();
+                        let hash = tx.hash().clone();
                         let _ = FullDispatcher::dispatch_transaction(
                             &*self.client,
                             &*self.miner,

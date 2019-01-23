@@ -556,8 +556,8 @@ impl ChainNotify for Sync {
                 let mut lock = sent_transaction_hashes_mutex.lock();
 
                 if let Ok(ref mut sent_transaction_hashes) = lock {
-                    if !sent_transaction_hashes.contains_key(&hash) {
-                        sent_transaction_hashes.insert(hash, 0);
+                    if !sent_transaction_hashes.contains_key(hash) {
+                        sent_transaction_hashes.insert(hash.clone(), 0);
                         SyncStorage::insert_received_transaction(transaction_rlp);
                     }
                 }

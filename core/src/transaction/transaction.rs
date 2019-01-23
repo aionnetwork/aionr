@@ -449,7 +449,7 @@ impl UnverifiedTransaction {
     pub fn signature(&self) -> Ed25519Signature { Ed25519Signature::from(self.sig.clone()) }
 
     /// Get the hash of this header (blake2b of the RLP).
-    pub fn hash(&self) -> H256 { self.hash }
+    pub fn hash(&self) -> &H256 { &self.hash }
 
     /// Get the timestamp
     pub fn timestamp(&self) -> &Bytes { &self.timestamp }
@@ -592,7 +592,7 @@ impl SignedTransaction {
     }
 
     /// Returns transaction sender.
-    pub fn sender(&self) -> Address { self.sender }
+    pub fn sender(&self) -> &Address { &self.sender }
 
     /// Returns a public key of the sender.
     pub fn public_key(&self) -> Option<Ed25519Public> { self.public }
@@ -1091,7 +1091,7 @@ mod tests {
         .sign(&key.secret(), None);
         let mut slice = blake2b(key.public());
         slice[0] = 0xA0;
-        assert_eq!(Address::from(slice), t.sender());
+        assert_eq!(Address::from(slice), *t.sender());
         assert_eq!(t.chain_id(), None);
     }
 
@@ -1113,11 +1113,11 @@ mod tests {
             transaction_type: 1,
         }
         .fake_sign(Address::from(0x69));
-        assert_eq!(Address::from(0x69), t.sender());
+        assert_eq!(Address::from(0x69), *t.sender());
         assert_eq!(t.chain_id(), None);
 
         let t = t.clone();
-        assert_eq!(Address::from(0x69), t.sender());
+        assert_eq!(Address::from(0x69), *t.sender());
         assert_eq!(t.chain_id(), None);
 
         println!("{:?}", t.rlp_bytes().to_hex());
@@ -1130,7 +1130,7 @@ mod tests {
         let test_vector = |tx_data: &str, address: &'static str| {
             let signed = rlp::decode(&FromHex::from_hex(tx_data).unwrap());
             let signed = SignedTransaction::new(signed).unwrap();
-            assert_eq!(signed.sender(), address.into());
+            assert_eq!(signed.sender().clone(), address.into());
             println!("chainid: {:?}", signed.chain_id());
         };
 

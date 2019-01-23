@@ -113,11 +113,11 @@ impl TransactionEntry {
             Ok(tx) => tx,
         };
 
-        let hash = tx.hash();
+        let hash = tx.hash().clone();
         match SignedTransaction::new(tx) {
             Ok(tx) => Some(PendingTransaction::new(tx, self.condition.map(Into::into))),
             Err(_) => {
-                warn!(target: "local_store", "Bad signature on persistent transaction: {}", hash);
+                warn!(target: "local_store", "Bad signature on persistent transaction: {}", &hash);
                 return None;
             }
         }

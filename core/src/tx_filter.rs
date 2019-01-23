@@ -92,7 +92,7 @@ impl TransactionFilter {
             }
         };
         let sender = transaction.sender();
-        match cache.entry((*parent_hash, sender)) {
+        match cache.entry((*parent_hash, sender.clone())) {
             Entry::Occupied(entry) => *entry.get() & tx_type != 0,
             Entry::Vacant(entry) => {
                 let contract_address = self.contract_address;
@@ -100,7 +100,7 @@ impl TransactionFilter {
                     .contract
                     .functions()
                     .allowed_tx_types()
-                    .call(sender, &|data| {
+                    .call(sender.clone(), &|data| {
                         client.call_contract(BlockId::Hash(*parent_hash), contract_address, data)
                     })
                     .map(|p| p.low_u32())

@@ -54,7 +54,7 @@ pub use self::stratum::{Stratum, Error as StratumError, Options as StratumOption
 
 pub use transaction::local_transactions::Status as LocalTransactionStatus;
 
-use std::collections::BTreeMap;
+use std::collections::{HashMap, BTreeMap};
 use aion_types::{H256, U256, Address};
 use bytes::Bytes;
 
@@ -63,7 +63,7 @@ use client::{MiningBlockChainClient};
 use error::{Error};
 use header::BlockNumber;
 use receipt::{RichReceipt, Receipt};
-use transaction::{UnverifiedTransaction, PendingTransaction, ImportResult as TransactionImportResult};
+use transaction::{UnverifiedTransaction, PendingTransaction};
 
 /// Miner client API
 pub trait MinerService: Send + Sync {
@@ -124,14 +124,14 @@ pub trait MinerService: Send + Sync {
         &self,
         chain: &MiningBlockChainClient,
         transactions: Vec<UnverifiedTransaction>,
-    ) -> Vec<Result<TransactionImportResult, Error>>;
+    ) -> Vec<Result<(), Error>>;
 
     /// Imports own (node owner) transaction to queue.
     fn import_own_transaction(
         &self,
         chain: &MiningBlockChainClient,
         transaction: PendingTransaction,
-    ) -> Result<TransactionImportResult, Error>;
+    ) -> Result<(), Error>;
 
     /// Returns hashes of transactions currently in pending
     fn pending_transactions_hashes(&self, best_block: BlockNumber) -> Vec<H256>;
@@ -175,11 +175,7 @@ pub trait MinerService: Send + Sync {
 
     /// Removes transaction from the queue.
     /// NOTE: The transaction is not removed from pending block if mining.
-    fn remove_pending_transaction(
-        &self,
-        chain: &MiningBlockChainClient,
-        hash: &H256,
-    ) -> Option<PendingTransaction>;
+    fn remove_pending_transaction(&self, hash: H256);
 
     /// Get a list of all pending transactions in the queue.
     fn pending_transactions(&self) -> Vec<PendingTransaction>;
@@ -195,7 +191,7 @@ pub trait MinerService: Send + Sync {
     fn future_transactions(&self) -> Vec<PendingTransaction>;
 
     /// Get a list of local transactions with statuses.
-    fn local_transactions(&self) -> BTreeMap<H256, LocalTransactionStatus>;
+    fn local_transactions(&self) -> HashMap<H256, LocalTransactionStatus>;
 
     /// Get a list of all pending receipts.
     fn pending_receipts(&self, best_block: BlockNumber) -> BTreeMap<H256, Receipt>;

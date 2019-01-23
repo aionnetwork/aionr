@@ -199,8 +199,7 @@ impl BroadcastsHandler {
                 if !transaction_rlp.is_empty() {
                     if let Ok(t) = transaction_rlp.as_val() {
                         let tx: UnverifiedTransaction = t;
-                        let hash = tx.hash();
-
+                        let hash = tx.hash().clone();
                         if !transaction_hashes.contains_key(&hash) {
                             transactions.push(tx);
                             transaction_hashes.insert(hash, 0);

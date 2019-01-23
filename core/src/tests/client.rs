@@ -361,6 +361,7 @@ fn does_not_propagate_delayed_transactions() {
         .miner()
         .import_own_transaction(&*client, tx1)
         .unwrap();
+    client.miner().update_transaction_pool(&*client, true);
     assert_eq!(0, client.ready_transactions().len());
     assert_eq!(2, client.miner().pending_transactions().len());
     push_blocks_to_client(&client, 53, 2, 2);
