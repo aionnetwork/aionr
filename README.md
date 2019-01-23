@@ -151,7 +151,7 @@ RPC services can be connected from the following addresses:
 - **WebSocket**: Port `8546`
 - **ICP**: `$Home/.aion/jsonrpc.ipc`
 
-See the [user manual](./wiki/User-Manual) or [CMD & Config](https://github.com/aionnetwork/aionr/wiki/CMD-&-Config) wiki to find how to change RPC port settings.
+See the [user manual](https://github.com/aionnetwork/aionr/wiki/User-Manual) or [CMD & Config](https://github.com/aionnetwork/aionr/wiki/CMD-&-Config) wiki to find how to change RPC port settings.
 
 ### Miners
 
