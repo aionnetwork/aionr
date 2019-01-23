@@ -113,7 +113,8 @@ Once you have installed the prerequisites, follow these steps to build the kerne
     cd package/aionr-package
     ```
 
-2. Run the `aion` package. Make sure to include any commands you want the kernel to execute. You can find more information on supplying commands in the [user manual](https://github.com/aionnetwork/aionr/wiki/User-Manual#launch-rust-kernel):
+2. Run the `aion` package. Make sure to include any commands you want the kernel to execute. You can find more information on supplying commands in the [user manual](https://github.com/aionnetwork/aionr/wiki/User-Manual#launch-rust-kernel).
+Kernel will print **configuration path**, **genesis file path**, **db directory** and **keystore location** at the top of its log.
 
 ```bash
 $ ./aion
@@ -142,6 +143,7 @@ $ ./aion
 > 2019-01-23 09:12:46 ======================================================== Sync Statics =========================================================
 
 ```
+**We provides quick launch scripts to connect to Mainnet, Mastery and custom network. Running the quick scripts will load the configuration and the genesis in each network folder. You can modify those files in each directory. See launch examples [Kernel Deployment Examples](https://github.com/aionnetwork/aionr/wiki/Kernel-Deployment-Examples)**
 
 ### Connecting to JSON RPC Services
 
