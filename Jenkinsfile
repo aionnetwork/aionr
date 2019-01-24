@@ -44,9 +44,11 @@ pipeline {
         stage('Build'){
             steps{
             	sh 'set -e'
-                echo "building..."
-            
-                sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"'
+                echo "clean old package"
+            	sh 'rm aionr*.tar.gz || echo "no previous build packages"'
+            	sh 'rm -r package || echo "no previous build package folder"'
+            	echo "building..."
+                sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-$(git describe --tags)-$(date +%Y%m%d)"'
             }
         }
 		stage('Unit Test'){
@@ -78,7 +80,6 @@ pipeline {
 				script{
 					try{
 						sh './scripts/run_RPCtest.sh'
-						sh 'echo $?'
 					}
 					catch(Exception e){
 						echo "${e}"
@@ -100,7 +101,7 @@ pipeline {
         }
 
         success{
-			archiveArtifacts artifacts: '*.tar.gz,test_results/*.*',fingerprint:true
+			archiveArtifacts artifacts: '*.tar.gz,test_results/*.*,target/release/aion',fingerprint:true
             slackSend channel: '#ci',
                       color: 'good',
                       message: "${currentBuild.fullDisplayName} completed successfully. Grab the generated builds at ${env.BUILD_URL}\nArtifacts: ${env.BUILD_URL}artifact/\n Check BenchTest result: ${env.BUILD_URL}artifact/test_results/report.html \nCommit: ${GIT_COMMIT}\nChanges:${message}"

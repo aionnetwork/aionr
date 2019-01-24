@@ -3,20 +3,22 @@
 set -e
 
 nohup /run/aionminer -l 127.0.0.1:8008 -u 0xa07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137 -d 0 -t 1 &
-echo "start aion_rust"
+
 
 WS="${PWD}"
-PACKAGE="aionr-0.1.1-$(date +%Y%m%d)"
+PACKAGE="aionr-$(git describe --tags)-$(date +%Y%m%d)"
 
 # remove db
+echo "clean previous testdb"
 rm -rf $HOME/.aion/chains
-
+rm -rf $HOME/.aion/keys/custom
 
 # start kernel to custom network
 cd package/"${PACKAGE}"
-
+echo "import accounts"
 ./custom.sh account import $HOME/.aion/keys/testnet/*
 
+echo "start aion_rust"
 nohup  ./custom.sh --author=a07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137 &
 sleep 7
 
