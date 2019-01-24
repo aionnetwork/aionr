@@ -243,14 +243,14 @@ pub trait BlockChainClient: Sync + Send {
     fn gas_price_corpus(
         &self,
         blk_price_window: usize,
-        max_blk_travers: usize,
+        max_blk_traverse: usize,
     ) -> ::stats::Corpus<U256>
     {
         let mut block_num = self.chain_info().best_block_number;
         let mut corpus = Vec::new();
         let mut count = 0;
         while corpus.len() < blk_price_window {
-            if block_num == 0 || count == max_blk_travers {
+            if block_num == 0 || count == max_blk_traverse {
                 return Vec::new().into();
             }
             let block = match self.block(BlockId::Number(block_num)) {
@@ -260,19 +260,28 @@ pub trait BlockChainClient: Sync + Send {
                     return Vec::new().into();
                 }
             };
+            let block_author = block.header_view().author();
             match block
-                .transaction_views()
-                .iter()
-                .map(|t| t.gas_price())
+                .view()
+                .localized_transactions()
+                .iter_mut()
+                .filter_map(|t| {
+                    if t.sender() != block_author {
+                        Some(t)
+                    } else {
+                        None
+                    }
+                })
+                .map(|t| t.gas_price)
                 .min()
             {
                 Some(gas_price) => {
                     corpus.push(gas_price);
+                    block_num -= 1;
                 }
                 None => (),
             }
             count += 1;
-            block_num -= 1;
         }
         corpus.into()
     }

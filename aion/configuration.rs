@@ -398,11 +398,12 @@ impl Configuration {
         if !self.args.flag_dynamic_gas_price {
             return Ok(None);
         }
-        let dynamic = DynamicGasPrice {
-            blk_price_window: self.args.arg_blk_price_window,
-            max_blk_traverse: self.args.arg_max_blk_traverse,
-            gas_price_percentile: self.args.arg_gas_price_percentile,
-        };
+        let mut dynamic = DynamicGasPrice::default();
+
+        dynamic.blk_price_window = self.args.arg_blk_price_window;
+        dynamic.max_blk_traverse = self.args.arg_max_blk_traverse;
+        dynamic.gas_price_percentile = self.args.arg_gas_price_percentile;
+
         Ok(Some(dynamic))
     }
 

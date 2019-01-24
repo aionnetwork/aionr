@@ -455,6 +455,8 @@ pub struct DynamicGasPrice {
     pub blk_price_window: usize,
     pub max_blk_traverse: usize,
     pub gas_price_percentile: usize,
+    pub last_processed: i64,
+    pub recommendation: U256,
 }
 
 impl Default for DynamicGasPrice {
@@ -463,6 +465,8 @@ impl Default for DynamicGasPrice {
             blk_price_window: 20,
             max_blk_traverse: 64,
             gas_price_percentile: 60,
+            last_processed: -1,
+            recommendation: U256::from(10000000000u64),
         }
     }
 }
@@ -568,17 +572,22 @@ where
         None => {
             return miner.minimal_gas_price();
         }
-        Some(dynamic_gas_price) => {
-            client
-                .gas_price_corpus(
-                    dynamic_gas_price.blk_price_window,
-                    dynamic_gas_price.max_blk_traverse,
-                )
-                .percentile(dynamic_gas_price.gas_price_percentile)
-                .cloned()
-                .map_or(miner.minimal_gas_price(), |gas_price| {
-                    ::std::cmp::min(gas_price, miner.local_maximal_gas_price())
-                })
+        Some(mut dynamic_gas_price) => {
+            let blk_now = client.chain_info().best_block_number as i64;
+            if blk_now - dynamic_gas_price.last_processed >= 2 {
+                dynamic_gas_price.recommendation = client
+                    .gas_price_corpus(
+                        dynamic_gas_price.blk_price_window,
+                        dynamic_gas_price.max_blk_traverse,
+                    )
+                    .percentile(dynamic_gas_price.gas_price_percentile)
+                    .cloned()
+                    .map_or(miner.minimal_gas_price(), |gas_price| {
+                        ::std::cmp::min(gas_price, miner.local_maximal_gas_price())
+                    });
+                dynamic_gas_price.last_processed = blk_now;
+            }
+            return dynamic_gas_price.recommendation;
         }
     }
 }
