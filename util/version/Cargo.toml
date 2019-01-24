@@ -3,7 +3,7 @@
 [package]
 name = "aion-version"
 # NOTE: this value is used for Aion version string (via env CARGO_PKG_VERSION)
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Aion Foundation <admin@aion.network>"]
 build = "build.rs"
 
