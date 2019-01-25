@@ -47,6 +47,8 @@ pipeline {
                 echo "clean old package"
             	sh 'rm aionr*.tar.gz || echo "no previous build packages"'
             	sh 'rm -r package || echo "no previous build package folder"'
+            	echo 'clean compiled version.rs'
+            	sh 'rm -r target/release/build/aion-version*'
             	echo "building..."
                 sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-$(git describe --tags)-$(date +%Y%m%d)"'
             }
