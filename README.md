@@ -11,8 +11,6 @@ This repository contains the rust kernel implementation and releases for the Aio
 
 Mainstream adoption of blockchains is limited because of scalability, privacy, and interoperability challenges. Aion is a multi-tier blockchain network designed to address these challenges.
 
-Many blockchains will are being created to solve business challenges in different industries. The Aion network is designed to support custom blockchains a provide a way for seperate blockchains to communicate.
-
 The [Aion White Papers](https://aion.network/developers/#whitepapers) provides more details on our design and project roadmap.
 
 ## Install the Kernel
