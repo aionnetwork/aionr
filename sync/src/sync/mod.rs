@@ -197,6 +197,7 @@ impl SyncMgr {
                     SyncStorage::get_block_chain().clear_bad();
                     SyncStorage::clear_downloaded_headers();
                     SyncStorage::clear_downloaded_blocks();
+                    SyncStorage::clear_downloaded_block_hashes();
                     SyncStorage::clear_requested_blocks();
                     SyncStorage::clear_headers_with_bodies_requested();
                     SyncStorage::set_synced_block_number(SyncStorage::get_chain_info().best_block_number);
