@@ -21,6 +21,8 @@
 
 use std::fmt;
 
+pub const MAX_VALID_ACTTION_VALUE: u8 = 7;
+
 #[derive(Serialize, Deserialize, PartialEq)]
 pub enum Version {
     V0 = 0,
