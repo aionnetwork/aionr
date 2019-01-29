@@ -18,7 +18,6 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
 use acore::client::{BlockChainClient, BlockId, BlockStatus, ChainNotify};
 use acore::transaction::UnverifiedTransaction;
 use aion_types::H256;
