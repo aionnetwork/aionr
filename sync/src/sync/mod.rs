@@ -124,9 +124,10 @@ impl SyncMgr {
                             P2pMgr::remove_peer(node.node_hash);
                         }
                     } else if node.last_request_timestamp
-                        + Duration::from_secs(STATICS_INTERVAL * 4)
+                        + Duration::from_secs(STATICS_INTERVAL * 12)
                         < SystemTime::now()
                     {
+                        info!(target: "sync", "Disconnect with idle node: {}@{}.", node.get_node_id(), node.get_ip_addr());
                         P2pMgr::remove_peer(node.node_hash);
                     }
                 }
@@ -193,8 +194,10 @@ impl SyncMgr {
                     && block_number_now - block_number_last_time < 2
                 {
                     SyncStorage::get_block_chain().clear_queue();
+                    SyncStorage::get_block_chain().clear_bad();
                     SyncStorage::clear_downloaded_headers();
                     SyncStorage::clear_downloaded_blocks();
+                    SyncStorage::clear_downloaded_block_hashes();
                     SyncStorage::clear_requested_blocks();
                     SyncStorage::clear_headers_with_bodies_requested();
                     SyncStorage::set_synced_block_number(SyncStorage::get_chain_info().best_block_number);
@@ -468,6 +471,10 @@ impl ChainNotify for Sync {
         _duration: u64,
     )
     {
+        if P2pMgr::get_all_nodes_count() == 0 {
+            return;
+        }
+
         if !imported.is_empty() {
             let min_imported_block_number = SyncStorage::get_synced_block_number() + 1;
             let mut max_imported_block_number = 0;

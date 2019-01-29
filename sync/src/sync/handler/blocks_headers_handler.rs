@@ -22,6 +22,7 @@
 use acore::client::BlockId;
 use acore::engines::pow_equihash_engine::POWEquihashEngine;
 use acore::header::Header as BlockHeader;
+use acore_bytes::to_hex;
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
@@ -74,11 +75,9 @@ impl BlockHeadersHandler {
                     if synced_block_number + LARGE_REQUEST_SIZE * 5 > max_staged_block_number {
                         let sync_speed = SyncStorage::get_sync_speed();
                         let jump_size = if sync_speed <= 40 {
-                            400
-                        } else if sync_speed > 40 && sync_speed <= 80 {
+                            480
+                        } else if sync_speed > 40 && sync_speed <= 100 {
                             sync_speed as u64 * 12
-                        } else if sync_speed > 80 && sync_speed <= 120 {
-                            sync_speed as u64 * 10
                         } else {
                             1200
                         };
@@ -246,7 +245,9 @@ impl BlockHeadersHandler {
                                 }
                             }
 
-                            if !SyncStorage::is_imported_block_hash(&hash) {
+                            if !SyncStorage::is_downloaded_block_hashes(&hash)
+                                && !SyncStorage::is_imported_block_hash(&hash)
+                            {
                                 hw.headers.push(header.clone());
                             }
                         }
@@ -254,11 +255,11 @@ impl BlockHeadersHandler {
                     }
                     Err(e) => {
                         // ignore this batch if any invalidated header
-                        error!(target: "sync", "Invalid header: {:?}, header: {}", e, header_rlp);
+                        error!(target: "sync", "Invalid header: {:?}, header: {}, received from {}@{}", e, to_hex(header_rlp.as_raw()), node.get_node_id(), node.get_ip_addr());
                     }
                 }
             } else {
-                error!(target: "sync", "Invalid header: {:?}", header_rlp);
+                error!(target: "sync", "Invalid header: {}, received from {}@{}", to_hex(header_rlp.as_raw()), node.get_node_id(), node.get_ip_addr());
             }
         }
 
