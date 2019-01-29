@@ -224,13 +224,13 @@ impl BlockHeadersHandler {
                                 || prev_header.hash() != *header.parent_hash())
                         {
                             error!(target: "sync",
-                            "<inconsistent-block-headers num={}, prev+1={}, hash={}, p_hash={}>, hash={}>",
-                            header.number(),
-                            prev_header.number() + 1,
-                            header.parent_hash(),
-                            prev_header.hash(),
-                            header.hash(),
-                        );
+                                "<inconsistent-block-headers num={}, prev+1={}, hash={}, p_hash={}>, hash={}>",
+                                header.number(),
+                                prev_header.number() + 1,
+                                header.parent_hash(),
+                                prev_header.hash(),
+                                header.hash(),
+                            );
                             break;
                         } else {
                             let hash = header.hash();
