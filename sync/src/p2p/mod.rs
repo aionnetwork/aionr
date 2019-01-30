@@ -126,7 +126,7 @@ impl P2pMgr {
                     socket
                         .set_recv_buffer_size(1 << 24)
                         .expect("set_recv_buffer_size failed");
-                    
+
                     socket
                         .set_keepalive(Some(Duration::from_secs(30)))
                         .expect("set_keepalive failed");

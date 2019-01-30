@@ -480,7 +480,7 @@ impl ChainNotify for Sync {
             let mut max_imported_block_number = 0;
             let client = SyncStorage::get_block_chain();
             for hash in imported.iter() {
-                ImportHandler::import_staged_blocks(&hash);
+                // ImportHandler::import_staged_blocks(&hash);
                 let block_id = BlockId::Hash(*hash);
                 if client.block_status(block_id) == BlockStatus::InChain {
                     if let Some(block_number) = client.block_number(block_id) {
