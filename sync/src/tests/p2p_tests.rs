@@ -72,7 +72,7 @@ fn test_load_boot_nodes() {
     for _ in 0..10 {
         node.inc_repeated();
     }
-    assert_eq!(node.ip_addr.port, 30303);
+    assert_eq!(node.ip_addr.port, 30309);
     assert_eq!(node.is_over_repeated_threshold(), true);
 
     node.node_hash = node_hash;
