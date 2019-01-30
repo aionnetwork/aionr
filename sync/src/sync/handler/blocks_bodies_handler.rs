@@ -196,19 +196,19 @@ impl BlockBodiesHandler {
                             if node.mode == Mode::LIGHTNING {
                                 let mut block_hashes_to_stage = Vec::new();
                                 let mut blocks_to_stage = Vec::new();
-                                if let Some(parent) = blocks.get(0) {
-                                    let parent_hash = parent.header.hash();
-                                    let parent_number = parent.header.number();
+                                if let Some(block) = blocks.get(0) {
+                                    let parent_hash = block.header.parent_hash();
+                                    let parent_number = block.header.number() - 1;
                                     if let Ok(mut staged_blocks) =
                                         SyncStorage::get_staged_blocks().lock()
                                     {
                                         if staged_blocks.len() < 32
                                             && !staged_blocks.contains_key(&parent_hash)
                                         {
-                                            for block in blocks.iter() {
-                                                let hash = block.header.hash();
+                                            for blk in blocks.iter() {
+                                                let hash = blk.header.hash();
                                                 block_hashes_to_stage.push(hash);
-                                                blocks_to_stage.push(block.rlp_bytes(Seal::With));
+                                                blocks_to_stage.push(blk.rlp_bytes(Seal::With));
                                             }
 
                                             let max_staged_block_number =
@@ -221,7 +221,7 @@ impl BlockBodiesHandler {
                                                 block_hashes_to_stage,
                                             );
 
-                                            staged_blocks.insert(parent_hash, blocks_to_stage);
+                                            staged_blocks.insert(*parent_hash, blocks_to_stage);
 
                                             if max_staged_block_number
                                                 > SyncStorage::get_max_staged_block_number()
