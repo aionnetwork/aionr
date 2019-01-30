@@ -78,7 +78,7 @@ pub fn get_network_config() -> NetworkConfig {
     ));
 
     net_config.local_node =
-        String::from("p2p://00000000-6666-0000-0000-000000000000@0.0.0.0:30303");
+        String::from("p2p://00000000-6666-0000-0000-000000000000@0.0.0.0:30309");
     net_config.net_id = 256;
     net_config.sync_from_boot_nodes_only = false;
     net_config

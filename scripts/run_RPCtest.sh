@@ -19,7 +19,7 @@ echo "import accounts"
 ./custom.sh account import $HOME/.aion/keys/testnet/*
 
 echo "start aion_rust"
-nohup  ./custom.sh --author=a07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137 --http-port=8511 &
+nohup  ./custom.sh --author=a07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137 &
 sleep 7
 
 # go aion_web3_test
