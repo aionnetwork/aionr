@@ -93,9 +93,9 @@ impl ImportHandler {
                         blocks_to_import.push(block.rlp_bytes(Seal::With));
                     } else if status == BlockStatus::Bad {
                         warn!(target: "sync", "Bad block {}, {:?}, got from node: {}@{}, mode: {}", block.header.number(), block.header.hash(), node.get_node_id(), node.get_ip_addr(), node.mode);
-                        // node.mode = Mode::BACKWARD;
-                        // P2pMgr::update_node_with_mode(node.node_hash, &node);
-                        break;
+                        node.mode = Mode::BACKWARD;
+                        P2pMgr::update_node_with_mode(node.node_hash, &node);
+                        return;
                     } else if max_block_number < block.header.number() {
                         max_block_number = block.header.number();
                     }
@@ -106,6 +106,7 @@ impl ImportHandler {
                         match node.mode {
                             Mode::BACKWARD => {
                                 info!(target: "sync", "Node: {}, the fork point #{} found, switched from BACKWARD mode to FORWARD mode", node.get_node_id(), max_block_number);
+
                                 node.mode = Mode::FORWARD;
                                 node.synced_block_num = max_block_number;
                             }

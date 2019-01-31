@@ -22,21 +22,21 @@
 
 //! Single account in the system.
 
-use std::fmt;
-use std::sync::Arc;
-use std::collections::{HashMap, BTreeMap};
-use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP, blake2b};
-use aion_types::{H256, U256, H128, U128, Address};
-use kvdb::{DBValue, HashStore};
+use aion_types::{Address, H128, H256, U128, U256};
+use basic_account::BasicAccount;
+use blake2b::{blake2b, BLAKE2B_EMPTY, BLAKE2B_NULL_RLP};
 use bytes::{Bytes, ToPretty};
-use trie;
-use trie::{SecTrieDB, Trie, TrieFactory, TrieError};
+use kvdb::{DBValue, HashStore};
+use lru_cache::LruCache;
 use pod_account::*;
 use rlp::*;
-use lru_cache::LruCache;
-use basic_account::BasicAccount;
+use std::collections::{BTreeMap, HashMap};
+use std::fmt;
+use std::sync::Arc;
+use trie;
+use trie::{SecTrieDB, Trie, TrieError, TrieFactory};
 
-use std::cell::{RefCell, Cell};
+use std::cell::{Cell, RefCell};
 
 const STORAGE_CACHE_ITEMS: usize = 8192;
 
@@ -212,12 +212,18 @@ impl Account {
         self.code_filth = Filth::Dirty;
     }
 
-    pub fn set_empty_but_commit(&mut self) { self.empty_but_commit = true; }
+    pub fn set_empty_but_commit(&mut self) {
+        self.empty_but_commit = true;
+    }
 
-    pub fn get_empty_but_commit(&mut self) -> bool { return self.empty_but_commit; }
+    pub fn get_empty_but_commit(&mut self) -> bool {
+        return self.empty_but_commit;
+    }
 
     /// Reset this account's code to the given code.
-    pub fn reset_code(&mut self, code: Bytes) { self.init_code(code); }
+    pub fn reset_code(&mut self, code: Bytes) {
+        self.init_code(code);
+    }
 
     /// Set (and cache) the contents of the trie's storage at `key` to `value`.
     pub fn set_storage(&mut self, key: H128, value: H128) {
@@ -237,6 +243,9 @@ impl Account {
         self.storage_cache
             .borrow_mut()
             .insert(key.clone(), value.clone());
+
+        info!(target:"account", "key: {:?}, value: {:?}.", key, value);
+
         Ok(value)
     }
 
@@ -286,13 +295,19 @@ impl Account {
     }
 
     /// return the balance associated with this account.
-    pub fn balance(&self) -> &U256 { &self.balance }
+    pub fn balance(&self) -> &U256 {
+        &self.balance
+    }
 
     /// return the nonce associated with this account.
-    pub fn nonce(&self) -> &U256 { &self.nonce }
+    pub fn nonce(&self) -> &U256 {
+        &self.nonce
+    }
 
     /// return the code hash associated with this account.
-    pub fn code_hash(&self) -> H256 { self.code_hash.clone() }
+    pub fn code_hash(&self) -> H256 {
+        self.code_hash.clone()
+    }
 
     /// return the code hash associated with this account.
     pub fn address_hash(&self, address: &Address) -> H256 {
@@ -318,7 +333,9 @@ impl Account {
 
     /// returns the account's code size. If `None` then the code cache or code size cache isn't available -
     /// get someone who knows to call `note_code`.
-    pub fn code_size(&self) -> Option<usize> { self.code_size.clone() }
+    pub fn code_size(&self) -> Option<usize> {
+        self.code_size.clone()
+    }
 
     #[cfg(test)]
     /// Provide a byte array which hashes to the `code_hash`. returns the hash as a result.
@@ -430,7 +447,9 @@ impl Account {
     }
 
     /// Check if account is basic (Has no code).
-    pub fn is_basic(&self) -> bool { self.code_hash == BLAKE2B_EMPTY }
+    pub fn is_basic(&self) -> bool {
+        self.code_hash == BLAKE2B_EMPTY
+    }
 
     /// Return the storage root associated with this account or None if it has been altered via the overlay.
     pub fn storage_root(&self) -> Option<&H256> {
@@ -442,15 +461,23 @@ impl Account {
     }
 
     /// Return the storage overlay.
-    pub fn storage_changes(&self) -> &HashMap<H128, H128> { &self.storage_changes }
+    pub fn storage_changes(&self) -> &HashMap<H128, H128> {
+        &self.storage_changes
+    }
 
-    pub fn storage_changes_dword(&self) -> &HashMap<H128, H256> { &self.storage_changes_dword }
+    pub fn storage_changes_dword(&self) -> &HashMap<H128, H256> {
+        &self.storage_changes_dword
+    }
 
     /// Increment the nonce of the account by one.
-    pub fn inc_nonce(&mut self) { self.nonce = self.nonce + U256::from(1u8); }
+    pub fn inc_nonce(&mut self) {
+        self.nonce = self.nonce + U256::from(1u8);
+    }
 
     /// Increase account balance.
-    pub fn add_balance(&mut self, x: &U256) { self.balance = self.balance + *x; }
+    pub fn add_balance(&mut self, x: &U256) {
+        self.balance = self.balance + *x;
+    }
 
     /// Decrease account balance.
     /// Panics if balance is less than `x`
@@ -464,8 +491,7 @@ impl Account {
         &mut self,
         trie_factory: &TrieFactory,
         db: &mut HashStore,
-    ) -> trie::Result<()>
-    {
+    ) -> trie::Result<()> {
         let mut t = trie_factory.from_existing(db, &mut self.storage_root)?;
         for (k, v) in self.storage_changes.drain() {
             // cast key and value to trait type,
@@ -484,8 +510,7 @@ impl Account {
         &mut self,
         trie_factory: &TrieFactory,
         db: &mut HashStore,
-    ) -> trie::Result<()>
-    {
+    ) -> trie::Result<()> {
         let mut t = trie_factory.from_existing(db, &mut self.storage_root)?;
         for (k, v) in self.storage_changes_dword.drain() {
             // cast key and value to trait type,
@@ -612,8 +637,7 @@ impl Account {
         &self,
         db: &HashStore,
         storage_key: H128,
-    ) -> Result<(Vec<Bytes>, H256), Box<TrieError>>
-    {
+    ) -> Result<(Vec<Bytes>, H256), Box<TrieError>> {
         use trie::recorder::Recorder;
 
         let mut recorder = Recorder::new();
@@ -647,12 +671,12 @@ impl fmt::Debug for Account {
 
 #[cfg(test)]
 mod tests {
-    use rlp_compress::{compress, decompress,snapshot_swapper};
-    use aion_types::Address;
-    use kvdb::MemoryDB;
-    use bytes::Bytes;
     use super::*;
     use account_db::*;
+    use aion_types::Address;
+    use bytes::Bytes;
+    use kvdb::MemoryDB;
+    use rlp_compress::{compress, decompress, snapshot_swapper};
 
     #[test]
     fn account_compress() {
