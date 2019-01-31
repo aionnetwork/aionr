@@ -230,6 +230,7 @@ impl BlockBodiesHandler {
                                                     max_staged_block_number,
                                                 );
                                             }
+                                            node.inc_reputation(10);
                                         }
                                     }
                                 }
@@ -238,6 +239,7 @@ impl BlockBodiesHandler {
                                 bw.node_id_hash = node.node_hash;
                                 bw.blocks.extend(blocks);
                                 SyncStorage::insert_downloaded_blocks(bw);
+                                node.inc_reputation(20);
                             }
 
                             if node.mode == Mode::NORMAL || node.mode == Mode::THUNDER {

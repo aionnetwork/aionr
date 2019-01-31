@@ -25,7 +25,7 @@ use futures::sync::mpsc;
 use futures::{Future, Stream};
 use rand::{thread_rng, Rng};
 use state::Storage;
-use std::collections::{hash_map::DefaultHasher, HashMap};
+use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::io;
 use std::net::Shutdown;
@@ -53,6 +53,7 @@ lazy_static! {
     static ref NETWORK_CONFIG: Storage<NetworkConfig> = Storage::new();
     static ref SOCKETS_MAP: Storage<Mutex<HashMap<u64, TcpStream>>> = Storage::new();
     static ref GLOBAL_NODES_MAP: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
+    static ref TOP8_NODE_HASHES: RwLock<Vec<u64>> = { RwLock::new(Vec::new()) };
     static ref ENABLED: Storage<AtomicBool> = Storage::new();
     static ref TP: Storage<ThreadPool> = Storage::new();
 }
@@ -146,11 +147,17 @@ impl P2pMgr {
 
     pub fn load_boot_nodes(boot_nodes_str: Vec<String>) -> Vec<Node> {
         let mut boot_nodes = Vec::new();
-        for boot_node_str in boot_nodes_str {
-            if boot_node_str.len() != 0 {
-                let mut boot_node = Node::new_with_node_str(boot_node_str.to_string());
-                boot_node.is_from_boot_list = true;
-                boot_nodes.push(boot_node);
+        if let Ok(mut top8) = TOP8_NODE_HASHES.write() {
+            for boot_node_str in boot_nodes_str {
+                if boot_node_str.len() != 0 {
+                    let mut boot_node = Node::new_with_node_str(boot_node_str.to_string());
+                    top8.push(boot_node.node_hash.clone());
+                    boot_node.is_from_boot_list = true;
+                    boot_nodes.push(boot_node);
+                }
+            }
+            if top8.len() > 8 {
+                top8.split_off(8);
             }
         }
         boot_nodes
@@ -381,15 +388,15 @@ impl P2pMgr {
     }
 
     pub fn get_an_active_node() -> Option<Node> {
-        let nodes = Self::get_nodes(ALIVE);
-        let node_count = nodes.len();
-        if node_count > 0 {
+        if let Ok(refresh_top8_nodes) = TOP8_NODE_HASHES.read() {
+            let node_count = refresh_top8_nodes.len();
             let mut rng = thread_rng();
             let random_index: usize = rng.gen_range(0, node_count);
-            return Self::get_node(nodes[random_index].node_hash);
-        } else {
-            None
+            if let Some(node_hash) = refresh_top8_nodes.get(random_index) {
+                return Self::get_node(*node_hash);
+            }
         }
+        None
     }
 
     pub fn get_node(node_hash: u64) -> Option<Node> {
@@ -415,6 +422,31 @@ impl P2pMgr {
                 node.mode = n.mode.clone();
                 n.update(node);
             }
+        }
+    }
+
+    pub fn replace_top8_node_hashes(node_hashes: Vec<u64>) {
+        if let Ok(mut refresh_top8_nodes) = TOP8_NODE_HASHES.write() {
+            refresh_top8_nodes.clear();
+            refresh_top8_nodes.extend(node_hashes);
+        }
+    }
+
+    pub fn refresh_top8_node_hashes(node_hashes: Vec<u64>) {
+        if let Ok(mut refresh_top8_nodes) = TOP8_NODE_HASHES.write() {
+            refresh_top8_nodes.retain(|node_hash| !node_hashes.contains(node_hash));
+            refresh_top8_nodes.splice(..0, node_hashes.iter().cloned());
+            if refresh_top8_nodes.len() > 8 {
+                refresh_top8_nodes.split_off(8);
+            }
+        }
+    }
+
+    pub fn get_top8_node_hashes() -> HashSet<u64> {
+        if let Ok(top8) = TOP8_NODE_HASHES.read() {
+            top8.iter().map(|hash| *hash).collect::<HashSet<_>>()
+        } else {
+            HashSet::new()
         }
     }
 

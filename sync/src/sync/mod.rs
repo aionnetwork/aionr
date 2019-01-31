@@ -59,6 +59,7 @@ const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
 const BLOCKS_IMPORT_INTERVAL: u64 = 50;
 const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
+const REPUTATION_HANDLE_INTERVAL: u64 = 15;
 const SYNC_STATIC_CAPACITY: usize = 25;
 
 #[derive(Clone)]
@@ -113,6 +114,35 @@ impl SyncMgr {
         })
         .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(broadcast_transactions_task);
+
+        let reputation_handle_task = Interval::new(
+            Instant::now(),
+            Duration::from_secs(REPUTATION_HANDLE_INTERVAL),
+        )
+        .for_each(move |_| {
+            let mut active_nodes = P2pMgr::get_nodes(ALIVE);
+            active_nodes.sort_by(|a, b| {
+                if a.reputation != b.reputation {
+                    b.reputation.cmp(&a.reputation)
+                } else {
+                    b.best_block_num.cmp(&a.best_block_num)
+                }
+            });
+
+            let mut top8_nodes: Vec<_> = active_nodes
+                .iter()
+                .map(|ref node| node.node_hash)
+                .collect::<Vec<_>>();
+            if top8_nodes.len() > 8 {
+                top8_nodes.split_off(8);
+                P2pMgr::replace_top8_node_hashes(top8_nodes);
+            } else {
+                P2pMgr::refresh_top8_node_hashes(top8_nodes);
+            }
+            Ok(())
+        })
+        .map_err(|e| error!("interval errored; err={:?}", e));
+        executor.spawn(reputation_handle_task);
 
         let statics_task = Interval::new(Instant::now(), Duration::from_secs(STATICS_INTERVAL))
             .for_each(move |_| {

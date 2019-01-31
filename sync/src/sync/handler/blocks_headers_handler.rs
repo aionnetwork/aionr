@@ -224,7 +224,7 @@ impl BlockHeadersHandler {
                                 || prev_header.hash() != *header.parent_hash())
                         {
                             error!(target: "sync",
-                                "<inconsistent-block-headers num={}, prev+1={}, hash={}, p_hash={}>, hash={}>",
+                                "<inconsistent-block-headers num={}, prev+1={}, parent_hash={}, prev_hash={}, hash={}>",
                                 header.number(),
                                 prev_header.number() + 1,
                                 header.parent_hash(),
@@ -266,8 +266,10 @@ impl BlockHeadersHandler {
         if !hw.headers.is_empty() {
             hw.node_hash = node_hash;
             hw.timestamp = SystemTime::now();
+            node.inc_reputation(10);
             SyncStorage::insert_downloaded_headers(hw);
         } else {
+            node.inc_reputation(1);
             debug!(target: "sync", "Came too late............");
         }
 

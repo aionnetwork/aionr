@@ -16,6 +16,7 @@ db = { path = "../db/core" }
 rlp = { path = "../util/rlp" }
 aion-version = { path = "../util/version" }
 
+parking_lot = "0.5"
 bincode = "1.0.1"
 byteorder = "1.2.7"
 bytes = "0.4"

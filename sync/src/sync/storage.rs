@@ -30,12 +30,13 @@ use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::SystemTime;
 use tokio::runtime::{Runtime, TaskExecutor};
+use parking_lot::RwLock as PLRwLock;
 
 lazy_static! {
     static ref BLOCK_CHAIN: Storage<RwLock<BlockChain>> = Storage::new();
     static ref SYNC_EXECUTORS: Storage<RwLock<SyncExecutor>> = Storage::new();
     static ref LOCAL_STATUS: Storage<RwLock<LocalStatus>> = Storage::new();
-    static ref NETWORK_STATUS: Storage<RwLock<NetworkStatus>> = Storage::new();
+    static ref NETWORK_STATUS: Storage<PLRwLock<NetworkStatus>> = Storage::new();
     static ref DOWNLOADED_HEADERS: Storage<Mutex<VecDeque<HeadersWrapper>>> = Storage::new();
     static ref HEADERS_WITH_BODIES_REQUESTED: Storage<Mutex<HashMap<u64, HeadersWrapper>>> =
         Storage::new();
@@ -108,7 +109,7 @@ impl SyncStorage {
             local_status.synced_block_number = synced_block_number;
             local_status.synced_block_number_last_time = synced_block_number;
             LOCAL_STATUS.set(RwLock::new(local_status));
-            NETWORK_STATUS.set(RwLock::new(network_status));
+            NETWORK_STATUS.set(PLRwLock::new(network_status));
             DOWNLOADED_HEADERS.set(Mutex::new(downloaded_headers));
             HEADERS_WITH_BODIES_REQUESTED.set(Mutex::new(headers_with_bodies_requested));
             DOWNLOADED_BLOCKS.set(Mutex::new(downloaded_blocks));
@@ -299,24 +300,18 @@ impl SyncStorage {
     }
 
     pub fn get_network_best_block_number() -> u64 {
-        if let Ok(network_status) = NETWORK_STATUS.get().read() {
-            return network_status.best_block_num;
-        }
-        0
+        let network_status = NETWORK_STATUS.get().read();
+        return network_status.best_block_num;
     }
 
     pub fn get_network_best_block_hash() -> H256 {
-        if let Ok(network_status) = NETWORK_STATUS.get().read() {
-            return network_status.best_hash;
-        }
-        H256::from(0)
+        let network_status = NETWORK_STATUS.get().read();
+        return network_status.best_hash;
     }
 
     pub fn get_network_total_diff() -> U256 {
-        if let Ok(network_status) = NETWORK_STATUS.get().read() {
-            return network_status.total_diff;
-        }
-        U256::from(0)
+        let network_status = NETWORK_STATUS.get().read();
+        return network_status.total_diff;
     }
 
     pub fn insert_requested_time(hash: H256) {
@@ -410,12 +405,11 @@ impl SyncStorage {
         target_total_difficulty: U256,
     )
     {
-        if let Ok(mut network_status) = NETWORK_STATUS.get().write() {
-            if target_total_difficulty > network_status.total_diff {
-                network_status.best_block_num = best_block_num;
-                network_status.best_hash = best_hash;
-                network_status.total_diff = target_total_difficulty;
-            }
+        let mut network_status = NETWORK_STATUS.get().write();
+        if target_total_difficulty > network_status.total_diff {
+            network_status.best_block_num = best_block_num;
+            network_status.best_hash = best_hash;
+            network_status.total_diff = target_total_difficulty;
         }
     }
 

@@ -151,18 +151,28 @@ impl BroadcastsHandler {
                                             trace!(target: "sync", "Sync broadcast new block sent...");
                                             P2pMgr::send(n.node_hash, req.clone());
                                         }
+                                        node.inc_reputation(10);
+                                        P2pMgr::update_node(node.node_hash, node);
                                     }
                                     Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
                                         trace!(target: "sync", "New block already in chain {:?}", hash);
+                                        node.inc_reputation(1);
+                                        P2pMgr::update_node(node.node_hash, node);
                                     }
                                     Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
                                         trace!(target: "sync", "New block already queued {:?}", hash);
+                                        node.inc_reputation(1);
+                                        P2pMgr::update_node(node.node_hash, node);
                                     }
                                     Err(BlockImportError::Block(BlockError::UnknownParent(p))) => {
                                         info!(target: "sync", "New block with unknown parent ({:?}) {:?}", p, hash);
+                                        node.dec_reputation(10);
+                                        P2pMgr::update_node(node.node_hash, node);
                                     }
                                     Err(e) => {
                                         error!(target: "sync", "Bad new block {:?} : {:?}", hash, e);
+                                        node.dec_reputation(50);
+                                        P2pMgr::update_node(node.node_hash, node);
                                     }
                                 };
                             }
@@ -215,6 +225,8 @@ impl BroadcastsHandler {
             if transactions.len() > 0 {
                 let client = SyncStorage::get_block_chain();
                 client.import_queued_transactions(transactions);
+                node.inc_reputation(1);
+                P2pMgr::update_node(node.node_hash, node);
             }
             node.last_broadcast_timestamp = SystemTime::now();
         }

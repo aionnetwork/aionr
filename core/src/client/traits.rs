@@ -277,11 +277,11 @@ pub trait BlockChainClient: Sync + Send {
             {
                 Some(gas_price) => {
                     corpus.push(gas_price);
-                    block_num -= 1;
                 }
                 None => (),
             }
             count += 1;
+            block_num -= 1;
         }
         corpus.into()
     }

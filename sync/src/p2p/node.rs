@@ -141,6 +141,7 @@ pub struct Node {
     pub is_from_boot_list: bool,
     pub repeated: u8,
     pub revision: [u8; MAX_REVISION_LENGTH],
+    pub reputation: u64,
 }
 
 impl Node {
@@ -166,6 +167,7 @@ impl Node {
             is_from_boot_list: false,
             repeated: 0,
             revision: [b' '; MAX_REVISION_LENGTH],
+            reputation: 0,
         }
     }
 
@@ -241,6 +243,7 @@ impl Node {
         self.tx = node_new.tx.clone();
         self.repeated = node_new.repeated;
         self.revision = node_new.revision;
+        self.reputation = node_new.reputation;
     }
 
     pub fn set_ip_addr(&mut self, addr: SocketAddr) {
@@ -257,6 +260,10 @@ impl Node {
         node_id.into()
     }
 
+    pub fn get_node_string(&self) -> String {
+        format!("p2p://{}@{}", self.get_node_id(), self.get_ip_addr())
+    }
+
     pub fn get_ip_addr(&self) -> String { self.ip_addr.get_addr() }
 
     pub fn get_display_ip_addr(&self) -> String { self.ip_addr.get_display_addr() }
@@ -266,6 +273,16 @@ impl Node {
     pub fn inc_repeated(&mut self) { self.repeated = self.repeated + 1; }
 
     pub fn reset_repeated(&mut self) { self.repeated = 0; }
+
+    pub fn inc_reputation(&mut self, score: u64) { self.reputation += score; }
+
+    pub fn dec_reputation(&mut self, score: u64) {
+        if self.reputation >= score {
+            self.reputation -= score;
+        }
+    }
+
+    pub fn reset_reputation(&mut self) { self.reputation = 0; }
 }
 
 impl fmt::Display for Node {
@@ -312,7 +329,8 @@ impl fmt::Display for Node {
             f,
             "    revision:{}\n",
             String::from_utf8_lossy(&self.revision)
-        )
+        )?;
+        write!(f, "    reputation: {}\n", self.reputation)
     }
 }
 

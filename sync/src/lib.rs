@@ -19,6 +19,7 @@
  *
  ******************************************************************************/
 
+extern crate parking_lot;
 extern crate bincode;
 extern crate byteorder;
 extern crate bytes;

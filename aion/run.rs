@@ -22,6 +22,8 @@
 use std::sync::{Arc, Weak};
 use std::thread;
 use std::time::{Duration, Instant};
+use std::fs;
+use std::io::{BufRead,BufReader};
 
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
 use acore::client::{BlockChainClient, Client, DatabaseCompactionProfile, VMType};
@@ -381,17 +383,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // enable Sync module
     network_manager.start_network();
-
-    if let Some(config_path) = cmd.dirs.config {
-        let local_node = P2pMgr::get_local_node();
-        fill_back_local_node(
-            config_path,
-            format!(
-                "p2p://{}@{}",
-                local_node.get_node_id(),
-                local_node.get_ip_addr()
-            ),
-        );
+    if let Some(config_path) = cmd.dirs.config.clone() {
+        fill_back_local_node(config_path);
     }
 
     // Create a weak reference to the client so that we can wait on shutdown until it is dropped
@@ -408,6 +401,11 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     http_server.expect("Invalid HTTP server instance!").close();
     ipc_server.expect("Invalid IPC server instance!").close();
 
+    if let Some(config_path) = cmd.dirs.config {
+        //        if !net_conf.sync_from_boot_nodes_only {
+        fill_back_boot_nodes(config_path);
+        //        }
+    }
     network_manager.stop_network();
 
     // close/drop this stuff as soon as exit detected.
@@ -605,10 +603,8 @@ fn build_create_account_hint(spec: &SpecType, keys: &str) -> String {
     )
 }
 
-fn fill_back_local_node(path: String, local_node_info: String) {
-    use std::fs;
-    use std::io::BufRead;
-    use std::io::BufReader;
+fn fill_back_local_node(path: String) {
+    let local_node_info = P2pMgr::get_local_node().get_node_string();
     let file = fs::File::open(&path).expect("Cannot open config file");
     let reader = BufReader::new(file);
     let mut no_change = true;
@@ -644,6 +640,37 @@ fn fill_back_local_node(path: String, local_node_info: String) {
     }
     let _ = fs::write(&path, ret).expect("Rewrite failed");
     info!(target: "run","Local node fill back!");
+}
+
+fn fill_back_boot_nodes(path: String) {
+    let boot_nodes: Vec<String> = P2pMgr::get_top8_node_hashes()
+        .iter()
+        .filter_map(|hash| P2pMgr::get_node(*hash))
+        .map(|x| x.get_node_string())
+        .collect();
+
+    let file = fs::File::open(&path).expect("Cannot open config file");
+    let reader = BufReader::new(file);
+    let mut ret: String = reader
+        .lines()
+        .filter_map(|l| l.ok())
+        .map(|s| s.trim().into())
+        .collect::<Vec<String>>()
+        .join("\n");
+    if let Some(index) = ret.find("\nboot_nodes") {
+        let ret_clone = ret.clone();
+        let (left, rest) = ret_clone.split_at(index);
+        let (_, right) = rest.split_at(rest.find("]").unwrap() + 1);
+        ret = format!("{}\nboot_nodes = {:?}{}", left, boot_nodes, right);
+    } else {
+        if let Some(index) = ret.find("[network]\n") {
+            ret.insert_str(index + 10, &format!("boot_nodes = {:?}\n", boot_nodes));
+        } else {
+            ret.insert_str(0, &format!("[network]\nboot_nodes = {:?}\n\n", boot_nodes));
+        }
+    }
+    let _ = fs::write(&path, ret).expect("Rewrite failed");
+    info!(target: "run","Boot nodes fill back!");
 }
 
 fn wait_for_exit() {

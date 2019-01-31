@@ -90,6 +90,7 @@ impl ActiveNodesHandler {
         }
         res.body.put_slice(res_body.as_slice());
         res.head.set_length(res.body.len() as u32);
+        peer_node.inc_reputation(1);
 
         NetEvent::update_node_state(peer_node, NetEvent::OnActiveNodesReq);
         P2pMgr::update_node(peer_node_hash, peer_node);
@@ -130,14 +131,18 @@ impl ActiveNodesHandler {
             }
         }
 
-        for n in node_list.iter() {
-            match P2pMgr::get_node(n.node_hash) {
-                Some(_) => {}
-                None => {
-                    P2pMgr::add_node(n.clone());
+        if node_list.len() > 0 {
+            for n in node_list.iter() {
+                match P2pMgr::get_node(n.node_hash) {
+                    Some(_) => {}
+                    None => {
+                        P2pMgr::add_node(n.clone());
+                    }
                 }
             }
+            peer_node.inc_reputation(10);
         }
+
         NetEvent::update_node_state(peer_node, NetEvent::OnActiveNodesRes);
         P2pMgr::update_node(peer_node_hash, peer_node);
     }

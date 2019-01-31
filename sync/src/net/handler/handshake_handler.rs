@@ -123,6 +123,7 @@ impl HandshakeHandler {
                 P2pMgr::add_peer(node.clone(), &socket);
             }
         }
+        node.inc_reputation(1);
 
         P2pMgr::send(node.node_hash, res);
         P2pMgr::remove_peer(old_node_hash);
@@ -140,7 +141,7 @@ impl HandshakeHandler {
         } else {
             node.revision[0..revision_len].copy_from_slice(revision);
         }
-
+        node.inc_reputation(10);
         NetEvent::update_node_state(node, NetEvent::OnHandshakeRes);
         P2pMgr::update_node(node.node_hash, node);
     }

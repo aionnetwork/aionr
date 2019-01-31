@@ -114,6 +114,7 @@ impl StatusHandler {
         }
         node.target_total_difficulty = U256::from(total_difficulty);
         SyncEvent::update_node_state(node, SyncEvent::OnStatusRes);
+        node.inc_reputation(1);
         P2pMgr::update_node(node_hash, node);
 
         SyncStorage::update_network_status(

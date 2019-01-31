@@ -51,7 +51,7 @@ impl ImportHandler {
                 let number = header_view.number();
                 let hash = header_view.hash();
 
-                if enable_import {
+                if enable_import && !SyncStorage::is_staged_block_hash(hash) {
                     SyncStorage::insert_requested_time(hash);
                     match client.import_block(block.clone()) {
                         Ok(_)
@@ -124,6 +124,7 @@ impl ImportHandler {
                                 node.synced_block_num = max_block_number;
                             }
                             _ => {
+                                node.inc_reputation(1);
                                 if max_block_number > node.synced_block_num {
                                     if node.synced_block_num + 32
                                         > SyncStorage::get_network_best_block_number()
@@ -210,8 +211,10 @@ impl ImportHandler {
                                             node.current_total_difficulty = current_total_difficulty
                                         }
                                     }
+                                    node.inc_reputation(1);
                                     info!(target: "sync", "AlreadyStored block #{}, {:?} received from node {}", number, hash, node.get_node_id());
                                 } else {
+                                    node.inc_reputation(10);
                                     debug!(target: "sync", "Best block #{}, {:?} imported from node {}", number, hash, node.get_node_id());
                                 }
 
@@ -269,10 +272,10 @@ impl ImportHandler {
                             Err(BlockImportError::Block(BlockError::UnknownParent(_))) => {
                                 if number == 1 {
                                     error!(target: "sync", "Invalid genesis !!!");
-
+                                    node.reset_reputation();
                                     break;
                                 }
-
+                                node.dec_reputation(5);
                                 if number > SyncStorage::get_synced_block_number() {
                                     // put into staging...
                                     if let Ok(mut staged_blocks) =
@@ -308,6 +311,7 @@ impl ImportHandler {
                                                     max_staged_block_number,
                                                 );
                                             }
+                                            node.inc_reputation(10);
                                         } else {
                                             node.synced_block_num =
                                                 client.chain_info().best_block_number;
@@ -344,6 +348,7 @@ impl ImportHandler {
                                 }
                             }
                             Err(e) => {
+                                node.dec_reputation(50);
                                 if !node.is_over_repeated_threshold() {
                                     warn!(target: "sync", "Got bad block #{}, {:?}", number, hash);
 
