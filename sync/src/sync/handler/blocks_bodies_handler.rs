@@ -194,41 +194,50 @@ impl BlockBodiesHandler {
 
                         if !blocks.is_empty() {
                             if node.mode == Mode::LIGHTNING {
-                                let mut block_hashes_to_stage = Vec::new();
-                                let mut blocks_to_stage = Vec::new();
                                 if let Some(block) = blocks.get(0) {
-                                    let parent_hash = block.header.parent_hash();
-                                    let parent_number = block.header.number() - 1;
-                                    if let Ok(mut staged_blocks) =
-                                        SyncStorage::get_staged_blocks().lock()
-                                    {
-                                        if staged_blocks.len() < 32
-                                            && !staged_blocks.contains_key(&parent_hash)
+                                    let block_number = block.header.number();
+                                    let max_staged_block_number =
+                                        SyncStorage::get_max_staged_block_number();
+                                    if block_number <= max_staged_block_number {
+                                        debug!(target: "sync", "Block #{} is out of staging scope: [#{} - Lastest)", block_number, max_staged_block_number);
+                                        return;
+                                    } else {
+                                        let mut block_hashes_to_stage = Vec::new();
+                                        let mut blocks_to_stage = Vec::new();
+
+                                        let parent_hash = block.header.parent_hash();
+                                        let parent_number = block_number - 1;
+                                        if let Ok(mut staged_blocks) =
+                                            SyncStorage::get_staged_blocks().lock()
                                         {
-                                            for blk in blocks.iter() {
-                                                let hash = blk.header.hash();
-                                                block_hashes_to_stage.push(hash);
-                                                blocks_to_stage.push(blk.rlp_bytes(Seal::With));
-                                            }
-
-                                            let max_staged_block_number =
-                                                parent_number + blocks_to_stage.len() as u64;
-
-                                            info!(target: "sync", "Staged blocks from {} to {} with parent: {}", parent_number + 1, max_staged_block_number, parent_hash);
-                                            debug!(target: "sync", "cache size: {}", staged_blocks.len());
-
-                                            SyncStorage::insert_staged_block_hashes(
-                                                block_hashes_to_stage,
-                                            );
-
-                                            staged_blocks.insert(*parent_hash, blocks_to_stage);
-
-                                            if max_staged_block_number
-                                                > SyncStorage::get_max_staged_block_number()
+                                            if staged_blocks.len() < 32
+                                                && !staged_blocks.contains_key(&parent_hash)
                                             {
-                                                SyncStorage::set_max_staged_block_number(
-                                                    max_staged_block_number,
+                                                for blk in blocks.iter() {
+                                                    let hash = blk.header.hash();
+                                                    block_hashes_to_stage.push(hash);
+                                                    blocks_to_stage.push(blk.rlp_bytes(Seal::With));
+                                                }
+
+                                                let max_staged_block_number =
+                                                    parent_number + blocks_to_stage.len() as u64;
+
+                                                info!(target: "sync", "Staged blocks from {} to {} with parent: {}", parent_number + 1, max_staged_block_number, parent_hash);
+                                                debug!(target: "sync", "cache size: {}", staged_blocks.len());
+
+                                                SyncStorage::insert_staged_block_hashes(
+                                                    block_hashes_to_stage,
                                                 );
+
+                                                staged_blocks.insert(*parent_hash, blocks_to_stage);
+
+                                                if max_staged_block_number
+                                                    > SyncStorage::get_max_staged_block_number()
+                                                {
+                                                    SyncStorage::set_max_staged_block_number(
+                                                        max_staged_block_number,
+                                                    );
+                                                }
                                             }
                                         }
                                     }
