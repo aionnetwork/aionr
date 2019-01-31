@@ -611,21 +611,18 @@ impl Account {
     pub fn prove_storage(
         &self,
         db: &HashStore,
-        storage_key: H256,
+        storage_key: H128,
     ) -> Result<(Vec<Bytes>, H256), Box<TrieError>>
     {
-        use trie::{Trie, TrieDB};
         use trie::recorder::Recorder;
 
         let mut recorder = Recorder::new();
-
-        let trie = TrieDB::new(db, &self.storage_root)?;
-        let item: U256 = {
+        let trie = SecTrieDB::new(db, &self.storage_root)?;
+        let item: H256 = {
             let query = (&mut recorder, ::rlp::decode);
             trie.get_with(&storage_key, query)?
-                .unwrap_or_else(U256::zero)
+                .unwrap_or_else(H256::zero)
         };
-
         Ok((
             recorder.drain().into_iter().map(|r| r.data).collect(),
             item.into(),

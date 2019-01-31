@@ -1268,7 +1268,7 @@ impl<B: Backend> State<B> {
     pub fn prove_storage(
         &self,
         account_key: H256,
-        storage_key: H256,
+        storage_key: H128,
     ) -> trie::Result<(Vec<Bytes>, H256)>
     {
         // TODO: probably could look into cache somehow but it's keyed by

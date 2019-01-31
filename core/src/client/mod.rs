@@ -35,8 +35,6 @@ pub use self::test_client::{TestBlockChainClient, EachBlockWith};
 pub use self::chain_notify::ChainNotify;
 pub use self::traits::{BlockChainClient, MiningBlockChainClient, EngineClient};
 
-pub use self::traits::ProvingBlockChainClient;
-
 pub use types::ids::*;
 pub use types::trace_filter::Filter as TraceFilter;
 pub use types::pruning_info::PruningInfo;

@@ -23,29 +23,29 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
-use block::{OpenBlock, SealedBlock, ClosedBlock};
+use block::{ClosedBlock, OpenBlock, SealedBlock};
 use blockchain::TreeRoute;
 use encoded;
-use error::{ImportResult, CallError, BlockImportError};
-use vms::LastHashes;
-use factory::VmFactory;
+use error::{BlockImportError, CallError, ImportResult};
 use executive::Executed;
+use factory::VmFactory;
 use filter::Filter;
-use header::{BlockNumber};
+use header::BlockNumber;
 use log_entry::LocalizedLogEntry;
 use receipt::LocalizedReceipt;
 use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction};
 use verification::queue::QueueInfo as BlockQueueInfo;
+use vms::LastHashes;
 
-use aion_types::{H256, H128, U256, Address};
+use aion_types::{Address, H128, H256, U256};
 use bytes::Bytes;
 use kvdb::DBValue;
 
-use types::ids::*;
 use types::basic_account::BasicAccount;
-use types::call_analytics::CallAnalytics;
-use types::blockchain_info::BlockChainInfo;
 use types::block_status::BlockStatus;
+use types::blockchain_info::BlockChainInfo;
+use types::call_analytics::CallAnalytics;
+use types::ids::*;
 use types::pruning_info::PruningInfo;
 
 use super::super::transaction::UnverifiedTransaction;
@@ -244,8 +244,7 @@ pub trait BlockChainClient: Sync + Send {
         &self,
         blk_price_window: usize,
         max_blk_traverse: usize,
-    ) -> ::stats::Corpus<U256>
-    {
+    ) -> ::stats::Corpus<U256> {
         let mut block_num = self.chain_info().best_block_number;
         let mut corpus = Vec::new();
         let mut count = 0;
@@ -307,6 +306,29 @@ pub trait BlockChainClient: Sync + Send {
 
     /// Get the address of a particular blockchain service, if available.
     fn registry_address(&self, name: String, block: BlockId) -> Option<Address>;
+
+    /// Prove account storage at a specific block id.
+    ///
+    /// Both provided keys assume a secure trie.
+    /// Returns a vector of raw trie nodes (in order from the root) proving the storage query.
+    fn prove_storage(&self, key1: H256, key2: H128, id: BlockId) -> Option<(Vec<Bytes>, H256)>;
+
+    /// Prove account existence at a specific block id.
+    /// The key is the blake2b hash of the account's address.
+    /// Returns a vector of raw trie nodes (in order from the root) proving the query.
+    fn prove_account(&self, key1: H256, id: BlockId) -> Option<(Vec<Bytes>, BasicAccount)>;
+
+    /// Prove execution of a transaction at the given block.
+    /// Returns the output of the call and a vector of database items necessary
+    /// to reproduce it.
+    fn prove_transaction(
+        &self,
+        transaction: SignedTransaction,
+        id: BlockId,
+    ) -> Option<(Bytes, Vec<DBValue>)>;
+
+    /// Get an epoch change signal by block hash.
+    fn epoch_signal(&self, hash: H256) -> Option<Vec<u8>>;
 }
 
 /// Extended client interface used for mining
@@ -370,30 +392,4 @@ pub trait EngineClient: Sync + Send {
 
     /// Get raw block header data by block id.
     fn block_header(&self, id: BlockId) -> Option<encoded::Header>;
-}
-
-/// Extended client interface for providing proofs of the state.
-pub trait ProvingBlockChainClient: BlockChainClient {
-    /// Prove account storage at a specific block id.
-    ///
-    /// Both provided keys assume a secure trie.
-    /// Returns a vector of raw trie nodes (in order from the root) proving the storage query.
-    fn prove_storage(&self, key1: H256, key2: H256, id: BlockId) -> Option<(Vec<Bytes>, H256)>;
-
-    /// Prove account existence at a specific block id.
-    /// The key is the blake2b hash of the account's address.
-    /// Returns a vector of raw trie nodes (in order from the root) proving the query.
-    fn prove_account(&self, key1: H256, id: BlockId) -> Option<(Vec<Bytes>, BasicAccount)>;
-
-    /// Prove execution of a transaction at the given block.
-    /// Returns the output of the call and a vector of database items necessary
-    /// to reproduce it.
-    fn prove_transaction(
-        &self,
-        transaction: SignedTransaction,
-        id: BlockId,
-    ) -> Option<(Bytes, Vec<DBValue>)>;
-
-    /// Get an epoch change signal by block hash.
-    fn epoch_signal(&self, hash: H256) -> Option<Vec<u8>>;
 }
