@@ -293,7 +293,7 @@ impl ImportHandler {
                                             debug!(target: "sync", "cache size: {}", staged_blocks.len());
 
                                             let mut staged_block_hashes = Vec::new();
-                                            for block in blocks_to_import.iter() {
+                                            for block in blocks_to_stage.iter() {
                                                 let block_view = BlockView::new(block);
                                                 let hash = block_view.header_view().hash();
                                                 staged_block_hashes.push(hash);
