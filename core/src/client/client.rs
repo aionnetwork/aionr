@@ -583,71 +583,6 @@ impl Client {
         imported
     }
 
-    /// Import a block with transaction receipts.
-    /// The block is guaranteed to be the next best blocks in the first block sequence.
-    /// Does no sealing or transaction validation.
-    fn import_old_block(
-        &self,
-        block_bytes: Bytes,
-        receipts_bytes: Bytes,
-    ) -> Result<H256, ::error::Error> {
-        let block = BlockView::new(&block_bytes);
-        let header = block.header();
-        let receipts = ::rlp::decode_list(&receipts_bytes);
-        let hash = header.hash();
-        let _import_lock = self.import_lock.lock();
-
-        {
-            trace_time!("import_old_block");
-            let chain = self.chain.read();
-            let mut ancient_verifier = self.ancient_verifier.lock();
-
-            {
-                // closure for verifying a block.
-                let verify_with = |verifier: &AncientVerifier| -> Result<(), ::error::Error> {
-                    // verify the block, passing the chain for updating the epoch
-                    // verifier.
-                    let mut rng = OsRng::new().map_err(UtilError::from)?;
-                    verifier.verify(&mut rng, &header, &chain)
-                };
-
-                // initialize the ancient block verifier if we don't have one already.
-                match &mut *ancient_verifier {
-                    &mut Some(ref verifier) => verify_with(verifier)?,
-                    x @ &mut None => {
-                        // load most recent epoch.
-                        trace!(target: "client", "Initializing ancient block restoration.");
-                        let current_epoch_data = chain
-                            .epoch_transitions()
-                            .take_while(|&(_, ref t)| t.block_number < header.number())
-                            .last()
-                            .map(|(_, t)| t.proof)
-                            .expect("At least one epoch entry (genesis) always stored; qed");
-
-                        let current_verifier = self
-                            .engine
-                            .epoch_verifier(&header, &current_epoch_data)
-                            .known_confirmed()?;
-                        let current_verifier =
-                            AncientVerifier::new(self.engine.clone(), current_verifier);
-
-                        verify_with(&current_verifier)?;
-                        *x = Some(current_verifier);
-                    }
-                }
-            }
-
-            // Commit results
-            let mut batch = DBTransaction::new();
-            chain.insert_unordered_block(&mut batch, &block_bytes, receipts, None, false, true);
-            // Final commit to the DB
-            self.db.read().write_buffered(batch);
-            chain.commit();
-        }
-        self.db.read().flush().expect("DB flush failed.");
-        Ok(hash)
-    }
-
     // NOTE: the header of the block passed here is not necessarily sealed, as
     // it is for reconstructing the state transition.
     //
@@ -1675,26 +1610,71 @@ impl BlockChainClient for Client {
         Ok(self.block_queue.import(unverified)?)
     }
 
-    fn import_block_with_receipts(
+    fn try_import_block(
         &self,
         block_bytes: Bytes,
-        receipts_bytes: Bytes,
-    ) -> Result<H256, BlockImportError> {
+        total_difficulty: U256,
+    ) -> Result<H256, BlockImportError>
+    {
+        let block = BlockView::new(&block_bytes);
+        let header = block.header();
+        let hash = header.hash();
+        let _import_lock = self.import_lock.lock();
         {
-            // check block order
-            let header = BlockView::new(&block_bytes).header_view();
-            if self.chain.read().is_known(&header.hash()) {
-                return Err(BlockImportError::Import(ImportError::AlreadyInChain));
+            trace_time!("try_import_block");
+            let chain = self.chain.read();
+            let mut ancient_verifier = self.ancient_verifier.lock();
+            {
+                // closure for verifying a block.
+                let verify_with = |verifier: &AncientVerifier| -> Result<(), ::error::Error> {
+                    // verify the block, passing the chain for updating the epoch
+                    // verifier.
+                    let mut rng = OsRng::new().map_err(UtilError::from)?;
+                    verifier.verify(&mut rng, &header, &chain)
+                };
+
+                // initialize the ancient block verifier if we don't have one already.
+                match &mut *ancient_verifier {
+                    &mut Some(ref verifier) => verify_with(verifier)?,
+                    x @ &mut None => {
+                        // load most recent epoch.
+                        trace!(target: "client", "Initializing ancient block restoration.");
+                        let current_epoch_data = chain
+                            .epoch_transitions()
+                            .take_while(|&(_, ref t)| t.block_number < header.number())
+                            .last()
+                            .map(|(_, t)| t.proof)
+                            .expect("At least one epoch entry (genesis) always stored; qed");
+
+                        let current_verifier = self
+                            .engine
+                            .epoch_verifier(&header, &current_epoch_data)
+                            .known_confirmed()?;
+                        let current_verifier =
+                            AncientVerifier::new(self.engine.clone(), current_verifier);
+
+                        verify_with(&current_verifier)?;
+                        *x = Some(current_verifier);
+                    }
+                }
             }
-            let status = self.block_status(BlockId::Hash(header.parent_hash()));
-            if status == BlockStatus::Unknown || status == BlockStatus::Pending {
-                return Err(BlockImportError::Block(BlockError::UnknownParent(
-                    header.parent_hash(),
-                )));
-            }
+
+            // Commit results
+            let mut batch = DBTransaction::new();
+            chain.insert_unordered_block(
+                &mut batch,
+                &block_bytes,
+                vec![],
+                Some(total_difficulty),
+                true,
+                true,
+            );
+            // Final commit to the DB
+            self.db.read().write_buffered(batch);
+            chain.commit();
         }
-        self.import_old_block(block_bytes, receipts_bytes)
-            .map_err(Into::into)
+        self.db.read().flush().expect("DB flush failed.");
+        Ok(hash)
     }
 
     fn queue_info(&self) -> BlockQueueInfo {

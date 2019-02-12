@@ -19,38 +19,29 @@
  *
  ******************************************************************************/
 
-use acore::client::BlockId;
 use acore::engines::pow_equihash_engine::POWEquihashEngine;
 use acore::header::Header as BlockHeader;
+use acore::client::BlockStatus;
 use acore_bytes::to_hex;
-use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
+use byteorder::{BigEndian, ByteOrder};
 use bytes::BufMut;
-use rlp::{RlpStream, UntrustedRlp};
-use std::mem;
+use rlp::UntrustedRlp;
 use std::time::{Duration, SystemTime};
+use kvdb::DBTransaction;
 
 use super::super::action::SyncAction;
 use super::super::event::SyncEvent;
-use super::super::storage::{HeadersWrapper, SyncStorage};
+use super::super::storage::{BlockWrapper, HeadersWrapper, SyncStorage, MAX_CACHED_BLOCK_HASHED};
+use super::blocks_bodies_handler::BlockBodiesHandler;
 
 use p2p::*;
 
-const BACKWARD_SYNC_STEP: u64 = 64;
-const REQUEST_SIZE: u64 = 24;
-const LARGE_REQUEST_SIZE: u64 = 48;
+const BACKWARD_SYNC_STEP: u64 = 128;
+const REQUEST_SIZE: u64 = 96;
 
 pub struct BlockHeadersHandler;
 
 impl BlockHeadersHandler {
-    pub fn get_headers_from_random_node() {
-        if let Some(mut node) = P2pMgr::get_an_active_node() {
-            if node.synced_block_num == 0 {
-                node.synced_block_num = SyncStorage::get_synced_block_number() + 1;
-            }
-            BlockHeadersHandler::get_headers_from_node(&mut node);
-        }
-    }
-
     pub fn get_headers_from_node(node: &mut Node) {
         trace!(target: "sync", "get_headers_from_node, node id: {}", node.get_node_id());
 
@@ -58,60 +49,34 @@ impl BlockHeadersHandler {
             return;
         }
 
-        if node.last_request_timestamp + Duration::from_millis(1000) > SystemTime::now() {
+        if node.last_request_timestamp + Duration::from_secs(1) > SystemTime::now() {
+            return;
+        }
+
+        if node.synced_block_num == 0 {
+            node.synced_block_num = SyncStorage::get_synced_block_number() + 1;
+        }
+
+        if SyncStorage::get_synced_block_number() + ((MAX_CACHED_BLOCK_HASHED / 4) as u64)
+            <= node.synced_block_num
+        {
+            debug!(target: "sync", "get_headers_from_node, {} - {}", SyncStorage::get_synced_block_number(), node.synced_block_num);
+
             return;
         }
 
         if node.target_total_difficulty > node.current_total_difficulty {
             let mut from: u64 = 1;
-            let mut size = REQUEST_SIZE;
+            let size = REQUEST_SIZE;
 
             match node.mode {
-                Mode::LIGHTNING => {
-                    // request far forward blocks
-                    let mut self_num;
-                    let max_staged_block_number = SyncStorage::get_max_staged_block_number();
-                    let synced_block_number = SyncStorage::get_synced_block_number();
-                    if synced_block_number + LARGE_REQUEST_SIZE * 5 > max_staged_block_number {
-                        let sync_speed = SyncStorage::get_sync_speed();
-                        let jump_size = if sync_speed <= 40 {
-                            480
-                        } else if sync_speed > 40 && sync_speed <= 100 {
-                            sync_speed as u64 * 12
-                        } else {
-                            1200
-                        };
-                        self_num = synced_block_number + jump_size;
-                    } else {
-                        self_num = max_staged_block_number + 1;
-                    }
-                    if node.best_block_num > self_num + LARGE_REQUEST_SIZE {
-                        size = LARGE_REQUEST_SIZE;
-                        from = self_num;
-                    } else {
-                        // transition to ramp down strategy
-                        node.mode = Mode::THUNDER;
-                        return;
-                    }
-                }
-                Mode::THUNDER => {
-                    let mut self_num = SyncStorage::get_synced_block_number();
-                    size = LARGE_REQUEST_SIZE;
-                    from = if self_num > 4 { self_num - 3 } else { 1 };
-                }
                 Mode::NORMAL => {
-                    let self_num = SyncStorage::get_synced_block_number();
-                    let node_num = node.best_block_num;
-
-                    if node_num >= self_num + BACKWARD_SYNC_STEP {
-                        from = if self_num > 4 { self_num - 3 } else { 1 };
-                    } else if self_num < BACKWARD_SYNC_STEP {
-                        from = if self_num > 16 { self_num - 15 } else { 1 };
-                    } else if node_num >= self_num - BACKWARD_SYNC_STEP {
-                        from = self_num - 16;
-                    } else {
-                        return;
+                    if node.synced_block_num + 128 < SyncStorage::get_synced_block_number() {
+                        node.synced_block_num = SyncStorage::get_synced_block_number();
                     }
+
+                    let self_num = node.synced_block_num;
+                    from = if self_num > 2 { self_num - 1 } else { 1 };
                 }
                 Mode::BACKWARD => {
                     let self_num = node.synced_block_num;
@@ -125,7 +90,9 @@ impl BlockHeadersHandler {
                 }
             };
 
-            if node.last_request_num != from {
+            if node.last_request_num == from {
+                return;
+            } else {
                 node.last_request_timestamp = SystemTime::now();
             }
             node.last_request_num = from;
@@ -156,62 +123,22 @@ impl BlockHeadersHandler {
         P2pMgr::send(node_hash, req);
     }
 
-    pub fn handle_blocks_headers_req(node: &mut Node, req: ChannelBuffer) {
+    pub fn handle_blocks_headers_req(_node: &mut Node, _req: ChannelBuffer) {
         trace!(target: "sync", "BLOCKSHEADERSREQ received.");
-
-        let client = SyncStorage::get_block_chain();
-
-        let mut res = ChannelBuffer::new();
-        let node_hash = node.node_hash;
-
-        res.head.ver = Version::V0.value();
-        res.head.ctrl = Control::SYNC.value();
-        res.head.action = SyncAction::BLOCKSHEADERSRES.value();
-
-        let mut res_body = Vec::new();
-
-        let (mut from, req_body_rest) = req.body.split_at(mem::size_of::<u64>());
-        let from = from.read_u64::<BigEndian>().unwrap_or(1);
-        let (mut size, _) = req_body_rest.split_at(mem::size_of::<u32>());
-        let size = size.read_u32::<BigEndian>().unwrap_or(1);
-        let chain_info = client.chain_info();
-        let last = chain_info.best_block_number;
-
-        let mut header_count = 0;
-        let number = from;
-        let mut data = Vec::new();
-        while number + header_count <= last && header_count < size.into() {
-            match client.block_header(BlockId::Number(number + header_count)) {
-                Some(hdr) => {
-                    data.append(&mut hdr.into_inner());
-                    header_count += 1;
-                }
-                None => {}
-            }
-        }
-
-        if header_count > 0 {
-            let mut rlp = RlpStream::new_list(header_count as usize);
-
-            rlp.append_raw(&data, header_count as usize);
-            res_body.put_slice(rlp.as_raw());
-        }
-
-        res.body.put_slice(res_body.as_slice());
-        res.head.set_length(res.body.len() as u32);
-
-        SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersReq);
-        P2pMgr::update_node(node_hash, node);
-        P2pMgr::send(node_hash, res);
     }
 
     pub fn handle_blocks_headers_res(node: &mut Node, req: ChannelBuffer) {
         trace!(target: "sync", "BLOCKSHEADERSRES received.");
 
+        if node.target_total_difficulty < SyncStorage::get_network_total_diff() {
+            info!(target: "sync", "target_total_difficulty: {}, network_total_diff: {}.", node.target_total_difficulty, SyncStorage::get_network_total_diff());
+            // return;
+        }
+
         let node_hash = node.node_hash;
         let rlp = UntrustedRlp::new(req.body.as_slice());
         let mut prev_header = BlockHeader::new();
-        let mut hw = HeadersWrapper::new();
+        let mut headers = Vec::new();
 
         for header_rlp in rlp.iter() {
             if let Ok(header) = header_rlp.as_val() {
@@ -224,32 +151,27 @@ impl BlockHeadersHandler {
                                 || prev_header.hash() != *header.parent_hash())
                         {
                             error!(target: "sync",
-                                "<inconsistent-block-headers num={}, prev+1={}, parent_hash={}, prev_hash={}, hash={}>",
-                                header.number(),
-                                prev_header.number() + 1,
-                                header.parent_hash(),
-                                prev_header.hash(),
-                                header.hash(),
-                            );
+                            "<inconsistent-block-headers num={}, prev+1={}, hash={}, p_hash={}>, hash={}>",
+                            header.number(),
+                            prev_header.number() + 1,
+                            header.parent_hash(),
+                            prev_header.hash(),
+                            header.hash(),
+                        );
                             break;
                         } else {
                             let hash = header.hash();
                             let number = header.number();
 
-                            // Skip staged block header
-                            if node.mode == Mode::THUNDER {
-                                if SyncStorage::is_staged_block_hash(hash) {
-                                    debug!(target: "sync", "Skip staged block header #{}: {:?}", number, hash);
-                                    // hw.headers.push(header.clone());
-                                    break;
-                                }
+                            if number <= SyncStorage::get_synced_block_number() {
+                                debug!(target: "sync", "Imported header: {} - {:?}.", number, hash);
+                            } else if SyncStorage::is_block_hash_confirmed(hash, true) {
+                                headers.push(header.clone());
+                                debug!(target: "sync", "Confirmed header: {} - {:?}, to be imported.", number, hash);
+                            } else {
+                                debug!(target: "sync", "Downloaded header: {} - {:?}, under confirmation.", number, hash);
                             }
-
-                            if !SyncStorage::is_downloaded_block_hashes(&hash)
-                                && !SyncStorage::is_imported_block_hash(&hash)
-                            {
-                                hw.headers.push(header.clone());
-                            }
+                            node.synced_block_num = number;
                         }
                         prev_header = header;
                     }
@@ -263,11 +185,10 @@ impl BlockHeadersHandler {
             }
         }
 
-        if !hw.headers.is_empty() {
-            hw.node_hash = node_hash;
-            hw.timestamp = SystemTime::now();
+        if !headers.is_empty() {
             node.inc_reputation(10);
-            SyncStorage::insert_downloaded_headers(hw);
+            Self::import_block_header(node_hash, headers);
+            Self::get_headers_from_node(node);
         } else {
             node.inc_reputation(1);
             debug!(target: "sync", "Came too late............");
@@ -275,5 +196,100 @@ impl BlockHeadersHandler {
 
         SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
         P2pMgr::update_node(node_hash, node);
+    }
+
+    fn import_block_header(node_hash: u64, headers: Vec<BlockHeader>) {
+        let mut count = 0;
+        let mut hw = HeadersWrapper::new();
+        let mut local_status = SyncStorage::get_local_status();
+        for header in headers.iter() {
+			let mut tx = DBTransaction::new();
+            let mut header_chain = SyncStorage::get_block_header_chain();
+            if header_chain.status(header.parent_hash()) != BlockStatus::InChain {
+                break;
+            }
+			if let Ok(pending) = header_chain.insert(&mut tx, &header, None) {
+                header_chain.apply_pending(tx, pending);
+			}
+
+            let hash = header.hash();
+            let number = header.number();
+            let parent_hash = header.parent_hash();
+            if SyncStorage::is_block_hash_confirmed(hash, false) {
+                if let Ok(ref mut downloaded_blocks) = SyncStorage::get_downloaded_blocks().lock() {
+                    if number == 1 || number == SyncStorage::get_starting_block_number() {
+                    } else if let Some(parent_bw) = downloaded_blocks.get_mut(&(number - 1)) {
+                        if parent_bw
+                            .block_hashes
+                            .iter()
+                            .filter(|h| *h == parent_hash)
+                            .next()
+                            .is_none()
+                        {
+                            continue;
+                        }
+                    } else {
+                        debug!(target: "sync", "number {}, starting_block_number: {}", number, SyncStorage::get_starting_block_number());
+                        continue;
+                    }
+
+                    if let Some(bw_old) = downloaded_blocks.get_mut(&number) {
+                        if &bw_old.parent_hash == parent_hash {
+                            let mut index = 0;
+                            for h in bw_old.block_hashes.iter() {
+                                if h == &hash {
+                                    debug!(target: "sync", "Already imported block header #{}-{}", number, hash);
+                                    continue;
+                                }
+                                index += 1;
+                            }
+
+                            if index == bw_old.block_hashes.len() {
+                                bw_old.block_hashes.extend(vec![hash]);
+
+                                count += 1;
+                                local_status.total_difficulty =
+                                    local_status.total_difficulty + header.difficulty().clone();
+                                local_status.synced_block_number = number;
+                                local_status.synced_block_hash = hash;
+                                debug!(target: "sync", "Block header #{} - {:?} imported(side chain against {:?}).", number, hash, bw_old.block_hashes);
+                            }
+                        }
+                        continue;
+                    }
+
+                    let bw = BlockWrapper {
+                        block_number: number,
+                        parent_hash: header.parent_hash().clone(),
+                        block_hashes: vec![hash],
+                        block_headers: None,
+                    };
+
+                    downloaded_blocks.insert(number, bw);
+
+                    count += 1;
+                    if number > 0 {
+                        hw.node_hash = node_hash;
+                        hw.hashes.push(hash);
+                        hw.headers.push(header.clone());
+                    }
+                    local_status.total_difficulty =
+                        local_status.total_difficulty + header.difficulty().clone();
+                    local_status.synced_block_number = number;
+                    local_status.synced_block_hash = hash;
+
+                    debug!(target: "sync", "Block header #{} - {:?} imported", number, hash);
+                }
+            } else {
+                warn!(target: "sync", "Not confirmed Block header #{} - {:?}.", number, hash);
+            }
+        }
+
+        if count > 0 {
+            SyncStorage::set_local_status(local_status);
+            // if hw.hashes.len() > 0 {
+            //     BlockBodiesHandler::send_blocks_bodies_req(node_hash, hw);
+            // }
+        }
     }
 }

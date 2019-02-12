@@ -777,7 +777,12 @@ impl BlockChainClient for TestBlockChainClient {
         Ok(h)
     }
 
-    fn import_block_with_receipts(&self, b: Bytes, _r: Bytes) -> Result<H256, BlockImportError> {
+    fn try_import_block(
+        &self,
+        b: Bytes,
+        _total_difficulty: U256,
+    ) -> Result<H256, BlockImportError>
+    {
         self.import_block(b)
     }
 

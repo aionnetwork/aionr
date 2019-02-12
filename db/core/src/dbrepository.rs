@@ -19,16 +19,16 @@
  *
  ******************************************************************************/
 
-use rockskvdb;
 use mockkvdb;
-use std::collections::{HashMap,BTreeMap};
 use parking_lot::RwLock;
+use rockskvdb;
+use std::collections::{BTreeMap, HashMap};
 
-use super::{Result, DBValue};
-use traits::{KeyValueDAO, KeyValueDB};
+use super::{DBValue, Result};
 use dbconfigs::RepositoryConfig;
-use dbtransaction::{DBTransaction, DBOp};
+use dbtransaction::{DBOp, DBTransaction};
 use error::Error;
+use traits::{KeyValueDAO, KeyValueDB};
 use MemoryDB;
 
 type DB = rockskvdb::Rockskvdb;
@@ -64,7 +64,9 @@ impl MemoryDBRepository {
             configs: Vec::new(),
         }
     }
-    fn flush(&self) -> Result<()> { Ok(()) }
+    fn flush(&self) -> Result<()> {
+        Ok(())
+    }
 
     #[cfg(test)]
     fn close_all(&mut self) {}
@@ -75,7 +77,9 @@ impl MemoryDBRepository {
 
 impl DbRepository {
     /// insert a db to the repository
-    pub fn insert_db(&mut self, _configs: Vec<RepositoryConfig>) -> Result<()> { unimplemented!() }
+    pub fn insert_db(&mut self, _configs: Vec<RepositoryConfig>) -> Result<()> {
+        unimplemented!()
+    }
     /// init repository
     pub fn init(configs: Vec<RepositoryConfig>) -> Result<DbRepository> {
         let dbconfigs = configs.clone();
@@ -108,14 +112,12 @@ impl DbRepository {
             match self.dbs.get(&*db_name) {
                 Some(db) => {
                     let mut db = db.write();
-                    db.flush().map_err(|e| {
-                        Error::FlushError {
-                            name: db_name,
-                            desc: e,
-                        }
+                    db.flush().map_err(|e| Error::FlushError {
+                        name: db_name,
+                        desc: e,
                     })?;
                 }
-                _ => error!(target: "db","db:{} not found",db_name),
+                _ => error!(target: "db","db:{} not found -",db_name),
             }
         }
         Ok(())
@@ -143,7 +145,9 @@ impl DbRepository {
 
 impl Drop for DbRepository {
     /// flush all dbs before drop.
-    fn drop(&mut self) { let _ = self.flush(); }
+    fn drop(&mut self) {
+        let _ = self.flush();
+    }
 }
 
 impl MockDbRepository {
@@ -161,9 +165,13 @@ impl MockDbRepository {
         }
     }
     /// flush all db
-    fn flush(&self) -> Result<()> { Ok(()) }
+    fn flush(&self) -> Result<()> {
+        Ok(())
+    }
     /// close all dbs
-    fn close_all(&mut self) { self.dbs.clear(); }
+    fn close_all(&mut self) {
+        self.dbs.clear();
+    }
     /// reopen all dbs
     fn open_all(&mut self) {
         self.close_all();
@@ -224,7 +232,7 @@ macro_rules! impl_keyvaluedb {
                             }
                         }
                         None => {
-                            error!(target:"db","db:{} not found",db_name);
+                            error!(target:"db","db:{} not found --",db_name);
                         }
                     }
                 }
@@ -237,7 +245,7 @@ macro_rules! impl_keyvaluedb {
                         Box::new(db.iter())
                     }
                     _ => {
-                        error!(target:"db","db:{} not found",db_name);
+                        error!(target:"db","db:{} not found ---",db_name);
                         Box::new(None.into_iter())
                     }
                 }
@@ -251,7 +259,7 @@ macro_rules! impl_keyvaluedb {
                         res
                     }
                     None => {
-                        error!(target:"db","db:{} not found",db_name);
+                        error!(target:"db","db:{} not found ----",db_name);
                         None
                     }
                 }
@@ -270,7 +278,7 @@ macro_rules! impl_keyvaluedb {
                         res
                     }
                     None => {
-                        error!(target:"db","db:{} not found",db_name);
+                        error!(target:"db","db:{} not found -----",db_name);
                         Box::new(None.into_iter())
                     }
                 }

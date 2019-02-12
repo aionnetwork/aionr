@@ -32,12 +32,9 @@ pub const BODIES_DOWNLOADED: u32 = 1 << 6;
 pub enum SyncEvent {
     OnStatusReq,
     OnStatusRes,
-    OnBlockHeadersReq,
     OnBlockHeadersRes,
     OnBlockBodiesReq,
     OnBlockBodiesRes,
-    OnBroadCastTx,
-    OnBroadCastBlock,
 }
 
 impl SyncEvent {
@@ -52,7 +49,7 @@ impl SyncEvent {
                     warn!(target: "sync", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
                 }
             }
-            SyncEvent::OnBlockHeadersReq | SyncEvent::OnBlockHeadersRes => {
+            SyncEvent::OnBlockHeadersRes => {
                 if state_code & STATUS_GOT == STATUS_GOT {
                     node.state_code = state_code | HEADERS_DOWNLOADED;
                 } else {
@@ -66,18 +63,6 @@ impl SyncEvent {
                     // TBD
                 }
             }
-            SyncEvent::OnBroadCastTx => {
-                if state_code & HANDSHAKE_DONE == HANDSHAKE_DONE {
-                } else {
-                    warn!(target: "sync", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
-                }
-            }
-            SyncEvent::OnBroadCastBlock => {
-                if state_code & HANDSHAKE_DONE == HANDSHAKE_DONE {
-                } else {
-                    warn!(target: "sync", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
-                }
-            }
         }
     }
 }
@@ -87,12 +72,9 @@ impl fmt::Display for SyncEvent {
         let printable = match *self {
             SyncEvent::OnStatusReq => "OnStatusReq",
             SyncEvent::OnStatusRes => "OnStatusRes",
-            SyncEvent::OnBlockHeadersReq => "OnBlockHeadersReq",
             SyncEvent::OnBlockHeadersRes => "OnBlockHeadersRes",
             SyncEvent::OnBlockBodiesReq => "OnBlockBodiesReq",
             SyncEvent::OnBlockBodiesRes => "OnBlockBodiesRes",
-            SyncEvent::OnBroadCastTx => "OnBroadCastTx",
-            SyncEvent::OnBroadCastBlock => "OnBroadCastBlock",
         };
         write!(f, "{}", printable)
     }
@@ -102,10 +84,7 @@ impl fmt::Display for SyncEvent {
 fn display_event_test() {
     println!("SyncEvent: {}", SyncEvent::OnStatusReq);
     println!("SyncEvent: {}", SyncEvent::OnStatusRes);
-    println!("SyncEvent: {}", SyncEvent::OnBlockHeadersReq);
     println!("SyncEvent: {}", SyncEvent::OnBlockHeadersRes);
     println!("SyncEvent: {}", SyncEvent::OnBlockBodiesReq);
     println!("SyncEvent: {}", SyncEvent::OnBlockBodiesRes);
-    println!("SyncEvent: {}", SyncEvent::OnBroadCastTx);
-    println!("SyncEvent: {}", SyncEvent::OnBroadCastBlock);
 }

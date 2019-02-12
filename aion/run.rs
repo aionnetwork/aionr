@@ -19,11 +19,11 @@
  *
  ******************************************************************************/
 
+use std::fs;
+use std::io::{BufRead, BufReader};
 use std::sync::{Arc, Weak};
 use std::thread;
 use std::time::{Duration, Instant};
-use std::fs;
-use std::io::{BufRead,BufReader};
 
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
 use acore::client::{BlockChainClient, Client, DatabaseCompactionProfile, VMType};
@@ -38,10 +38,10 @@ use aion_version::version;
 use ansi_term::Colour;
 use cache::CacheConfig;
 use ctrlc::CtrlC;
+use dir::helpers::absolute;
 use dir::{DatabaseDirectories, Directories};
 use fdlimit::raise_fd_limit;
 use helpers::{passwords_from_files, to_client_config};
-use dir::helpers::absolute;
 use io::{IoChannel, IoService};
 use logger::LogConfig;
 use modules;
@@ -52,7 +52,7 @@ use pb::{new_pb, WalletApiConfiguration};
 use rpc;
 use rpc_apis;
 use sync::p2p::{NetworkConfig, P2pMgr};
-use sync::sync::SyncConfig;
+use sync::sync::{SyncConfig, Params};
 use tokio;
 use tokio::prelude::*;
 use user_defaults::UserDefaults;
@@ -207,8 +207,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         &client_path,
         &cmd.dirs.ipc_path(),
         miner.clone(),
-    )
-    .map_err(|e| format!("Client service error: {:?}", e))?;
+    ).map_err(|e| format!("Client service error: {:?}", e))?;
 
     info!(target: "run","Genesis hash: {:?}",genesis_hash);
 
@@ -237,9 +236,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     }
 
     let client = service.client();
-
-    // drop the spec to free up genesis state.
-    drop(spec);
 
     // initialize the local node information store.
     let store = {
@@ -298,16 +294,21 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     }
 
     // create sync object
-    let sync_config = SyncConfig::default();
+    let sync_params = Params {
+        config: SyncConfig::default(),
+        client: client.clone() as Arc<BlockChainClient>,
+        network_config: net_conf,
+        spec: spec,
+        db: service.db().clone(),
+    };
 
-    let (sync_provider, network_manager, chain_notify) = modules::sync(
-        sync_config,
-        net_conf,
-        client.clone() as Arc<BlockChainClient>,
-    )
-    .map_err(|e| format!("Sync error: {}", e))?;
+    let (sync_provider, network_manager, chain_notify) =
+        modules::sync(sync_params).map_err(|e| format!("Sync error: {}", e))?;
 
     service.add_notify(chain_notify.clone());
+
+    // drop the spec to free up genesis state.
+    // drop(spec);
 
     // spin up rpc eventloop
     let runtime_rpc = tokio::runtime::Builder::new()
@@ -461,8 +462,7 @@ fn print_running_environment(
     spec_data_dir: &String,
     dirs: &Directories,
     db_dirs: &DatabaseDirectories,
-)
-{
+) {
     if let Some(config) = &dirs.config {
         info!(
             target: "run",
@@ -536,8 +536,7 @@ fn prepare_account_provider(
     data_dir: &str,
     cfg: AccountsConfig,
     passwords: &[String],
-) -> Result<AccountProvider, String>
-{
+) -> Result<AccountProvider, String> {
     use acore::keychain::accounts_dir::RootDiskDirectory;
     use acore::keychain::EthStore;
 
@@ -614,9 +613,10 @@ fn fill_back_local_node(path: String) {
         .map(|config| {
             let config_ = config.clone().to_owned();
             let option: Vec<&str> = config_.split("=").collect();
-            if option[0].trim() == "local_node" && option[1]
-                .find("00000000-0000-0000-0000-000000000000")
-                .is_some()
+            if option[0].trim() == "local_node"
+                && option[1]
+                    .find("00000000-0000-0000-0000-000000000000")
+                    .is_some()
             {
                 no_change = false;
                 format!("local_node = {:?}", local_node_info)

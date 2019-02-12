@@ -18,42 +18,34 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
-use acore::block::Block;
-use acore::client::{BlockChainClient, BlockChainInfo, BlockQueueInfo};
+use acore::client::{header_chain::HeaderChain, BlockChainClient, BlockChainInfo, BlockQueueInfo};
 use acore::header::Header as BlockHeader;
+use acore::spec::Spec;
 use aion_types::{H256, U256};
+use kvdb::{DBTransaction, DatabaseConfig, DbRepository, KeyValueDB, RepositoryConfig};
 use lru_cache::LruCache;
 use state::Storage;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::SystemTime;
 use tokio::runtime::{Runtime, TaskExecutor};
-use parking_lot::RwLock as PLRwLock;
 
 lazy_static! {
     static ref BLOCK_CHAIN: Storage<RwLock<BlockChain>> = Storage::new();
+    static ref BLOCK_HEADER_CHAIN: Storage<RwLock<BlockHeaderChain>> = Storage::new();
     static ref SYNC_EXECUTORS: Storage<RwLock<SyncExecutor>> = Storage::new();
     static ref LOCAL_STATUS: Storage<RwLock<LocalStatus>> = Storage::new();
-    static ref NETWORK_STATUS: Storage<PLRwLock<NetworkStatus>> = Storage::new();
-    static ref DOWNLOADED_HEADERS: Storage<Mutex<VecDeque<HeadersWrapper>>> = Storage::new();
-    static ref HEADERS_WITH_BODIES_REQUESTED: Storage<Mutex<HashMap<u64, HeadersWrapper>>> =
-        Storage::new();
-    static ref DOWNLOADED_BLOCKS: Storage<Mutex<VecDeque<BlocksWrapper>>> = Storage::new();
-    static ref REQUESTED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, SystemTime>>> = Storage::new();
-    static ref IMPORTED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
+    static ref NETWORK_STATUS: Storage<RwLock<NetworkStatus>> = Storage::new();
+    static ref DOWNLOADED_BLOCKS: Storage<Mutex<LruCache<u64, BlockWrapper>>> = Storage::new();
     static ref DOWNLOADED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
     static ref SENT_TRANSACTION_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
-    static ref RECEIVED_TRANSACTIONS: Storage<Mutex<VecDeque<Vec<u8>>>> = Storage::new();
-    static ref STAGED_BLOCKS: Storage<Mutex<LruCache<H256, Vec<Vec<u8>>>>> = Storage::new();
-    static ref STAGED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
+    static ref HEADERS_WITH_BODIES_REQUESTED: Storage<Mutex<HashMap<u64, HeadersWrapper>>> =
+        Storage::new();
+    static ref LIGHT_CLIENT: Storage<RwLock<LightClient>> = Storage::new();
 }
 
-pub const MAX_DOWNLOADED_HEADERS_COUNT: usize = 4096;
-const MAX_CACHED_BLOCK_HASHES: usize = 32;
-const MAX_CACHED_TRANSACTION_HASHES: usize = 20480;
-const MAX_RECEIVED_TRANSACTIONS_COUNT: usize = 20480;
+pub const MAX_CACHED_BLOCKS: usize = 1024;
+pub const MAX_CACHED_BLOCK_HASHED: usize = 8192;
 
 #[derive(Clone)]
 struct BlockChain {
@@ -65,10 +57,15 @@ struct SyncExecutor {
     inner: Option<Arc<Runtime>>,
 }
 
+#[derive(Clone)]
+struct BlockHeaderChain {
+    inner: Option<Arc<HeaderChain>>,
+}
+
 pub struct SyncStorage;
 
 impl SyncStorage {
-    pub fn init(client: Arc<BlockChainClient>) {
+    pub fn init(client: Arc<BlockChainClient>, spec: Spec, db: Arc<KeyValueDB>) {
         if let Some(_) = BLOCK_CHAIN.try_get() {
             if let Ok(mut block_chain) = BLOCK_CHAIN.get().write() {
                 if let Some(_) = block_chain.inner {
@@ -83,8 +80,6 @@ impl SyncStorage {
                 }
             }
         } else {
-            let synced_block_number = client.chain_info().best_block_number;
-
             let block_chain = BlockChain {
                 inner: Some(client),
             };
@@ -93,36 +88,29 @@ impl SyncStorage {
                 inner: Some(Arc::new(Runtime::new().expect("Tokio Runtime"))),
             };
 
-            let mut local_status = LocalStatus::new();
-            let mut network_status = NetworkStatus::new();
-            let mut downloaded_headers = VecDeque::new();
-            let mut headers_with_bodies_requested = HashMap::new();
-            let mut downloaded_blocks = VecDeque::new();
-            let mut requested_block_hashes = LruCache::new(MAX_CACHED_BLOCK_HASHES);
-            let mut imported_block_hashes = LruCache::new(MAX_CACHED_BLOCK_HASHES);
-            let mut downloaded_block_hashes = LruCache::new(MAX_CACHED_BLOCK_HASHES * 2);
-            let mut sent_transaction_hases = LruCache::new(MAX_CACHED_TRANSACTION_HASHES);
-            let mut received_transactions = VecDeque::new();
-            let mut staged_blocks = LruCache::new(MAX_CACHED_BLOCK_HASHES);
-            let mut staged_block_hashes = LruCache::new(MAX_CACHED_BLOCK_HASHES);
+            let header_chain = HeaderChain::new(db, &spec).unwrap();
 
-            local_status.synced_block_number = synced_block_number;
-            local_status.synced_block_number_last_time = synced_block_number;
+            let block_header_chain = BlockHeaderChain {
+                inner: Some(Arc::new(header_chain)),
+            };
+
+            let mut local_status = LocalStatus::new();
+            let network_status = NetworkStatus::new();
+            let downloaded_blocks = LruCache::new(MAX_CACHED_BLOCKS);
+            let downloaded_block_hashes = LruCache::new(MAX_CACHED_BLOCK_HASHED);
+
+            local_status.synced_block_number = 0;
+            local_status.synced_block_number_last_time = 0;
             LOCAL_STATUS.set(RwLock::new(local_status));
-            NETWORK_STATUS.set(PLRwLock::new(network_status));
-            DOWNLOADED_HEADERS.set(Mutex::new(downloaded_headers));
-            HEADERS_WITH_BODIES_REQUESTED.set(Mutex::new(headers_with_bodies_requested));
+            NETWORK_STATUS.set(RwLock::new(network_status));
             DOWNLOADED_BLOCKS.set(Mutex::new(downloaded_blocks));
-            REQUESTED_BLOCK_HASHES.set(Mutex::new(requested_block_hashes));
-            IMPORTED_BLOCK_HASHES.set(Mutex::new(imported_block_hashes));
             DOWNLOADED_BLOCK_HASHES.set(Mutex::new(downloaded_block_hashes));
-            SENT_TRANSACTION_HASHES.set(Mutex::new(sent_transaction_hases));
-            RECEIVED_TRANSACTIONS.set(Mutex::new(received_transactions));
-            STAGED_BLOCKS.set(Mutex::new(staged_blocks));
-            STAGED_BLOCK_HASHES.set(Mutex::new(staged_block_hashes));
+            HEADERS_WITH_BODIES_REQUESTED.set(Mutex::new(HashMap::new()));
 
             BLOCK_CHAIN.set(RwLock::new(block_chain));
             SYNC_EXECUTORS.set(RwLock::new(sync_executor));
+            BLOCK_HEADER_CHAIN.set(RwLock::new(block_header_chain));
+            LIGHT_CLIENT.set(RwLock::new(LightClient::new("./data")));
         }
     }
 
@@ -136,17 +124,6 @@ impl SyncStorage {
             .expect("get_client")
     }
 
-    pub fn get_chain_info() -> BlockChainInfo {
-        let client = BLOCK_CHAIN
-            .get()
-            .read()
-            .expect("get_chain_info")
-            .clone()
-            .inner
-            .expect("get_chain_info");
-        client.chain_info()
-    }
-
     pub fn get_executor() -> TaskExecutor {
         let rt = SYNC_EXECUTORS
             .get()
@@ -156,6 +133,29 @@ impl SyncStorage {
             .inner
             .expect("get_executor");
         rt.executor()
+    }
+
+    pub fn get_block_header_chain() -> Arc<HeaderChain> {
+        BLOCK_HEADER_CHAIN
+            .get()
+            .read()
+            .expect("get_block_header_chain")
+            .clone()
+            .inner
+            .expect("get_block_header_chain")
+    }
+
+    pub fn set_starting_block_number(starting_block_number: u64) {
+        if let Ok(mut local_status) = LOCAL_STATUS.get().write() {
+            local_status.starting_block_number = starting_block_number;
+        }
+    }
+
+    pub fn get_starting_block_number() -> u64 {
+        if let Ok(local_status) = LOCAL_STATUS.get().read() {
+            return local_status.starting_block_number;
+        }
+        0
     }
 
     pub fn set_synced_block_number(synced_block_number: u64) {
@@ -197,64 +197,37 @@ impl SyncStorage {
         0
     }
 
-    pub fn set_max_staged_block_number(max_staged_block_number: u64) {
+    pub fn set_local_status(status: LocalStatus) {
         if let Ok(mut local_status) = LOCAL_STATUS.get().write() {
-            local_status.max_staged_block_number = max_staged_block_number;
+            local_status.genesis_hash = status.genesis_hash;
+            local_status.synced_block_hash = status.synced_block_hash;
+            local_status.synced_block_number = status.synced_block_number;
+            local_status.total_difficulty = status.total_difficulty;
         }
     }
 
-    pub fn get_max_staged_block_number() -> u64 {
+    pub fn get_local_status() -> LocalStatus {
         if let Ok(local_status) = LOCAL_STATUS.get().read() {
-            return local_status.max_staged_block_number;
+            return local_status.clone();
         }
-        0
+        LocalStatus::new()
     }
 
-    pub fn get_downloaded_headers() -> &'static Mutex<VecDeque<HeadersWrapper>> {
-        DOWNLOADED_HEADERS.get()
-    }
-
-    pub fn clear_downloaded_headers() {
-        if let Ok(ref mut downloaded_headers) = DOWNLOADED_HEADERS.get().lock() {
-            downloaded_headers.clear();
-        }
-    }
-
-    pub fn get_headers_with_bodies_requested() -> &'static Mutex<HashMap<u64, HeadersWrapper>> {
-        HEADERS_WITH_BODIES_REQUESTED.get()
-    }
-
-    pub fn insert_headers_with_bodies_requested(hw: HeadersWrapper) {
-        if let Ok(ref mut headers_with_bodies_requested) =
-            HEADERS_WITH_BODIES_REQUESTED.get().lock()
-        {
-            headers_with_bodies_requested.insert(hw.node_hash, hw);
-        } else {
-            warn!(target: "sync", "headers_with_bodies_requested_mutex lock failed");
-        }
-    }
-
-    pub fn pick_headers_with_bodies_requested(node_hash: &u64) -> Option<HeadersWrapper> {
-        if let Ok(ref mut headers_with_bodies_requested) =
-            HEADERS_WITH_BODIES_REQUESTED.get().lock()
-        {
-            headers_with_bodies_requested.remove(node_hash)
-        } else {
-            warn!(target: "sync", "headers_with_bodies_requested_mutex lock failed");
-            None
-        }
-    }
-
-    pub fn clear_headers_with_bodies_requested() {
-        if let Ok(ref mut headers_with_bodies_requested) =
-            HEADERS_WITH_BODIES_REQUESTED.get().lock()
-        {
-            headers_with_bodies_requested.clear();
-        }
-    }
-
-    pub fn get_downloaded_blocks() -> &'static Mutex<VecDeque<BlocksWrapper>> {
+    pub fn get_downloaded_blocks() -> &'static Mutex<LruCache<u64, BlockWrapper>> {
         DOWNLOADED_BLOCKS.get()
+    }
+
+    pub fn is_downloaded_block(block_number: u64, hash: H256) -> bool {
+        if let Ok(ref mut downloaded_blocks) = DOWNLOADED_BLOCKS.get().lock() {
+            if let Some(bw) = downloaded_blocks.get_mut(&block_number) {
+                for h in bw.block_hashes.iter() {
+                    if h == &hash {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
     }
 
     pub fn get_downloaded_blocks_count() -> usize {
@@ -265,34 +238,6 @@ impl SyncStorage {
         }
     }
 
-    pub fn insert_downloaded_headers(hw: HeadersWrapper) {
-        let downloaded_headers_mutex = DOWNLOADED_HEADERS.get();
-        {
-            let mut lock = downloaded_headers_mutex.lock();
-            if let Ok(ref mut downloaded_headers) = lock {
-                if downloaded_headers.len() <= MAX_DOWNLOADED_HEADERS_COUNT {
-                    downloaded_headers.push_back(hw);
-                } else {
-                    warn!(target: "sync", "too many downloaded_headers...");
-                }
-            } else {
-                warn!(target: "sync", "downloaded_headers_mutex lock failed");
-            }
-        }
-    }
-
-    pub fn insert_downloaded_blocks(bw: BlocksWrapper) {
-        let downloaded_blocks_mutex = DOWNLOADED_BLOCKS.get();
-        {
-            let mut lock = downloaded_blocks_mutex.lock();
-            if let Ok(ref mut downloaded_blocks) = lock {
-                downloaded_blocks.push_back(bw);
-            } else {
-                warn!(target: "sync", "downloaded_blocks_mutex lock failed");
-            }
-        }
-    }
-
     pub fn clear_downloaded_blocks() {
         if let Ok(ref mut downloaded_blocks) = DOWNLOADED_BLOCKS.get().lock() {
             downloaded_blocks.clear();
@@ -300,80 +245,24 @@ impl SyncStorage {
     }
 
     pub fn get_network_best_block_number() -> u64 {
-        let network_status = NETWORK_STATUS.get().read();
-        return network_status.best_block_num;
+        if let Ok(network_status) = NETWORK_STATUS.get().read() {
+            return network_status.best_block_num;
+        }
+        0
     }
 
     pub fn get_network_best_block_hash() -> H256 {
-        let network_status = NETWORK_STATUS.get().read();
-        return network_status.best_hash;
+        if let Ok(network_status) = NETWORK_STATUS.get().read() {
+            return network_status.best_hash;
+        }
+        H256::from(0)
     }
 
     pub fn get_network_total_diff() -> U256 {
-        let network_status = NETWORK_STATUS.get().read();
-        return network_status.total_diff;
-    }
-
-    pub fn insert_requested_time(hash: H256) {
-        if let Ok(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().lock() {
-            if !requested_block_hashes.contains_key(&hash) {
-                requested_block_hashes.insert(hash, SystemTime::now());
-            }
+        if let Ok(network_status) = NETWORK_STATUS.get().read() {
+            return network_status.total_diff;
         }
-    }
-
-    pub fn get_requested_time(hash: &H256) -> Option<SystemTime> {
-        if let Ok(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().lock() {
-            if let Some(time) = requested_block_hashes.get_mut(hash) {
-                return Some(time.clone());
-            }
-        }
-        None
-    }
-
-    pub fn clear_requested_blocks() {
-        if let Ok(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().lock() {
-            requested_block_hashes.clear();
-        }
-    }
-
-    pub fn get_imported_block_hashes() -> &'static Mutex<LruCache<H256, u8>> {
-        return IMPORTED_BLOCK_HASHES.get();
-    }
-
-    pub fn remove_imported_block_hashes(hashes: Vec<H256>) {
-        if let Ok(ref mut imported_block_hashes) = IMPORTED_BLOCK_HASHES.get().lock() {
-            for hash in hashes.iter() {
-                imported_block_hashes.remove(&hash);
-            }
-        } else {
-            warn!(target: "sync", "imported_block_hashes_mutex lock failed");
-        }
-    }
-
-    pub fn clear_imported_block_hashes() {
-        if let Ok(ref mut imported_block_hashes) = IMPORTED_BLOCK_HASHES.get().lock() {
-            imported_block_hashes.clear();
-        }
-    }
-
-    pub fn insert_imported_block_hashes(imported: Vec<H256>) {
-        if let Ok(ref mut imported_block_hashes) = IMPORTED_BLOCK_HASHES.get().lock() {
-            for hash in imported.iter() {
-                imported_block_hashes.insert(*hash, 0);
-            }
-        } else {
-            warn!(target: "sync", "imported_block_hashes_mutex lock failed");
-        }
-    }
-
-    pub fn is_imported_block_hash(hash: &H256) -> bool {
-        if let Ok(ref mut imported_block_hashes) = IMPORTED_BLOCK_HASHES.get().lock() {
-            imported_block_hashes.contains_key(hash)
-        } else {
-            warn!(target: "sync", "imported_block_hashes_mutex lock failed");
-            false
-        }
+        U256::from(0)
     }
 
     pub fn get_downloaded_block_hashes() -> &'static Mutex<LruCache<H256, u8>> {
@@ -386,13 +275,23 @@ impl SyncStorage {
         }
     }
 
-    pub fn is_downloaded_block_hashes(hash: &H256) -> bool {
-        if let Ok(ref mut downloaded_block_hashes) = DOWNLOADED_BLOCK_HASHES.get().lock() {
-            downloaded_block_hashes.contains_key(hash)
-        } else {
-            warn!(target: "sync", "downloaded_block_hashes lock failed");
-            false
+    pub fn is_block_hash_confirmed(hash: H256, is_increase: bool) -> bool {
+        if let Ok(mut downloaded_block_hashes) = DOWNLOADED_BLOCK_HASHES.get().lock() {
+            if downloaded_block_hashes.contains_key(&hash) {
+                let increase = if is_increase { 1 } else { 0 };
+                if let Some(count) = downloaded_block_hashes.get_mut(&hash) {
+                    if *count >= 2 {
+                        return true;
+                    } else {
+                        *count += increase;
+                    }
+                }
+            } else {
+                downloaded_block_hashes.insert(hash, 1);
+            }
         }
+
+        false
     }
 
     pub fn get_sent_transaction_hashes() -> &'static Mutex<LruCache<H256, u8>> {
@@ -403,71 +302,70 @@ impl SyncStorage {
         best_block_num: u64,
         best_hash: H256,
         target_total_difficulty: U256,
-    )
-    {
-        let mut network_status = NETWORK_STATUS.get().write();
-        if target_total_difficulty > network_status.total_diff {
-            network_status.best_block_num = best_block_num;
-            network_status.best_hash = best_hash;
-            network_status.total_diff = target_total_difficulty;
-        }
-    }
-
-    pub fn get_received_transactions() -> &'static Mutex<VecDeque<Vec<u8>>> {
-        RECEIVED_TRANSACTIONS.get()
-    }
-
-    pub fn get_received_transactions_count() -> usize {
-        if let Ok(received_transactions) = RECEIVED_TRANSACTIONS.get().lock() {
-            return received_transactions.len();
-        } else {
-            0
-        }
-    }
-
-    pub fn insert_received_transaction(transaction: Vec<u8>) {
-        let mut lock = RECEIVED_TRANSACTIONS.get().lock();
-        if let Ok(ref mut received_transactions) = lock {
-            if received_transactions.len() <= MAX_RECEIVED_TRANSACTIONS_COUNT {
-                received_transactions.push_back(transaction);
-            }
-        } else {
-            warn!(target: "sync", "downloaded_headers_mutex lock failed");
-        }
-    }
-
-    pub fn get_staged_blocks() -> &'static Mutex<LruCache<H256, Vec<Vec<u8>>>> {
-        STAGED_BLOCKS.get()
-    }
-
-    pub fn insert_staged_block_hashes(hashes: Vec<H256>) {
-        if let Ok(mut staged_block_hashes) = STAGED_BLOCK_HASHES.get().lock() {
-            for hash in hashes.iter() {
-                staged_block_hashes.insert(*hash, 0);
+    ) {
+        if let Ok(mut network_status) = NETWORK_STATUS.get().write() {
+            if target_total_difficulty > network_status.total_diff {
+                network_status.best_block_num = best_block_num;
+                network_status.best_hash = best_hash;
+                network_status.total_diff = target_total_difficulty;
             }
         }
     }
 
-    pub fn is_staged_block_hash(hash: H256) -> bool {
-        if let Ok(mut staged_block_hashes) = STAGED_BLOCK_HASHES.get().lock() {
-            return staged_block_hashes.contains_key(&hash);
-        }
-        return false;
+    pub fn get_light_client() -> &'static RwLock<LightClient> {
+        LIGHT_CLIENT.get()
     }
 
-    pub fn remove_staged_block_hash(hash: H256) {
-        if let Ok(mut staged_block_hashes) = STAGED_BLOCK_HASHES.get().lock() {
-            staged_block_hashes.remove(&hash);
+    pub fn get_best_block_header(genesis_hash: &H256) -> Option<Vec<u8>> {
+        if let Ok(light_client) = LIGHT_CLIENT.get().read() {
+            if let Some(ref best_block_hash) = light_client.get_best_block_hash(genesis_hash) {
+                error!(target: "sync", "get_best_block_header: {}", genesis_hash);
+                return light_client.find_header(best_block_hash);
+            } else {
+                error!(target: "sync", "No best block header found, genesis hash: {}", genesis_hash);
+            }
+        }
+        None
+    }
+
+    pub fn get_chain_info() -> BlockChainInfo {
+        let local_status = SyncStorage::get_local_status();
+        BlockChainInfo {
+            total_difficulty: local_status.total_difficulty,
+            pending_total_difficulty: local_status.total_difficulty,
+            //genesis_hash: H256::from("0x30793b4ea012c6d3a58c85c5b049962669369807a98e36807c1b02116417f823"),
+            genesis_hash: local_status.genesis_hash,
+            best_block_hash: local_status.synced_block_hash,
+            best_block_number: local_status.synced_block_number,
+            best_block_timestamp: 0,
+            ancient_block_hash: None,
+            ancient_block_number: None,
+            first_block_hash: None,
+            first_block_number: None,
         }
     }
 
-    pub fn clear_staged_blocks() {
-        if let Ok(mut staged_blocks) = STAGED_BLOCKS.get().lock() {
-            staged_blocks.clear();
+    pub fn insert_headers_with_bodies_requested(hw: HeadersWrapper) -> bool {
+        if let Ok(ref mut headers_with_bodies_requested) =
+            HEADERS_WITH_BODIES_REQUESTED.get().lock()
+        {
+            if !headers_with_bodies_requested.contains_key(&hw.node_hash) {
+                headers_with_bodies_requested.insert(hw.node_hash, hw);
+                return true;
+            }
         }
 
-        if let Ok(mut staged_block_hashes) = STAGED_BLOCK_HASHES.get().lock() {
-            staged_block_hashes.clear();
+        false
+    }
+
+    pub fn pick_headers_with_bodies_requested(node_hash: &u64) -> Option<HeadersWrapper> {
+        if let Ok(ref mut headers_with_bodies_requested) =
+            HEADERS_WITH_BODIES_REQUESTED.get().lock()
+        {
+            headers_with_bodies_requested.remove(node_hash)
+        } else {
+            warn!(target: "sync", "headers_with_bodies_requested_mutex lock failed");
+            None
         }
     }
 
@@ -542,7 +440,10 @@ pub struct LocalStatus {
     pub synced_block_number: u64,
     pub synced_block_number_last_time: u64,
     pub sync_speed: u16,
-    pub max_staged_block_number: u64,
+    pub synced_block_hash: H256,
+    pub total_difficulty: U256,
+    pub genesis_hash: H256,
+    pub starting_block_number: u64,
 }
 
 impl LocalStatus {
@@ -551,7 +452,10 @@ impl LocalStatus {
             synced_block_number: 0,
             synced_block_number_last_time: 0,
             sync_speed: 48,
-            max_staged_block_number: 0,
+            synced_block_hash: H256::from(0),
+            total_difficulty: U256::from(0),
+            genesis_hash: H256::from(0),
+            starting_block_number: 1,
         }
     }
 }
@@ -571,8 +475,14 @@ impl fmt::Display for LocalStatus {
         ));
         try!(write!(
             f,
-            "    max staged block number: {}\n",
-            self.max_staged_block_number
+            "    synced block hash: {:?}\n",
+            self.synced_block_hash
+        ));
+        try!(write!(f, "    genesis hash: {:?}\n", self.genesis_hash));
+        try!(write!(
+            f,
+            "    starting block number: {}\n",
+            self.starting_block_number
         ));
         write!(f, "\n")
     }
@@ -615,7 +525,7 @@ impl fmt::Display for NetworkStatus {
 #[derive(Clone, PartialEq)]
 pub struct HeadersWrapper {
     pub node_hash: u64,
-    pub timestamp: SystemTime,
+    pub hashes: Vec<H256>,
     pub headers: Vec<BlockHeader>,
 }
 
@@ -623,23 +533,181 @@ impl HeadersWrapper {
     pub fn new() -> Self {
         HeadersWrapper {
             node_hash: 0,
-            timestamp: SystemTime::now(),
+            hashes: Vec::new(),
             headers: Vec::new(),
         }
     }
 }
 
 #[derive(Clone, PartialEq)]
-pub struct BlocksWrapper {
-    pub node_id_hash: u64,
-    pub blocks: Vec<Block>,
+pub struct BlockWrapper {
+    pub block_number: u64,
+    pub parent_hash: H256,
+    pub block_hashes: Vec<H256>,
+    pub block_headers: Option<Vec<BlockHeader>>,
 }
 
-impl BlocksWrapper {
+impl BlockWrapper {
     pub fn new() -> Self {
-        BlocksWrapper {
-            node_id_hash: 0,
-            blocks: Vec::new(),
+        BlockWrapper {
+            block_number: 0,
+            parent_hash: H256::new(),
+            block_hashes: Vec::new(),
+            block_headers: None,
         }
     }
+}
+
+const HEADERS_DB: &'static str = "headers";
+const BLOCKS_DB: &'static str = "blocks";
+const BEST_BLOCK_DB: &'static str = "best_block";
+
+pub struct LightClient {
+    db: Arc<KeyValueDB>,
+}
+
+impl LightClient {
+    pub fn new(path: &str) -> LightClient {
+        let db_configs = vec![
+            Self::generate_db_configs(HEADERS_DB, path),
+            Self::generate_db_configs(BLOCKS_DB, path),
+            Self::generate_db_configs(BEST_BLOCK_DB, path),
+        ];
+        let db = DbRepository::init(db_configs).unwrap();
+        LightClient { db: Arc::new(db) }
+    }
+
+    pub fn get_db(&self) -> Arc<KeyValueDB> {
+        self.db.clone()
+    }
+
+    fn generate_db_configs(name: &str, path: &str) -> RepositoryConfig {
+        RepositoryConfig {
+            db_name: name.into(),
+            db_config: DatabaseConfig::default(),
+            db_path: format!("{}/{}", path, name),
+        }
+    }
+
+    fn find(&self, db_name: &'static str, key: &H256) -> Option<Vec<u8>> {
+        let reader = self.db.clone();
+
+        match reader.get(db_name.into(), key) {
+            Ok(data) => {
+                if let Some(data_bytes) = data {
+                    return Some(data_bytes.into_vec());
+                }
+            }
+            Err(e) => {
+                error!(target: "sync", "Error: {}", e);
+            }
+        }
+
+        None
+    }
+
+    pub fn save(&mut self, db_name: &'static str, keyes: Vec<H256>, data: Vec<&[u8]>) {
+        let writer = self.db.clone();
+
+        let mut db_tx = DBTransaction::new();
+        let keyes_size = keyes.len();
+        if keyes_size > 0 && keyes_size == data.len() {
+            let mut keyes_iterator = keyes.iter();
+            let mut data_iterator = data.iter();
+            for _ in 0..keyes_size {
+                let k = keyes_iterator.next().expect("Invalid inuut key");
+                let d = data_iterator.next().expect("Invalid inuut data");
+                db_tx.put(db_name.into(), k, d);
+            }
+            if let Err(e) = writer.write(db_tx) {
+                error!(target: "sync", "failed to save into {}, {}", db_name, e);
+            }
+        }
+    }
+
+    pub fn find_header(&self, hash: &H256) -> Option<Vec<u8>> {
+        self.find(HEADERS_DB, hash)
+    }
+
+    pub fn save_headers(&mut self, hashes: Vec<H256>, headers: Vec<&[u8]>) {
+        self.save(HEADERS_DB, hashes, headers);
+    }
+
+    pub fn find_block(&self, hash: &H256) -> Option<Vec<u8>> {
+        self.find(BLOCKS_DB, hash)
+    }
+
+    pub fn save_blocks(&mut self, hashes: Vec<H256>, blocks: Vec<&[u8]>) {
+        self.save(BLOCKS_DB, hashes, blocks);
+    }
+
+    pub fn get_best_block_hash(&self, genesis_hash: &H256) -> Option<H256> {
+        if let Some(best_block_hash) = self.find(BEST_BLOCK_DB, genesis_hash) {
+            return Some(H256::from(best_block_hash.as_slice()));
+        }
+        None
+    }
+
+    pub fn set_best_block_hash(&mut self, genesis_hash: H256, best_block_hash: H256) {
+        self.save(BEST_BLOCK_DB, vec![genesis_hash], vec![&best_block_hash]);
+    }
+}
+
+#[test]
+fn test_light_client() {
+    let mut light_client = LightClient::new("./data");
+
+    let hash1 = H256::from("0x30793b4ea012c6d3a58c85c5b049962669369807a98e36807c1b02116417f823");
+    let hash2 = H256::from("0x60793b4ea012c6d3a58c85c5b049962669369807a98e36807c1b02116417f826");
+    let hashes = vec![hash1, hash2];
+
+    println!("1 header 1: {:?}", light_client.find_header(&hash1));
+    println!("1 header 2: {:?}", light_client.find_header(&hash2));
+    println!("1 block 1: {:?}", light_client.find_block(&hash1));
+    println!("1 block 2: {:?}", light_client.find_block(&hash2));
+    println!(
+        "1 best_block_hash: {:?}",
+        light_client.get_best_block_hash(&hash1)
+    );
+
+    let header1 = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0];
+    let header2 = vec![0, 9, 8, 7, 6, 5, 4, 3, 2, 1];
+    let headers = vec![header1.as_slice(), header2.as_slice()];
+
+    light_client.save_headers(hashes.clone(), headers);
+    let found_header1 = light_client.find_header(&hash1).unwrap();
+    let found_header2 = light_client.find_header(&hash2).unwrap();
+    assert_eq!(found_header1, header1);
+    assert_eq!(found_header2, header2);
+
+    let mut block1 = Vec::new();
+    let mut block2 = Vec::new();
+    let mut body;
+    body = format!("{:?}", ::std::time::SystemTime::now()).into_bytes();
+    block1.extend(header1.clone());
+    block1.extend(body);
+    body = format!("{:?}", ::std::time::SystemTime::now()).into_bytes();
+    block2.extend(header2.clone());
+    block2.extend(body);
+    let blocks = vec![block1.as_slice(), block2.as_slice()];
+
+    light_client.save_blocks(hashes.clone(), blocks);
+    let found_block1 = light_client.find_block(&hash1).unwrap();
+    let found_block2 = light_client.find_block(&hash2).unwrap();
+
+    assert_eq!(found_block1, block1);
+    assert_eq!(found_block2, block2);
+
+    light_client.set_best_block_hash(hash1, hash2);
+    let best_block_hash = light_client.get_best_block_hash(&hash1).unwrap();
+    assert_eq!(best_block_hash, hash2);
+
+    println!("2 header 1: {:?}", light_client.find_header(&hash1));
+    println!("2 header 2: {:?}", light_client.find_header(&hash2));
+    println!("3 block 1: {:?}", light_client.find_block(&hash1));
+    println!("3 block 2: {:?}", light_client.find_block(&hash2));
+    println!(
+        "2 best_block_hash: {:?}",
+        light_client.get_best_block_hash(&hash1)
+    );
 }

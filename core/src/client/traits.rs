@@ -171,10 +171,10 @@ pub trait BlockChainClient: Sync + Send {
     fn import_block(&self, bytes: Bytes) -> Result<H256, BlockImportError>;
 
     /// Import a block with transaction receipts. Does no sealing and transaction validation.
-    fn import_block_with_receipts(
+    fn try_import_block(
         &self,
         block_bytes: Bytes,
-        receipts_bytes: Bytes,
+        total_difficulty: U256,
     ) -> Result<H256, BlockImportError>;
 
     /// Get block queue information.

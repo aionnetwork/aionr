@@ -18,13 +18,13 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use acore::client::{BlockChainClient, BlockId, BlockStatus, ChainNotify};
-use acore::transaction::UnverifiedTransaction;
+use acore::client::{BlockChainClient, ChainNotify};
+use acore::spec::Spec;
+use acore::views::HeaderView;
 use aion_types::H256;
 use futures::{Future, Stream};
-use rlp::UntrustedRlp;
+use kvdb::KeyValueDB;
 use std::collections::BTreeMap;
-use std::ops::Index;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::TaskExecutor;
@@ -55,7 +55,6 @@ mod handler;
 pub mod storage;
 
 const STATUS_REQ_INTERVAL: u64 = 2;
-const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
 const BLOCKS_IMPORT_INTERVAL: u64 = 50;
 const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
@@ -77,19 +76,6 @@ impl SyncMgr {
                 })
                 .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(status_req_task);
-
-        let blocks_bodies_req_task = Interval::new(
-            Instant::now(),
-            Duration::from_millis(BLOCKS_BODIES_REQ_INTERVAL),
-        )
-        .for_each(move |_| {
-            // blocks bodies req
-            BlockBodiesHandler::send_blocks_bodies_req();
-
-            Ok(())
-        })
-        .map_err(|e| error!("interval errored; err={:?}", e));
-        executor.spawn(blocks_bodies_req_task);
 
         let blocks_import_task = Interval::new(
             Instant::now(),
@@ -171,7 +157,6 @@ impl SyncMgr {
                 info!(target: "sync", "{:=^127}", " Sync Statics ");
                 info!(target: "sync", "Best block number: {}, hash: {}", chain_info.best_block_number, chain_info.best_block_hash);
                 info!(target: "sync", "Network Best block number: {}, hash: {}", SyncStorage::get_network_best_block_number(), SyncStorage::get_network_best_block_hash());
-                info!(target: "sync", "Max staged block number: {}", SyncStorage::get_max_staged_block_number());
                 info!(target: "sync", "Sync speed: {} blks/sec", sync_speed);
                 info!(target: "sync",
                     "Total/Connected/Active peers: {}/{}/{}",
@@ -219,41 +204,10 @@ impl SyncMgr {
                 }
                 info!(target: "sync", "{:-^127}","");
 
-                if block_number_now + 8 < SyncStorage::get_network_best_block_number()
-                    && block_number_now - block_number_last_time < 2
-                {
-                    SyncStorage::get_block_chain().clear_queue();
-                    SyncStorage::get_block_chain().clear_bad();
-                    SyncStorage::clear_downloaded_headers();
-                    SyncStorage::clear_downloaded_blocks();
-                    SyncStorage::clear_downloaded_block_hashes();
-                    SyncStorage::clear_requested_blocks();
-                    SyncStorage::clear_headers_with_bodies_requested();
-                    SyncStorage::set_synced_block_number(SyncStorage::get_chain_info().best_block_number);
-                    let abnormal_mode_nodes_count =
-                        P2pMgr::get_nodes_count_with_mode(Mode::BACKWARD)
-                            + P2pMgr::get_nodes_count_with_mode(Mode::FORWARD);
-                    if abnormal_mode_nodes_count > (active_nodes_count / 5)
-                        || active_nodes_count == 0
-                    {
-                        info!(target: "sync", "Abnormal status, reseting network...");
-                        P2pMgr::reset();
 
-                        SyncStorage::clear_imported_block_hashes();
-                        SyncStorage::clear_staged_blocks();
-                        SyncStorage::set_max_staged_block_number(0);
-                    }
-                }
 
                 SyncStorage::set_synced_block_number_last_time(block_number_now);
                 SyncStorage::set_sync_speed(sync_speed as u16);
-
-                if SyncStorage::get_network_best_block_number()
-                    <= SyncStorage::get_synced_block_number()
-                {
-                    // full synced
-                    SyncStorage::clear_staged_blocks();
-                }
 
                 Ok(())
             })
@@ -295,10 +249,10 @@ impl SyncMgr {
                                 BlockBodiesHandler::handle_blocks_bodies_res(node, req);
                             }
                             SyncAction::BROADCASTTX => {
-                                BroadcastsHandler::handle_broadcast_tx(node, req);
+                                trace!(target: "sync", "BROADCASTTX received.");
                             }
                             SyncAction::BROADCASTBLOCK => {
-                                BroadcastsHandler::handle_broadcast_block(node, req);
+                                trace!(target: "sync", "BROADCASTBLOCK received.");
                             }
                             _ => {
                                 trace!(target: "sync", "UNKNOWN received.");
@@ -327,12 +281,14 @@ impl SyncMgr {
 pub struct SyncConfig {
     /// Max blocks to download ahead
     pub max_download_ahead_blocks: usize,
+    pub genesis_hash: H256,
 }
 
 impl Default for SyncConfig {
     fn default() -> SyncConfig {
         SyncConfig {
             max_download_ahead_blocks: 20000,
+            genesis_hash: H256::from(0),
         }
     }
 }
@@ -345,6 +301,10 @@ pub struct Params {
     pub client: Arc<BlockChainClient>,
     /// Network layer configuration.
     pub network_config: NetworkConfig,
+    /// Spec
+    pub spec: Spec,
+    /// DB
+    pub db: Arc<KeyValueDB>,
 }
 
 pub struct NetworkService {
@@ -355,25 +315,31 @@ pub struct NetworkService {
 pub struct Sync {
     /// Network service
     network: NetworkService,
-    /// starting block number.
-    starting_block_number: u64,
 }
 
 impl Sync {
     /// Create handler with the network service
     pub fn get_instance(params: Params) -> Arc<Sync> {
-        let chain_info = params.client.chain_info();
-        // starting block number is the local best block number during kernel startup.
-        let starting_block_number = chain_info.best_block_number;
+        SyncStorage::init(params.client, params.spec, params.db);
 
-        SyncStorage::init(params.client);
+        let genesis_hash = params.config.genesis_hash;
+        info!(target: "sync", "Genesis hash: {:?}", genesis_hash);
+
+        if let Ok(light_client) = SyncStorage::get_light_client().write() {
+            let db = light_client.get_db();
+            info!(target: "sync", "keys {:?}", db.keys());
+
+            let number = db
+                .iter("headers")
+                .max_by_key(|(_, v)| HeaderView::new(v.to_vec().as_slice()).number());
+            info!(target: "sync", "number {:?}", number);
+        }
 
         let service = NetworkService {
             config: params.network_config.clone(),
         };
         Arc::new(Sync {
             network: service,
-            starting_block_number: starting_block_number,
         })
     }
 }
@@ -403,7 +369,7 @@ impl SyncProvider for Sync {
             state: SyncState::Idle,
             protocol_version: 0,
             network_id: 256,
-            start_block_number: self.starting_block_number,
+            start_block_number: 0,
             last_imported_block_number: None,
             highest_block_number: { Some(SyncStorage::get_network_best_block_number()) },
             blocks_received: 0,
@@ -491,85 +457,16 @@ impl NetworkManager for Sync {
 impl ChainNotify for Sync {
     fn new_blocks(
         &self,
-        imported: Vec<H256>,
+        _imported: Vec<H256>,
         _invalid: Vec<H256>,
-        enacted: Vec<H256>,
+        _enacted: Vec<H256>,
         _retracted: Vec<H256>,
-        sealed: Vec<H256>,
+        _sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
         _duration: u64,
     )
     {
-        if P2pMgr::get_all_nodes_count() == 0 {
-            return;
-        }
-
-        if !imported.is_empty() {
-            let min_imported_block_number = SyncStorage::get_synced_block_number() + 1;
-            let mut max_imported_block_number = 0;
-            let client = SyncStorage::get_block_chain();
-            for hash in imported.iter() {
-                // ImportHandler::import_staged_blocks(&hash);
-                let block_id = BlockId::Hash(*hash);
-                if client.block_status(block_id) == BlockStatus::InChain {
-                    if let Some(block_number) = client.block_number(block_id) {
-                        if max_imported_block_number < block_number {
-                            max_imported_block_number = block_number;
-                        }
-                    }
-                }
-            }
-
-            // The imported blocks are not new or not yet in chain. Do not notify in this case.
-            if max_imported_block_number < min_imported_block_number {
-                return;
-            }
-
-            let synced_block_number = SyncStorage::get_synced_block_number();
-            if max_imported_block_number <= synced_block_number {
-                let mut hashes = Vec::new();
-                for block_number in max_imported_block_number..synced_block_number + 1 {
-                    let block_id = BlockId::Number(block_number);
-                    if let Some(block_hash) = client.block_hash(block_id) {
-                        hashes.push(block_hash);
-                    }
-                }
-                if hashes.len() > 0 {
-                    SyncStorage::remove_imported_block_hashes(hashes);
-                }
-            }
-
-            SyncStorage::set_synced_block_number(max_imported_block_number);
-
-            for block_number in min_imported_block_number..max_imported_block_number + 1 {
-                let block_id = BlockId::Number(block_number);
-                if let Some(blk) = client.block(block_id) {
-                    let block_hash = blk.hash();
-                    ImportHandler::import_staged_blocks(&block_hash);
-                    if let Some(time) = SyncStorage::get_requested_time(&block_hash) {
-                        info!(target: "sync",
-                            "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
-                            block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
-                    }
-                }
-            }
-        }
-
-        if enacted.is_empty() {
-            for hash in enacted.iter() {
-                debug!(target: "sync", "enacted hash: {:?}", hash);
-                ImportHandler::import_staged_blocks(&hash);
-            }
-        }
-
-        if !sealed.is_empty() {
-            debug!(target: "sync", "Propagating blocks...");
-            SyncStorage::insert_imported_block_hashes(sealed.clone());
-            BroadcastsHandler::propagate_new_blocks(
-                sealed.index(0),
-                SyncStorage::get_block_chain(),
-            );
-        }
+        info!(target: "sync", "new_blocks in chain...");
     }
 
     fn start(&self) {
@@ -582,24 +479,7 @@ impl ChainNotify for Sync {
 
     fn broadcast(&self, _message: Vec<u8>) {}
 
-    fn transactions_received(&self, transactions: &[Vec<u8>]) {
-        if transactions.len() == 1 {
-            let transaction_rlp = transactions[0].clone();
-            if let Ok(tx) = UntrustedRlp::new(&transaction_rlp).as_val() {
-                let transaction: UnverifiedTransaction = tx;
-                let hash = transaction.hash();
-                let sent_transaction_hashes_mutex = SyncStorage::get_sent_transaction_hashes();
-                let mut lock = sent_transaction_hashes_mutex.lock();
-
-                if let Ok(ref mut sent_transaction_hashes) = lock {
-                    if !sent_transaction_hashes.contains_key(&hash) {
-                        sent_transaction_hashes.insert(hash, 0);
-                        SyncStorage::insert_received_transaction(transaction_rlp);
-                    }
-                }
-            }
-        }
-    }
+    fn transactions_received(&self, _transactions: &[Vec<u8>]) {}
 }
 
 /// Configuration for IPC service.

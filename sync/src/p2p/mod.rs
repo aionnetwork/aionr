@@ -24,18 +24,20 @@ use bytes::BytesMut;
 use futures::sync::mpsc;
 use futures::{Future, Stream};
 use rand::{thread_rng, Rng};
+use socket2::{Domain, Socket, Type};
 use state::Storage;
 use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
 use std::io;
-use std::net::Shutdown;
+use std::net::{Shutdown, TcpStream as StdTcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, RwLock};
+use std::sync::RwLock;
 use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 use tokio::runtime::TaskExecutor;
 use tokio_codec::{Decoder, Encoder, Framed};
+use tokio_reactor::Handle;
 use tokio_threadpool::{Builder, ThreadPool};
 
 mod error;
@@ -51,7 +53,7 @@ pub use self::node::*;
 lazy_static! {
     static ref LOCAL_NODE: Storage<Node> = Storage::new();
     static ref NETWORK_CONFIG: Storage<NetworkConfig> = Storage::new();
-    static ref SOCKETS_MAP: Storage<Mutex<HashMap<u64, TcpStream>>> = Storage::new();
+    static ref SOCKETS_MAP: RwLock<HashMap<u64, StdTcpStream>> = { RwLock::new(HashMap::new()) };
     static ref GLOBAL_NODES_MAP: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
     static ref TOP8_NODE_HASHES: RwLock<Vec<u64>> = { RwLock::new(Vec::new()) };
     static ref ENABLED: Storage<AtomicBool> = Storage::new();
@@ -63,9 +65,6 @@ pub struct P2pMgr;
 
 impl P2pMgr {
     pub fn enable(cfg: NetworkConfig) {
-        let sockets_map: HashMap<u64, TcpStream> = HashMap::new();
-        SOCKETS_MAP.set(Mutex::new(sockets_map));
-
         let local_node_str = cfg.local_node.clone();
         let mut local_node = Node::new_with_node_str(local_node_str);
 
@@ -90,8 +89,7 @@ impl P2pMgr {
         executor: &TaskExecutor,
         local_addr: &String,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    )
-    {
+    ) {
         if let Ok(addr) = local_addr.parse() {
             let listener = TcpListener::bind(&addr).expect("Failed to bind");
             info!(target: "net", "Listening on: {}", local_addr);
@@ -117,33 +115,54 @@ impl P2pMgr {
         }
     }
 
-    pub fn create_client(peer_node: Node, handle: fn(node: &mut Node, req: ChannelBuffer)) {
+    pub fn create_client(mut peer_node: Node, handle: fn(node: &mut Node, req: ChannelBuffer)) {
         let node_ip_addr = peer_node.get_ip_addr();
         if let Ok(addr) = node_ip_addr.parse() {
             let thread_pool = Self::get_thread_pool();
             let node_id = peer_node.get_node_id();
-            let connect = TcpStream::connect(&addr)
-                .map(move |socket| {
-                    socket
-                        .set_recv_buffer_size(1 << 24)
-                        .expect("set_recv_buffer_size failed");
+            if let Ok(socket) = Socket::new(Domain::ipv4(), Type::stream(), None) {
+                let std_stream = socket.into_tcp_stream();
+                peer_node.node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
+                let node_hash = peer_node.node_hash;
 
-                    socket
-                        .set_keepalive(Some(Duration::from_secs(30)))
-                        .expect("set_keepalive failed");
+                if let Some(node) = P2pMgr::get_node(node_hash) {
+                    if node.state_code == DISCONNECTED {
+                        trace!(target: "net", "update known peer node {}@{}...", node.get_node_id(), node.get_ip_addr());
+                        P2pMgr::remove_peer(node_hash);
+                    } else {
+                        return;
+                    }
+                }
 
-                    Self::process_outbounds(socket, peer_node, handle);
-                })
-                .map_err(
-                    move |e| error!(target: "net", "Node: {}@{}, {}", node_ip_addr, node_id, e),
-                );
-            thread_pool.spawn(connect);
+                if let Ok(std_stream_cloned) = std_stream.try_clone() {
+                    let stream = TcpStream::connect_std(std_stream_cloned, &addr, &Handle::default())
+                        .map(move |socket| {
+                            socket
+                                .set_recv_buffer_size(1 << 24)
+                                .expect("set_recv_buffer_size failed");
+
+                            socket
+                                .set_keepalive(Some(Duration::from_secs(30)))
+                                .expect("set_keepalive failed");
+
+                            Self::process_outbounds(socket, std_stream, peer_node.clone(), handle);
+                        })
+                        .map_err(
+                            move |e| error!(target: "net", "Node: {}@{}, {}", node_ip_addr, node_id, e),
+                        );
+                    thread_pool.spawn(stream);
+                }
+            }
         }
     }
 
-    pub fn get_thread_pool() -> &'static ThreadPool { TP.get() }
+    pub fn get_thread_pool() -> &'static ThreadPool {
+        TP.get()
+    }
 
-    pub fn get_network_config() -> &'static NetworkConfig { NETWORK_CONFIG.get() }
+    pub fn get_network_config() -> &'static NetworkConfig {
+        NETWORK_CONFIG.get()
+    }
 
     pub fn load_boot_nodes(boot_nodes_str: Vec<String>) -> Vec<Node> {
         let mut boot_nodes = Vec::new();
@@ -163,7 +182,9 @@ impl P2pMgr {
         boot_nodes
     }
 
-    pub fn get_local_node() -> &'static Node { LOCAL_NODE.get() }
+    pub fn get_local_node() -> &'static Node {
+        LOCAL_NODE.get()
+    }
 
     pub fn disable() {
         ENABLED.get().store(false, Ordering::SeqCst);
@@ -171,9 +192,9 @@ impl P2pMgr {
     }
 
     pub fn reset() {
-        if let Ok(mut sockets_map) = SOCKETS_MAP.get().lock() {
+        if let Ok(mut sockets_map) = SOCKETS_MAP.write() {
             for (_, socket) in sockets_map.iter_mut() {
-                if let Err(e) = socket.shutdown() {
+                if let Err(e) = socket.shutdown(Shutdown::Both) {
                     error!(target: "net", "Invalid socket， {}", e);
                 }
             }
@@ -183,34 +204,32 @@ impl P2pMgr {
         }
     }
 
-    pub fn get_peer(node_hash: u64) -> Option<TcpStream> {
-        if let Ok(mut socktes_map) = SOCKETS_MAP.get().lock() {
+    pub fn get_peer(node_hash: u64) -> Option<StdTcpStream> {
+        if let Ok(mut socktes_map) = SOCKETS_MAP.write() {
             return socktes_map.remove(&node_hash);
         }
 
         None
     }
 
-    pub fn add_peer(node: Node, ref_socket: &TcpStream) {
-        if let Ok(socket) = ref_socket.try_clone() {
-            if let Ok(mut sockets_map) = SOCKETS_MAP.get().lock() {
-                match sockets_map.get(&node.node_hash) {
-                    Some(_) => {
-                        warn!(target: "net", "Known node, ...");
-                    }
-                    None => {
-                        if let Ok(mut peer_nodes) = GLOBAL_NODES_MAP.write() {
-                            let max_peers_num = NETWORK_CONFIG.get().max_peers as usize;
-                            if peer_nodes.len() < max_peers_num {
-                                match peer_nodes.get(&node.node_hash) {
-                                    Some(_) => {
-                                        warn!(target: "net", "Known node...");
-                                    }
-                                    None => {
-                                        sockets_map.insert(node.node_hash, socket);
-                                        peer_nodes.insert(node.node_hash, node);
-                                        return;
-                                    }
+    pub fn add_peer(node: Node, socket: StdTcpStream) {
+        if let Ok(mut sockets_map) = SOCKETS_MAP.write() {
+            match sockets_map.get(&node.node_hash) {
+                Some(_) => {
+                    warn!(target: "net", "Known node, ...");
+                }
+                None => {
+                    if let Ok(mut peer_nodes) = GLOBAL_NODES_MAP.write() {
+                        let max_peers_num = NETWORK_CONFIG.get().max_peers as usize;
+                        if peer_nodes.len() < max_peers_num {
+                            match peer_nodes.get(&node.node_hash) {
+                                Some(_) => {
+                                    warn!(target: "net", "Known node...");
+                                }
+                                None => {
+                                    sockets_map.insert(node.node_hash, socket);
+                                    peer_nodes.insert(node.node_hash, node);
+                                    return;
                                 }
                             }
                         }
@@ -219,13 +238,13 @@ impl P2pMgr {
             }
         }
 
-        if let Err(e) = ref_socket.shutdown(Shutdown::Both) {
+        if let Err(e) = socket.shutdown(Shutdown::Both) {
             error!(target: "net", "{}", e);
         }
     }
 
     pub fn remove_peer(node_hash: u64) -> Option<Node> {
-        if let Ok(mut sockets_map) = SOCKETS_MAP.get().lock() {
+        if let Ok(mut sockets_map) = SOCKETS_MAP.write() {
             if let Some(socket) = sockets_map.remove(&node_hash) {
                 if let Err(e) = socket.shutdown(Shutdown::Both) {
                     trace!(target: "net", "remove_peer， invalid socket， {}", e);
@@ -304,12 +323,10 @@ impl P2pMgr {
         nodes_count
     }
 
-    pub fn get_nodes_count_all_modes() -> (usize, usize, usize, usize, usize) {
+    pub fn get_nodes_count_all_modes() -> (usize, usize, usize) {
         let mut normal_nodes_count = 0;
         let mut backward_nodes_count = 0;
         let mut forward_nodes_count = 0;
-        let mut lightning_nodes_count = 0;
-        let mut thunder_nodes_count = 0;
         if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
             for val in nodes_map.values() {
                 if val.state_code & ALIVE == ALIVE {
@@ -317,8 +334,6 @@ impl P2pMgr {
                         Mode::NORMAL => normal_nodes_count += 1,
                         Mode::BACKWARD => backward_nodes_count += 1,
                         Mode::FORWARD => forward_nodes_count += 1,
-                        Mode::LIGHTNING => lightning_nodes_count += 1,
-                        Mode::THUNDER => thunder_nodes_count += 1,
                     }
                 }
             }
@@ -327,8 +342,6 @@ impl P2pMgr {
             normal_nodes_count,
             backward_nodes_count,
             forward_nodes_count,
-            lightning_nodes_count,
-            thunder_nodes_count,
         )
     }
 
@@ -465,7 +478,7 @@ impl P2pMgr {
                 peer_node.state_code = CONNECTED;
                 trace!(target: "net", "New incoming connection: {}", peer_addr);
 
-                let (tx, rx) = mpsc::channel(409600);
+                let (tx, rx) = mpsc::channel(4096000);
                 let thread_pool = P2pMgr::get_thread_pool();
 
                 peer_node.tx = Some(tx);
@@ -475,8 +488,8 @@ impl P2pMgr {
                 trace!(target: "net", "A new peer added: {}", peer_node);
 
                 let mut node_hash = peer_node.node_hash;
-                P2pMgr::add_peer(peer_node, &socket);
                 // process request from the incoming stream
+
                 let (sink, stream) = P2pMgr::split_frame(socket);
                 let read = stream.for_each(move |msg| {
                     if let Some(mut peer_node) = P2pMgr::get_node(node_hash) {
@@ -494,6 +507,7 @@ impl P2pMgr {
                     io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")
                 }));
                 thread_pool.spawn(write.then(move |_| {
+                    P2pMgr::remove_peer(node_hash);
                     trace!(target:"net", "Connection with {:?} closed.", peer_ip);
                     Ok(())
                 }));
@@ -505,32 +519,19 @@ impl P2pMgr {
 
     fn process_outbounds(
         socket: TcpStream,
-        peer_node: Node,
+        std_stream: StdTcpStream,
+        mut peer_node: Node,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    )
-    {
-        let mut peer_node = peer_node.clone();
-        peer_node.node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
+    ) {
         let node_hash = peer_node.node_hash;
-
-        if let Some(node) = P2pMgr::get_node(node_hash) {
-            if node.state_code == DISCONNECTED {
-                trace!(target: "net", "update known peer node {}@{}...", node.get_node_id(), node.get_ip_addr());
-                P2pMgr::remove_peer(node_hash);
-            } else {
-                return;
-            }
-        }
-
-        let (tx, rx) = mpsc::channel(409600);
+        let (tx, rx) = mpsc::channel(4096000);
         peer_node.tx = Some(tx);
         peer_node.state_code = CONNECTED | IS_SERVER;
         peer_node.ip_addr.is_server = true;
         let peer_ip = peer_node.get_ip_addr().clone();
+
+        P2pMgr::add_peer(peer_node.clone(), std_stream);
         trace!(target: "net", "A new peer added: {}@{}", peer_node.get_node_id(), peer_node.get_ip_addr());
-
-        P2pMgr::add_peer(peer_node.clone(), &socket);
-
         // process request from the outcoming stream
         let (sink, stream) = P2pMgr::split_frame(socket);
 
@@ -561,15 +562,13 @@ impl P2pMgr {
 
     pub fn send(node_hash: u64, msg: ChannelBuffer) {
         match Self::get_tx(node_hash) {
-            Some(mut tx) => {
-                match tx.try_send(msg) {
-                    Ok(()) => {}
-                    Err(e) => {
-                        Self::remove_peer(node_hash);
-                        trace!(target: "net", "Failed to send the msg, Err: {}", e);
-                    }
+            Some(mut tx) => match tx.try_send(msg) {
+                Ok(()) => {}
+                Err(e) => {
+                    Self::remove_peer(node_hash);
+                    trace!(target: "net", "Failed to send the msg, Err: {}", e);
                 }
-            }
+            },
             None => {
                 Self::remove_peer(node_hash);
                 trace!(target: "net", "Invalid peer !, node_hash: {}", node_hash);
@@ -673,7 +672,9 @@ pub struct NetworkConfig {
 }
 
 impl Default for NetworkConfig {
-    fn default() -> Self { NetworkConfig::new() }
+    fn default() -> Self {
+        NetworkConfig::new()
+    }
 }
 
 impl NetworkConfig {

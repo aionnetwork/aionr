@@ -43,14 +43,17 @@ pub const COL_EXTRA: &'static str = "extra";
 pub const COL_ACCOUNT_BLOOM: &'static str = "account_bloom";
 /// Column for general information from the local node which can persist.
 pub const COL_NODE_INFO: &'static str = "node_info";
+/// Column for header chain.
+const COL_HEADER_CHAIN: &'static str = "header_chain";
 
-pub const DB_NAMES: [&'static str; 6] = [
+pub const DB_NAMES: [&'static str; 7] = [
     "headers",
     "bodies",
     "state",
     "extra",
     "account_bloom",
     "node_info",
+    "header_chain",
 ];
 /// Modes for updating caches.
 #[derive(Clone, Copy)]

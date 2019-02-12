@@ -50,8 +50,6 @@ pub enum Mode {
     NORMAL,
     BACKWARD,
     FORWARD,
-    LIGHTNING,
-    THUNDER,
 }
 
 impl fmt::Display for Mode {
@@ -60,8 +58,6 @@ impl fmt::Display for Mode {
             Mode::NORMAL => "NORMAL",
             Mode::BACKWARD => "BACKWARD",
             Mode::FORWARD => "FORWARD",
-            Mode::LIGHTNING => "LIGHTNING",
-            Mode::THUNDER => "THUNDER",
         };
         write!(f, "{}", printable)
     }
@@ -93,7 +89,7 @@ impl IpAddr {
 
     pub fn get_display_addr(&self) -> String {
         format!(
-            "{:>3}.{:>3}.{:>3}.{:>3}:{}",
+            "{:<3}.{:<3}.{:<3}.{:<3}:{}",
             self.ip[1], self.ip[3], self.ip[5], self.ip[7], self.port
         )
         .to_string()
@@ -184,7 +180,7 @@ impl Node {
         if "00000000-0000-0000-0000-000000000000" == node_id.to_string() {
             let uuid = Uuid::new_v4();
             node.node_id
-                .copy_from_slice(uuid.hyphenated().to_string().as_bytes());
+                .copy_from_slice(uuid.to_hyphenated().to_string().as_bytes());
         } else {
             node.node_id.copy_from_slice(node_id.as_bytes());
         }

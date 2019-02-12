@@ -18,8 +18,9 @@ use std::io;
 use std::mem::size_of;
 use cryptoutil::copy_memory;
 
-use rand::{OsRng, Rng};
+use rand::Rng;
 use rand::distributions::Standard;
+use rand::rngs::OsRng;
 use serialize::base64;
 use serialize::base64::{FromBase64, ToBase64};
 
