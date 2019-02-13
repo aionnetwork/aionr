@@ -65,6 +65,7 @@ pub use self::backend::Backend;
 pub use self::substate::Substate;
 
 /// Used to return information about an `State::apply` operation.
+#[derive(Debug)]
 pub struct ApplyOutcome {
     /// The receipt for the applied transaction.
     pub receipt: Receipt,
@@ -858,6 +859,65 @@ impl<B: Backend> State<B> {
         Ok(ApplyOutcome {
             receipt,
         })
+    }
+
+    pub fn apply_batch(
+        &mut self,
+        env_info: &EnvInfo,
+        machine: &Machine,
+        txs: &[SignedTransaction],
+    ) -> Vec<ApplyResult>
+    {
+        let exec_results = self.execute_bulk(env_info, machine, txs, true, false);
+
+        match self.commit() {
+            Err(x) => return vec![Err(Error::from(x))],
+            _ => {}
+        }
+
+        let state_root = self.root().clone();
+
+        let mut receipts = Vec::new();
+        for result in exec_results {
+            let outcome = match result {
+                Ok(e) => {
+                    let receipt = Receipt::new(
+                        state_root,
+                        e.gas_used,
+                        e.transaction_fee,
+                        e.logs,
+                        e.output,
+                        e.exception,
+                    );
+                    Ok(ApplyOutcome {
+                        receipt,
+                    })
+                }
+                Err(x) => Err(From::from(x)),
+            };
+            receipts.push(outcome);
+        }
+
+        trace!(target: "state", "Transaction receipt: {:?}", receipts);
+
+        return receipts;
+    }
+
+    fn execute_bulk(
+        &mut self,
+        env_info: &EnvInfo,
+        machine: &Machine,
+        txs: &[SignedTransaction],
+        check_nonce: bool,
+        virt: bool,
+    ) -> Vec<Result<Executed, ExecutionError>>
+    {
+        let mut e = Executive::new(self, env_info, machine);
+
+        match virt {
+            true => e.transact_virtual_bulk(txs, check_nonce),
+            false => e.transact_bulk(txs, check_nonce, false),
+        }
     }
 
     // Execute a given transaction without committing changes.

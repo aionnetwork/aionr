@@ -34,13 +34,15 @@ extern crate rustc_hex;
 extern crate db as kvdb;
 #[cfg(test)]
 mod tests;
+extern crate rlp;
+extern crate patricia_trie as trie;
+extern crate vm_utils as utils;
 
 pub mod context;
 pub mod basetypes;
 pub mod callback;
 
 pub mod vm;
-pub mod env_info;
 mod ffi;
 mod core;
 

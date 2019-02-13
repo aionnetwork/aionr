@@ -21,8 +21,7 @@
 
 use super::builtin::{BuiltinParams, BuiltinContract, BuiltinExt};
 use aion_types::U256;
-use vms::vm::ExecutionResult;
-use vms::{ReturnData, EvmStatusCode};
+use vms::{ExecutionResult, ExecStatus, ReturnData};
 use blake2b::Blake2b;
 
 const WORD_LENGTH: u64 = 4;
@@ -70,7 +69,7 @@ impl BuiltinContract for Blake2bHashContract {
         if len == 0 || len > 2_097_152 {
             return ExecutionResult {
                 gas_left: U256::zero(),
-                status_code: EvmStatusCode::Failure,
+                status_code: ExecStatus::Failure,
                 return_data: ReturnData::empty(),
                 exception: "incorrect size of the input data.".into(),
             };
@@ -78,7 +77,7 @@ impl BuiltinContract for Blake2bHashContract {
         let hash = &Blake2b::hash_256(input);
         ExecutionResult {
             gas_left: U256::zero(),
-            status_code: EvmStatusCode::Success,
+            status_code: ExecStatus::Success,
             return_data: ReturnData::new(hash.to_vec(), 0, hash.len()),
             exception: String::default(),
         }
@@ -92,7 +91,7 @@ mod tests {
     use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
     use state::{State, Substate};
     use tests::helpers::get_temp_state;
-    use vms::EvmStatusCode;
+    use vms::ExecStatus;
     use bytes::to_hex;
     use aion_types::{Address, H256};
 
@@ -132,7 +131,7 @@ mod tests {
 
         let input = "a0010101010101010101010101".as_bytes();
         let result = contract.execute(&mut ext, &input);
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         let ret_data = result.return_data;
         assert_eq!(ret_data.mem.len(), 32);
         let expected = "aa6648de0988479263cf3730a48ef744d238b96a5954aa77d647ae965d3f7715";
@@ -148,7 +147,7 @@ mod tests {
 
         let input = "1".as_bytes();
         let result = contract.execute(&mut ext, &input);
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         let ret_data = result.return_data;
         assert_eq!(ret_data.mem.len(), 32);
         let expected = "92cdf578c47085a5992256f0dcf97d0b19f1f1c9de4d5fe30c3ace6191b6e5db";
@@ -166,7 +165,7 @@ mod tests {
     //
     //        let input = box [0u8; 2 * 1024 * 1024];
     //        let result = contract.execute(&mut ext, input.as_ref());
-    //        assert!(result.status_code == EvmStatusCode::Success);
+    //        assert!(result.status_code == ExecStatus::Success);
     //        let ret_data = result.return_data;
     //        assert_eq!(ret_data.mem.len(), 32);
     //        let expected = "9852d74e002f23d14ba2638b905609419bd16e50843ac147ccf4d509ed2c9dfc";
@@ -181,7 +180,7 @@ mod tests {
         let mut ext = get_ext_default(state, substate);
         let input = "".as_bytes();
         let result = contract.execute(&mut ext, &input);
-        assert!(result.status_code == EvmStatusCode::Failure);
+        assert!(result.status_code == ExecStatus::Failure);
     }
 
     // uncomment if uncomment box_syntax in root crate
@@ -193,6 +192,6 @@ mod tests {
     //        let mut ext = get_ext_default(state, substate);
     //        let input = box [0u8; 2 * 1024 * 1024 + 1];
     //        let result = contract.execute(&mut ext, input.as_ref());
-    //        assert!(result.status_code == EvmStatusCode::Failure);
+    //        assert!(result.status_code == ExecStatus::Failure);
     //    }
 }

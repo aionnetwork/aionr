@@ -28,7 +28,7 @@ use super::tx_hash_contract::TxHashContract;
 use super::atb::token_bridge_contract::TokenBridgeContract;
 use std::fmt;
 use state::{State, Substate, Backend as StateBackend,CleanupMode};
-use vms::vm::ExecutionResult;
+use vms::ExecutionResult;
 use log_entry::LogEntry;
 
 pub trait BuiltinContract: Send + Sync {

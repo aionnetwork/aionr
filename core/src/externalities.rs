@@ -34,9 +34,12 @@ use vms::{
     Ext,
     EnvInfo,
     CallType,
+    ExecutionResult,
+    ExecStatus,
     ReturnData,
-EvmStatusCode};
-use vms::vm::{self, ExecutionResult};
+    AVMExt,
+};
+use vms::vm::{self};
 use kvdb::KeyValueDB;
 use db::{self, Readable};
 
@@ -51,17 +54,90 @@ pub struct OriginInfo {
 
 impl OriginInfo {
     /// Populates origin info from action params.
-    pub fn from(params: &ActionParams) -> Self {
-        OriginInfo {
-            address: params.address.clone(),
-            origin: params.origin.clone(),
-            gas_price: params.gas_price,
-            value: match params.value {
-                ActionValue::Transfer(val) | ActionValue::Apparent(val) => val,
-            },
-            origin_tx_hash: params.original_transaction_hash.clone(),
+    pub fn from(params: &[ActionParams]) -> Vec<Self> {
+        params
+            .iter()
+            .map(|p| {
+                OriginInfo {
+                    address: p.address.clone(),
+                    origin: p.origin.clone(),
+                    gas_price: p.gas_price,
+                    value: match p.value {
+                        ActionValue::Transfer(val) | ActionValue::Apparent(val) => val,
+                    },
+                    origin_tx_hash: p.original_transaction_hash.clone(),
+                }
+            })
+            .collect()
+    }
+}
+
+/// Implementation of evm Externalities.
+pub struct AVMExternalities<'a, B: 'a>
+where B: StateBackend
+{
+    state: &'a mut State<B>,
+    env_info: &'a EnvInfo,
+    machine: &'a Machine,
+    depth: usize,
+    origin_info: Vec<OriginInfo>,
+    substates: &'a mut [Substate],
+}
+
+impl<'a, B: 'a> AVMExternalities<'a, B>
+where B: StateBackend
+{
+    /// Basic `Externalities` constructor.
+    pub fn new(
+        state: &'a mut State<B>,
+        env_info: &'a EnvInfo,
+        machine: &'a Machine,
+        depth: usize,
+        origin_info: Vec<OriginInfo>,
+        substates: &'a mut [Substate],
+    ) -> Self
+    {
+        AVMExternalities {
+            state: state,
+            env_info: env_info,
+            machine: machine,
+            depth: depth,
+            origin_info: origin_info,
+            substates: substates,
         }
     }
+}
+
+impl<'a, B: 'a> AVMExt for AVMExternalities<'a, B>
+where B: StateBackend
+{
+    fn env_info(&self) -> &EnvInfo { self.env_info }
+
+    fn depth(&self) -> usize { self.depth }
+
+    fn create_account(&mut self, address: &Address) { unimplemented!() }
+
+    fn account_exists(&self, address: &Address) -> bool { unimplemented!() }
+
+    fn save_code(&mut self, address: &Address, code: &Vec<u8>) { unimplemented!() }
+
+    fn get_code(&self, address: &Address) -> Arc<Vec<u8>> { unimplemented!() }
+
+    fn sstore(&mut self, address: &Address, key: &Vec<u8>, value: Vec<u8>) { unimplemented!() }
+
+    fn sload(&self, address: &Address, key: &Vec<u8>) -> Option<Vec<u8>> { unimplemented!() }
+
+    fn remove_account(&mut self, address: &Address) { unimplemented!() }
+
+    fn avm_balance(&self, address: &Address) -> U256 { unimplemented!() }
+
+    fn inc_balance(&mut self, address: &Address, inc: &U256) { unimplemented!() }
+
+    fn dec_balance(&mut self, address: &Address, dec: &U256) { unimplemented!() }
+
+    fn get_nonce(&self, address: &Address) -> u64 { unimplemented!() }
+
+    fn inc_nonce(&mut self, address: &Address) { unimplemented!() }
 }
 
 /// Implementation of evm Externalities.
@@ -72,7 +148,7 @@ where B: StateBackend
     env_info: &'a EnvInfo,
     machine: &'a Machine,
     depth: usize,
-    origin_info: OriginInfo,
+    origin_info: Vec<OriginInfo>,
     substate: &'a mut Substate,
     db: Arc<KeyValueDB>,
 }
@@ -86,7 +162,7 @@ where B: StateBackend
         env_info: &'a EnvInfo,
         machine: &'a Machine,
         depth: usize,
-        origin_info: OriginInfo,
+        origin_info: Vec<OriginInfo>,
         substate: &'a mut Substate,
         kvdb: Arc<KeyValueDB>,
     ) -> Self
@@ -108,25 +184,25 @@ where B: StateBackend
 {
     fn storage_at(&self, key: &H128) -> H128 {
         self.state
-            .storage_at(&self.origin_info.address, key)
+            .storage_at(&self.origin_info[0].address, key)
             .expect("Fatal error occurred when getting storage.")
     }
 
     fn set_storage(&mut self, key: H128, value: H128) {
         self.state
-            .set_storage(&self.origin_info.address, key, value)
+            .set_storage(&self.origin_info[0].address, key, value)
             .expect("Fatal error occurred when putting storage.");
     }
 
     fn storage_at_dword(&self, key: &H128) -> H256 {
         self.state
-            .storage_at_dword(&self.origin_info.address, key)
+            .storage_at_dword(&self.origin_info[0].address, key)
             .expect("Fatal error occurred when getting storage.")
     }
 
     fn set_storage_dword(&mut self, key: H128, value: H256) {
         self.state
-            .set_storage_dword(&self.origin_info.address, key, value)
+            .set_storage_dword(&self.origin_info[0].address, key, value)
             .expect("Fatal error occurred when putting storage.")
     }
 
@@ -142,7 +218,7 @@ where B: StateBackend
             .expect("Fatal error occurred when checking account existance.")
     }
 
-    fn origin_balance(&self) -> U256 { self.balance(&self.origin_info.address) }
+    fn origin_balance(&self) -> U256 { self.balance(&self.origin_info[0].address) }
 
     fn balance(&self, address: &Address) -> U256 {
         self.state
@@ -194,13 +270,13 @@ where B: StateBackend
     /// Create new contract account
     fn create(&mut self, gas: &U256, value: &U256, code: &[u8]) -> ExecutionResult {
         // create new contract address
-        let (address, code_hash) = match self.state.nonce(&self.origin_info.address) {
-            Ok(nonce) => contract_address(&self.origin_info.address, &nonce),
+        let (address, code_hash) = match self.state.nonce(&self.origin_info[0].address) {
+            Ok(nonce) => contract_address(&self.origin_info[0].address, &nonce),
             Err(e) => {
                 debug!(target: "ext", "Database corruption encountered: {:?}", e);
                 return ExecutionResult {
                     gas_left: 0.into(),
-                    status_code: EvmStatusCode::Failure,
+                    status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from(
                         "Cannot get origin address and nonce from database. Database corruption \
@@ -214,10 +290,10 @@ where B: StateBackend
         let params = ActionParams {
             code_address: address.clone(),
             address: address.clone(),
-            sender: self.origin_info.address.clone(),
-            origin: self.origin_info.origin.clone(),
+            sender: self.origin_info[0].address.clone(),
+            origin: self.origin_info[0].origin.clone(),
             gas: *gas,
-            gas_price: self.origin_info.gas_price,
+            gas_price: self.origin_info[0].gas_price,
             value: ActionValue::Transfer(*value),
             code: Some(Arc::new(code.to_vec())),
             code_hash: code_hash,
@@ -226,7 +302,7 @@ where B: StateBackend
             static_flag: false,
             params_type: vm::ParamsType::Embedded,
             transaction_hash: H256::default(),
-            original_transaction_hash: self.origin_info.origin_tx_hash.clone(),
+            original_transaction_hash: self.origin_info[0].origin_tx_hash.clone(),
         };
 
         let mut result = {
@@ -236,18 +312,18 @@ where B: StateBackend
         };
 
         // If succeed, add address into substate, set the return_data (normally should be the deployed code) to address
-        if result.status_code == EvmStatusCode::Success {
+        if result.status_code == ExecStatus::Success {
             self.substate.contracts_created.push(address.clone());
             let address_vec: Vec<u8> = address.clone().to_vec();
             let length: usize = address_vec.len();
             result.return_data = ReturnData::new(address_vec, 0, length);
 
             // Increment nonce of the caller contract account
-            if let Err(e) = self.state.inc_nonce(&self.origin_info.address) {
+            if let Err(e) = self.state.inc_nonce(&self.origin_info[0].address) {
                 debug!(target: "ext", "Database corruption encountered: {:?}", e);
                 return ExecutionResult {
                     gas_left: 0.into(),
-                    status_code: EvmStatusCode::Failure,
+                    status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from(
                         "inc_nonce failed. Database corruption may encountered.",
@@ -261,7 +337,7 @@ where B: StateBackend
                 debug!(target: "ext", "Database corruption encountered: {:?}", e);
                 return ExecutionResult {
                     gas_left: 0.into(),
-                    status_code: EvmStatusCode::Failure,
+                    status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from(
                         "inc_nonce failed. Database corruption may encountered.",
@@ -298,7 +374,7 @@ where B: StateBackend
             Err(_) => {
                 return ExecutionResult {
                     gas_left: 0.into(),
-                    status_code: EvmStatusCode::Failure,
+                    status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from("Code not founded."),
                 }
@@ -314,7 +390,7 @@ where B: StateBackend
         {
             ActionValue::Transfer(value.unwrap())
         } else {
-            ActionValue::Apparent(self.origin_info.value) // Apparent value will not be transfered
+            ActionValue::Apparent(self.origin_info[0].value) // Apparent value will not be transfered
         };
 
         let params = ActionParams {
@@ -322,9 +398,9 @@ where B: StateBackend
             address: receive_address.clone(),
             value: action_value,
             code_address: code_address.clone(),
-            origin: self.origin_info.origin.clone(),
+            origin: self.origin_info[0].origin.clone(),
             gas: *gas,
-            gas_price: self.origin_info.gas_price,
+            gas_price: self.origin_info[0].gas_price,
             code: code,
             code_hash: Some(code_hash),
             data: Some(data.to_vec()),
@@ -332,7 +408,7 @@ where B: StateBackend
             static_flag: static_flag,
             params_type: vm::ParamsType::Separate,
             transaction_hash: H256::default(),
-            original_transaction_hash: self.origin_info.origin_tx_hash,
+            original_transaction_hash: self.origin_info[0].origin_tx_hash,
         };
 
         let mut ex = Executive::from_parent(self.state, self.env_info, self.machine, self.depth);
@@ -356,7 +432,7 @@ where B: StateBackend
     fn log(&mut self, topics: Vec<H256>, data: &[u8]) {
         use log_entry::LogEntry;
 
-        let address = self.origin_info.address.clone();
+        let address = self.origin_info[0].address.clone();
         self.substate.logs.push(LogEntry {
             address: address,
             topics: topics,
@@ -365,7 +441,7 @@ where B: StateBackend
     }
 
     fn suicide(&mut self, refund_address: &Address) {
-        let address = self.origin_info.address.clone();
+        let address = self.origin_info[0].address.clone();
         let balance = self.balance(&address);
         if &address == refund_address {
             // TODO [todr] To be consistent with CPP client we set balance to 0 in that case.
@@ -402,7 +478,7 @@ where B: StateBackend
         //      Need more thoughts how to handle and return init_code exception
         //      from vm module to kernel.
         self.state
-            .init_code(&self.origin_info.address, code)
+            .init_code(&self.origin_info[0].address, code)
             .expect(
                 "init_code should not fail as account should
             already be created before",
@@ -412,7 +488,7 @@ where B: StateBackend
     // triggered when create a contract account with code = None
     fn set_special_empty_flag(&mut self) {
         self.state
-            .set_empty_but_commit(&self.origin_info.address)
+            .set_empty_but_commit(&self.origin_info[0].address)
             .expect("set empty_but_commit flags should not fail");
     }
 }
@@ -479,7 +555,7 @@ mod tests {
             &setup.env_info,
             &setup.machine,
             0,
-            get_test_origin(),
+            vec![get_test_origin()],
             &mut setup.sub_state,
             Arc::new(MemoryDBRepository::new()),
         );
@@ -508,7 +584,7 @@ mod tests {
             &setup.env_info,
             &setup.machine,
             0,
-            get_test_origin(),
+            vec![get_test_origin()],
             &mut setup.sub_state,
             Arc::new(MemoryDBRepository::new()),
         );
@@ -533,7 +609,7 @@ mod tests {
             &setup.env_info,
             &setup.machine,
             0,
-            get_test_origin(),
+            vec![get_test_origin()],
             &mut setup.sub_state,
             Arc::new(MemoryDBRepository::new()),
         );
@@ -573,7 +649,7 @@ mod tests {
                 &setup.env_info,
                 &setup.machine,
                 0,
-                get_test_origin(),
+                vec![get_test_origin()],
                 &mut setup.sub_state,
                 Arc::new(MemoryDBRepository::new()),
             );
@@ -596,7 +672,7 @@ mod tests {
                 &setup.env_info,
                 &setup.machine,
                 0,
-                get_test_origin(),
+                vec![get_test_origin()],
                 &mut setup.sub_state,
                 Arc::new(MemoryDBRepository::new()),
             );

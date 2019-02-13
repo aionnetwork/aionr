@@ -33,9 +33,11 @@ extern crate acore_bytes as bytes;
 extern crate common_types as types;
 extern crate ajson;
 extern crate fastvm;
+extern crate avm;
 extern crate libc;
 #[macro_use]
 extern crate log;
+extern crate vm_utils as utils;
 
 pub use self::factory::FastVMFactory;
 pub use self::vmtype::VMType;
@@ -43,15 +45,14 @@ pub use fastvm::vm::{
     self,
     Vm,
     ActionParams,
-    CallType,
     ActionValue,
     ParamsType,
     Ext,
-    Error,
-    ReturnData
+    Error
 };
 
-pub use fastvm::EvmStatusCode;
+pub use avm::AVMExt;
 
-pub use fastvm::env_info::{EnvInfo, LastHashes};
 pub use fastvm::basetypes::constants;
+
+pub use utils::{ReturnData, ExecutionResult, ExecStatus, CallType, EnvInfo, LastHashes};

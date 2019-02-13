@@ -145,7 +145,7 @@ dependencies = [
 
 [[package]]
 name = "aion"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "acore 0.1.0",
  "acore-bytes 0.1.0",
@@ -155,7 +155,7 @@ dependencies = [
  "aion-pb-apiserver 0.1.0",
  "aion-rpc 0.1.0",
  "aion-types 0.1.0",
- "aion-version 0.1.0",
+ "aion-version 0.1.1",
  "ansi_term 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "blake2b 0.1.0",
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -255,7 +255,7 @@ dependencies = [
  "acore-bytes 0.1.0",
  "acore-io 0.1.0",
  "aion-types 0.1.0",
- "aion-version 0.1.0",
+ "aion-version 0.1.1",
  "ajson 0.1.0",
  "ansi_term 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "blake2b 0.1.0",
@@ -310,7 +310,7 @@ dependencies = [
 
 [[package]]
 name = "aion-version"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "target_info 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -359,6 +359,19 @@ dependencies = [
  "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "termion 1.5.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.3.5 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
+name = "avm"
+version = "0.1.0"
+dependencies = [
+ "aion-types 0.1.0",
+ "lazy_static 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num-bigint 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rjni 0.0.1",
+ "rustc-hex 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vm_utils 0.1.0",
 ]
 
 [[package]]
@@ -896,6 +909,7 @@ dependencies = [
  "serde_derive 1.0.80 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.32 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
+ "vm_utils 0.1.0",
 ]
 
 [[package]]
@@ -2071,6 +2085,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rjni"
+version = "0.0.1"
+dependencies = [
+ "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "rlp"
 version = "0.2.1"
 dependencies = [
@@ -2352,7 +2373,7 @@ dependencies = [
  "acore-bytes 0.1.0",
  "acore-io 0.1.0",
  "aion-types 0.1.0",
- "aion-version 0.1.0",
+ "aion-version 0.1.1",
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "blake2b 0.1.0",
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2866,12 +2887,24 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "vm_utils"
+version = "0.1.0"
+dependencies = [
+ "aion-types 0.1.0",
+ "ajson 0.1.0",
+ "blake2b 0.1.0",
+ "common-types 0.1.0",
+ "rlp 0.2.1",
+]
+
+[[package]]
 name = "vms"
 version = "0.1.0"
 dependencies = [
  "acore-bytes 0.1.0",
  "aion-types 0.1.0",
  "ajson 0.1.0",
+ "avm 0.1.0",
  "bit-set 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "blake2b 0.1.0",
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2885,6 +2918,7 @@ dependencies = [
  "parking_lot 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "patricia-trie 0.1.0",
  "rlp 0.2.1",
+ "vm_utils 0.1.0",
 ]
 
 [[package]]

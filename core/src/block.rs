@@ -42,7 +42,7 @@ use header::{Header, Seal};
 use receipt::Receipt;
 use state::State;
 use state_db::StateDB;
-use transaction::{UnverifiedTransaction, SignedTransaction, Error as TransactionError};
+use transaction::{UnverifiedTransaction, SignedTransaction, Error as TransactionError, AVM_TRANSACTION_TYPE};
 use verification::PreverifiedBlock;
 use kvdb::KeyValueDB;
 
@@ -303,6 +303,52 @@ impl<'x> OpenBlock<'x> {
 
     /// Get the environment info concerning this block.
     pub fn env_info(&self) -> EnvInfo { self.block.env_info() }
+
+    // apply avm transactions
+    pub fn apply_batch_txs(
+        &mut self,
+        txs: &[SignedTransaction],
+        h: Option<H256>,
+    ) -> Vec<Result<Receipt, Error>>
+    {
+        //TODO: deal with AVM parallelism
+        if !txs
+            .iter()
+            .filter(|t| self.block.transactions_set.contains(&t.hash()))
+            .collect::<Vec<_>>()
+            .is_empty()
+        {
+            return vec![Err(From::from(TransactionError::AlreadyImported))];
+        }
+        let env_info = self.env_info();
+        let mut idx = 0;
+        let mut receipts_results = Vec::new();
+        for apply_result in self
+            .block
+            .state
+            .apply_batch(&env_info, self.engine.machine(), txs)
+        {
+            let result = match apply_result {
+                Ok(outcome) => {
+                    self.block
+                        .transactions_set
+                        .insert(h.unwrap_or_else(|| txs[idx].hash()));
+                    self.block.transactions.push(txs[idx].clone().into());
+                    self.block
+                        .header
+                        .add_transaction_fee(&outcome.receipt.transaction_fee);
+                    self.block.receipts.push(outcome.receipt.clone());
+                    idx += 1;
+                    Ok(outcome.receipt)
+                }
+                Err(x) => Err(From::from(x)),
+            };
+
+            receipts_results.push(result);
+        }
+
+        receipts_results
+    }
 
     /// Push a transaction into the block.
     ///
@@ -613,9 +659,22 @@ fn push_transactions(
     transactions: &[SignedTransaction],
 ) -> Result<(), Error>
 {
-    for t in transactions {
-        block.push_transaction(t.clone(), None)?;
+    let mut tx_batch = Vec::new();
+
+    for tx in transactions {
+        if tx.tx_type() != AVM_TRANSACTION_TYPE {
+            if tx_batch.len() >= 1 {
+                block.apply_batch_txs(tx_batch.as_slice(), None);
+                tx_batch.clear();
+            }
+            block.push_transaction(tx.clone(), None)?;
+        } else {
+            tx_batch.push(tx.clone())
+        }
     }
+
+    block.apply_batch_txs(tx_batch.as_slice(), None);
+
     Ok(())
 }
 

@@ -48,6 +48,7 @@ pub const SYSTEM_ADDRESS: Address = H256([
 ]);
 
 pub const DEFAULT_TRANSACTION_TYPE: u8 = 0x01;
+pub const AVM_TRANSACTION_TYPE: u8 = 0xf;
 
 struct TransactionEnergyRule;
 impl TransactionEnergyRule {
@@ -590,6 +591,9 @@ impl SignedTransaction {
             })
         }
     }
+
+    /// Returns transaction type.
+    pub fn tx_type(&self) -> u8 { self.transaction.unsigned.transaction_type }
 
     /// Returns transaction sender.
     pub fn sender(&self) -> Address { self.sender }

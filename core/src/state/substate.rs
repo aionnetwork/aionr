@@ -28,7 +28,7 @@ use super::CleanupMode;
 
 /// State changes which should be applied in finalize,
 /// after transaction is fully executed.
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Substate {
     /// Any accounts that have suicided.
     pub suicides: HashSet<Address>,

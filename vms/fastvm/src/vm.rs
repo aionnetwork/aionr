@@ -19,21 +19,12 @@
  *
  ******************************************************************************/
 
-extern crate aion_types;
-extern crate acore_bytes as bytes;
-extern crate ajson;
-extern crate rlp;
-extern crate blake2b as hash;
-extern crate patricia_trie as trie;
-
 use aion_types::{U256, H256, H128, U128, U512, Address};
-use self::bytes::Bytes;
+use bytes::Bytes;
 use hash::{blake2b, BLAKE2B_EMPTY};
-use self::rlp::{Encodable, Decodable, DecoderError, RlpStream, UntrustedRlp};
-use env_info::EnvInfo;
 use ffi::EvmStatusCode;
-
 use std::{fmt, ops, cmp};
+use utils::{ReturnData, ExecutionResult, CallType, EnvInfo};
 
 // result definition
 /// VM errors. from vm/src/errors.rs
@@ -84,8 +75,8 @@ pub enum Error {
     Reverted,
 }
 
-impl From<Box<trie::TrieError>> for Error {
-    fn from(err: Box<trie::TrieError>) -> Self {
+impl From<Box<::trie::TrieError>> for Error {
+    fn from(err: Box<::trie::TrieError>) -> Self {
         Error::Internal(format!("Internal error: {}", err))
     }
 }
@@ -116,49 +107,6 @@ impl fmt::Display for Error {
             OutOfBounds => write!(f, "Out of bounds"),
             Reverted => write!(f, "Reverted"),
         }
-    }
-}
-
-/// The type of the call-like instruction.
-#[derive(Debug, PartialEq, Clone)]
-pub enum CallType {
-    /// Not a CALL.
-    None,
-    /// CALL.
-    Call,
-    /// CALLCODE.
-    CallCode,
-    /// DELEGATECALL.
-    DelegateCall,
-    /// STATICCALL
-    StaticCall,
-}
-
-impl Encodable for CallType {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        let v = match *self {
-            CallType::None => 0u32,
-            CallType::Call => 1,
-            CallType::CallCode => 2,
-            CallType::DelegateCall => 3,
-            CallType::StaticCall => 4,
-        };
-        Encodable::rlp_append(&v, s);
-    }
-}
-
-impl Decodable for CallType {
-    fn decode(rlp: &UntrustedRlp) -> ::std::result::Result<Self, DecoderError> {
-        rlp.as_val().and_then(|v| {
-            Ok(match v {
-                0u32 => CallType::None,
-                1 => CallType::Call,
-                2 => CallType::CallCode,
-                3 => CallType::DelegateCall,
-                4 => CallType::StaticCall,
-                _ => return Err(DecoderError::Custom("Invalid value of CallType item")),
-            })
-        })
     }
 }
 
@@ -261,8 +209,8 @@ impl Default for ActionParams {
     }
 }
 
-impl From<ajson::vm::Transaction> for ActionParams {
-    fn from(t: ajson::vm::Transaction) -> Self {
+impl From<::ajson::vm::Transaction> for ActionParams {
+    fn from(t: ::ajson::vm::Transaction) -> Self {
         let address: Address = t.address.into();
         ActionParams {
             code_address: Address::new(),
@@ -287,37 +235,16 @@ impl From<ajson::vm::Transaction> for ActionParams {
     }
 }
 
-// return type definition
-/// Return data buffer. Holds memory from a previous call and a slice into that memory.
-#[derive(Debug, PartialEq)]
-pub struct ReturnData {
-    pub mem: Vec<u8>,
-    pub offset: usize,
-    pub size: usize,
-}
-
-impl ::std::ops::Deref for ReturnData {
-    type Target = [u8];
-    fn deref(&self) -> &[u8] { &self.mem[self.offset..self.offset + self.size] }
-}
-
-impl ReturnData {
-    /// Create empty `ReturnData`.
-    pub fn empty() -> Self {
-        ReturnData {
-            mem: Vec::new(),
-            offset: 0,
-            size: 0,
-        }
-    }
-    /// Create `ReturnData` from give buffer and slice.
-    pub fn new(mem: Vec<u8>, offset: usize, size: usize) -> Self {
-        ReturnData {
-            mem: mem,
-            offset: offset,
-            size: size,
-        }
-    }
+#[derive(Debug)]
+pub struct FvmExecutionResult {
+    /// Final amount of gas left.
+    pub gas_left: U256,
+    /// Status code returned from VM
+    pub status_code: EvmStatusCode,
+    /// Return data buffer.
+    pub return_data: ReturnData,
+    /// exception / error message (empty if success)
+    pub exception: String,
 }
 
 /// Externalities interface for EVMs
@@ -426,32 +353,7 @@ pub trait Vm {
     /// This function should be used to execute transaction.
     /// It returns either an error, a known amount of gas left, or parameters to be used
     /// to compute the final gas left.
-    fn exec(&mut self, params: ActionParams, ext: &mut Ext) -> Result<ExecutionResult, Error>;
-}
-
-/// Finalization result. Gas Left: either it is a known value, or it needs to be computed by processing
-/// a return instruction.
-#[derive(Debug)]
-pub struct ExecutionResult {
-    /// Final amount of gas left.
-    pub gas_left: U256,
-    /// Status code returned from VM
-    pub status_code: EvmStatusCode,
-    /// Return data buffer.
-    pub return_data: ReturnData,
-    /// exception / error message (empty if success)
-    pub exception: String,
-}
-
-impl Default for ExecutionResult {
-    fn default() -> Self {
-        ExecutionResult {
-            gas_left: 0.into(),
-            status_code: EvmStatusCode::Success,
-            return_data: ReturnData::empty(),
-            exception: String::new(),
-        }
-    }
+    fn exec(&mut self, params: ActionParams, ext: &mut Ext) -> Result<FvmExecutionResult, Error>;
 }
 
 /// Cost calculation type. For low-gas usage we calculate costs using usize instead of U256
@@ -537,6 +439,7 @@ impl CostType for usize {
 #[cfg(test)]
 mod tests {
     use aion_types::U256;
+    use rlp::RlpStream;
     use super::*;
 
     #[test]

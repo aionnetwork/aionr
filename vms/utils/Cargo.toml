@@ -1,0 +1,11 @@
+[package]
+name = "vm_utils"
+version = "0.1.0"
+authors = ["Camus Qiu <camus@aion.network>"]
+
+[dependencies]
+aion-types = { path = "../../util/aion-types"}
+rlp = { path = "../../util/rlp" }
+blake2b = { path = "../../util/blake2b" }
+common-types = { path = "../../core/types" }
+ajson = { path = "../../json" }

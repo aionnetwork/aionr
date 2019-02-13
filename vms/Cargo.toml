@@ -18,5 +18,7 @@ blake2b = { path = "../util/blake2b" }
 parking_lot = "0.5"
 memory-cache = { path = "../util/memory_cache" }
 fastvm = { path = "fastvm" }
+avm = { path = "avm" }
 libc = "0.2.0"
 logger = { path = "../util/logger" }
+vm_utils = { path = "utils" }

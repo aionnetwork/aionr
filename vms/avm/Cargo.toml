@@ -1,0 +1,13 @@
+[package]
+name = "avm"
+version = "0.1.0"
+authors = ["Yulong Wu <yulong@aion.network>", "Camus Qiu <camus@aion.network>"]
+
+[dependencies]
+rjni = { path = "rjni" }
+libc = "*"
+rustc-hex = "1.0"
+num-bigint = "0.2"
+aion-types = { path = "../../util/aion-types" }
+lazy_static = "1.0"
+vm_utils = { path = "../utils" }
