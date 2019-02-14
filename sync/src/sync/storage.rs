@@ -25,17 +25,18 @@ use aion_types::{H256, U256};
 use kvdb::{DBTransaction, DatabaseConfig, DbRepository, KeyValueDB, RepositoryConfig};
 use lru_cache::LruCache;
 use state::Storage;
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
 use tokio::runtime::{Runtime, TaskExecutor};
 
 lazy_static! {
     static ref BLOCK_CHAIN: Storage<RwLock<BlockChain>> = Storage::new();
-    static ref BLOCK_HEADER_CHAIN: Storage<RwLock<BlockHeaderChain>> = Storage::new();
-    static ref SYNC_EXECUTORS: Storage<RwLock<SyncExecutor>> = Storage::new();
+    static ref BLOCK_HEADER_CHAIN: Storage<HeaderChain> = Storage::new();
+    static ref SYNC_EXECUTORS: Storage<RwLock<Runtime>> = Storage::new();
     static ref LOCAL_STATUS: Storage<RwLock<LocalStatus>> = Storage::new();
     static ref NETWORK_STATUS: Storage<RwLock<NetworkStatus>> = Storage::new();
+    static ref DOWNLOADED_HEADERS: Storage<Mutex<VecDeque<BlockHeader>>> = Storage::new();
     static ref DOWNLOADED_BLOCKS: Storage<Mutex<LruCache<u64, BlockWrapper>>> = Storage::new();
     static ref DOWNLOADED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
     static ref SENT_TRANSACTION_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
@@ -52,16 +53,6 @@ struct BlockChain {
     inner: Option<Arc<BlockChainClient>>,
 }
 
-#[derive(Clone)]
-struct SyncExecutor {
-    inner: Option<Arc<Runtime>>,
-}
-
-#[derive(Clone)]
-struct BlockHeaderChain {
-    inner: Option<Arc<HeaderChain>>,
-}
-
 pub struct SyncStorage;
 
 impl SyncStorage {
@@ -73,43 +64,26 @@ impl SyncStorage {
                     block_chain.inner = Some(client);
                 }
             }
-            if let Ok(mut sync_executor) = SYNC_EXECUTORS.get().write() {
-                if let Some(_) = sync_executor.inner {
-                } else {
-                    sync_executor.inner = Some(Arc::new(Runtime::new().expect("Tokio Runtime")));
-                }
-            }
         } else {
             let block_chain = BlockChain {
                 inner: Some(client),
             };
 
-            let sync_executor = SyncExecutor {
-                inner: Some(Arc::new(Runtime::new().expect("Tokio Runtime"))),
-            };
-
-            let header_chain = HeaderChain::new(db, &spec).unwrap();
-
-            let block_header_chain = BlockHeaderChain {
-                inner: Some(Arc::new(header_chain)),
-            };
-
+            let block_header_chain = HeaderChain::new(db, &spec).unwrap();
             let mut local_status = LocalStatus::new();
-            let network_status = NetworkStatus::new();
-            let downloaded_blocks = LruCache::new(MAX_CACHED_BLOCKS);
-            let downloaded_block_hashes = LruCache::new(MAX_CACHED_BLOCK_HASHED);
 
             local_status.synced_block_number = 0;
             local_status.synced_block_number_last_time = 0;
             LOCAL_STATUS.set(RwLock::new(local_status));
-            NETWORK_STATUS.set(RwLock::new(network_status));
-            DOWNLOADED_BLOCKS.set(Mutex::new(downloaded_blocks));
-            DOWNLOADED_BLOCK_HASHES.set(Mutex::new(downloaded_block_hashes));
+            NETWORK_STATUS.set(RwLock::new(NetworkStatus::new()));
+            DOWNLOADED_HEADERS.set(Mutex::new(VecDeque::new()));
+            DOWNLOADED_BLOCKS.set(Mutex::new(LruCache::new(MAX_CACHED_BLOCKS)));
+            DOWNLOADED_BLOCK_HASHES.set(Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHED)));
             HEADERS_WITH_BODIES_REQUESTED.set(Mutex::new(HashMap::new()));
 
             BLOCK_CHAIN.set(RwLock::new(block_chain));
-            SYNC_EXECUTORS.set(RwLock::new(sync_executor));
-            BLOCK_HEADER_CHAIN.set(RwLock::new(block_header_chain));
+            SYNC_EXECUTORS.set(RwLock::new(Runtime::new().expect("Tokio Runtime")));
+            BLOCK_HEADER_CHAIN.set(block_header_chain);
             LIGHT_CLIENT.set(RwLock::new(LightClient::new("./data")));
         }
     }
@@ -125,24 +99,12 @@ impl SyncStorage {
     }
 
     pub fn get_executor() -> TaskExecutor {
-        let rt = SYNC_EXECUTORS
-            .get()
-            .read()
-            .expect("get_executor")
-            .clone()
-            .inner
-            .expect("get_executor");
+        let rt = SYNC_EXECUTORS.get().read().expect("get_executor");
         rt.executor()
     }
 
-    pub fn get_block_header_chain() -> Arc<HeaderChain> {
-        BLOCK_HEADER_CHAIN
-            .get()
-            .read()
-            .expect("get_block_header_chain")
-            .clone()
-            .inner
-            .expect("get_block_header_chain")
+    pub fn get_block_header_chain() -> &'static HeaderChain {
+        BLOCK_HEADER_CHAIN.get()
     }
 
     pub fn set_starting_block_number(starting_block_number: u64) {
@@ -184,6 +146,19 @@ impl SyncStorage {
         0
     }
 
+    pub fn set_requested_block_number_last_time(requested_block_number_last_time: u64) {
+        if let Ok(mut local_status) = LOCAL_STATUS.get().write() {
+            local_status.requested_block_number_last_time = requested_block_number_last_time;
+        }
+    }
+
+    pub fn get_requested_block_number_last_time() -> u64 {
+        if let Ok(local_status) = LOCAL_STATUS.get().read() {
+            return local_status.requested_block_number_last_time;
+        }
+        0
+    }
+
     pub fn set_sync_speed(sync_speed: u16) {
         if let Ok(mut local_status) = LOCAL_STATUS.get().write() {
             local_status.sync_speed = sync_speed;
@@ -211,6 +186,16 @@ impl SyncStorage {
             return local_status.clone();
         }
         LocalStatus::new()
+    }
+
+    pub fn get_downloaded_headers() -> &'static Mutex<VecDeque<BlockHeader>> {
+        DOWNLOADED_HEADERS.get()
+    }
+
+    pub fn clear_downloaded_headers() {
+        if let Ok(ref mut downloaded_headers) = DOWNLOADED_HEADERS.get().lock() {
+            downloaded_headers.clear();
+        }
     }
 
     pub fn get_downloaded_blocks() -> &'static Mutex<LruCache<u64, BlockWrapper>> {
@@ -275,15 +260,14 @@ impl SyncStorage {
         }
     }
 
-    pub fn is_block_hash_confirmed(hash: H256, is_increase: bool) -> bool {
+    pub fn is_block_hash_confirmed(hash: H256) -> bool {
         if let Ok(mut downloaded_block_hashes) = DOWNLOADED_BLOCK_HASHES.get().lock() {
             if downloaded_block_hashes.contains_key(&hash) {
-                let increase = if is_increase { 1 } else { 0 };
                 if let Some(count) = downloaded_block_hashes.get_mut(&hash) {
-                    if *count >= 2 {
+                    if *count >= 1 {
                         return true;
                     } else {
-                        *count += increase;
+                        *count += 1;
                     }
                 }
             } else {
@@ -329,20 +313,7 @@ impl SyncStorage {
     }
 
     pub fn get_chain_info() -> BlockChainInfo {
-        let local_status = SyncStorage::get_local_status();
-        BlockChainInfo {
-            total_difficulty: local_status.total_difficulty,
-            pending_total_difficulty: local_status.total_difficulty,
-            //genesis_hash: H256::from("0x30793b4ea012c6d3a58c85c5b049962669369807a98e36807c1b02116417f823"),
-            genesis_hash: local_status.genesis_hash,
-            best_block_hash: local_status.synced_block_hash,
-            best_block_number: local_status.synced_block_number,
-            best_block_timestamp: 0,
-            ancient_block_hash: None,
-            ancient_block_number: None,
-            first_block_hash: None,
-            first_block_number: None,
-        }
+        Self::get_block_header_chain().chain_info()
     }
 
     pub fn insert_headers_with_bodies_requested(hw: HeadersWrapper) -> bool {
@@ -370,7 +341,6 @@ impl SyncStorage {
     }
 
     pub fn reset() {
-        SYNC_EXECUTORS.get().write().expect("get_executor").inner = None;
         BLOCK_CHAIN.get().write().expect("get_block_chain").inner = None;
     }
 }
@@ -439,6 +409,7 @@ pub enum SyncState {
 pub struct LocalStatus {
     pub synced_block_number: u64,
     pub synced_block_number_last_time: u64,
+    pub requested_block_number_last_time: u64,
     pub sync_speed: u16,
     pub synced_block_hash: H256,
     pub total_difficulty: U256,
@@ -451,6 +422,7 @@ impl LocalStatus {
         LocalStatus {
             synced_block_number: 0,
             synced_block_number_last_time: 0,
+            requested_block_number_last_time: 0,
             sync_speed: 48,
             synced_block_hash: H256::from(0),
             total_difficulty: U256::from(0),
@@ -472,6 +444,11 @@ impl fmt::Display for LocalStatus {
             f,
             "    synced block number last time: {}\n",
             self.synced_block_number_last_time
+        ));
+        try!(write!(
+            f,
+            "    requested block number last time: {}\n",
+            self.requested_block_number_last_time
         ));
         try!(write!(
             f,

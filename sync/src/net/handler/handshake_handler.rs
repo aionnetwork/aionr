@@ -71,7 +71,7 @@ impl HandshakeHandler {
 
     pub fn handle_handshake_req(node: &mut Node, req: ChannelBuffer) {
         trace!(target: "net", "HANDSHAKEREQ received.");
-
+        
         let (node_id, req_body_rest) = req.body.split_at(NODE_ID_LENGTH);
         let (mut net_id, req_body_rest) = req_body_rest.split_at(mem::size_of::<i32>());
         let peer_net_id = net_id.read_u32::<BigEndian>().unwrap_or(0);

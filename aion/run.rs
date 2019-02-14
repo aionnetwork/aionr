@@ -643,11 +643,15 @@ fn fill_back_local_node(path: String) {
 }
 
 fn fill_back_boot_nodes(path: String) {
-    let boot_nodes: Vec<String> = P2pMgr::get_top8_node_hashes()
+    let boot_nodes: Vec<String> = P2pMgr::get_top16_node_hashes()
         .iter()
         .filter_map(|hash| P2pMgr::get_node(*hash))
         .map(|x| x.get_node_string())
         .collect();
+
+    if boot_nodes.len() < 8 {
+        return;
+    }
 
     let file = fs::File::open(&path).expect("Cannot open config file");
     let reader = BufReader::new(file);

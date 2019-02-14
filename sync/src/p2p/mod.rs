@@ -55,7 +55,7 @@ lazy_static! {
     static ref NETWORK_CONFIG: Storage<NetworkConfig> = Storage::new();
     static ref SOCKETS_MAP: RwLock<HashMap<u64, StdTcpStream>> = { RwLock::new(HashMap::new()) };
     static ref GLOBAL_NODES_MAP: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
-    static ref TOP8_NODE_HASHES: RwLock<Vec<u64>> = { RwLock::new(Vec::new()) };
+    static ref TOP16_NODE_HASHES: RwLock<Vec<u64>> = { RwLock::new(Vec::new()) };
     static ref ENABLED: Storage<AtomicBool> = Storage::new();
     static ref TP: Storage<ThreadPool> = Storage::new();
 }
@@ -135,18 +135,21 @@ impl P2pMgr {
                 }
 
                 if let Ok(std_stream_cloned) = std_stream.try_clone() {
-                    let stream = TcpStream::connect_std(std_stream_cloned, &addr, &Handle::default())
-                        .map(move |socket| {
-                            socket
-                                .set_recv_buffer_size(1 << 24)
-                                .expect("set_recv_buffer_size failed");
+                    let stream = TcpStream::connect_std(
+                        std_stream_cloned,
+                        &addr,
+                        &Handle::default(),
+                    ).map(move |socket| {
+                        socket
+                            .set_recv_buffer_size(1 << 24)
+                            .expect("set_recv_buffer_size failed");
 
-                            socket
-                                .set_keepalive(Some(Duration::from_secs(30)))
-                                .expect("set_keepalive failed");
+                        socket
+                            .set_keepalive(Some(Duration::from_secs(30)))
+                            .expect("set_keepalive failed");
 
-                            Self::process_outbounds(socket, std_stream, peer_node.clone(), handle);
-                        })
+                        Self::process_outbounds(socket, std_stream, peer_node.clone(), handle);
+                    })
                         .map_err(
                             move |e| error!(target: "net", "Node: {}@{}, {}", node_ip_addr, node_id, e),
                         );
@@ -166,17 +169,17 @@ impl P2pMgr {
 
     pub fn load_boot_nodes(boot_nodes_str: Vec<String>) -> Vec<Node> {
         let mut boot_nodes = Vec::new();
-        if let Ok(mut top8) = TOP8_NODE_HASHES.write() {
+        if let Ok(mut top16) = TOP16_NODE_HASHES.write() {
             for boot_node_str in boot_nodes_str {
                 if boot_node_str.len() != 0 {
                     let mut boot_node = Node::new_with_node_str(boot_node_str.to_string());
-                    top8.push(boot_node.node_hash.clone());
+                    top16.push(boot_node.node_hash.clone());
                     boot_node.is_from_boot_list = true;
                     boot_nodes.push(boot_node);
                 }
             }
-            if top8.len() > 8 {
-                top8.split_off(8);
+            if top16.len() > 16 {
+                top16.split_off(16);
             }
         }
         boot_nodes
@@ -390,23 +393,26 @@ impl P2pMgr {
             }
         }
         let normal_nodes_count = normal_nodes.len();
-        if normal_nodes_count == 0 {
-            return None;
-        }
-        let mut rng = thread_rng();
-        let random_index: usize = rng.gen_range(0, normal_nodes_count);
-        let node = &normal_nodes[random_index];
+        if normal_nodes_count > 0 {
+            let mut rng = thread_rng();
+            let random_index: usize = rng.gen_range(0, normal_nodes_count);
+            let node = &normal_nodes[random_index];
 
-        Self::remove_peer(node.node_hash)
+            Self::remove_peer(node.node_hash)
+        } else {
+            None
+        }
     }
 
     pub fn get_an_active_node() -> Option<Node> {
-        if let Ok(refresh_top8_nodes) = TOP8_NODE_HASHES.read() {
-            let node_count = refresh_top8_nodes.len();
-            let mut rng = thread_rng();
-            let random_index: usize = rng.gen_range(0, node_count);
-            if let Some(node_hash) = refresh_top8_nodes.get(random_index) {
-                return Self::get_node(*node_hash);
+        if let Ok(refresh_top16_nodes) = TOP16_NODE_HASHES.read() {
+            let node_count = refresh_top16_nodes.len();
+            if node_count > 0 {
+                let mut rng = thread_rng();
+                let random_index: usize = rng.gen_range(0, node_count);
+                if let Some(node_hash) = refresh_top16_nodes.get(random_index) {
+                    return Self::get_node(*node_hash);
+                }
             }
         }
         None
@@ -438,26 +444,26 @@ impl P2pMgr {
         }
     }
 
-    pub fn replace_top8_node_hashes(node_hashes: Vec<u64>) {
-        if let Ok(mut refresh_top8_nodes) = TOP8_NODE_HASHES.write() {
-            refresh_top8_nodes.clear();
-            refresh_top8_nodes.extend(node_hashes);
+    pub fn replace_top16_node_hashes(node_hashes: Vec<u64>) {
+        if let Ok(mut refresh_top16_nodes) = TOP16_NODE_HASHES.write() {
+            refresh_top16_nodes.clear();
+            refresh_top16_nodes.extend(node_hashes);
         }
     }
 
-    pub fn refresh_top8_node_hashes(node_hashes: Vec<u64>) {
-        if let Ok(mut refresh_top8_nodes) = TOP8_NODE_HASHES.write() {
-            refresh_top8_nodes.retain(|node_hash| !node_hashes.contains(node_hash));
-            refresh_top8_nodes.splice(..0, node_hashes.iter().cloned());
-            if refresh_top8_nodes.len() > 8 {
-                refresh_top8_nodes.split_off(8);
+    pub fn refresh_top16_node_hashes(node_hashes: Vec<u64>) {
+        if let Ok(mut refresh_top16_nodes) = TOP16_NODE_HASHES.write() {
+            refresh_top16_nodes.retain(|node_hash| !node_hashes.contains(node_hash));
+            refresh_top16_nodes.splice(..0, node_hashes.iter().cloned());
+            if refresh_top16_nodes.len() > 16 {
+                refresh_top16_nodes.split_off(16);
             }
         }
     }
 
-    pub fn get_top8_node_hashes() -> HashSet<u64> {
-        if let Ok(top8) = TOP8_NODE_HASHES.read() {
-            top8.iter().map(|hash| *hash).collect::<HashSet<_>>()
+    pub fn get_top16_node_hashes() -> HashSet<u64> {
+        if let Ok(top16) = TOP16_NODE_HASHES.read() {
+            top16.iter().map(|hash| *hash).collect::<HashSet<_>>()
         } else {
             HashSet::new()
         }

@@ -123,7 +123,7 @@ pub struct Node {
     pub node_hash: u64,
     pub state_code: u32,
     pub best_block_num: u64,
-    pub synced_block_num: u64,
+    pub requested_block_num: u64,
     pub best_hash: H256,
     pub genesis_hash: H256,
     pub target_total_difficulty: U256,
@@ -149,7 +149,7 @@ impl Node {
             node_hash: 0,
             state_code: DISCONNECTED,
             best_block_num: 0,
-            synced_block_num: 0,
+            requested_block_num: 0,
             best_hash: H256::default(),
             genesis_hash: H256::default(),
             target_total_difficulty: U256::default(),
@@ -226,7 +226,7 @@ impl Node {
         self.node_hash = node_new.node_hash;
         self.state_code = node_new.state_code;
         self.best_block_num = node_new.best_block_num;
-        self.synced_block_num = node_new.synced_block_num;
+        self.requested_block_num = node_new.requested_block_num;
         self.best_hash = node_new.best_hash;
         self.genesis_hash = node_new.genesis_hash;
         self.target_total_difficulty = node_new.target_total_difficulty;
@@ -294,7 +294,7 @@ impl fmt::Display for Node {
         write!(f, "    node hash: {:064X}\n", self.node_hash)?;
         write!(f, "    state code: {:032b}\n", self.state_code)?;
         write!(f, "    best block number: {}\n", self.best_block_num)?;
-        write!(f, "    synced block number: {}\n", self.synced_block_num)?;
+        write!(f, "    requested block number: {}\n", self.requested_block_num)?;
         write!(f, "    boot node: {}\n", self.is_from_boot_list)?;
         write!(f, "    mode: {}\n", self.mode)?;
         write!(

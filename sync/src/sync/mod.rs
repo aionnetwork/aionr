@@ -41,7 +41,6 @@ use self::action::SyncAction;
 use self::handler::blocks_bodies_handler::BlockBodiesHandler;
 use self::handler::blocks_headers_handler::BlockHeadersHandler;
 use self::handler::broadcast_handler::BroadcastsHandler;
-use self::handler::import_handler::ImportHandler;
 use self::handler::status_handler::StatusHandler;
 use self::storage::{
     ActivePeerInfo, PeerInfo, SyncState, SyncStatus, SyncStorage, TransactionStats,
@@ -54,8 +53,8 @@ mod event;
 mod handler;
 pub mod storage;
 
-const STATUS_REQ_INTERVAL: u64 = 2;
-const BLOCKS_IMPORT_INTERVAL: u64 = 50;
+const STATUS_REQ_INTERVAL: u64 = 5;
+const BLOCK_HEADERS_IMPORT_INTERVAL: u64 = 50;
 const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const REPUTATION_HANDLE_INTERVAL: u64 = 15;
@@ -77,17 +76,17 @@ impl SyncMgr {
                 .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(status_req_task);
 
-        let blocks_import_task = Interval::new(
+        let block_headers_import_task = Interval::new(
             Instant::now(),
-            Duration::from_millis(BLOCKS_IMPORT_INTERVAL),
+            Duration::from_millis(BLOCK_HEADERS_IMPORT_INTERVAL),
         )
         .for_each(move |_| {
-            ImportHandler::import_blocks();
+            BlockHeadersHandler::import_block_header();
 
             Ok(())
         })
         .map_err(|e| error!("interval errored; err={:?}", e));
-        executor.spawn(blocks_import_task);
+        executor.spawn(block_headers_import_task);
 
         let broadcast_transactions_task = Interval::new(
             Instant::now(),
@@ -115,15 +114,15 @@ impl SyncMgr {
                 }
             });
 
-            let mut top8_nodes: Vec<_> = active_nodes
+            let mut top16_nodes: Vec<_> = active_nodes
                 .iter()
                 .map(|ref node| node.node_hash)
                 .collect::<Vec<_>>();
-            if top8_nodes.len() > 8 {
-                top8_nodes.split_off(8);
-                P2pMgr::replace_top8_node_hashes(top8_nodes);
+            if top16_nodes.len() > 16 {
+                top16_nodes.split_off(16);
+                P2pMgr::replace_top16_node_hashes(top16_nodes);
             } else {
-                P2pMgr::refresh_top8_node_hashes(top8_nodes);
+                P2pMgr::replace_top16_node_hashes(top16_nodes);
             }
             Ok(())
         })

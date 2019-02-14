@@ -119,9 +119,8 @@ impl StatusHandler {
         if SyncStorage::get_synced_block_number() == 0 {
             // let init_synced_block_number = if node.best_block_num > STAGED_BLOCK_COUNT { node.best_block_num - STAGED_BLOCK_COUNT } else { STAGED_BLOCK_COUNT };
             
-            let block_header_chain = SyncStorage::get_block_header_chain();
-            let header = block_header_chain.best_header();
-            let init_synced_block_number = header.number();
+            let chain_info = SyncStorage::get_chain_info();
+            let init_synced_block_number = chain_info.best_block_number;
             
             SyncStorage::set_synced_block_number(init_synced_block_number);
             SyncStorage::set_starting_block_number(init_synced_block_number + 1);
@@ -140,6 +139,6 @@ impl StatusHandler {
             }
         }
 
-        BlockHeadersHandler::get_headers_from_node(node);
+        // BlockHeadersHandler::get_headers_from_node(node, 1);
     }
 }

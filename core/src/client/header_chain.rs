@@ -27,6 +27,7 @@ use std::sync::Arc;
 
 use super::cache::Cache;
 use super::cht;
+use super::BlockChainInfo;
 use aion_types::{H256, H264, U256};
 use encoded;
 use engines::epoch::{PendingTransition as PendingEpochTransition, Transition as EpochTransition};
@@ -303,6 +304,11 @@ impl HeaderChain {
 				cache,
 			};
 			info!(target: "chain", "created header chain : {:?}", decoded_header );
+
+			let mut tx = DBTransaction::new();
+			if let Ok(pending) = chain.insert(&mut tx, &spec.genesis_header(), None) {
+				chain.apply_pending(tx, pending);
+			}
 			chain
 		};
 
@@ -318,7 +324,7 @@ impl HeaderChain {
 			{
 				let mut batch = DBTransaction::new();
 				let data = encode_canonical_transition(&decoded_header, &genesis_data);
-								info!(target: "chain", "inserted genesis epoch data : {:?}", data );
+				info!(target: "chain", "inserted genesis epoch data : {:?}", data );
 				batch.put_vec(COL, LAST_CANONICAL_TRANSITION, data);
 				chain.db.write(batch).unwrap();
 			}
@@ -387,7 +393,7 @@ impl HeaderChain {
 		let total_difficulty = match total_difficulty {
 			Some(td) => td,
 			None => {
-				let parent_td = if number == 1 {
+				let parent_td = if number <= 1 {
 					self.genesis_header.difficulty()
 				} else {
 					candidates
@@ -489,7 +495,7 @@ impl HeaderChain {
 				.keys()
 				.next()
 				.expect("at least one era just created; qed");
-			if earliest_era + HISTORY + cht::SIZE <= number {
+			if earliest_era != 0 && earliest_era + HISTORY + cht::SIZE <= number {
 				let cht_num = cht::block_to_cht_number(earliest_era)
 					.expect("fails only for number == 0; genesis never imported; qed");
 
@@ -786,6 +792,23 @@ impl HeaderChain {
 	/// The header corresponding the the parent hash must be stored already.
 	pub fn epoch_transition_for(&self, _parent_hash: H256) -> Option<(Header, Vec<u8>)> {
 		None
+	}
+
+	/// chain info
+	pub fn chain_info(&self) -> BlockChainInfo {
+		let best_block = self.best_block();
+		BlockChainInfo {
+			total_difficulty: best_block.total_difficulty,
+			pending_total_difficulty: best_block.total_difficulty,
+			genesis_hash: self.genesis_hash(),
+			best_block_hash: best_block.hash,
+			best_block_number: best_block.number,
+			best_block_timestamp: 0,
+			ancient_block_hash: None,
+			ancient_block_number: None,
+			first_block_hash: None,
+			first_block_number: None,
+		}
 	}
 }
 

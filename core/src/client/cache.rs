@@ -52,11 +52,11 @@ impl Default for CacheSizes {
 	fn default() -> Self {
 		const MB: usize = 1024 * 1024;
 		CacheSizes {
-			headers: 10 * MB,
-			canon_hashes: 3 * MB,
-			bodies: 20 * MB,
-			receipts: 10 * MB,
-			chain_score: 7 * MB,
+			headers: 500 * MB,
+			canon_hashes: 30 * MB,
+			bodies: 200 * MB,
+			receipts: 100 * MB,
+			chain_score: 70 * MB,
 		}
 	}
 }
