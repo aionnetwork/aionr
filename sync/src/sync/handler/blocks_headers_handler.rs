@@ -37,19 +37,18 @@ use super::super::storage::{SyncStorage, MAX_CACHED_BLOCK_HASHED};
 use p2p::*;
 
 const BACKWARD_SYNC_STEP: u64 = 128;
-const REQUEST_SIZE: u64 = 96;
 
 pub struct BlockHeadersHandler;
 
 impl BlockHeadersHandler {
-    pub fn get_headers_from_node(node: &mut Node, mut from: u64) {
+    pub fn get_headers_from_node(node: &mut Node, mut from: u64, size: u64) {
         trace!(target: "sync", "get_headers_from_node, node id: {}", node.get_node_id());
 
         if P2pMgr::get_network_config().sync_from_boot_nodes_only && !node.is_from_boot_list {
             return;
         }
 
-        if node.last_request_timestamp + Duration::from_millis(1000) > SystemTime::now() {
+        if node.last_request_timestamp + Duration::from_millis(50) > SystemTime::now() {
             return;
         }
 
@@ -65,11 +64,8 @@ impl BlockHeadersHandler {
             return;
         }
 
-        let size = REQUEST_SIZE;
         if node.target_total_difficulty > node.current_total_difficulty {
-            if from != 1 {
-                from = SyncStorage::get_synced_block_number() + 1;
-            } else {
+            if from == 0 {
                 match node.mode {
                     Mode::NORMAL => {
                         if node.requested_block_num + 128 < SyncStorage::get_synced_block_number() {
@@ -210,8 +206,12 @@ impl BlockHeadersHandler {
 
         if !headers.is_empty() {
             node.inc_reputation(10);
-            if let Ok(mut downloaded_headers) = SyncStorage::get_downloaded_headers().try_lock() {
-                downloaded_headers.append(&mut headers);
+            if let Ok(mut downloaded_headers) = SyncStorage::get_downloaded_headers().lock() {
+                for header in headers.iter() {
+                    if ! downloaded_headers.contains(header) {
+                        downloaded_headers.push_back(header.clone());
+                    }
+                }
             }
         } else {
             node.inc_reputation(1);
@@ -223,12 +223,8 @@ impl BlockHeadersHandler {
     }
 
     pub fn import_block_header() {
-        if let Some(mut node) = P2pMgr::get_an_active_node() {
-            Self::get_headers_from_node(&mut node, 2);
-        }
         let mut headers = Vec::new();
         if let Ok(ref mut downloaded_headers) = SyncStorage::get_downloaded_headers().try_lock() {
-            info!(target: "sync", "downloaded_headers size: {}", downloaded_headers.len());
             while let Some(header) = downloaded_headers.pop_front() {
                 headers.push(header);
             }

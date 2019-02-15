@@ -19,43 +19,4 @@
  *
  ******************************************************************************/
 
-extern crate parking_lot;
-extern crate bincode;
-extern crate byteorder;
-extern crate bytes;
-extern crate futures;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-extern crate lru_cache;
-extern crate rand;
-extern crate rustc_hex;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde;
-extern crate socket2;
-extern crate state;
-extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_reactor;
-extern crate tokio_threadpool;
-
-extern crate blake2b;
-extern crate acore;
-extern crate acore_bytes;
-extern crate acore_io;
-extern crate aion_types;
-extern crate rlp;
-extern crate uuid;
-extern crate aion_version as version;
-
-pub mod net;
-pub mod p2p;
-pub mod sync;
-pub mod light;
-
-extern crate db as kvdb;
-
-#[cfg(test)]
-mod tests;
+pub mod on_demand_handler;

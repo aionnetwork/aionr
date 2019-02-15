@@ -67,6 +67,7 @@ impl fmt::Display for Version {
 pub enum Control {
     NET = 0,
     SYNC = 1,
+    LIGHT = 2,
     UNKNOWN = 0xFF,
 }
 
@@ -75,6 +76,7 @@ impl Control {
         match *self {
             Control::NET => 0 as u8,
             Control::SYNC => 1 as u8,
+            Control::LIGHT => 1 as u8,
             Control::UNKNOWN => 0xFF as u8,
         }
     }
@@ -83,6 +85,7 @@ impl Control {
         match value {
             0 => Control::NET,
             1 => Control::SYNC,
+            2 => Control::LIGHT,
             _ => Control::UNKNOWN,
         }
     }
@@ -93,6 +96,7 @@ impl fmt::Display for Control {
         let printable = match *self {
             Control::NET => "NET",
             Control::SYNC => "SYNC",
+            Control::LIGHT => "LIGHT",
             Control::UNKNOWN => "UNKNOWN",
         };
         write!(f, "{}", printable)
