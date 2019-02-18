@@ -34,7 +34,7 @@ lazy_static! {
     static ref BLOCK_CHAIN: Storage<RwLock<BlockChain>> = Storage::new();
     static ref BLOCK_HEADER_CHAIN: Storage<HeaderChain> = Storage::new();
     static ref SYNC_EXECUTORS: Storage<RwLock<Runtime>> = Storage::new();
-    static ref LOCAL_STATUS: Storage<RwLock<LocalStatus>> = Storage::new();
+    static ref LOCAL_STATUS: RwLock<LocalStatus> = RwLock::new(LocalStatus::new());
     static ref NETWORK_STATUS: Storage<RwLock<NetworkStatus>> = Storage::new();
     static ref DOWNLOADED_HEADERS: Storage<Mutex<VecDeque<BlockHeader>>> = Storage::new();
     static ref DOWNLOADED_BLOCKS: Storage<Mutex<LruCache<u64, BlockWrapper>>> = Storage::new();
@@ -70,11 +70,7 @@ impl SyncStorage {
             };
 
             let block_header_chain = HeaderChain::new(db, &spec).unwrap();
-            let mut local_status = LocalStatus::new();
 
-            local_status.synced_block_number = 0;
-            local_status.synced_block_number_last_time = 0;
-            LOCAL_STATUS.set(RwLock::new(local_status));
             NETWORK_STATUS.set(RwLock::new(NetworkStatus::new()));
             DOWNLOADED_HEADERS.set(Mutex::new(VecDeque::new()));
             DOWNLOADED_BLOCKS.set(Mutex::new(LruCache::new(MAX_CACHED_BLOCKS)));
@@ -108,86 +104,70 @@ impl SyncStorage {
     }
 
     pub fn set_starting_block_number(starting_block_number: u64) {
-        if let Ok(mut local_status) = LOCAL_STATUS.get().write() {
+        if let Ok(mut local_status) = LOCAL_STATUS.write() {
             local_status.starting_block_number = starting_block_number;
         }
     }
 
     pub fn get_starting_block_number() -> u64 {
-        if let Ok(local_status) = LOCAL_STATUS.get().read() {
+        if let Ok(local_status) = LOCAL_STATUS.read() {
             return local_status.starting_block_number;
         }
         0
     }
 
     pub fn set_synced_block_number(synced_block_number: u64) {
-        if let Ok(mut local_status) = LOCAL_STATUS.get().write() {
+        if let Ok(mut local_status) = LOCAL_STATUS.write() {
             local_status.synced_block_number = synced_block_number;
         }
     }
 
     pub fn get_synced_block_number() -> u64 {
-        if let Ok(local_status) = LOCAL_STATUS.get().read() {
+        if let Ok(local_status) = LOCAL_STATUS.read() {
             return local_status.synced_block_number;
         }
         0
     }
 
     pub fn set_synced_block_number_last_time(synced_block_number_last_time: u64) {
-        if let Ok(mut local_status) = LOCAL_STATUS.get().write() {
+        if let Ok(mut local_status) = LOCAL_STATUS.write() {
             local_status.synced_block_number_last_time = synced_block_number_last_time;
         }
     }
 
     pub fn get_synced_block_number_last_time() -> u64 {
-        if let Ok(local_status) = LOCAL_STATUS.get().read() {
+        if let Ok(local_status) = LOCAL_STATUS.read() {
             return local_status.synced_block_number_last_time;
         }
         0
     }
 
     pub fn set_requested_block_number_last_time(requested_block_number_last_time: u64) {
-        if let Ok(mut local_status) = LOCAL_STATUS.get().write() {
+        if let Ok(mut local_status) = LOCAL_STATUS.write() {
             local_status.requested_block_number_last_time = requested_block_number_last_time;
         }
     }
 
     pub fn get_requested_block_number_last_time() -> u64 {
-        if let Ok(local_status) = LOCAL_STATUS.get().read() {
+        if let Ok(local_status) = LOCAL_STATUS.read() {
             return local_status.requested_block_number_last_time;
         }
         0
     }
 
     pub fn set_sync_speed(sync_speed: u16) {
-        if let Ok(mut local_status) = LOCAL_STATUS.get().write() {
+        if let Ok(mut local_status) = LOCAL_STATUS.write() {
             local_status.sync_speed = sync_speed;
         }
     }
 
     pub fn get_sync_speed() -> u16 {
-        if let Ok(local_status) = LOCAL_STATUS.get().read() {
+        if let Ok(local_status) = LOCAL_STATUS.read() {
             return local_status.sync_speed;
         }
         0
     }
-
-    pub fn set_local_status(status: LocalStatus) {
-        if let Ok(mut local_status) = LOCAL_STATUS.get().write() {
-            local_status.genesis_hash = status.genesis_hash;
-            local_status.synced_block_hash = status.synced_block_hash;
-            local_status.synced_block_number = status.synced_block_number;
-            local_status.total_difficulty = status.total_difficulty;
-        }
-    }
-
-    pub fn get_local_status() -> LocalStatus {
-        if let Ok(local_status) = LOCAL_STATUS.get().read() {
-            return local_status.clone();
-        }
-        LocalStatus::new()
-    }
-
+    
     pub fn get_downloaded_headers() -> &'static Mutex<VecDeque<BlockHeader>> {
         DOWNLOADED_HEADERS.get()
     }

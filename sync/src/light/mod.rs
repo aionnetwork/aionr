@@ -18,6 +18,7 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
+use super::p2p::*;
 
 #[derive(Clone, Copy)]
 pub struct LightSyncManager;
@@ -45,7 +46,6 @@ impl LightSyncManager {
             }
             Version::V1 => {
                 trace!(target: "net", "Ver 1 package received.");
-                HandshakeHandler::send_handshake_req(node);
             }
             _ => {
                 error!(target: "net", "Invalid Version.");

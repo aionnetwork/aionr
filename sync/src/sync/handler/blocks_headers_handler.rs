@@ -27,7 +27,7 @@ use byteorder::{BigEndian, ByteOrder};
 use bytes::BufMut;
 use kvdb::DBTransaction;
 use rlp::UntrustedRlp;
-use std::collections::VecDeque;
+use std::thread;
 use std::time::{Duration, SystemTime};
 
 use super::super::action::SyncAction;
@@ -132,87 +132,35 @@ impl BlockHeadersHandler {
         let node_hash = node.node_hash;
         let rlp = UntrustedRlp::new(req.body.as_slice());
         let mut prev_header = BlockHeader::new();
-        let mut headers = VecDeque::new();
+        let mut headers = Vec::new();
 
         for header_rlp in rlp.iter() {
-            if let Ok(header) = header_rlp.as_val() {
-                let result = POWEquihashEngine::validate_block_header(&header);
-                match result {
-                    Ok(()) => {
-                        // break if not consisting
-                        if prev_header.number() != 0
-                            && (header.number() != prev_header.number() + 1
-                                || prev_header.hash() != *header.parent_hash())
-                        {
-                            error!(target: "sync",
-                            "<inconsistent-block-headers num={}, prev+1={}, hash={}, p_hash={}>, hash={}>",
-                            header.number(),
-                            prev_header.number() + 1,
-                            header.parent_hash(),
-                            prev_header.hash(),
-                            header.hash(),
-                        );
-                            break;
-                        } else {
-                            let hash = header.hash();
-                            let number = header.number();
+            if let Ok(hd) = header_rlp.as_val() {
+                let header: BlockHeader = hd;
+                let hash = header.hash();
+                let number = header.number();
 
-                            if number <= SyncStorage::get_synced_block_number() {
-                                debug!(target: "sync", "Imported header: {} - {:?}.", number, hash);
-                            } else {
-                                //if SyncStorage::is_block_hash_confirmed(hash) {
-                                headers.push_back(header.clone());
-
-                                // if let Ok(header_chain) =
-                                //     SyncStorage::get_block_header_chain().read()
-                                // {
-                                //     if header_chain.status(header.parent_hash())
-                                //         != BlockStatus::InChain
-                                //         || header_chain.status(&hash) == BlockStatus::InChain
-                                //     {
-                                //         break;
-                                //     }
-                                //     let mut tx = DBTransaction::new();
-                                //     if let Ok(pending) = header_chain.insert(&mut tx, &header, None)
-                                //     {
-                                //         header_chain.apply_pending(tx, pending);
-                                //         SyncStorage::set_synced_block_number(number);
-                                //         // info!(target: "sync", "New block header #{} - {}, imported.", number, hash);
-                                //     }
-                                // }
-
-                                debug!(target: "sync", "Confirmed header: {} - {:?}, to be imported.", number, hash);
-                            }
-                            // else {
-                            //     debug!(target: "sync", "Downloaded header: {} - {:?}, under confirmation.", number, hash);
-                            // }
-                            if node.requested_block_num < number {
-                                node.requested_block_num = number;
-                            }
-                        }
-                        prev_header = header;
-                    }
-                    Err(e) => {
-                        // ignore this batch if any invalidated header
-                        error!(target: "sync", "Invalid header: {:?}, header: {}, received from {}@{}", e, to_hex(header_rlp.as_raw()), node.get_node_id(), node.get_ip_addr());
-                        P2pMgr::remove_peer(node.node_hash);
-                    }
+                if number <= SyncStorage::get_synced_block_number() {
+                    debug!(target: "sync", "Imported header: {} - {:?}.", number, hash);
+                } else {
+                    headers.push(header.clone());
                 }
+                if node.requested_block_num < number {
+                    node.requested_block_num = number;
+                }
+                prev_header = header.clone();
             } else {
                 error!(target: "sync", "Invalid header: {}, received from {}@{}", to_hex(header_rlp.as_raw()), node.get_node_id(), node.get_ip_addr());
                 P2pMgr::remove_peer(node.node_hash);
+                return;
             }
         }
 
         if !headers.is_empty() {
             node.inc_reputation(10);
-            if let Ok(mut downloaded_headers) = SyncStorage::get_downloaded_headers().lock() {
-                for header in headers.iter() {
-                    if ! downloaded_headers.contains(header) {
-                        downloaded_headers.push_back(header.clone());
-                    }
-                }
-            }
+            thread::spawn(move || {
+                Self::import_block_header(headers);
+            });
         } else {
             node.inc_reputation(1);
             debug!(target: "sync", "Came too late............");
@@ -222,14 +170,7 @@ impl BlockHeadersHandler {
         P2pMgr::update_node(node_hash, node);
     }
 
-    pub fn import_block_header() {
-        let mut headers = Vec::new();
-        if let Ok(ref mut downloaded_headers) = SyncStorage::get_downloaded_headers().try_lock() {
-            while let Some(header) = downloaded_headers.pop_front() {
-                headers.push(header);
-            }
-        }
-
+    pub fn import_block_header(headers: Vec<BlockHeader>) {
         let header_chain = SyncStorage::get_block_header_chain();
         for header in headers.iter() {
             let hash = header.hash();
@@ -239,7 +180,7 @@ impl BlockHeadersHandler {
             if header_chain.status(parent_hash) != BlockStatus::InChain
                 || header_chain.status(&hash) == BlockStatus::InChain
             {
-                break;
+                continue;
             }
             let mut tx = DBTransaction::new();
             if let Ok(pending) = header_chain.insert(&mut tx, &header, None) {
@@ -247,73 +188,6 @@ impl BlockHeadersHandler {
                 SyncStorage::set_synced_block_number(number);
                 // info!(target: "sync", "New block header #{} - {}, imported.", number, hash);
             }
-
-            /*
-                if let Ok(ref mut downloaded_blocks) = SyncStorage::get_downloaded_blocks().lock() {
-                    if number == 1 || number == SyncStorage::get_starting_block_number() {
-                    } else if let Some(parent_bw) = downloaded_blocks.get_mut(&(number - 1)) {
-                        if parent_bw
-                            .block_hashes
-                            .iter()
-                            .filter(|h| *h == parent_hash)
-                            .next()
-                            .is_none()
-                        {
-                            continue;
-                        }
-                    } else {
-                        debug!(target: "sync", "number {}, starting_block_number: {}", number, SyncStorage::get_starting_block_number());
-                        continue;
-                    }
-
-                    if let Some(bw_old) = downloaded_blocks.get_mut(&number) {
-                        if &bw_old.parent_hash == parent_hash {
-                            let mut index = 0;
-                            for h in bw_old.block_hashes.iter() {
-                                if h == &hash {
-                                    debug!(target: "sync", "Already imported block header #{}-{}", number, hash);
-                                    continue;
-                                }
-                                index += 1;
-                            }
-
-                            if index == bw_old.block_hashes.len() {
-                                bw_old.block_hashes.extend(vec![hash]);
-
-                                count += 1;
-                                local_status.total_difficulty =
-                                    local_status.total_difficulty + header.difficulty().clone();
-                                local_status.synced_block_number = number;
-                                local_status.synced_block_hash = hash;
-                                debug!(target: "sync", "Block header #{} - {:?} imported(side chain against {:?}).", number, hash, bw_old.block_hashes);
-                            }
-                        }
-                        continue;
-                    }
-
-                    let bw = BlockWrapper {
-                        block_number: number,
-                        parent_hash: header.parent_hash().clone(),
-                        block_hashes: vec![hash],
-                        block_headers: None,
-                    };
-
-                    downloaded_blocks.insert(number, bw);
-
-                    count += 1;
-                    if number > 0 {
-                        hw.node_hash = node_hash;
-                        hw.hashes.push(hash);
-                        hw.headers.push(header.clone());
-                    }
-                    local_status.total_difficulty =
-                        local_status.total_difficulty + header.difficulty().clone();
-                    local_status.synced_block_number = number;
-                    local_status.synced_block_hash = hash;
-
-                    debug!(target: "sync", "Block header #{} - {:?} imported", number, hash);
-                }
-                */
         }
     }
 }

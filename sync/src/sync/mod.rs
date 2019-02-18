@@ -54,8 +54,7 @@ mod handler;
 pub mod storage;
 
 const STATUS_REQ_INTERVAL: u64 = 5;
-const GET_BLOCK_HEADERS_INTERVAL: u64 = 100;
-const BLOCK_HEADERS_IMPORT_INTERVAL: u64 = 50;
+const GET_BLOCK_HEADERS_INTERVAL: u64 = 50;
 const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const REPUTATION_HANDLE_INTERVAL: u64 = 60;
@@ -82,11 +81,11 @@ impl SyncMgr {
             Instant::now(),
             Duration::from_millis(GET_BLOCK_HEADERS_INTERVAL),
         ).for_each(move |_| {
-            let from = SyncStorage::get_synced_block_number() + 1;
             let size = REQUEST_SIZE;
 
-            for _ in 0..2 {
+            for _ in 0..4 {
                 if let Some(mut node) = P2pMgr::get_an_active_node() {
+                    let from = SyncStorage::get_synced_block_number() + 1;
                     BlockHeadersHandler::get_headers_from_node(&mut node, from, size);
                 }
             }
@@ -95,17 +94,6 @@ impl SyncMgr {
         })
             .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(get_block_headers_task);
-
-        let block_headers_import_task = Interval::new(
-            Instant::now(),
-            Duration::from_millis(BLOCK_HEADERS_IMPORT_INTERVAL),
-        ).for_each(move |_| {
-            BlockHeadersHandler::import_block_header();
-
-            Ok(())
-        })
-            .map_err(|e| error!("interval errored; err={:?}", e));
-        executor.spawn(block_headers_import_task);
 
         let broadcast_transactions_task = Interval::new(
             Instant::now(),

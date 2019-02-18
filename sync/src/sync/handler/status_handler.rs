@@ -27,7 +27,6 @@ use std::mem;
 use super::super::action::SyncAction;
 use super::super::event::SyncEvent;
 use super::super::storage::SyncStorage;
-use super::blocks_headers_handler::BlockHeadersHandler;
 use p2p::*;
 
 const BEST_HASH_LENGTH: usize = 32;
