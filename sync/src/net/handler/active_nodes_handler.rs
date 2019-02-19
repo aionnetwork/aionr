@@ -101,12 +101,25 @@ impl ActiveNodesHandler {
         trace!(target: "net", "ACTIVENODESRES received.");
 
         let peer_node_hash = peer_node.node_hash;
+
+        if req.body.len() < 1 {
+            warn!(target: "net", "Node {}@{} removed: Invalid active nodes response length!!", peer_node.get_node_id(), peer_node.get_ip_addr());
+            P2pMgr::remove_peer(peer_node_hash);
+            return;
+        }
+
         let (node_count, rest) = req.body.split_at(1);
         let mut node_list = Vec::new();
         let mut rest = rest;
         if node_count[0] > 0 {
             for _i in 0..node_count[0] as u32 {
                 let mut node = Node::new();
+
+                if rest.len() < NODE_ID_LENGTH + IP_LENGTH + mem::size_of::<u32>() {
+                    warn!(target: "net", "Node {}@{} removed: Invalid active node response length!!", peer_node.get_node_id(), peer_node.get_ip_addr());
+                    P2pMgr::remove_peer(peer_node_hash);
+                    return;
+                }
 
                 let (node_id, rest_body) = rest.split_at(NODE_ID_LENGTH);
                 let (ip, rest_body) = rest_body.split_at(IP_LENGTH);

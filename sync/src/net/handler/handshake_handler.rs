@@ -71,7 +71,12 @@ impl HandshakeHandler {
 
     pub fn handle_handshake_req(node: &mut Node, req: ChannelBuffer) {
         trace!(target: "net", "HANDSHAKEREQ received.");
-        
+
+        if req.body.len() < NODE_ID_LENGTH + IP_LENGTH + 2 * mem::size_of::<i32>() + 2 {
+            warn!(target: "net", "Node {}@{} removed: Invalid handshake request length!!", node.get_node_id(), node.get_ip_addr());
+            P2pMgr::remove_peer(node.node_hash);
+            return;
+        }
         let (node_id, req_body_rest) = req.body.split_at(NODE_ID_LENGTH);
         let (mut net_id, req_body_rest) = req_body_rest.split_at(mem::size_of::<i32>());
         let peer_net_id = net_id.read_u32::<BigEndian>().unwrap_or(0);
@@ -85,9 +90,23 @@ impl HandshakeHandler {
         let (mut port, revision_version) = req_body_rest.split_at(mem::size_of::<i32>());
         let (revision_len, rest) = revision_version.split_at(1);
         let revision_len = revision_len[0] as usize;
+
+        if rest.len() < revision_len + 1 {
+            warn!(target: "net", "Node {}@{} removed: Invalid node revision length!!", node.get_node_id(), node.get_ip_addr());
+            P2pMgr::remove_peer(node.node_hash);
+            return;
+        }
+
         let (revision, rest) = rest.split_at(revision_len);
         let (version_len, rest) = rest.split_at(1);
         let version_len = version_len[0] as usize;
+
+        if rest.len() < version_len {
+            warn!(target: "net", "Node {}@{} removed: Invalid node version length!!", node.get_node_id(), node.get_ip_addr());
+            P2pMgr::remove_peer(node.node_hash);
+            return;
+        }
+
         let (_version, _rest) = rest.split_at(version_len);
 
         node.node_id.copy_from_slice(node_id);
@@ -132,9 +151,22 @@ impl HandshakeHandler {
     pub fn handle_handshake_res(node: &mut Node, req: ChannelBuffer) {
         trace!(target: "net", "HANDSHAKERES received.");
 
+        if req.body.len() < 2 {
+            warn!(target: "net", "Node {}@{} removed: Invalid handshake response length!!", node.get_node_id(), node.get_ip_addr());
+            P2pMgr::remove_peer(node.node_hash);
+            return;
+        }
+
         let (_, revision) = req.body.split_at(1);
         let (revision_len, rest) = revision.split_at(1);
         let revision_len = revision_len[0] as usize;
+
+        if rest.len() < revision_len {
+            warn!(target: "net", "Node {}@{} removed: Invalid node revision length!!", node.get_node_id(), node.get_ip_addr());
+            P2pMgr::remove_peer(node.node_hash);
+            return;
+        }
+
         let (revision, _rest) = rest.split_at(revision_len);
         if revision_len > MAX_REVISION_LENGTH {
             node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
