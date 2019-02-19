@@ -63,7 +63,7 @@ impl NetManager {
     fn enable_p2p_server(executor: &TaskExecutor) {
         thread::sleep(Duration::from_secs(5));
         let local_addr = P2pMgr::get_local_node().get_ip_addr();
-        P2pMgr::create_server(&executor, &local_addr, Self::handle);
+        P2pMgr::create_server(executor, local_addr, Self::handle);
     }
 
     fn enable_p2p_clients(executor: &TaskExecutor) {

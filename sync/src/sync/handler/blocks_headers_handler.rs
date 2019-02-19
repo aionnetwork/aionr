@@ -20,14 +20,13 @@
  ******************************************************************************/
 
 use acore::client::BlockStatus;
-use acore::engines::pow_equihash_engine::POWEquihashEngine;
 use acore::header::Header as BlockHeader;
 use acore_bytes::to_hex;
 use byteorder::{BigEndian, ByteOrder};
 use bytes::BufMut;
+use futures::future::lazy;
 use kvdb::DBTransaction;
 use rlp::UntrustedRlp;
-use std::thread;
 use std::time::{Duration, SystemTime};
 
 use super::super::action::SyncAction;
@@ -95,7 +94,7 @@ impl BlockHeadersHandler {
             }
             node.last_request_num = from;
 
-            info!(target: "sync", "request headers: from number: {}, node: {}, rn: {}, mode: {}.", from, node.get_ip_addr(), node.requested_block_num, node.mode);
+            debug!(target: "sync", "request headers: from number: {}, node: {}, rn: {}, mode: {}.", from, node.get_ip_addr(), node.requested_block_num, node.mode);
 
             SyncStorage::set_requested_block_number_last_time(from + size);
             Self::send_blocks_headers_req(node.node_hash, from, size as u32);
@@ -131,7 +130,6 @@ impl BlockHeadersHandler {
 
         let node_hash = node.node_hash;
         let rlp = UntrustedRlp::new(req.body.as_slice());
-        let mut prev_header = BlockHeader::new();
         let mut headers = Vec::new();
 
         for header_rlp in rlp.iter() {
@@ -148,7 +146,6 @@ impl BlockHeadersHandler {
                 if node.requested_block_num < number {
                     node.requested_block_num = number;
                 }
-                prev_header = header.clone();
             } else {
                 error!(target: "sync", "Invalid header: {}, received from {}@{}", to_hex(header_rlp.as_raw()), node.get_node_id(), node.get_ip_addr());
                 P2pMgr::remove_peer(node.node_hash);
@@ -158,9 +155,12 @@ impl BlockHeadersHandler {
 
         if !headers.is_empty() {
             node.inc_reputation(10);
-            thread::spawn(move || {
-                Self::import_block_header(headers);
-            });
+            let node_ip = node.get_ip_addr();
+            let executor = SyncStorage::get_executor();
+            executor.spawn(lazy(move || {
+                Self::import_block_header(headers, node_ip);
+                Ok(())
+            }));
         } else {
             node.inc_reputation(1);
             debug!(target: "sync", "Came too late............");
@@ -170,7 +170,8 @@ impl BlockHeadersHandler {
         P2pMgr::update_node(node_hash, node);
     }
 
-    pub fn import_block_header(headers: Vec<BlockHeader>) {
+    pub fn import_block_header(headers: Vec<BlockHeader>, node_ip: String) {
+        let mut imported = false;
         let header_chain = SyncStorage::get_block_header_chain();
         for header in headers.iter() {
             let hash = header.hash();
@@ -187,7 +188,11 @@ impl BlockHeadersHandler {
                 header_chain.apply_pending(tx, pending);
                 SyncStorage::set_synced_block_number(number);
                 // info!(target: "sync", "New block header #{} - {}, imported.", number, hash);
+                imported = true;
             }
+        }
+        if imported {
+            info!(target: "sync", "Import headers from: {}", node_ip);
         }
     }
 }

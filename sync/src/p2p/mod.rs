@@ -22,18 +22,19 @@ use acore_bytes::to_hex;
 use bincode::config;
 use bytes::BytesMut;
 use futures::sync::mpsc;
+use futures::future::lazy;
 use futures::{Future, Stream};
 use rand::{thread_rng, Rng};
 use socket2::{Domain, Socket, Type};
 use state::Storage;
 use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
-use std::io;
-use std::net::{Shutdown, TcpStream as StdTcpStream};
+use std::net::{Shutdown, TcpListener as StdTcpListener, TcpStream as StdTcpStream};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 use std::time::Duration;
-use tokio::net::{TcpListener, TcpStream};
+use std::io;
+use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tokio::runtime::TaskExecutor;
 use tokio_codec::{Decoder, Encoder, Framed};
@@ -85,34 +86,23 @@ impl P2pMgr {
         NETWORK_CONFIG.set(cfg);
     }
 
-    pub fn create_server(
-        executor: &TaskExecutor,
-        local_addr: &String,
-        handle: fn(node: &mut Node, req: ChannelBuffer),
-    ) {
-        if let Ok(addr) = local_addr.parse() {
-            let listener = TcpListener::bind(&addr).expect("Failed to bind");
-            info!(target: "net", "Listening on: {}", local_addr);
-            let server = listener
-                .incoming()
-                .map_err(|e| error!(target: "net", "Failed to accept socket; error = {:?}", e))
-                .for_each(move |socket| {
-                    socket
-                        .set_recv_buffer_size(1 << 24)
-                        .expect("set_recv_buffer_size failed");
+    pub fn create_server(executor: &TaskExecutor, local_addr: String, handle: fn(node: &mut Node, req: ChannelBuffer)) {
+        executor.spawn(lazy(move || {
+            let listener = StdTcpListener::bind(local_addr).expect("Failed to bind");
 
-                    socket
-                        .set_keepalive(Some(Duration::from_secs(30)))
-                        .expect("set_keepalive failed");
+            info!(target: "net", "Listening on: {:?}", listener.local_addr());
 
-                    Self::process_inbounds(socket, handle);
+            for stream in listener.incoming() {
+                match stream {
+                    Ok(stream) => {
+                        Self::process_inbounds(stream, handle);
+                    }
+                    Err(e) => error!(target: "net", "Failed to accept socket; error = {:?}", e),
+                }
+            }
 
-                    Ok(())
-                });
-            executor.spawn(server);
-        } else {
-            error!(target: "net", "Invalid ip address: {}", local_addr);
-        }
+            Ok(())
+        }));
     }
 
     pub fn create_client(mut peer_node: Node, handle: fn(node: &mut Node, req: ChannelBuffer)) {
@@ -469,57 +459,72 @@ impl P2pMgr {
         }
     }
 
-    pub fn process_inbounds(socket: TcpStream, handle: fn(node: &mut Node, req: ChannelBuffer)) {
-        if let Ok(peer_addr) = socket.peer_addr() {
+    pub fn process_inbounds(
+        std_stream: StdTcpStream,
+        handle: fn(node: &mut Node, req: ChannelBuffer),
+    ) {
+        if let Ok(peer_addr) = std_stream.peer_addr() {
             let mut peer_node = Node::new_with_addr(peer_addr);
             let peer_ip = peer_node.ip_addr.get_ip();
-            let local_ip = P2pMgr::get_local_node().ip_addr.get_ip();
             let network_config = P2pMgr::get_network_config();
             if P2pMgr::get_nodes_count(ALIVE) < network_config.max_peers as usize
                 && !network_config.ip_black_list.contains(&peer_ip)
             {
-                let mut value = peer_node.ip_addr.get_addr();
-                value.push_str(&local_ip);
-                peer_node.node_hash = P2pMgr::calculate_hash(&value);
-                peer_node.state_code = CONNECTED;
-                trace!(target: "net", "New incoming connection: {}", peer_addr);
+                if let Ok(std_stream_cloned) = std_stream.try_clone() {
+                    let local_ip = P2pMgr::get_local_node().ip_addr.get_ip();
+                    let mut value = peer_node.ip_addr.get_addr();
+                    value.push_str(&local_ip);
+                    peer_node.node_hash = P2pMgr::calculate_hash(&value);
 
-                let (tx, rx) = mpsc::channel(4096000);
-                let thread_pool = P2pMgr::get_thread_pool();
-
-                peer_node.tx = Some(tx);
-                peer_node.state_code = CONNECTED;
-                peer_node.ip_addr.is_server = false;
-
-                trace!(target: "net", "A new peer added: {}", peer_node);
-
-                let mut node_hash = peer_node.node_hash;
-                // process request from the incoming stream
-
-                let (sink, stream) = P2pMgr::split_frame(socket);
-                let read = stream.for_each(move |msg| {
-                    if let Some(mut peer_node) = P2pMgr::get_node(node_hash) {
-                        handle(&mut peer_node, msg.clone());
-                        node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
+                    if let Some(node) = P2pMgr::get_node(peer_node.node_hash) {
+                        if node.state_code == DISCONNECTED {
+                            trace!(target: "net", "update known peer node {}@{}...", node.get_node_id(), node.get_ip_addr());
+                            P2pMgr::remove_peer(peer_node.node_hash);
+                        } else {
+                            return;
+                        }
                     }
 
-                    Ok(())
-                });
+                    if let Ok(socket) = TcpStream::from_std(std_stream_cloned, &Handle::default()) {
+                        let (tx, rx) = mpsc::channel(4096000);
+                        let thread_pool = P2pMgr::get_thread_pool();
 
-                thread_pool.spawn(read.then(|_| Ok(())));
+                        peer_node.tx = Some(tx);
+                        peer_node.state_code = CONNECTED;
+                        peer_node.ip_addr.is_server = false;
+                        peer_node.state_code = CONNECTED;
+                        P2pMgr::add_peer(peer_node.clone(), std_stream);
+                        trace!(target: "net", "A new peer added: {}", peer_node);
 
-                // send everything in rx to sink
-                let write = sink.send_all(rx.map_err(|()| {
-                    io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")
-                }));
-                thread_pool.spawn(write.then(move |_| {
-                    P2pMgr::remove_peer(node_hash);
-                    trace!(target:"net", "Connection with {:?} closed.", peer_ip);
-                    Ok(())
-                }));
+                        let mut node_hash = peer_node.node_hash;
+                        // process request from the incoming stream
+
+                        let (sink, stream) = P2pMgr::split_frame(socket);
+                        let read = stream.for_each(move |msg| {
+                            if let Some(mut peer_node) = P2pMgr::get_node(node_hash) {
+                                handle(&mut peer_node, msg.clone());
+                                node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
+                            }
+
+                            Ok(())
+                        });
+
+                        thread_pool.spawn(read.then(|_| Ok(())));
+
+                        // send everything in rx to sink
+                        let write = sink.send_all(rx.map_err(|()| {
+                            io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")
+                        }));
+                        thread_pool.spawn(write.then(move |_| {
+                            P2pMgr::remove_peer(node_hash);
+                            trace!(target:"net", "Connection with {:?} closed.", peer_ip);
+                            Ok(())
+                        }));
+                    }
+                }
             }
         } else {
-            error!(target: "net", "Invalid socket: {:?}", socket);
+            error!(target: "net", "Invalid socket: {:?}", std_stream);
         }
     }
 

@@ -24,7 +24,7 @@ use super::p2p::*;
 pub struct LightSyncManager;
 
 impl LightSyncManager {
-    fn handle(node: &mut Node, req: ChannelBuffer) {
+    pub fn handle(_node: &mut Node, req: ChannelBuffer) {
         match Version::from(req.head.ver) {
             Version::V0 => {
                 trace!(target: "net", "Ver 0 package received.");
