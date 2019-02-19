@@ -104,6 +104,8 @@ extern crate bytebuffer;
 
 extern crate tokio;
 
+extern crate avm_abi;
+
 pub mod account_provider;
 pub mod block;
 pub mod client;

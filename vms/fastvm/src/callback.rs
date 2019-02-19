@@ -25,7 +25,7 @@ use basetypes::{EvmMessage, constants};
 use ffi::{EvmResult, EvmStatusCode};
 use aion_types::{U128, H256, U256, Address};
 use vm::Ext;
-use utils::CallType;
+use vm_common::CallType;
 
 // definitions of callbacks used by fastvm.so; obj : &Callback
 #[no_mangle]

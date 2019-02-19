@@ -30,7 +30,7 @@
 use std::collections::{HashSet, HashMap};
 use std::sync::Arc;
 
-use state::Account;
+use state::{Account, AVMAccount};
 use parking_lot::Mutex;
 use aion_types::{Address, H256};
 use kvdb::{AsHashStore, HashStore, DBValue, MemoryDB};
@@ -71,6 +71,13 @@ pub trait Backend: Send {
     /// Check whether an account is known to be empty. Returns true if known to be
     /// empty, false otherwise.
     fn is_known_null(&self, address: &Address) -> bool;
+}
+
+/// State backend for AVM. See module docs for more details.
+pub trait AVMBackend<'a>: Backend + Send {
+    fn get_cached_account(&self, addr: &Address) -> Option<Option<AVMAccount<'a>>>;
+    fn get_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
+    where F: FnOnce(Option<&mut AVMAccount<'a>>) -> U;
 }
 
 /// A raw backend used to check proofs of execution.

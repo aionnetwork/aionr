@@ -4,7 +4,8 @@ extern crate libc;
 extern crate num_bigint;
 extern crate rjni;
 extern crate aion_types;
-extern crate vm_utils as utils;
+extern crate vm_common;
+extern crate avm_abi;
 
 #[macro_use]
 extern crate lazy_static;

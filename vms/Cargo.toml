@@ -21,4 +21,4 @@ fastvm = { path = "fastvm" }
 avm = { path = "avm" }
 libc = "0.2.0"
 logger = { path = "../util/logger" }
-vm_utils = { path = "utils" }
+vm_common = { path = "vm_common" }

@@ -5,9 +5,10 @@ extern crate num_bigint;
 use core::fmt;
 use core::slice;
 use libc::c_void;
-use std::mem;
+use std::{mem, ptr};
 use num_bigint::BigUint;
 use avm::AVMExt;
+use aion_types::Address;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -117,23 +118,32 @@ pub extern fn avm_put_code(
     code: *const avm_bytes,
 )
 {
-    unsafe {
-        println!(
-            "Callback: avm_put_code({:?}, {}, {})",
-            handle, *address, *code
-        );
-    }
+    let ext: &mut Box<AVMExt> = unsafe { mem::transmute(handle) };
+    let addr: &Address = unsafe { mem::transmute(address) };
+    let code: &avm_bytes = unsafe { mem::transmute(code) };
+    println!("avm_put_code, ext ptr = {:?}", handle);
+    let ext_code: &[u8] =
+        unsafe { ::std::slice::from_raw_parts(code.pointer, code.length as usize) };
+    ext.save_code(addr, ext_code.to_vec());
 }
 
 #[no_mangle]
 pub extern fn avm_get_code(handle: *const c_void, address: *const avm_address) -> avm_bytes {
-    unsafe {
-        let code = new_null_bytes();
-        println!(
-            "Callback: avm_get_code({:?}, {}) => {}",
-            handle, *address, code
-        );
-        code
+    let ext: &mut Box<AVMExt> = unsafe { mem::transmute(handle) };
+    let addr: &Address = unsafe { mem::transmute(address) };
+    match ext.get_code(addr) {
+        None => {
+            avm_bytes {
+                length: 0,
+                pointer: ptr::null_mut(),
+            }
+        }
+        Some(code) => {
+            avm_bytes {
+                length: code.len() as u32,
+                pointer: unsafe { mem::transmute(&code.as_slice()[0]) },
+            }
+        }
     }
 }
 

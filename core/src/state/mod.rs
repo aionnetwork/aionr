@@ -57,11 +57,13 @@ use trie::{Trie, TrieDB, TrieError};
 
 mod account;
 mod substate;
+mod avm_account;
 
 pub mod backend;
 
 pub use self::account::Account;
-pub use self::backend::Backend;
+pub use self::avm_account::AVMAccount;
+pub use self::backend::{Backend, AVMBackend};
 pub use self::substate::Substate;
 
 /// Used to return information about an `State::apply` operation.

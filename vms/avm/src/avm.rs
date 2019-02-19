@@ -13,7 +13,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
 use types::{TransactionContext, TransactionResult};
-use utils::EnvInfo;
+use vm_common::EnvInfo;
 
 /// We keep a single JVM instance in the background, which will be shared
 /// among multiple threads. Before invoking any JNI methods, the executing
@@ -125,15 +125,15 @@ fn find_files(path: &Path, extension: &str) -> Result<Vec<String>, Error> {
     return Ok(result);
 }
 
-use std::sync::Mutex;
+// use std::sync::Mutex;
 
-lazy_static! {
-    static ref EXT_HDLS: Mutex<Vec<i64>> = Mutex::new(vec![]);
-}
+// lazy_static! {
+//     static ref EXT_HDLS: Mutex<Vec<i64>> = Mutex::new(vec![]);
+// }
 
-fn push_handler(ext: i64) { EXT_HDLS.lock().unwrap().push(ext); }
+// fn push_handler(ext: i64) { EXT_HDLS.lock().unwrap().push(ext); }
 
-fn pop_handler() -> i64 { EXT_HDLS.lock().unwrap().pop().unwrap_or(0) }
+// fn pop_handler() -> i64 { EXT_HDLS.lock().unwrap().pop().unwrap_or(0) }
 
 /// Aion virtual machine
 #[derive(Clone)]
@@ -150,6 +150,8 @@ impl Drop for AVM {
     }
 }
 
+// static mut ExecutorClass: AtomicPtr<Class> = AtomicPtr::new(ptr::null_mut());
+
 impl AVM {
     /// create a new AVM instance
     pub fn new() -> AVM {
@@ -159,9 +161,9 @@ impl AVM {
         // attach this thread to the JVM
         unsafe {
             let vm = JVM_SINGLETON.load(Ordering::Relaxed);
-            let mut env = ptr::null_mut();
+            let env: *mut ffi::JNIEnv = ptr::null_mut();
 
-            ((**vm).AttachCurrentThread)(vm, &mut env, ptr::null_mut());
+            //((**vm).AttachCurrentThread)(vm, &mut env, ptr::null_mut());
 
             AVM {
                 jvm: JavaVM {
@@ -172,6 +174,28 @@ impl AVM {
         }
     }
 
+    fn attach(&self) -> Self {
+        unsafe {
+            let vm = JVM_SINGLETON.load(Ordering::Relaxed);
+            let mut env = ptr::null_mut();
+            ((**vm).AttachCurrentThread)(vm, &mut env, ptr::null_mut());
+
+            AVM {
+                jvm: JavaVM {
+                    vm: self.jvm.vm,
+                    env: ffi::from_raw(env),
+                },
+            }
+        }
+    }
+
+    fn dettach(&self) {
+        let vm: *mut ffi::JavaVM = ffi::into_raw(self.jvm.vm);
+        unsafe {
+            ((**vm).DetachCurrentThread)(vm);
+        }
+    }
+
     /// Executes a list of transactions
     pub fn execute(
         &self,
@@ -179,12 +203,15 @@ impl AVM {
         transactions: &Vec<TransactionContext>,
     ) -> Result<Vec<TransactionResult>, &'static str>
     {
+        println!("start rust jvm executor");
+        let vm = self.attach();
         // find the NativeTransactionExecutor class
-        let class = self
+        let class = vm
             .jvm
             .class("org/aion/avm/jni/NativeTransactionExecutor")
             .expect("NativeTransactionExecutor is missing in the classpath");
 
+        println!("load native class");
         // the method name
         let name = "execute";
 
@@ -192,30 +219,27 @@ impl AVM {
         let return_type = Type::Object("[B");
 
         // the arguments
-        let handle = ext_hdl;
         let arguments = [
-            Value::Long(handle), // handle
+            Value::Long(ext_hdl), // handle
             Value::Object(
-                self.jvm
+                vm.jvm
                     .new_byte_array_with_data(&Self::encode_transaction_contexts(&transactions))
                     .expect("Failed to create new byte array in JVM"),
             ),
         ];
 
-        push_handler(ext_hdl);
-
+        println!("rust jvm call_static");
         // invoke the method
         let ret = class
             .call_static(name, &arguments, return_type)
             .expect("Failed to call the execute() method");
 
-        pop_handler();
-
         if let Value::Object(obj) = ret {
             if obj.is_null() {
                 Err("The execute() method failed")
             } else {
-                let bytes = self.jvm.load_byte_array(&obj);
+                let bytes = vm.jvm.load_byte_array(&obj);
+                self.dettach();
                 Self::decode_transaction_results(&bytes)
             }
         } else {
@@ -253,8 +277,8 @@ use aion_types::{Address, U256};
 pub trait AVMExt {
     fn create_account(&mut self, address: &Address);
     fn account_exists(&self, address: &Address) -> bool;
-    fn save_code(&mut self, address: &Address, code: &Vec<u8>);
-    fn get_code(&self, address: &Address) -> Arc<Vec<u8>>;
+    fn save_code(&mut self, address: &Address, code: Vec<u8>);
+    fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>>;
     fn sstore(&mut self, address: &Address, key: &Vec<u8>, value: Vec<u8>);
     fn sload(&self, address: &Address, key: &Vec<u8>) -> Option<Vec<u8>>;
     fn remove_account(&mut self, address: &Address);
@@ -276,13 +300,12 @@ mod test {
     use std::io::Read;
     use std::path::PathBuf;
     use types::TransactionContext;
-    use rustc_hex::FromHex;
+    use avm_abi::{AbiToken, AVMEncoder};
 
     #[test]
     fn test_avm_hello_world() {
         let avm = AVM::new();
         let transactions = prepare_transactions();
-        // println!("txs = {:?}", transactions);
         let results = avm.execute(0, &transactions).unwrap();
         println!("{:?}", results);
     }
@@ -347,9 +370,9 @@ mod test {
             address: [1u8; 32].to_vec(),
             caller: [5u8; 32].to_vec(),
             origin: [6u8; 32].to_vec(),
-            nonce: 0,
+            nonce: 1,
             value: vec![10],
-            data: "sayHello".as_bytes().to_vec(),
+            data: AbiToken::STRING("sayHello".to_string()).encode(),
             energy_limit: 1_000_000,
             energy_price: 1,
             transaction_hash: [4u8; 32].to_vec(),

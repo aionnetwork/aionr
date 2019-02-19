@@ -23,4 +23,4 @@ blake2b = { path = "../../util/blake2b" }
 log = "0.3"
 rustc-hex = "1.0"
 db = { path = "../../db/core" }
-vm_utils = { path = "../utils" }
+vm_common = { path = "../vm_common" }

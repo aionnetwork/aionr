@@ -119,11 +119,26 @@ where B: StateBackend
 
     fn account_exists(&self, address: &Address) -> bool { unimplemented!() }
 
-    fn save_code(&mut self, address: &Address, code: &Vec<u8>) { unimplemented!() }
+    fn save_code(&mut self, address: &Address, code: Vec<u8>) {
+        println!("AVMExt save code");
+        self.state
+            .init_code(&self.origin_info[0].address, code)
+            .expect("save avm code should not fail");
+    }
 
-    fn get_code(&self, address: &Address) -> Arc<Vec<u8>> { unimplemented!() }
+    fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
+        println!("AVM get code");
+        match self.state.code(address) {
+            Ok(code) => code,
+            Err(_x) => None,
+        }
+    }
 
-    fn sstore(&mut self, address: &Address, key: &Vec<u8>, value: Vec<u8>) { unimplemented!() }
+    fn sstore(&mut self, a: &Address, key: &Vec<u8>, value: Vec<u8>) {
+        // self.state
+        //     .set_storage(a, key, value)
+        //     .expect("Fatal error occured when set storage");
+    }
 
     fn sload(&self, address: &Address, key: &Vec<u8>) -> Option<Vec<u8>> { unimplemented!() }
 

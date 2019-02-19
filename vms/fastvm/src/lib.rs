@@ -36,7 +36,7 @@ extern crate db as kvdb;
 mod tests;
 extern crate rlp;
 extern crate patricia_trie as trie;
-extern crate vm_utils as utils;
+extern crate vm_common;
 
 pub mod context;
 pub mod basetypes;

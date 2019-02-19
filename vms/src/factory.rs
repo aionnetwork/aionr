@@ -25,11 +25,10 @@ use fastvm::{EvmStatusCode, FastVM};
 use fastvm::basetypes::{constants::GAS_CODE_DEPOSIT, DataWord};
 use fastvm::context::{execution_kind, ExecutionContext, TransactionResult};
 use fastvm::vm::{Ext, ActionParams, ActionValue};
-use utils::{ExecutionResult, ExecStatus, CallType};
+use vm_common::{ExecutionResult, ExecStatus, CallType, ReturnData};
 use std::sync::Arc;
 use avm::{AVM, AVMExt};
 use avm::types::{TransactionContext as AVMTxContext, AvmStatusCode};
-use utils::ReturnData;
 
 pub trait Factory {
     fn exec(&mut self, params: Vec<ActionParams>, ext: &mut Ext) -> Vec<ExecutionResult>;
@@ -265,10 +264,9 @@ impl Factory for AVMFactory {
             ))
         }
 
-        //println!("tx_context = {:?}", avm_tx_contexts);
-
         let inst = &mut self.instance;
         let ext_ptr: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(ext)) };
+        println!("ext ptr = {:?}", ext_ptr);
         let mut res = inst.execute(ext_ptr as i64, &avm_tx_contexts);
 
         let ext_post: &mut Box<Ext> = unsafe { ::std::mem::transmute(ext_ptr) };

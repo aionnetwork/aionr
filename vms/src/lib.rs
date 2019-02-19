@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 #[macro_use]
-pub mod factory;
+mod factory;
 mod vmtype;
 
 extern crate bit_set;
@@ -37,10 +37,11 @@ extern crate avm;
 extern crate libc;
 #[macro_use]
 extern crate log;
-extern crate vm_utils as utils;
+extern crate rlp;
+extern crate vm_common;
 
-pub use self::factory::FastVMFactory;
-pub use self::vmtype::VMType;
+pub use factory::{Factory, FastVMFactory, AVMFactory};
+pub use vmtype::VMType;
 pub use fastvm::vm::{
     self,
     Vm,
@@ -55,4 +56,4 @@ pub use avm::AVMExt;
 
 pub use fastvm::basetypes::constants;
 
-pub use utils::{ReturnData, ExecutionResult, ExecStatus, CallType, EnvInfo, LastHashes};
+pub use vm_common::{ReturnData, ExecutionResult, ExecStatus, CallType, EnvInfo, LastHashes};

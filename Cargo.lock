@@ -40,6 +40,7 @@ dependencies = [
  "aion-types 0.1.0",
  "ajson 0.1.0",
  "ansi_term 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "avm_abi 0.1.0",
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "blake2b 0.1.0",
  "bloomchain 0.2.0",
@@ -366,13 +367,18 @@ name = "avm"
 version = "0.1.0"
 dependencies = [
  "aion-types 0.1.0",
+ "avm_abi 0.1.0",
  "lazy_static 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-bigint 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rjni 0.0.1",
  "rustc-hex 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "vm_utils 0.1.0",
+ "vm_common 0.1.0",
 ]
+
+[[package]]
+name = "avm_abi"
+version = "0.1.0"
 
 [[package]]
 name = "backtrace"
@@ -909,7 +915,7 @@ dependencies = [
  "serde_derive 1.0.80 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.32 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
- "vm_utils 0.1.0",
+ "vm_common 0.1.0",
 ]
 
 [[package]]
@@ -2887,7 +2893,7 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "vm_utils"
+name = "vm_common"
 version = "0.1.0"
 dependencies = [
  "aion-types 0.1.0",
@@ -2918,7 +2924,7 @@ dependencies = [
  "parking_lot 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "patricia-trie 0.1.0",
  "rlp 0.2.1",
- "vm_utils 0.1.0",
+ "vm_common 0.1.0",
 ]
 
 [[package]]

@@ -24,7 +24,7 @@ use bytes::Bytes;
 use hash::{blake2b, BLAKE2B_EMPTY};
 use ffi::EvmStatusCode;
 use std::{fmt, ops, cmp};
-use utils::{ReturnData, ExecutionResult, CallType, EnvInfo};
+use vm_common::{ReturnData, ExecutionResult, CallType, EnvInfo};
 
 // result definition
 /// VM errors. from vm/src/errors.rs

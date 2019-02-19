@@ -1,6 +1,6 @@
 use super::codec::{NativeDecoder, NativeEncoder};
 use aion_types::{Address};
-use utils::ExecStatus;
+use vm_common::ExecStatus;
 
 use std::fmt;
 

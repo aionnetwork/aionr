@@ -29,7 +29,7 @@ use memory_cache::MemoryLruCache;
 use journaldb::JournalDB;
 use kvdb::{KeyValueDB, DBTransaction, HashStore};
 use aion_types::{H256, Address};
-use state::{self, Account};
+use state::{self, Account, AVMAccount};
 use header::BlockNumber;
 use blake2b::blake2b;
 use parking_lot::Mutex;
@@ -506,6 +506,17 @@ impl state::Backend for StateDB {
         let bloom = self.account_bloom.lock();
         let is_null = !bloom.check(&*blake2b(address));
         is_null
+    }
+}
+
+impl<'a> state::AVMBackend<'a> for StateDB {
+    fn get_cached_account(&self, addr: &Address) -> Option<Option<AVMAccount<'a>>> {
+        unimplemented!()
+    }
+
+    fn get_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
+    where F: FnOnce(Option<&mut AVMAccount<'a>>) -> U {
+        unimplemented!()
     }
 }
 

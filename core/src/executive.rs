@@ -676,8 +676,22 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         return res;
     }
 
-    #[test]
     pub fn create_avm(
+        &mut self,
+        params: Vec<ActionParams>,
+        substates: &mut [Substate],
+    ) -> Vec<ExecutionResult>
+    {
+        self.state.checkpoint();
+
+        let mut unconfirmed_substates = vec![Substate::new(); params.len()];
+
+        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice());
+
+        res
+    }
+
+    pub fn call_avm(
         &mut self,
         params: Vec<ActionParams>,
         substates: &mut [Substate],
@@ -915,6 +929,7 @@ Address};
     use transaction::{Action, Transaction, SignedTransaction};
     use bytes::Bytes;
     use error::ExecutionError;
+    use avm_abi::{AbiToken, AVMEncoder};
 
     fn make_aion_machine() -> EthereumMachine {
         let machine = ::ethereum::new_aion_test_machine();
@@ -2357,10 +2372,46 @@ Address};
             .unwrap();
         let info = EnvInfo::default();
         let machine = make_aion_machine();
-        let mut substate = Substate::new();
+        let substate = Substate::new();
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.create_avm(vec![params], &mut [substate])
+            ex.create_avm(vec![params.clone()], &mut [substate])
+        };
+
+        assert_eq!(state.commit().is_ok(), true);
+        assert_eq!(
+            state.root().to_vec(),
+            "596426bcd6ff5affa67adf43b1a280aed0f81b4c74c4b2c3a8eda4a5b4ac9a44"
+                .from_hex()
+                .unwrap()
+        );
+    }
+
+    #[test]
+    fn avm_save_and_call_code() {
+        // Create contract on already existing address
+        let code = "000006ce504b03040a0000080000fa7e114d000000000000000000000000090004004d4554412d494e462ffeca0000504b03040a0000080800f97e114dd56006437f00000096000000140000004d4554412d494e462f4d414e49464553542e4d464d8bb10ac320140077c17f904c2dc587365bb6c4a54be8d6ce0ff34a0246e529b4fdfb9aaddb71c7cd18b71795aa1fc4654b7150168c1463fc336346bf926aae456ba097c23161a5454fdf36183070bdd85e9dba3ba30fa45ce29c186bdbbbb314336e51bb80a50ccaa71de8837b0e042b8590de89c302b7039f074a21c50f504b03040a0000080000f97e114d00000000000000000000000004000000636f6d2f504b03040a0000080000f97e114d0000000000000000000000000c000000636f6d2f6578616d706c652f504b03040a0000080000f97e114d00000000000000000000000017000000636f6d2f6578616d706c652f68656c6c6f776f726c642f504b03040a0000080800f97e114d15fb44197c0200002d04000027000000636f6d2f6578616d706c652f68656c6c6f776f726c642f48656c6c6f576f726c642e636c61737385525d4f1341143d43cb6ebb6e291444a055f912db8a2ca2e207684225c6c6aa891808e98bd3edd82eec0759b7a8ffc9078c09104d8c4f3ef8a38c7786852a98d84defbd73e79e3be79e999fbfbe7c03b08807064c4ca770c5c00caeea281a4862da40096503d7302bcd751d7306d2b0d2b437afe30643e24d1030b02a450d1e3268cb8eef440f69592cad33241f054dc190ad39be78def11a227cc51b2e6572b5c0e6ee3a0f1db98e93c9a8edbc6598aad9816789f7dcdb7185d516ae1bbc0b42b7693d91e1860c97e800de6c32f416abd5129dce38fd1b940d3b3e352a96ea15721e7768955ab6dd98559a87ad8e27fc888e19acd7b6f82eb75ceeb7ac178d2d6147d436b316717bfb19df8939196b4127b4c563472eb25d0673126ba21f038451e9d971c57242c782899b28304cfc770e1db74cdc4641c7a2893bb86be21eee330c748955fd48b444686209cb26b2e863e83f4dfbafd45a143a7e8ba66e89a8f2211234e96410b62cee04bec5773d8bef3856c50dec6dbb4df2bcecf891e3d16c3ad5aff28874cc9f295fa95457854d5749373cdc54d18adf24e88613b58f398c14cfea59afa88bc8c698aef8178a72eb5f179072fc689dbb1da1de501513f4d64c7aa23df465d04791216520df0b26f5279ba395459ec96cf900ec93020c92d55452c31059f3a800e7314c9e4860240657a83a413e992fbcfe780a3ba4b0e347fb315646a34482a9688ca21e8af328c4fde663325aae671f89bd531d47fe60a3c51dd3b878829ea16af9ebfb8ae4e6017a0fa11d42df539cbb5d0a48e1d2c9f89b8a013046c53f30ac20a9a7e5c4c277a4f7617cc639a94942e173c41924a646bc3324e62875396694217b99a605092febd9282527d50053bf01504b03040a0000080800f97e114dbbf4728ca9000000e8000000110000006d6f64756c652d696e666f2e636c6173734d8d4b0e824010446bfc8082bf04e301dcdba00b8fe0ce9527186154cc0c4330a04bcfe5c2037828e380f8e94eba53957add8fe7ed0e6089a10d87c1d9e83c0bc52a968261a474944b318b939da6232f3883b5ae2c0fae879e91f380025a78e88f316070ff008649a815890b57a914741052eab3ce64c4d02d6fd1969fca1f3adb138f7542bc50c4d3f8cdf935e7ffb82bc0f0a986e97236d1327b8a76ed5a2665a35329f3e89bc70b504b010214030a0000080000fa7e114d000000000000000000000000090004000000000000001000ed41000000004d4554412d494e462ffeca0000504b010214030a0000080800f97e114dd56006437f00000096000000140000000000000000000000a4812b0000004d4554412d494e462f4d414e49464553542e4d46504b010214030a0000080000f97e114d000000000000000000000000040000000000000000001000ed41dc000000636f6d2f504b010214030a0000080000f97e114d0000000000000000000000000c0000000000000000001000ed41fe000000636f6d2f6578616d706c652f504b010214030a0000080000f97e114d000000000000000000000000170000000000000000001000ed4128010000636f6d2f6578616d706c652f68656c6c6f776f726c642f504b010214030a0000080800f97e114d15fb44197c0200002d040000270000000000000000000000a4815d010000636f6d2f6578616d706c652f68656c6c6f776f726c642f48656c6c6f576f726c642e636c617373504b010214030a0000080800f97e114dbbf4728ca9000000e8000000110000000000000000000000a4811e0400006d6f64756c652d696e666f2e636c617373504b05060000000007000700c2010000f60400000000".from_hex().unwrap();
+        let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
+        let address = contract_address(&sender, &U256::zero()).0;
+        let mut params = ActionParams::default();
+        params.address = address.clone();
+        params.sender = sender.clone();
+        params.origin = sender.clone();
+        params.gas = U256::from(1_000_000);
+        params.code = Some(Arc::new(code.clone()));
+        params.value = ActionValue::Transfer(0.into());
+        params.call_type = CallType::None;
+        params.gas_price = 1.into();
+        let mut state = get_temp_state();
+        state
+            .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
+            .unwrap();
+        let info = EnvInfo::default();
+        let machine = make_aion_machine();
+        let substate = Substate::new();
+        let execution_results = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.create_avm(vec![params.clone()], &mut [substate])
         };
 
         for r in execution_results {
@@ -2377,6 +2428,30 @@ Address};
                 return_data, status_code, gas_left
             );
         }
+
+        params.call_type = CallType::Call;
+        params.data = Some(AbiToken::STRING("sayHello".to_string()).encode());
+        let substate = Substate::new();
+        let execution_results = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.call_avm(vec![params.clone()], &mut [substate])
+        };
+
+        for r in execution_results {
+            let ExecutionResult {
+                status_code,
+                gas_left,
+                return_data,
+                exception,
+            } = r;
+            assert_eq!(status_code, ExecStatus::Success);
+
+            println!(
+                "(return_data = {:?}, status_code = {:?}, gas_left = {:?})",
+                return_data, status_code, gas_left
+            );
+        }
+
         assert_eq!(state.commit().is_ok(), true);
         assert_eq!(
             state.root().to_vec(),

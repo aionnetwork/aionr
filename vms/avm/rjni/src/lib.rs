@@ -482,7 +482,7 @@ impl JavaVM {
 ///
 /// The class has a prescribed lifetime, since it cannot outlive the JVM that
 /// created it.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct Class<'a> {
     jvm: &'a JavaVM,
     raw: ffi::jclass,
@@ -676,6 +676,10 @@ impl<'a> Class<'a> {
             Ok(())
         }
     }
+}
+
+impl<'a> Into<i64> for Class<'a> {
+    fn into(self) -> i64 { unsafe { mem::transmute(&self) } }
 }
 
 /// An object (an instance of a class), which can have methods called on it and
