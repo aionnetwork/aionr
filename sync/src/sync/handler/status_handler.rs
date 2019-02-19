@@ -134,7 +134,7 @@ impl StatusHandler {
             node.last_request_timestamp = SystemTime::now();
             P2pMgr::update_node(node.node_hash, node);
         } else {
-            BlockHeadersHandler::get_headers_from_random_node();
+            BlockHeadersHandler::get_headers_from_node(node);
         }
     }
 }

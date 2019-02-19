@@ -108,6 +108,11 @@ impl ActiveNodesHandler {
             for _i in 0..node_count[0] as u32 {
                 let mut node = Node::new();
 
+                if rest.len() < NODE_ID_LENGTH + IP_LENGTH + mem::size_of::<u32>() {
+                    warn!(target: "net", "Node {}@{} removed: Invalid active nodes response length!!", node.get_node_id(), node.get_ip_addr());
+                    P2pMgr::remove_peer(node.node_hash);
+                    return;
+                }
                 let (node_id, rest_body) = rest.split_at(NODE_ID_LENGTH);
                 let (ip, rest_body) = rest_body.split_at(IP_LENGTH);
                 let (mut port, next) = rest_body.split_at(mem::size_of::<u32>());

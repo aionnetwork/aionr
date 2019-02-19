@@ -42,6 +42,7 @@ const LARGE_REQUEST_SIZE: u64 = 48;
 pub struct BlockHeadersHandler;
 
 impl BlockHeadersHandler {
+    /*
     pub fn get_headers_from_random_node() {
         if let Some(mut node) = P2pMgr::get_an_active_node() {
             if node.synced_block_num == 0 {
@@ -50,6 +51,7 @@ impl BlockHeadersHandler {
             BlockHeadersHandler::get_headers_from_node(&mut node);
         }
     }
+    */
 
     pub fn get_headers_from_node(node: &mut Node) {
         trace!(target: "sync", "get_headers_from_node, node id: {}", node.get_node_id());
@@ -125,7 +127,9 @@ impl BlockHeadersHandler {
                 }
             };
 
-            if node.last_request_num != from {
+            if node.last_request_num == from {
+                return;
+            } else {
                 node.last_request_timestamp = SystemTime::now();
             }
             node.last_request_num = from;
