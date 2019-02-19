@@ -91,7 +91,7 @@ impl HandshakeHandler {
         let (revision_len, rest) = revision_version.split_at(1);
         let revision_len = revision_len[0] as usize;
         if rest.len() < revision_len + 1 {
-            warn!(target: "net", "Node {}@{} removed: Invalid node revision length!!", node.get_node_id(), node.get_ip_addr());
+            warn!(target: "net", "Node {}@{} removed: Invalid request node revision length!!", node.get_node_id(), node.get_ip_addr());
             P2pMgr::remove_peer(node.node_hash);
             return;
         }
@@ -99,7 +99,7 @@ impl HandshakeHandler {
         let (version_len, rest) = rest.split_at(1);
         let version_len = version_len[0] as usize;
         if rest.len() < version_len {
-            warn!(target: "net", "Node {}@{} removed: Invalid node version length!!", node.get_node_id(), node.get_ip_addr());
+            warn!(target: "net", "Node {}@{} removed: Invalid request node version length!!", node.get_node_id(), node.get_ip_addr());
             P2pMgr::remove_peer(node.node_hash);
             return;
         }
@@ -147,9 +147,22 @@ impl HandshakeHandler {
     pub fn handle_handshake_res(node: &mut Node, req: ChannelBuffer) {
         trace!(target: "net", "HANDSHAKERES received.");
 
+        if req.body.len() < 2 {
+            warn!(target: "net", "Node {}@{} removed: Invalid handshake response length!!", node.get_node_id(), node.get_ip_addr());
+            P2pMgr::remove_peer(node.node_hash);
+            return;
+        }
+
         let (_, revision) = req.body.split_at(1);
         let (revision_len, rest) = revision.split_at(1);
         let revision_len = revision_len[0] as usize;
+
+        if rest.len() < revision_len {
+            warn!(target: "net", "Node {}@{} removed: Invalid response node revision length!!", node.get_node_id(), node.get_ip_addr());
+            P2pMgr::remove_peer(node.node_hash);
+            return;
+        }
+
         let (revision, _rest) = rest.split_at(revision_len);
         if revision_len > MAX_REVISION_LENGTH {
             node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
