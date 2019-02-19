@@ -32,7 +32,7 @@ use aion_types::{H256, H264, U256};
 use encoded;
 use engines::epoch::{PendingTransition as PendingEpochTransition, Transition as EpochTransition};
 use error::BlockError;
-use header::Header;
+use header::{Header, Seal};
 use heapsize::HeapSizeOf;
 use kvdb::{DBTransaction, KeyValueDB};
 use parking_lot::{Mutex, RwLock};
@@ -435,7 +435,7 @@ impl HeaderChain {
 			self.live_epoch_proofs.write().insert(hash, transition);
 		}
 
-		let raw = header.encoded().into_inner();
+		let raw = header.rlp(Seal::Without);
 		transaction.put_vec(COL, &hash[..], raw);
 
 		// TODO: For engines when required, use cryptoeconomic guarantees.
