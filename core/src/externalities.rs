@@ -108,6 +108,8 @@ where B: StateBackend
     }
 }
 
+use state::AVMInterface;
+
 impl<'a, B: 'a> AVMExt for AVMExternalities<'a, B>
 where B: StateBackend
 {
@@ -115,9 +117,17 @@ where B: StateBackend
 
     fn depth(&self) -> usize { self.depth }
 
-    fn create_account(&mut self, address: &Address) { unimplemented!() }
+    fn create_account(&mut self, a: &Address) {
+        self.state
+            .new_avm_account(a)
+            .expect("create avm account failed");
+    }
 
-    fn account_exists(&self, address: &Address) -> bool { unimplemented!() }
+    fn account_exists(&self, a: &Address) -> bool {
+        self.state
+            .check_avm_acc_exists(a)
+            .expect("check avm account failed")
+    }
 
     fn save_code(&mut self, address: &Address, code: Vec<u8>) {
         println!("AVMExt save code");
@@ -135,24 +145,54 @@ where B: StateBackend
     }
 
     fn sstore(&mut self, a: &Address, key: &Vec<u8>, value: Vec<u8>) {
-        // self.state
-        //     .set_storage(a, key, value)
-        //     .expect("Fatal error occured when set storage");
+        self.state
+            .set_avm_storage(a, key, value)
+            .expect("Fatal error occured when set storage");
     }
 
-    fn sload(&self, address: &Address, key: &Vec<u8>) -> Option<Vec<u8>> { unimplemented!() }
+    fn sload(&self, a: &Address, key: &Vec<u8>) -> Option<Vec<u8>> {
+        match self.state.get_avm_storage(a, key) {
+            Ok(value) => Some(value),
+            Err(x) => None,
+        }
+    }
 
-    fn remove_account(&mut self, address: &Address) { unimplemented!() }
+    fn remove_account(&mut self, a: &Address) {
+        self.state
+            .remove_avm_account(a)
+            .expect("remove avm account failed");
+    }
 
-    fn avm_balance(&self, address: &Address) -> U256 { unimplemented!() }
+    fn avm_balance(&self, a: &Address) -> U256 {
+        self.state
+            .balance(a)
+            .expect("Fatal error during get balance")
+    }
 
-    fn inc_balance(&mut self, address: &Address, inc: &U256) { unimplemented!() }
+    fn inc_balance(&mut self, a: &Address, value: &U256) {
+        self.state
+            .add_balance(a, value, CleanupMode::NoEmpty)
+            .expect("add balance failed");
 
-    fn dec_balance(&mut self, address: &Address, dec: &U256) { unimplemented!() }
+    }
 
-    fn get_nonce(&self, address: &Address) -> u64 { unimplemented!() }
+    fn dec_balance(&mut self, a: &Address, value: &U256) {
+        self.state
+            .sub_balance(a, value, &mut CleanupMode::NoEmpty)
+            .expect("decrease balance failed")
+    }
 
-    fn inc_nonce(&mut self, address: &Address) { unimplemented!() }
+    fn get_nonce(&self, a: &Address) -> u64 {
+        self.state
+            .nonce(a)
+            .expect("get nonce failed").low_u64()
+    }
+
+    fn inc_nonce(&mut self, a: &Address) {
+        self.state
+            .inc_nonce(a)
+            .expect("increment nonce failed")
+    }
 }
 
 /// Implementation of evm Externalities.

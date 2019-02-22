@@ -58,6 +58,7 @@ struct AccountCache {
     // When changing the type of the values here, be sure to update `mem_used` and
     // `new`.
     accounts: LruCache<Address, Option<Account>>,
+    avm_accounts: LruCache<Address, Option<AVMAccount>>,
     /// Information on the modifications in recently committed blocks; specifically which addresses
     /// changed in which block. Ordered by block number.
     modifications: VecDeque<BlockChanges>,
@@ -139,6 +140,7 @@ impl StateDB {
             db: db,
             account_cache: Arc::new(Mutex::new(AccountCache {
                 accounts: LruCache::new(cache_items),
+                avm_accounts: LruCache::new(cache_items),
                 modifications: VecDeque::new(),
             })),
             code_cache: Arc::new(Mutex::new(MemoryLruCache::new(code_cache_size))),
@@ -495,6 +497,15 @@ impl state::Backend for StateDB {
         cache.accounts.get_mut(a).map(|c| f(c.as_mut()))
     }
 
+    fn get_avm_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
+    where F: FnOnce(Option<&mut AVMAccount>) -> U {
+        let mut cache = self.account_cache.lock();
+        if !Self::is_allowed(a, &self.parent_hash, &cache.modifications) {
+            return None;
+        }
+        cache.avm_accounts.get_mut(a).map(|c| f(c.as_mut()))
+    }
+
     fn note_non_null_account(&self, address: &Address) {
         trace!(target: "account_bloom", "Note account bloom: {:?}", address);
         let mut bloom = self.account_bloom.lock();
@@ -510,12 +521,12 @@ impl state::Backend for StateDB {
 }
 
 impl<'a> state::AVMBackend<'a> for StateDB {
-    fn get_cached_account(&self, addr: &Address) -> Option<Option<AVMAccount<'a>>> {
+    fn get_cached_account(&self, addr: &Address) -> Option<Option<AVMAccount>> {
         unimplemented!()
     }
 
     fn get_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
-    where F: FnOnce(Option<&mut AVMAccount<'a>>) -> U {
+    where F: FnOnce(Option<&mut AVMAccount>) -> U {
         unimplemented!()
     }
 }

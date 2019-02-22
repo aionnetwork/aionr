@@ -62,6 +62,9 @@ pub trait Backend: Send {
     fn get_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
     where F: FnOnce(Option<&mut Account>) -> U;
 
+    fn get_avm_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
+    where F: FnOnce(Option<&mut AVMAccount>) -> U;
+
     /// Get cached code based on hash.
     fn get_cached_code(&self, hash: &H256) -> Option<Arc<Vec<u8>>>;
 
@@ -75,9 +78,9 @@ pub trait Backend: Send {
 
 /// State backend for AVM. See module docs for more details.
 pub trait AVMBackend<'a>: Backend + Send {
-    fn get_cached_account(&self, addr: &Address) -> Option<Option<AVMAccount<'a>>>;
+    fn get_cached_account(&self, addr: &Address) -> Option<Option<AVMAccount>>;
     fn get_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
-    where F: FnOnce(Option<&mut AVMAccount<'a>>) -> U;
+    where F: FnOnce(Option<&mut AVMAccount>) -> U;
 }
 
 /// A raw backend used to check proofs of execution.
@@ -121,6 +124,10 @@ impl Backend for ProofCheck {
     fn get_cached_account(&self, _addr: &Address) -> Option<Option<Account>> { None }
     fn get_cached<F, U>(&self, _a: &Address, _f: F) -> Option<U>
     where F: FnOnce(Option<&mut Account>) -> U {
+        None
+    }
+    fn get_avm_cached<F, U>(&self, _a: &Address, _f: F) -> Option<U>
+    where F: FnOnce(Option<&mut AVMAccount>) -> U {
         None
     }
     fn get_cached_code(&self, _hash: &H256) -> Option<Arc<Vec<u8>>> { None }
@@ -186,6 +193,11 @@ impl<H: AsHashStore + Send + Sync> Backend for Proving<H> {
         None
     }
 
+    fn get_avm_cached<F, U>(&self, _: &Address, _: F) -> Option<U>
+    where F: FnOnce(Option<&mut AVMAccount>) -> U {
+        None
+    }
+
     fn get_cached_code(&self, _: &H256) -> Option<Arc<Vec<u8>>> { None }
     fn note_non_null_account(&self, _: &Address) {}
     fn is_known_null(&self, _: &Address) -> bool { false }
@@ -234,6 +246,11 @@ impl<H: AsHashStore + Send + Sync> Backend for Basic<H> {
 
     fn get_cached<F, U>(&self, _: &Address, _: F) -> Option<U>
     where F: FnOnce(Option<&mut Account>) -> U {
+        None
+    }
+
+    fn get_avm_cached<F, U>(&self, _: &Address, _: F) -> Option<U>
+    where F: FnOnce(Option<&mut AVMAccount>) -> U {
         None
     }
 

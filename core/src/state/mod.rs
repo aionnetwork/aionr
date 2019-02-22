@@ -61,8 +61,8 @@ mod avm_account;
 
 pub mod backend;
 
+pub use self::avm_account::{AVMInterface, AVMAccount, AVMAccMgr};
 pub use self::account::Account;
-pub use self::avm_account::AVMAccount;
 pub use self::backend::{Backend, AVMBackend};
 pub use self::substate::Substate;
 
@@ -312,6 +312,9 @@ pub struct State<B: Backend> {
     account_start_nonce: U256,
     factories: Factories,
     kvdb: Arc<KeyValueDB>,
+
+    // avm account info
+    avm_mgr: AVMAccMgr,
 }
 
 #[derive(Copy, Clone)]
@@ -360,6 +363,7 @@ impl<B: Backend> State<B> {
             account_start_nonce: account_start_nonce,
             factories: factories,
             kvdb: kvdb,
+            avm_mgr: AVMAccMgr::new()
         }
     }
 
@@ -384,6 +388,7 @@ impl<B: Backend> State<B> {
             account_start_nonce: account_start_nonce,
             factories: factories,
             kvdb: kvdb,
+            avm_mgr: AVMAccMgr::new(),
         };
 
         Ok(state)
@@ -405,6 +410,7 @@ impl<B: Backend> State<B> {
             account_start_nonce: self.account_start_nonce,
             factories: self.factories,
             kvdb: self.kvdb,
+            avm_mgr: AVMAccMgr::new(),
         }
     }
 
@@ -1375,7 +1381,74 @@ impl Clone for State<StateDB> {
             account_start_nonce: self.account_start_nonce.clone(),
             factories: self.factories.clone(),
             kvdb: self.kvdb.clone(),
+            avm_mgr: AVMAccMgr::new(),
         }
+    }
+}
+
+use std::borrow::BorrowMut;
+
+impl<B: Backend> AVMInterface for State<B> {
+
+    fn new_avm_account(&mut self, a: &Address) -> trie::Result<()> {
+        self.avm_mgr.new_account(a);
+        Ok(())
+    }
+
+    fn check_avm_acc_exists(&self, a: &Address) -> trie::Result<bool> {
+       unimplemented!()
+    }
+
+    fn set_avm_storage(&mut self, a: &Address, key: &Vec<u8>, value: Vec<u8>) -> trie::Result<()> {
+        //self.avm_mgr.set_storage(key, value);
+        unimplemented!()
+    }
+
+    fn get_avm_storage(&self, address: &Address, key: &Vec<u8>) -> trie::Result<Vec<u8>> {
+        let local_cache = self.avm_mgr.cache.borrow_mut();
+        let mut local_account = None;
+        let maybe_acc = local_cache.get(address);
+        match maybe_acc {
+            Some(account) => {
+                if let Some(value) = account.cached_storage_at(key) {
+                    return Ok(value);
+                } else {
+                    local_account = Some(account);
+                }
+            },
+            _ => return Ok(Vec::new())
+        }
+
+        let trie_res = self.db.get_avm_cached(address, |acc| {
+            match acc {
+                None => Ok(Vec::new()),
+                Some(a) => {
+                    let account_db = self
+                        .factories
+                        .accountdb
+                        .readonly(self.db.as_hashstore(), a.address_hash(address));
+                    a.storage_at(account_db.as_hashstore(), key)
+                }
+            }
+        });
+
+        if let Some(res) = trie_res {
+            return res;
+        }
+        
+        if let Some(ref mut acc) = local_account {
+                let account_db = self
+                    .factories
+                    .accountdb
+                    .readonly(self.db.as_hashstore(), acc.address_hash(address));
+                return acc.storage_at(account_db.as_hashstore(), key);
+        } else {
+            return Ok(Vec::new());
+        }
+    }
+
+    fn remove_avm_account(&mut self, a: &Address) -> trie::Result<()> {
+        unimplemented!()
     }
 }
 
