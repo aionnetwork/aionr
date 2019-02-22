@@ -28,12 +28,12 @@ use state::Storage;
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
-use tokio::runtime::{Runtime, TaskExecutor};
+use tokio::runtime::{Builder, TaskExecutor, Runtime};
 
 lazy_static! {
     static ref BLOCK_CHAIN: Storage<RwLock<BlockChain>> = Storage::new();
     static ref BLOCK_HEADER_CHAIN: Storage<HeaderChain> = Storage::new();
-    static ref SYNC_EXECUTORS: Storage<RwLock<Runtime>> = Storage::new();
+    static ref SYNC_RUNTIME: Storage<RwLock<Runtime>> = Storage::new();
     static ref LOCAL_STATUS: RwLock<LocalStatus> = RwLock::new(LocalStatus::new());
     static ref NETWORK_STATUS: Storage<RwLock<NetworkStatus>> = Storage::new();
     static ref DOWNLOADED_HEADERS: Storage<Mutex<VecDeque<BlockHeader>>> = Storage::new();
@@ -70,6 +70,13 @@ impl SyncStorage {
             };
 
             let block_header_chain = HeaderChain::new(db, &spec).unwrap();
+            SYNC_RUNTIME.set(RwLock::new(
+                Builder::new()
+                    .core_threads(6)
+                    .name_prefix("SYNC-Task")
+                    .build()
+                    .expect("Tokio Runtime"),
+            ));
 
             NETWORK_STATUS.set(RwLock::new(NetworkStatus::new()));
             DOWNLOADED_HEADERS.set(Mutex::new(VecDeque::new()));
@@ -78,7 +85,6 @@ impl SyncStorage {
             HEADERS_WITH_BODIES_REQUESTED.set(Mutex::new(HashMap::new()));
 
             BLOCK_CHAIN.set(RwLock::new(block_chain));
-            SYNC_EXECUTORS.set(RwLock::new(Runtime::new().expect("Tokio Runtime")));
             BLOCK_HEADER_CHAIN.set(block_header_chain);
             LIGHT_CLIENT.set(RwLock::new(LightClient::new("./data")));
         }
@@ -94,13 +100,16 @@ impl SyncStorage {
             .expect("get_client")
     }
 
-    pub fn get_executor() -> TaskExecutor {
-        let rt = SYNC_EXECUTORS.get().read().expect("get_executor");
-        rt.executor()
-    }
-
     pub fn get_block_header_chain() -> &'static HeaderChain {
         BLOCK_HEADER_CHAIN.get()
+    }
+
+    pub fn get_sync_executor() -> TaskExecutor {
+        SYNC_RUNTIME
+            .get()
+            .write()
+            .expect("Tokio Runtime")
+            .executor()
     }
 
     pub fn set_starting_block_number(starting_block_number: u64) {
@@ -167,7 +176,7 @@ impl SyncStorage {
         }
         0
     }
-    
+
     pub fn get_downloaded_headers() -> &'static Mutex<VecDeque<BlockHeader>> {
         DOWNLOADED_HEADERS.get()
     }

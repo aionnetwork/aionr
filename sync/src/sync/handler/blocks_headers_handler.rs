@@ -156,7 +156,7 @@ impl BlockHeadersHandler {
         if !headers.is_empty() {
             node.inc_reputation(10);
             let node_ip = node.get_ip_addr();
-            let executor = SyncStorage::get_executor();
+            let executor = SyncStorage::get_sync_executor();
             executor.spawn(lazy(move || {
                 Self::import_block_header(headers, node_ip);
                 Ok(())

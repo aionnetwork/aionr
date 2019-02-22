@@ -27,7 +27,6 @@ use kvdb::KeyValueDB;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
-use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 
 use net::handler::default_handler::DefaultHandler;
@@ -65,7 +64,9 @@ const REQUEST_SIZE: u64 = 96;
 struct SyncMgr;
 
 impl SyncMgr {
-    fn enable(executor: &TaskExecutor) {
+    fn enable() {
+        let executor = SyncStorage::get_sync_executor();
+
         let status_req_task =
             Interval::new(Instant::now(), Duration::from_secs(STATUS_REQ_INTERVAL))
                 .for_each(move |_| {
@@ -241,6 +242,7 @@ impl SyncMgr {
                                 BlockHeadersHandler::handle_blocks_headers_req(node, req);
                             }
                             SyncAction::BLOCKSHEADERSRES => {
+
                                 BlockHeadersHandler::handle_blocks_headers_res(node, req);
                             }
                             SyncAction::BLOCKSBODIESREQ => {
@@ -434,7 +436,6 @@ impl NetworkManager for Sync {
     fn deny_unreserved_peers(&self) {}
 
     fn start_network(&self) {
-        let executor = SyncStorage::get_executor();
         let sync_handler = DefaultHandler {
             callback: SyncMgr::handle,
         };
@@ -442,10 +443,10 @@ impl NetworkManager for Sync {
         P2pMgr::enable(self.network_config());
         debug!(target: "sync", "###### P2P enabled... ######");
 
-        NetManager::enable(&executor, sync_handler);
+        NetManager::enable(sync_handler);
         debug!(target: "sync", "###### network enabled... ######");
 
-        SyncMgr::enable(&executor);
+        SyncMgr::enable();
         debug!(target: "sync", "###### SYNC enabled... ######");
     }
 

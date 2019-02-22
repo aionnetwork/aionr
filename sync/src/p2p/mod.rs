@@ -22,21 +22,18 @@ use acore_bytes::to_hex;
 use bincode::config;
 use bytes::BytesMut;
 use futures::sync::mpsc;
-use futures::future::lazy;
 use futures::{Future, Stream};
 use rand::{thread_rng, Rng};
 use socket2::{Domain, Socket, Type};
 use state::Storage;
 use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
 use std::hash::{Hash, Hasher};
+use std::io;
 use std::net::{Shutdown, TcpListener as StdTcpListener, TcpStream as StdTcpStream};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::RwLock;
 use std::time::Duration;
-use std::io;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
-use tokio::runtime::TaskExecutor;
 use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_reactor::Handle;
 use tokio_threadpool::{Builder, ThreadPool};
@@ -57,7 +54,6 @@ lazy_static! {
     static ref SOCKETS_MAP: RwLock<HashMap<u64, StdTcpStream>> = { RwLock::new(HashMap::new()) };
     static ref GLOBAL_NODES_MAP: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
     static ref TOP16_NODE_HASHES: RwLock<Vec<u64>> = { RwLock::new(Vec::new()) };
-    static ref ENABLED: Storage<AtomicBool> = Storage::new();
     static ref TP: Storage<ThreadPool> = Storage::new();
 }
 
@@ -71,45 +67,37 @@ impl P2pMgr {
 
         local_node.net_id = cfg.net_id;
 
-        info!(target:"net","local node loaded: {}@{}", local_node.get_node_id(), local_node.get_ip_addr());
-
-        LOCAL_NODE.set(local_node.clone());
-
-        ENABLED.set(AtomicBool::new(true));
+        info!(target:"net","Local node: {}@{}.", local_node.get_node_id(), local_node.get_ip_addr());
+        LOCAL_NODE.set(local_node);
 
         TP.set(
             Builder::new()
                 .pool_size((cfg.max_peers * 3) as usize)
+                .name_prefix("P2P-Task")
                 .build(),
         );
 
         NETWORK_CONFIG.set(cfg);
     }
 
-    pub fn create_server(executor: &TaskExecutor, local_addr: String, handle: fn(node: &mut Node, req: ChannelBuffer)) {
-        executor.spawn(lazy(move || {
-            let listener = StdTcpListener::bind(local_addr).expect("Failed to bind");
+    pub fn create_server(local_addr: String, handle: fn(node: &mut Node, req: ChannelBuffer)) {
+        let listener = StdTcpListener::bind(local_addr).expect("Failed to bind");
 
-            info!(target: "net", "Listening on: {:?}", listener.local_addr());
+        info!(target: "net", "Listening on: {:?}", listener.local_addr());
 
-            for stream in listener.incoming() {
-                match stream {
-                    Ok(stream) => {
-                        Self::process_inbounds(stream, handle);
-                    }
-                    Err(e) => error!(target: "net", "Failed to accept socket; error = {:?}", e),
+        for stream in listener.incoming() {
+            match stream {
+                Ok(stream) => {
+                    Self::process_inbounds(stream, handle);
                 }
+                Err(e) => error!(target: "net", "Failed to accept socket; error = {:?}", e),
             }
-
-            Ok(())
-        }));
+        }
     }
 
     pub fn create_client(mut peer_node: Node, handle: fn(node: &mut Node, req: ChannelBuffer)) {
         let node_ip_addr = peer_node.get_ip_addr();
         if let Ok(addr) = node_ip_addr.parse() {
-            let thread_pool = Self::get_thread_pool();
-            let node_id = peer_node.get_node_id();
             if let Ok(socket) = Socket::new(Domain::ipv4(), Type::stream(), None) {
                 let std_stream = socket.into_tcp_stream();
                 peer_node.node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
@@ -125,6 +113,8 @@ impl P2pMgr {
                 }
 
                 if let Ok(std_stream_cloned) = std_stream.try_clone() {
+                    let thread_pool = Self::get_thread_pool();
+                    let node_id = peer_node.get_node_id();
                     let stream = TcpStream::connect_std(
                         std_stream_cloned,
                         &addr,
@@ -180,7 +170,6 @@ impl P2pMgr {
     }
 
     pub fn disable() {
-        ENABLED.get().store(false, Ordering::SeqCst);
         Self::reset();
     }
 
