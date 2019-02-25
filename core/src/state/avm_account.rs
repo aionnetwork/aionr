@@ -14,6 +14,7 @@ use kvdb::{HashStore};
 
 use std::cell::{RefCell, Cell};
 use super::backend::Backend;
+use super::{RequireCache, AccountState};
 
 const STORAGE_CACHE_ITEMS: usize = 8192;
 
@@ -52,6 +53,23 @@ pub struct AVMAccount {
     address_hash: Cell<Option<H256>>,
 }
 
+impl From<BasicAccount> for AVMAccount {
+    fn from(basic: BasicAccount) -> Self {
+        AVMAccount {
+            balance: basic.balance,
+            nonce: basic.nonce,
+            storage_root: basic.storage_root,
+            storage_cache: Self::empty_storage_cache(),
+            storage_changes: HashMap::new(),
+            code_hash: basic.code_hash,
+            code_size: None,
+            code_cache: Arc::new(vec![]),
+            code_filth: Filth::Clean,
+            address_hash: Cell::new(None),
+        }
+    }
+}
+
 impl<'a> AVMAccount {
     /// Create a new account with the given balance.
     pub fn new_basic(balance: U256, nonce: U256) -> AVMAccount {
@@ -68,11 +86,37 @@ impl<'a> AVMAccount {
             address_hash: Cell::new(None),
         }
     }
+
+    /// Create a new account from RLP.
+    pub fn from_rlp(rlp: &[u8]) -> AVMAccount {
+        let basic: BasicAccount = ::rlp::decode(rlp);
+        basic.into()
+    }
+}
+
+pub struct AVMAccountEntry {
+    account: Option<AVMAccount>,
+    old_balance: Option<U256>,
+    state: AccountState,
+}
+
+impl AVMAccountEntry {
+    pub fn new_clean(account: Option<AVMAccount>) -> AVMAccountEntry {
+        AVMAccountEntry {
+            old_balance: account.as_ref().map(|a| a.balance().clone()),
+            account: account,
+            state: AccountState::CleanFresh,
+        }
+    }
 }
 
 impl AVMAccount
 {
-    fn cache_given_code(&mut self, code: Arc<Bytes>) {
+    fn balance(&self) -> &U256 {
+        return &self.balance;
+    }
+
+    pub fn cache_given_code(&mut self, code: Arc<Bytes>) {
         trace!(
             target: "account",
             "Account::cache_given_code: ic={}; self.code_hash={:?}, self.code_cache={}",
@@ -85,6 +129,32 @@ impl AVMAccount
         self.code_cache = code;
     }
 
+    /// Provide a database to get `code_size`. Should not be called if it is a contract without code.
+    pub fn cache_code_size(&mut self, db: &HashStore) -> bool {
+        // TODO: fill out self.code_cache;
+        trace!(
+            target: "account",
+            "Account::cache_code_size: ic={}; self.code_hash={:?}, self.code_cache={}",
+            self.is_cached(),
+            self.code_hash,
+            self.code_cache.pretty()
+        );
+        self.code_size.is_some() || if self.code_hash != BLAKE2B_EMPTY {
+            match db.get(&self.code_hash) {
+                Some(x) => {
+                    self.code_size = Some(x.len());
+                    true
+                }
+                _ => {
+                    warn!(target: "account","Failed reverse get of {}", self.code_hash);
+                    false
+                }
+            }
+        } else {
+            false
+        }
+    }
+
     pub fn address_hash(&self, address: &Address) -> H256 {
         let hash = self.address_hash.get();
         hash.unwrap_or_else(|| {
@@ -94,9 +164,9 @@ impl AVMAccount
         })
     }
 
-    fn code_hash(&self) -> H256 { self.code_hash.clone() }
+    pub fn code_hash(&self) -> H256 { self.code_hash.clone() }
 
-    fn is_cached(&self) -> bool {
+    pub fn is_cached(&self) -> bool {
         !self.code_cache.is_empty()
             || (self.code_cache.is_empty() && self.code_hash == BLAKE2B_EMPTY)
     }
@@ -177,4 +247,13 @@ pub trait AVMInterface {
     fn set_avm_storage(&mut self, a: &Address, key: &Vec<u8>, value: Vec<u8>) -> trie::Result<()>;
     fn get_avm_storage(&self, a: &Address, key: &Vec<u8>) -> trie::Result<Vec<u8>>;
     fn remove_avm_account(&mut self, a: &Address) -> trie::Result<()>;
+    fn ensure_avm_cached<F, U>(
+        &self,
+        a: &Address,
+        require: RequireCache,
+        check_null: bool,
+        f: F,
+    ) -> trie::Result<U>
+    where
+        F: Fn(Option<&AVMAccount>) -> U;
 }
