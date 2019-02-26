@@ -34,13 +34,10 @@ extern crate rustc_hex;
 #[macro_use]
 extern crate serde_derive;
 extern crate serde;
-extern crate socket2;
 extern crate state;
 extern crate tokio;
 extern crate tokio_codec;
-extern crate tokio_reactor;
 extern crate tokio_threadpool;
-extern crate tokio_current_thread;
 
 extern crate blake2b;
 extern crate acore;

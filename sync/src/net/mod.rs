@@ -91,11 +91,11 @@ impl NetManager {
                 let node_hash = P2pMgr::calculate_hash(&boot_node.get_node_id());
                 if let Some(node) = P2pMgr::get_node(node_hash) {
                     if node.state_code == DISCONNECTED {
-                        info!(target: "net", "boot node reconnected: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
+                        trace!(target: "net", "boot node reconnected: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
                         Self::connet_peer(boot_node.clone());
                     }
                 } else {
-                    info!(target: "net", "boot node loaded: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
+                    trace!(target: "net", "boot node loaded: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
                     Self::connet_peer(boot_node.clone());
                 }
             }
@@ -146,7 +146,7 @@ impl NetManager {
     }
 
     fn connet_peer(peer_node: Node) {
-        info!(target: "net", "Try to connect to node {}", peer_node.get_ip_addr());
+        trace!(target: "net", "Try to connect to node {}", peer_node.get_ip_addr());
         let node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
         P2pMgr::remove_peer(node_hash);
         P2pMgr::create_client(peer_node, Self::handle);
