@@ -71,7 +71,7 @@ impl P2pMgr {
 
         TP.set(
             Builder::new()
-                .pool_size((cfg.max_peers * 3) as usize)
+                .pool_size((cfg.max_peers * 4) as usize)
                 .name_prefix("P2P-Task")
                 .build(),
         );
@@ -201,6 +201,7 @@ impl P2pMgr {
                                     warn!(target: "net", "Known node...");
                                 }
                                 None => {
+                                    trace!(target: "net", "A new peer added: {}@{}", node.get_node_id(), node.get_ip_addr());
                                     sockets_map.insert(node.node_hash, socket);
                                     peer_nodes.insert(node.node_hash, node);
                                     return;
@@ -221,17 +222,14 @@ impl P2pMgr {
         if let Ok(mut sockets_map) = SOCKETS_MAP.write() {
             if let Some(socket) = sockets_map.remove(&node_hash) {
                 if let Err(e) = socket.shutdown(Shutdown::Both) {
-                    trace!(target: "net", "remove_peer， invalid socket， {}", e);
+                    error!(target: "net", "remove_peer， invalid socket， {}", e);
                 }
             }
         }
         if let Ok(mut peer_nodes) = GLOBAL_NODES_MAP.write() {
-            // if let Some(node) = peer_nodes.remove(&node_hash) {
-            //     info!(target: "p2p", "Node {}@{} removed.", node.get_node_id(), node.get_ip_addr());
-            //     return Some(node);
-            // }
-            // info!(target: "net", "remove_peer， peer_node hash: {}", node_hash);
-            return peer_nodes.remove(&node_hash);
+            if let Some(node) = peer_nodes.remove(&node_hash) {
+                trace!(target: "net", "remove_peer， peer_node {}@{}", node.get_node_id(), node.get_ip_addr());
+            }
         }
 
         None
@@ -445,9 +443,7 @@ impl P2pMgr {
             let mut peer_node = Node::new_with_addr(peer_addr);
             let peer_ip = peer_node.ip_addr.get_ip();
             let network_config = P2pMgr::get_network_config();
-            if P2pMgr::get_nodes_count(ALIVE) < network_config.max_peers as usize
-                && !network_config.ip_black_list.contains(&peer_ip)
-            {
+            if !network_config.ip_black_list.contains(&peer_ip) {
                 let local_ip = P2pMgr::get_local_node().ip_addr.get_ip();
                 let mut value = peer_node.ip_addr.get_addr();
                 value.push_str(&local_ip);
@@ -494,10 +490,15 @@ impl P2pMgr {
                     io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")
                 }));
                 thread_pool.spawn(write.then(move |_| {
-                    P2pMgr::remove_peer(node_hash);
-                    trace!(target:"net", "Connection with {:?} closed.", peer_ip);
+                    info!(target:"net", "Connection with {} closed.", peer_addr);
+
                     Ok(())
                 }));
+            } else {
+                info!(target: "net", "Too many peers, the limitation is {}", network_config.max_peers);
+                if let Err(e) = socket.shutdown(Shutdown::Both) {
+                    error!(target: "net", "Invalid socket， {}", e);
+                }
             }
         } else {
             error!(target: "net", "Invalid socket: {:?}", socket);
@@ -519,7 +520,6 @@ impl P2pMgr {
         let raw_fd = socket.as_raw_fd();
         let std_stream = unsafe { StdTcpStream::from_raw_fd(raw_fd) };
         P2pMgr::add_peer(peer_node.clone(), std_stream);
-        trace!(target: "net", "A new peer added: {}@{}", peer_node.get_node_id(), peer_node.get_ip_addr());
         // process request from the outcoming stream
         let (sink, stream) = P2pMgr::split_frame(socket);
 

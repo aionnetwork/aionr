@@ -23,10 +23,10 @@ use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use std::mem;
 
-use version::short_version;
 use super::super::action::NetAction;
 use super::super::event::NetEvent;
 use p2p::*;
+use version::short_version;
 
 const VERSION: &str = "02";
 const REVISION_PREFIX: &str = "r-";
@@ -135,17 +135,18 @@ impl HandshakeHandler {
         let node_id_hash = P2pMgr::calculate_hash(&node.get_node_id());
         node.node_hash = node_id_hash;
         if P2pMgr::is_connected(node_id_hash) {
-            trace!(target: "net", "known node {}@{} ...", node.get_node_id(), node.get_ip_addr());
+            info!(target: "net", "known node {}@{} ...", node.get_node_id(), node.get_ip_addr());
+            P2pMgr::remove_peer(old_node_hash);
         } else {
             NetEvent::update_node_state(node, NetEvent::OnHandshakeReq);
             if let Some(socket) = P2pMgr::get_peer(old_node_hash) {
+                P2pMgr::remove_peer(old_node_hash);
                 P2pMgr::add_peer(node.clone(), socket);
             }
         }
         node.inc_reputation(1);
 
         P2pMgr::send(node.node_hash, res);
-        P2pMgr::remove_peer(old_node_hash);
     }
 
     pub fn handle_handshake_res(node: &mut Node, req: ChannelBuffer) {
