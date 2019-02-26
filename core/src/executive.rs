@@ -929,7 +929,7 @@ Address};
     use transaction::{Action, Transaction, SignedTransaction};
     use bytes::Bytes;
     use error::ExecutionError;
-    use avm_abi::{AbiToken, AVMEncoder};
+    use avm_abi::{AbiToken, AVMEncoder, ToBytes};
 
     fn make_aion_machine() -> EthereumMachine {
         let machine = ::ethereum::new_aion_test_machine();
@@ -2406,7 +2406,7 @@ Address};
         let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         file.push("src/tests/AVMDapps/com.example.helloworld.jar");
         let file_str = file.to_str().expect("Failed to locate the helloworld.jar");
-        let code = read_file(file_str).expect("unable to open avm dapp");
+        let mut code = read_file(file_str).expect("unable to open avm dapp");
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
         let address = contract_address(&sender, &U256::zero()).0;
         println!("sender = {:?}, receiver = {:?}", sender, address);
@@ -2415,7 +2415,9 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        let mut avm_code: Vec<u8> = (code.len() as u32).to_vm_bytes();
+        avm_code.append(&mut code);
+        params.code = Some(Arc::new(avm_code.clone()));
         params.value = ActionValue::Transfer(0.into());
         params.call_type = CallType::None;
         params.gas_price = 1.into();
@@ -2450,7 +2452,9 @@ Address};
         }
 
         params.call_type = CallType::Call;
-        params.data = Some(AbiToken::STRING("run".to_string()).encode());
+        let mut call_data = 6_i32.to_vm_bytes();
+        call_data.append(&mut AbiToken::STRING("run".to_string()).encode());
+        params.data = Some(call_data);
         println!("call data = {:?}", params.data);
         let substate = Substate::new();
         let execution_results = {

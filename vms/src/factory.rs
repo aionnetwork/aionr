@@ -176,6 +176,10 @@ impl Factory for FastVMFactory {
     }
 }
 
+const AVM_CREATE: i32 = 2;
+const AVM_CALL: i32 = 3;
+const AVM_BALANCE_TRANSFER: i32 = 4;
+
 #[derive(Clone)]
 pub struct AVMFactory {
     instance: AVM,
@@ -234,14 +238,11 @@ impl Factory for AVMFactory {
             let tx_hash = vec![0; 32];
             let depth = ext.depth() as i32;
             let kind = match params.call_type {
-                CallType::None => 2,
-                CallType::Call => execution_kind::CALL,
-                CallType::CallCode => execution_kind::CALLCODE,
-                CallType::DelegateCall => execution_kind::DELEGATECALL,
-                CallType::StaticCall => execution_kind::CALL,
+                CallType::None => AVM_CREATE,
+                _ => AVM_CALL,
             };
 
-            if kind == 2 {
+            if kind == AVM_CREATE {
                 call_data = code.clone();
             }
 
