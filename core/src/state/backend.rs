@@ -55,6 +55,8 @@ pub trait Backend: Send {
     /// Returns 'None' if cache is disabled or if the account is not cached.
     fn get_cached_account(&self, addr: &Address) -> Option<Option<Account>>;
 
+    fn get_avm_cached_account(&self, addr: &Address) -> Option<Option<AVMAccount>>;
+
     /// Get value from a cached account.
     /// `None` is passed to the closure if the account entry cached
     /// is known not to exist.
@@ -122,6 +124,7 @@ impl Backend for ProofCheck {
     fn add_to_account_cache(&mut self, _addr: Address, _data: Option<Account>, _modified: bool) {}
     fn cache_code(&self, _hash: H256, _code: Arc<Vec<u8>>) {}
     fn get_cached_account(&self, _addr: &Address) -> Option<Option<Account>> { None }
+    fn get_avm_cached_account(&self, _addr: &Address) -> Option<Option<AVMAccount>> { None }
     fn get_cached<F, U>(&self, _a: &Address, _f: F) -> Option<U>
     where F: FnOnce(Option<&mut Account>) -> U {
         None
@@ -188,6 +191,8 @@ impl<H: AsHashStore + Send + Sync> Backend for Proving<H> {
 
     fn get_cached_account(&self, _: &Address) -> Option<Option<Account>> { None }
 
+    fn get_avm_cached_account(&self, _addr: &Address) -> Option<Option<AVMAccount>> { None }
+
     fn get_cached<F, U>(&self, _: &Address, _: F) -> Option<U>
     where F: FnOnce(Option<&mut Account>) -> U {
         None
@@ -243,6 +248,8 @@ impl<H: AsHashStore + Send + Sync> Backend for Basic<H> {
     fn cache_code(&self, _: H256, _: Arc<Vec<u8>>) {}
 
     fn get_cached_account(&self, _: &Address) -> Option<Option<Account>> { None }
+
+    fn get_avm_cached_account(&self, _addr: &Address) -> Option<Option<AVMAccount>> { None }
 
     fn get_cached<F, U>(&self, _: &Address, _: F) -> Option<U>
     where F: FnOnce(Option<&mut Account>) -> U {

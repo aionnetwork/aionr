@@ -132,7 +132,7 @@ where B: StateBackend
     fn save_code(&mut self, address: &Address, code: Vec<u8>) {
         println!("AVMExt save code");
         self.state
-            .init_code(&self.origin_info[0].address, code)
+            .init_avm_code(address, code)
             .expect("save avm code should not fail");
     }
 

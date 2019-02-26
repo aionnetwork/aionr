@@ -482,6 +482,17 @@ impl state::Backend for StateDB {
             .map(|a| a.as_ref().map(|a| a.clone_basic()))
     }
 
+    fn get_avm_cached_account(&self, addr: &Address) -> Option<Option<AVMAccount>> {
+        let mut cache = self.account_cache.lock();
+        if !Self::is_allowed(addr, &self.parent_hash, &cache.modifications) {
+            return None;
+        }
+        cache
+            .avm_accounts
+            .get_mut(addr)
+            .map(|a| a.as_ref().map(|a| a.clone_basic()))
+    }
+
     fn get_cached_code(&self, hash: &H256) -> Option<Arc<Vec<u8>>> {
         let mut cache = self.code_cache.lock();
 

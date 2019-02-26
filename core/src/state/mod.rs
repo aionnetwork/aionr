@@ -90,7 +90,7 @@ pub enum ProvedExecution {
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 /// Account modification state. Used to check if the account was
 /// Modified in between commits and overall.
-enum AccountState {
+pub enum AccountState {
     /// Account was loaded from disk and never modified in this state object.
     CleanFresh,
     /// Account was loaded from the global cache and never modified.
@@ -318,7 +318,7 @@ pub struct State<B: Backend> {
 }
 
 #[derive(Copy, Clone)]
-enum RequireCache {
+pub enum RequireCache {
     None,
     CodeSize,
     Code,
@@ -414,6 +414,10 @@ impl<B: Backend> State<B> {
         }
     }
 
+    pub fn avm_mgr(&mut self) -> &mut AVMAccMgr {
+        &mut self.avm_mgr
+    }
+
     /// Create a recoverable checkpoint of this state.
     pub fn checkpoint(&mut self) { self.checkpoints.get_mut().push(HashMap::new()); }
 
@@ -476,10 +480,6 @@ impl<B: Backend> State<B> {
                 checkpoint.entry(*address).or_insert(old_value);
             }
         }
-    }
-
-    fn insert_avm_cache(&self, address: &Address, account: AVMAccountEntry) {
-        
     }
 
     fn note_cache(&self, address: &Address) {
@@ -815,6 +815,19 @@ impl<B: Backend> State<B> {
             a,
             true,
             || Account::new_contract(0.into(), self.account_start_nonce),
+            |_| {},
+        )?
+        .init_code(code);
+        Ok(())
+    }
+
+    /// Initialise the code of account `a` so that it is `code`.
+    /// NOTE: Account should have been created with `new_contract`.
+    pub fn init_avm_code(&mut self, a: &Address, code: Bytes) -> trie::Result<()> {
+        self.require_avm_or_from(
+            a,
+            true,
+            || AVMAccount::new_contract(0.into(), self.account_start_nonce),
             |_| {},
         )?
         .init_code(code);
@@ -1273,6 +1286,16 @@ impl<B: Backend> State<B> {
     }
 
     /// Pull account `a` in our cache from the trie DB. `require_code` requires that the code be cached, too.
+    fn require_avm<'a>(&'a self, a: &Address, require_code: bool) -> trie::Result<RefMut<'a, AVMAccount>> {
+        self.require_avm_or_from(
+            a,
+            require_code,
+            || AVMAccount::new_basic(0u8.into(), self.account_start_nonce),
+            |_| {},
+        )
+    }
+
+    /// Pull account `a` in our cache from the trie DB. `require_code` requires that the code be cached, too.
     /// If it doesn't exist, make account equal the evaluation of `default`.
     fn require_or_from<'a, F, G>(
         &'a self,
@@ -1334,6 +1357,74 @@ impl<B: Backend> State<B> {
                         );
                     }
                     account
+                }
+                _ => panic!("Required account must always exist; qed"),
+            }
+        }))
+    }
+
+    /// Pull account `a` in our cache from the trie DB. `require_code` requires that the code be cached, too.
+    /// If it doesn't exist, make account equal the evaluation of `default`.
+    fn require_avm_or_from<'a, F, G>(
+        &'a self,
+        a: &Address,
+        require_code: bool,
+        default: F,
+        not_default: G,
+    ) -> trie::Result<RefMut<'a, AVMAccount>>
+    where
+        F: FnOnce() -> AVMAccount,
+        G: FnOnce(&mut AVMAccount),
+    {
+        let contains_key = self.avm_mgr.cache.borrow().contains_key(a);
+        if !contains_key {
+            match self.db.get_avm_cached_account(a) {
+                Some(acc) => self.avm_mgr.insert_cache(a, AVMAccountEntry::new_clean_cached(acc)),
+                None => {
+                    let maybe_acc = if !self.db.is_known_null(a) {
+                        let db = self
+                            .factories
+                            .trie
+                            .readonly(self.db.as_hashstore(), &self.root)?;
+                        AVMAccountEntry::new_clean(db.get_with(a, AVMAccount::from_rlp)?)
+                    } else {
+                        AVMAccountEntry::new_clean(None)
+                    };
+                    self.avm_mgr.insert_cache(a, maybe_acc);
+                }
+            }
+        }
+        self.avm_mgr.note_cache(a);
+
+        // at this point the entry is guaranteed to be in the cache.
+        Ok(RefMut::map(self.avm_mgr.cache.borrow_mut(), |c| {
+            let entry = c
+                .get_mut(a)
+                .expect("entry known to exist in the cache; qed");
+
+            match &mut entry.account {
+                &mut Some(ref mut acc) => not_default(acc),
+                slot => *slot = Some(default()),
+            }
+
+            // set the dirty flag after changing account data.
+            entry.change_state(AccountState::Dirty);
+            match entry.account {
+                Some(ref mut account) => {
+                    if require_code {
+                        let addr_hash = account.address_hash(a);
+                        let accountdb = self
+                            .factories
+                            .accountdb
+                            .readonly(self.db.as_hashstore(), addr_hash);
+                        Self::update_avm_account_cache(
+                            RequireCache::Code,
+                            account,
+                            &self.db,
+                            accountdb.as_hashstore(),
+                        );
+                    }
+                   account
                 }
                 _ => panic!("Required account must always exist; qed"),
             }
@@ -1441,13 +1532,15 @@ impl<B: Backend> AVMInterface for State<B> {
         F: Fn(Option<&AVMAccount>) -> U,
     {
         // check local cache first
-        if let Some(ref mut account) = self.avm_mgr.cache.borrow_mut().get_mut(a) {
-            let accountdb = self
-                .factories
-                .accountdb
-                .readonly(self.db.as_hashstore(), account.address_hash(a));
-            Self::update_avm_account_cache(require, account, &self.db, accountdb.as_hashstore());
-            return Ok(f(Some(account)));
+        if let Some(ref mut maybe_acc) = self.avm_mgr.cache.borrow_mut().get_mut(a) {
+            if let Some(ref mut account) = maybe_acc.account {
+                let accountdb = self
+                    .factories
+                    .accountdb
+                    .readonly(self.db.as_hashstore(), account.address_hash(a));
+                Self::update_avm_account_cache(require, account, &self.db, accountdb.as_hashstore());
+                return Ok(f(Some(account)));
+            }
         }
         // check global cache
         let result = self.db.get_avm_cached(a, |mut acc| {
@@ -1487,7 +1580,7 @@ impl<B: Backend> AVMInterface for State<B> {
                     );
                 }
                 let r = f(maybe_acc.as_ref());
-                self.insert_avm_cache(a, AVMAccountEntry::new_clean(maybe_acc));
+                self.avm_mgr.insert_cache(a, AVMAccountEntry::new_clean(maybe_acc));
                 Ok(r)
             }
         }
@@ -1499,27 +1592,28 @@ impl<B: Backend> AVMInterface for State<B> {
     }
 
     fn check_avm_acc_exists(&self, a: &Address) -> trie::Result<bool> {
-       unimplemented!()
+       self.ensure_avm_cached(a, RequireCache::None, false, |a| a.is_some())
     }
 
     fn set_avm_storage(&mut self, a: &Address, key: &Vec<u8>, value: Vec<u8>) -> trie::Result<()> {
-        //self.avm_mgr.set_storage(key, value);
-        unimplemented!()
+        self.require_avm(a, false)?.set_storage(key, value);
+        Ok(())
     }
 
     fn get_avm_storage(&self, address: &Address, key: &Vec<u8>) -> trie::Result<Vec<u8>> {
         let local_cache = self.avm_mgr.cache.borrow_mut();
         let mut local_account = None;
-        let maybe_acc = local_cache.get(address);
-        match maybe_acc {
-            Some(account) => {
-                if let Some(value) = account.cached_storage_at(key) {
-                    return Ok(value);
-                } else {
-                    local_account = Some(account);
-                }
-            },
-            _ => return Ok(Vec::new())
+        if let Some(maybe_acc) = local_cache.get(address) {
+            match maybe_acc.account {
+                Some(ref account) => {
+                    if let Some(value) = account.cached_storage_at(key) {
+                        return Ok(value);
+                    } else {
+                        local_account = Some(account);
+                    }
+                },
+                _ => return Ok(Vec::new())
+            }
         }
 
         let trie_res = self.db.get_avm_cached(address, |acc| {
