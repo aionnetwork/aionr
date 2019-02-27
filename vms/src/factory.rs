@@ -270,7 +270,7 @@ impl Factory for AVMFactory {
 
         let inst = &mut self.instance;
         let ext_ptr: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(ext)) };
-        println!("ext ptr = {:?}", ext_ptr);
+        //println!("ext ptr = {:?}, avm contexts = {:?}", ext_ptr, avm_tx_contexts);
         let mut res = inst.execute(ext_ptr as i64, &avm_tx_contexts);
 
         let ext_post: &mut Box<Ext> = unsafe { ::std::mem::transmute(ext_ptr) };

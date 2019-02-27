@@ -13,7 +13,6 @@ use basic_account::BasicAccount;
 use kvdb::{HashStore};
 
 use std::cell::{RefCell, Cell};
-use super::backend::Backend;
 use super::{RequireCache, AccountState};
 
 const STORAGE_CACHE_ITEMS: usize = 8192;
@@ -27,7 +26,7 @@ pub enum Filth {
     Dirty,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct AVMAccount {
     // Balance of the account.
     balance: U256,
@@ -71,30 +70,7 @@ impl From<BasicAccount> for AVMAccount {
     }
 }
 
-impl<'a> AVMAccount {
-    /// Create a new account with the given balance.
-    pub fn new_basic(balance: U256, nonce: U256) -> AVMAccount {
-        AVMAccount {
-            balance: balance,
-            nonce: nonce,
-            storage_root: BLAKE2B_NULL_RLP,
-            storage_cache: Self::empty_storage_cache(),
-            storage_changes: HashMap::new(),
-            code_hash: BLAKE2B_EMPTY,
-            code_cache: Arc::new(vec![]),
-            code_size: Some(0),
-            code_filth: Filth::Clean,
-            address_hash: Cell::new(None),
-        }
-    }
-
-    /// Create a new account from RLP.
-    pub fn from_rlp(rlp: &[u8]) -> AVMAccount {
-        let basic: BasicAccount = ::rlp::decode(rlp);
-        basic.into()
-    }
-}
-
+#[derive(Debug)]
 pub struct AVMAccountEntry {
     pub account: Option<AVMAccount>,
     old_balance: Option<U256>,
@@ -137,8 +113,47 @@ impl AVMAccountEntry {
 
 impl AVMAccount
 {
-    fn balance(&self) -> &U256 {
+    /// Create a new account with the given balance.
+    pub fn new_basic(balance: U256, nonce: U256) -> AVMAccount {
+        AVMAccount {
+            balance: balance,
+            nonce: nonce,
+            storage_root: BLAKE2B_NULL_RLP,
+            storage_cache: Self::empty_storage_cache(),
+            storage_changes: HashMap::new(),
+            code_hash: BLAKE2B_EMPTY,
+            code_cache: Arc::new(vec![]),
+            code_size: Some(0),
+            code_filth: Filth::Clean,
+            address_hash: Cell::new(None),
+        }
+    }
+
+    /// Create a new account from RLP.
+    pub fn from_rlp(rlp: &[u8]) -> AVMAccount {
+        let basic: BasicAccount = ::rlp::decode(rlp);
+        basic.into()
+    }
+
+    pub fn balance(&self) -> &U256 {
         return &self.balance;
+    }
+
+    /// return the nonce associated with this account.
+    pub fn nonce(&self) -> &U256 { &self.nonce }
+
+    /// Increment the nonce of the account by one.
+    pub fn inc_nonce(&mut self) { self.nonce = self.nonce + U256::from(1u8); }
+
+    /// Increase account balance.
+    pub fn add_balance(&mut self, x: &U256) { self.balance = self.balance + *x; }
+
+    /// Decrease account balance.
+    /// Panics if balance is less than `x`
+    pub fn sub_balance(&mut self, x: &U256) {
+        println!("balance = {:?}, decrement = {:?}", self.balance, *x);
+        assert!(self.balance >= *x);
+        self.balance = self.balance - *x;
     }
 
     /// Set this account's code to the given code.
@@ -148,6 +163,18 @@ impl AVMAccount
         self.code_cache = Arc::new(code);
         self.code_size = Some(self.code_cache.len());
         self.code_filth = Filth::Dirty;
+    }
+
+    /// returns the account's code. If `None` then the code cache isn't available -
+    /// get someone who knows to call `note_code`.
+    pub fn code(&self) -> Option<Arc<Bytes>> {
+        // [FZH] to understand why 'self.code_hash != BLAKE2B_EMPTY'
+        // if self.code_hash != BLAKE2B_EMPTY && self.code_cache.is_empty() {
+        if self.code_cache.is_empty() {
+            return None;
+        }
+
+        Some(self.code_cache.clone())
     }
 
     pub fn cache_given_code(&mut self, code: Arc<Bytes>) {
@@ -233,6 +260,7 @@ impl AVMAccount
     }
 
     pub fn cached_storage_at(&self, key: &Vec<u8>) -> Option<Vec<u8>> {
+        println!("search storage_changes: {:?}", self.storage_changes);
         if let Some(value) = self.storage_changes.get(key) {
             return Some(value.clone());
         }
@@ -247,6 +275,7 @@ impl AVMAccount
     }
 
     pub fn storage_at(&self, db: &HashStore, key: &Vec<u8>) -> trie::Result<Vec<u8>> {
+        println!("get storage: key = {:?}", key);
         if let Some(value) = self.cached_storage_at(key) {
             return Ok(value);
         }
@@ -260,8 +289,10 @@ impl AVMAccount
     }
 
     /// Set (and cache) the contents of the trie's storage at `key` to `value`.
-    pub fn set_storage(&mut self, key: &Bytes, value: Bytes) {
-        self.storage_changes.insert(key.clone(), value);
+    pub fn set_storage(&mut self, key: Bytes, value: Bytes) {
+        //println!("insert cached storage: key = {:?}, value = {:?}", key, value);
+        self.storage_changes.insert(key, value);
+        println!("storage_changes = {:?}", self.storage_changes);
     }
 
     /// Clone basic account data
@@ -300,12 +331,14 @@ impl AVMAccount
 
 pub struct AVMAccMgr {
     pub cache: RefCell<HashMap<Address, AVMAccountEntry>>,
+    pub checkpoints: RefCell<Vec<HashMap<Address, Option<AVMAccountEntry>>>>,
 }
 
 impl AVMAccMgr {
     pub fn new() -> Self {
         AVMAccMgr {
             cache: RefCell::new(HashMap::new()),
+            checkpoints: RefCell::new(Vec::new()),
         }
     }
     pub fn new_account(&mut self, address: &Address) {
@@ -330,7 +363,7 @@ impl AVMAccMgr {
 pub trait AVMInterface {
     fn new_avm_account(&mut self, a: &Address) -> trie::Result<()>;
     fn check_avm_acc_exists(&self, a: &Address) -> trie::Result<bool>;
-    fn set_avm_storage(&mut self, a: &Address, key: &Vec<u8>, value: Vec<u8>) -> trie::Result<()>;
+    fn set_avm_storage(&mut self, a: &Address, key: Vec<u8>, value: Vec<u8>) -> trie::Result<()>;
     fn get_avm_storage(&self, a: &Address, key: &Vec<u8>) -> trie::Result<Vec<u8>>;
     fn remove_avm_account(&mut self, a: &Address) -> trie::Result<()>;
     fn ensure_avm_cached<F, U>(

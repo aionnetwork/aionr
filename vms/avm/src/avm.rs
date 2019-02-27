@@ -270,7 +270,7 @@ pub trait AVMExt {
     fn account_exists(&self, address: &Address) -> bool;
     fn save_code(&mut self, address: &Address, code: Vec<u8>);
     fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>>;
-    fn sstore(&mut self, address: &Address, key: &Vec<u8>, value: Vec<u8>);
+    fn sstore(&mut self, address: &Address, key: Vec<u8>, value: Vec<u8>);
     fn sload(&self, address: &Address, key: &Vec<u8>) -> Option<Vec<u8>>;
     fn remove_account(&mut self, address: &Address);
     fn avm_balance(&self, address: &Address) -> U256;

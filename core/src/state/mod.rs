@@ -550,9 +550,25 @@ impl<B: Backend> State<B> {
         })
     }
 
+    /// Get the balance of account `a`.
+    pub fn avm_balance(&self, a: &Address) -> trie::Result<U256> {
+        self.ensure_avm_cached(a, RequireCache::None, true, |a| {
+            a.as_ref()
+                .map_or(U256::zero(), |account| *account.balance())
+        })
+    }
+
     /// Get the nonce of account `a`.
     pub fn nonce(&self, a: &Address) -> trie::Result<U256> {
         self.ensure_cached(a, RequireCache::None, true, |a| {
+            a.as_ref()
+                .map_or(self.account_start_nonce, |account| *account.nonce())
+        })
+    }
+
+    /// Get the nonce of account `a`.
+    pub fn avm_nonce(&self, a: &Address) -> trie::Result<U256> {
+        self.ensure_avm_cached(a, RequireCache::None, true, |a| {
             a.as_ref()
                 .map_or(self.account_start_nonce, |account| *account.nonce())
         })
@@ -722,6 +738,12 @@ impl<B: Backend> State<B> {
         })
     }
 
+    pub fn avm_code(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
+        self.ensure_avm_cached(a, RequireCache::Code, true, |a| {
+            a.as_ref().map_or(None, |a| a.code().clone())
+        })
+    }
+
     /// Get an account's code hash.
     pub fn code_hash(&self, a: &Address) -> trie::Result<H256> {
         self.ensure_cached(a, RequireCache::None, true, |a| {
@@ -757,6 +779,26 @@ impl<B: Backend> State<B> {
         Ok(())
     }
 
+    pub fn add_avm_balance(
+        &mut self,
+        a: &Address,
+        incr: &U256,
+        cleanup_mode: CleanupMode,
+    ) -> trie::Result<()>
+    {
+        debug!(target: "state", "add_balance({}, {}): {}", a, incr, self.balance(a)?);
+        let is_value_transfer = !incr.is_zero();
+        if is_value_transfer || (cleanup_mode == CleanupMode::ForceCreate && !self.exists(a)?) {
+            self.require_avm(a, false)?.add_balance(incr);
+        } else if let CleanupMode::TrackTouched(set) = cleanup_mode {
+            if self.check_avm_acc_exists(a)? {
+                set.insert(*a);
+                self.touch_avm(a)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Subtract `decr` from the balance of account `a`.
     pub fn sub_balance(
         &mut self,
@@ -768,6 +810,24 @@ impl<B: Backend> State<B> {
         debug!(target: "state", "sub_balance({}, {}): {}", a, decr, self.balance(a)?);
         if !decr.is_zero() || !self.exists(a)? {
             self.require(a, false)?.sub_balance(decr);
+        }
+        if let CleanupMode::TrackTouched(ref mut set) = *cleanup_mode {
+            set.insert(*a);
+        }
+        Ok(())
+    }
+
+    /// Subtract `decr` from the balance of account `a`.
+    pub fn sub_avm_balance(
+        &mut self,
+        a: &Address,
+        decr: &U256,
+        cleanup_mode: &mut CleanupMode,
+    ) -> trie::Result<()>
+    {
+        debug!(target: "state", "sub_balance({}, {}): {}", a, decr, self.balance(a)?);
+        if !decr.is_zero() || !self.check_avm_acc_exists(a)? {
+            self.require_avm(a, false)?.sub_balance(decr);
         }
         if let CleanupMode::TrackTouched(ref mut set) = *cleanup_mode {
             set.insert(*a);
@@ -792,6 +852,11 @@ impl<B: Backend> State<B> {
     /// Increment the nonce of account `a` by 1.
     pub fn inc_nonce(&mut self, a: &Address) -> trie::Result<()> {
         self.require(a, false).map(|mut x| x.inc_nonce())
+    }
+
+    /// Increment the nonce of account `a` by 1.
+    pub fn inc_avm_nonce(&mut self, a: &Address) -> trie::Result<()> {
+        self.require_avm(a, false).map(|mut x| x.inc_nonce())
     }
 
     /// Mutate storage of account `a` so that it is `value` for `key`.
@@ -968,6 +1033,11 @@ impl<B: Backend> State<B> {
 
     fn touch(&mut self, a: &Address) -> trie::Result<()> {
         self.require(a, false)?;
+        Ok(())
+    }
+
+    fn touch_avm(&mut self, a: &Address) -> trie::Result<()> {
+        self.require_avm(a, false)?;
         Ok(())
     }
 
@@ -1489,7 +1559,7 @@ impl<B: Backend> State<B> {
 }
 
 impl<B: Backend> fmt::Debug for State<B> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{:?}", self.cache.borrow()) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{:?}, {:?}", self.cache.borrow(), self.avm_mgr.cache.borrow()) }
 }
 
 // TODO: cloning for `State` shouldn't be possible in general; Remove this and use
@@ -1595,7 +1665,7 @@ impl<B: Backend> AVMInterface for State<B> {
        self.ensure_avm_cached(a, RequireCache::None, false, |a| a.is_some())
     }
 
-    fn set_avm_storage(&mut self, a: &Address, key: &Vec<u8>, value: Vec<u8>) -> trie::Result<()> {
+    fn set_avm_storage(&mut self, a: &Address, key: Vec<u8>, value: Vec<u8>) -> trie::Result<()> {
         self.require_avm(a, false)?.set_storage(key, value);
         Ok(())
     }

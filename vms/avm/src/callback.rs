@@ -132,6 +132,7 @@ pub extern fn avm_put_code(
     println!("avm_put_code, ext ptr = {:?}", handle);
     let ext_code: &[u8] =
         unsafe { ::std::slice::from_raw_parts(code.pointer, code.length as usize) };
+    println!("code = {:?}", ext_code);
     ext.save_code(addr, ext_code.to_vec());
 }
 
@@ -144,12 +145,14 @@ pub extern fn avm_get_code(handle: *const c_void, address: *const avm_address) -
 
     match ext.get_code(addr) {
         None => {
+            //println!("code is None");
             avm_bytes {
                 length: 0,
                 pointer: ptr::null_mut(),
             }
         }
         Some(code) => {
+            //println!("code = {:?}", code);
             avm_bytes {
                 length: code.len() as u32,
                 pointer: unsafe { mem::transmute(&code.as_slice()[0]) },
@@ -171,9 +174,12 @@ pub extern fn avm_put_storage(
     let key: &avm_bytes = unsafe { mem::transmute(key) };
     let value: &avm_bytes = unsafe { mem::transmute(value) };
 
-    println!("avm_put_storage: addr = 0x{:?}, key = {:?}, value = {:?}", addr, key, value);
+    let storage_key: Vec<u8> = (*key).into();
+    let storage_value: Vec<u8> = (*value).into();
 
-    ext.sstore(addr, &(*key).into(), (*value).into());
+    println!("avm_put_storage: addr = 0x{:?}, key = {:?}, value = {:?}", addr, storage_key, storage_value);
+
+    ext.sstore(addr, (*key).into(), (*value).into());
 }
 
 #[no_mangle]
@@ -270,9 +276,10 @@ pub extern fn avm_decrease_balance(
 pub extern fn avm_get_nonce(handle: *const c_void, address: *const avm_address) -> u64 {
     let ext: &mut Box<AVMExt> = unsafe {mem::transmute(handle)};
     let addr: &Address = unsafe {mem::transmute(address)};
+    let nonce = ext.get_nonce(addr);
 
-    println!("avm_get_nonce: 0x{:?}", addr);
-    return ext.get_nonce(addr);
+    println!("avm_get_nonce: 0x{:?} = {:?}", addr, nonce);
+    return nonce;
 }
 
 #[no_mangle]

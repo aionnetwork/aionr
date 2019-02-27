@@ -135,13 +135,13 @@ where B: StateBackend
 
     fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
         println!("AVM get code");
-        match self.state.code(address) {
+        match self.state.avm_code(address) {
             Ok(code) => code,
             Err(_x) => None,
         }
     }
 
-    fn sstore(&mut self, a: &Address, key: &Vec<u8>, value: Vec<u8>) {
+    fn sstore(&mut self, a: &Address, key: Vec<u8>, value: Vec<u8>) {
         self.state
             .set_avm_storage(a, key, value)
             .expect("Fatal error occured when set storage");
@@ -162,32 +162,32 @@ where B: StateBackend
 
     fn avm_balance(&self, a: &Address) -> U256 {
         self.state
-            .balance(a)
+            .avm_balance(a)
             .expect("Fatal error during get balance")
     }
 
     fn inc_balance(&mut self, a: &Address, value: &U256) {
         self.state
-            .add_balance(a, value, CleanupMode::NoEmpty)
+            .add_avm_balance(a, value, CleanupMode::NoEmpty)
             .expect("add balance failed");
 
     }
 
     fn dec_balance(&mut self, a: &Address, value: &U256) {
         self.state
-            .sub_balance(a, value, &mut CleanupMode::NoEmpty)
+            .sub_avm_balance(a, value, &mut CleanupMode::NoEmpty)
             .expect("decrease balance failed")
     }
 
     fn get_nonce(&self, a: &Address) -> u64 {
         self.state
-            .nonce(a)
+            .avm_nonce(a)
             .expect("get nonce failed").low_u64()
     }
 
     fn inc_nonce(&mut self, a: &Address) {
         self.state
-            .inc_nonce(a)
+            .inc_avm_nonce(a)
             .expect("increment nonce failed")
     }
 }

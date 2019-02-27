@@ -2423,10 +2423,10 @@ Address};
         params.gas_price = 1.into();
         let mut state = get_temp_state();
         state
-            .add_balance(&sender, &U256::from(1_000_000), CleanupMode::NoEmpty)
+            .add_avm_balance(&sender, &U256::from(5_000_000), CleanupMode::NoEmpty)
             .unwrap();
         state
-            .add_balance(&address, &U256::from(1_000_000), CleanupMode::NoEmpty)
+            .add_avm_balance(&address, &U256::from(1_000_000), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
         let machine = make_aion_machine();
@@ -2435,6 +2435,8 @@ Address};
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create_avm(vec![params.clone()], &mut [substate])
         };
+
+        println!("state after create = {:?}", state);
 
         for r in execution_results {
             let ExecutionResult {
@@ -2452,7 +2454,8 @@ Address};
         }
 
         params.call_type = CallType::Call;
-        let mut call_data = 6_i32.to_vm_bytes();
+        //let mut call_data = 6_i32.to_vm_bytes();
+        let mut call_data = Vec::new();
         call_data.append(&mut AbiToken::STRING("run".to_string()).encode());
         params.data = Some(call_data);
         params.nonce += 1;
