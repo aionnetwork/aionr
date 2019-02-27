@@ -366,8 +366,10 @@ dependencies = [
 name = "avm"
 version = "0.1.0"
 dependencies = [
+ "acore-bytes 0.1.0",
  "aion-types 0.1.0",
  "avm_abi 0.1.0",
+ "blake2b 0.1.0",
  "lazy_static 1.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-bigint 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",

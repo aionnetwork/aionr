@@ -52,7 +52,7 @@ pub use fastvm::vm::{
     Error
 };
 
-pub use avm::AVMExt;
+pub use avm::{AVMExt, AVMActionParams};
 
 pub use fastvm::basetypes::constants;
 

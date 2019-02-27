@@ -80,7 +80,6 @@ where B: StateBackend
     env_info: &'a EnvInfo,
     machine: &'a Machine,
     depth: usize,
-    origin_info: Vec<OriginInfo>,
     substates: &'a mut [Substate],
 }
 
@@ -93,7 +92,6 @@ where B: StateBackend
         env_info: &'a EnvInfo,
         machine: &'a Machine,
         depth: usize,
-        origin_info: Vec<OriginInfo>,
         substates: &'a mut [Substate],
     ) -> Self
     {
@@ -102,7 +100,6 @@ where B: StateBackend
             env_info: env_info,
             machine: machine,
             depth: depth,
-            origin_info: origin_info,
             substates: substates,
         }
     }

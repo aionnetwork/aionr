@@ -99,6 +99,7 @@ impl TransactionContext {
         block_timestamp: i64,
         block_nrglimit: u64,
         block_difficulty: Bytes,
+        nonce: u64,
     ) -> Self
     {
         TransactionContext {
@@ -106,7 +107,7 @@ impl TransactionContext {
             address: address.to_vec(),
             caller: caller.to_vec(),
             origin: origin.to_vec(),
-            nonce: 0, //TODO: update
+            nonce: nonce,
             value: call_value,
             data: call_data,
             energy_limit: nrg_limit,

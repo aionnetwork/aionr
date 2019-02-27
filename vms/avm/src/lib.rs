@@ -6,14 +6,20 @@ extern crate rjni;
 extern crate aion_types;
 extern crate vm_common;
 extern crate avm_abi;
-
-#[macro_use]
-extern crate lazy_static;
+extern crate acore_bytes as bytes;
+extern crate blake2b as hash;
 
 pub mod avm;
 pub mod callback;
 pub mod codec;
 pub mod types;
 
-pub use avm::AVM;
-pub use avm::AVMExt;
+pub use avm::{
+    AVM,
+    AVMExt,
+    AVMActionParams,
+};
+
+pub use types::{
+    TransactionContext as AVMTxContext
+};

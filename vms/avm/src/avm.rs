@@ -13,7 +13,10 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
 use types::{TransactionContext, TransactionResult};
-use vm_common::EnvInfo;
+use vm_common::{EnvInfo, CallType};
+use bytes::Bytes;
+use aion_types::{Address, U256, H256};
+use hash::{BLAKE2B_EMPTY};
 
 /// We keep a single JVM instance in the background, which will be shared
 /// among multiple threads. Before invoking any JNI methods, the executing
@@ -124,16 +127,6 @@ fn find_files(path: &Path, extension: &str) -> Result<Vec<String>, Error> {
 
     return Ok(result);
 }
-
-// use std::sync::Mutex;
-
-// lazy_static! {
-//     static ref EXT_HDLS: Mutex<Vec<i64>> = Mutex::new(vec![]);
-// }
-
-// fn push_handler(ext: i64) { EXT_HDLS.lock().unwrap().push(ext); }
-
-// fn pop_handler() -> i64 { EXT_HDLS.lock().unwrap().pop().unwrap_or(0) }
 
 /// Aion virtual machine
 #[derive(Clone)]
@@ -272,8 +265,6 @@ impl AVM {
     }
 }
 
-use aion_types::{Address, U256};
-
 pub trait AVMExt {
     fn create_account(&mut self, address: &Address);
     fn account_exists(&self, address: &Address) -> bool;
@@ -289,6 +280,63 @@ pub trait AVMExt {
     fn inc_nonce(&mut self, address: &Address);
     fn env_info(&self) -> &EnvInfo;
     fn depth(&self) -> usize;
+}
+
+// TODO: should be a trait, possible to avoid cloning everything from a Transaction(/View).
+/// Action (call/create) input params. Everything else should be specified in Externalities.
+#[derive(Clone, Debug)]
+pub struct AVMActionParams {
+    /// Address of currently executed code.
+    pub code_address: Address,
+    /// Hash of currently executed code.
+    pub code_hash: Option<H256>,
+    /// Receive address. Usually equal to code_address,
+    /// except when called using CALLCODE.
+    pub address: Address,
+    /// Sender of current part of the transaction.
+    pub sender: Address,
+    /// Transaction initiator.
+    pub origin: Address,
+    /// Gas paid up front for transaction execution
+    pub gas: U256,
+    /// Gas price.
+    pub gas_price: U256,
+    /// Transaction value.
+    pub value: U256,
+    /// Code being executed.
+    pub code: Option<Arc<Bytes>>,
+    /// Input data.
+    pub data: Option<Bytes>,
+    /// Type of call
+    pub call_type: CallType,
+    /// transaction hash
+    pub transaction_hash: H256,
+    /// original transaction hash
+    pub original_transaction_hash: H256,
+    /// Nonce
+    pub nonce: u64,
+}
+
+impl Default for AVMActionParams {
+    /// Returns default ActionParams initialized with zeros
+    fn default() -> AVMActionParams {
+        AVMActionParams {
+            code_address: Address::new(),
+            code_hash: Some(BLAKE2B_EMPTY),
+            address: Address::new(),
+            sender: Address::new(),
+            origin: Address::new(),
+            gas: U256::zero(),
+            gas_price: U256::zero(),
+            value: U256::zero(),
+            code: None,
+            data: None,
+            call_type: CallType::None,
+            transaction_hash: H256::default(),
+            original_transaction_hash: H256::default(),
+            nonce: 0,
+        }
+    }
 }
 
 #[cfg(test)]

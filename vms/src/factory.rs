@@ -27,12 +27,16 @@ use fastvm::context::{execution_kind, ExecutionContext, TransactionResult};
 use fastvm::vm::{Ext, ActionParams, ActionValue};
 use vm_common::{ExecutionResult, ExecStatus, CallType, ReturnData};
 use std::sync::Arc;
-use avm::{AVM, AVMExt};
+use avm::{
+    AVM,
+    AVMExt,
+    AVMActionParams
+};
 use avm::types::{TransactionContext as AVMTxContext, AvmStatusCode};
 
 pub trait Factory {
     fn exec(&mut self, params: Vec<ActionParams>, ext: &mut Ext) -> Vec<ExecutionResult>;
-    fn exec_v1(&mut self, params: Vec<ActionParams>, ext: &mut AVMExt) -> Vec<ExecutionResult>;
+    fn exec_v1(&mut self, params: Vec<AVMActionParams>, ext: &mut AVMExt) -> Vec<ExecutionResult>;
 }
 
 #[derive(Clone)]
@@ -171,7 +175,7 @@ impl Factory for FastVMFactory {
             },
         }]
     }
-    fn exec_v1(&mut self, params: Vec<ActionParams>, ext: &mut AVMExt) -> Vec<ExecutionResult> {
+    fn exec_v1(&mut self, params: Vec<AVMActionParams>, ext: &mut AVMExt) -> Vec<ExecutionResult> {
         unimplemented!()
     }
 }
@@ -197,7 +201,7 @@ impl Factory for AVMFactory {
     fn exec(&mut self, fvm_params: Vec<ActionParams>, ext: &mut Ext) -> Vec<ExecutionResult> {
         unimplemented!()
     }
-    fn exec_v1(&mut self, avm_params: Vec<ActionParams>, ext: &mut AVMExt) -> Vec<ExecutionResult> {
+    fn exec_v1(&mut self, avm_params: Vec<AVMActionParams>, ext: &mut AVMExt) -> Vec<ExecutionResult> {
         let mut avm_tx_contexts = Vec::new();
 
         for params in avm_params {
@@ -220,10 +224,7 @@ impl Factory for AVMFactory {
             let address = params.address;
             let caller = params.sender;
             let origin = params.origin;
-            let transfer_value = match params.value {
-                ActionValue::Transfer(val) => <[u8; 16]>::from(U128::from(val)),
-                ActionValue::Apparent(val) => <[u8; 16]>::from(U128::from(val)),
-            };
+            let transfer_value: [u8; 32] = params.value.into();
             let call_value = transfer_value.to_vec();
             debug!(target: "vm", "call_data = {:?}", call_data);
             debug!(target: "vm", "gas limit = {:?}", gas_limit);
@@ -245,6 +246,7 @@ impl Factory for AVMFactory {
             if kind == AVM_CREATE {
                 call_data = code.clone();
             }
+            let nonce = params.nonce;
 
             avm_tx_contexts.push(AVMTxContext::new(
                 tx_hash,
@@ -262,6 +264,7 @@ impl Factory for AVMFactory {
                 block_timestamp,
                 block_gas_limit,
                 block_difficulty,
+                nonce,
             ))
         }
 
