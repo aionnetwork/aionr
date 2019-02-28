@@ -2469,9 +2469,9 @@ Address};
         }
 
         params.call_type = CallType::Call;
-        let mut call_data = 6_i32.to_vm_bytes();
-        // let mut call_data = Vec::new();
-        call_data.append(&mut AbiToken::STRING("run".to_string()).encode());
+        //let mut call_data = 14_i32.to_vm_bytes();
+        let mut call_data = vec![0x72,0x75,0x6E,0x3C,0x3E];
+        //call_data.append(&mut AbiToken::STRING("run".to_string()).encode());
         params.data = Some(call_data);
         params.nonce += 1;
         println!("call data = {:?}", params.data);
