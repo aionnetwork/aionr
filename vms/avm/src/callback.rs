@@ -145,17 +145,17 @@ pub extern fn avm_get_code(handle: *const c_void, address: *const avm_address) -
 
     match ext.get_code(addr) {
         None => {
-            //println!("code is None");
-            avm_bytes {
-                length: 0,
-                pointer: ptr::null_mut(),
-            }
+            unsafe {new_null_bytes()}
         }
         Some(code) => {
-            //println!("code = {:?}", code);
-            avm_bytes {
-                length: code.len() as u32,
-                pointer: unsafe { mem::transmute(&code.as_slice()[0]) },
+            if code.len() == 0 {
+                unsafe {new_null_bytes()}
+            } else {
+                unsafe {
+                    let ret = new_fixed_bytes(code.len() as u32);
+                    ptr::copy(&code.as_slice()[0], ret.pointer, code.len());
+                    ret
+                }
             }
         }
     }
