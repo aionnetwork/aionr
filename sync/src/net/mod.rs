@@ -115,7 +115,6 @@ impl NetManager {
         let local_node_id_hash = P2pMgr::calculate_hash(&local_node.get_node_id());
         let network_config = P2pMgr::get_network_config();
         let max_peers_num = network_config.max_peers as usize;
-        let client_ip_black_list = network_config.ip_black_list.clone();
         let sync_from_boot_nodes_only = network_config.sync_from_boot_nodes_only;
 
         let connect_normal_nodes_task = Interval::new(
@@ -128,7 +127,7 @@ impl NetManager {
                     let peer_node_id_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
                     if peer_node_id_hash != local_node_id_hash {
                         let peer_ip = peer_node.ip_addr.get_ip();
-                        if !client_ip_black_list.contains(&peer_ip) {
+                        if !P2pMgr::is_black_ip(&peer_ip) {
                             Self::connet_peer(peer_node);
                         }
                     }

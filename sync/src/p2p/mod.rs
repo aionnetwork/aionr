@@ -54,6 +54,7 @@ lazy_static! {
     static ref GLOBAL_NODES_MAP: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
     static ref TOP16_NODE_HASHES: RwLock<Vec<u64>> = { RwLock::new(Vec::new()) };
     static ref TP: Storage<ThreadPool> = Storage::new();
+    static ref IP_BLACK_LIST: RwLock<HashSet<String>> = { RwLock::new(HashSet::new()) };
 }
 
 #[derive(Clone, Copy)]
@@ -76,6 +77,9 @@ impl P2pMgr {
                 .build(),
         );
 
+        for ip in cfg.ip_black_list.iter() {
+            Self::add_black_ip(ip.clone());
+        }
         NETWORK_CONFIG.set(cfg);
     }
 
@@ -84,19 +88,33 @@ impl P2pMgr {
             let listener = TcpListener::bind(&addr).expect("Failed to bind");
             info!(target: "net", "Listening on: {}", local_addr);
             let thread_pool = Self::get_thread_pool();
+            let network_config = P2pMgr::get_network_config();
             let server = listener
                 .incoming()
                 .map_err(|e| error!(target: "net", "Failed to accept socket; error = {:?}", e))
                 .for_each(move |socket| {
-                    socket
-                        .set_recv_buffer_size(1 << 24)
-                        .expect("set_recv_buffer_size failed");
+                    if let Ok(peer_addr) = socket.peer_addr() {
+                        let peer_ip = peer_addr.ip().to_string();
+                        if !Self::is_black_ip(&peer_ip) {
+                            socket
+                                .set_recv_buffer_size(1 << 24)
+                                .expect("set_recv_buffer_size failed");
 
-                    socket
-                        .set_keepalive(Some(Duration::from_secs(30)))
-                        .expect("set_keepalive failed");
+                            socket
+                                .set_keepalive(Some(Duration::from_secs(30)))
+                                .expect("set_keepalive failed");
 
-                    Self::process_inbounds(socket, handle);
+                            let mut peer_node = Node::new_with_addr(peer_addr);
+                            Self::process_inbounds(socket, &mut peer_node, handle);
+                        } else {
+                            info!(target: "net", "Too many peers, the limitation is {}", network_config.max_peers);
+                            if let Err(e) = socket.shutdown(Shutdown::Both) {
+                                error!(target: "net", "Invalid socket， {}", e);
+                            }
+                        }
+                    } else {
+                        error!(target: "net", "Invalid socket: {:?}", socket);
+                    }
 
                     Ok(())
                 });
@@ -136,6 +154,27 @@ impl P2pMgr {
 
     pub fn get_network_config() -> &'static NetworkConfig {
         NETWORK_CONFIG.get()
+    }
+
+    pub fn is_black_ip(ip: &String) -> bool {
+        if let Ok(ip_black_list) = IP_BLACK_LIST.read() {
+            if ip_black_list.contains(ip) {
+                return true;
+            }
+        }
+        false
+    }
+
+    pub fn add_black_ip(ip: String) {
+        if let Ok(mut ip_black_list) = IP_BLACK_LIST.write() {
+            ip_black_list.insert(ip);
+        }
+    }
+
+    pub fn remove_black_ip(ip: &String) {
+        if let Ok(mut ip_black_list) = IP_BLACK_LIST.write() {
+            ip_black_list.remove(ip);
+        }
     }
 
     pub fn load_boot_nodes(boot_nodes_str: Vec<String>) -> Vec<Node> {
@@ -438,71 +477,62 @@ impl P2pMgr {
         }
     }
 
-    pub fn process_inbounds(socket: TcpStream, handle: fn(node: &mut Node, req: ChannelBuffer)) {
-        if let Ok(peer_addr) = socket.peer_addr() {
-            let mut peer_node = Node::new_with_addr(peer_addr);
-            let peer_ip = peer_node.ip_addr.get_ip();
-            let network_config = P2pMgr::get_network_config();
-            if !network_config.ip_black_list.contains(&peer_ip) {
-                let local_ip = P2pMgr::get_local_node().ip_addr.get_ip();
-                let mut value = peer_node.ip_addr.get_addr();
-                value.push_str(&local_ip);
-                peer_node.node_hash = P2pMgr::calculate_hash(&value);
+    pub fn process_inbounds(
+        socket: TcpStream,
+        peer_node: &mut Node,
+        handle: fn(node: &mut Node, req: ChannelBuffer),
+    ) {
+        let local_ip = P2pMgr::get_local_node().ip_addr.get_ip();
+        let mut value = peer_node.ip_addr.get_addr();
+        value.push_str(&local_ip);
+        peer_node.node_hash = P2pMgr::calculate_hash(&value);
 
-                if let Some(node) = P2pMgr::get_node(peer_node.node_hash) {
-                    if node.state_code == DISCONNECTED {
-                        trace!(target: "net", "update known peer node {}@{}...", node.get_node_id(), node.get_ip_addr());
-                        P2pMgr::remove_peer(peer_node.node_hash);
-                    } else {
-                        return;
-                    }
-                }
-
-                let (tx, rx) = mpsc::channel(4096000);
-                let thread_pool = P2pMgr::get_thread_pool();
-
-                peer_node.tx = Some(tx);
-                peer_node.state_code = CONNECTED;
-                peer_node.ip_addr.is_server = false;
-
-                let raw_fd = socket.as_raw_fd();
-                let std_stream = unsafe { StdTcpStream::from_raw_fd(raw_fd) };
-                P2pMgr::add_peer(peer_node.clone(), std_stream);
-                trace!(target: "net", "A new peer added: {}", raw_fd);
-
-                let mut node_hash = peer_node.node_hash;
-                // process request from the incoming stream
-
-                let (sink, stream) = P2pMgr::split_frame(socket);
-                let read = stream.for_each(move |msg| {
-                    if let Some(mut peer_node) = P2pMgr::get_node(node_hash) {
-                        handle(&mut peer_node, msg.clone());
-                        node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
-                    }
-
-                    Ok(())
-                });
-
-                thread_pool.spawn(read.then(|_| Ok(())));
-
-                // send everything in rx to sink
-                let write = sink.send_all(rx.map_err(|()| {
-                    io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")
-                }));
-                thread_pool.spawn(write.then(move |_| {
-                    info!(target:"net", "Connection with {} closed.", peer_addr);
-
-                    Ok(())
-                }));
+        if let Some(node) = P2pMgr::get_node(peer_node.node_hash) {
+            if node.state_code == DISCONNECTED {
+                trace!(target: "net", "update known peer node {}@{}...", node.get_node_id(), node.get_ip_addr());
+                P2pMgr::remove_peer(peer_node.node_hash);
             } else {
-                info!(target: "net", "Too many peers, the limitation is {}", network_config.max_peers);
-                if let Err(e) = socket.shutdown(Shutdown::Both) {
-                    error!(target: "net", "Invalid socket， {}", e);
-                }
+                return;
             }
-        } else {
-            error!(target: "net", "Invalid socket: {:?}", socket);
         }
+
+        let (tx, rx) = mpsc::channel(1);
+        let thread_pool = P2pMgr::get_thread_pool();
+
+        peer_node.tx = Some(tx);
+        peer_node.state_code = CONNECTED;
+        peer_node.ip_addr.is_server = false;
+
+        let raw_fd = socket.as_raw_fd();
+        let std_stream = unsafe { StdTcpStream::from_raw_fd(raw_fd) };
+        P2pMgr::add_peer(peer_node.clone(), std_stream);
+        trace!(target: "net", "A new peer added: {}", raw_fd);
+
+        let mut node_hash = peer_node.node_hash;
+        // process request from the incoming stream
+
+        let (sink, stream) = P2pMgr::split_frame(socket);
+        let read = stream.for_each(move |msg| {
+            if let Some(mut peer_node) = P2pMgr::get_node(node_hash) {
+                handle(&mut peer_node, msg.clone());
+                node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
+            }
+
+            Ok(())
+        });
+
+        thread_pool.spawn(read.then(|_| Ok(())));
+
+        // send everything in rx to sink
+        let write = sink.send_all(
+            rx.map_err(|()| io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")),
+        );
+        let peer_ip_addr = peer_node.get_ip_addr();
+        thread_pool.spawn(write.then(move |_| {
+            info!(target:"net", "Connection with {} closed.", peer_ip_addr);
+
+            Ok(())
+        }));
     }
 
     fn process_outbounds(
