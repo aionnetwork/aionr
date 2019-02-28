@@ -2,12 +2,10 @@
 use std::sync::Arc;
 use std::collections::{HashMap};
 use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP, blake2b};
-use aion_types::{H256, U256, H128, U128, Address};
+use aion_types::{H256, U256, Address};
 use bytes::{Bytes, ToPretty};
 use trie;
-use trie::{SecTrieDB, Trie, TrieFactory, TrieError};
-use pod_account::*;
-use rlp::*;
+use trie::{SecTrieDB, Trie};
 use lru_cache::LruCache;
 use basic_account::BasicAccount;
 use kvdb::{HashStore};
@@ -285,14 +283,17 @@ impl AVMAccount
         self.storage_cache
             .borrow_mut()
             .insert(key.clone(), value.clone());
+        println!("get storage value from db: key = {:?}, value = {:?}", key, value);
         Ok(value)
     }
 
     /// Set (and cache) the contents of the trie's storage at `key` to `value`.
     pub fn set_storage(&mut self, key: Bytes, value: Bytes) {
-        //println!("insert cached storage: key = {:?}, value = {:?}", key, value);
+        println!("pre storage_changes = {:?}", self.storage_changes);
         self.storage_changes.insert(key, value);
-        println!("storage_changes = {:?}", self.storage_changes);
+        let raw_changes: *mut HashMap<Vec<u8>, Vec<u8>> = unsafe {::std::mem::transmute(&self.storage_changes)};
+        println!("storage_changes ptr = {:?}", raw_changes);
+        println!("post storage_changes = {:?}", self.storage_changes);
     }
 
     /// Clone basic account data
@@ -349,7 +350,7 @@ impl AVMAccMgr {
         self.cache.borrow_mut().insert(*address, account);
     }
 
-    pub fn note_cache(&self, address: &Address) {
+    pub fn note_cache(&self, _address: &Address) {
         //TODO: whether we need a checkpoint to revert account code
         // unimplemented!()
     }

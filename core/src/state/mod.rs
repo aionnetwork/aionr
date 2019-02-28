@@ -1714,7 +1714,7 @@ impl<B: Backend> AVMInterface for State<B> {
         }
     }
 
-    fn remove_avm_account(&mut self, a: &Address) -> trie::Result<()> {
+    fn remove_avm_account(&mut self, _a: &Address) -> trie::Result<()> {
         unimplemented!()
     }
 }

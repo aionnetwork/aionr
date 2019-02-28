@@ -8,6 +8,7 @@ extern crate vm_common;
 extern crate avm_abi;
 extern crate acore_bytes as bytes;
 extern crate blake2b as hash;
+extern crate rand;
 
 pub mod avm;
 pub mod callback;

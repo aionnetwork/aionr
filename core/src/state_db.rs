@@ -531,17 +531,6 @@ impl state::Backend for StateDB {
     }
 }
 
-impl<'a> state::AVMBackend<'a> for StateDB {
-    fn get_cached_account(&self, addr: &Address) -> Option<Option<AVMAccount>> {
-        unimplemented!()
-    }
-
-    fn get_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
-    where F: FnOnce(Option<&mut AVMAccount>) -> U {
-        unimplemented!()
-    }
-}
-
 /// Sync wrapper for the account.
 struct SyncAccount(Option<Account>);
 /// That implementation is safe because account is never modified or accessed in any way.

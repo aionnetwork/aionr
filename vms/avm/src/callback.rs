@@ -161,6 +161,8 @@ pub extern fn avm_get_code(handle: *const c_void, address: *const avm_address) -
     }
 }
 
+use rand;
+
 #[no_mangle]
 pub extern fn avm_put_storage(
     handle: *const c_void,
@@ -169,17 +171,22 @@ pub extern fn avm_put_storage(
     value: *const avm_bytes,
 )
 {
+    //raw debug info
+    println!("handler = {:?}, address ptr: {:?}; origin key = {:?}, origin value = {:?}",
+        handle,
+        address,
+        unsafe {(*key)},
+        unsafe {(*value)}
+    );
     let ext: &mut Box<AVMExt> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
-    let key: &avm_bytes = unsafe { mem::transmute(key) };
-    let value: &avm_bytes = unsafe { mem::transmute(value) };
 
-    let storage_key: Vec<u8> = (*key).into();
-    let storage_value: Vec<u8> = (*value).into();
+    let key: &[u8] = unsafe {slice::from_raw_parts((*key).pointer, (*key).length as usize)};
+    let value: &[u8] = unsafe {slice::from_raw_parts((*value).pointer, (*value).length as usize)};
 
-    println!("avm_put_storage: addr = 0x{:?}, key = {:?}, value = {:?}", addr, storage_key, storage_value);
+    println!("avm_put_storage: addr = 0x{:?}, key = {:?}, value = {:?}", addr, key, value);
 
-    ext.sstore(addr, (*key).into(), (*value).into());
+    ext.sstore(addr, key.into(), value.into());
 }
 
 #[no_mangle]
@@ -190,32 +197,29 @@ pub extern fn avm_get_storage(
 ) -> avm_bytes
 {
     let ext: &mut Box<AVMExt> = unsafe { mem::transmute(handle) };
-    let addr: &Address = unsafe { mem::transmute(address) };
-    let key: &avm_bytes = unsafe { mem::transmute(key) };
+    let addr = unsafe {&(*address).bytes.into()};
+    let key: &[u8] = unsafe {slice::from_raw_parts((*key).pointer, (*key).length as usize)};
 
-    let test_key: Vec<u8> = (*key).into();
-    println!("avm_get_storage: addr = 0x{:?}, key = {:?}", addr, test_key);
+    println!("avm_get_storage: addr = 0x{:?}, key = {:?}", addr, key);
 
-    let value = match ext.sload(addr, &(*key).into()) {
-        Some(value) => {
-            println!("value = {:?}", value);
-            let pointer = if value.len() == 0 {
-                ::std::ptr::null_mut()
-            } else {
-                unsafe { mem::transmute(&value)}
-            };
-            avm_bytes {
-                length: value.len() as u32,
-                pointer:  pointer,
-            }
+    match ext.sload(addr, &key.into()) {
+        Some(v) => {
+           if v.len() > 0 {
+               println!("storage value = {:?}", v);
+               unsafe {
+                   let mut ret = new_fixed_bytes(v.len() as u32);
+                   ptr::copy(&v.as_slice()[0], ret.pointer, v.len());
+                   ret
+                }
+           } else {
+               unsafe {new_null_bytes()}
+           }
         },
-        None => avm_bytes {
-            length: 0,
-            pointer: ::std::ptr::null_mut(),
+        None => {
+            println!("value is None");
+            unsafe {new_null_bytes()}
         }
-    };
-
-    value
+    }
 }
 
 #[no_mangle]
@@ -306,5 +310,39 @@ pub fn register_callbacks() {
         callbacks.decrease_balance = avm_decrease_balance;
         callbacks.get_nonce = avm_get_nonce;
         callbacks.increment_nonce = avm_increment_nonce;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rand;
+    use std::ptr;
+    use hash::BLAKE2B_EMPTY;
+
+    use super::*;
+
+    #[test]
+    fn test_set_storage() {
+        //debug key/value
+        let mut key: Vec<u8> = (1..10).map(|_| {
+            rand::random()
+        }).collect();
+        let mut value = vec![5,6,7,8];
+
+        println!("address = {:?}, key = {:?}, value = {:?}", BLAKE2B_EMPTY, key, value);
+
+        let handle: *mut libc::c_void = ptr::null_mut();
+        let address = avm_address {
+            bytes: BLAKE2B_EMPTY.into(),
+        };
+        let key = avm_bytes {
+            length: key.len() as u32,
+            pointer: &mut key.as_mut_slice()[0],
+        };
+        let value = avm_bytes {
+            length: value.len() as u32,
+            pointer: &mut value.as_mut_slice()[0],
+        };
+        avm_put_storage(handle, &address, &key, &value);
     }
 }
