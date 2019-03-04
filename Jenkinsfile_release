@@ -96,14 +96,14 @@ pipeline {
 
         success{
 			archiveArtifacts artifacts: '*.tar.gz,test_results/*.*,target/release/aion',fingerprint:true
-            slackSend channel: '@Miao',
+            slackSend channel: '#ci',
                       color: 'good',
                       message: "${currentBuild.fullDisplayName} completed successfully. Grab the generated builds at ${env.BUILD_URL}\nArtifacts: ${env.BUILD_URL}artifact/\n Check BenchTest result: ${env.BUILD_URL}artifact/test_results/report.html \nCommit: ${GIT_COMMIT}\nChanges:${message}"
         }
 		
         failure {
             //cleanWs();
-            slackSend channel: '@Miao',
+            slackSend channel: '#ci',
             color: 'danger', 
             message: "${currentBuild.fullDisplayName} failed at ${env.BUILD_URL}\nCommit: ${GIT_COMMIT}\nChanges:${message}"
         }
