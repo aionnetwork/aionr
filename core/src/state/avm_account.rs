@@ -2,13 +2,15 @@
 use std::sync::Arc;
 use std::collections::{HashMap};
 use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP, blake2b};
-use aion_types::{H256, U256, Address};
+use aion_types::{H128, H256, U256, Address};
 use bytes::{Bytes, ToPretty};
 use trie;
-use trie::{SecTrieDB, Trie};
+use trie::{SecTrieDB, Trie, TrieFactory};
 use lru_cache::LruCache;
 use basic_account::BasicAccount;
-use kvdb::{HashStore};
+use kvdb::{DBValue, HashStore};
+
+use rlp::encode;
 
 use std::cell::{RefCell, Cell};
 use super::{RequireCache, AccountState};
@@ -71,8 +73,8 @@ impl From<BasicAccount> for AVMAccount {
 #[derive(Debug)]
 pub struct AVMAccountEntry {
     pub account: Option<AVMAccount>,
-    old_balance: Option<U256>,
-    state: AccountState,
+    pub old_balance: Option<U256>,
+    pub state: AccountState,
 }
 
 impl AVMAccountEntry {
@@ -104,9 +106,12 @@ impl AVMAccountEntry {
     pub fn get_state(&self) -> AccountState {
         self.state.clone()
     }
+
     pub fn change_state(&mut self, state: AccountState) {
         self.state = state;
     }
+
+    pub fn is_dirty(&self) -> bool { self.state == AccountState::Dirty }
 }
 
 impl AVMAccount
@@ -328,6 +333,88 @@ impl AVMAccount
             address_hash: Cell::new(None),
         }
     }
+
+    /// Commit any unsaved code. `code_hash` will always return the hash of the `code_cache` after this.
+    pub fn commit_code(&mut self, db: &mut HashStore) {
+        trace!(
+            target: "account",
+            "Commiting code of {:?} - {:?}, {:?}",
+            self,
+            self.code_filth == Filth::Dirty,
+            self.code_cache.is_empty()
+        );
+        match (self.code_filth == Filth::Dirty, self.code_cache.is_empty()) {
+            (true, true) => {
+                self.code_size = Some(0);
+                self.code_filth = Filth::Clean;
+            }
+            (true, false) => {
+                db.emplace(
+                    self.code_hash.clone(),
+                    DBValue::from_slice(&*self.code_cache),
+                );
+                self.code_size = Some(self.code_cache.len());
+                self.code_filth = Filth::Clean;
+            }
+            (false, _) => {}
+        }
+    }
+
+    /// Check if account has zero nonce, balance, no code.
+    pub fn is_null(&self) -> bool {
+        self.balance.is_zero() && self.nonce.is_zero() && self.code_hash == BLAKE2B_EMPTY
+    }
+
+    /// Determine whether there are any un-`commit()`-ed storage-setting operations.
+    pub fn storage_is_clean(&self) -> bool {
+        self.storage_changes.is_empty()
+    }
+
+    /// Check if account has zero nonce, balance, no code and no storage.
+    ///
+    /// NOTE: Will panic if `!self.storage_is_clean()`
+    pub fn is_empty(&self) -> bool {
+        assert!(
+            self.storage_is_clean(),
+            "Account::is_empty() may only legally be called when storage is clean."
+        );
+        self.is_null() && self.storage_root == BLAKE2B_NULL_RLP
+    }
+
+    /// Commit the `storage_changes` to the backing DB and update `storage_root`.
+    pub fn commit_storage(
+        &mut self,
+        trie_factory: &TrieFactory,
+        db: &mut HashStore,
+    ) -> trie::Result<()>
+    {
+        let mut t = trie_factory.from_existing(db, &mut self.storage_root)?;
+        for (k, v) in self.storage_changes.drain() {
+            // cast key and value to trait type,
+            // so we can call overloaded `to_bytes` method
+            let mut is_zero = true;
+            for item in &v {
+                if *item != 0x00 {
+                    is_zero = false;
+                    break;
+                }
+            }
+            match is_zero {
+                true => t.remove(&k)?,
+                false => t.insert(&k, &encode(&v))?,
+            };
+
+            self.storage_cache.borrow_mut().insert(k, v);
+        }
+        Ok(())
+    }
+
+    pub fn discard_storage_changes(&mut self) {
+        self.storage_changes.clear();
+    }
+
+    /// Return the storage overlay.
+    pub fn storage_changes(&self) -> &HashMap<Bytes, Bytes> { &self.storage_changes }
 }
 
 pub struct AVMAccMgr {

@@ -1094,11 +1094,59 @@ impl<B: Backend> State<B> {
             }
         }
 
+        // update AVM accounts
+        let mut avm_accounts = self.avm_mgr.cache.borrow_mut();
+        debug!(target: "cons", "commit accounts = {:?}", accounts);
+        for (address, ref mut a) in avm_accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
+            if let Some(ref mut account) = a.account {
+                let addr_hash = account.address_hash(address);
+                {
+                    let mut account_db = self
+                        .factories
+                        .accountdb
+                        .create(self.db.as_hashstore_mut(), addr_hash);
+                    account.commit_code(account_db.as_hashstore_mut());
+                    // Tmp workaround to ignore storage changes on null accounts
+                    // until java kernel fixed the problem
+                    if !account.is_null() {
+                        account
+                            .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
+                    } else if !account.storage_changes().is_empty()
+                    {
+                        account.discard_storage_changes();
+                        a.state = AccountState::CleanFresh;
+                    } else {
+                        if a.state == AccountState::Dirty
+                            && account.code_hash() == BLAKE2B_EMPTY
+                        {
+                            a.state = AccountState::CleanFresh;
+                        }
+                    }
+                }
+                if !account.is_empty() {
+                    self.db.note_non_null_account(address);
+                }
+            }
+        }
+
         {
             let mut trie = self
                 .factories
                 .trie
                 .from_existing(self.db.as_hashstore_mut(), &mut self.root)?;
+            for (address, ref mut a) in accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
+                a.state = AccountState::Committed;
+                match a.account {
+                    Some(ref mut account) => {
+                        trie.insert(address, &account.rlp())?;
+                    }
+                    None => {
+                        trie.remove(address)?;
+                    }
+                };
+            }
+
+            // commit avm accounts
             for (address, ref mut a) in accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
                 a.state = AccountState::Committed;
                 match a.account {
