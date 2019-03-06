@@ -457,7 +457,7 @@ impl HeaderChain {
 				.rev()
 				.skip_while(|&(height, _)| *height > number)
 			{
-				if height != number && entry.canonical_hash == canon_hash {
+				if height == 0 || height != number && entry.canonical_hash == canon_hash {
 					break;
 				}
 

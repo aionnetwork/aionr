@@ -56,7 +56,7 @@ const STATUS_REQ_INTERVAL: u64 = 5;
 const GET_BLOCK_HEADERS_INTERVAL: u64 = 50;
 const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
-const REPUTATION_HANDLE_INTERVAL: u64 = 60;
+const REPUTATION_HANDLE_INTERVAL: u64 = 30;
 const SYNC_STATIC_CAPACITY: usize = 25;
 const REQUEST_SIZE: u64 = 96;
 
@@ -242,7 +242,6 @@ impl SyncMgr {
                                 BlockHeadersHandler::handle_blocks_headers_req(node, req);
                             }
                             SyncAction::BLOCKSHEADERSRES => {
-
                                 BlockHeadersHandler::handle_blocks_headers_res(node, req);
                             }
                             SyncAction::BLOCKSBODIESREQ => {

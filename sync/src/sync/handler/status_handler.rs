@@ -18,7 +18,7 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
+use acore::client::cht;
 use aion_types::{H256, U256};
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
@@ -116,13 +116,18 @@ impl StatusHandler {
         P2pMgr::update_node(node_hash, node);
 
         if SyncStorage::get_synced_block_number() == 0 {
-            // let init_synced_block_number = if node.best_block_num > STAGED_BLOCK_COUNT { node.best_block_num - STAGED_BLOCK_COUNT } else { STAGED_BLOCK_COUNT };
-            
-            let chain_info = SyncStorage::get_chain_info();
-            let init_synced_block_number = chain_info.best_block_number;
-            
+            let init_synced_block_number;
+            if let Some(cht_num) = cht::block_to_cht_number(best_block_num) {
+                init_synced_block_number = cht::start_number(cht_num) - 1;
+            } else {
+                let chain_info = SyncStorage::get_chain_info();
+                init_synced_block_number = chain_info.best_block_number;
+            }
+
             SyncStorage::set_synced_block_number(init_synced_block_number);
-            SyncStorage::set_starting_block_number(init_synced_block_number + 1);
+            SyncStorage::set_starting_block_number(init_synced_block_number);
+
+            info!(target: "sync", "!!!!!!!!!!!!!!!!!!!!!!! init_synced_block_number {}", init_synced_block_number);
         }
 
         SyncStorage::update_network_status(

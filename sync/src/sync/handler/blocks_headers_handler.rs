@@ -22,11 +22,12 @@
 use acore::client::BlockStatus;
 use acore::header::Header as BlockHeader;
 use acore_bytes::to_hex;
+use aion_types::U256;
 use byteorder::{BigEndian, ByteOrder};
 use bytes::BufMut;
-use futures::future::lazy;
 use kvdb::DBTransaction;
 use rlp::UntrustedRlp;
+use std::sync::Mutex;
 use std::time::{Duration, SystemTime};
 
 use super::super::action::SyncAction;
@@ -34,6 +35,10 @@ use super::super::event::SyncEvent;
 use super::super::storage::{SyncStorage, MAX_CACHED_BLOCK_HASHED};
 
 use p2p::*;
+
+lazy_static! {
+    static ref LOCK: Mutex<u8> = Mutex::new(0);
+}
 
 const BACKWARD_SYNC_STEP: u64 = 128;
 
@@ -63,7 +68,7 @@ impl BlockHeadersHandler {
             return;
         }
 
-        if node.target_total_difficulty > node.current_total_difficulty {
+        if node.target_total_difficulty >= node.current_total_difficulty {
             if from == 0 {
                 match node.mode {
                     Mode::NORMAL => {
@@ -94,11 +99,13 @@ impl BlockHeadersHandler {
             }
             node.last_request_num = from;
 
-            debug!(target: "sync", "request headers: from number: {}, node: {}, rn: {}, mode: {}.", from, node.get_ip_addr(), node.requested_block_num, node.mode);
+            info!(target: "sync", "request headers: from number: {}, node: {}, rn: {}, mode: {}.", from, node.get_ip_addr(), node.requested_block_num, node.mode);
 
             SyncStorage::set_requested_block_number_last_time(from + size);
             Self::send_blocks_headers_req(node.node_hash, from, size as u32);
             P2pMgr::update_node(node.node_hash, node);
+        } else {
+            info!(target: "sync", "request headers: from nu");
         }
     }
 
@@ -138,10 +145,11 @@ impl BlockHeadersHandler {
                 let hash = header.hash();
                 let number = header.number();
 
-                if number <= SyncStorage::get_synced_block_number() {
-                    debug!(target: "sync", "Imported header: {} - {:?}.", number, hash);
+                if number < SyncStorage::get_synced_block_number() {
+                    trace!(target: "sync", "Imported header: {} - {:?}.", number, hash);
                 } else {
                     headers.push(header.clone());
+                    trace!(target: "sync", "header: {} - {:?} to be imported.", number, hash);
                 }
                 if node.requested_block_num < number {
                     node.requested_block_num = number;
@@ -149,18 +157,14 @@ impl BlockHeadersHandler {
             } else {
                 error!(target: "sync", "Invalid header: {}, received from {}@{}", to_hex(header_rlp.as_raw()), node.get_node_id(), node.get_ip_addr());
                 P2pMgr::remove_peer(node.node_hash);
+                info!(target: "sync", "header removed.");
                 return;
             }
         }
 
         if !headers.is_empty() {
             node.inc_reputation(10);
-            let node_ip = node.get_ip_addr();
-            let executor = SyncStorage::get_sync_executor();
-            executor.spawn(lazy(move || {
-                Self::import_block_header(headers, node_ip);
-                Ok(())
-            }));
+            Self::import_block_header(headers);
         } else {
             node.inc_reputation(1);
             debug!(target: "sync", "Came too late............");
@@ -170,29 +174,27 @@ impl BlockHeadersHandler {
         P2pMgr::update_node(node_hash, node);
     }
 
-    pub fn import_block_header(headers: Vec<BlockHeader>, node_ip: String) {
-        let mut imported = false;
+    pub fn import_block_header(headers: Vec<BlockHeader>) {
         let header_chain = SyncStorage::get_block_header_chain();
         for header in headers.iter() {
             let hash = header.hash();
             let number = header.number();
-            let parent_hash = header.parent_hash();
 
-            if header_chain.status(parent_hash) != BlockStatus::InChain
-                || header_chain.status(&hash) == BlockStatus::InChain
-            {
-                continue;
+            if LOCK.lock().is_ok() {
+                if header_chain.status(&hash) != BlockStatus::InChain {
+                    let mut tx = DBTransaction::new();
+                    if let Ok(pending) = header_chain.insert_with_td(
+                        &mut tx,
+                        &header,
+                        U256::from(number * 100000),
+                        None,
+                    ) {
+                        header_chain.apply_pending(tx, pending);
+                        SyncStorage::set_synced_block_number(number);
+                        info!(target: "sync", "New block header #{} - {}, imported.", number, hash);
+                    }
+                }
             }
-            let mut tx = DBTransaction::new();
-            if let Ok(pending) = header_chain.insert(&mut tx, &header, None) {
-                header_chain.apply_pending(tx, pending);
-                SyncStorage::set_synced_block_number(number);
-                // info!(target: "sync", "New block header #{} - {}, imported.", number, hash);
-                imported = true;
-            }
-        }
-        if imported {
-            info!(target: "sync", "Import headers from: {}", node_ip);
         }
     }
 }
