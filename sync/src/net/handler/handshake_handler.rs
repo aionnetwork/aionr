@@ -135,7 +135,7 @@ impl HandshakeHandler {
         } else {
             NetEvent::update_node_state(node, NetEvent::OnHandshakeReq);
             if let Some(socket) = P2pMgr::get_peer(old_node_hash) {
-                P2pMgr::add_peer(node.clone(), &socket);
+                P2pMgr::add_peer(node.clone(), socket);
             }
         }
         node.inc_reputation(1);

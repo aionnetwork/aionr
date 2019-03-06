@@ -24,13 +24,13 @@ use acore::client::{BlockChainClient, BlockChainInfo, BlockQueueInfo};
 use acore::header::Header as BlockHeader;
 use aion_types::{H256, U256};
 use lru_cache::LruCache;
+use parking_lot::RwLock as PLRwLock;
 use state::Storage;
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::SystemTime;
-use tokio::runtime::{Runtime, TaskExecutor};
-use parking_lot::RwLock as PLRwLock;
+use tokio::runtime::{Builder, Runtime, TaskExecutor};
 
 lazy_static! {
     static ref BLOCK_CHAIN: Storage<RwLock<BlockChain>> = Storage::new();
@@ -76,12 +76,6 @@ impl SyncStorage {
                     block_chain.inner = Some(client);
                 }
             }
-            if let Ok(mut sync_executor) = SYNC_EXECUTORS.get().write() {
-                if let Some(_) = sync_executor.inner {
-                } else {
-                    sync_executor.inner = Some(Arc::new(Runtime::new().expect("Tokio Runtime")));
-                }
-            }
         } else {
             let synced_block_number = client.chain_info().best_block_number;
 
@@ -90,7 +84,13 @@ impl SyncStorage {
             };
 
             let sync_executor = SyncExecutor {
-                inner: Some(Arc::new(Runtime::new().expect("Tokio Runtime"))),
+                inner: Some(Arc::new(
+                    Builder::new()
+                        .core_threads(6)
+                        .name_prefix("SYNC-Task")
+                        .build()
+                        .expect("SYNC_RUNTIME error."),
+                )),
             };
 
             let mut local_status = LocalStatus::new();
@@ -130,31 +130,31 @@ impl SyncStorage {
         BLOCK_CHAIN
             .get()
             .read()
-            .expect("get_block_chain")
+            .expect("get_block_chain error")
             .clone()
             .inner
-            .expect("get_client")
+            .expect("get_client error")
     }
 
     pub fn get_chain_info() -> BlockChainInfo {
         let client = BLOCK_CHAIN
             .get()
             .read()
-            .expect("get_chain_info")
+            .expect("get_chain_info error")
             .clone()
             .inner
-            .expect("get_chain_info");
+            .expect("get_chain_info error");
         client.chain_info()
     }
 
-    pub fn get_executor() -> TaskExecutor {
+    pub fn get_sync_executor() -> TaskExecutor {
         let rt = SYNC_EXECUTORS
             .get()
             .read()
-            .expect("get_executor")
+            .expect("get_executor error")
             .clone()
             .inner
-            .expect("get_executor");
+            .expect("get_executor error");
         rt.executor()
     }
 
@@ -403,8 +403,7 @@ impl SyncStorage {
         best_block_num: u64,
         best_hash: H256,
         target_total_difficulty: U256,
-    )
-    {
+    ) {
         let mut network_status = NETWORK_STATUS.get().write();
         if target_total_difficulty > network_status.total_diff {
             network_status.best_block_num = best_block_num;
@@ -472,8 +471,8 @@ impl SyncStorage {
     }
 
     pub fn reset() {
-        SYNC_EXECUTORS.get().write().expect("get_executor").inner = None;
-        BLOCK_CHAIN.get().write().expect("get_block_chain").inner = None;
+        SYNC_EXECUTORS.get().write().expect("get_executor error").inner = None;
+        BLOCK_CHAIN.get().write().expect("get_block_chain error").inner = None;
     }
 }
 

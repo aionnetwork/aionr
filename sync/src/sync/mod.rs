@@ -27,7 +27,6 @@ use std::collections::BTreeMap;
 use std::ops::Index;
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
-use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 
 use net::handler::default_handler::DefaultHandler;
@@ -66,7 +65,9 @@ const SYNC_STATIC_CAPACITY: usize = 25;
 struct SyncMgr;
 
 impl SyncMgr {
-    fn enable(executor: &TaskExecutor) {
+    fn enable() {
+        let executor = SyncStorage::get_sync_executor();
+
         let status_req_task =
             Interval::new(Instant::now(), Duration::from_secs(STATUS_REQ_INTERVAL))
                 .for_each(move |_| {
@@ -148,11 +149,7 @@ impl SyncMgr {
             .for_each(move |_| {
                 let connected_nodes = P2pMgr::get_nodes(CONNECTED);
                 for node in connected_nodes.iter() {
-                    if node.mode == Mode::BACKWARD || node.mode == Mode::FORWARD {
-                        if node.target_total_difficulty < SyncStorage::get_network_total_diff() {
-                            P2pMgr::remove_peer(node.node_hash);
-                        }
-                    } else if node.last_request_timestamp
+                    if node.last_request_timestamp
                         + Duration::from_secs(STATICS_INTERVAL * 12)
                         < SystemTime::now()
                     {
@@ -465,7 +462,6 @@ impl NetworkManager for Sync {
     fn deny_unreserved_peers(&self) {}
 
     fn start_network(&self) {
-        let executor = SyncStorage::get_executor();
         let sync_handler = DefaultHandler {
             callback: SyncMgr::handle,
         };
@@ -473,10 +469,10 @@ impl NetworkManager for Sync {
         P2pMgr::enable(self.network_config());
         debug!(target: "sync", "###### P2P enabled... ######");
 
-        NetManager::enable(&executor, sync_handler);
+        NetManager::enable(sync_handler);
         debug!(target: "sync", "###### network enabled... ######");
 
-        SyncMgr::enable(&executor);
+        SyncMgr::enable();
         debug!(target: "sync", "###### SYNC enabled... ######");
     }
 
