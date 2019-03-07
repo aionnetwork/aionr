@@ -126,6 +126,7 @@ pub mod state;
 pub mod state_db;
 pub mod verification;
 pub mod views;
+pub mod account;
 
 mod cache_manager;
 mod blooms;

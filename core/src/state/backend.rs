@@ -30,7 +30,7 @@
 use std::collections::{HashSet, HashMap};
 use std::sync::Arc;
 
-use state::{Account, AVMAccount};
+use state::{FVMAccount, AVMAccount};
 use parking_lot::Mutex;
 use aion_types::{Address, H256};
 use kvdb::{AsHashStore, HashStore, DBValue, MemoryDB};
@@ -44,7 +44,7 @@ pub trait Backend: Send {
     fn as_hashstore_mut(&mut self) -> &mut HashStore;
 
     /// Add an account entry to the cache.
-    fn add_to_account_cache(&mut self, addr: Address, data: Option<Account>, modified: bool);
+    fn add_to_account_cache(&mut self, addr: Address, data: Option<FVMAccount>, modified: bool);
 
     /// Add a global code cache entry. This doesn't need to worry about canonicality because
     /// it simply maps hashes to raw code and will always be correct in the absence of
@@ -53,7 +53,7 @@ pub trait Backend: Send {
 
     /// Get basic copy of the cached account. Not required to include storage.
     /// Returns 'None' if cache is disabled or if the account is not cached.
-    fn get_cached_account(&self, addr: &Address) -> Option<Option<Account>>;
+    fn get_cached_account(&self, addr: &Address) -> Option<Option<FVMAccount>>;
 
     fn get_avm_cached_account(&self, addr: &Address) -> Option<Option<AVMAccount>>;
 
@@ -62,10 +62,13 @@ pub trait Backend: Send {
     /// is known not to exist.
     /// `None` is returned if the entry is not cached.
     fn get_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
-    where F: FnOnce(Option<&mut Account>) -> U;
+    where F: FnOnce(Option<&mut FVMAccount>) -> U;
 
     fn get_avm_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
     where F: FnOnce(Option<&mut AVMAccount>) -> U;
+
+    // fn get_avm_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
+    // where F: FnOnce(Option<&mut AVMAccount>) -> U;
 
     /// Get cached code based on hash.
     fn get_cached_code(&self, hash: &H256) -> Option<Arc<Vec<u8>>>;
@@ -121,18 +124,22 @@ impl HashStore for ProofCheck {
 impl Backend for ProofCheck {
     fn as_hashstore(&self) -> &HashStore { self }
     fn as_hashstore_mut(&mut self) -> &mut HashStore { self }
-    fn add_to_account_cache(&mut self, _addr: Address, _data: Option<Account>, _modified: bool) {}
+    fn add_to_account_cache(&mut self, _addr: Address, _data: Option<FVMAccount>, _modified: bool) {}
     fn cache_code(&self, _hash: H256, _code: Arc<Vec<u8>>) {}
-    fn get_cached_account(&self, _addr: &Address) -> Option<Option<Account>> { None }
+    fn get_cached_account(&self, _addr: &Address) -> Option<Option<FVMAccount>> { None }
     fn get_avm_cached_account(&self, _addr: &Address) -> Option<Option<AVMAccount>> { None }
     fn get_cached<F, U>(&self, _a: &Address, _f: F) -> Option<U>
-    where F: FnOnce(Option<&mut Account>) -> U {
+    where F: FnOnce(Option<&mut FVMAccount>) -> U {
         None
     }
     fn get_avm_cached<F, U>(&self, _a: &Address, _f: F) -> Option<U>
     where F: FnOnce(Option<&mut AVMAccount>) -> U {
         None
     }
+    // fn get_avm_cached<F, U>(&self, _a: &Address, _f: F) -> Option<U>
+    // where F: FnOnce(Option<&mut AVMAccount>) -> U {
+    //     None
+    // }
     fn get_cached_code(&self, _hash: &H256) -> Option<Arc<Vec<u8>>> { None }
     fn note_non_null_account(&self, _address: &Address) {}
     fn is_known_null(&self, _address: &Address) -> bool { false }
@@ -185,16 +192,16 @@ impl<H: AsHashStore + Send + Sync> Backend for Proving<H> {
 
     fn as_hashstore_mut(&mut self) -> &mut HashStore { self }
 
-    fn add_to_account_cache(&mut self, _: Address, _: Option<Account>, _: bool) {}
+    fn add_to_account_cache(&mut self, _: Address, _: Option<FVMAccount>, _: bool) {}
 
     fn cache_code(&self, _: H256, _: Arc<Vec<u8>>) {}
 
-    fn get_cached_account(&self, _: &Address) -> Option<Option<Account>> { None }
+    fn get_cached_account(&self, _: &Address) -> Option<Option<FVMAccount>> { None }
 
     fn get_avm_cached_account(&self, _addr: &Address) -> Option<Option<AVMAccount>> { None }
 
     fn get_cached<F, U>(&self, _: &Address, _: F) -> Option<U>
-    where F: FnOnce(Option<&mut Account>) -> U {
+    where F: FnOnce(Option<&mut FVMAccount>) -> U {
         None
     }
 
@@ -202,6 +209,11 @@ impl<H: AsHashStore + Send + Sync> Backend for Proving<H> {
     where F: FnOnce(Option<&mut AVMAccount>) -> U {
         None
     }
+
+    // fn get_avm_cached<F, U>(&self, _: &Address, _: F) -> Option<U>
+    // where F: FnOnce(Option<&mut AVMAccount>) -> U {
+    //     None
+    // }
 
     fn get_cached_code(&self, _: &H256) -> Option<Arc<Vec<u8>>> { None }
     fn note_non_null_account(&self, _: &Address) {}
@@ -243,16 +255,16 @@ impl<H: AsHashStore + Send + Sync> Backend for Basic<H> {
 
     fn as_hashstore_mut(&mut self) -> &mut HashStore { self.0.as_hashstore_mut() }
 
-    fn add_to_account_cache(&mut self, _: Address, _: Option<Account>, _: bool) {}
+    fn add_to_account_cache(&mut self, _: Address, _: Option<FVMAccount>, _: bool) {}
 
     fn cache_code(&self, _: H256, _: Arc<Vec<u8>>) {}
 
-    fn get_cached_account(&self, _: &Address) -> Option<Option<Account>> { None }
+    fn get_cached_account(&self, _: &Address) -> Option<Option<FVMAccount>> { None }
 
     fn get_avm_cached_account(&self, _addr: &Address) -> Option<Option<AVMAccount>> { None }
 
     fn get_cached<F, U>(&self, _: &Address, _: F) -> Option<U>
-    where F: FnOnce(Option<&mut Account>) -> U {
+    where F: FnOnce(Option<&mut FVMAccount>) -> U {
         None
     }
 
@@ -260,6 +272,11 @@ impl<H: AsHashStore + Send + Sync> Backend for Basic<H> {
     where F: FnOnce(Option<&mut AVMAccount>) -> U {
         None
     }
+
+    // fn get_avm_cached<F, U>(&self, _: &Address, _: F) -> Option<U>
+    // where F: FnOnce(Option<&mut AVMAccount>) -> U {
+    //     None
+    // }
 
     fn get_cached_code(&self, _: &H256) -> Option<Arc<Vec<u8>>> { None }
     fn note_non_null_account(&self, _: &Address) {}

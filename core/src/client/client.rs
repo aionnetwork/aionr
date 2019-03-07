@@ -61,7 +61,7 @@ use receipt::{LocalizedReceipt, Receipt};
 use rlp::*;
 use service::ClientIoMessage;
 use spec::Spec;
-use state::{self, State};
+use state::{self, State, AccType, FVMKey, FVMValue};
 use state_db::StateDB;
 use transaction::{
     Action, LocalizedTransaction, PendingTransaction, SignedTransaction, Transaction,
@@ -1082,7 +1082,7 @@ impl Client {
                 Executive::new(state, env_info, machine).transact_virtual(transaction, false)?;
 
             if let Some(original) = original_state {
-                ret.state_diff = Some(state.diff_from(original).map_err(ExecutionError::from)?);
+                ret.state_diff = Some(state.diff_from(original, transaction.transaction_type.into()).map_err(ExecutionError::from)?);
             }
             Ok(ret)
         }
@@ -1452,12 +1452,13 @@ impl BlockChainClient for Client {
     }
 
     fn nonce(&self, address: &Address, id: BlockId) -> Option<U256> {
-        self.state_at(id).and_then(|s| s.nonce(address).ok())
+        self.state_at(id).and_then(|s| s.nonce(address, AccType::FVM).ok())
     }
 
+    //TODO: update account type
     fn storage_root(&self, address: &Address, id: BlockId) -> Option<H256> {
         self.state_at(id)
-            .and_then(|s| s.storage_root(address).ok())
+            .and_then(|s| s.storage_root(address, AccType::FVM).ok())
             .and_then(|x| x)
     }
 
@@ -1468,21 +1469,29 @@ impl BlockChainClient for Client {
 
     fn code(&self, address: &Address, id: BlockId) -> Option<Option<Bytes>> {
         self.state_at(id)
-            .and_then(|s| s.code(address).ok())
+            .and_then(|s| s.code(address, AccType::FVM).ok())
             .map(|c| c.map(|c| (&*c).clone()))
     }
 
     fn code_hash(&self, address: &Address, id: BlockId) -> Option<H256> {
-        self.state_at(id).and_then(|s| s.code_hash(address).ok())
+        self.state_at(id).and_then(|s| s.code_hash(address, AccType::FVM).ok())
     }
 
     fn balance(&self, address: &Address, id: BlockId) -> Option<U256> {
-        self.state_at(id).and_then(|s| s.balance(address).ok())
+        self.state_at(id).and_then(|s| s.balance(address, AccType::FVM).ok())
     }
 
     fn storage_at(&self, address: &Address, position: &H128, id: BlockId) -> Option<H128> {
-        self.state_at(id)
-            .and_then(|s| s.storage_at(address, position).ok())
+        let value = self.state_at(id)
+            .and_then(|s| s.storage_at(address, &FVMKey::Normal(*position)).ok());
+        if let Some(v) = value {
+            match v {
+                FVMValue::Normal(_v) => Some(_v),
+                FVMValue::Long(_) => None,
+            }
+        } else {
+            None
+        }
     }
 
     fn list_accounts(
@@ -1548,7 +1557,7 @@ impl BlockChainClient for Client {
             _ => return None,
         };
 
-        let root = match state.storage_root(account) {
+        let root = match state.storage_root(account, AccType::FVM) {
             Ok(Some(root)) => root,
             _ => return None,
         };

@@ -33,7 +33,7 @@ use error::Error;
 use executive::Executive;
 use header::{BlockNumber, Header};
 use spec::CommonParams;
-use state::{CleanupMode, Substate};
+use state::{CleanupMode, Substate, AccType};
 use transaction::{self, SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
 use tx_filter::TransactionFilter;
 
@@ -88,8 +88,8 @@ impl EthereumMachine {
             gas: gas,
             gas_price: 0.into(),
             value: ActionValue::Transfer(0.into()),
-            code: state.code(&contract_address)?,
-            code_hash: Some(state.code_hash(&contract_address)?),
+            code: state.code(&contract_address, AccType::FVM)?,
+            code_hash: Some(state.code_hash(&contract_address, AccType::FVM)?),
             data: data,
             call_type: CallType::Call,
             static_flag: false,
@@ -99,7 +99,7 @@ impl EthereumMachine {
         };
         let mut ex = Executive::new(&mut state, &env_info, self);
         let mut substate = Substate::new();
-        let result = ex.call(params, &mut substate);
+        let result = ex.call(params, &mut substate, AccType::FVM);
         match result.exception.as_str() {
             "" => {
                 return Ok(result.return_data.mem);
@@ -270,7 +270,7 @@ impl<'a> ::aion_machine::LocalizedMachine<'a> for EthereumMachine {
 
 impl ::aion_machine::WithBalances for EthereumMachine {
     fn balance(&self, live: &ExecutedBlock, address: &Address) -> Result<U256, Error> {
-        live.state().balance(address).map_err(Into::into)
+        live.state().balance(address, AccType::FVM).map_err(Into::into)
     }
 
     fn add_balance(
@@ -281,7 +281,7 @@ impl ::aion_machine::WithBalances for EthereumMachine {
     ) -> Result<(), Error>
     {
         live.state_mut()
-            .add_balance(address, amount, CleanupMode::NoEmpty)
+            .add_balance(address, amount, CleanupMode::NoEmpty, AccType::FVM)
             .map_err(Into::into)
     }
 }

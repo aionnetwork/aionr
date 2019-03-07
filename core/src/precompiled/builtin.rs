@@ -27,9 +27,10 @@ use super::blake2b_hash_contract::Blake2bHashContract;
 use super::tx_hash_contract::TxHashContract;
 use super::atb::token_bridge_contract::TokenBridgeContract;
 use std::fmt;
-use state::{State, Substate, Backend as StateBackend,CleanupMode};
+use state::{State, Substate, Backend as StateBackend,CleanupMode, AccType};
 use vms::ExecutionResult;
 use log_entry::LogEntry;
+use state::{FVMKey, FVMValue};
 
 pub trait BuiltinContract: Send + Sync {
     /// gas cost.
@@ -168,26 +169,34 @@ impl<'a, B: 'a> BuiltinExt for BuiltinExtImpl<'a, B>
 where B: StateBackend
 {
     fn storage_at(&self, key: &H128) -> H128 {
-        self.state
-            .storage_at(&self.context.address, key)
-            .expect("Fatal error occurred when getting storage.")
+        let value = self.state
+            .storage_at(&self.context.address, &FVMKey::Normal(*key))
+            .expect("Fatal error occurred when getting storage.");
+        match value {
+            FVMValue::Normal(v) => v,
+            FVMValue::Long(_) => panic!("expected fvm storage value"),
+        }
     }
 
     fn set_storage(&mut self, key: H128, value: H128) {
         self.state
-            .set_storage(&self.context.address, key, value)
+            .set_storage(&self.context.address, FVMKey::Normal(key), FVMValue::Normal(value))
             .expect("Fatal error occurred when putting storage.")
     }
 
     fn storage_at_dword(&self, key: &H128) -> H256 {
-        self.state
-            .storage_at_dword(&self.context.address, key)
-            .expect("Fatal error occurred when getting storage.")
+        let value = self.state
+            .storage_at(&self.context.address, &FVMKey::Wide(*key))
+            .expect("Fatal error occurred when getting storage.");
+        match value {
+            FVMValue::Normal(_) => panic!("unexpected fvm value"),
+            FVMValue::Long(v) => v,
+        }
     }
 
     fn set_storage_dword(&mut self, key: H128, value: H256) {
         self.state
-            .set_storage_dword(&self.context.address, key, value)
+            .set_storage(&self.context.address, FVMKey::Wide(key), FVMValue::Long(value))
             .expect("Fatal error occurred when putting storage.")
     }
 
@@ -208,25 +217,25 @@ where B: StateBackend
 
     fn inc_nonce(&mut self, a: &Address) {
         self.state
-            .inc_nonce(a)
+            .inc_nonce(a, AccType::FVM)
             .expect("Fatal error occurred when incrementing nonce.")
     }
 
     fn transfer_balance(&mut self, from: &Address, to: &Address, by: &U256) {
         self.state
-            .transfer_balance(from, to, by, CleanupMode::ForceCreate)
+            .transfer_balance(from, to, by, CleanupMode::ForceCreate, AccType::FVM)
             .expect("Fatal error occurred when transfering balance.")
     }
 
     fn add_balance(&mut self, to: &Address, incr: &U256) {
         self.state
-            .add_balance(to, incr, CleanupMode::ForceCreate)
+            .add_balance(to, incr, CleanupMode::ForceCreate, AccType::FVM)
             .expect("Fatal error occurred when adding balance.")
     }
 
     fn balance(&self, address: &Address) -> U256 {
         self.state
-            .balance(address)
+            .balance(address, AccType::FVM)
             .expect("Fatal error occurred when getting balance.")
     }
 }

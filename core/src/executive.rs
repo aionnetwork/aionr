@@ -26,7 +26,7 @@ use blake2b::blake2b;
 use aion_types::{H256, U256, U512, Address};
 #[cfg(test)]
 use aion_types::U128;
-use state::{Backend as StateBackend, State, Substate, CleanupMode};
+use state::{Backend as StateBackend, State, Substate, CleanupMode, AccType};
 use machine::EthereumMachine as Machine;
 use error::ExecutionError;
 use vms::{
@@ -160,12 +160,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     ) -> Result<Executed, ExecutionError>
     {
         let sender = t.sender();
-        let balance = self.state.balance(&sender)?;
+        let balance = self.state.balance(&sender, t.transaction_type.into())?;
         let needed_balance = t.value.saturating_add(t.gas.saturating_mul(t.gas_price));
         if balance < needed_balance {
             // give the sender a sufficient balance
             self.state
-                .add_balance(&sender, &(needed_balance - balance), CleanupMode::NoEmpty)?;
+                .add_balance(&sender, &(needed_balance - balance), CleanupMode::NoEmpty, t.transaction_type.into())?;
         }
 
         self.transact(t, check_nonce, true)
@@ -191,7 +191,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // validate transactions
         for t in txs {
             let sender = t.sender();
-            let nonce = self.state.nonce(&sender).unwrap();
+            let nonce = self.state.nonce(&sender, t.transaction_type.into()).unwrap();
 
             // 1. Check transaction nonce
             if check_nonce && t.nonce != nonce {
@@ -239,7 +239,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
             // 3. Check balance, avoid unaffordable transactions
             // TODO: we might need bigints here, or at least check overflows.
-            let balance: U512 = U512::from(self.state.balance(&sender).unwrap());
+            let balance: U512 = U512::from(self.state.balance(&sender, t.transaction_type.into()).unwrap());
             let gas_cost: U512 = t.gas.full_mul(t.gas_price);
             let total_cost: U512 = U512::from(t.value) + gas_cost;
             if balance < total_cost {
@@ -282,8 +282,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         gas: init_gas,
                         gas_price: t.gas_price,
                         value: t.value,
-                        code: self.state.code(address).unwrap(),
-                        code_hash: Some(self.state.code_hash(address).unwrap()),
+                        code: self.state.code(address, t.transaction_type.into()).unwrap(),
+                        code_hash: Some(self.state.code_hash(address, t.transaction_type.into()).unwrap()),
                         data: Some(t.data.clone()),
                         call_type: CallType::Call,
                         transaction_hash: t.hash(),
@@ -358,7 +358,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     {
         let _vm_lock = VM_LOCK.lock().unwrap();
         let sender = t.sender();
-        let nonce = self.state.nonce(&sender)?;
+        let nonce = self.state.nonce(&sender, t.transaction_type.into())?;
 
         // 1. Check transaction nonce
         if check_nonce && t.nonce != nonce {
@@ -405,7 +405,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         // 3. Check balance, avoid unaffordable transactions
         // TODO: we might need bigints here, or at least check overflows.
-        let balance: U512 = U512::from(self.state.balance(&sender)?);
+        let balance: U512 = U512::from(self.state.balance(&sender, t.transaction_type.into())?);
         let gas_cost: U512 = t.gas.full_mul(t.gas_price);
         let total_cost: U512 = U512::from(t.value) + gas_cost;
         if balance < total_cost {
@@ -425,11 +425,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // Increment nonce of the sender and deduct the cost of the entire gas limit from
         // the sender's account. After VM execution, gas left (not used) shall be refunded
         // (if applicable) to the sender's account.
-        self.state.inc_nonce(&sender)?;
+        self.state.inc_nonce(&sender, t.transaction_type.into())?;
         self.state.sub_balance(
             &sender,
             &U256::from(gas_cost),
             &mut substate.to_cleanup_mode(),
+            t.transaction_type.into(),
         )?;
 
         // Transactions are now handled in different ways depending on whether it's
@@ -465,8 +466,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     gas: init_gas,
                     gas_price: t.gas_price,
                     value: ActionValue::Transfer(t.value),
-                    code: self.state.code(address)?,
-                    code_hash: Some(self.state.code_hash(address)?),
+                    code: self.state.code(address, t.transaction_type.into())?,
+                    code_hash: Some(self.state.code_hash(address, t.transaction_type.into())?),
                     data: Some(t.data.clone()),
                     call_type: CallType::Call,
                     static_flag: false,
@@ -474,7 +475,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     transaction_hash: t.hash(),
                     original_transaction_hash: t.hash(),
                 };
-                self.call(params, &mut substate)
+                self.call(params, &mut substate, t.transaction_type.into())
             }
         };
 
@@ -531,7 +532,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     /// NOTE. It does not finalize the transaction (doesn't do refunds, nor suicides).
     /// Modifies the substate.
     /// Returns either gas_left or `vm::Error`.
-    pub fn call(&mut self, params: ActionParams, substate: &mut Substate) -> ExecutionResult {
+    pub fn call(&mut self, params: ActionParams, substate: &mut Substate, acc_type: AccType) -> ExecutionResult {
         trace!(
             target: "executive",
             "Executive::call(params={:?}) self.env_info={:?}",
@@ -540,7 +541,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         );
 
         // backup current state in case of error to rollback
-        self.state.checkpoint();
+        self.state.checkpoint(acc_type.clone());
 
         if self.depth >= 1 {
             // at first, transfer value to destination
@@ -552,6 +553,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     &params.address,
                     &val,
                     substate.to_cleanup_mode(),
+                    acc_type,
                 ) {
                     return ExecutionResult {
                         gas_left: 0.into(),
@@ -569,11 +571,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // Builtin contract call
         if let Some(builtin) = self.machine.builtin(&params.code_address, self.info.number) {
             // Create contract account if it does yet exist (when being called for the first time)
-            if self.state.exists(&params.code_address).is_ok()
-                && !self.state.exists(&params.code_address).unwrap()
+            if self.state.exists(&params.code_address, acc_type).is_ok()
+                && !self.state.exists(&params.code_address, acc_type).unwrap()
             {
                 self.state
-                    .new_contract(&params.code_address, 0.into(), 0.into());
+                    .new_contract(&params.code_address, 0.into(), 0.into(), acc_type);
             }
             // Engines aren't supposed to return builtins until activation, but
             // prefer to fail rather than silently break consensus.
@@ -612,12 +614,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     // Handle state and substates
                     self.enact_result(&result, substate, unconfirmed_substate);
                 } else {
-                    self.state.revert_to_checkpoint();
+                    self.state.revert_to_checkpoint(acc_type);
                 }
                 res = result;
             } else {
                 // If not enough gas, rollback state and return failure status
-                self.state.revert_to_checkpoint();
+                self.state.revert_to_checkpoint(acc_type);
                 res = ExecutionResult {
                     gas_left: 0.into(),
                     status_code: ExecStatus::Failure,
@@ -640,7 +642,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             } else {
                 // otherwise it's just a basic transaction.
                 debug!(target: "vm", "deal with normal tx");
-                self.state.discard_checkpoint();
+                self.state.discard_checkpoint(acc_type);
 
                 res = ExecutionResult {
                     gas_left: params.gas,
@@ -662,6 +664,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     &params.address,
                     &val,
                     substate.to_cleanup_mode(),
+                    acc_type,
                 ) {
                     return ExecutionResult {
                         gas_left: 0.into(),
@@ -682,7 +685,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         substates: &mut [Substate],
     ) -> Vec<ExecutionResult>
     {
-        self.state.checkpoint();
+        self.state.checkpoint(AccType::AVM);
 
         let mut unconfirmed_substates = vec![Substate::new(); params.len()];
 
@@ -697,7 +700,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         substates: &mut [Substate],
     ) -> Vec<ExecutionResult>
     {
-        self.state.checkpoint();
+        self.state.checkpoint(AccType::AVM);
 
         let mut unconfirmed_substates = vec![Substate::new(); params.len()];
 
@@ -717,7 +720,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // opcode. This applies retroactively starting from genesis.
         if self
             .state
-            .exists_and_not_null(&params.address)
+            .exists_and_not_null(&params.address, AccType::FVM)
             .unwrap_or(true)
         {
             return ExecutionResult {
@@ -739,7 +742,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         );
 
         // backup used in case of running out of gas
-        self.state.checkpoint();
+        self.state.checkpoint(AccType::FVM);
 
         // part of substate that may be reverted
         let mut unconfirmed_substate = Substate::new();
@@ -754,7 +757,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             // In case any error still occurs here, consider this transaction as a failure
             if let Err(_) =
                 self.state
-                    .sub_balance(&params.sender, &val, &mut substate.to_cleanup_mode())
+                    .sub_balance(&params.sender, &val, &mut substate.to_cleanup_mode(), AccType::FVM)
             {
                 return ExecutionResult {
                     gas_left: 0.into(),
@@ -764,10 +767,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 };
             }
             self.state
-                .new_contract(&params.address, val + prev_bal, nonce_offset);
+                .new_contract(&params.address, val + prev_bal, nonce_offset, AccType::FVM);
         } else {
             self.state
-                .new_contract(&params.address, prev_bal, nonce_offset);
+                .new_contract(&params.address, prev_bal, nonce_offset, AccType::FVM);
         }
 
         let res = self.exec_vm(params, &mut unconfirmed_substate);
@@ -794,7 +797,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let substate = substates[idx].clone();
             // perform suicides
             for address in &substate.suicides {
-                self.state.avm_mgr().kill_account(address);
+                self.state.kill_account(address, AccType::AVM);
             }
             let gas_left = match result.status_code {
                 ExecStatus::Success | ExecStatus::Revert => result.gas_left,
@@ -860,7 +863,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         );
         // Below: NoEmpty is safe since the sender must already be non-null to have sent this transaction
         self.state
-            .add_balance(&sender, &refund_value, CleanupMode::NoEmpty)?;
+            .add_balance(&sender, &refund_value, CleanupMode::NoEmpty, AccType::FVM)?;
         trace!(
             target: "executive",
             "exec::finalize: Compensating author: fees_value={}, author={}\n",
@@ -868,11 +871,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             &self.info.author
         );
         self.state
-            .add_balance(&self.info.author, &fees_value, substate.to_cleanup_mode())?;
+            .add_balance(&self.info.author, &fees_value, substate.to_cleanup_mode(), AccType::FVM)?;
 
         // perform suicides
         for address in &substate.suicides {
-            self.state.kill_account(address);
+            self.state.kill_account(address, AccType::FVM);
         }
 
         Ok(Executed {
@@ -902,12 +905,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             // Commit state changes by discarding checkpoint only when
             // return status code is Success
             ExecStatus::Success => {
-                self.state.discard_checkpoint();
+                self.state.discard_checkpoint(AccType::FVM);
                 substate.accrue(un_substate);
             }
             _ => {
                 // Rollback state changes by reverting to checkpoint
-                self.state.revert_to_checkpoint();
+                self.state.revert_to_checkpoint(AccType::FVM);
             }
         }
     }
@@ -973,7 +976,7 @@ Address};
         params.data = Some("26121ff0".from_hex().unwrap());
         let mut state = get_temp_state();
         state
-            .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
+            .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty, AccType::FVM)
             .unwrap();
         let mut info = EnvInfo::default();
         info.number = 1;
@@ -989,7 +992,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
 
         assert_eq!(status_code, ExecStatus::Success);

@@ -29,7 +29,7 @@ use kvdb::HashStore;
 use triehash::sec_trie_root;
 use bytes::Bytes;
 use trie::TrieFactory;
-use state::Account;
+use state::{FVMAccount, VMAccount};
 use ajson;
 use types::account_diff::*;
 use rlp::{self, RlpStream};
@@ -53,18 +53,19 @@ pub struct PodAccount {
 impl PodAccount {
     /// Convert Account to a PodAccount.
     /// NOTE: This will silently fail unless the account is fully cached.
-    pub fn from_account(acc: &Account) -> PodAccount {
+    pub fn from_account(acc: &FVMAccount) -> PodAccount {
         PodAccount {
             balance: *acc.balance(),
             nonce: *acc.nonce(),
             storage: acc
                 .storage_changes()
+                .0
                 .iter()
                 .fold(BTreeMap::new(), |mut m, (k, v)| {
                     m.insert(k.clone(), v.clone());
                     m
                 }),
-            storage_dword: acc.storage_changes_dword().iter().fold(
+            storage_dword: acc.storage_changes().1.iter().fold(
                 BTreeMap::new(),
                 |mut m, (k, v)| {
                     m.insert(k.clone(), v.clone());

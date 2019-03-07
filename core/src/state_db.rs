@@ -29,7 +29,7 @@ use memory_cache::MemoryLruCache;
 use journaldb::JournalDB;
 use kvdb::{KeyValueDB, DBTransaction, HashStore};
 use aion_types::{H256, Address};
-use state::{self, Account, AVMAccount};
+use state::{self, FVMAccount, AVMAccount};
 use header::BlockNumber;
 use blake2b::blake2b;
 use parking_lot::Mutex;
@@ -37,6 +37,7 @@ use util_error::UtilError;
 use bloom_journal::{Bloom, BloomJournal};
 use db::COL_ACCOUNT_BLOOM;
 use byteorder::{LittleEndian, ByteOrder};
+use state::AccType;
 
 /// Number of bytes allocated in the memory for accounts bloom.
 pub const ACCOUNT_BLOOM_SPACE: usize = 1048576;
@@ -57,7 +58,7 @@ struct AccountCache {
     /// DB Account cache. `None` indicates that account is known to be missing.
     // When changing the type of the values here, be sure to update `mem_used` and
     // `new`.
-    accounts: LruCache<Address, Option<Account>>,
+    accounts: LruCache<Address, Option<FVMAccount>>,
     avm_accounts: LruCache<Address, Option<AVMAccount>>,
     /// Information on the modifications in recently committed blocks; specifically which addresses
     /// changed in which block. Ordered by block number.
@@ -134,13 +135,14 @@ impl StateDB {
         let bloom = Self::load_bloom(&**db.backing());
         let acc_cache_size = cache_size * ACCOUNT_CACHE_RATIO / 100;
         let code_cache_size = cache_size - acc_cache_size;
-        let cache_items = acc_cache_size / ::std::mem::size_of::<Option<Account>>();
+        let fvm_cache_items = acc_cache_size / ::std::mem::size_of::<Option<FVMAccount>>();
+        let avm_cache_items = acc_cache_size / ::std::mem::size_of::<Option<AVMAccount>>();
 
         StateDB {
             db: db,
             account_cache: Arc::new(Mutex::new(AccountCache {
-                accounts: LruCache::new(cache_items),
-                avm_accounts: LruCache::new(cache_items),
+                accounts: LruCache::new(fvm_cache_items),
+                avm_accounts: LruCache::new(avm_cache_items),
                 modifications: VecDeque::new(),
             })),
             code_cache: Arc::new(Mutex::new(MemoryLruCache::new(code_cache_size))),
@@ -394,7 +396,7 @@ impl StateDB {
         self.db.mem_used() + {
             let accounts = self.account_cache.lock().accounts.len();
             let code_size = self.code_cache.lock().current_size();
-            code_size + accounts * ::std::mem::size_of::<Option<Account>>()
+            code_size + accounts * ::std::mem::size_of::<Option<FVMAccount>>()
         }
     }
 
@@ -457,7 +459,7 @@ impl state::Backend for StateDB {
 
     fn as_hashstore_mut(&mut self) -> &mut HashStore { self.db.as_hashstore_mut() }
 
-    fn add_to_account_cache(&mut self, addr: Address, data: Option<Account>, modified: bool) {
+    fn add_to_account_cache(&mut self, addr: Address, data: Option<FVMAccount>, modified: bool) {
         self.local_cache.push(CacheQueueItem {
             address: addr,
             account: SyncAccount(data),
@@ -471,7 +473,7 @@ impl state::Backend for StateDB {
         cache.insert(hash, code);
     }
 
-    fn get_cached_account(&self, addr: &Address) -> Option<Option<Account>> {
+    fn get_cached_account(&self, addr: &Address) -> Option<Option<FVMAccount>> {
         let mut cache = self.account_cache.lock();
         if !Self::is_allowed(addr, &self.parent_hash, &cache.modifications) {
             return None;
@@ -500,7 +502,7 @@ impl state::Backend for StateDB {
     }
 
     fn get_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
-    where F: FnOnce(Option<&mut Account>) -> U {
+    where F: FnOnce(Option<&mut FVMAccount>) -> U {
         let mut cache = self.account_cache.lock();
         if !Self::is_allowed(a, &self.parent_hash, &cache.modifications) {
             return None;
@@ -532,7 +534,7 @@ impl state::Backend for StateDB {
 }
 
 /// Sync wrapper for the account.
-struct SyncAccount(Option<Account>);
+struct SyncAccount(Option<FVMAccount>);
 /// That implementation is safe because account is never modified or accessed in any way.
 /// We only need `Sync` here to allow `StateDb` to be kept in a `RwLock`.
 /// `Account` is `!Sync` by default because of `RefCell`s inside it.

@@ -25,7 +25,7 @@ use std::cmp;
 use std::sync::Arc;
 use aion_types::{H256, U256, H128, Address};
 use bytes::Bytes;
-use state::{Backend as StateBackend, State, Substate, CleanupMode};
+use state::{Backend as StateBackend, State, Substate, CleanupMode, AccType, FVMKey, FVMValue};
 use machine::EthereumMachine as Machine;
 use executive::*;
 use vms::{
@@ -105,8 +105,6 @@ where B: StateBackend
     }
 }
 
-use state::AVMInterface;
-
 impl<'a, B: 'a> AVMExt for AVMExternalities<'a, B>
 where B: StateBackend
 {
@@ -116,26 +114,25 @@ where B: StateBackend
 
     fn create_account(&mut self, a: &Address) {
         self.state
-            .new_avm_account(a)
-            .expect("create avm account failed");
+            .new_contract(a, 0.into(), 0.into(), AccType::AVM)
     }
 
     fn account_exists(&self, a: &Address) -> bool {
         self.state
-            .check_avm_acc_exists(a)
+            .exists(a, AccType::AVM)
             .expect("check avm account failed")
     }
 
     fn save_code(&mut self, address: &Address, code: Vec<u8>) {
         println!("AVMExt save code");
         self.state
-            .init_avm_code(address, code)
+            .init_code(address, code, AccType::AVM)
             .expect("save avm code should not fail");
     }
 
     fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
         println!("AVM get code");
-        match self.state.avm_code(address) {
+        match self.state.code(address, AccType::AVM) {
             Ok(code) => code,
             Err(_x) => None,
         }
@@ -148,7 +145,7 @@ where B: StateBackend
     }
 
     fn sload(&self, a: &Address, key: &Vec<u8>) -> Option<Vec<u8>> {
-        match self.state.get_avm_storage(a, key) {
+        match self.state.avm_storage_at(a, key) {
             Ok(value) => Some(value),
             Err(x) => None,
         }
@@ -156,38 +153,37 @@ where B: StateBackend
 
     fn remove_account(&mut self, a: &Address) {
         self.state
-            .remove_avm_account(a)
-            .expect("remove avm account failed");
+            .kill_account(a, AccType::AVM)
     }
 
     fn avm_balance(&self, a: &Address) -> U256 {
         self.state
-            .avm_balance(a)
+            .balance(a, AccType::AVM)
             .expect("Fatal error during get balance")
     }
 
     fn inc_balance(&mut self, a: &Address, value: &U256) {
         self.state
-            .add_avm_balance(a, value, CleanupMode::NoEmpty)
+            .add_balance(a, value, CleanupMode::NoEmpty, AccType::AVM)
             .expect("add balance failed");
 
     }
 
     fn dec_balance(&mut self, a: &Address, value: &U256) {
         self.state
-            .sub_avm_balance(a, value, &mut CleanupMode::NoEmpty)
+            .sub_balance(a, value, &mut CleanupMode::NoEmpty, AccType::AVM)
             .expect("decrease balance failed")
     }
 
     fn get_nonce(&self, a: &Address) -> u64 {
         self.state
-            .avm_nonce(a)
+            .nonce(a, AccType::AVM)
             .expect("get nonce failed").low_u64()
     }
 
     fn inc_nonce(&mut self, a: &Address) {
         self.state
-            .inc_avm_nonce(a)
+            .inc_nonce(a, AccType::AVM)
             .expect("increment nonce failed")
     }
 }
@@ -235,38 +231,46 @@ impl<'a, B: 'a> Ext for Externalities<'a, B>
 where B: StateBackend
 {
     fn storage_at(&self, key: &H128) -> H128 {
-        self.state
-            .storage_at(&self.origin_info[0].address, key)
-            .expect("Fatal error occurred when getting storage.")
+        let value = self.state
+            .storage_at(&self.origin_info[0].address, &FVMKey::Normal(*key))
+            .expect("Fatal error occurred when getting storage.");
+        match value {
+            FVMValue::Normal(v) => v,
+            FVMValue::Long(_) => panic!("unexpected storage value"),
+        }
     }
 
     fn set_storage(&mut self, key: H128, value: H128) {
         self.state
-            .set_storage(&self.origin_info[0].address, key, value)
+            .set_storage(&self.origin_info[0].address, FVMKey::Normal(key), FVMValue::Normal(value))
             .expect("Fatal error occurred when putting storage.");
     }
 
     fn storage_at_dword(&self, key: &H128) -> H256 {
-        self.state
-            .storage_at_dword(&self.origin_info[0].address, key)
-            .expect("Fatal error occurred when getting storage.")
+        let value =self.state
+            .storage_at(&self.origin_info[0].address, &FVMKey::Wide(*key))
+            .expect("Fatal error occurred when getting storage.");
+        match value {
+            FVMValue::Long(v) => v,
+            FVMValue::Normal(_) => panic!("unexpected fvm storage value"),
+        }
     }
 
     fn set_storage_dword(&mut self, key: H128, value: H256) {
         self.state
-            .set_storage_dword(&self.origin_info[0].address, key, value)
+            .set_storage(&self.origin_info[0].address, FVMKey::Wide(key), FVMValue::Long(value))
             .expect("Fatal error occurred when putting storage.")
     }
 
     fn exists(&self, address: &Address) -> bool {
         self.state
-            .exists(address)
+            .exists(address, AccType::FVM)
             .expect("Fatal error occurred when checking account existance.")
     }
 
     fn exists_and_not_null(&self, address: &Address) -> bool {
         self.state
-            .exists_and_not_null(address)
+            .exists_and_not_null(address, AccType::FVM)
             .expect("Fatal error occurred when checking account existance.")
     }
 
@@ -274,7 +278,7 @@ where B: StateBackend
 
     fn balance(&self, address: &Address) -> U256 {
         self.state
-            .balance(address)
+            .balance(address, AccType::FVM)
             .expect("Fatal error occurred when getting balance.")
     }
 
@@ -322,7 +326,7 @@ where B: StateBackend
     /// Create new contract account
     fn create(&mut self, gas: &U256, value: &U256, code: &[u8]) -> ExecutionResult {
         // create new contract address
-        let (address, code_hash) = match self.state.nonce(&self.origin_info[0].address) {
+        let (address, code_hash) = match self.state.nonce(&self.origin_info[0].address, AccType::FVM) {
             Ok(nonce) => contract_address(&self.origin_info[0].address, &nonce),
             Err(e) => {
                 debug!(target: "ext", "Database corruption encountered: {:?}", e);
@@ -371,7 +375,7 @@ where B: StateBackend
             result.return_data = ReturnData::new(address_vec, 0, length);
 
             // Increment nonce of the caller contract account
-            if let Err(e) = self.state.inc_nonce(&self.origin_info[0].address) {
+            if let Err(e) = self.state.inc_nonce(&self.origin_info[0].address, AccType::FVM) {
                 debug!(target: "ext", "Database corruption encountered: {:?}", e);
                 return ExecutionResult {
                     gas_left: 0.into(),
@@ -385,7 +389,7 @@ where B: StateBackend
 
             // EIP-161
             // Newly created account starts at nonce 1. (to avoiding being considered as empty/null account)
-            if let Err(e) = self.state.inc_nonce(&address) {
+            if let Err(e) = self.state.inc_nonce(&address, AccType::FVM) {
                 debug!(target: "ext", "Database corruption encountered: {:?}", e);
                 return ExecutionResult {
                     gas_left: 0.into(),
@@ -419,8 +423,8 @@ where B: StateBackend
         // Get code from the called account
         let code_res = self
             .state
-            .code(code_address)
-            .and_then(|code| self.state.code_hash(code_address).map(|hash| (code, hash)));
+            .code(code_address, AccType::FVM)
+            .and_then(|code| self.state.code_hash(code_address, AccType::FVM).map(|hash| (code, hash)));
         let (code, code_hash) = match code_res {
             Ok((code, hash)) => (code, hash),
             Err(_) => {
@@ -464,19 +468,19 @@ where B: StateBackend
         };
 
         let mut ex = Executive::from_parent(self.state, self.env_info, self.machine, self.depth);
-        ex.call(params, self.substate)
+        ex.call(params, self.substate, AccType::FVM)
     }
 
     fn extcode(&self, address: &Address) -> Arc<Bytes> {
         self.state
-            .code(address)
+            .code(address, AccType::FVM)
             .expect("Fatal error occurred when getting code.")
             .unwrap_or_else(|| Arc::new(vec![]))
     }
 
     fn extcodesize(&self, address: &Address) -> usize {
         self.state
-            .code_size(address)
+            .code_size(address, AccType::FVM)
             .expect("Fatal error occurred when getting code size.")
             .unwrap_or(0)
     }
@@ -498,7 +502,7 @@ where B: StateBackend
         if &address == refund_address {
             // TODO [todr] To be consistent with CPP client we set balance to 0 in that case.
             self.state
-                .sub_balance(&address, &balance, &mut CleanupMode::NoEmpty)
+                .sub_balance(&address, &balance, &mut CleanupMode::NoEmpty, AccType::FVM)
                 .expect(
                     "Fatal error occurred when subtracting balance from address to be destructed",
                 );
@@ -510,6 +514,7 @@ where B: StateBackend
                     refund_address,
                     &balance,
                     self.substate.to_cleanup_mode(),
+                    AccType::FVM,
                 )
                 .expect("Fatal error occurred when transfering balance.");
         }
@@ -530,7 +535,7 @@ where B: StateBackend
         //      Need more thoughts how to handle and return init_code exception
         //      from vm module to kernel.
         self.state
-            .init_code(&self.origin_info[0].address, code)
+            .init_code(&self.origin_info[0].address, code, AccType::FVM)
             .expect(
                 "init_code should not fail as account should
             already be created before",
