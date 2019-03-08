@@ -403,7 +403,8 @@ impl SyncStorage {
         best_block_num: u64,
         best_hash: H256,
         target_total_difficulty: U256,
-    ) {
+    )
+    {
         let mut network_status = NETWORK_STATUS.get().write();
         if target_total_difficulty > network_status.total_diff {
             network_status.best_block_num = best_block_num;
@@ -471,8 +472,16 @@ impl SyncStorage {
     }
 
     pub fn reset() {
-        SYNC_EXECUTORS.get().write().expect("get_executor error").inner = None;
-        BLOCK_CHAIN.get().write().expect("get_block_chain error").inner = None;
+        SYNC_EXECUTORS
+            .get()
+            .write()
+            .expect("get_executor error")
+            .inner = None;
+        BLOCK_CHAIN
+            .get()
+            .write()
+            .expect("get_block_chain error")
+            .inner = None;
     }
 }
 

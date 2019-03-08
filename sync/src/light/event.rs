@@ -1,4 +1,5 @@
 /*******************************************************************************
+ * Copyright (c) 2015-2018 Parity Technologies (UK) Ltd.
  * Copyright (c) 2018-2019 Aion foundation.
  *
  *     This file is part of the aion network project.
@@ -19,41 +20,25 @@
  *
  ******************************************************************************/
 
-extern crate parking_lot;
-extern crate bincode;
-extern crate byteorder;
-extern crate bytes;
-extern crate futures;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-extern crate lru_cache;
-extern crate rand;
-extern crate rustc_hex;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde;
-extern crate state;
-extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_threadpool;
+use std::fmt;
 
-extern crate blake2b;
-extern crate acore;
-extern crate acore_bytes;
-extern crate acore_io;
-extern crate aion_types;
-extern crate rlp;
-extern crate uuid;
-extern crate aion_version as version;
+pub enum LightEvent {
+    OnDemandReq,
+    OnDemandRes,
+}
 
-pub mod net;
-pub mod p2p;
-pub mod sync;
-pub mod light;
+impl fmt::Display for LightEvent {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let printable = match *self {
+            LightEvent::OnDemandReq => "OnDemandReq",
+            LightEvent::OnDemandRes => "OnDemandRes",
+        };
+        write!(f, "{}", printable)
+    }
+}
 
-extern crate db as kvdb;
-
-#[cfg(test)]
-mod tests;
+#[test]
+fn display_event_test() {
+    println!("SyncEvent: {}", SyncEvent::OnDeMandReq);
+    println!("SyncEvent: {}", SyncEvent::OnDeMandRes);
+}

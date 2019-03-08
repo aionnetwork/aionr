@@ -46,6 +46,7 @@ use self::storage::{
     ActivePeerInfo, PeerInfo, SyncState, SyncStatus, SyncStorage, TransactionStats,
 };
 use rustc_hex::ToHex;
+use light::LightSyncManager;
 
 pub mod action;
 pub mod error;
@@ -268,7 +269,9 @@ impl SyncMgr {
                 trace!(target: "sync", "Ver 0 package received.");
 
                 match Control::from(req.head.ctrl) {
-                    Control::NET => {}
+                    Control::NET | Control::LIGHT => {
+                        error!(target: "sync", "unreachable control!");
+                    }
                     Control::SYNC => {
                         trace!(target: "sync", "P2P message received.");
 
@@ -465,11 +468,14 @@ impl NetworkManager for Sync {
         let sync_handler = DefaultHandler {
             callback: SyncMgr::handle,
         };
+        let light_handler = DefaultHandler {
+            callback: LightSyncManager::handle,
+        };
 
         P2pMgr::enable(self.network_config());
         debug!(target: "sync", "###### P2P enabled... ######");
 
-        NetManager::enable(sync_handler);
+        NetManager::enable(sync_handler, light_handler);
         debug!(target: "sync", "###### network enabled... ######");
 
         SyncMgr::enable();

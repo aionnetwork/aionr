@@ -345,7 +345,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     };
 
     let runtime_jsonrpc = {
-        if cmd.http_conf.processing_threads > num_cpus::get() {
+        if cmd.http_conf.enabled && cmd.http_conf.processing_threads > num_cpus::get() {
             warn!(target: "run","jsonrpc processing threads is greater than num of cpus");
         }
         tokio::runtime::Builder::new()

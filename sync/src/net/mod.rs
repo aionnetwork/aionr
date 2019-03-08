@@ -42,20 +42,22 @@ use self::handler::handshake_handler::HandshakeHandler;
 use self::handler::pingpong_handler::PingPongHandler;
 
 lazy_static! {
-    static ref DEFAULT_HANDLER: Storage<DefaultHandler> = Storage::new();
+    static ref SYNC_HANDLER: Storage<DefaultHandler> = Storage::new();
+    static ref LIGHT_HANDLER: Storage<DefaultHandler> = Storage::new();
     static ref NET_RUNTIME: Storage<RwLock<Runtime>> = Storage::new();
 }
 
-const RECONNECT_BOOT_NOEDS_INTERVAL: u64 = 10;
-const RECONNECT_NORMAL_NOEDS_INTERVAL: u64 = 5;
+const RECONNECT_BOOT_NODES_INTERVAL: u64 = 10;
+const RECONNECT_NORMAL_NODES_INTERVAL: u64 = 5;
 const NODE_ACTIVE_REQ_INTERVAL: u64 = 10;
 
 #[derive(Clone, Copy)]
 pub struct NetManager;
 
 impl NetManager {
-    pub fn enable(handler: DefaultHandler) {
-        DEFAULT_HANDLER.set(handler);
+    pub fn enable(sync_handler: DefaultHandler, light_handler: DefaultHandler) {
+        SYNC_HANDLER.set(sync_handler);
+        LIGHT_HANDLER.set(light_handler);
         NET_RUNTIME.set(RwLock::new(
             Builder::new()
                 .core_threads(3)
@@ -88,7 +90,7 @@ impl NetManager {
         let boot_nodes = P2pMgr::load_boot_nodes(network_config.boot_nodes.clone());
         let connect_boot_nodes_task = Interval::new(
             Instant::now(),
-            Duration::from_secs(RECONNECT_BOOT_NOEDS_INTERVAL),
+            Duration::from_secs(RECONNECT_BOOT_NODES_INTERVAL),
         ).for_each(move |_| {
             for boot_node in boot_nodes.iter() {
                 let node_hash = P2pMgr::calculate_hash(&boot_node.get_node_id());
@@ -122,8 +124,9 @@ impl NetManager {
 
         let connect_normal_nodes_task = Interval::new(
             Instant::now(),
-            Duration::from_secs(RECONNECT_NORMAL_NOEDS_INTERVAL),
-        ).for_each(move |_| {
+            Duration::from_secs(RECONNECT_NORMAL_NODES_INTERVAL),
+        )
+        .for_each(move |_| {
             let active_nodes_count = P2pMgr::get_nodes_count(ALIVE);
             if !sync_from_boot_nodes_only && active_nodes_count < max_peers_num {
                 if let Some(peer_node) = P2pMgr::get_an_inactive_node() {
@@ -139,7 +142,7 @@ impl NetManager {
 
             Ok(())
         })
-            .map_err(|e| error!("interval errored; err={:?}", e));
+        .map_err(|e| error!("interval errored; err={:?}", e));
         NET_RUNTIME
             .get()
             .write()
@@ -151,12 +154,13 @@ impl NetManager {
         let activenodes_req_task = Interval::new(
             Instant::now(),
             Duration::from_secs(NODE_ACTIVE_REQ_INTERVAL),
-        ).for_each(move |_| {
+        )
+        .for_each(move |_| {
             ActiveNodesHandler::send_activenodes_req();
 
             Ok(())
         })
-            .map_err(|e| error!("interval errored; err={:?}", e));
+        .map_err(|e| error!("interval errored; err={:?}", e));
         NET_RUNTIME
             .get()
             .write()
@@ -203,7 +207,13 @@ impl NetManager {
                     Control::SYNC => {
                         trace!(target: "net", "P2P SYNC message received.");
 
-                        let handler = DEFAULT_HANDLER.get();
+                        let handler = SYNC_HANDLER.get();
+                        handler.handle(node, req);
+                    }
+                    Control::LIGHT => {
+                        trace!(target: "net", "LIGHT MOD SYNC message received.");
+
+                        let handler = LIGHT_HANDLER.get();
                         handler.handle(node, req);
                     }
                     _ => {

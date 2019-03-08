@@ -1,4 +1,5 @@
 /*******************************************************************************
+ * Copyright (c) 2015-2018 Parity Technologies (UK) Ltd.
  * Copyright (c) 2018-2019 Aion foundation.
  *
  *     This file is part of the aion network project.
@@ -18,42 +19,25 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
+pub enum Kind {
+    Account = 0,
+    UNKNOWN = 0xff,
+}
 
-extern crate parking_lot;
-extern crate bincode;
-extern crate byteorder;
-extern crate bytes;
-extern crate futures;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-extern crate lru_cache;
-extern crate rand;
-extern crate rustc_hex;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde;
-extern crate state;
-extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_threadpool;
+impl Kind {
+    pub fn value(&self) -> u8 {
+        match self {
+            Kind::Account => 0u8,
+            Kind::UNKNOWN => 0xffu8,
+        }
+    }
+}
 
-extern crate blake2b;
-extern crate acore;
-extern crate acore_bytes;
-extern crate acore_io;
-extern crate aion_types;
-extern crate rlp;
-extern crate uuid;
-extern crate aion_version as version;
-
-pub mod net;
-pub mod p2p;
-pub mod sync;
-pub mod light;
-
-extern crate db as kvdb;
-
-#[cfg(test)]
-mod tests;
+impl From<u8> for Kind {
+    fn from(value: u8) -> Kind {
+        match value {
+            0 => Kind::Account,
+            _ => Kind::UNKNOWN,
+        }
+    }
+}

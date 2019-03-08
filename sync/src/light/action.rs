@@ -19,41 +19,40 @@
  *
  ******************************************************************************/
 
-extern crate parking_lot;
-extern crate bincode;
-extern crate byteorder;
-extern crate bytes;
-extern crate futures;
-#[macro_use]
-extern crate lazy_static;
-#[macro_use]
-extern crate log;
-extern crate lru_cache;
-extern crate rand;
-extern crate rustc_hex;
-#[macro_use]
-extern crate serde_derive;
-extern crate serde;
-extern crate state;
-extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_threadpool;
+use std::fmt;
 
-extern crate blake2b;
-extern crate acore;
-extern crate acore_bytes;
-extern crate acore_io;
-extern crate aion_types;
-extern crate rlp;
-extern crate uuid;
-extern crate aion_version as version;
+#[derive(Serialize, Deserialize, PartialEq)]
+pub enum LightAction {
+    ONDEMANDREQ = 0,
+    ONDEMANDRES = 1,
+    UNKNOWN = 0xFF,
+}
 
-pub mod net;
-pub mod p2p;
-pub mod sync;
-pub mod light;
+impl LightAction {
+    pub fn value(&self) -> u8 {
+        match *self {
+            LightAction::ONDEMANDREQ => 0 as u8,
+            LightAction::ONDEMANDRES => 1 as u8,
+            LightAction::UNKNOWN => 0xFF as u8,
+        }
+    }
 
-extern crate db as kvdb;
+    pub fn from(value: u8) -> LightAction {
+        match value {
+            0 => LightAction::ONDEMANDREQ,
+            1 => LightAction::ONDEMANDRES,
+            _ => LightAction::UNKNOWN,
+        }
+    }
+}
 
-#[cfg(test)]
-mod tests;
+impl fmt::Display for LightAction {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        let printable = match *self {
+            LightAction::ONDEMANDREQ => "ONDEMANDREQ",
+            LightAction::ONDEMANDRES => "ONDEMANDRES",
+            LightAction::UNKNOWN => "UNKNOWN",
+        };
+        write!(f, "{}", printable)
+    }
+}
