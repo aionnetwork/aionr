@@ -77,7 +77,7 @@ impl FVMAccount {
             code_filth: Filth::Clean,
             address_hash: Cell::new(None),
             empty_but_commit: false,
-            account_type: AccType::AVM,
+            account_type: AccType::FVM,
         }
     }
 

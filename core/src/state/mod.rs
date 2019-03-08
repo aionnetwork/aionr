@@ -489,7 +489,12 @@ impl<B: Backend> State<B> {
     pub fn exists(&self, a: &Address) -> trie::Result<bool> {
         // Bloom filter does not contain empty accounts, so it is important here to
         // check if account exists in the database directly before EIP-161 is in effect.
-        self.ensure_fvm_cached(a, RequireCache::None, false, |a| a.is_some())
+        // self.ensure_fvm_cached(a, RequireCache::None, false, |a| a.is_some())
+        let fvm_exist = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| a.is_some());
+        match fvm_exist {
+            Ok(_) => fvm_exist,
+            _ => self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| a.is_some()),
+        }
     }
 
     /// Determine whether an account exists and if not empty.

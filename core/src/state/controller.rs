@@ -1,15 +1,19 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
-use aion_types::{Address, U256};
+use aion_types::{Address, U256, H256};
 use state::{
     VMAccount,
     FVMAccount,
     AVMAccount,
-    Backend,
     RequireCache,
+    Backend,
+    AccType,
 };
+
+use factory::Factories;
+use state_db::StateDB;
 use trie;
-use account_db::Factory as AccountFactory;
+use trie::{Trie, TrieError};
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 /// Account modification state. Used to check if the account was
@@ -125,8 +129,6 @@ where T: VMAccount
     fn insert_cache(&self, address: &Address, account: AccountEntry<T>);
     ///
     fn note_cache(&self, address: &Address);
-    // get cached account entry
-    // fn get_cached(&self, address: &Address) -> Option<&AccountEntry<T>>;
 }
 
 impl<T: VMAccount> AccountCacheOps<T> for VMAccountManager<T> {
@@ -155,7 +157,6 @@ impl<T: VMAccount> AccountCacheOps<T> for VMAccountManager<T> {
             });
         }
     }
-
 }
 
 // macro_rules! impl_cache_ops {
@@ -207,6 +208,146 @@ impl<T: VMAccount> VMAccountManager<T> {
             cache: RefCell::new(cache),
             checkpoints: RefCell::new(Vec::new()),
             account_start_nonce: account_start_nonce,
+        }
+    }
+}
+
+impl VMAccountManager<FVMAccount> {
+    pub fn get_cached<F, U, B: Backend>(
+        &self,
+        a: &Address,
+        db: &B,
+        root: H256,
+        factories: &Factories,
+        require: RequireCache,
+        check_null: bool,
+        f: F,
+    ) -> trie::Result<U>
+    where F: Fn(Option<&FVMAccount>) -> U,
+    {
+        // get from local cache
+        if let Some(ref mut maybe_acc) = self.cache.borrow_mut().get_mut(a) {
+            if let Some(ref mut account) = maybe_acc.account {
+                let accountdb = factories
+                    .accountdb
+                    .readonly(db.as_hashstore(), account.address_hash(a));
+                account.update_account_cache(require, db, accountdb.as_hashstore());
+                return Ok(f(Some(account)));
+            }
+            return Ok(f(None));
+        }
+
+        // get from global cache
+
+        let result = db.get_cached(a, |mut acc| {
+            if let Some(ref mut account) = acc {
+                let accountdb = factories
+                    .accountdb
+                    .readonly(db.as_hashstore(), account.address_hash(a));
+                account.update_account_cache(require, db, accountdb.as_hashstore());
+            }
+            f(acc.map(|a| &*a))
+        });
+        match result {
+            Some(r) => Ok(r),
+            None => {
+                // first check if it is not in database for sure
+                if check_null && db.is_known_null(a) {
+                    return Ok(f(None));
+                }
+
+                // not found in the global cache, get from the DB and insert into local
+                let state_db = factories
+                    .trie
+                    .readonly(db.as_hashstore(), &root)?;
+                let mut maybe_acc = state_db.get_with(a, FVMAccount::from_rlp)?;
+                if let Some(ref mut account) = maybe_acc.as_mut() {
+                    if account.account_type != AccType::FVM {
+                        return Err(Box::new(TrieError::IncompleteDatabase(root)));
+                    }
+                    let accountdb = factories
+                        .accountdb
+                        .readonly(db.as_hashstore(), account.address_hash(a));
+                    account.update_account_cache(
+                        require,
+                        db,
+                        accountdb.as_hashstore(),
+                    );
+                }
+                let r = f(maybe_acc.as_ref());
+                self.insert_cache(a, AccountEntry::new_clean(maybe_acc));
+                Ok(r)
+            }
+        }
+    }
+}
+
+impl VMAccountManager<AVMAccount> {
+    pub fn get_cached<F, U, B: Backend>(
+        &self,
+        a: &Address,
+        db: &B,
+        root: H256,
+        factories: &Factories,
+        require: RequireCache,
+        check_null: bool,
+        f: F,
+    ) -> trie::Result<U>
+    where F: Fn(Option<&AVMAccount>) -> U,
+    {
+        // get from local cache
+        if let Some(ref mut maybe_acc) = self.cache.borrow_mut().get_mut(a) {
+            if let Some(ref mut account) = maybe_acc.account {
+                let accountdb = factories
+                    .accountdb
+                    .readonly(db.as_hashstore(), account.address_hash(a));
+                account.update_account_cache(require, db, accountdb.as_hashstore());
+                return Ok(f(Some(account)));
+            }
+            return Ok(f(None));
+        }
+
+        // get from global cache
+
+        let result = db.get_avm_cached(a, |mut acc| {
+            if let Some(ref mut account) = acc {
+                let accountdb = factories
+                    .accountdb
+                    .readonly(db.as_hashstore(), account.address_hash(a));
+                account.update_account_cache(require, db, accountdb.as_hashstore());
+            }
+            f(acc.map(|a| &*a))
+        });
+        match result {
+            Some(r) => Ok(r),
+            None => {
+                // first check if it is not in database for sure
+                if check_null && db.is_known_null(a) {
+                    return Ok(f(None));
+                }
+
+                // not found in the global cache, get from the DB and insert into local
+                let state_db = factories
+                    .trie
+                    .readonly(db.as_hashstore(), &root)?;
+                let mut maybe_acc = state_db.get_with(a, AVMAccount::from_rlp)?;
+                if let Some(ref mut account) = maybe_acc.as_mut() {
+                    if account.account_type != AccType::AVM {
+                        return Err(Box::new(TrieError::IncompleteDatabase(root)));
+                    }
+                    let accountdb = factories
+                        .accountdb
+                        .readonly(db.as_hashstore(), account.address_hash(a));
+                    account.update_account_cache(
+                        require,
+                        db,
+                        accountdb.as_hashstore(),
+                    );
+                }
+                let r = f(maybe_acc.as_ref());
+                self.insert_cache(a, AccountEntry::new_clean(maybe_acc));
+                Ok(r)
+            }
         }
     }
 }

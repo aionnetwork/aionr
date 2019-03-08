@@ -15,7 +15,7 @@ pub enum AccType {
 impl From<u8> for AccType {
     fn from(t: u8) -> AccType {
         match t {
-            0xf => AccType::AVM,
+            0x01 => AccType::AVM,
             _ => AccType::FVM,
         }
     }

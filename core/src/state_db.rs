@@ -545,7 +545,7 @@ mod tests {
     use aion_types::{H256, U256, Address};
     use kvdb::DBTransaction;
     use tests::helpers::*;
-    use state::{Account, Backend, FVMAccount, VMAccount};
+    use state::{VMAccount, Backend, FVMAccount};
     use logger::init_log;
 
     #[test]
