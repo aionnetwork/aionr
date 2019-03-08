@@ -490,71 +490,92 @@ impl<B: Backend> State<B> {
         // Bloom filter does not contain empty accounts, so it is important here to
         // check if account exists in the database directly before EIP-161 is in effect.
         // self.ensure_fvm_cached(a, RequireCache::None, false, |a| a.is_some())
-        let fvm_exist = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| a.is_some());
-        match fvm_exist {
-            Ok(_) => fvm_exist,
-            _ => self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| a.is_some()),
+        let result = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| a.is_some());
+        if result.is_ok() {
+            result
+        } else {
+            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| a.is_some())
         }
     }
 
     /// Determine whether an account exists and if not empty.
-    pub fn exists_and_not_null(&self, a: &Address, acc_type: AccType) -> trie::Result<bool> {
-        match acc_type {
-            AccType::FVM => {
-                self.ensure_fvm_cached(a, RequireCache::None, false, |a| {
-                    a.map_or(false, |a| !a.is_null())
-                })
-            },
-            AccType::AVM => {
-                self.ensure_avm_cached(a, RequireCache::None, false, |a| {
-                    a.map_or(false, |a| !a.is_null())
-                })
-            },
+    pub fn exists_and_not_null(&self, a: &Address) -> trie::Result<bool> {
+        let result = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| {
+            a.map_or(false, |a| !a.is_null())
+        });
+        if result.is_ok() {
+            result
+        } else {
+            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| {
+                a.map_or(false, |a| !a.is_null())
+            })
         }
     }
 
     /// Determine whether an account exists and has code or non-zero nonce.
-    pub fn exists_and_has_code_or_nonce(&self, a: &Address, acc_type: AccType) -> trie::Result<bool> {
-        match acc_type {
-            AccType::FVM => {
-                self.ensure_fvm_cached(a, RequireCache::CodeSize, false, |a| {
-                    a.map_or(false, |a| {
-                        a.code_hash() != BLAKE2B_EMPTY || *a.nonce() != self.fvm_manager.account_start_nonce
-                    })
+    pub fn exists_and_has_code_or_nonce(&self, a: &Address) -> trie::Result<bool> {
+        let result = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::CodeSize, false, |a| {
+            a.map_or(false, |a| {
+                a.code_hash() != BLAKE2B_EMPTY || *a.nonce() != self.fvm_manager.account_start_nonce
+            })
+        });
+        if result.is_ok() {
+            result
+        } else {
+            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::CodeSize, false, |a| {
+                a.map_or(false, |a| {
+                    a.code_hash() != BLAKE2B_EMPTY || *a.nonce() != self.avm_manager.account_start_nonce
                 })
-            },
-            AccType::AVM => {
-                self.ensure_avm_cached(a, RequireCache::CodeSize, false, |a| {
-                    a.map_or(false, |a| {
-                        a.code_hash() != BLAKE2B_EMPTY || *a.nonce() != self.avm_manager.account_start_nonce
-                    })
-                })
-            },
+            })
         }
     }
 
     /// Get the balance of account `a`.
     pub fn balance(&self, a: &Address) -> trie::Result<U256> {
-        self.ensure_fvm_cached(a, RequireCache::None, true, |a| {
+        let fvm_balance = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref()
                 .map_or(U256::zero(), |account| *account.balance())
-        })
+        });
+        if fvm_balance.is_ok() {
+            return fvm_balance;
+        } else {
+            return self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
+                a.as_ref()
+                    .map_or(U256::zero(), |account| *account.balance())
+            });
+        }
     }
 
     /// Get the nonce of account `a`.
     pub fn nonce(&self, a: &Address) -> trie::Result<U256> {
-        self.ensure_fvm_cached(a, RequireCache::None, true, |a| {
+        let nonce = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref()
                 .map_or(self.fvm_manager.account_start_nonce, |account| *account.nonce())
-        })
+        });
+        if nonce.is_ok() {
+            return nonce;
+        } else {
+            return self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
+                a.as_ref()
+                    .map_or(self.avm_manager.account_start_nonce, |account| *account.nonce())
+            });
+        }
     }
 
     /// Get the storage root of account `a`.
     pub fn storage_root(&self, a: &Address) -> trie::Result<Option<H256>> {
-        self.ensure_fvm_cached(a, RequireCache::None, true, |a| {
+        let root = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref()
                 .and_then(|account| account.storage_root().cloned())
-        })
+        });
+        if root.is_ok() {
+            root
+        } else {
+            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
+                a.as_ref()
+                    .and_then(|account| account.storage_root().cloned())
+            })
+        }
     }
 
     /// Mutate storage of account `address` so that it is `value` for `key`.
@@ -717,31 +738,43 @@ impl<B: Backend> State<B> {
 
     /// Get accounts' code.
     pub fn code(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
-        self.ensure_fvm_cached(a, RequireCache::Code, true, |a| {
+        let code = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::Code, true, |a| {
             a.as_ref().map_or(None, |a| a.code().clone())
-        })
+        });
+        if code.is_ok() {
+            code
+        } else {
+            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::Code, true, |a| {
+                a.as_ref().map_or(None, |a| a.code().clone())
+            })
+        }
     }
 
     /// Get an account's code hash.
     pub fn code_hash(&self, a: &Address) -> trie::Result<H256> {
-        self.ensure_fvm_cached(a, RequireCache::None, true, |a| {
+        let hash = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref().map_or(BLAKE2B_EMPTY, |a| a.code_hash())
-        })
+        });
+        if hash.is_ok() {
+            hash
+        } else {
+            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
+                a.as_ref().map_or(BLAKE2B_EMPTY, |a| a.code_hash())
+            })
+        }
     }
 
     /// Get accounts' code size.
     pub fn code_size(&self, a: &Address, acc_type: AccType) -> trie::Result<Option<usize>> {
-        match acc_type {
-            AccType::FVM => {
-                self.ensure_fvm_cached(a, RequireCache::CodeSize, true, |a| {
-                    a.as_ref().and_then(|a| a.code_size())
-                })
-            },
-            AccType::AVM => {
-                self.ensure_avm_cached(a, RequireCache::CodeSize, true, |a| {
-                    a.as_ref().and_then(|a| a.code_size())
-                })
-            },
+        let code_size = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::CodeSize, true, |a| {
+            a.as_ref().and_then(|a| a.code_size())
+        });
+        if code_size.is_ok() {
+            code_size
+        } else {
+            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::CodeSize, true, |a| {
+                a.as_ref().and_then(|a| a.code_size())
+            })
         }
     }
 
@@ -1462,7 +1495,7 @@ impl<B: Backend> State<B> {
                             .factories
                             .trie
                             .readonly(self.db.as_hashstore(), &self.root)?;
-                        AccountEntry::new_clean(db.get_with(a, Account::from_rlp)?)
+                        AccountEntry::new_clean(db.get_with(a, FVMAccount::from_rlp)?)
                     } else {
                         AccountEntry::new_clean(None)
                     };
@@ -1778,14 +1811,14 @@ mod tests {
         let a = Address::zero();
         let mut state = get_temp_state();
         assert_eq!(state.exists(&a).unwrap(), false);
-        assert_eq!(state.exists_and_not_null(&a, AccType::FVM).unwrap(), false);
+        assert_eq!(state.exists_and_not_null(&a).unwrap(), false);
         state.inc_nonce(&a).unwrap();
         assert_eq!(state.exists(&a).unwrap(), true);
-        assert_eq!(state.exists_and_not_null(&a, AccType::FVM).unwrap(), true);
+        assert_eq!(state.exists_and_not_null(&a).unwrap(), true);
         assert_eq!(state.nonce(&a).unwrap(), U256::from(1u64));
         state.kill_account(&a, AccType::FVM);
         assert_eq!(state.exists(&a).unwrap(), false);
-        assert_eq!(state.exists_and_not_null(&a, AccType::FVM).unwrap(), false);
+        assert_eq!(state.exists_and_not_null(&a).unwrap(), false);
         assert_eq!(state.nonce(&a).unwrap(), U256::from(0u64));
     }
 
@@ -1815,7 +1848,7 @@ mod tests {
         )
         .unwrap();
         assert!(!state.exists(&a).unwrap());
-        assert!(!state.exists_and_not_null(&a, AccType::FVM).unwrap());
+        assert!(!state.exists_and_not_null(&a).unwrap());
     }
 
     #[test]
@@ -1846,7 +1879,7 @@ mod tests {
         .unwrap();
 
         assert!(!state.exists(&a).unwrap());
-        assert!(!state.exists_and_not_null(&a, AccType::FVM).unwrap());
+        assert!(!state.exists_and_not_null(&a).unwrap());
     }
 
     #[test]

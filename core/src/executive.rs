@@ -717,7 +717,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // opcode. This applies retroactively starting from genesis.
         if self
             .state
-            .exists_and_not_null(&params.address, AccType::FVM)
+            .exists_and_not_null(&params.address)
             .unwrap_or(true)
         {
             return ExecutionResult {

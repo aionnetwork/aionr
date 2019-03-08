@@ -270,7 +270,7 @@ where B: StateBackend
 
     fn exists_and_not_null(&self, address: &Address) -> bool {
         self.state
-            .exists_and_not_null(address, AccType::FVM)
+            .exists_and_not_null(address)
             .expect("Fatal error occurred when checking account existance.")
     }
 
