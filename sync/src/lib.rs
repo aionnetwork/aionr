@@ -51,6 +51,7 @@ extern crate aion_version as version;
 pub mod net;
 pub mod p2p;
 pub mod sync;
+pub mod light;
 
 extern crate db as kvdb;
 

@@ -23,12 +23,10 @@ use aion_types::{H256, U256};
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use std::mem;
-use std::time::SystemTime;
 
 use super::super::action::SyncAction;
 use super::super::event::SyncEvent;
 use super::super::storage::SyncStorage;
-use super::blocks_headers_handler::BlockHeadersHandler;
 use p2p::*;
 
 const BEST_HASH_LENGTH: usize = 32;
@@ -107,11 +105,11 @@ impl StatusHandler {
 
         node.best_hash = H256::from(best_hash);
         node.best_block_num = best_block_num;
-        if node.mode != Mode::BACKWARD && node.mode != Mode::FORWARD {
-            let chain_info = SyncStorage::get_chain_info();
-            node.synced_block_num = chain_info.best_block_number;
-            node.current_total_difficulty = chain_info.total_difficulty;
-        }
+
+        let chain_info = SyncStorage::get_chain_info();
+        node.synced_block_num = chain_info.best_block_number;
+        node.current_total_difficulty = chain_info.total_difficulty;
+
         node.target_total_difficulty = U256::from(total_difficulty);
         SyncEvent::update_node_state(node, SyncEvent::OnStatusRes);
         node.inc_reputation(1);
@@ -128,13 +126,6 @@ impl StatusHandler {
             if !node.is_from_boot_list {
                 return;
             }
-        }
-
-        if SyncStorage::get_network_best_block_number() <= SyncStorage::get_synced_block_number() {
-            node.last_request_timestamp = SystemTime::now();
-            P2pMgr::update_node(node.node_hash, node);
-        } else {
-            BlockHeadersHandler::get_headers_from_node(node);
         }
     }
 }

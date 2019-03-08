@@ -18,23 +18,23 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
-use acore::block::Block;
-use acore::client::BlockId;
-use acore::header::Seal;
+use acore::client::{BlockId, BlockStatus};
 use aion_types::H256;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
-use std::time::SystemTime;
+use std::sync::Mutex;
 
 use super::super::action::SyncAction;
 use super::super::event::SyncEvent;
-use super::super::storage::{BlocksWrapper, SyncStorage};
+use super::super::storage::SyncStorage;
 use p2p::*;
 
-use super::blocks_headers_handler::BlockHeadersHandler;
+lazy_static! {
+    static ref LOCK: Mutex<u8> = Mutex::new(0);
+}
 
 const HASH_LEN: usize = 32;
+const REQUEST_SIZE: u64 = 96;
 
 pub struct BlockBodiesHandler;
 
@@ -45,45 +45,63 @@ impl BlockBodiesHandler {
         req.head.ctrl = Control::SYNC.value();
         req.head.action = SyncAction::BLOCKSBODIESREQ.value();
 
-        let mut hws = Vec::new();
-        if let Ok(mut downloaded_headers) = SyncStorage::get_downloaded_headers().try_lock() {
-            while let Some(hw) = downloaded_headers.pop_front() {
-                if !hw.headers.is_empty() {
-                    hws.push(hw);
+        let header_chain = SyncStorage::get_block_header_chain();
+        let block_chain = SyncStorage::get_block_chain();
+        let mut best_header_number = header_chain.chain_info().best_block_number;
+        let mut best_block_number = block_chain.chain_info().best_block_number;
+
+        let mut headers = Vec::new();
+        let mut number = best_block_number + 1;
+        let mut hash = H256::from(0);
+        while number <= best_header_number {
+            if let Some(header) = header_chain.block_header(BlockId::Number(number)) {
+                hash = header.hash();
+                headers.push(hash);
+                req.body.extend_from_slice(&hash);
+
+                if headers.len() == REQUEST_SIZE as usize {
+                    if let Some(ref mut node) = P2pMgr::get_an_active_node() {
+                        let mut get_headers_with_bodies_requested =
+                            SyncStorage::get_headers_with_bodies_requested().lock();
+                        {
+                            if !get_headers_with_bodies_requested.contains_key(&node.node_hash) {
+                                req.head.len = req.body.len() as u32;
+                                P2pMgr::send(node.node_hash, req.clone());
+                                get_headers_with_bodies_requested
+                                    .insert(node.node_hash, headers.clone());
+                                debug!(target: "sync", "send_blocks_bodies_req for #{} to #{} - {}, msg: {}.", number - REQUEST_SIZE, number, hash, req);
+
+                                SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
+                                P2pMgr::update_node(node.node_hash, node);
+                            }
+                        }
+                    }
+                    return;
+                } else {
+                    best_block_number = block_chain.chain_info().best_block_number + 1;
+                    best_header_number = header_chain.chain_info().best_block_number;
+                    if best_block_number > number {
+                        number = best_block_number;
+                    } else {
+                        number += 1;
+                    }
                 }
             }
         }
 
-        for hw in hws.iter() {
-            let mut req = req.clone();
-            req.body.clear();
-
-            let mut header_requested = Vec::new();
-            for header in hw.headers.iter() {
-                if !SyncStorage::is_downloaded_block_hashes(&header.hash())
-                    && !SyncStorage::is_imported_block_hash(&header.hash())
+        if headers.len() > 0 {
+            if let Some(ref mut node) = P2pMgr::get_an_active_node() {
+                let mut get_headers_with_bodies_requested =
+                    SyncStorage::get_headers_with_bodies_requested().lock();
                 {
-                    req.body.put_slice(&header.hash());
-                    header_requested.push(header.clone());
-                }
-            }
+                    if !get_headers_with_bodies_requested.contains_key(&node.node_hash) {
+                        req.head.len = req.body.len() as u32;
+                        P2pMgr::send(node.node_hash, req.clone());
+                        get_headers_with_bodies_requested.insert(node.node_hash, headers.clone());
+                        debug!(target: "sync", "send_blocks_bodies_req for #{} to #{} - {}, msg: {}.", number as usize - headers.len(), number, hash, req);
 
-            let body_len = req.body.len();
-            if body_len > 0 {
-                if let Ok(ref mut headers_with_bodies_requested) =
-                    SyncStorage::get_headers_with_bodies_requested().lock()
-                {
-                    if !headers_with_bodies_requested.contains_key(&hw.node_hash) {
-                        req.head.set_length(body_len as u32);
-
-                        P2pMgr::send(hw.node_hash, req);
-
-                        trace!(target: "sync", "Sync blocks bodies req sent...");
-                        let mut hw = hw.clone();
-                        hw.timestamp = SystemTime::now();
-                        hw.headers.clear();
-                        hw.headers.extend(header_requested);
-                        headers_with_bodies_requested.insert(hw.node_hash, hw);
+                        SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
+                        P2pMgr::update_node(node.node_hash, node);
                     }
                 }
             }
@@ -138,121 +156,38 @@ impl BlockBodiesHandler {
         trace!(target: "sync", "BLOCKSBODIESRES received from: {}.", node.get_ip_addr());
 
         let node_hash = node.node_hash;
-        let mut blocks = Vec::new();
         if req.body.len() > 0 {
             match SyncStorage::pick_headers_with_bodies_requested(&node_hash) {
-                Some(hw) => {
-                    let headers = hw.headers;
-                    if !headers.is_empty() {
-                        let rlp = UntrustedRlp::new(req.body.as_slice());
-
-                        let mut bodies = Vec::new();
-                        for block_bodies in rlp.iter() {
-                            for block_body in block_bodies.iter() {
-                                let mut transactions = Vec::new();
-                                if !block_body.is_empty() {
-                                    for transaction_rlp in block_body.iter() {
-                                        if !transaction_rlp.is_empty() {
-                                            if let Ok(transaction) = transaction_rlp.as_val() {
-                                                transactions.push(transaction);
-                                            }
-                                        }
-                                    }
-                                }
-                                bodies.push(transactions);
-                            }
-                        }
-
-                        if headers.len() == bodies.len() {
-                            for i in 0..headers.len() {
-                                let block = Block {
-                                    header: headers[i].clone(),
-                                    transactions: bodies[i].clone(),
-                                };
-                                if let Ok(mut downloaded_block_hashes) =
-                                    SyncStorage::get_downloaded_block_hashes().lock()
+                Some(hashes) => {
+                    let block_bodies = UntrustedRlp::new(req.body.as_slice());
+                    let header_chain = SyncStorage::get_block_header_chain();
+                    let block_chain = SyncStorage::get_block_chain();
+                    if let Ok(item_count) = block_bodies.item_count() {
+                        if hashes.len() == item_count {
+                            for i in 0..item_count {
+                                let hash = hashes[i];
+                                if let Some(header) = header_chain.block_header(BlockId::Hash(hash))
                                 {
-                                    let hash = block.header.hash();
-                                    if !downloaded_block_hashes.contains_key(&hash) {
-                                        blocks.push(block);
-                                        downloaded_block_hashes.insert(hash, 0);
-                                    } else {
-                                        trace!(target: "sync", "downloaded_block_hashes: {}.", hash);
-                                    }
-                                }
-                            }
-                        } else {
-                            debug!(
-                                target: "sync",
-                                "Count mismatch, headers count: {}, bodies count: {}, node id: {}",
-                                headers.len(),
-                                bodies.len(),
-                                node.get_node_id()
-                            );
-                            blocks.clear();
-                        }
+                                    if let Ok(body) = block_bodies.at(i) {
+                                        if let Ok(txs) = body.at(0) {
+                                            let mut data = header.into_inner();
+                                            data.extend_from_slice(txs.as_raw());
+                                            let mut block = RlpStream::new_list(2);
+                                            block.append_raw(&data, 2);
 
-                        if !blocks.is_empty() {
-                            if node.mode == Mode::LIGHTNING {
-                                if let Some(block) = blocks.get(0) {
-                                    let block_number = block.header.number();
-                                    let max_staged_block_number =
-                                        SyncStorage::get_max_staged_block_number();
-                                    if block_number <= max_staged_block_number {
-                                        debug!(target: "sync", "Block #{} is out of staging scope: [#{} - Lastest)", block_number, max_staged_block_number);
-                                        return;
-                                    } else {
-                                        let mut block_hashes_to_stage = Vec::new();
-                                        let mut blocks_to_stage = Vec::new();
-
-                                        let parent_hash = block.header.parent_hash();
-                                        let parent_number = block_number - 1;
-                                        if let Ok(mut staged_blocks) =
-                                            SyncStorage::get_staged_blocks().lock()
-                                        {
-                                            if staged_blocks.len() < 32
-                                                && !staged_blocks.contains_key(&parent_hash)
-                                            {
-                                                for blk in blocks.iter() {
-                                                    let hash = blk.header.hash();
-                                                    block_hashes_to_stage.push(hash);
-                                                    blocks_to_stage.push(blk.rlp_bytes(Seal::With));
-                                                }
-
-                                                let max_staged_block_number =
-                                                    parent_number + blocks_to_stage.len() as u64;
-
-                                                info!(target: "sync", "Staged blocks from {} to {} with parent: {}", parent_number + 1, max_staged_block_number, parent_hash);
-                                                debug!(target: "sync", "cache size: {}", staged_blocks.len());
-
-                                                SyncStorage::insert_staged_block_hashes(
-                                                    block_hashes_to_stage,
-                                                );
-
-                                                staged_blocks.insert(*parent_hash, blocks_to_stage);
-
-                                                if max_staged_block_number
-                                                    > SyncStorage::get_max_staged_block_number()
+                                            if LOCK.lock().is_ok() {
+                                                if block_chain.block_status(BlockId::Hash(hash))
+                                                    == BlockStatus::Unknown
                                                 {
-                                                    SyncStorage::set_max_staged_block_number(
-                                                        max_staged_block_number,
-                                                    );
+                                                    SyncStorage::insert_requested_time(hash);
+                                                    let result = block_chain
+                                                        .import_block(block.as_raw().to_vec());
+                                                    trace!(target: "sync", "result: {:?}.", result);
                                                 }
                                             }
-                                            node.inc_reputation(10);
                                         }
                                     }
                                 }
-                            } else {
-                                let mut bw = BlocksWrapper::new();
-                                bw.node_id_hash = node.node_hash;
-                                bw.blocks.extend(blocks);
-                                SyncStorage::insert_downloaded_blocks(bw);
-                                node.inc_reputation(20);
-                            }
-
-                            if node.mode == Mode::NORMAL || node.mode == Mode::THUNDER {
-                                BlockHeadersHandler::get_headers_from_node(node);
                             }
                         }
                     }

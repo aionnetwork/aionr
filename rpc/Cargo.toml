@@ -7,10 +7,10 @@ authors = ["Aion Foundation <admin@aion.network>"]
 
 [dependencies]
 ansi_term = "0.10"
-cid = "0.2"
+cid = "0.3.0"
 futures = "0.1.6"
 log = "0.3"
-multihash ="0.7"
+multihash ="0.8.0"
 order-stat = "0.1"
 parking_lot = "0.5"
 rand = "0.4"

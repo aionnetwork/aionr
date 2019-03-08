@@ -19,7 +19,20 @@
  *
  ******************************************************************************/
 
-pub mod status_handler;
-pub mod blocks_headers_handler;
-pub mod blocks_bodies_handler;
-pub mod broadcast_handler;
+use bytes::BufMut;
+
+use super::super::action::NetAction;
+use super::super::event::NetEvent;
+use p2p::*;
+
+pub struct OnDemandHandler;
+
+impl OnDemandHandler {
+    pub fn handle_on_demand_req(node: &mut Node, _req: ChannelBuffer) {
+        trace!(target: "net", "PING received.");
+    }
+
+    pub fn handle_on_demand_res(node: &mut Node, _req: ChannelBuffer) {
+        trace!(target: "net", "PING received.");
+    }
+}

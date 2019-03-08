@@ -22,6 +22,7 @@ acore-stratum = { path = "../stratum" }
 aion-types = { path = "../util/aion-types"}
 ethbloom = { path = "../util/ethbloom"}
 memory-cache = { path = "../util/memory_cache" }
+plain_hasher = { path = "../util/plain_hasher" }
 abi = { path = "../util/abi" }
 abi-contract = { path = "../util/abi/contract" }
 abi-derive = { path = "../util/abi/derive" }
@@ -70,6 +71,8 @@ bytebuffer = "0.2.1"
 transient-hashmap = "0.4"
 linked-hash-map = "0.5"
 tokio = "0.1.11"
+smallvec = "0.6"
+hashdb = "0.3.0"
 
 [dev-dependencies]
 trie-standardmap = { path = "../util/trie-standardmap" }

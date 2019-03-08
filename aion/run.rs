@@ -52,7 +52,7 @@ use pb::{new_pb, WalletApiConfiguration};
 use rpc;
 use rpc_apis;
 use sync::p2p::{NetworkConfig, P2pMgr};
-use sync::sync::SyncConfig;
+use sync::sync::{Params, SyncConfig};
 use tokio;
 use tokio::prelude::*;
 use user_defaults::UserDefaults;
@@ -238,9 +238,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     let client = service.client();
 
-    // drop the spec to free up genesis state.
-    drop(spec);
-
     // initialize the local node information store.
     let store = {
         let db = service.db();
@@ -298,16 +295,21 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     }
 
     // create sync object
-    let sync_config = SyncConfig::default();
+    let sync_params = Params {
+        config: SyncConfig::default(),
+        client: client.clone() as Arc<BlockChainClient>,
+        network_config: net_conf,
+        spec: spec,
+        db: service.db().clone(),
+    };
 
-    let (sync_provider, network_manager, chain_notify) = modules::sync(
-        sync_config,
-        net_conf,
-        client.clone() as Arc<BlockChainClient>,
-    )
-    .map_err(|e| format!("Sync error: {}", e))?;
+    let (sync_provider, network_manager, chain_notify) =
+        modules::sync(sync_params).map_err(|e| format!("Sync error: {}", e))?;
 
     service.add_notify(chain_notify.clone());
+
+    // drop the spec to free up genesis state.
+    // drop(spec);
 
     // spin up rpc eventloop
     let runtime_rpc = tokio::runtime::Builder::new()

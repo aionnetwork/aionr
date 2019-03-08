@@ -80,6 +80,9 @@ extern crate using_queue;
 extern crate table;
 extern crate memory_cache;
 extern crate journaldb;
+extern crate plain_hasher;
+extern crate smallvec;
+extern crate hashdb;
 
 #[macro_use]
 extern crate macros;

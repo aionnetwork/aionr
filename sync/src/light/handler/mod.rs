@@ -19,7 +19,4 @@
  *
  ******************************************************************************/
 
-pub mod status_handler;
-pub mod blocks_headers_handler;
-pub mod blocks_bodies_handler;
-pub mod broadcast_handler;
+pub mod on_demand_handler;

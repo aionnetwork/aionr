@@ -13,4 +13,4 @@ rand = "*"
 time = "*"
 libc = "*"
 aion-types = { path = "../../util/aion-types"}
-subtle = "0.5"
+subtle = "1.0.0"
