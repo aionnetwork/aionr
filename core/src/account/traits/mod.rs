@@ -21,6 +21,15 @@ impl From<u8> for AccType {
     }
 }
 
+impl From<AccType> for u8 {
+    fn from(t: AccType) -> u8 {
+        match t {
+            AccType::AVM => 0x01,
+            AccType::FVM => 0x00,
+        }
+    }
+}
+
 pub trait VMAccount: Sync + Send {
 
     fn from_rlp(rlp: &[u8]) -> Self;
@@ -114,7 +123,7 @@ pub trait VMAccount: Sync + Send {
     //TODO: 
     fn overwrite_with(&mut self, pther: Self);
 
-    fn acc_type(&self) -> AccType;
+    fn acc_type(&self) -> u8;
 
     fn update_account_cache<B: Backend>(
         &mut self,

@@ -160,12 +160,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     ) -> Result<Executed, ExecutionError>
     {
         let sender = t.sender();
-        let balance = self.state.balance(&sender, t.transaction_type.into())?;
+        let balance = self.state.balance(&sender)?;
         let needed_balance = t.value.saturating_add(t.gas.saturating_mul(t.gas_price));
         if balance < needed_balance {
             // give the sender a sufficient balance
             self.state
-                .add_balance(&sender, &(needed_balance - balance), CleanupMode::NoEmpty, t.transaction_type.into())?;
+                .add_balance(&sender, &(needed_balance - balance), CleanupMode::NoEmpty)?;
         }
 
         self.transact(t, check_nonce, true)
@@ -191,7 +191,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // validate transactions
         for t in txs {
             let sender = t.sender();
-            let nonce = self.state.nonce(&sender, t.transaction_type.into()).unwrap();
+            let nonce = self.state.nonce(&sender).unwrap();
 
             // 1. Check transaction nonce
             if check_nonce && t.nonce != nonce {
@@ -239,7 +239,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
             // 3. Check balance, avoid unaffordable transactions
             // TODO: we might need bigints here, or at least check overflows.
-            let balance: U512 = U512::from(self.state.balance(&sender, t.transaction_type.into()).unwrap());
+            let balance: U512 = U512::from(self.state.balance(&sender).unwrap());
             let gas_cost: U512 = t.gas.full_mul(t.gas_price);
             let total_cost: U512 = U512::from(t.value) + gas_cost;
             if balance < total_cost {
@@ -282,8 +282,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         gas: init_gas,
                         gas_price: t.gas_price,
                         value: t.value,
-                        code: self.state.code(address, t.transaction_type.into()).unwrap(),
-                        code_hash: Some(self.state.code_hash(address, t.transaction_type.into()).unwrap()),
+                        code: self.state.code(address).unwrap(),
+                        code_hash: Some(self.state.code_hash(address).unwrap()),
                         data: Some(t.data.clone()),
                         call_type: CallType::Call,
                         transaction_hash: t.hash(),
@@ -358,7 +358,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     {
         let _vm_lock = VM_LOCK.lock().unwrap();
         let sender = t.sender();
-        let nonce = self.state.nonce(&sender, t.transaction_type.into())?;
+        let nonce = self.state.nonce(&sender)?;
 
         // 1. Check transaction nonce
         if check_nonce && t.nonce != nonce {
@@ -405,7 +405,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         // 3. Check balance, avoid unaffordable transactions
         // TODO: we might need bigints here, or at least check overflows.
-        let balance: U512 = U512::from(self.state.balance(&sender, t.transaction_type.into())?);
+        let balance: U512 = U512::from(self.state.balance(&sender)?);
         let gas_cost: U512 = t.gas.full_mul(t.gas_price);
         let total_cost: U512 = U512::from(t.value) + gas_cost;
         if balance < total_cost {
@@ -425,12 +425,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // Increment nonce of the sender and deduct the cost of the entire gas limit from
         // the sender's account. After VM execution, gas left (not used) shall be refunded
         // (if applicable) to the sender's account.
-        self.state.inc_nonce(&sender, t.transaction_type.into())?;
+        self.state.inc_nonce(&sender)?;
         self.state.sub_balance(
             &sender,
             &U256::from(gas_cost),
             &mut substate.to_cleanup_mode(),
-            t.transaction_type.into(),
         )?;
 
         // Transactions are now handled in different ways depending on whether it's
@@ -466,8 +465,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     gas: init_gas,
                     gas_price: t.gas_price,
                     value: ActionValue::Transfer(t.value),
-                    code: self.state.code(address, t.transaction_type.into())?,
-                    code_hash: Some(self.state.code_hash(address, t.transaction_type.into())?),
+                    code: self.state.code(address)?,
+                    code_hash: Some(self.state.code_hash(address)?),
                     data: Some(t.data.clone()),
                     call_type: CallType::Call,
                     static_flag: false,
@@ -553,7 +552,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     &params.address,
                     &val,
                     substate.to_cleanup_mode(),
-                    acc_type,
                 ) {
                     return ExecutionResult {
                         gas_left: 0.into(),
@@ -571,8 +569,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // Builtin contract call
         if let Some(builtin) = self.machine.builtin(&params.code_address, self.info.number) {
             // Create contract account if it does yet exist (when being called for the first time)
-            if self.state.exists(&params.code_address, acc_type).is_ok()
-                && !self.state.exists(&params.code_address, acc_type).unwrap()
+            if self.state.exists(&params.code_address).is_ok()
+                && !self.state.exists(&params.code_address).unwrap()
             {
                 self.state
                     .new_contract(&params.code_address, 0.into(), 0.into(), acc_type);
@@ -664,7 +662,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     &params.address,
                     &val,
                     substate.to_cleanup_mode(),
-                    acc_type,
                 ) {
                     return ExecutionResult {
                         gas_left: 0.into(),
@@ -757,7 +754,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             // In case any error still occurs here, consider this transaction as a failure
             if let Err(_) =
                 self.state
-                    .sub_balance(&params.sender, &val, &mut substate.to_cleanup_mode(), AccType::FVM)
+                    .sub_balance(&params.sender, &val, &mut substate.to_cleanup_mode())
             {
                 return ExecutionResult {
                     gas_left: 0.into(),
@@ -863,7 +860,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         );
         // Below: NoEmpty is safe since the sender must already be non-null to have sent this transaction
         self.state
-            .add_balance(&sender, &refund_value, CleanupMode::NoEmpty, AccType::FVM)?;
+            .add_balance(&sender, &refund_value, CleanupMode::NoEmpty)?;
         trace!(
             target: "executive",
             "exec::finalize: Compensating author: fees_value={}, author={}\n",
@@ -871,7 +868,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             &self.info.author
         );
         self.state
-            .add_balance(&self.info.author, &fees_value, substate.to_cleanup_mode(), AccType::FVM)?;
+            .add_balance(&self.info.author, &fees_value, substate.to_cleanup_mode())?;
 
         // perform suicides
         for address in &substate.suicides {
@@ -976,7 +973,7 @@ Address};
         params.data = Some("26121ff0".from_hex().unwrap());
         let mut state = get_temp_state();
         state
-            .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty, AccType::FVM)
+            .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
             .unwrap();
         let mut info = EnvInfo::default();
         info.number = 1;
@@ -1017,7 +1014,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1115,7 +1112,7 @@ Address};
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             println!("call executor");
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1141,7 +1138,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1167,7 +1164,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1193,7 +1190,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1219,7 +1216,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
 
         assert_eq!(status_code, ExecStatus::Revert);
@@ -1296,7 +1293,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1330,7 +1327,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::Revert);
     }
@@ -1402,7 +1399,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
 
         println!("return data = {:?}", return_data);
@@ -1435,7 +1432,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
     }
 
@@ -1511,7 +1508,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
 
         println!("return data = {:?}", return_data);
@@ -1586,7 +1583,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&sender).unwrap(), U256::from(80));
@@ -1616,7 +1613,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&sender).unwrap(), U256::from(80));
@@ -1644,7 +1641,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::Success);
         let ReturnData {
@@ -1678,7 +1675,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::Success);
         let ReturnData {
@@ -1949,7 +1946,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
         println!("return data = {:?}", return_data);
         assert_eq!(status_code, ExecStatus::Revert);
@@ -1982,7 +1979,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
         println!("return data = {:?}", return_data);
         assert_eq!(status_code, ExecStatus::Revert);
@@ -2103,7 +2100,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate)
+            ex.call(params, &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::OutOfGas);
     }
@@ -2188,7 +2185,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate)
+            ex.call(params.clone(), &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(0));
@@ -2211,7 +2208,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate)
+            ex.call(params.clone(), &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::OutOfGas);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(0));
@@ -2234,7 +2231,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate)
+            ex.call(params.clone(), &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(10));
@@ -2257,7 +2254,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate)
+            ex.call(params.clone(), &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(20));
@@ -2279,7 +2276,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate)
+            ex.call(params.clone(), &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(30));
@@ -2302,7 +2299,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate)
+            ex.call(params.clone(), &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::OutOfGas);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(30));
@@ -2325,7 +2322,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate)
+            ex.call(params.clone(), &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::OutOfGas);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(30));
@@ -2348,7 +2345,7 @@ Address};
             exception: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate)
+            ex.call(params.clone(), &mut substate, AccType::FVM)
         };
         assert_eq!(status_code, ExecStatus::OutOfGas);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(30));
@@ -2371,7 +2368,7 @@ Address};
         params.gas_price = 1.into();
         let mut state = get_temp_state();
         state
-            .add_avm_balance(&sender, &U256::from(5_000_000), CleanupMode::NoEmpty)
+            .add_balance(&sender, &U256::from(5_000_000), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
         let machine = make_aion_machine();
@@ -2441,10 +2438,10 @@ Address};
         params.gas_price = 1.into();
         let mut state = get_temp_state();
         state
-            .add_avm_balance(&sender, &U256::from(5_000_000), CleanupMode::NoEmpty)
+            .add_balance(&sender, &U256::from(5_000_000), CleanupMode::NoEmpty)
             .unwrap();
         state
-            .add_avm_balance(&address, &U256::from(1_000_000), CleanupMode::NoEmpty)
+            .add_balance(&address, &U256::from(1_000_000), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
         let machine = make_aion_machine();
@@ -2508,14 +2505,12 @@ Address};
         );
     }
 
-    use state::AVMInterface;
-
     #[test]
     fn avm_storage() {
         let mut state = get_temp_state();
         let address = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
         state.set_avm_storage(&address, vec![0,0,0,1], vec![0,0,0,2]).expect("avm set storage failed");
-        let value = state.get_avm_storage(&address, &vec![0,0,0,1]).expect("avm get storage failed");
+        let value = state.avm_storage_at(&address, &vec![0,0,0,1]).expect("avm get storage failed");
         assert_eq!(value, vec![0,0,0,2]);
         state.set_avm_storage(&address, vec![1,2,3,4,5,6,7,8,9,0], vec![1,2,3,4,5,0,0,0,2]).expect("avm set storage failed");
         println!("state = {:?}", state);

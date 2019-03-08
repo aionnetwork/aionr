@@ -486,17 +486,10 @@ impl<B: Backend> State<B> {
     }
 
     /// Determine whether an account exists.
-    pub fn exists(&self, a: &Address, acc_type: AccType) -> trie::Result<bool> {
+    pub fn exists(&self, a: &Address) -> trie::Result<bool> {
         // Bloom filter does not contain empty accounts, so it is important here to
         // check if account exists in the database directly before EIP-161 is in effect.
-        match acc_type {
-            AccType::FVM => {
-                self.ensure_fvm_cached(a, RequireCache::None, false, |a| a.is_some())
-            },
-            AccType::AVM => {
-                self.ensure_avm_cached(a, RequireCache::None, false, |a| a.is_some())
-            },
-        }
+        self.ensure_fvm_cached(a, RequireCache::None, false, |a| a.is_some())
     }
 
     /// Determine whether an account exists and if not empty.
@@ -536,57 +529,27 @@ impl<B: Backend> State<B> {
     }
 
     /// Get the balance of account `a`.
-    pub fn balance(&self, a: &Address, acc_type: AccType) -> trie::Result<U256> {
-        match acc_type {
-            AccType::FVM => {
-                self.ensure_fvm_cached(a, RequireCache::None, true, |a| {
-                    a.as_ref()
-                        .map_or(U256::zero(), |account| *account.balance())
-                })
-            },
-            AccType::AVM => {
-                self.ensure_avm_cached(a, RequireCache::None, true, |a| {
-                    a.as_ref()
-                        .map_or(U256::zero(), |account| *account.balance())
-                })
-            },
-        }
+    pub fn balance(&self, a: &Address) -> trie::Result<U256> {
+        self.ensure_fvm_cached(a, RequireCache::None, true, |a| {
+            a.as_ref()
+                .map_or(U256::zero(), |account| *account.balance())
+        })
     }
 
     /// Get the nonce of account `a`.
-    pub fn nonce(&self, a: &Address, acc_type: AccType) -> trie::Result<U256> {
-        match acc_type {
-            AccType::FVM => {
-                self.ensure_fvm_cached(a, RequireCache::None, true, |a| {
-                    a.as_ref()
-                        .map_or(self.avm_manager.account_start_nonce, |account| *account.nonce())
-                })
-            },
-            AccType::AVM => {
-                self.ensure_avm_cached(a, RequireCache::None, true, |a| {
-                    a.as_ref()
-                        .map_or(self.avm_manager.account_start_nonce, |account| *account.nonce())
-                })
-            },
-        }
+    pub fn nonce(&self, a: &Address) -> trie::Result<U256> {
+        self.ensure_fvm_cached(a, RequireCache::None, true, |a| {
+            a.as_ref()
+                .map_or(self.fvm_manager.account_start_nonce, |account| *account.nonce())
+        })
     }
 
     /// Get the storage root of account `a`.
-    pub fn storage_root(&self, a: &Address, acc_type: AccType) -> trie::Result<Option<H256>> {
-        match acc_type {
-            AccType::FVM => {
-                self.ensure_avm_cached(a, RequireCache::None, true, |a| {
-                    a.as_ref()
-                        .and_then(|account| account.storage_root().cloned())
-                })
-            },
-            AccType::AVM => {
-                self.ensure_avm_cached(a, RequireCache::None, true, |a| {
-                    a.as_ref()
-                        .and_then(|account| account.storage_root().cloned())
-                })
-            },
-        }
+    pub fn storage_root(&self, a: &Address) -> trie::Result<Option<H256>> {
+        self.ensure_fvm_cached(a, RequireCache::None, true, |a| {
+            a.as_ref()
+                .and_then(|account| account.storage_root().cloned())
+        })
     }
 
     /// Mutate storage of account `address` so that it is `value` for `key`.
@@ -748,35 +711,17 @@ impl<B: Backend> State<B> {
     }
 
     /// Get accounts' code.
-    pub fn code(&self, a: &Address, acc_type: AccType) -> trie::Result<Option<Arc<Bytes>>> {
-        match acc_type {
-            AccType::FVM => {
-                self.ensure_fvm_cached(a, RequireCache::Code, true, |a| {
-                    a.as_ref().map_or(None, |a| a.code().clone())
-                })
-            },
-            AccType::AVM => {
-                self.ensure_avm_cached(a, RequireCache::Code, true, |a| {
-                    a.as_ref().map_or(None, |a| a.code().clone())
-                })
-            },
-        }
+    pub fn code(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
+        self.ensure_fvm_cached(a, RequireCache::Code, true, |a| {
+            a.as_ref().map_or(None, |a| a.code().clone())
+        })
     }
 
     /// Get an account's code hash.
-    pub fn code_hash(&self, a: &Address, acc_type: AccType) -> trie::Result<H256> {
-        match acc_type {
-            AccType::FVM => {
-                self.ensure_fvm_cached(a, RequireCache::None, true, |a| {
-                    a.as_ref().map_or(BLAKE2B_EMPTY, |a| a.code_hash())
-                })
-            },
-            AccType::AVM => {
-                self.ensure_avm_cached(a, RequireCache::None, true, |a| {
-                    a.as_ref().map_or(BLAKE2B_EMPTY, |a| a.code_hash())
-                })
-            },
-        }
+    pub fn code_hash(&self, a: &Address) -> trie::Result<H256> {
+        self.ensure_fvm_cached(a, RequireCache::None, true, |a| {
+            a.as_ref().map_or(BLAKE2B_EMPTY, |a| a.code_hash())
+        })
     }
 
     /// Get accounts' code size.
@@ -801,20 +746,16 @@ impl<B: Backend> State<B> {
         a: &Address,
         incr: &U256,
         cleanup_mode: CleanupMode,
-        acc_type: AccType,
     ) -> trie::Result<()>
     {
-        debug!(target: "state", "add_balance({}, {}): {}", a, incr, self.balance(a, acc_type.clone())?);
+        debug!(target: "state", "add_balance({}, {}): {}", a, incr, self.balance(a)?);
         let is_value_transfer = !incr.is_zero();
-        if is_value_transfer || (cleanup_mode == CleanupMode::ForceCreate && !self.exists(a, acc_type.clone())?) {
-            match acc_type.clone() {
-                AccType::FVM => self.require(a, false)?.add_balance(incr),
-                AccType::AVM => self.require_avm(a, false)?.add_balance(incr),
-            }
+        if is_value_transfer || (cleanup_mode == CleanupMode::ForceCreate && !self.exists(a)?) {
+            self.require(a, false)?.add_balance(incr);
         } else if let CleanupMode::TrackTouched(set) = cleanup_mode {
-            if self.exists(a, acc_type.clone())? {
+            if self.exists(a)? {
                 set.insert(*a);
-                self.touch(a, acc_type)?;
+                self.touch(a)?;
             }
         }
         Ok(())
@@ -826,15 +767,11 @@ impl<B: Backend> State<B> {
         a: &Address,
         decr: &U256,
         cleanup_mode: &mut CleanupMode,
-        acc_type: AccType,
     ) -> trie::Result<()>
     {
-        debug!(target: "state", "sub_balance({}, {}): {}", a, decr, self.balance(a, acc_type.clone())?);
-        if !decr.is_zero() || !self.exists(a, acc_type.clone())? {
-            match acc_type {
-                AccType::FVM => self.require(a, false)?.sub_balance(decr),
-                AccType::AVM => self.require_avm(a, false)?.sub_balance(decr),
-            }
+        debug!(target: "state", "sub_balance({}, {}): {}", a, decr, self.balance(a)?);
+        if !decr.is_zero() || !self.exists(a)? {
+            self.require(a, false)?.sub_balance(decr);
         }
         if let CleanupMode::TrackTouched(ref mut set) = *cleanup_mode {
             set.insert(*a);
@@ -849,20 +786,16 @@ impl<B: Backend> State<B> {
         to: &Address,
         by: &U256,
         mut cleanup_mode: CleanupMode,
-        acc_type: AccType,
     ) -> trie::Result<()>
     {
-        self.sub_balance(from, by, &mut cleanup_mode, acc_type.clone())?;
-        self.add_balance(to, by, cleanup_mode, acc_type)?;
+        self.sub_balance(from, by, &mut cleanup_mode)?;
+        self.add_balance(to, by, cleanup_mode)?;
         Ok(())
     }
 
     /// Increment the nonce of account `a` by 1.
-    pub fn inc_nonce(&mut self, a: &Address, acc_type: AccType) -> trie::Result<()> {
-        match acc_type {
-            AccType::FVM => self.require(a, false).map(|mut x| x.inc_nonce()),
-            AccType::AVM => self.require_avm(a, false).map(|mut x| x.inc_nonce()),
-        }
+    pub fn inc_nonce(&mut self, a: &Address) -> trie::Result<()> {
+        self.require(a, false).map(|mut x| x.inc_nonce())
     }
 
     /// Mutate storage of account `a` so that it is `value` for `key`.
@@ -1051,12 +984,8 @@ impl<B: Backend> State<B> {
         }
     }
 
-    fn touch(&mut self, a: &Address, acc_type: AccType) -> trie::Result<()> {
-        if acc_type == AccType::FVM {
-            self.require(a, false)?;
-        } else {
-            self.require_avm(a, false)?;
-        }
+    fn touch(&mut self, a: &Address) -> trie::Result<()> {
+        self.require(a, false)?;
         Ok(())
     }
 
@@ -1280,44 +1209,6 @@ impl<B: Backend> State<B> {
         let mut state_pre = orig;
         state_pre.query_pod(&pod_state_post, &addresses_post, acc_type)?;
         Ok(pod_state::diff_pod(&state_pre.to_pod(), &pod_state_post))
-    }
-
-    // load required account data from the databases.
-    fn update_avm_account_cache(
-        require: RequireCache,
-        account: &mut AVMAccount,
-        state_db: &B,
-        db: &HashStore,
-    )
-    {
-        if let RequireCache::None = require {
-            return;
-        }
-
-        if account.is_cached() {
-            return;
-        }
-
-        // if there's already code in the global cache, always cache it localy
-        let hash = account.code_hash();
-        match state_db.get_cached_code(&hash) {
-            Some(code) => account.cache_given_code(code),
-            None => {
-                match require {
-                    RequireCache::None => {}
-                    RequireCache::Code => {
-                        if let Some(code) = account.cache_code(db) {
-                            // propagate code loaded from the database to
-                            // the global code cache.
-                            state_db.cache_code(hash, code)
-                        }
-                    }
-                    RequireCache::CodeSize => {
-                        account.cache_code_size(db);
-                    }
-                }
-            }
-        }
     }
 
     /// Check caches for required data
@@ -1796,14 +1687,14 @@ mod tests {
         let (root, db) = {
             let mut state = get_temp_state();
             state
-                .require_or_from(
+                .require_fvm_or_from(
                     &a,
                     false,
-                    || Account::new_contract(42.into(), 0.into()),
+                    || FVMAccount::new_contract(42.into(), 0.into()),
                     |_| {},
                 )
                 .unwrap();
-            state.init_code(&a, vec![1, 2, 3]).unwrap();
+            state.init_code(&a, vec![1, 2, 3], AccType::FVM).unwrap();
             assert_eq!(state.code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
             state.commit().unwrap();
             assert_eq!(state.code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
@@ -1829,8 +1720,8 @@ mod tests {
             state
                 .set_storage(
                     &a,
-                    H128::from(U128::from(2u64)),
-                    H128::from(U128::from(69u64)),
+                    FVMKey::Normal(H128::from(U128::from(2u64))),
+                    FVMValue::Normal(H128::from(U128::from(69u64))),
                 )
                 .unwrap();
             state.commit().unwrap();
@@ -1846,8 +1737,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            s.storage_at(&a, &H128::from(U128::from(2u64))).unwrap(),
-            H128::from(U128::from(69u64))
+            s.storage_at(&a, &FVMKey::Normal(H128::from(U128::from(2u64)))).unwrap(),
+            FVMValue::Normal(H128::from(U128::from(69u64)))
         );
     }
 
@@ -1882,14 +1773,14 @@ mod tests {
         let a = Address::zero();
         let mut state = get_temp_state();
         assert_eq!(state.exists(&a).unwrap(), false);
-        assert_eq!(state.exists_and_not_null(&a).unwrap(), false);
+        assert_eq!(state.exists_and_not_null(&a, AccType::FVM).unwrap(), false);
         state.inc_nonce(&a).unwrap();
         assert_eq!(state.exists(&a).unwrap(), true);
-        assert_eq!(state.exists_and_not_null(&a).unwrap(), true);
+        assert_eq!(state.exists_and_not_null(&a, AccType::FVM).unwrap(), true);
         assert_eq!(state.nonce(&a).unwrap(), U256::from(1u64));
-        state.kill_account(&a);
+        state.kill_account(&a, AccType::FVM);
         assert_eq!(state.exists(&a).unwrap(), false);
-        assert_eq!(state.exists_and_not_null(&a).unwrap(), false);
+        assert_eq!(state.exists_and_not_null(&a, AccType::FVM).unwrap(), false);
         assert_eq!(state.nonce(&a).unwrap(), U256::from(0u64));
     }
 
@@ -1919,7 +1810,7 @@ mod tests {
         )
         .unwrap();
         assert!(!state.exists(&a).unwrap());
-        assert!(!state.exists_and_not_null(&a).unwrap());
+        assert!(!state.exists_and_not_null(&a, AccType::FVM).unwrap());
     }
 
     #[test]
@@ -1950,7 +1841,7 @@ mod tests {
         .unwrap();
 
         assert!(!state.exists(&a).unwrap());
-        assert!(!state.exists_and_not_null(&a).unwrap());
+        assert!(!state.exists_and_not_null(&a, AccType::FVM).unwrap());
     }
 
     #[test]
@@ -1976,7 +1867,7 @@ mod tests {
             .unwrap();
             assert_eq!(state.exists(&a).unwrap(), true);
             assert_eq!(state.nonce(&a).unwrap(), U256::from(1u64));
-            state.kill_account(&a);
+            state.kill_account(&a, AccType::FVM);
             state.commit().unwrap();
             assert_eq!(state.exists(&a).unwrap(), false);
             assert_eq!(state.nonce(&a).unwrap(), U256::from(0u64));
@@ -2065,19 +1956,19 @@ mod tests {
     fn checkpoint_basic() {
         let mut state = get_temp_state();
         let a = Address::zero();
-        state.checkpoint();
+        state.checkpoint(AccType::FVM);
         state
             .add_balance(&a, &U256::from(69u64), CleanupMode::NoEmpty)
             .unwrap();
         assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.discard_checkpoint();
+        state.discard_checkpoint(AccType::FVM);
         assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.checkpoint();
+        state.checkpoint(AccType::FVM);
         state
             .add_balance(&a, &U256::from(1u64), CleanupMode::NoEmpty)
             .unwrap();
         assert_eq!(state.balance(&a).unwrap(), U256::from(70u64));
-        state.revert_to_checkpoint();
+        state.revert_to_checkpoint(AccType::FVM);
         assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
     }
 
@@ -2085,15 +1976,15 @@ mod tests {
     fn checkpoint_nested() {
         let mut state = get_temp_state();
         let a = Address::zero();
-        state.checkpoint();
-        state.checkpoint();
+        state.checkpoint(AccType::FVM);
+        state.checkpoint(AccType::FVM);
         state
             .add_balance(&a, &U256::from(69u64), CleanupMode::NoEmpty)
             .unwrap();
         assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.discard_checkpoint();
+        state.discard_checkpoint(AccType::FVM);
         assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.revert_to_checkpoint();
+        state.revert_to_checkpoint(AccType::FVM);
         assert_eq!(state.balance(&a).unwrap(), U256::from(0));
     }
 
@@ -2112,15 +2003,15 @@ mod tests {
         let mut state = get_temp_state();
 
         let a: Address = 0xa.into();
-        state.init_code(&a, b"abcdefg".to_vec()).unwrap();;
+        state.init_code(&a, b"abcdefg".to_vec(), AccType::FVM).unwrap();;
         state
             .add_balance(&a, &256.into(), CleanupMode::NoEmpty)
             .unwrap();
-        state.set_storage(&a, 0xb.into(), 0xc.into()).unwrap();
+        state.set_storage(&a, FVMKey::Normal(0xb.into()), FVMValue::Normal(0xc.into())).unwrap();
 
         let mut new_state = state.clone();
-        new_state.set_storage(&a, 0xb.into(), 0xd.into()).unwrap();
+        new_state.set_storage(&a, FVMKey::Normal(0xb.into()), FVMValue::Normal(0xd.into())).unwrap();
 
-        new_state.diff_from(state).unwrap();
+        new_state.diff_from(state, AccType::FVM).unwrap();
     }
 }

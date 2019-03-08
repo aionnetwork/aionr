@@ -88,8 +88,8 @@ impl EthereumMachine {
             gas: gas,
             gas_price: 0.into(),
             value: ActionValue::Transfer(0.into()),
-            code: state.code(&contract_address, AccType::FVM)?,
-            code_hash: Some(state.code_hash(&contract_address, AccType::FVM)?),
+            code: state.code(&contract_address)?,
+            code_hash: Some(state.code_hash(&contract_address)?),
             data: data,
             call_type: CallType::Call,
             static_flag: false,
@@ -270,7 +270,7 @@ impl<'a> ::aion_machine::LocalizedMachine<'a> for EthereumMachine {
 
 impl ::aion_machine::WithBalances for EthereumMachine {
     fn balance(&self, live: &ExecutedBlock, address: &Address) -> Result<U256, Error> {
-        live.state().balance(address, AccType::FVM).map_err(Into::into)
+        live.state().balance(address).map_err(Into::into)
     }
 
     fn add_balance(
@@ -281,7 +281,7 @@ impl ::aion_machine::WithBalances for EthereumMachine {
     ) -> Result<(), Error>
     {
         live.state_mut()
-            .add_balance(address, amount, CleanupMode::NoEmpty, AccType::FVM)
+            .add_balance(address, amount, CleanupMode::NoEmpty)
             .map_err(Into::into)
     }
 }

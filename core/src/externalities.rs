@@ -119,7 +119,7 @@ where B: StateBackend
 
     fn account_exists(&self, a: &Address) -> bool {
         self.state
-            .exists(a, AccType::AVM)
+            .exists(a)
             .expect("check avm account failed")
     }
 
@@ -132,7 +132,7 @@ where B: StateBackend
 
     fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
         println!("AVM get code");
-        match self.state.code(address, AccType::AVM) {
+        match self.state.code(address) {
             Ok(code) => code,
             Err(_x) => None,
         }
@@ -158,32 +158,32 @@ where B: StateBackend
 
     fn avm_balance(&self, a: &Address) -> U256 {
         self.state
-            .balance(a, AccType::AVM)
+            .balance(a)
             .expect("Fatal error during get balance")
     }
 
     fn inc_balance(&mut self, a: &Address, value: &U256) {
         self.state
-            .add_balance(a, value, CleanupMode::NoEmpty, AccType::AVM)
+            .add_balance(a, value, CleanupMode::NoEmpty)
             .expect("add balance failed");
 
     }
 
     fn dec_balance(&mut self, a: &Address, value: &U256) {
         self.state
-            .sub_balance(a, value, &mut CleanupMode::NoEmpty, AccType::AVM)
+            .sub_balance(a, value, &mut CleanupMode::NoEmpty)
             .expect("decrease balance failed")
     }
 
     fn get_nonce(&self, a: &Address) -> u64 {
         self.state
-            .nonce(a, AccType::AVM)
+            .nonce(a)
             .expect("get nonce failed").low_u64()
     }
 
     fn inc_nonce(&mut self, a: &Address) {
         self.state
-            .inc_nonce(a, AccType::AVM)
+            .inc_nonce(a)
             .expect("increment nonce failed")
     }
 }
@@ -264,7 +264,7 @@ where B: StateBackend
 
     fn exists(&self, address: &Address) -> bool {
         self.state
-            .exists(address, AccType::FVM)
+            .exists(address)
             .expect("Fatal error occurred when checking account existance.")
     }
 
@@ -278,7 +278,7 @@ where B: StateBackend
 
     fn balance(&self, address: &Address) -> U256 {
         self.state
-            .balance(address, AccType::FVM)
+            .balance(address)
             .expect("Fatal error occurred when getting balance.")
     }
 
@@ -326,7 +326,7 @@ where B: StateBackend
     /// Create new contract account
     fn create(&mut self, gas: &U256, value: &U256, code: &[u8]) -> ExecutionResult {
         // create new contract address
-        let (address, code_hash) = match self.state.nonce(&self.origin_info[0].address, AccType::FVM) {
+        let (address, code_hash) = match self.state.nonce(&self.origin_info[0].address) {
             Ok(nonce) => contract_address(&self.origin_info[0].address, &nonce),
             Err(e) => {
                 debug!(target: "ext", "Database corruption encountered: {:?}", e);
@@ -375,7 +375,7 @@ where B: StateBackend
             result.return_data = ReturnData::new(address_vec, 0, length);
 
             // Increment nonce of the caller contract account
-            if let Err(e) = self.state.inc_nonce(&self.origin_info[0].address, AccType::FVM) {
+            if let Err(e) = self.state.inc_nonce(&self.origin_info[0].address) {
                 debug!(target: "ext", "Database corruption encountered: {:?}", e);
                 return ExecutionResult {
                     gas_left: 0.into(),
@@ -389,7 +389,7 @@ where B: StateBackend
 
             // EIP-161
             // Newly created account starts at nonce 1. (to avoiding being considered as empty/null account)
-            if let Err(e) = self.state.inc_nonce(&address, AccType::FVM) {
+            if let Err(e) = self.state.inc_nonce(&address) {
                 debug!(target: "ext", "Database corruption encountered: {:?}", e);
                 return ExecutionResult {
                     gas_left: 0.into(),
@@ -423,8 +423,8 @@ where B: StateBackend
         // Get code from the called account
         let code_res = self
             .state
-            .code(code_address, AccType::FVM)
-            .and_then(|code| self.state.code_hash(code_address, AccType::FVM).map(|hash| (code, hash)));
+            .code(code_address)
+            .and_then(|code| self.state.code_hash(code_address).map(|hash| (code, hash)));
         let (code, code_hash) = match code_res {
             Ok((code, hash)) => (code, hash),
             Err(_) => {
@@ -473,7 +473,7 @@ where B: StateBackend
 
     fn extcode(&self, address: &Address) -> Arc<Bytes> {
         self.state
-            .code(address, AccType::FVM)
+            .code(address)
             .expect("Fatal error occurred when getting code.")
             .unwrap_or_else(|| Arc::new(vec![]))
     }
@@ -502,7 +502,7 @@ where B: StateBackend
         if &address == refund_address {
             // TODO [todr] To be consistent with CPP client we set balance to 0 in that case.
             self.state
-                .sub_balance(&address, &balance, &mut CleanupMode::NoEmpty, AccType::FVM)
+                .sub_balance(&address, &balance, &mut CleanupMode::NoEmpty)
                 .expect(
                     "Fatal error occurred when subtracting balance from address to be destructed",
                 );
@@ -514,7 +514,6 @@ where B: StateBackend
                     refund_address,
                     &balance,
                     self.substate.to_cleanup_mode(),
-                    AccType::FVM,
                 )
                 .expect("Fatal error occurred when transfering balance.");
         }

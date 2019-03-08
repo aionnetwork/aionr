@@ -626,7 +626,7 @@ pub fn enact(
                 kvdb.clone(),
             )?;
             trace!(target: "enact", "num={}, root={}, author={}, author_balance={}\n",
-                header.number(), s.root(), header.author(), s.balance(&header.author(), AccType::FVM)?);
+                header.number(), s.root(), header.author(), s.balance(&header.author())?);
         }
     }
     // let s = State::from_existing(db.boxed_clone(), parent.state_root().clone(), engine.account_start_nonce(parent.number() + 1), factories.clone())?;
@@ -784,7 +784,7 @@ mod tests {
                     Arc::new(MemoryDBRepository::new()),
                 )?;
                 trace!(target: "enact", "num={}, root={}, author={}, author_balance={}\n",
-                    header.number(), s.root(), header.author(), s.balance(&header.author(), AccType::FVM)?);
+                    header.number(), s.root(), header.author(), s.balance(&header.author())?);
             }
         }
 

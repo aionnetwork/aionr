@@ -217,25 +217,25 @@ where B: StateBackend
 
     fn inc_nonce(&mut self, a: &Address) {
         self.state
-            .inc_nonce(a, AccType::FVM)
+            .inc_nonce(a)
             .expect("Fatal error occurred when incrementing nonce.")
     }
 
     fn transfer_balance(&mut self, from: &Address, to: &Address, by: &U256) {
         self.state
-            .transfer_balance(from, to, by, CleanupMode::ForceCreate, AccType::FVM)
+            .transfer_balance(from, to, by, CleanupMode::ForceCreate)
             .expect("Fatal error occurred when transfering balance.")
     }
 
     fn add_balance(&mut self, to: &Address, incr: &U256) {
         self.state
-            .add_balance(to, incr, CleanupMode::ForceCreate, AccType::FVM)
+            .add_balance(to, incr, CleanupMode::ForceCreate)
             .expect("Fatal error occurred when adding balance.")
     }
 
     fn balance(&self, address: &Address) -> U256 {
         self.state
-            .balance(address, AccType::FVM)
+            .balance(address)
             .expect("Fatal error occurred when getting balance.")
     }
 }

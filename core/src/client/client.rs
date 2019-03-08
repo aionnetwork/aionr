@@ -1452,13 +1452,13 @@ impl BlockChainClient for Client {
     }
 
     fn nonce(&self, address: &Address, id: BlockId) -> Option<U256> {
-        self.state_at(id).and_then(|s| s.nonce(address, AccType::FVM).ok())
+        self.state_at(id).and_then(|s| s.nonce(address).ok())
     }
 
     //TODO: update account type
     fn storage_root(&self, address: &Address, id: BlockId) -> Option<H256> {
         self.state_at(id)
-            .and_then(|s| s.storage_root(address, AccType::FVM).ok())
+            .and_then(|s| s.storage_root(address).ok())
             .and_then(|x| x)
     }
 
@@ -1469,16 +1469,16 @@ impl BlockChainClient for Client {
 
     fn code(&self, address: &Address, id: BlockId) -> Option<Option<Bytes>> {
         self.state_at(id)
-            .and_then(|s| s.code(address, AccType::FVM).ok())
+            .and_then(|s| s.code(address).ok())
             .map(|c| c.map(|c| (&*c).clone()))
     }
 
     fn code_hash(&self, address: &Address, id: BlockId) -> Option<H256> {
-        self.state_at(id).and_then(|s| s.code_hash(address, AccType::FVM).ok())
+        self.state_at(id).and_then(|s| s.code_hash(address).ok())
     }
 
     fn balance(&self, address: &Address, id: BlockId) -> Option<U256> {
-        self.state_at(id).and_then(|s| s.balance(address, AccType::FVM).ok())
+        self.state_at(id).and_then(|s| s.balance(address).ok())
     }
 
     fn storage_at(&self, address: &Address, position: &H128, id: BlockId) -> Option<H128> {
@@ -1557,7 +1557,7 @@ impl BlockChainClient for Client {
             _ => return None,
         };
 
-        let root = match state.storage_root(account, AccType::FVM) {
+        let root = match state.storage_root(account) {
             Ok(Some(root)) => root,
             _ => return None,
         };

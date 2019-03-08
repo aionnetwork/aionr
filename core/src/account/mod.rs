@@ -58,7 +58,7 @@ impl From<BasicAccount> for FVMAccount {
             code_filth: Filth::Clean,
             address_hash: Cell::new(None),
             empty_but_commit: false,
-            account_type: AccType::FVM,
+            account_type: basic.account_type.into(),
         }
     }
 }
@@ -550,11 +550,12 @@ macro_rules! impl_account {
 
             /// Export to RLP.
             fn rlp(&self) -> Bytes {
-                let mut stream = RlpStream::new_list(4);
+                let mut stream = RlpStream::new_list(5);
                 stream.append(&self.nonce);
                 stream.append(&self.balance);
                 stream.append(&self.storage_root);
                 stream.append(&self.code_hash);
+                stream.append(&self.acc_type());
                 stream.out()
             }
 
@@ -570,8 +571,8 @@ macro_rules! impl_account {
                 unimplemented!()
             }
 
-            fn acc_type(&self) -> AccType {
-                self.account_type.clone()
+            fn acc_type(&self) -> u8 {
+                self.account_type.clone().into()
             }
 
             fn update_account_cache<B: Backend>(
