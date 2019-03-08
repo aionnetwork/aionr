@@ -182,7 +182,8 @@ impl P2pMgr {
             for boot_node_str in boot_nodes_str {
                 if boot_node_str.len() != 0 {
                     let mut boot_node = Node::new_with_node_str(boot_node_str.to_string());
-                    top8.push(boot_node.node_hash.clone());
+                    boot_node.node_hash = P2pMgr::calculate_hash(&boot_node.get_node_id());
+                    top8.push(boot_node.node_hash);
                     boot_node.is_from_boot_list = true;
                     boot_nodes.push(boot_node);
                 }
@@ -317,46 +318,6 @@ impl P2pMgr {
         nodes_count
     }
 
-    pub fn get_nodes_count_with_mode(mode: Mode) -> usize {
-        let mut nodes_count = 0;
-        if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
-            for val in nodes_map.values() {
-                if val.state_code & ALIVE == ALIVE && val.mode == mode {
-                    nodes_count += 1;
-                }
-            }
-        }
-        nodes_count
-    }
-
-    pub fn get_nodes_count_all_modes() -> (usize, usize, usize, usize, usize) {
-        let mut normal_nodes_count = 0;
-        let mut backward_nodes_count = 0;
-        let mut forward_nodes_count = 0;
-        let mut lightning_nodes_count = 0;
-        let mut thunder_nodes_count = 0;
-        if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
-            for val in nodes_map.values() {
-                if val.state_code & ALIVE == ALIVE {
-                    match val.mode {
-                        Mode::NORMAL => normal_nodes_count += 1,
-                        Mode::BACKWARD => backward_nodes_count += 1,
-                        Mode::FORWARD => forward_nodes_count += 1,
-                        Mode::LIGHTNING => lightning_nodes_count += 1,
-                        Mode::THUNDER => thunder_nodes_count += 1,
-                    }
-                }
-            }
-        }
-        (
-            normal_nodes_count,
-            backward_nodes_count,
-            forward_nodes_count,
-            lightning_nodes_count,
-            thunder_nodes_count,
-        )
-    }
-
     pub fn get_all_nodes_count() -> u16 {
         let mut count = 0;
         if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
@@ -422,16 +383,16 @@ impl P2pMgr {
                 if let Some(node_hash) = refresh_top8_nodes.get(random_index) {
                     return Self::get_node(*node_hash);
                 }
-            } else {
-                let alive_nodes = Self::get_nodes(ALIVE);
-                let alive_node_count = alive_nodes.len();
-                if alive_node_count > 0 {
-                    let mut rng = thread_rng();
-                    let random_index: usize = rng.gen_range(0, alive_node_count);
-                    if let Some(node) = alive_nodes.get(random_index) {
-                        return Self::get_node(node.node_hash);
-                    }
-                }
+            }
+        }
+
+        let alive_nodes = Self::get_nodes(ALIVE);
+        let alive_node_count = alive_nodes.len();
+        if alive_node_count > 0 {
+            let mut rng = thread_rng();
+            let random_index: usize = rng.gen_range(0, alive_node_count);
+            if let Some(node) = alive_nodes.get(random_index) {
+                return Some(node.clone());
             }
         }
         None
@@ -457,7 +418,6 @@ impl P2pMgr {
     pub fn update_node(node_hash: u64, node: &mut Node) {
         if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
             if let Some(n) = nodes_map.get_mut(&node_hash) {
-                node.mode = n.mode.clone();
                 n.update(node);
             }
         }
@@ -487,6 +447,15 @@ impl P2pMgr {
             HashSet::new()
         }
     }
+
+    pub fn reset_reputation() {
+        if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
+            for node in nodes_map.values_mut() {
+                node.reputation = 1000;
+            }
+        }
+    }
+
     pub fn process_inbounds(
         socket: TcpStream,
         peer_node: &mut Node,
@@ -507,7 +476,7 @@ impl P2pMgr {
             }
         }
 
-        let (tx, rx) = mpsc::channel(4096);
+        let (tx, rx) = mpsc::channel(32);
         let thread_pool = P2pMgr::get_thread_pool();
 
         peer_node.tx = Some(tx);
@@ -553,7 +522,7 @@ impl P2pMgr {
     )
     {
         let node_hash = peer_node.node_hash;
-        let (tx, rx) = mpsc::channel(4096);
+        let (tx, rx) = mpsc::channel(32);
         peer_node.tx = Some(tx);
         peer_node.state_code = CONNECTED | IS_SERVER;
         peer_node.ip_addr.is_server = true;

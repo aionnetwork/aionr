@@ -27,6 +27,9 @@ mod config;
 mod error;
 mod test_client;
 mod client;
+pub mod header_chain;
+mod cache;
+pub mod cht;
 
 pub use self::client::*;
 pub use self::config::{ClientConfig, DatabaseCompactionProfile, BlockChainConfig, VMType};

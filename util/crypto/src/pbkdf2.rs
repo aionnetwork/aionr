@@ -13,8 +13,9 @@ use std::iter::repeat;
 use std::io;
 use cryptoutil::copy_memory;
 
-use rand::{OsRng, Rng};
+use rand::Rng;
 use rand::distributions::Standard;
+use rand::rngs::OsRng;
 use serialize::base64;
 use serialize::base64::{FromBase64, ToBase64};
 

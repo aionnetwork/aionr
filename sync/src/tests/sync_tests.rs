@@ -93,7 +93,7 @@ fn benchtest_sync_mainnet() {
                 node.best_block_num,
                 node.synced_block_num,
                 node.mode,
-                node.last_request_num,
+                node.requested_block_num,
                 duration
             );
         }

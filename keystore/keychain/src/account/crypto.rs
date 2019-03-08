@@ -26,9 +26,9 @@ use {json, Error, crypto};
 use blake2b::blake2b;
 use random::Random;
 use smallvec::SmallVec;
+use subtle::ConstantTimeEq;
 use account::{Cipher, Kdf, Aes128Ctr, Pbkdf2, Prf};
 use rlp::{self, RlpStream, UntrustedRlp, DecoderError};
-use subtle;
 use key::Ed25519Secret;
 
 /// Encrypted data
@@ -151,7 +151,7 @@ impl Crypto {
 
         let mac = blake2b(crypto::derive_mac(&derived_right_bits, &self.ciphertext));
 
-        if subtle::slices_equal(&mac, &self.mac) == 0 {
+        if mac.ct_eq(&self.mac).unwrap_u8() == 0 {
             return Err(Error::InvalidPassword);
         }
 

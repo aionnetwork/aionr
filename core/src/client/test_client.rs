@@ -132,16 +132,12 @@ pub enum EachBlockWith {
 }
 
 impl Default for TestBlockChainClient {
-    fn default() -> Self {
-        TestBlockChainClient::new()
-    }
+    fn default() -> Self { TestBlockChainClient::new() }
 }
 
 impl TestBlockChainClient {
     /// Creates new test client.
-    pub fn new() -> Self {
-        Self::new_with_extra_data(Bytes::new())
-    }
+    pub fn new() -> Self { Self::new_with_extra_data(Bytes::new()) }
 
     /// Creates new test client with specified extra data for each block
     pub fn new_with_extra_data(extra_data: Bytes) -> Self {
@@ -223,19 +219,13 @@ impl TestBlockChainClient {
     }
 
     /// Set block queue size for testing
-    pub fn set_queue_size(&self, size: usize) {
-        self.queue_size.store(size, AtomicOrder::Relaxed);
-    }
+    pub fn set_queue_size(&self, size: usize) { self.queue_size.store(size, AtomicOrder::Relaxed); }
 
     /// Set timestamp assigned to latest sealed block
-    pub fn set_latest_block_timestamp(&self, ts: u64) {
-        *self.latest_block_timestamp.write() = ts;
-    }
+    pub fn set_latest_block_timestamp(&self, ts: u64) { *self.latest_block_timestamp.write() = ts; }
 
     /// Set logs to return for each logs call.
-    pub fn set_logs(&self, logs: Vec<LocalizedLogEntry>) {
-        *self.logs.write() = logs;
-    }
+    pub fn set_logs(&self, logs: Vec<LocalizedLogEntry>) { *self.logs.write() = logs; }
 
     /// Add blocks to test client.
     pub fn add_blocks(&self, count: usize, with: EachBlockWith) {
@@ -318,11 +308,12 @@ impl TestBlockChainClient {
             BlockId::Hash(hash) => Some(hash),
             BlockId::Number(n) => self.numbers.read().get(&(n as usize)).cloned(),
             BlockId::Earliest => self.numbers.read().get(&0).cloned(),
-            BlockId::Latest | BlockId::Pending => self
-                .numbers
-                .read()
-                .get(&(self.numbers.read().len() - 1))
-                .cloned(),
+            BlockId::Latest | BlockId::Pending => {
+                self.numbers
+                    .read()
+                    .get(&(self.numbers.read().len() - 1))
+                    .cloned()
+            }
         }
     }
 
@@ -359,9 +350,7 @@ impl TestBlockChainClient {
     }
 
     /// Set reported history size.
-    pub fn set_history(&self, h: Option<u64>) {
-        *self.history.write() = h;
-    }
+    pub fn set_history(&self, h: Option<u64>) { *self.history.write() = h; }
 }
 
 pub fn get_temp_state_db() -> (StateDB, TempDir) {
@@ -383,16 +372,15 @@ pub fn get_temp_state_db() -> (StateDB, TempDir) {
 }
 
 impl MiningBlockChainClient for TestBlockChainClient {
-    fn as_block_chain_client(&self) -> &BlockChainClient {
-        self
-    }
+    fn as_block_chain_client(&self) -> &BlockChainClient { self }
 
     fn prepare_open_block(
         &self,
         author: Address,
         gas_range_target: (U256, U256),
         extra_data: Bytes,
-    ) -> OpenBlock {
+    ) -> OpenBlock
+    {
         let engine = &*self.spec.engine;
         let genesis_header = self.spec.genesis_header();
         let (state_db, _tempdir) = get_temp_state_db();
@@ -414,31 +402,24 @@ impl MiningBlockChainClient for TestBlockChainClient {
             extra_data,
             false,
             self.db.clone(),
-        ).expect("Opening block for tests will not fail.");
+        )
+        .expect("Opening block for tests will not fail.");
         // TODO [todr] Override timestamp for predictability (set_timestamp_now kind of sucks)
         open_block.set_timestamp(*self.latest_block_timestamp.read());
         open_block
     }
 
-    fn reopen_block(&self, block: ClosedBlock) -> OpenBlock {
-        block.reopen(&*self.spec.engine)
-    }
+    fn reopen_block(&self, block: ClosedBlock) -> OpenBlock { block.reopen(&*self.spec.engine) }
 
-    fn vm_factory(&self) -> &VmFactory {
-        &self.vm_factory
-    }
+    fn vm_factory(&self) -> &VmFactory { &self.vm_factory }
 
-    fn import_sealed_block(&self, _block: SealedBlock) -> ImportResult {
-        Ok(H256::default())
-    }
+    fn import_sealed_block(&self, _block: SealedBlock) -> ImportResult { Ok(H256::default()) }
 
     fn broadcast_transaction(&self, _transactions: Bytes) {}
 
     fn broadcast_proposal_block(&self, _block: SealedBlock) {}
 
-    fn prepare_block_interval(&self) -> Duration {
-        Duration::default()
-    }
+    fn prepare_block_interval(&self) -> Duration { Duration::default() }
 }
 
 impl BlockChainClient for TestBlockChainClient {
@@ -447,7 +428,8 @@ impl BlockChainClient for TestBlockChainClient {
         _t: &SignedTransaction,
         _analytics: CallAnalytics,
         _block: BlockId,
-    ) -> Result<Executed, CallError> {
+    ) -> Result<Executed, CallError>
+    {
         self.execution_result.read().clone().unwrap()
     }
 
@@ -455,7 +437,8 @@ impl BlockChainClient for TestBlockChainClient {
         &self,
         txs: &[(SignedTransaction, CallAnalytics)],
         block: BlockId,
-    ) -> Result<Vec<Executed>, CallError> {
+    ) -> Result<Vec<Executed>, CallError>
+    {
         let mut res = Vec::with_capacity(txs.len());
         for &(ref tx, analytics) in txs {
             res.push(self.call(tx, analytics, block)?);
@@ -475,36 +458,33 @@ impl BlockChainClient for TestBlockChainClient {
         &self,
         _block: BlockId,
         _analytics: CallAnalytics,
-    ) -> Result<Box<Iterator<Item = Executed>>, CallError> {
+    ) -> Result<Box<Iterator<Item = Executed>>, CallError>
+    {
         Ok(Box::new(
             self.execution_result.read().clone().unwrap().into_iter(),
         ))
     }
 
-    fn block_total_difficulty(&self, _id: BlockId) -> Option<U256> {
-        Some(U256::zero())
-    }
+    fn block_total_difficulty(&self, _id: BlockId) -> Option<U256> { Some(U256::zero()) }
 
-    fn block_hash(&self, id: BlockId) -> Option<H256> {
-        Self::block_hash(self, id)
-    }
+    fn block_hash(&self, id: BlockId) -> Option<H256> { Self::block_hash(self, id) }
 
     fn nonce(&self, address: &Address, id: BlockId) -> Option<U256> {
         match id {
-            BlockId::Latest | BlockId::Pending => Some(
-                self.nonces
-                    .read()
-                    .get(address)
-                    .cloned()
-                    .unwrap_or(U256::zero()),
-            ),
+            BlockId::Latest | BlockId::Pending => {
+                Some(
+                    self.nonces
+                        .read()
+                        .get(address)
+                        .cloned()
+                        .unwrap_or(U256::zero()),
+                )
+            }
             _ => None,
         }
     }
 
-    fn storage_root(&self, _address: &Address, _id: BlockId) -> Option<H256> {
-        None
-    }
+    fn storage_root(&self, _address: &Address, _id: BlockId) -> Option<H256> { None }
 
     fn latest_nonce(&self, address: &Address) -> U256 {
         self.nonce(address, BlockId::Latest).unwrap()
@@ -528,13 +508,15 @@ impl BlockChainClient for TestBlockChainClient {
 
     fn balance(&self, address: &Address, id: BlockId) -> Option<U256> {
         match id {
-            BlockId::Latest | BlockId::Pending => Some(
-                self.balances
-                    .read()
-                    .get(address)
-                    .cloned()
-                    .unwrap_or_else(U256::zero),
-            ),
+            BlockId::Latest | BlockId::Pending => {
+                Some(
+                    self.balances
+                        .read()
+                        .get(address)
+                        .cloned()
+                        .unwrap_or_else(U256::zero),
+                )
+            }
             _ => None,
         }
     }
@@ -545,13 +527,15 @@ impl BlockChainClient for TestBlockChainClient {
 
     fn storage_at(&self, address: &Address, position: &H128, id: BlockId) -> Option<H128> {
         match id {
-            BlockId::Latest | BlockId::Pending => Some(
-                self.storage
-                    .read()
-                    .get(&(address.clone(), position.clone()))
-                    .cloned()
-                    .unwrap_or_else(H128::new),
-            ),
+            BlockId::Latest | BlockId::Pending => {
+                Some(
+                    self.storage
+                        .read()
+                        .get(&(address.clone(), position.clone()))
+                        .cloned()
+                        .unwrap_or_else(H128::new),
+                )
+            }
             _ => None,
         }
     }
@@ -561,7 +545,8 @@ impl BlockChainClient for TestBlockChainClient {
         _id: BlockId,
         _after: Option<&Address>,
         _count: u64,
-    ) -> Option<Vec<Address>> {
+    ) -> Option<Vec<Address>>
+    {
         None
     }
 
@@ -571,7 +556,8 @@ impl BlockChainClient for TestBlockChainClient {
         _account: &Address,
         _after: Option<&H128>,
         _count: u64,
-    ) -> Option<Vec<H128>> {
+    ) -> Option<Vec<H128>>
+    {
         None
     }
     fn transaction(&self, _id: TransactionId) -> Option<LocalizedTransaction> {
@@ -615,9 +601,7 @@ impl BlockChainClient for TestBlockChainClient {
             .map(encoded::Header::new)
     }
 
-    fn block_number(&self, _id: BlockId) -> Option<BlockNumber> {
-        unimplemented!()
-    }
+    fn block_number(&self, _id: BlockId) -> Option<BlockNumber> { unimplemented!() }
 
     fn block_body(&self, id: BlockId) -> Option<encoded::Body> {
         self.block_hash(id).and_then(|hash| {
@@ -796,9 +780,7 @@ impl BlockChainClient for TestBlockChainClient {
 
     fn clear_bad(&self) {}
 
-    fn additional_params(&self) -> BTreeMap<String, String> {
-        Default::default()
-    }
+    fn additional_params(&self) -> BTreeMap<String, String> { Default::default() }
 
     fn chain_info(&self) -> BlockChainInfo {
         let number = self.blocks.read().len() as BlockNumber - 1;
@@ -828,9 +810,7 @@ impl BlockChainClient for TestBlockChainClient {
             .ready_transactions(info.best_block_number, info.best_block_timestamp)
     }
 
-    fn spec_name(&self) -> String {
-        "foundation".into()
-    }
+    fn spec_name(&self) -> String { "foundation".into() }
 
     fn disable(&self) {
         unimplemented!();
@@ -854,39 +834,28 @@ impl BlockChainClient for TestBlockChainClient {
         _id: BlockId,
         _address: Address,
         _data: Bytes,
-    ) -> Result<Bytes, String> {
+    ) -> Result<Bytes, String>
+    {
         Ok(vec![])
     }
 
-    fn registrar_address(&self) -> Option<Address> {
-        None
-    }
+    fn registrar_address(&self) -> Option<Address> { None }
 
-    fn registry_address(&self, _name: String, _block: BlockId) -> Option<Address> {
-        None
-    }
+    fn registry_address(&self, _name: String, _block: BlockId) -> Option<Address> { None }
 
-    fn prove_storage(&self, _: H256, _: H128, _: BlockId) -> Option<(Vec<Bytes>, H256)> {
-        None
-    }
+    fn prove_storage(&self, _: H256, _: H128, _: BlockId) -> Option<(Vec<Bytes>, H256)> { None }
 
-    fn prove_account(&self, _: H256, _: BlockId) -> Option<(Vec<Bytes>, BasicAccount)> {
-        None
-    }
+    fn prove_account(&self, _: H256, _: BlockId) -> Option<(Vec<Bytes>, BasicAccount)> { None }
 
     fn prove_transaction(&self, _: SignedTransaction, _: BlockId) -> Option<(Bytes, Vec<DBValue>)> {
         None
     }
 
-    fn epoch_signal(&self, _: H256) -> Option<Vec<u8>> {
-        None
-    }
+    fn epoch_signal(&self, _: H256) -> Option<Vec<u8>> { None }
 }
 
 impl super::traits::EngineClient for TestBlockChainClient {
-    fn update_sealing(&self) {
-        self.miner.update_sealing(self)
-    }
+    fn update_sealing(&self) { self.miner.update_sealing(self) }
 
     fn submit_seal(&self, block_hash: H256, seal: Vec<Bytes>) {
         if self.miner.submit_seal(self, block_hash, seal).is_err() {
@@ -896,17 +865,11 @@ impl super::traits::EngineClient for TestBlockChainClient {
 
     fn broadcast_consensus_message(&self, _message: Bytes) {}
 
-    fn epoch_transition_for(&self, _block_hash: H256) -> Option<::engines::EpochTransition> {
-        None
-    }
+    fn epoch_transition_for(&self, _block_hash: H256) -> Option<::engines::EpochTransition> { None }
 
-    fn chain_info(&self) -> BlockChainInfo {
-        BlockChainClient::chain_info(self)
-    }
+    fn chain_info(&self) -> BlockChainInfo { BlockChainClient::chain_info(self) }
 
-    fn as_full_client(&self) -> Option<&BlockChainClient> {
-        Some(self)
-    }
+    fn as_full_client(&self) -> Option<&BlockChainClient> { Some(self) }
 
     fn block_number(&self, id: BlockId) -> Option<BlockNumber> {
         BlockChainClient::block_number(self, id)

@@ -45,28 +45,6 @@ pub const IS_SERVER: u32 = 1 << 1;
 pub const ALIVE: u32 = 1 << 3;
 pub const DISCONNECTED: u32 = 1 << 10;
 
-#[derive(Clone, PartialEq)]
-pub enum Mode {
-    NORMAL,
-    BACKWARD,
-    FORWARD,
-    LIGHTNING,
-    THUNDER,
-}
-
-impl fmt::Display for Mode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let printable = match *self {
-            Mode::NORMAL => "NORMAL",
-            Mode::BACKWARD => "BACKWARD",
-            Mode::FORWARD => "FORWARD",
-            Mode::LIGHTNING => "LIGHTNING",
-            Mode::THUNDER => "THUNDER",
-        };
-        write!(f, "{}", printable)
-    }
-}
-
 #[derive(Clone, Copy, Deserialize, Eq, Hash, PartialEq, Serialize)]
 pub struct IpAddr {
     pub ip: [u8; 8],
@@ -132,9 +110,8 @@ pub struct Node {
     pub genesis_hash: H256,
     pub target_total_difficulty: U256,
     pub current_total_difficulty: U256,
-    pub mode: Mode,
     pub last_request_timestamp: SystemTime,
-    pub last_request_num: u64,
+    pub requested_block_num: u64,
     pub last_broadcast_timestamp: SystemTime,
     pub last_sent_transactions: HashSet<H256>,
     pub tx: Option<Tx>,
@@ -158,9 +135,8 @@ impl Node {
             genesis_hash: H256::default(),
             target_total_difficulty: U256::default(),
             current_total_difficulty: U256::default(),
-            mode: Mode::NORMAL,
             last_request_timestamp: SystemTime::now(),
-            last_request_num: 0,
+            requested_block_num: 0,
             last_broadcast_timestamp: SystemTime::now(),
             last_sent_transactions: HashSet::new(),
             tx: None,
@@ -184,7 +160,7 @@ impl Node {
         if "00000000-0000-0000-0000-000000000000" == node_id.to_string() {
             let uuid = Uuid::new_v4();
             node.node_id
-                .copy_from_slice(uuid.hyphenated().to_string().as_bytes());
+                .copy_from_slice(uuid.to_hyphenated().to_string().as_bytes());
         } else {
             node.node_id.copy_from_slice(node_id.as_bytes());
         }
@@ -235,9 +211,8 @@ impl Node {
         self.genesis_hash = node_new.genesis_hash;
         self.target_total_difficulty = node_new.target_total_difficulty;
         self.current_total_difficulty = node_new.current_total_difficulty;
-        self.mode = node_new.mode.clone();
         self.last_request_timestamp = node_new.last_request_timestamp;
-        self.last_request_num = node_new.last_request_num;
+        self.requested_block_num = node_new.requested_block_num;
         self.last_broadcast_timestamp = node_new.last_broadcast_timestamp;
         self.is_from_boot_list = node_new.is_from_boot_list;
         self.tx = node_new.tx.clone();
@@ -300,13 +275,12 @@ impl fmt::Display for Node {
         write!(f, "    best block number: {}\n", self.best_block_num)?;
         write!(f, "    synced block number: {}\n", self.synced_block_num)?;
         write!(f, "    boot node: {}\n", self.is_from_boot_list)?;
-        write!(f, "    mode: {}\n", self.mode)?;
         write!(
             f,
             "    last request timestamp: {:?}\n",
             self.last_request_timestamp
         )?;
-        write!(f, "    last_request_num: {}\n", self.last_request_num)?;
+        write!(f, "    requested_block_num: {}\n", self.requested_block_num)?;
         write!(
             f,
             "    last broadcast timestamp: {:?}\n",

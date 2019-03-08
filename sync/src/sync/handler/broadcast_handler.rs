@@ -135,50 +135,41 @@ impl BroadcastsHandler {
                 let client = SyncStorage::get_block_chain();
                 match client.block_header(BlockId::Hash(*parent_hash)) {
                     Some(_) => {
-                        if let Ok(ref mut imported_block_hashes) =
-                            SyncStorage::get_imported_block_hashes().lock()
-                        {
-                            if !imported_block_hashes.contains_key(&hash) {
-                                let result = client.import_block(block_rlp.as_raw().to_vec());
+                        let result = client.import_block(block_rlp.as_raw().to_vec());
 
-                                match result {
-                                    Ok(_) => {
-                                        trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
-                                        imported_block_hashes.insert(hash, 0);
-                                        let active_nodes = P2pMgr::get_nodes(ALIVE);
-                                        for n in active_nodes.iter() {
-                                            // broadcast new block
-                                            trace!(target: "sync", "Sync broadcast new block sent...");
-                                            P2pMgr::send(n.node_hash, req.clone());
-                                        }
-                                        node.inc_reputation(10);
-                                        P2pMgr::update_node(node.node_hash, node);
-                                    }
-                                    Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
-                                        trace!(target: "sync", "New block already in chain {:?}", hash);
-                                        node.inc_reputation(1);
-                                        P2pMgr::update_node(node.node_hash, node);
-                                    }
-                                    Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
-                                        trace!(target: "sync", "New block already queued {:?}", hash);
-                                        node.inc_reputation(1);
-                                        P2pMgr::update_node(node.node_hash, node);
-                                    }
-                                    Err(BlockImportError::Block(BlockError::UnknownParent(p))) => {
-                                        info!(target: "sync", "New block with unknown parent ({:?}) {:?}", p, hash);
-                                        node.dec_reputation(10);
-                                        P2pMgr::update_node(node.node_hash, node);
-                                    }
-                                    Err(e) => {
-                                        error!(target: "sync", "Bad new block {:?} : {:?}", hash, e);
-                                        node.dec_reputation(50);
-                                        P2pMgr::update_node(node.node_hash, node);
-                                    }
-                                };
+                        match result {
+                            Ok(_) => {
+                                trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
+                                let active_nodes = P2pMgr::get_nodes(ALIVE);
+                                for n in active_nodes.iter() {
+                                    // broadcast new block
+                                    trace!(target: "sync", "Sync broadcast new block sent...");
+                                    P2pMgr::send(n.node_hash, req.clone());
+                                }
+                                node.inc_reputation(10);
+                                P2pMgr::update_node(node.node_hash, node);
                             }
-                        } else {
-                            trace!(target: "sync", "imported_block_hashes_mutex lock failed");
-                        }
+                            Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
+                                trace!(target: "sync", "New block already in chain {:?}", hash);
+                                node.inc_reputation(1);
+                                P2pMgr::update_node(node.node_hash, node);
+                            }
+                            Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
+                                trace!(target: "sync", "New block already queued {:?}", hash);
+                                node.inc_reputation(1);
+                                P2pMgr::update_node(node.node_hash, node);
+                            }
+                            Err(BlockImportError::Block(BlockError::UnknownParent(p))) => {
+                                info!(target: "sync", "New block with unknown parent ({:?}) {:?}", p, hash);
+                                node.dec_reputation(10);
+                                P2pMgr::update_node(node.node_hash, node);
+                            }
+                            Err(e) => {
+                                error!(target: "sync", "Bad new block {:?} : {:?}", hash, e);
+                                node.dec_reputation(50);
+                                P2pMgr::update_node(node.node_hash, node);
+                            }
+                        };
                     }
                     None => {}
                 };

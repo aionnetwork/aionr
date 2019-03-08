@@ -19,13 +19,17 @@
  *
  ******************************************************************************/
 use acore::client::{BlockChainClient, BlockId, BlockStatus, ChainNotify};
+use acore::spec::Spec;
 use acore::transaction::UnverifiedTransaction;
 use aion_types::H256;
+use futures::future::{loop_fn, Loop};
 use futures::{Future, Stream};
+use kvdb::KeyValueDB;
 use rlp::UntrustedRlp;
 use std::collections::BTreeMap;
 use std::ops::Index;
 use std::sync::Arc;
+use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::timer::Interval;
 
@@ -40,7 +44,6 @@ use self::action::SyncAction;
 use self::handler::blocks_bodies_handler::BlockBodiesHandler;
 use self::handler::blocks_headers_handler::BlockHeadersHandler;
 use self::handler::broadcast_handler::BroadcastsHandler;
-use self::handler::import_handler::ImportHandler;
 use self::handler::status_handler::StatusHandler;
 use self::storage::{
     ActivePeerInfo, PeerInfo, SyncState, SyncStatus, SyncStorage, TransactionStats,
@@ -55,11 +58,11 @@ mod handler;
 pub mod storage;
 
 const STATUS_REQ_INTERVAL: u64 = 2;
-const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
-const BLOCKS_IMPORT_INTERVAL: u64 = 50;
-const STATICS_INTERVAL: u64 = 15;
+const GET_BLOCK_HEADERS_INTERVAL: u64 = 50;
+const BLOCKS_BODIES_REQ_INTERVAL: u64 = 800;
+const STATICS_INTERVAL: u64 = 30;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
-const REPUTATION_HANDLE_INTERVAL: u64 = 15;
+const REPUTATION_HANDLE_INTERVAL: u64 = 300;
 const SYNC_STATIC_CAPACITY: usize = 25;
 
 #[derive(Clone)]
@@ -80,30 +83,36 @@ impl SyncMgr {
                 .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(status_req_task);
 
-        let blocks_bodies_req_task = Interval::new(
-            Instant::now(),
-            Duration::from_millis(BLOCKS_BODIES_REQ_INTERVAL),
-        )
-        .for_each(move |_| {
+        let get_block_headers_task = loop_fn(0, |_| {
+            let from_new = SyncStorage::get_requested_block_number_last_time() + 1;
+
+            for _ in 0..4 {
+                if let Some(mut node) = P2pMgr::get_an_active_node() {
+                    BlockHeadersHandler::get_headers_from_node(&mut node, from_new);
+                }
+            }
+
+            thread::sleep(Duration::from_millis(GET_BLOCK_HEADERS_INTERVAL));
+            if SyncStorage::is_syncing() {
+                Ok(Loop::Continue(from_new))
+            } else {
+                Ok(Loop::Break(()))
+            }
+        });
+        executor.spawn(get_block_headers_task);
+
+        let blocks_bodies_req_task = loop_fn(0, |counter| {
             // blocks bodies req
             BlockBodiesHandler::send_blocks_bodies_req();
+            thread::sleep(Duration::from_millis(BLOCKS_BODIES_REQ_INTERVAL));
 
-            Ok(())
-        })
-        .map_err(|e| error!("interval errored; err={:?}", e));
+            if SyncStorage::is_syncing() {
+                Ok(Loop::Continue(counter + 1))
+            } else {
+                Ok(Loop::Break(()))
+            }
+        });
         executor.spawn(blocks_bodies_req_task);
-
-        let blocks_import_task = Interval::new(
-            Instant::now(),
-            Duration::from_millis(BLOCKS_IMPORT_INTERVAL),
-        )
-        .for_each(move |_| {
-            ImportHandler::import_blocks();
-
-            Ok(())
-        })
-        .map_err(|e| error!("interval errored; err={:?}", e));
-        executor.spawn(blocks_import_task);
 
         let broadcast_transactions_task = Interval::new(
             Instant::now(),
@@ -141,6 +150,7 @@ impl SyncMgr {
             } else {
                 P2pMgr::refresh_top8_node_hashes(top8_nodes);
             }
+            P2pMgr::reset_reputation();
             Ok(())
         })
         .map_err(|e| error!("interval errored; err={:?}", e));
@@ -150,8 +160,7 @@ impl SyncMgr {
             .for_each(move |_| {
                 let connected_nodes = P2pMgr::get_nodes(CONNECTED);
                 for node in connected_nodes.iter() {
-                    if node.last_request_timestamp
-                        + Duration::from_secs(STATICS_INTERVAL * 12)
+                    if node.last_request_timestamp + Duration::from_secs(STATICS_INTERVAL * 12)
                         < SystemTime::now()
                     {
                         info!(target: "sync", "Disconnect with idle node: {}@{}.", node.get_node_id(), node.get_ip_addr());
@@ -178,13 +187,12 @@ impl SyncMgr {
                     active_nodes_count,
                 );
                 info!(target: "sync", "{:-^127}","");
-                info!(target: "sync","      Total Diff    Blk No.    Blk Hash                 Address                 Revision      Conn  Seed  LstReq No.       Mode");
+                info!(target: "sync","      Total Diff    Blk No.    Blk Hash                 Address                 Revision      Conn  Seed  LstReq No.");
                 info!(target: "sync", "{:-^127}","");
-                active_nodes.sort_by(|a,b|{
-                    if a.target_total_difficulty != b.target_total_difficulty{
+                active_nodes.sort_by(|a, b| {
+                    if a.target_total_difficulty != b.target_total_difficulty {
                         b.target_total_difficulty.cmp(&a.target_total_difficulty)
-                    }
-                    else{
+                    } else {
                         b.best_block_num.cmp(&a.best_block_num)
                     }
                 });
@@ -192,7 +200,7 @@ impl SyncMgr {
                 for node in active_nodes.iter() {
                     if let Ok(_) = node.last_request_timestamp.elapsed() {
                         info!(target: "sync",
-                            "{:>16}{:>11}{:>12}{:>24}{:>25}{:>10}{:>6}{:>12}{:>11}",
+                            "{:>16}{:>11}{:>12}{:>24}{:>25}{:>10}{:>6}{:>12}",
                             format!("{}",node.target_total_difficulty),
                             node.best_block_num,
                             format!("{}",node.best_hash),
@@ -206,8 +214,7 @@ impl SyncMgr {
                                 true => "Y",
                                 _ => ""
                             },
-                            node.last_request_num,
-                            format!("{}",node.mode)
+                            node.requested_block_num
                         );
                         count += 1;
                         if count == SYNC_STATIC_CAPACITY {
@@ -222,25 +229,17 @@ impl SyncMgr {
                 {
                     SyncStorage::get_block_chain().clear_queue();
                     SyncStorage::get_block_chain().clear_bad();
-                    SyncStorage::clear_downloaded_headers();
-                    SyncStorage::clear_downloaded_blocks();
-                    SyncStorage::clear_downloaded_block_hashes();
                     SyncStorage::clear_requested_blocks();
                     SyncStorage::clear_headers_with_bodies_requested();
-                    SyncStorage::set_synced_block_number(SyncStorage::get_chain_info().best_block_number);
-                    let abnormal_mode_nodes_count =
-                        P2pMgr::get_nodes_count_with_mode(Mode::BACKWARD)
-                            + P2pMgr::get_nodes_count_with_mode(Mode::FORWARD);
-                    if abnormal_mode_nodes_count > (active_nodes_count / 5)
-                        || active_nodes_count == 0
-                    {
-                        info!(target: "sync", "Abnormal status, reseting network...");
-                        P2pMgr::reset();
+                    SyncStorage::set_synced_block_number(
+                        SyncStorage::get_chain_info().best_block_number,
+                    );
 
-                        SyncStorage::clear_imported_block_hashes();
-                        SyncStorage::clear_staged_blocks();
-                        SyncStorage::set_max_staged_block_number(0);
-                    }
+                    // info!(target: "sync", "Abnormal status, reseting network...");
+                    // P2pMgr::reset();
+
+                    SyncStorage::clear_staged_blocks();
+                    SyncStorage::set_max_staged_block_number(0);
                 }
 
                 SyncStorage::set_synced_block_number_last_time(block_number_now);
@@ -319,7 +318,10 @@ impl SyncMgr {
         };
     }
 
-    fn disable() { SyncStorage::reset(); }
+    fn disable() {
+        SyncStorage::set_is_syncing(false);
+        SyncStorage::reset();
+    }
 }
 
 /// Sync configuration
@@ -345,8 +347,11 @@ pub struct Params {
     pub client: Arc<BlockChainClient>,
     /// Network layer configuration.
     pub network_config: NetworkConfig,
+    /// Spec
+    pub spec: Spec,
+    /// DB
+    pub db: Arc<KeyValueDB>,
 }
-
 pub struct NetworkService {
     pub config: NetworkConfig,
 }
@@ -363,10 +368,18 @@ impl Sync {
     /// Create handler with the network service
     pub fn get_instance(params: Params) -> Arc<Sync> {
         let chain_info = params.client.chain_info();
+
+        SyncStorage::init(params.client, params.spec, params.db);
+
+        SyncStorage::set_is_syncing(true);
         // starting block number is the local best block number during kernel startup.
         let starting_block_number = chain_info.best_block_number;
 
-        SyncStorage::init(params.client);
+        SyncStorage::set_synced_block_number(starting_block_number);
+        SyncStorage::set_synced_block_number_last_time(starting_block_number);
+
+        let header_chain_info = SyncStorage::get_block_header_chain().chain_info();
+        SyncStorage::set_requested_block_number_last_time(header_chain_info.best_block_number);
 
         let service = NetworkService {
             config: params.network_config.clone(),
@@ -495,7 +508,7 @@ impl ChainNotify for Sync {
         &self,
         imported: Vec<H256>,
         _invalid: Vec<H256>,
-        enacted: Vec<H256>,
+        _enacted: Vec<H256>,
         _retracted: Vec<H256>,
         sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
@@ -527,27 +540,12 @@ impl ChainNotify for Sync {
                 return;
             }
 
-            let synced_block_number = SyncStorage::get_synced_block_number();
-            if max_imported_block_number <= synced_block_number {
-                let mut hashes = Vec::new();
-                for block_number in max_imported_block_number..synced_block_number + 1 {
-                    let block_id = BlockId::Number(block_number);
-                    if let Some(block_hash) = client.block_hash(block_id) {
-                        hashes.push(block_hash);
-                    }
-                }
-                if hashes.len() > 0 {
-                    SyncStorage::remove_imported_block_hashes(hashes);
-                }
-            }
-
             SyncStorage::set_synced_block_number(max_imported_block_number);
 
             for block_number in min_imported_block_number..max_imported_block_number + 1 {
                 let block_id = BlockId::Number(block_number);
                 if let Some(blk) = client.block(block_id) {
                     let block_hash = blk.hash();
-                    ImportHandler::import_staged_blocks(&block_hash);
                     if let Some(time) = SyncStorage::get_requested_time(&block_hash) {
                         info!(target: "sync",
                             "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
@@ -557,16 +555,8 @@ impl ChainNotify for Sync {
             }
         }
 
-        if enacted.is_empty() {
-            for hash in enacted.iter() {
-                debug!(target: "sync", "enacted hash: {:?}", hash);
-                ImportHandler::import_staged_blocks(&hash);
-            }
-        }
-
         if !sealed.is_empty() {
             debug!(target: "sync", "Propagating blocks...");
-            SyncStorage::insert_imported_block_hashes(sealed.clone());
             BroadcastsHandler::propagate_new_blocks(
                 sealed.index(0),
                 SyncStorage::get_block_chain(),

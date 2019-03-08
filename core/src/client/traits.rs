@@ -244,7 +244,8 @@ pub trait BlockChainClient: Sync + Send {
         &self,
         blk_price_window: usize,
         max_blk_traverse: usize,
-    ) -> ::stats::Corpus<U256> {
+    ) -> ::stats::Corpus<U256>
+    {
         let mut block_num = self.chain_info().best_block_number;
         let mut corpus = Vec::new();
         let mut count = 0;
