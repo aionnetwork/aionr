@@ -679,7 +679,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     pub fn create_avm(
         &mut self,
         params: Vec<AVMActionParams>,
-        substates: &mut [Substate],
+        _substates: &mut [Substate],
     ) -> Vec<ExecutionResult>
     {
         self.state.checkpoint(AccType::AVM);
@@ -694,7 +694,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     pub fn call_avm(
         &mut self,
         params: Vec<AVMActionParams>,
-        substates: &mut [Substate],
+        _substates: &mut [Substate],
     ) -> Vec<ExecutionResult>
     {
         self.state.checkpoint(AccType::AVM);
@@ -929,7 +929,7 @@ Address};
     use transaction::{Action, Transaction, SignedTransaction};
     use bytes::Bytes;
     use error::ExecutionError;
-    use avm_abi::{AbiToken, AVMEncoder, ToBytes};
+    use avm_abi::{ToBytes};
 
     fn make_aion_machine() -> EthereumMachine {
         let machine = ::ethereum::new_aion_test_machine();
@@ -2383,7 +2383,7 @@ Address};
                 status_code,
                 gas_left,
                 return_data,
-                exception,
+                exception: _,
             } = r;
             assert_eq!(status_code, ExecStatus::Success);
 
@@ -2458,7 +2458,7 @@ Address};
                 status_code,
                 gas_left,
                 return_data,
-                exception,
+                exception: _,
             } = r;
             assert_eq!(status_code, ExecStatus::Success);
 
@@ -2469,9 +2469,7 @@ Address};
         }
 
         params.call_type = CallType::Call;
-        //let mut call_data = 14_i32.to_vm_bytes();
-        let mut call_data = vec![0x72,0x75,0x6E,0x3C,0x3E];
-        //call_data.append(&mut AbiToken::STRING("run".to_string()).encode());
+        let call_data = vec![0x72,0x75,0x6E,0x3C,0x3E];
         params.data = Some(call_data);
         params.nonce += 1;
         println!("call data = {:?}", params.data);
@@ -2486,7 +2484,7 @@ Address};
                 status_code,
                 gas_left,
                 return_data,
-                exception,
+                exception: _,
             } = r;
             assert_eq!(status_code, ExecStatus::Success);
 

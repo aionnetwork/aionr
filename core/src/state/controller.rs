@@ -11,7 +11,6 @@ use state::{
 };
 
 use factory::Factories;
-use state_db::StateDB;
 use trie;
 use trie::{Trie, TrieError};
 
@@ -98,20 +97,29 @@ impl<T: VMAccount> AccountEntry<T> {
             state: AccountState::CleanCached,
         }
     }
+}
 
-    // Replace data with another entry but preserve storage cache.
-    pub fn overwrite_with(&mut self, other: AccountEntry<T>) {
-        self.state = other.state;
-        match other.account {
-            Some(acc) => {
-                if let Some(ref mut ours) = self.account {
-                    ours.overwrite_with(acc);
+macro_rules! impl_account_overwrite {
+    ($T: ty) => {
+        impl AccountEntry<$T> {
+            // Replace data with another entry but preserve storage cache.
+            pub fn overwrite_with(&mut self, other: AccountEntry<$T>) {
+                self.state = other.state;
+                match other.account {
+                    Some(acc) => {
+                        if let Some(ref mut ours) = self.account {
+                            ours.overwrite_with(acc);
+                        }
+                    }
+                    None => self.account = None,
                 }
             }
-            None => self.account = None,
         }
-    }
+    };
 }
+
+impl_account_overwrite!(FVMAccount);
+impl_account_overwrite!(AVMAccount);
 
 pub struct VMAccountManager<T>
 where T: VMAccount
@@ -159,41 +167,6 @@ impl<T: VMAccount> AccountCacheOps<T> for VMAccountManager<T> {
     }
 }
 
-// macro_rules! impl_cache_ops {
-//     ($T: ty) => {
-//         impl AccountCacheOps<$T> for VMAccountManager<$T> {
-//             fn insert_cache(&self, address: &Address, account: AccountEntry<$T>) {
-//                 // Dirty account which is not in the cache means this is a new account.
-//                 // It goes directly into the checkpoint as there's nothing to rever to.
-//                 //
-//                 // In all other cases account is read as clean first, and after that made
-//                 // dirty in and added to the checkpoint with `note_cache`.
-//                 let is_dirty = account.is_dirty();
-//                 let old_value = self.cache.borrow_mut().insert(*address, account);
-//                 if is_dirty {
-//                     if let Some(ref mut checkpoint) = self.checkpoints.borrow_mut().last_mut() {
-//                         checkpoint.entry(*address).or_insert(old_value);
-//                     }
-//                 }
-//             }
-
-//             fn note_cache(&self, address: &Address) {
-//                 if let Some(ref mut checkpoint) = self.checkpoints.borrow_mut().last_mut() {
-//                     checkpoint.entry(*address).or_insert_with(|| {
-//                         self.cache
-//                             .borrow()
-//                             .get(address)
-//                             .map(AccountEntry::clone_dirty)
-//                     });
-//                 }
-//             }
-//         }
-//     };
-// }
-
-// impl_cache_ops!(FVMAccount);
-// impl_cache_ops!(AVMAccount);
-
 impl<T: VMAccount> VMAccountManager<T> {
     pub fn new(account_start_nonce: U256) -> Self {
         Self {
@@ -212,8 +185,11 @@ impl<T: VMAccount> VMAccountManager<T> {
     }
 }
 
+/// define Account specific methods
+/// for now: we use separately account cache dealing with fvm and avm account,
+/// so get_cached is individual.
 impl VMAccountManager<FVMAccount> {
-    pub fn get_cached<F, U, B: Backend>(
+    pub fn get_cached<F, U: ::std::fmt::Debug, B: Backend>(
         &self,
         a: &Address,
         db: &B,
@@ -238,7 +214,7 @@ impl VMAccountManager<FVMAccount> {
         }
 
         // get from global cache
-
+        println!("search in fvm global cache");
         let result = db.get_cached(a, |mut acc| {
             if let Some(ref mut account) = acc {
                 let accountdb = factories
@@ -248,6 +224,7 @@ impl VMAccountManager<FVMAccount> {
             }
             f(acc.map(|a| &*a))
         });
+        println!("fvm glocal cache returns: {:?}", result);
         match result {
             Some(r) => Ok(r),
             None => {
@@ -260,6 +237,7 @@ impl VMAccountManager<FVMAccount> {
                 let state_db = factories
                     .trie
                     .readonly(db.as_hashstore(), &root)?;
+                println!("search in database");
                 let mut maybe_acc = state_db.get_with(a, FVMAccount::from_rlp)?;
                 if let Some(ref mut account) = maybe_acc.as_mut() {
                     if account.account_type != AccType::FVM {

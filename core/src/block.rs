@@ -40,7 +40,7 @@ use error::{Error, BlockError};
 use factory::Factories;
 use header::{Header, Seal};
 use receipt::Receipt;
-use state::{State, AccType};
+use state::State;
 use state_db::StateDB;
 use transaction::{UnverifiedTransaction, SignedTransaction, Error as TransactionError, AVM_TRANSACTION_TYPE};
 use verification::PreverifiedBlock;

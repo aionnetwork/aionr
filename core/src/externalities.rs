@@ -133,7 +133,10 @@ where B: StateBackend
     fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
         println!("AVM get code");
         match self.state.code(address) {
-            Ok(code) => code,
+            Ok(code) => {
+                println!("code = {:?}", code);
+                code
+            },
             Err(_x) => None,
         }
     }
@@ -147,7 +150,7 @@ where B: StateBackend
     fn sload(&self, a: &Address, key: &Vec<u8>) -> Option<Vec<u8>> {
         match self.state.avm_storage_at(a, key) {
             Ok(value) => Some(value),
-            Err(x) => None,
+            Err(_) => None,
         }
     }
 
@@ -480,7 +483,7 @@ where B: StateBackend
 
     fn extcodesize(&self, address: &Address) -> usize {
         self.state
-            .code_size(address, AccType::FVM)
+            .code_size(address)
             .expect("Fatal error occurred when getting code size.")
             .unwrap_or(0)
     }

@@ -37,7 +37,6 @@ use util_error::UtilError;
 use bloom_journal::{Bloom, BloomJournal};
 use db::COL_ACCOUNT_BLOOM;
 use byteorder::{LittleEndian, ByteOrder};
-use state::AccType;
 
 /// Number of bytes allocated in the memory for accounts bloom.
 pub const ACCOUNT_BLOOM_SPACE: usize = 1048576;

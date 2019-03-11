@@ -23,7 +23,7 @@ pub struct BasicAccount {
 /// Single account in the system.
 /// Keeps track of changes to the code and storage.
 /// The changes are applied in `commit_storage` and `commit_code`
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Account<T, U> {
     // Balance of the account.
     pub balance: U256,

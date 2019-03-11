@@ -109,14 +109,9 @@ pub extern fn avm_create_account(handle: *const c_void, address: *const avm_addr
 
 #[no_mangle]
 pub extern fn avm_has_account_state(handle: *const c_void, address: *const avm_address) -> u32 {
-    unsafe {
-        let result: u32 = 1;
-        println!(
-            "Callback: avm_has_account_state({:?}, {}) => {}",
-            handle, *address, result
-        );
-        result
-    }
+    let ext: &mut Box<AVMExt> = unsafe {mem::transmute(handle)};
+    let addr: &Address = unsafe { mem::transmute(address) };
+    ext.account_exists(addr) as u32
 }
 
 #[no_mangle]
@@ -160,8 +155,6 @@ pub extern fn avm_get_code(handle: *const c_void, address: *const avm_address) -
         }
     }
 }
-
-use rand;
 
 #[no_mangle]
 pub extern fn avm_put_storage(

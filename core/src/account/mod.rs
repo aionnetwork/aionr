@@ -3,8 +3,9 @@ mod traits;
 
 use lru_cache::LruCache;
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::collections::{HashMap, BTreeMap};
 use std::sync::Arc;
+use std::fmt;
 
 use aion_types::{H128, U128, H256, U256, Address};
 use bytes::{Bytes, ToPretty};
@@ -189,37 +190,11 @@ impl FVMAccount {
     }
 
     /// Clone account data, dirty storage keys and cached storage keys.
-    fn clone_all(&self) -> Self {
-        let mut account = self.clone_dirty();
-        account.storage_cache = self.storage_cache.clone();
-        account
-    }
-
-    /// Replace self with the data from other account merging storage cache.
-    /// Basic account data and all modifications are overwritten
-    /// with new values.
-    pub fn overwrite_with(&mut self, other: Self) {
-        self.balance = other.balance;
-        self.nonce = other.nonce;
-        self.storage_root = other.storage_root;
-        self.code_hash = other.code_hash;
-        self.code_filth = other.code_filth;
-        self.code_cache = other.code_cache;
-        self.code_size = other.code_size;
-        self.address_hash = other.address_hash;
-
-        let mut cache = self.storage_cache.0.borrow_mut();
-        for (k, v) in other.storage_cache.0.into_inner() {
-            cache.insert(k.clone(), v.clone()); //TODO: cloning should not be required here
-        }
-
-        let mut cache = self.storage_cache.1.borrow_mut();
-        for (k, v) in other.storage_cache.1.into_inner() {
-            cache.insert(k.clone(), v.clone()); //TODO: cloning should not be required here
-        }
-
-        self.storage_changes = other.storage_changes;
-    }
+    // fn clone_all(&self) -> Self {
+    //     let mut account = self.clone_dirty();
+    //     account.storage_cache = self.storage_cache.clone();
+    //     account
+    // }
 
     pub fn set_empty_but_commit(&mut self) { self.empty_but_commit = true; }
 }
@@ -567,10 +542,6 @@ macro_rules! impl_account {
                 account
             }
 
-            fn overwrite_with(&mut self, pther: Self) {
-                unimplemented!()
-            }
-
             fn acc_type(&self) -> u8 {
                 self.account_type.clone().into()
             }
@@ -728,6 +699,27 @@ impl FVMAccount {
             },
         }
     }
+
+    pub fn overwrite_with(&mut self, other: Self) {
+        self.balance = other.balance;
+        self.nonce = other.nonce;
+        self.storage_root = other.storage_root;
+        self.code_hash = other.code_hash;
+        self.code_filth = other.code_filth;
+        self.code_cache = other.code_cache;
+        self.code_size = other.code_size;
+        self.address_hash = other.address_hash;
+        let mut cache = self.storage_cache.0.borrow_mut();
+        for (k, v) in other.storage_cache.0.into_inner() {
+            cache.insert(k.clone(), v.clone()); //TODO: cloning should not be required here
+        }
+
+        let mut cache = self.storage_cache.1.borrow_mut();
+        for (k, v) in other.storage_cache.1.into_inner() {
+            cache.insert(k.clone(), v.clone()); //TODO: cloning should not be required here
+        }
+        self.storage_changes = other.storage_changes;
+    }
 }
 
 impl AVMAccount {
@@ -764,6 +756,40 @@ impl AVMAccount {
         let raw_changes: *mut HashMap<Vec<u8>, Vec<u8>> = unsafe {::std::mem::transmute(&self.storage_changes)};
         println!("storage_changes ptr = {:?}", raw_changes);
         println!("post storage_changes = {:?}", self.storage_changes);
+    }
+}
+
+impl fmt::Debug for FVMAccount {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("AVMAccount")
+            .field("balance", &self.balance)
+            .field("nonce", &self.nonce)
+            .field("code", &self.code())
+            .field(
+                "storage",
+                &self.storage_changes.0.iter().collect::<BTreeMap<_, _>>(),
+            )
+            .field(
+                "storage dword", 
+                &self.storage_changes.1.iter().collect::<BTreeMap<_, _>>(),
+            )
+            .field("storage_root", &self.storage_root)
+            .finish()
+    }
+}
+
+impl fmt::Debug for AVMAccount {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        f.debug_struct("AVMAccount")
+            .field("balance", &self.balance)
+            .field("nonce", &self.nonce)
+            .field("code", &self.code())
+            .field(
+                "storage",
+                &self.storage_changes.iter().collect::<BTreeMap<_, _>>(),
+            )
+            .field("storage_root", &self.storage_root)
+            .finish()
     }
 }
 

@@ -26,7 +26,7 @@
 //! or rolled back.
 
 use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP};
-use std::cell::{RefCell, RefMut};
+use std::cell::{RefMut};
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
@@ -49,21 +49,17 @@ use vms::EnvInfo;
 
 use aion_types::{Address, H128, H256, U256};
 use bytes::Bytes;
-use kvdb::{KeyValueDB, AsHashStore, DBValue, HashStore, MemoryDBRepository};
+use kvdb::{KeyValueDB, AsHashStore, DBValue, MemoryDBRepository};
 
 use trie;
 use trie::recorder::Recorder;
 use trie::{Trie, TrieDB, TrieError};
 
-// mod account;
 mod controller;
 mod substate;
-mod avm_account;
 
 pub mod backend;
 
-// pub use self::avm_account::{AVMInterface, AVMAccount, AVMAccountEntry, AVMAccMgr};
-// pub use self::account::Account;
 pub use account::{
     FVMAccount,
     AVMAccount,
@@ -741,12 +737,17 @@ impl<B: Backend> State<B> {
         let code = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::Code, true, |a| {
             a.as_ref().map_or(None, |a| a.code().clone())
         });
-        if code.is_ok() {
-            code
-        } else {
-            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::Code, true, |a| {
-                a.as_ref().map_or(None, |a| a.code().clone())
-            })
+
+        match code.as_ref() {
+            Ok(v) => {
+                if v.is_some() {
+                    code.clone()
+                } else {
+                    self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::Code, true, |a| {
+                        a.as_ref().map_or(None, |a| a.code().clone())})
+                }
+            },
+            Err(_) => code.clone(),
         }
     }
 
@@ -765,10 +766,11 @@ impl<B: Backend> State<B> {
     }
 
     /// Get accounts' code size.
-    pub fn code_size(&self, a: &Address, acc_type: AccType) -> trie::Result<Option<usize>> {
+    pub fn code_size(&self, a: &Address) -> trie::Result<Option<usize>> {
         let code_size = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::CodeSize, true, |a| {
             a.as_ref().and_then(|a| a.code_size())
         });
+
         if code_size.is_ok() {
             code_size
         } else {
@@ -861,9 +863,9 @@ impl<B: Backend> State<B> {
                     |_| {},
                 )?
                 .init_code(code);
-                Ok(())
             },
             AccType::AVM => {
+                println!("save AVM code in local cache");
                 self.require_avm_or_from(
                     a,
                     true,
@@ -871,9 +873,10 @@ impl<B: Backend> State<B> {
                     |_| {},
                 )?
                 .init_code(code);
-                Ok(())
             },
         }
+
+        Ok(())
     }
 
     pub fn set_empty_but_commit(&mut self, a: &Address) -> trie::Result<()> {
@@ -1024,11 +1027,6 @@ impl<B: Backend> State<B> {
 
     fn touch(&mut self, a: &Address) -> trie::Result<()> {
         self.require(a, false)?;
-        Ok(())
-    }
-
-    fn touch_avm(&mut self, a: &Address) -> trie::Result<()> {
-        self.require_avm(a, false)?;
         Ok(())
     }
 
@@ -1423,12 +1421,13 @@ impl<B: Backend> State<B> {
             match self.db.get_avm_cached_account(a) {
                 Some(acc) => self.avm_manager.insert_cache(a, AccountEntry::new_clean_cached(acc)),
                 None => {
+                    println!("No AVM account in local cache");
                     let maybe_acc = if !self.db.is_known_null(a) {
                         let db = self
                             .factories
                             .trie
                             .readonly(self.db.as_hashstore(), &self.root)?;
-                        AccountEntry::new_clean(db.get_with(a, Account::from_rlp)?)
+                        AccountEntry::new_clean(db.get_with(a, AVMAccount::from_rlp)?)
                     } else {
                         AccountEntry::new_clean(None)
                     };

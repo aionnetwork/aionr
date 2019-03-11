@@ -27,7 +27,7 @@ use super::blake2b_hash_contract::Blake2bHashContract;
 use super::tx_hash_contract::TxHashContract;
 use super::atb::token_bridge_contract::TokenBridgeContract;
 use std::fmt;
-use state::{State, Substate, Backend as StateBackend,CleanupMode, AccType};
+use state::{State, Substate, Backend as StateBackend,CleanupMode};
 use vms::ExecutionResult;
 use log_entry::LogEntry;
 use state::{FVMKey, FVMValue};

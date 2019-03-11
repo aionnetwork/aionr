@@ -117,12 +117,6 @@ pub trait VMAccount: Sync + Send {
     // /// Clone account data, dirty storage keys and cached storage keys.
     // fn clone_all(&self) -> Self;
 
-    // /// Replace self with the data from other account merging storage cache.
-    // /// Basic account data and all modifications are overwritten
-    // /// with new values.
-    //TODO: 
-    fn overwrite_with(&mut self, pther: Self);
-
     fn acc_type(&self) -> u8;
 
     fn update_account_cache<B: Backend>(
