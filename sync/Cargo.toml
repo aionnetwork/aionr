@@ -1,7 +1,7 @@
 [package]
 description = "blockchain sync"
 name = "sync"
-version = "0.2.0"
+version = "0.3.0"
 authors = ["Well Shang <jia@aion.network>"]
 
 [lib]

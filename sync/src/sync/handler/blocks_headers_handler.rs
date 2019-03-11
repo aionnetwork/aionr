@@ -40,39 +40,40 @@ const REQUEST_SIZE: u64 = 96;
 pub struct BlockHeadersHandler;
 
 impl BlockHeadersHandler {
-    pub fn get_headers_from_node(node: &mut Node, mut from: u64) {
-        if P2pMgr::get_network_config().sync_from_boot_nodes_only
-            && !node.is_from_boot_list
-            && node.state_code & STATUS_GOT == STATUS_GOT
-        {
-            return;
-        }
+    pub fn get_headers() {
+        if let Some(mut node) = P2pMgr::get_an_active_node() {
+            if P2pMgr::get_network_config().sync_from_boot_nodes_only
+                && !node.is_from_boot_list
+                && node.state_code & STATUS_GOT == STATUS_GOT
+            {
+                return;
+            }
 
-        if node.last_request_timestamp + Duration::from_millis(50) > SystemTime::now() {
-            return;
-        }
-
-        if node.target_total_difficulty >= node.current_total_difficulty {
-            if from == 0 {
-                if node.requested_block_num + 128 < SyncStorage::get_synced_block_number() {
-                    node.requested_block_num = SyncStorage::get_synced_block_number() + 128;
+            if node.target_total_difficulty >= node.current_total_difficulty {
+                if node.last_request_timestamp + Duration::from_millis(50) > SystemTime::now() {
+                    return;
+                }
+                let from = SyncStorage::get_block_header_chain()
+                    .chain_info()
+                    .best_block_number + 1;
+                if SyncStorage::get_synced_block_number() + 50000 < from {
+                    trace!(target: "sync", "!!!!!!!!!!!!!!!!-!Pending");
+                    return;
                 }
 
-                let self_num = node.requested_block_num;
-                from = if self_num > 2 { self_num - 1 } else { 1 };
+                if node.requested_block_num == from {
+                    return;
+                } else {
+                    node.last_request_timestamp = SystemTime::now();
+                }
+                node.requested_block_num = from;
+
+                debug!(target: "sync", "request headers: from number: {}, node: {}, rn: {}.", from, node.get_ip_addr(), node.requested_block_num);
+
+                Self::send_blocks_headers_req(node.node_hash, from, REQUEST_SIZE as u32);
+                SyncStorage::set_requested_block_number_last_time(from + REQUEST_SIZE as u64);
+                P2pMgr::update_node(node.node_hash, &mut node);
             }
-
-            if node.requested_block_num == from {
-                return;
-            } else {
-                node.last_request_timestamp = SystemTime::now();
-            }
-            node.requested_block_num = from;
-
-            debug!(target: "sync", "request headers: from number: {}, node: {}, rn: {}.", from, node.get_ip_addr(), node.requested_block_num);
-
-            Self::send_blocks_headers_req(node.node_hash, from, REQUEST_SIZE as u32);
-            P2pMgr::update_node(node.node_hash, node);
         }
     }
 
@@ -168,9 +169,8 @@ impl BlockHeadersHandler {
                         let mut tx = DBTransaction::new();
                         if let Ok(pending) = header_chain.insert(&mut tx, &header, None) {
                             header_chain.apply_pending(tx, pending);
-                            SyncStorage::set_requested_block_number_last_time(number);
                             hases.push(hash);
-                            trace!(target: "sync", "New block header #{} - {}, imported.", number, hash);
+                            trace!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
                         }
                     }
                 }
@@ -180,6 +180,7 @@ impl BlockHeadersHandler {
             } else {
                 error!(target: "sync", "Invalid header: {}, received from {}@{}", to_hex(header_rlp.as_raw()), node.get_node_id(), node.get_ip_addr());
                 P2pMgr::remove_peer(node.node_hash);
+                P2pMgr::add_black_ip(node.get_ip());
                 info!(target: "sync", "header removed.");
                 return;
             }
@@ -187,5 +188,7 @@ impl BlockHeadersHandler {
 
         SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
         P2pMgr::update_node(node_hash, node);
+
+        BlockHeadersHandler::get_headers();
     }
 }

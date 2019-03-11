@@ -34,28 +34,34 @@ lazy_static! {
 }
 
 const HASH_LEN: usize = 32;
-const REQUEST_SIZE: u64 = 96;
+const REQUEST_SIZE: u64 = 64;
 
 pub struct BlockBodiesHandler;
 
 impl BlockBodiesHandler {
     pub fn send_blocks_bodies_req() {
+        let header_chain = SyncStorage::get_block_header_chain();
+        let mut best_header_number = header_chain.chain_info().best_block_number;
+        let synced_block_number = SyncStorage::get_synced_block_number();
+
         let mut req = ChannelBuffer::new();
         req.head.ver = Version::V0.value();
         req.head.ctrl = Control::SYNC.value();
         req.head.action = SyncAction::BLOCKSBODIESREQ.value();
 
-        let header_chain = SyncStorage::get_block_header_chain();
         let block_chain = SyncStorage::get_block_chain();
-        let mut best_header_number = header_chain.chain_info().best_block_number;
         let mut best_block_number = block_chain.chain_info().best_block_number;
+
+        best_block_number = if synced_block_number > best_block_number {
+            synced_block_number
+        } else {
+            best_block_number
+        };
 
         let mut headers = Vec::new();
         let mut number = best_block_number + 1;
-        let mut hash = H256::from(0);
         while number <= best_header_number {
-            if let Some(header) = header_chain.block_header(BlockId::Number(number)) {
-                hash = header.hash();
+            if let Some(hash) = header_chain.block_hash(BlockId::Number(number)) {
                 headers.push(hash);
                 req.body.extend_from_slice(&hash);
 
@@ -69,7 +75,7 @@ impl BlockBodiesHandler {
                                 P2pMgr::send(node.node_hash, req.clone());
                                 get_headers_with_bodies_requested
                                     .insert(node.node_hash, headers.clone());
-                                debug!(target: "sync", "send_blocks_bodies_req for #{} to #{} - {}, msg: {}.", number - REQUEST_SIZE, number, hash, req);
+                                trace!(target: "sync", "send_blocks_bodies_req for #{} to #{}.", number - REQUEST_SIZE, number);
 
                                 SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
                                 P2pMgr::update_node(node.node_hash, node);
@@ -78,7 +84,7 @@ impl BlockBodiesHandler {
                     }
                     return;
                 } else {
-                    best_block_number = block_chain.chain_info().best_block_number + 1;
+                    best_block_number = SyncStorage::get_synced_block_number() + 1;
                     best_header_number = header_chain.chain_info().best_block_number;
                     if best_block_number > number {
                         number = best_block_number;
@@ -98,7 +104,7 @@ impl BlockBodiesHandler {
                         req.head.len = req.body.len() as u32;
                         P2pMgr::send(node.node_hash, req.clone());
                         get_headers_with_bodies_requested.insert(node.node_hash, headers.clone());
-                        debug!(target: "sync", "send_blocks_bodies_req for #{} to #{} - {}, msg: {}.", number as usize - headers.len(), number, hash, req);
+                        trace!(target: "sync", "send_blocks_bodies_req for #{} to #{}, msg: {}.", number as usize - headers.len(), number, req);
 
                         SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
                         P2pMgr::update_node(node.node_hash, node);
@@ -176,13 +182,20 @@ impl BlockBodiesHandler {
                                             block.append_raw(&data, 2);
 
                                             if LOCK.lock().is_ok() {
-                                                if block_chain.block_status(BlockId::Hash(hash))
-                                                    == BlockStatus::Unknown
-                                                {
+                                                let status =
+                                                    block_chain.block_status(BlockId::Hash(hash));
+                                                if status == BlockStatus::Unknown {
                                                     SyncStorage::insert_requested_time(hash);
                                                     let result = block_chain
                                                         .import_block(block.as_raw().to_vec());
-                                                    trace!(target: "sync", "result: {:?}.", result);
+                                                    trace!(target: "sync", "result: {:?} from {}@{}.", result, node.get_ip_addr(), node.get_node_id());
+                                                } else {
+                                                    if block_chain.queue_info().verifying_queue_size
+                                                        > REQUEST_SIZE as usize
+                                                    {
+                                                        block_chain.clear_queue();
+                                                        trace!(target: "sync", "re 1 {:?}, {:?}", status, block_chain.queue_info());
+                                                    }
                                                 }
                                             }
                                         }
@@ -198,5 +211,6 @@ impl BlockBodiesHandler {
 
         SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesRes);
         P2pMgr::update_node(node_hash, node);
+        Self::send_blocks_bodies_req();
     }
 }

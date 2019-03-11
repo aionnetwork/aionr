@@ -193,7 +193,7 @@ dependencies = [
  "serde 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_derive 1.0.89 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
- "sync 0.2.0",
+ "sync 0.3.0",
  "tempdir 0.3.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "term_size 0.3.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "textwrap 0.9.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -246,7 +246,7 @@ dependencies = [
  "protoc-rust 2.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "rand 0.6.5 (registry+https://github.com/rust-lang/crates.io-index)",
  "rustc-hex 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
- "sync 0.2.0",
+ "sync 0.3.0",
  "zmq 0.8.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
@@ -290,7 +290,7 @@ dependencies = [
  "serde_json 1.0.39 (registry+https://github.com/rust-lang/crates.io-index)",
  "solidity 0.2.0",
  "stats 0.1.0",
- "sync 0.2.0",
+ "sync 0.3.0",
  "time 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "tiny-keccak 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "tokio 0.1.16 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2491,7 +2491,7 @@ dependencies = [
 
 [[package]]
 name = "sync"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "acore 0.1.0",
  "acore-bytes 0.1.0",
