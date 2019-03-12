@@ -91,7 +91,7 @@ impl StatusHandler {
     }
 
     pub fn handle_status_res(node: &mut Node, req: ChannelBuffer) {
-        trace!(target: "sync", "STATUSRES received.");
+        info!(target: "sync", "STATUSRES received.");
 
         let node_hash = node.node_hash;
         let (mut best_block_num, req_body_rest) = req.body.split_at(mem::size_of::<u64>());
@@ -120,12 +120,6 @@ impl StatusHandler {
             node.best_hash,
             node.target_total_difficulty,
         );
-
-        let sync_from_boot_nodes_only = P2pMgr::get_network_config().sync_from_boot_nodes_only;
-        if sync_from_boot_nodes_only {
-            if !node.is_from_boot_list {
-                return;
-            }
-        }
+                info!(target: "sync", "status {}", node);
     }
 }

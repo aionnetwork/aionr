@@ -125,6 +125,10 @@ impl P2pMgr {
 
     pub fn create_client(mut peer_node: Node, handle: fn(node: &mut Node, req: ChannelBuffer)) {
         trace!(target: "net", "Try to connect to node {}", peer_node.get_ip_addr());
+        let peer_ip = peer_node.get_ip();
+        if P2pMgr::is_black_ip(&peer_ip) {
+            return;
+        }
         let node_ip_addr = peer_node.get_ip_addr();
         if let Ok(addr) = node_ip_addr.parse() {
             let thread_pool = Self::get_thread_pool();
@@ -151,9 +155,13 @@ impl P2pMgr {
         }
     }
 
-    pub fn get_thread_pool() -> &'static ThreadPool { TP.get() }
+    pub fn get_thread_pool() -> &'static ThreadPool {
+        TP.get()
+    }
 
-    pub fn get_network_config() -> &'static NetworkConfig { NETWORK_CONFIG.get() }
+    pub fn get_network_config() -> &'static NetworkConfig {
+        NETWORK_CONFIG.get()
+    }
 
     pub fn is_black_ip(ip: &String) -> bool {
         if let Ok(ip_black_list) = IP_BLACK_LIST.read() {
@@ -195,16 +203,19 @@ impl P2pMgr {
         boot_nodes
     }
 
-    pub fn get_local_node() -> &'static Node { LOCAL_NODE.get() }
+    pub fn get_local_node() -> &'static Node {
+        LOCAL_NODE.get()
+    }
 
-    pub fn disable() { Self::reset(); }
+    pub fn disable() {
+        Self::reset();
+    }
 
     pub fn reset() {
         if let Ok(mut sockets_map) = SOCKETS_MAP.lock() {
             for (_, socket) in sockets_map.iter_mut() {
-                if let Err(e) = socket.shutdown(Shutdown::Both) {
-                    error!(target: "net", "Invalid socket， {}", e);
-                }
+                let result = socket.shutdown(Shutdown::Both);
+                trace!(target: "net", "Shutdown socket: {:?}.", result);
             }
         }
         if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
@@ -255,9 +266,8 @@ impl P2pMgr {
     pub fn remove_peer(node_hash: u64) -> Option<Node> {
         if let Ok(mut sockets_map) = SOCKETS_MAP.lock() {
             if let Some(socket) = sockets_map.remove(&node_hash) {
-                if let Err(e) = socket.shutdown(Shutdown::Both) {
-                    error!(target: "net", "remove_peer， invalid socket， {}", e);
-                }
+                let result = socket.shutdown(Shutdown::Both);
+                trace!(target: "net", "remove_peer socket, {:?}", result);
                 debug!(target: "net", "remove_peer connection， peer_node node_hash {}", node_hash);
             }
         }
@@ -407,14 +417,6 @@ impl P2pMgr {
         None
     }
 
-    pub fn update_node_with_mode(node_hash: u64, node: &Node) {
-        if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
-            if let Some(n) = nodes_map.get_mut(&node_hash) {
-                n.update(node);
-            }
-        }
-    }
-
     pub fn update_node(node_hash: u64, node: &mut Node) {
         if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
             if let Some(n) = nodes_map.get_mut(&node_hash) {
@@ -460,8 +462,7 @@ impl P2pMgr {
         socket: TcpStream,
         peer_node: &mut Node,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    )
-    {
+    ) {
         let local_ip = P2pMgr::get_local_node().ip_addr.get_ip();
         let mut value = peer_node.ip_addr.get_addr();
         value.push_str(&local_ip);
@@ -519,8 +520,7 @@ impl P2pMgr {
         socket: TcpStream,
         mut peer_node: Node,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    )
-    {
+    ) {
         let node_hash = peer_node.node_hash;
         let (tx, rx) = mpsc::channel(32);
         peer_node.tx = Some(tx);
@@ -561,18 +561,16 @@ impl P2pMgr {
 
     pub fn send(node_hash: u64, msg: ChannelBuffer) {
         match Self::get_tx(node_hash) {
-            Some(mut tx) => {
-                match tx.try_send(msg) {
-                    Ok(()) => {}
-                    Err(e) => {
-                        Self::remove_peer(node_hash);
-                        warn!(target: "net", "Failed to send the msg, Err: {}", e);
-                    }
+            Some(mut tx) => match tx.try_send(msg) {
+                Ok(()) => {}
+                Err(e) => {
+                    Self::remove_peer(node_hash);
+                    debug!(target: "net", "Failed to send the msg, Err: {}", e);
                 }
-            }
+            },
             None => {
                 Self::remove_peer(node_hash);
-                warn!(target: "net", "Invalid peer !, node_hash: {}", node_hash);
+                debug!(target: "net", "Invalid peer !, node_hash: {}", node_hash);
             }
         }
     }
@@ -673,7 +671,9 @@ pub struct NetworkConfig {
 }
 
 impl Default for NetworkConfig {
-    fn default() -> Self { NetworkConfig::new() }
+    fn default() -> Self {
+        NetworkConfig::new()
+    }
 }
 
 impl NetworkConfig {

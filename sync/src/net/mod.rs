@@ -96,11 +96,11 @@ impl NetManager {
                 let node_hash = P2pMgr::calculate_hash(&boot_node.get_node_id());
                 if let Some(node) = P2pMgr::get_node(node_hash) {
                     if node.state_code == DISCONNECTED {
-                        info!(target: "net", "boot node reconnected: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
+                        trace!(target: "net", "boot node reconnected: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
                         P2pMgr::create_client(boot_node.clone(), Self::handle);
                     }
                 } else {
-                    info!(target: "net", "boot node loaded: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
+                    trace!(target: "net", "boot node loaded: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
                     P2pMgr::create_client(boot_node.clone(), Self::handle);
                 }
             }
@@ -125,24 +125,20 @@ impl NetManager {
         let connect_normal_nodes_task = Interval::new(
             Instant::now(),
             Duration::from_secs(RECONNECT_NORMAL_NODES_INTERVAL),
-        )
-        .for_each(move |_| {
+        ).for_each(move |_| {
             let active_nodes_count = P2pMgr::get_nodes_count(ALIVE);
             if !sync_from_boot_nodes_only && active_nodes_count < max_peers_num {
                 if let Some(peer_node) = P2pMgr::get_an_inactive_node() {
                     let peer_node_id_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
                     if peer_node_id_hash != local_node_id_hash {
-                        let peer_ip = peer_node.ip_addr.get_ip();
-                        if !P2pMgr::is_black_ip(&peer_ip) {
-                            P2pMgr::create_client(peer_node, Self::handle);
-                        }
+                        P2pMgr::create_client(peer_node, Self::handle);
                     }
                 }
             }
 
             Ok(())
         })
-        .map_err(|e| error!("interval errored; err={:?}", e));
+            .map_err(|e| error!("interval errored; err={:?}", e));
         NET_RUNTIME
             .get()
             .write()
@@ -154,13 +150,12 @@ impl NetManager {
         let activenodes_req_task = Interval::new(
             Instant::now(),
             Duration::from_secs(NODE_ACTIVE_REQ_INTERVAL),
-        )
-        .for_each(move |_| {
+        ).for_each(move |_| {
             ActiveNodesHandler::send_activenodes_req();
 
             Ok(())
         })
-        .map_err(|e| error!("interval errored; err={:?}", e));
+            .map_err(|e| error!("interval errored; err={:?}", e));
         NET_RUNTIME
             .get()
             .write()
