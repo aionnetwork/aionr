@@ -21,14 +21,22 @@
  ******************************************************************************/
 pub enum Kind {
     Account = 0,
-    UNKNOWN = 0xff,
+    Header = 1,
+    Body = 2,
+    Storage = 3,
+    Code = 4,
+    Unknown = 0xff,
 }
 
 impl Kind {
     pub fn value(&self) -> u8 {
         match self {
             Kind::Account => 0u8,
-            Kind::UNKNOWN => 0xffu8,
+            Kind::Header => 1u8,
+            Kind::Body => 2u8,
+            Kind::Storage => 3u8,
+            Kind::Code => 4u8,
+            Kind::Unknown => 0xffu8,
         }
     }
 }
@@ -37,7 +45,11 @@ impl From<u8> for Kind {
     fn from(value: u8) -> Kind {
         match value {
             0 => Kind::Account,
-            _ => Kind::UNKNOWN,
+            1 => Kind::Header,
+            2 => Kind::Body,
+            3 => Kind::Storage,
+            4 => Kind::Code,
+            _ => Kind::Unknown,
         }
     }
 }
