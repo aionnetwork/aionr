@@ -21,28 +21,23 @@
 use acore::client::{BlockId, BlockStatus};
 use aion_types::H256;
 use bytes::BufMut;
+use futures::future::lazy;
 use rlp::{RlpStream, UntrustedRlp};
-use std::sync::Mutex;
 
 use super::super::action::SyncAction;
 use super::super::event::SyncEvent;
 use super::super::storage::SyncStorage;
 use p2p::*;
 
-lazy_static! {
-    static ref LOCK: Mutex<u8> = Mutex::new(0);
-}
-
 const HASH_LEN: usize = 32;
-const REQUEST_SIZE: u64 = 64;
+const REQUEST_SIZE: u64 = 96;
 
 pub struct BlockBodiesHandler;
 
 impl BlockBodiesHandler {
-    pub fn send_blocks_bodies_req() {
+    pub fn send_blocks_bodies_req(node: &mut Node) {
         let header_chain = SyncStorage::get_block_header_chain();
         let mut best_header_number = header_chain.chain_info().best_block_number;
-        let synced_block_number = SyncStorage::get_synced_block_number();
 
         let mut req = ChannelBuffer::new();
         req.head.ver = Version::V0.value();
@@ -51,6 +46,7 @@ impl BlockBodiesHandler {
 
         let block_chain = SyncStorage::get_block_chain();
         let mut best_block_number = block_chain.chain_info().best_block_number;
+        let synced_block_number = SyncStorage::get_synced_block_number();
 
         best_block_number = if synced_block_number > best_block_number {
             synced_block_number
@@ -96,19 +92,17 @@ impl BlockBodiesHandler {
         }
 
         if headers.len() > 0 {
-            if let Some(ref mut node) = P2pMgr::get_an_active_node() {
-                let mut get_headers_with_bodies_requested =
-                    SyncStorage::get_headers_with_bodies_requested().lock();
-                {
-                    if !get_headers_with_bodies_requested.contains_key(&node.node_hash) {
-                        req.head.len = req.body.len() as u32;
-                        P2pMgr::send(node.node_hash, req.clone());
-                        get_headers_with_bodies_requested.insert(node.node_hash, headers.clone());
-                        trace!(target: "sync", "send_blocks_bodies_req for #{} to #{}, msg: {}.", number as usize - headers.len(), number, req);
+            let mut get_headers_with_bodies_requested =
+                SyncStorage::get_headers_with_bodies_requested().lock();
+            {
+                if !get_headers_with_bodies_requested.contains_key(&node.node_hash) {
+                    req.head.len = req.body.len() as u32;
+                    P2pMgr::send(node.node_hash, req.clone());
+                    get_headers_with_bodies_requested.insert(node.node_hash, headers.clone());
+                    trace!(target: "sync", "send_blocks_bodies_req for #{} to #{}, msg: {}.", number as usize - headers.len(), number, req);
 
-                        SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
-                        P2pMgr::update_node(node.node_hash, node);
-                    }
+                    SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
+                    P2pMgr::update_node(node.node_hash, node);
                 }
             }
         }
@@ -159,58 +153,73 @@ impl BlockBodiesHandler {
     }
 
     pub fn handle_blocks_bodies_res(node: &mut Node, req: ChannelBuffer) {
-        trace!(target: "sync", "BLOCKSBODIESRES received from: {}.", node.get_ip_addr());
+        info!(target: "sync", "BLOCKSBODIESRES received from: {}.", node.get_ip_addr());
 
         let node_hash = node.node_hash;
-        if req.body.len() > 0 {
-            match SyncStorage::pick_headers_with_bodies_requested(&node_hash) {
-                Some(hashes) => {
-                    let block_bodies = UntrustedRlp::new(req.body.as_slice());
-                    let header_chain = SyncStorage::get_block_header_chain();
-                    let block_chain = SyncStorage::get_block_chain();
-                    if let Ok(item_count) = block_bodies.item_count() {
-                        if hashes.len() == item_count {
+
+        let block_chain = SyncStorage::get_block_chain();
+        match SyncStorage::pick_headers_with_bodies_requested(&node_hash) {
+            Some(hashes) => {
+                let block_bodies = UntrustedRlp::new(req.body.as_slice());
+                let header_chain = SyncStorage::get_block_header_chain();
+                if let Ok(item_count) = block_bodies.item_count() {
+                    if hashes.len() == item_count {
+                        let batch_status =
+                            block_chain.block_status(BlockId::Hash(hashes[item_count - 1]));
+                        if batch_status == BlockStatus::Unknown {
                             for i in 0..item_count {
                                 let hash = hashes[i];
-                                if let Some(header) = header_chain.block_header(BlockId::Hash(hash))
-                                {
-                                    if let Ok(body) = block_bodies.at(i) {
-                                        if let Ok(txs) = body.at(0) {
-                                            let mut data = header.into_inner();
-                                            data.extend_from_slice(txs.as_raw());
-                                            let mut block = RlpStream::new_list(2);
-                                            block.append_raw(&data, 2);
+                                let status = block_chain.block_status(BlockId::Hash(hash));
+                                if status == BlockStatus::Unknown {
+                                    if let Some(header) =
+                                        header_chain.block_header(BlockId::Hash(hash))
+                                    {
+                                        if let Ok(body) = block_bodies.at(i) {
+                                            if let Ok(txs) = body.at(0) {
+                                                let number = header.number();
+                                                let mut data = header.into_inner();
+                                                data.extend_from_slice(txs.as_raw());
+                                                let mut block = RlpStream::new_list(2);
+                                                block.append_raw(&data, 2);
 
-                                            if LOCK.lock().is_ok() {
-                                                let status =
-                                                    block_chain.block_status(BlockId::Hash(hash));
-                                                if status == BlockStatus::Unknown {
-                                                    SyncStorage::insert_requested_time(hash);
-                                                    let result = block_chain
-                                                        .import_block(block.as_raw().to_vec());
-                                                    trace!(target: "sync", "result: {:?} from {}@{}.", result, node.get_ip_addr(), node.get_node_id());
-                                                } else {
-                                                    if block_chain.queue_info().verifying_queue_size
-                                                        > REQUEST_SIZE as usize
-                                                    {
-                                                        block_chain.clear_queue();
-                                                        trace!(target: "sync", "re 1 {:?}, {:?}", status, block_chain.queue_info());
-                                                    }
-                                                }
+                                                SyncStorage::insert_requested_time(hash);
+                                                let result = block_chain
+                                                    .import_block(block.as_raw().to_vec());
+                                                trace!(target: "sync", "#{}, result: {:?} from {}", number, result, node.get_ip_addr());
                                             }
                                         }
+                                    } else {
+                                        info!(target: "sync", "meiyou {}, status: {:?}", node.get_ip_addr(), status);
                                     }
                                 }
                             }
+                        } else {
+                            if block_chain.queue_info().verifying_queue_size > REQUEST_SIZE as usize
+                            {
+                                block_chain.clear_queue();
+                            }
                         }
+                    } else {
+                        info!(target: "sync", "meiyou {}, {} - {}", node.get_ip_addr(), hashes.len(), item_count);
                     }
+                } else {
+                    info!(target: "sync", "meiyou 2 {}", node.get_ip_addr());
                 }
-                None => {}
+            }
+            None => {
+                info!(target: "sync", "meiyou {}", node.get_ip_addr());
             }
         }
 
         SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesRes);
         P2pMgr::update_node(node_hash, node);
-        Self::send_blocks_bodies_req();
+
+        let executor = SyncStorage::get_sync_executor();
+        executor.spawn(lazy(move || {
+            if let Some(ref mut peer_node) = P2pMgr::get_an_active_node() {
+                BlockBodiesHandler::send_blocks_bodies_req(peer_node);
+            }
+            Ok(())
+        }))
     }
 }

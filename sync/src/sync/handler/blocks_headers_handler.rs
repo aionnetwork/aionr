@@ -40,7 +40,7 @@ const REQUEST_SIZE: u64 = 96;
 pub struct BlockHeadersHandler;
 
 impl BlockHeadersHandler {
-    pub fn get_headers() {
+    pub fn get_headers(mut from: u64) {
         if let Some(mut node) = P2pMgr::get_an_active_node() {
             if P2pMgr::get_network_config().sync_from_boot_nodes_only
                 && !node.is_from_boot_list
@@ -53,12 +53,13 @@ impl BlockHeadersHandler {
                 if node.last_request_timestamp + Duration::from_millis(50) > SystemTime::now() {
                     return;
                 }
-                let from = SyncStorage::get_block_header_chain()
-                    .chain_info()
-                    .best_block_number + 1;
-                if SyncStorage::get_synced_block_number() + 50000 < from {
-                    trace!(target: "sync", "!!!!!!!!!!!!!!!!-!Pending");
-                    return;
+                if from == 0 {
+                    from = SyncStorage::get_block_header_chain()
+                        .chain_info()
+                        .best_block_number + 1;
+                    if SyncStorage::get_synced_block_number() + 512 < from {
+                        return;
+                    }
                 }
 
                 if node.requested_block_num == from {
@@ -163,14 +164,32 @@ impl BlockHeadersHandler {
                 if number < SyncStorage::get_synced_block_number() {
                     trace!(target: "sync", "Imported header: {} - {:?}.", number, hash);
                 } else {
-                    if header_chain.status(parent_hash) == BlockStatus::InChain
-                        && header_chain.status(&hash) != BlockStatus::InChain
-                    {
-                        let mut tx = DBTransaction::new();
-                        if let Ok(pending) = header_chain.insert(&mut tx, &header, None) {
-                            header_chain.apply_pending(tx, pending);
-                            hases.push(hash);
-                            trace!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
+                    if header_chain.status(parent_hash) == BlockStatus::InChain {
+                        if header_chain.status(&hash) != BlockStatus::InChain {
+                            let mut tx = DBTransaction::new();
+                            if let Ok(pending) = header_chain.insert(&mut tx, &header, None) {
+                                header_chain.apply_pending(tx, pending);
+                                hases.push(hash);
+                                trace!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
+                            }
+                        } else {
+                            trace!(target: "sync", "The block is inchain already.");
+                        }
+                    } else {
+                        if number <= header_chain.chain_info().best_block_number {
+                            if node.target_total_difficulty >= SyncStorage::get_network_total_diff()
+                            {
+                                info!(target: "sync", "Side chain found from {}@{}.", node.get_ip_addr(), node.get_node_id());
+                                let from = if number > REQUEST_SIZE {
+                                    number - REQUEST_SIZE
+                                } else {
+                                    1
+                                };
+                                BlockHeadersHandler::get_headers(from);
+                            } else {
+                                P2pMgr::remove_peer(node_hash);
+                                P2pMgr::add_black_ip(node.get_ip());
+                            }
                         }
                     }
                 }
@@ -189,6 +208,6 @@ impl BlockHeadersHandler {
         SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
         P2pMgr::update_node(node_hash, node);
 
-        BlockHeadersHandler::get_headers();
+        BlockHeadersHandler::get_headers(0);
     }
 }

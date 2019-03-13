@@ -59,7 +59,7 @@ pub mod storage;
 
 const STATUS_REQ_INTERVAL: u64 = 2;
 const GET_BLOCK_HEADERS_INTERVAL: u64 = 500;
-const BLOCKS_BODIES_REQ_INTERVAL: u64 = 1000;
+const BLOCKS_BODIES_REQ_INTERVAL: u64 = 500;
 const STATICS_INTERVAL: u64 = 30;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const REPUTATION_HANDLE_INTERVAL: u64 = 300;
@@ -84,9 +84,8 @@ impl SyncMgr {
         executor.spawn(status_req_task);
 
         let get_block_headers_task = loop_fn(0, |_| {
-            BlockHeadersHandler::get_headers();
-            BlockHeadersHandler::get_headers();
-            BlockHeadersHandler::get_headers();
+            BlockHeadersHandler::get_headers(0);
+            BlockHeadersHandler::get_headers(0);
 
             thread::sleep(Duration::from_millis(GET_BLOCK_HEADERS_INTERVAL));
             if SyncStorage::is_syncing() {
@@ -99,7 +98,9 @@ impl SyncMgr {
 
         let blocks_bodies_req_task = loop_fn(0, |counter| {
             // blocks bodies req
-            BlockBodiesHandler::send_blocks_bodies_req();
+            if let Some(ref mut node) = P2pMgr::get_an_active_node() {
+                BlockBodiesHandler::send_blocks_bodies_req(node);
+            }
             thread::sleep(Duration::from_millis(BLOCKS_BODIES_REQ_INTERVAL));
 
             if SyncStorage::is_syncing() {
