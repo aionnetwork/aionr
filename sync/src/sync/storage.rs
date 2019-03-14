@@ -27,6 +27,7 @@ use aion_types::{H256, U256};
 use kvdb::KeyValueDB;
 use lru_cache::LruCache;
 use parking_lot::{Mutex as PLMutex, RwLock as PLRwLock};
+use rlp::RlpStream;
 use state::Storage;
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -45,8 +46,7 @@ lazy_static! {
     static ref REQUESTED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, SystemTime>>> = Storage::new();
     static ref SENT_TRANSACTION_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
     static ref RECEIVED_TRANSACTIONS: Storage<Mutex<VecDeque<Vec<u8>>>> = Storage::new();
-    static ref STAGED_BLOCKS: Storage<Mutex<LruCache<H256, Vec<Vec<u8>>>>> = Storage::new();
-    static ref STAGED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
+    static ref STAGED_BLOCKS: Storage<Mutex<LruCache<H256, Vec<RlpStream>>>> = Storage::new();
 }
 
 const MAX_CACHED_TRANSACTION_HASHES: usize = 20480;
@@ -96,15 +96,12 @@ impl SyncStorage {
             let mut sent_transaction_hases = LruCache::new(MAX_CACHED_TRANSACTION_HASHES);
             let mut received_transactions = VecDeque::new();
             let mut staged_blocks = LruCache::new(MAX_CACHED_BLOCK_HASHES);
-            let mut staged_block_hashes = LruCache::new(MAX_CACHED_BLOCK_HASHES);
 
             HEADERS_WITH_BODIES_REQUESTED.set(PLMutex::new(HashMap::new()));
             REQUESTED_BLOCK_HASHES.set(Mutex::new(requested_block_hashes));
             SENT_TRANSACTION_HASHES.set(Mutex::new(sent_transaction_hases));
             RECEIVED_TRANSACTIONS.set(Mutex::new(received_transactions));
             STAGED_BLOCKS.set(Mutex::new(staged_blocks));
-            STAGED_BLOCK_HASHES.set(Mutex::new(staged_block_hashes));
-
             BLOCK_CHAIN.set(RwLock::new(block_chain));
             BLOCK_HEADER_CHAIN.set(block_header_chain);
             SYNC_EXECUTORS.set(RwLock::new(sync_executor));
@@ -302,38 +299,20 @@ impl SyncStorage {
         }
     }
 
-    pub fn get_staged_blocks() -> &'static Mutex<LruCache<H256, Vec<Vec<u8>>>> {
+    pub fn get_staged_blocks() -> &'static Mutex<LruCache<H256, Vec<RlpStream>>> {
         STAGED_BLOCKS.get()
     }
 
-    pub fn insert_staged_block_hashes(hashes: Vec<H256>) {
-        if let Ok(mut staged_block_hashes) = STAGED_BLOCK_HASHES.get().lock() {
-            for hash in hashes.iter() {
-                staged_block_hashes.insert(*hash, 0);
-            }
+    pub fn get_staged_blocks_with_hash(hash: H256) -> Option<Vec<RlpStream>> {
+        if let Ok(mut staged_block_hashes) = STAGED_BLOCKS.get().lock() {
+            return staged_block_hashes.remove(&hash);
         }
-    }
-
-    pub fn is_staged_block_hash(hash: H256) -> bool {
-        if let Ok(mut staged_block_hashes) = STAGED_BLOCK_HASHES.get().lock() {
-            return staged_block_hashes.contains_key(&hash);
-        }
-        return false;
-    }
-
-    pub fn remove_staged_block_hash(hash: H256) {
-        if let Ok(mut staged_block_hashes) = STAGED_BLOCK_HASHES.get().lock() {
-            staged_block_hashes.remove(&hash);
-        }
+        None
     }
 
     pub fn clear_staged_blocks() {
         if let Ok(mut staged_blocks) = STAGED_BLOCKS.get().lock() {
             staged_blocks.clear();
-        }
-
-        if let Ok(mut staged_block_hashes) = STAGED_BLOCK_HASHES.get().lock() {
-            staged_block_hashes.clear();
         }
     }
 

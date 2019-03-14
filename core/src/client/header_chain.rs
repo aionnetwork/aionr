@@ -241,7 +241,10 @@ impl HeaderChain {
                         );
                     }
                 }
-                candidates.insert(cur_number, entry);
+
+                if candidates.len() < 3072 {
+                    candidates.insert(cur_number, entry);
+                }
 
                 if cur_number > 0 {
                     cur_number -= 1;
@@ -487,6 +490,7 @@ impl HeaderChain {
                 .keys()
                 .next()
                 .expect("at least one era just created; qed");
+
             if earliest_era != 0 && earliest_era + HISTORY + cht::SIZE <= number {
                 let cht_num = cht::block_to_cht_number(earliest_era)
                     .expect("fails only for number == 0; genesis never imported; qed");

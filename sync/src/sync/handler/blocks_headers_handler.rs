@@ -32,6 +32,7 @@ use std::time::{Duration, SystemTime};
 use super::super::action::SyncAction;
 use super::super::event::{SyncEvent, STATUS_GOT};
 use super::super::storage::SyncStorage;
+use super::blocks_bodies_handler::BlockBodiesHandler;
 
 use p2p::*;
 
@@ -40,41 +41,39 @@ const REQUEST_SIZE: u64 = 96;
 pub struct BlockHeadersHandler;
 
 impl BlockHeadersHandler {
-    pub fn get_headers(mut from: u64) {
-        if let Some(mut node) = P2pMgr::get_an_active_node() {
-            if P2pMgr::get_network_config().sync_from_boot_nodes_only
-                && !node.is_from_boot_list
-                && node.state_code & STATUS_GOT == STATUS_GOT
-            {
+    pub fn get_headers(node: &mut Node, mut from: u64) {
+        if P2pMgr::get_network_config().sync_from_boot_nodes_only
+            && !node.is_from_boot_list
+            && node.state_code & STATUS_GOT == STATUS_GOT
+        {
+            return;
+        }
+
+        if node.target_total_difficulty >= node.current_total_difficulty {
+            if node.last_request_timestamp + Duration::from_millis(50) > SystemTime::now() {
                 return;
             }
-
-            if node.target_total_difficulty >= node.current_total_difficulty {
-                if node.last_request_timestamp + Duration::from_millis(50) > SystemTime::now() {
+            if from == 0 {
+                from = SyncStorage::get_block_header_chain()
+                    .chain_info()
+                    .best_block_number + 1;
+                if SyncStorage::get_synced_block_number() + 512 < from {
                     return;
                 }
-                if from == 0 {
-                    from = SyncStorage::get_block_header_chain()
-                        .chain_info()
-                        .best_block_number + 1;
-                    if SyncStorage::get_synced_block_number() + 512 < from {
-                        return;
-                    }
-                }
-
-                if node.requested_block_num == from {
-                    return;
-                } else {
-                    node.last_request_timestamp = SystemTime::now();
-                }
-                node.requested_block_num = from;
-
-                debug!(target: "sync", "request headers: from number: {}, node: {}, rn: {}.", from, node.get_ip_addr(), node.requested_block_num);
-
-                Self::send_blocks_headers_req(node.node_hash, from, REQUEST_SIZE as u32);
-                SyncStorage::set_requested_block_number_last_time(from + REQUEST_SIZE as u64);
-                P2pMgr::update_node(node.node_hash, &mut node);
             }
+
+            if node.requested_block_num == from {
+                return;
+            } else {
+                node.last_request_timestamp = SystemTime::now();
+            }
+            node.requested_block_num = from;
+
+            debug!(target: "sync", "request headers: from number: {}, node: {}, rn: {}.", from, node.get_ip_addr(), node.requested_block_num);
+
+            Self::send_blocks_headers_req(node.node_hash, from, REQUEST_SIZE as u32);
+            SyncStorage::set_requested_block_number_last_time(from + REQUEST_SIZE as u64);
+            P2pMgr::update_node(node.node_hash, node);
         }
     }
 
@@ -174,6 +173,13 @@ impl BlockHeadersHandler {
                             }
                         } else {
                             trace!(target: "sync", "The block is inchain already.");
+                            if node.target_total_difficulty >= SyncStorage::get_network_total_diff() && number < SyncStorage::get_synced_block_number() {
+                                SyncStorage::set_synced_block_number(number);
+                                SyncStorage::get_block_chain().clear_queue();
+                                BlockBodiesHandler::send_blocks_bodies_req(node);
+                                info!(target: "sync", "Recovered from side chain...");
+                                break;
+                            }
                         }
                     } else {
                         if number <= header_chain.chain_info().best_block_number {
@@ -185,7 +191,7 @@ impl BlockHeadersHandler {
                                 } else {
                                     1
                                 };
-                                BlockHeadersHandler::get_headers(from);
+                                BlockHeadersHandler::get_headers(node, from);
                             } else {
                                 P2pMgr::remove_peer(node_hash);
                                 P2pMgr::add_black_ip(node.get_ip());
@@ -208,6 +214,8 @@ impl BlockHeadersHandler {
         SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
         P2pMgr::update_node(node_hash, node);
 
-        BlockHeadersHandler::get_headers(0);
+        if let Some(ref mut peer_node) = P2pMgr::get_an_active_node() {
+            BlockHeadersHandler::get_headers(peer_node, 0);
+        }
     }
 }

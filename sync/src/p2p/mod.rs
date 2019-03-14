@@ -149,7 +149,11 @@ impl P2pMgr {
                     Self::process_outbounds(socket, peer_node, handle);
                 })
                 .map_err(
-                    move |e| error!(target: "net", "Node: {}@{}, {}", node_ip_addr, node_id, e),
+                    move |e| {
+                        P2pMgr::add_black_ip(peer_ip);
+                        P2pMgr::remove_peer(node_hash);
+                        error!(target: "net", "Node: {}@{}, {}", node_ip_addr, node_id, e);
+                    }
                 );
             thread_pool.spawn(connect);
         }
@@ -238,9 +242,10 @@ impl P2pMgr {
                     warn!(target: "net", "Known node: {}, ...", node.node_hash);
                 }
                 None => {
+                    let mut active_nodes_count = P2pMgr::get_nodes_count(ALIVE);
                     if let Ok(mut peer_nodes) = GLOBAL_NODES_MAP.write() {
                         let max_peers_num = NETWORK_CONFIG.get().max_peers as usize;
-                        if peer_nodes.len() < max_peers_num {
+                        if active_nodes_count < max_peers_num {
                             match peer_nodes.get(&node.node_hash) {
                                 Some(_) => {
                                     warn!(target: "net", "Known node...");
@@ -282,8 +287,11 @@ impl P2pMgr {
 
     pub fn add_node(node: Node) {
         let max_peers_num = NETWORK_CONFIG.get().max_peers as usize;
+        if P2pMgr::is_black_ip(&node.get_ip()) {
+            return;
+        }
         if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
-            if nodes_map.len() < max_peers_num {
+            if nodes_map.len() < max_peers_num * 2 {
                 match nodes_map.get(&node.node_hash) {
                     Some(_) => {
                         warn!(target: "net", "Known node...");
@@ -382,6 +390,19 @@ impl P2pMgr {
         } else {
             None
         }
+    }
+
+    pub fn get_an_alive_node() -> Option<Node> {
+        let alive_nodes = Self::get_nodes(ALIVE);
+        let alive_node_count = alive_nodes.len();
+        if alive_node_count > 0 {
+            let mut rng = thread_rng();
+            let random_index: usize = rng.gen_range(0, alive_node_count);
+            if let Some(node) = alive_nodes.get(random_index) {
+                return Some(node.clone());
+            }
+        }
+        None
     }
 
     pub fn get_an_active_node() -> Option<Node> {

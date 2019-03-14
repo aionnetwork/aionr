@@ -91,7 +91,7 @@ impl StatusHandler {
     }
 
     pub fn handle_status_res(node: &mut Node, req: ChannelBuffer) {
-        info!(target: "sync", "STATUSRES received.");
+        trace!(target: "sync", "STATUSRES received.");
 
         let node_hash = node.node_hash;
         let (mut best_block_num, req_body_rest) = req.body.split_at(mem::size_of::<u64>());
@@ -120,6 +120,5 @@ impl StatusHandler {
             node.best_hash,
             node.target_total_difficulty,
         );
-                info!(target: "sync", "status {}", node);
     }
 }

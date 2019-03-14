@@ -57,7 +57,7 @@ mod event;
 mod handler;
 pub mod storage;
 
-const STATUS_REQ_INTERVAL: u64 = 2;
+const STATUS_REQ_INTERVAL: u64 = 5;
 const GET_BLOCK_HEADERS_INTERVAL: u64 = 500;
 const BLOCKS_BODIES_REQ_INTERVAL: u64 = 500;
 const STATICS_INTERVAL: u64 = 30;
@@ -72,20 +72,23 @@ impl SyncMgr {
     fn enable() {
         let executor = SyncStorage::get_sync_executor();
 
-        let status_req_task =
-            Interval::new(Instant::now(), Duration::from_secs(STATUS_REQ_INTERVAL))
-                .for_each(move |_| {
-                    // status req
-                    StatusHandler::send_status_req();
+        let status_req_task = loop_fn(0, |_| {
+            // status req
+            StatusHandler::send_status_req();
 
-                    Ok(())
-                })
-                .map_err(|e| error!("interval errored; err={:?}", e));
+            thread::sleep(Duration::from_millis(STATUS_REQ_INTERVAL));
+            if SyncStorage::is_syncing() {
+                Ok(Loop::Continue(0))
+            } else {
+                Ok(Loop::Break(()))
+            }
+        });
         executor.spawn(status_req_task);
 
         let get_block_headers_task = loop_fn(0, |_| {
-            BlockHeadersHandler::get_headers(0);
-            BlockHeadersHandler::get_headers(0);
+            if let Some(ref mut node) = P2pMgr::get_an_alive_node() {
+                BlockHeadersHandler::get_headers(node, 0);
+            }
 
             thread::sleep(Duration::from_millis(GET_BLOCK_HEADERS_INTERVAL));
             if SyncStorage::is_syncing() {
@@ -98,7 +101,7 @@ impl SyncMgr {
 
         let blocks_bodies_req_task = loop_fn(0, |counter| {
             // blocks bodies req
-            if let Some(ref mut node) = P2pMgr::get_an_active_node() {
+            if let Some(ref mut node) = P2pMgr::get_an_alive_node() {
                 BlockBodiesHandler::send_blocks_bodies_req(node);
             }
             thread::sleep(Duration::from_millis(BLOCKS_BODIES_REQ_INTERVAL));
@@ -549,6 +552,7 @@ impl ChainNotify for Sync {
                             "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
                             block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
                     }
+                    //BlockBodiesHandler::import_staged_block(block_hash);
                 }
             }
         }

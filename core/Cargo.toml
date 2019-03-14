@@ -37,7 +37,7 @@ heapsize = "0.4"
 itertools = "0.5"
 lazy_static = "1.0"
 log = "0.3"
-lru-cache = "0.1"
+lru-cache = "0.1.1"
 num = "0.1"
 num_cpus = "1.2"
 aion-machine = { path = "../machine" }

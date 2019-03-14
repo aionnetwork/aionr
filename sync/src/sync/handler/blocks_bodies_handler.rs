@@ -18,7 +18,8 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use acore::client::{BlockId, BlockStatus};
+use acore::client::{BlockId, BlockImportError, BlockStatus};
+use acore::error::{BlockError, ImportError};
 use aion_types::H256;
 use bytes::BufMut;
 use futures::future::lazy;
@@ -44,16 +45,7 @@ impl BlockBodiesHandler {
         req.head.ctrl = Control::SYNC.value();
         req.head.action = SyncAction::BLOCKSBODIESREQ.value();
 
-        let block_chain = SyncStorage::get_block_chain();
-        let mut best_block_number = block_chain.chain_info().best_block_number;
-        let synced_block_number = SyncStorage::get_synced_block_number();
-
-        best_block_number = if synced_block_number > best_block_number {
-            synced_block_number
-        } else {
-            best_block_number
-        };
-
+        let mut best_block_number = SyncStorage::get_synced_block_number();
         let mut headers = Vec::new();
         let mut number = best_block_number + 1;
         while number <= best_header_number {
@@ -62,22 +54,21 @@ impl BlockBodiesHandler {
                 req.body.extend_from_slice(&hash);
 
                 if headers.len() == REQUEST_SIZE as usize {
-                    if let Some(ref mut node) = P2pMgr::get_an_active_node() {
-                        let mut get_headers_with_bodies_requested =
-                            SyncStorage::get_headers_with_bodies_requested().lock();
-                        {
-                            if !get_headers_with_bodies_requested.contains_key(&node.node_hash) {
-                                req.head.len = req.body.len() as u32;
-                                P2pMgr::send(node.node_hash, req.clone());
-                                get_headers_with_bodies_requested
-                                    .insert(node.node_hash, headers.clone());
-                                trace!(target: "sync", "send_blocks_bodies_req for #{} to #{}.", number - REQUEST_SIZE, number);
+                    let mut get_headers_with_bodies_requested =
+                        SyncStorage::get_headers_with_bodies_requested().lock();
+                    {
+                        if !get_headers_with_bodies_requested.contains_key(&node.node_hash) {
+                            req.head.len = req.body.len() as u32;
+                            P2pMgr::send(node.node_hash, req.clone());
+                            get_headers_with_bodies_requested
+                                .insert(node.node_hash, headers.clone());
+                            trace!(target: "sync", "send_blocks_bodies_req for #{} to #{}.", number - REQUEST_SIZE, number);
 
-                                SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
-                                P2pMgr::update_node(node.node_hash, node);
-                            }
+                            SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
+                            P2pMgr::update_node(node.node_hash, node);
                         }
                     }
+
                     return;
                 } else {
                     best_block_number = SyncStorage::get_synced_block_number() + 1;
@@ -177,6 +168,7 @@ impl BlockBodiesHandler {
                                         if let Ok(body) = block_bodies.at(i) {
                                             if let Ok(txs) = body.at(0) {
                                                 let number = header.number();
+                                                let _parent_hash = header.parent_hash();
                                                 let mut data = header.into_inner();
                                                 data.extend_from_slice(txs.as_raw());
                                                 let mut block = RlpStream::new_list(2);
@@ -185,7 +177,74 @@ impl BlockBodiesHandler {
                                                 SyncStorage::insert_requested_time(hash);
                                                 let result = block_chain
                                                     .import_block(block.as_raw().to_vec());
-                                                trace!(target: "sync", "#{}, result: {:?} from {}", number, result, node.get_ip_addr());
+                                                match result {
+                                                    Ok(_) => {
+                                                        node.inc_reputation(2);
+                                                        trace!(target: "sync", "Imported block #{} - {} - {}", number, hash, node.get_ip_addr());
+                                                    }
+                                                    | Err(BlockImportError::Import(
+                                                        ImportError::AlreadyInChain,
+                                                    ))
+                                                    | Err(BlockImportError::Import(
+                                                        ImportError::AlreadyQueued,
+                                                    )) => {
+                                                        node.inc_reputation(1);
+                                                        trace!(target: "sync", "Skipped block #{} - {} - {}", number, hash, node.get_ip_addr());
+                                                    }
+                                                    Err(BlockImportError::Block(
+                                                        BlockError::UnknownParent(_),
+                                                    )) => {
+                                                        if number == 1 {
+                                                            error!(target: "sync", "Invalid genesis !!!");
+                                                            return;
+                                                        } else if node.target_total_difficulty
+                                                            < SyncStorage::get_network_total_diff()
+                                                        {
+                                                            error!(target: "sync", "Invalid peer {}@{} !!!", node.get_ip_addr(), node.get_node_id());
+                                                            P2pMgr::remove_peer(node.node_hash);
+                                                        } else {
+                                                            // Staging...
+                                                            /*
+                                                            if let Ok(mut staged_blocks) = SyncStorage::get_staged_blocks().lock() {
+                                                                if !staged_blocks.contains_key(&parent_hash) {
+                                                                    let mut blks = Vec::new();
+                                                                    for j in i..item_count {
+                                                                        let hash = hashes[i];
+                                                                        if let Some(header) = header_chain.block_header(BlockId::Hash(hash)) {
+                                                                            if let Ok(body) = block_bodies.at(j) {
+                                                                                if let Ok(txs) = body.at(0) {
+                                                                                    let mut data = header.into_inner();
+                                                                                    data.extend_from_slice(txs.as_raw());
+                                                                                    let mut block = RlpStream::new_list(2);
+                                                                                    block.append_raw(&data, 2);
+                                                                                    blks.push(block);
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                    if !blks.is_empty() {
+                                                                        staged_blocks.insert(parent_hash, blks);
+                                                                    }
+                                                                }
+                                                            }
+                                                            trace!(target: "sync", "Staged block #{} - {} - {}", number, hash, node.get_ip_addr());
+                                                            */
+                                                            return;
+                                                        }
+                                                    }
+                                                    Err(e) => {
+                                                        if !node.is_over_repeated_threshold() {
+                                                            warn!(target: "sync", "Bad block #{} - {:?} - {}, {:?}", number, hash, node.get_ip_addr(), e);
+                                                            block_chain.clear_bad();
+                                                            block_chain.clear_queue();
+                                                            node.inc_repeated();
+                                                        } else {
+                                                            warn!(target: "sync", "Bad block #{} - {:?} - {}@{}, {:?}, peer node remove.", number, hash, node.get_node_id(), node.get_ip_addr(), e);
+                                                            P2pMgr::remove_peer(node.node_hash);
+                                                        }
+                                                        return;
+                                                    }
+                                                }
                                             }
                                         }
                                     } else {
@@ -194,7 +253,8 @@ impl BlockBodiesHandler {
                                 }
                             }
                         } else {
-                            if block_chain.queue_info().verifying_queue_size > REQUEST_SIZE as usize
+                            if block_chain.queue_info().verifying_queue_size
+                                >= REQUEST_SIZE as usize
                             {
                                 block_chain.clear_queue();
                             }
@@ -221,5 +281,24 @@ impl BlockBodiesHandler {
             }
             Ok(())
         }))
+    }
+
+    pub fn import_staged_block(parent_hash: H256) {
+        if let Some(blocks) = SyncStorage::get_staged_blocks_with_hash(parent_hash) {
+            let block_chain = SyncStorage::get_block_chain();
+            for block in blocks.iter() {
+                let result = block_chain.import_block(block.as_raw().to_vec());
+                match result {
+                    Ok(_)
+                    | Err(BlockImportError::Import(ImportError::AlreadyInChain))
+                    | Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
+                        trace!(target: "sync", "Imported staged block, result: {:?}", result);
+                    }
+                    Err(_) => {
+                        return;
+                    }
+                }
+            }
+        }
     }
 }
