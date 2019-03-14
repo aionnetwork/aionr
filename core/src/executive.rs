@@ -2451,8 +2451,8 @@ Address};
     fn avm_api() {
         // Create contract on already existing address
         let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        file.push("src/tests/AVMDapps/dapp.jar");
-        let file_str = file.to_str().expect("Failed to locate the dapp.jar");
+        file.push("src/tests/AVMDapps/avm_api.jar");
+        let file_str = file.to_str().expect("Failed to locate the avm_api.jar");
         let mut code = read_file(file_str).expect("unable to open avm dapp");
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
         let address = contract_address(&sender, &U256::zero()).0;
@@ -2635,7 +2635,7 @@ Address};
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
         assert_eq!(execution_results[0].status_code, ExecStatus::Success);
-        assert_eq!(execution_results[0].return_data.mem, vec![5,0,0,7,242]);
+        assert_eq!(execution_results[0].return_data.mem, vec![5,0,0,8,218]);
 
         // get remaining energy
         params.nonce += 1;
@@ -2647,7 +2647,7 @@ Address};
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
 
-        assert_eq!(execution_results[0].return_data.mem, vec![6,0,0,0,0,0,14,80,52]);
+        assert_eq!(execution_results[0].return_data.mem, vec![6,0,0,0,0,0,14,79,212]);
 
         // TODO: check internal call
         // params.nonce += 1;
@@ -2672,25 +2672,26 @@ Address};
         // assert_eq!(execution_results[0].return_data.mem, vec![0,1,2,3]);
 
         // selfdestruct
-        params.nonce += 1;
-        params.gas = U256::from(1_000_000);
-        let mut calldata = AbiToken::STRING(String::from("selfDestruct")).encode();
-        let mut addr = [0; 32];
-        addr.copy_from_slice(&address[..]);
-        calldata.append(&mut AbiToken::ADDRESS(addr).encode());
-        params.data = Some(calldata.clone());
-        let execution_results = {
-            let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call_avm(vec![params.clone()], &mut [substate.clone()])
-        };
-        assert_eq!(execution_results[0].status_code, ExecStatus::Success);
-        assert_eq!(state.exists(&avm_contract_addr).unwrap(), false);
+        //println!("old state = {:?}", state);
+        // params.nonce += 1;
+        // params.gas = U256::from(1_000_000);
+        // let mut calldata = AbiToken::STRING(String::from("selfDestruct")).encode();
+        // let mut addr = [0; 32];
+        // addr.copy_from_slice(&address[..]);
+        // calldata.append(&mut AbiToken::ADDRESS(addr).encode());
+        // params.data = Some(calldata.clone());
+        // let execution_results = {
+        //     let mut ex = Executive::new(&mut state, &info, &machine);
+        //     ex.call_avm(vec![params.clone()], &mut [substate.clone()])
+        // };
+        // assert_eq!(execution_results[0].status_code, ExecStatus::Success);
+        // //println!("state = {:?}", state);
+        // assert_eq!(state.exists(&params.address).unwrap(), false);
 
         // test log
         params.nonce += 1;
         params.gas = U256::from(1_000_000);
-        let mut calldata = AbiToken::STRING(String::from("log")).encode();
-        calldata.append(&mut AbiToken::AUCHAR(&[0,1,2,3]).encode());
+        let calldata = AbiToken::STRING(String::from("log1")).encode();
         params.data = Some(calldata.clone());
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
@@ -2701,10 +2702,7 @@ Address};
         // test log 1
         params.nonce += 1;
         params.gas = U256::from(1_000_000);
-        let mut calldata = AbiToken::STRING(String::from("log")).encode();
-        calldata.append(&mut AbiToken::AUCHAR(&[0,1,2,3]).encode());    // topic 1
-        calldata.append(&mut AbiToken::AUCHAR(&[5,6,7,8]).encode());    // topic 2
-        calldata.append(&mut AbiToken::AUCHAR(&[0x0a, 0x0a, 0x0a]).encode());   // data
+        let calldata = AbiToken::STRING(String::from("log2")).encode();
         params.data = Some(calldata.clone());
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
@@ -2715,11 +2713,7 @@ Address};
         // test log 2
         params.nonce += 1;
         params.gas = U256::from(1_000_000);
-        let mut calldata = AbiToken::STRING(String::from("log")).encode();
-        calldata.append(&mut AbiToken::AUCHAR(&[0,1,2,3]).encode());    // topic 1
-        calldata.append(&mut AbiToken::AUCHAR(&[5,6,7,8]).encode());    // topic 2
-        calldata.append(&mut AbiToken::AUCHAR(&[0x0a, 0x0a, 0x0a]).encode());   // topic 3
-        calldata.append(&mut AbiToken::AUCHAR(&[0x0b, 0x0b]).encode()); // data
+        let calldata = AbiToken::STRING(String::from("log3")).encode();
         params.data = Some(calldata.clone());
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
@@ -2730,12 +2724,7 @@ Address};
         // test log 3
         params.nonce += 1;
         params.gas = U256::from(1_000_000);
-        let mut calldata = AbiToken::STRING(String::from("log")).encode();
-        calldata.append(&mut AbiToken::AUCHAR(&[0,1,2,3]).encode());    // topic 1
-        calldata.append(&mut AbiToken::AUCHAR(&[5,6,7,8]).encode());    // topic 2
-        calldata.append(&mut AbiToken::AUCHAR(&[0x0a, 0x0a, 0x0a]).encode());   // topic 3
-        calldata.append(&mut AbiToken::AUCHAR(&[0x0b, 0x0b, 0x0b]).encode());   // topic 4
-        calldata.append(&mut AbiToken::AUCHAR(&[0x0c, 0x0c]).encode()); // data
+        let calldata = AbiToken::STRING(String::from("log4")).encode();
         params.data = Some(calldata.clone());
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
@@ -2746,41 +2735,41 @@ Address};
         // blake2b
         params.nonce += 1;
         params.gas = U256::from(1_000_000);
-        let mut calldata = AbiToken::STRING(String::from("blake2b")).encode();
-        calldata.append(&mut AbiToken::AUCHAR(&[0,1,2,3]).encode());    // data
+        let calldata = AbiToken::STRING(String::from("blake2b")).encode();
         params.data = Some(calldata.clone());
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
         assert_eq!(execution_results[0].status_code, ExecStatus::Success);
+        assert_eq!(execution_results[0].return_data.mem[3..], blake2b("hello, blake2b").to_vec()[..]);
 
         // sha256
         params.nonce += 1;
         params.gas = U256::from(1_000_000);
-        let mut calldata = AbiToken::STRING(String::from("sha256")).encode();
-        calldata.append(&mut AbiToken::AUCHAR(&[0,1,2,3]).encode());    // data
+        let calldata = AbiToken::STRING(String::from("sha256")).encode();
         params.data = Some(calldata.clone());
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
         assert_eq!(execution_results[0].status_code, ExecStatus::Success);
+        assert_eq!(execution_results[0].return_data.mem, vec![17,0,32,98,132,122,94,185,133,98,40,127,178,107,222,247,1,111,31,169,113,128,151,99,164,146,150,105,16,173,247,28,178,211,73]);
 
         // keccak256
         params.nonce += 1;
         params.gas = U256::from(1_000_000);
-        let mut calldata = AbiToken::STRING(String::from("keccak256")).encode();
-        calldata.append(&mut AbiToken::AUCHAR(&[0,1,2,3]).encode());    // data
+        let calldata = AbiToken::STRING(String::from("keccak256")).encode();
         params.data = Some(calldata.clone());
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
         assert_eq!(execution_results[0].status_code, ExecStatus::Success);
+        assert_eq!(execution_results[0].return_data.mem, vec![17,0,32,147,4,57,80,130,117,118,23,106,198,145,248,200,139,87,84,3,84,98,205,14,113,26,143,224,146,145,39,170,143,62,89]);
 
         // revert
-        params.nonce += 1;
+        params.nonce += 1;      // nonce = 19
         params.gas = U256::from(1_000_000);
         let calldata = AbiToken::STRING(String::from("revert")).encode();
         params.data = Some(calldata.clone());
@@ -2788,7 +2777,7 @@ Address};
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
-        assert_eq!(execution_results[0].status_code, ExecStatus::Success);
+        assert_eq!(execution_results[0].status_code, ExecStatus::Failure);
 
         // invalid
         params.nonce += 1;
@@ -2799,6 +2788,6 @@ Address};
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
-        assert_eq!(execution_results[0].status_code, ExecStatus::Success);
+        assert_eq!(execution_results[0].status_code, ExecStatus::Failure);
     }
 }

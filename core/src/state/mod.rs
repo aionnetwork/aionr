@@ -471,6 +471,7 @@ impl<B: Backend> State<B> {
 
     /// Remove an existing account.
     pub fn kill_account(&mut self, account: &Address, acc_type: AccType) {
+        println!("kill account: {:?}", account);
         match acc_type {
             AccType::FVM => {
                 self.fvm_manager.insert_cache(account, AccountEntry::<FVMAccount>::new_dirty(None));
@@ -487,10 +488,18 @@ impl<B: Backend> State<B> {
         // check if account exists in the database directly before EIP-161 is in effect.
         // self.ensure_fvm_cached(a, RequireCache::None, false, |a| a.is_some())
         let result = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| a.is_some());
-        if result.is_ok() {
-            result
-        } else {
-            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| a.is_some())
+
+        match result {
+            Ok(r) => {
+                if r == false {
+                    println!("try to check avm cache");
+                    self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| a.is_some())
+                } else {
+                    println!("found fvm exists");
+                    result
+                }
+            },
+            Err(_) => result,
         }
     }
 
