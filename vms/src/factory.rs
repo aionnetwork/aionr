@@ -180,9 +180,10 @@ impl Factory for FastVMFactory {
     }
 }
 
-const AVM_CREATE: i32 = 2;
-const AVM_CALL: i32 = 3;
+const AVM_CREATE: i32 = 3;
+const AVM_CALL: i32 = 0;
 const AVM_BALANCE_TRANSFER: i32 = 4;
+const AVM_GARBAGE_COLLECTION: i32 = 5;
 
 #[derive(Clone)]
 pub struct AVMFactory {
@@ -223,9 +224,11 @@ impl Factory for AVMFactory {
             let gas_price = params.gas_price.low_u64();
             let address = params.address;
             let caller = params.sender;
+            println!("caller = {:?}", caller);
             let origin = params.origin;
             let transfer_value: [u8; 32] = params.value.into();
             let call_value = transfer_value.to_vec();
+            println!("call_value = {:?}", call_value);
             debug!(target: "vm", "call_data = {:?}", call_data);
             debug!(target: "vm", "gas limit = {:?}", gas_limit);
 
@@ -273,7 +276,6 @@ impl Factory for AVMFactory {
         //println!("ext ptr = {:?}, avm contexts = {:?}", ext_ptr, avm_tx_contexts);
         let mut res = inst.execute(ext_ptr as i64, &avm_tx_contexts);
 
-        let ext_post: &mut Box<Ext> = unsafe { ::std::mem::transmute(ext_ptr) };
         let mut exec_results = Vec::new();
 
         if let Ok(ref mut tx_res) = res {
@@ -288,8 +290,8 @@ impl Factory for AVMFactory {
                 let mut gas_left =
                     U256::from(avm_tx_contexts[index].energy_limit - result.energy_used);
                 let return_data = result.return_data;
-                let storage_root = result.storage_root_hash;
-                println!("storage root = {}", storage_root);
+                //let storage_root = result.storage_root_hash;
+                //println!("storage root = {}", storage_root);
                 exec_results.push(ExecutionResult {
                     gas_left: gas_left.into(),
                     status_code: status_code.clone().into(),

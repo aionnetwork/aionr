@@ -105,6 +105,9 @@ extern {
 #[no_mangle]
 pub extern fn avm_create_account(handle: *const c_void, address: *const avm_address) {
     let ext: &mut Box<AVMExt> = unsafe { mem::transmute(handle) };
+    println!("create new AVM account");
+    let addr: &Address = unsafe { mem::transmute(address) };
+    ext.create_account(addr);
 }
 
 #[no_mangle]
@@ -127,7 +130,7 @@ pub extern fn avm_put_code(
     println!("avm_put_code, ext ptr = {:?}", handle);
     let ext_code: &[u8] =
         unsafe { ::std::slice::from_raw_parts(code.pointer, code.length as usize) };
-    println!("code = {:?}", ext_code);
+    //println!("code = {:?}", ext_code);
     ext.save_code(addr, ext_code.to_vec());
 }
 
@@ -219,6 +222,8 @@ pub extern fn avm_get_storage(
 pub extern fn avm_delete_account(handle: *const c_void, address: *const avm_address) {
     let ext: &mut Box<AVMExt> = unsafe {mem::transmute(handle)};
     let addr: &Address = unsafe {mem::transmute(address)};
+
+    println!("avm_selfdestruct: {:?}", addr);
 
     ext.remove_account(addr);
 }

@@ -134,7 +134,7 @@ where B: StateBackend
         println!("AVM get code");
         match self.state.code(address) {
             Ok(code) => {
-                println!("code = {:?}", code);
+                //println!("code = {:?}", code);
                 code
             },
             Err(_x) => None,
