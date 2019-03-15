@@ -56,13 +56,7 @@ impl BlockHeadersHandler {
             if from == 0 {
                 from = SyncStorage::get_block_header_chain()
                     .chain_info()
-                    .best_block_number
-                    + 1;
-                let synced_num = SyncStorage::get_synced_block_number() + 1;
-                debug!(target: "sync","from:{} synced_number:{}", from,synced_num);
-                if from < synced_num {
-                    from = synced_num;
-                }
+                    .best_block_number + 1;
 
                 if SyncStorage::get_synced_block_number() + 512 < from {
                     return;
@@ -173,22 +167,25 @@ impl BlockHeadersHandler {
                     if header_chain.status(parent_hash) == BlockStatus::InChain {
                         if header_chain.status(&hash) != BlockStatus::InChain {
                             let mut tx = DBTransaction::new();
-                            if let Ok(pending) = header_chain.insert(&mut tx, &header, None) {
+                            if let Ok(pending) =
+                                header_chain.insert(&mut tx, &header.encoded(), None)
+                            {
                                 header_chain.apply_pending(tx, pending);
                                 hases.push(hash);
                                 trace!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
+                                if node.target_total_difficulty
+                                    >= SyncStorage::get_network_total_diff()
+                                    && number < SyncStorage::get_synced_block_number()
+                                {
+                                    SyncStorage::set_synced_block_number(number - 2);
+                                    SyncStorage::get_block_chain().clear_queue();
+                                    BlockBodiesHandler::send_blocks_bodies_req(node);
+                                    info!(target: "sync", "Recovered from side chain...");
+                                    break;
+                                }
                             }
                         } else {
-                            trace!(target: "sync", "The block is inchain already.");
-                            if node.target_total_difficulty >= SyncStorage::get_network_total_diff()
-                                && number < SyncStorage::get_synced_block_number()
-                            {
-                                SyncStorage::set_synced_block_number(number);
-                                SyncStorage::get_block_chain().clear_queue();
-                                BlockBodiesHandler::send_blocks_bodies_req(node);
-                                info!(target: "sync", "Recovered from side chain...");
-                                break;
-                            }
+                            info!(target: "sync", "The block is inchain already.");
                         }
                     } else {
                         if number <= header_chain.chain_info().best_block_number {

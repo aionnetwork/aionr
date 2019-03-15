@@ -36,6 +36,9 @@ pub struct BlockBodiesHandler;
 
 impl BlockBodiesHandler {
     pub fn send_blocks_bodies_req(node: &mut Node) {
+        if node.best_block_num <= SyncStorage::get_synced_block_number() {
+            return;
+        }
         let header_chain = SyncStorage::get_block_header_chain();
         let mut best_header_number = header_chain.chain_info().best_block_number;
 
@@ -61,7 +64,7 @@ impl BlockBodiesHandler {
                             P2pMgr::send(node.node_hash, req.clone());
                             get_headers_with_bodies_requested
                                 .insert(node.node_hash, headers.clone());
-                            trace!(target: "sync", "send_blocks_bodies_req for #{} to #{}.", number - REQUEST_SIZE, number);
+                            info!(target: "sync", "send_blocks_bodies_req for #{} to #{}.", number - REQUEST_SIZE, number);
 
                             SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
                             P2pMgr::update_node(node.node_hash, node);
@@ -89,7 +92,7 @@ impl BlockBodiesHandler {
                     req.head.len = req.body.len() as u32;
                     P2pMgr::send(node.node_hash, req.clone());
                     get_headers_with_bodies_requested.insert(node.node_hash, headers.clone());
-                    trace!(target: "sync", "send_blocks_bodies_req for #{} to #{}, msg: {}.", number as usize - headers.len(), number, req);
+                    info!(target: "sync", "send_blocks_bodies_req for #{} to #{}, msg: {}.", number as usize - headers.len(), number, req);
 
                     SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
                     P2pMgr::update_node(node.node_hash, node);

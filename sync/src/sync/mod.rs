@@ -24,7 +24,7 @@ use acore::transaction::UnverifiedTransaction;
 use aion_types::H256;
 use futures::future::{loop_fn, Loop};
 use futures::{Future, Stream};
-use kvdb::KeyValueDB;
+use kvdb::{KeyValueDB, DBTransaction};
 use rlp::UntrustedRlp;
 use std::collections::BTreeMap;
 use std::ops::Index;
@@ -117,20 +117,18 @@ impl SyncMgr {
         let broadcast_transactions_task = Interval::new(
             Instant::now(),
             Duration::from_millis(BROADCAST_TRANSACTIONS_INTERVAL),
-        )
-        .for_each(move |_| {
+        ).for_each(move |_| {
             BroadcastsHandler::broad_new_transactions();
 
             Ok(())
         })
-        .map_err(|e| error!("interval errored; err={:?}", e));
+            .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(broadcast_transactions_task);
 
         let reputation_handle_task = Interval::new(
             Instant::now(),
             Duration::from_secs(REPUTATION_HANDLE_INTERVAL),
-        )
-        .for_each(move |_| {
+        ).for_each(move |_| {
             let mut active_nodes = P2pMgr::get_nodes(ALIVE);
             active_nodes.sort_by(|a, b| {
                 if a.reputation != b.reputation {
@@ -153,7 +151,7 @@ impl SyncMgr {
             P2pMgr::reset_reputation();
             Ok(())
         })
-        .map_err(|e| error!("interval errored; err={:?}", e));
+            .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(reputation_handle_task);
 
         let statics_task = Interval::new(Instant::now(), Duration::from_secs(STATICS_INTERVAL))
@@ -378,11 +376,28 @@ impl Sync {
         SyncStorage::set_synced_block_number(starting_block_number);
         SyncStorage::set_synced_block_number_last_time(starting_block_number);
 
-        let header_chain_info = SyncStorage::get_block_header_chain().chain_info();
+        let header_chain = SyncStorage::get_block_header_chain();
+        let header_chain_info = header_chain.chain_info();
         let best_header_number = header_chain_info.best_block_number;
         let best_block_number = SyncStorage::get_synced_block_number();
         if best_header_number >= best_block_number {
             SyncStorage::set_requested_block_number_last_time(best_header_number);
+        } else {
+            let block_chain = SyncStorage::get_block_chain();
+            for number in 1..best_block_number {
+                if let Some(ref header) = block_chain.block_header(BlockId::Number(number)) {
+                    if header_chain.status(&header.parent_hash()) == BlockStatus::InChain {
+                        let hash = header.hash();
+                        if header_chain.status(&hash) != BlockStatus::InChain {
+                            let mut tx = DBTransaction::new();
+                            if let Ok(pending) = header_chain.insert(&mut tx, header, None) {
+                                header_chain.apply_pending(tx, pending);
+                                trace!(target: "sync", "New block header #{} - {} imported.", number, hash);
+                            }
+                        }
+                    }
+                }
+            }
         }
 
         let service = NetworkService {
@@ -443,20 +458,22 @@ impl SyncProvider for Sync {
         peer_info_list
     }
 
-    fn enode(&self) -> Option<String> { Some(P2pMgr::get_local_node().get_node_id()) }
+    fn enode(&self) -> Option<String> {
+        Some(P2pMgr::get_local_node().get_node_id())
+    }
 
-    fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats> { BTreeMap::new() }
+    fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats> {
+        BTreeMap::new()
+    }
 
     fn active(&self) -> Vec<ActivePeerInfo> {
         let ac_nodes = P2pMgr::get_nodes(ALIVE);
         ac_nodes
             .into_iter()
-            .map(|node| {
-                ActivePeerInfo {
-                    highest_block_number: node.best_block_num,
-                    id: node.node_id.to_hex(),
-                    ip: node.ip_addr.ip.to_hex(),
-                }
+            .map(|node| ActivePeerInfo {
+                highest_block_number: node.best_block_num,
+                id: node.node_id.to_hex(),
+                ip: node.ip_addr.ip.to_hex(),
             })
             .collect()
     }
@@ -504,7 +521,9 @@ impl NetworkManager for Sync {
         P2pMgr::disable();
     }
 
-    fn network_config(&self) -> NetworkConfig { NetworkConfig::from(self.network.config.clone()) }
+    fn network_config(&self) -> NetworkConfig {
+        NetworkConfig::from(self.network.config.clone())
+    }
 }
 
 impl ChainNotify for Sync {
@@ -517,8 +536,7 @@ impl ChainNotify for Sync {
         sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
         _duration: u64,
-    )
-    {
+    ) {
         if P2pMgr::get_all_nodes_count() == 0 {
             return;
         }

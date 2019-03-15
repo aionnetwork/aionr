@@ -32,7 +32,7 @@ use aion_types::{H256, H264, U256};
 use encoded;
 use engines::epoch::{PendingTransition as PendingEpochTransition, Transition as EpochTransition};
 use error::BlockError;
-use header::{Header, Seal};
+use header::Header;
 use heapsize::HeapSizeOf;
 use kvdb::{DBTransaction, KeyValueDB};
 use parking_lot::{Mutex, RwLock};
@@ -291,7 +291,7 @@ impl HeaderChain {
             info!(target: "chain", "created header chain : {:?}", decoded_header );
 
             let mut tx = DBTransaction::new();
-            if let Ok(pending) = chain.insert(&mut tx, &spec.genesis_header(), None) {
+            if let Ok(pending) = chain.insert(&mut tx, &spec.genesis_header().encoded(), None) {
                 chain.apply_pending(tx, pending);
             }
             chain
@@ -329,7 +329,7 @@ impl HeaderChain {
     pub fn insert(
         &self,
         transaction: &mut DBTransaction,
-        header: &Header,
+        header: &encoded::Header,
         transition_proof: Option<Vec<u8>>,
     ) -> Result<PendingChanges, String>
     {
@@ -342,7 +342,7 @@ impl HeaderChain {
     pub fn insert_with_td(
         &self,
         transaction: &mut DBTransaction,
-        header: &Header,
+        header: &encoded::Header,
         total_difficulty: U256,
         transition_proof: Option<Vec<u8>>,
     ) -> Result<PendingChanges, String>
@@ -358,14 +358,14 @@ impl HeaderChain {
     fn insert_inner(
         &self,
         transaction: &mut DBTransaction,
-        header: &Header,
+        header: &encoded::Header,
         total_difficulty: Option<U256>,
         transition_proof: Option<Vec<u8>>,
     ) -> Result<PendingChanges, String>
     {
         let hash = header.hash();
         let number = header.number();
-        let parent_hash = *header.parent_hash();
+        let parent_hash = header.parent_hash();
         let transition = transition_proof.map(|proof| {
             EpochTransition {
                 block_hash: hash,
@@ -396,7 +396,7 @@ impl HeaderChain {
                         .expect("!!!")
                 };
 
-                parent_td + *header.difficulty()
+                parent_td + header.difficulty()
             }
         };
 
@@ -429,7 +429,7 @@ impl HeaderChain {
             self.live_epoch_proofs.write().insert(hash, transition);
         }
 
-        let raw = header.rlp(Seal::With);
+        let raw = header.clone().into_inner();
         transaction.put_vec(COL, &hash[..], raw);
 
         // TODO: For engines when required, use cryptoeconomic guarantees.
