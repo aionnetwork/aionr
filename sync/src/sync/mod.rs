@@ -377,7 +377,13 @@ impl Sync {
         SyncStorage::set_synced_block_number_last_time(starting_block_number);
 
         let header_chain_info = SyncStorage::get_block_header_chain().chain_info();
-        SyncStorage::set_requested_block_number_last_time(header_chain_info.best_block_number);
+        let best_header_number = header_chain_info.best_block_number;
+        let best_block_number = SyncStorage::get_synced_block_number();
+        if best_header_number < best_block_number {
+            SyncStorage::set_requested_block_number_last_time(best_block_number);
+        } else {
+            SyncStorage::set_requested_block_number_last_time(best_header_number);
+        }
 
         let service = NetworkService {
             config: params.network_config.clone(),

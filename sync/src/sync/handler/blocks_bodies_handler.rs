@@ -22,7 +22,6 @@ use acore::client::{BlockId, BlockImportError, BlockStatus};
 use acore::error::{BlockError, ImportError};
 use aion_types::H256;
 use bytes::BufMut;
-use futures::future::lazy;
 use rlp::{RlpStream, UntrustedRlp};
 
 use super::super::action::SyncAction;
@@ -274,13 +273,9 @@ impl BlockBodiesHandler {
         SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesRes);
         P2pMgr::update_node(node_hash, node);
 
-        let executor = SyncStorage::get_sync_executor();
-        executor.spawn(lazy(move || {
-            if let Some(ref mut peer_node) = P2pMgr::get_an_active_node() {
-                BlockBodiesHandler::send_blocks_bodies_req(peer_node);
-            }
-            Ok(())
-        }))
+        if let Some(ref mut peer_node) = P2pMgr::get_an_active_node() {
+            BlockBodiesHandler::send_blocks_bodies_req(peer_node);
+        }
     }
 
     pub fn import_staged_block(parent_hash: H256) {

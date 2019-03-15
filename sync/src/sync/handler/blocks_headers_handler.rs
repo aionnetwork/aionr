@@ -36,7 +36,7 @@ use super::blocks_bodies_handler::BlockBodiesHandler;
 
 use p2p::*;
 
-const REQUEST_SIZE: u64 = 96;
+const REQUEST_SIZE: u64 = 48;
 
 pub struct BlockHeadersHandler;
 
@@ -57,6 +57,10 @@ impl BlockHeadersHandler {
                 from = SyncStorage::get_block_header_chain()
                     .chain_info()
                     .best_block_number + 1;
+                let best_header_number = SyncStorage::get_requested_block_number_last_time();
+                if from < best_header_number {
+                    from = best_header_number;
+                }
                 if SyncStorage::get_synced_block_number() + 512 < from {
                     return;
                 }
@@ -173,7 +177,9 @@ impl BlockHeadersHandler {
                             }
                         } else {
                             trace!(target: "sync", "The block is inchain already.");
-                            if node.target_total_difficulty >= SyncStorage::get_network_total_diff() && number < SyncStorage::get_synced_block_number() {
+                            if node.target_total_difficulty >= SyncStorage::get_network_total_diff()
+                                && number < SyncStorage::get_synced_block_number()
+                            {
                                 SyncStorage::set_synced_block_number(number);
                                 SyncStorage::get_block_chain().clear_queue();
                                 BlockBodiesHandler::send_blocks_bodies_req(node);
