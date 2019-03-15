@@ -56,11 +56,14 @@ impl BlockHeadersHandler {
             if from == 0 {
                 from = SyncStorage::get_block_header_chain()
                     .chain_info()
-                    .best_block_number + 1;
-                let best_header_number = SyncStorage::get_requested_block_number_last_time();
-                if from < best_header_number {
-                    from = best_header_number;
+                    .best_block_number
+                    + 1;
+                let synced_num = SyncStorage::get_synced_block_number() + 1;
+                debug!(target: "sync","from:{} synced_number:{}", from,synced_num);
+                if from < synced_num {
+                    from = synced_num;
                 }
+
                 if SyncStorage::get_synced_block_number() + 512 < from {
                     return;
                 }

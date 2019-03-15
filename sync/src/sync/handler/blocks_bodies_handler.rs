@@ -181,7 +181,7 @@ impl BlockBodiesHandler {
                                                         node.inc_reputation(2);
                                                         trace!(target: "sync", "Imported block #{} - {} - {}", number, hash, node.get_ip_addr());
                                                     }
-                                                    | Err(BlockImportError::Import(
+                                                    Err(BlockImportError::Import(
                                                         ImportError::AlreadyInChain,
                                                     ))
                                                     | Err(BlockImportError::Import(

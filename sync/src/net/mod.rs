@@ -125,7 +125,8 @@ impl NetManager {
         let connect_normal_nodes_task = Interval::new(
             Instant::now(),
             Duration::from_secs(RECONNECT_NORMAL_NODES_INTERVAL),
-        ).for_each(move |_| {
+        )
+        .for_each(move |_| {
             let active_nodes_count = P2pMgr::get_nodes_count(ALIVE);
             if !sync_from_boot_nodes_only && active_nodes_count < max_peers_num {
                 if let Some(peer_node) = P2pMgr::get_an_inactive_node() {
@@ -138,7 +139,7 @@ impl NetManager {
 
             Ok(())
         })
-            .map_err(|e| error!("interval errored; err={:?}", e));
+        .map_err(|e| error!("interval errored; err={:?}", e));
         NET_RUNTIME
             .get()
             .write()
@@ -150,12 +151,13 @@ impl NetManager {
         let activenodes_req_task = Interval::new(
             Instant::now(),
             Duration::from_secs(NODE_ACTIVE_REQ_INTERVAL),
-        ).for_each(move |_| {
+        )
+        .for_each(move |_| {
             ActiveNodesHandler::send_activenodes_req();
 
             Ok(())
         })
-            .map_err(|e| error!("interval errored; err={:?}", e));
+        .map_err(|e| error!("interval errored; err={:?}", e));
         NET_RUNTIME
             .get()
             .write()
