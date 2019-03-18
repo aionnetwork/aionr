@@ -525,12 +525,12 @@ macro_rules! impl_account {
 
             /// Export to RLP.
             fn rlp(&self) -> Bytes {
-                let mut stream = RlpStream::new_list(5);
+                let mut stream = RlpStream::new_list(4);
                 stream.append(&self.nonce);
                 stream.append(&self.balance);
                 stream.append(&self.storage_root);
                 stream.append(&self.code_hash);
-                stream.append(&self.acc_type());
+                //stream.append(&self.acc_type());
                 stream.out()
             }
 
@@ -775,6 +775,7 @@ impl fmt::Debug for FVMAccount {
                 &self.storage_changes.1.iter().collect::<BTreeMap<_, _>>(),
             )
             .field("storage_root", &self.storage_root)
+            .field("empty_but_commit", &self.empty_but_commit)
             .finish()
     }
 }

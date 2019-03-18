@@ -292,6 +292,7 @@ impl Factory for AVMFactory {
                 let return_data = result.return_data;
                 //let storage_root = result.storage_root_hash;
                 //println!("storage root = {}", storage_root);
+                debug!(target: "vm", "avm status code = {:?}, gas left = {:?}", status_code, gas_left);
                 exec_results.push(ExecutionResult {
                     gas_left: gas_left.into(),
                     status_code: status_code.clone().into(),
@@ -300,7 +301,7 @@ impl Factory for AVMFactory {
                         AvmStatusCode::Success => String::default(),
                         code => code.to_string(),
                     },
-                })
+                });
             }
         } else {
             panic!("avm unexpected error");
