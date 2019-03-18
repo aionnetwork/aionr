@@ -798,15 +798,18 @@ impl<B: Backend> State<B> {
     ) -> trie::Result<()>
     {
         debug!(target: "state", "add_balance({}, {}): {}", a, incr, self.balance(a)?);
+        println!("state before add balance = {:?}", self);
         let is_value_transfer = !incr.is_zero();
         if is_value_transfer || (cleanup_mode == CleanupMode::ForceCreate && !self.exists(a)?) {
             self.require(a, false)?.add_balance(incr);
+            //panic!("hi");
         } else if let CleanupMode::TrackTouched(set) = cleanup_mode {
             if self.exists(a)? {
                 set.insert(*a);
                 self.touch(a)?;
             }
         }
+        println!("state after add balance = {:?}", self);
         Ok(())
     }
 
@@ -1041,10 +1044,12 @@ impl<B: Backend> State<B> {
 
     /// Commits our cached account changes into the trie.
     pub fn commit(&mut self) -> Result<(), Error> {
+        println!("state = {:?}", self);
         // first, commit the sub trees.
         let mut accounts = self.fvm_manager.cache.borrow_mut();
-        debug!(target: "cons", "commit accounts = {:?}", accounts);
+        debug!(target: "cons", "commit fvm accounts = {:?}", accounts);
         for (address, ref mut a) in accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
+            debug!(target: "cons", "found fastvm account: {:?} at address {:?}", a, address);
             if let Some(ref mut account) = a.account {
                 let addr_hash = account.address_hash(address);
                 {
@@ -1090,8 +1095,9 @@ impl<B: Backend> State<B> {
 
         // update AVM accounts
         let mut avm_accounts = self.avm_manager.cache.borrow_mut();
-        debug!(target: "cons", "commit accounts = {:?}", accounts);
+        debug!(target: "cons", "commit avm accounts = {:?}", accounts);
         for (address, ref mut a) in avm_accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
+            debug!(target: "cons", "found avm account: {:?} at address {:?}", a, address);
             if let Some(ref mut account) = a.account {
                 let addr_hash = account.address_hash(address);
                 {
@@ -1606,7 +1612,7 @@ impl<B: Backend> State<B> {
 }
 
 impl<B: Backend> fmt::Debug for State<B> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{:?}, {:?}", self.fvm_manager.cache.borrow(), self.avm_manager.cache.borrow()) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "fvm accounts = {:?}, avm accounts = {:?}", self.fvm_manager.cache.borrow(), self.avm_manager.cache.borrow()) }
 }
 
 // TODO: cloning for `State` shouldn't be possible in general; Remove this and use

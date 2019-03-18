@@ -237,7 +237,7 @@ impl VMAccountManager<FVMAccount> {
                 let state_db = factories
                     .trie
                     .readonly(db.as_hashstore(), &root)?;
-                println!("search in database");
+                println!("search in database: {:?}", a);
                 let mut maybe_acc = state_db.get_with(a, FVMAccount::from_rlp)?;
                 if let Some(ref mut account) = maybe_acc.as_mut() {
                     if account.account_type != AccType::FVM {

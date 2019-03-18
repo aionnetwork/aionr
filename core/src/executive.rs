@@ -474,7 +474,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     transaction_hash: t.hash(),
                     original_transaction_hash: t.hash(),
                 };
-                self.call(params, &mut substate, t.transaction_type.into())
+                let tx_type :U256 = t.transaction_type.into();
+                self.call(params, &mut substate, tx_type.into())
             }
         };
 

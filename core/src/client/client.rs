@@ -1082,7 +1082,8 @@ impl Client {
                 Executive::new(state, env_info, machine).transact_virtual(transaction, false)?;
 
             if let Some(original) = original_state {
-                ret.state_diff = Some(state.diff_from(original, transaction.transaction_type.into()).map_err(ExecutionError::from)?);
+                let tx_type :U256 = transaction.transaction_type.into();
+                ret.state_diff = Some(state.diff_from(original, tx_type.into()).map_err(ExecutionError::from)?);
             }
             Ok(ret)
         }

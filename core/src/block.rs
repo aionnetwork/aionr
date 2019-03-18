@@ -661,6 +661,7 @@ fn push_transactions(
 {
     let mut tx_batch = Vec::new();
 
+    debug!(target: "vm", "transactions = {:?}, len = {:?}", transactions, transactions.len());
     for tx in transactions {
         if tx.tx_type() != AVM_TRANSACTION_TYPE {
             if tx_batch.len() >= 1 {
@@ -673,7 +674,11 @@ fn push_transactions(
         }
     }
 
-    block.apply_batch_txs(tx_batch.as_slice(), None);
+    if !tx_batch.is_empty() {
+        block.apply_batch_txs(tx_batch.as_slice(), None);
+    }
+
+    debug!(target: "vm", "push transactions done");
 
     Ok(())
 }

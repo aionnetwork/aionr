@@ -16,8 +16,8 @@ pub struct BasicAccount {
     pub storage_root: H256,
     /// Code hash of the account.
     pub code_hash: H256,
-    /// Account type: FVM or AVM
-    pub account_type: u8,
+    // Account type: FVM or AVM
+    //pub account_type: U256,
 }
 
 /// Single account in the system.

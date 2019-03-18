@@ -12,20 +12,20 @@ pub enum AccType {
     AVM,
 }
 
-impl From<u8> for AccType {
-    fn from(t: u8) -> AccType {
-        match t {
+impl From<U256> for AccType {
+    fn from(t: U256) -> AccType {
+        match t.low_u32() {
             0x01 => AccType::AVM,
             _ => AccType::FVM,
         }
     }
 }
 
-impl From<AccType> for u8 {
-    fn from(t: AccType) -> u8 {
+impl From<AccType> for U256 {
+    fn from(t: AccType) -> U256 {
         match t {
-            AccType::AVM => 0x01,
-            AccType::FVM => 0x00,
+            AccType::AVM => 0x01.into(),
+            AccType::FVM => 0x00.into(),
         }
     }
 }
@@ -117,7 +117,7 @@ pub trait VMAccount: Sync + Send {
     // /// Clone account data, dirty storage keys and cached storage keys.
     // fn clone_all(&self) -> Self;
 
-    fn acc_type(&self) -> u8;
+    fn acc_type(&self) -> U256;
 
     fn update_account_cache<B: Backend>(
         &mut self,

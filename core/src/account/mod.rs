@@ -59,7 +59,7 @@ impl From<BasicAccount> for FVMAccount {
             code_filth: Filth::Clean,
             address_hash: Cell::new(None),
             empty_but_commit: false,
-            account_type: basic.account_type.into(),
+            account_type: AccType::FVM,
         }
     }
 }
@@ -542,8 +542,9 @@ macro_rules! impl_account {
                 account
             }
 
-            fn acc_type(&self) -> u8 {
-                self.account_type.clone().into()
+            fn acc_type(&self) -> U256 {
+                //self.account_type.clone().into()
+                return 0x00.into()
             }
 
             fn update_account_cache<B: Backend>(
@@ -761,7 +762,7 @@ impl AVMAccount {
 
 impl fmt::Debug for FVMAccount {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("AVMAccount")
+        f.debug_struct("FVMAccount")
             .field("balance", &self.balance)
             .field("nonce", &self.nonce)
             .field("code", &self.code())
