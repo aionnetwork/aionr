@@ -57,7 +57,7 @@ mod event;
 mod handler;
 pub mod storage;
 
-const STATUS_REQ_INTERVAL: u64 = 5;
+const STATUS_REQ_INTERVAL: u64 = 2;
 const GET_BLOCK_HEADERS_INTERVAL: u64 = 500;
 const BLOCKS_BODIES_REQ_INTERVAL: u64 = 500;
 const STATICS_INTERVAL: u64 = 30;
@@ -76,7 +76,7 @@ impl SyncMgr {
             // status req
             StatusHandler::send_status_req();
 
-            thread::sleep(Duration::from_millis(STATUS_REQ_INTERVAL));
+            thread::sleep(Duration::from_secs(STATUS_REQ_INTERVAL));
             if SyncStorage::is_syncing() {
                 Ok(Loop::Continue(0))
             } else {
