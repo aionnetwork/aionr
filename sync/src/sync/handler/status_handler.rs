@@ -107,7 +107,6 @@ impl StatusHandler {
         node.best_block_num = best_block_num;
 
         let chain_info = SyncStorage::get_chain_info();
-        node.synced_block_num = chain_info.best_block_number;
         node.current_total_difficulty = chain_info.total_difficulty;
 
         node.target_total_difficulty = U256::from(total_difficulty);

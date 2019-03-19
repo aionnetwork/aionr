@@ -102,7 +102,7 @@ impl SyncMgr {
         let blocks_bodies_req_task = loop_fn(0, |counter| {
             // blocks bodies req
             if let Some(ref mut node) = P2pMgr::get_an_alive_node() {
-                BlockBodiesHandler::send_blocks_bodies_req(node);
+                BlockBodiesHandler::get_blocks_bodies(node);
             }
             thread::sleep(Duration::from_millis(BLOCKS_BODIES_REQ_INTERVAL));
 
@@ -156,15 +156,15 @@ impl SyncMgr {
 
         let statics_task = Interval::new(Instant::now(), Duration::from_secs(STATICS_INTERVAL))
             .for_each(move |_| {
-                let connected_nodes = P2pMgr::get_nodes(CONNECTED);
-                for node in connected_nodes.iter() {
-                    if node.last_request_timestamp + Duration::from_secs(STATICS_INTERVAL * 12)
-                        < SystemTime::now()
-                    {
-                        info!(target: "sync", "Disconnect with idle node: {}@{}.", node.get_node_id(), node.get_ip_addr());
-                        P2pMgr::remove_peer(node.node_hash);
-                    }
-                }
+                // let connected_nodes = P2pMgr::get_nodes(CONNECTED);
+                // for node in connected_nodes.iter() {
+                //     if node.last_request_timestamp + Duration::from_secs(STATICS_INTERVAL * 12)
+                //         < SystemTime::now()
+                //     {
+                //         info!(target: "sync", "Disconnect with idle node: {}@{}.", node.get_node_id(), node.get_ip_addr());
+                //         P2pMgr::remove_peer(node.node_hash);
+                //     }
+                // }
 
                 let chain_info = SyncStorage::get_chain_info();
                 let block_number_last_time = SyncStorage::get_synced_block_number_last_time();
@@ -174,7 +174,7 @@ impl SyncMgr {
                 let active_nodes_count = active_nodes.len();
 
                 info!(target: "sync", "{:=^127}", " Sync Statics ");
-                info!(target: "sync", "Best block number: {}, hash: {}", chain_info.best_block_number, chain_info.best_block_hash);
+                info!(target: "sync", "Best block number: {}, hash: {}, total difficulty: {}", chain_info.best_block_number, chain_info.best_block_hash, chain_info.total_difficulty);
                 info!(target: "sync", "Network Best block number: {}, hash: {}", SyncStorage::get_network_best_block_number(), SyncStorage::get_network_best_block_hash());
                 info!(target: "sync", "Max staged block number: {}", SyncStorage::get_max_staged_block_number());
                 info!(target: "sync", "Sync speed: {} blks/sec", sync_speed);

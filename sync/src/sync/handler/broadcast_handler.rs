@@ -19,12 +19,13 @@
  *
  ******************************************************************************/
 
-use acore::client::{BlockChainClient, BlockId, BlockImportError};
+use acore::client::{BlockChainClient, BlockId, BlockImportError, BlockStatus};
 use acore::error::{BlockError, ImportError};
 use acore::header::Header as BlockHeader;
 use acore::transaction::UnverifiedTransaction;
 use aion_types::H256;
 use bytes::BufMut;
+use kvdb::DBTransaction;
 use rlp::{RlpStream, UntrustedRlp};
 use std::sync::Arc;
 use std::thread;
@@ -94,7 +95,19 @@ impl BroadcastsHandler {
             req.head.ctrl = Control::SYNC.value();
             req.head.action = SyncAction::BROADCASTBLOCK.value();
 
-            if let Some(block_rlp) = client.block(BlockId::Hash(block_hash.clone())) {
+            let header_chain = SyncStorage::get_block_header_chain();
+            if let Some(block_rlp) = client.block(BlockId::Hash(*block_hash)) {
+                let header = block_rlp.header();
+                if header_chain.status(&header.parent_hash()) == BlockStatus::InChain {
+                    if header_chain.status(block_hash) != BlockStatus::InChain {
+                        let mut tx = DBTransaction::new();
+                        if let Ok(pending) = header_chain.insert(&mut tx, &header, None) {
+                            header_chain.apply_pending(tx, pending);
+                            info!(target: "sync", "New block header #{} - {}, imported from local.", header.number(), block_hash);
+                        }
+                    }
+                }
+
                 req.body.put_slice(&block_rlp.into_inner());
 
                 req.head.len = req.body.len() as u32;
@@ -132,6 +145,17 @@ impl BroadcastsHandler {
                 }
 
                 let parent_hash = header.parent_hash();
+                let header_chain = SyncStorage::get_block_header_chain();
+                if header_chain.status(&parent_hash) == BlockStatus::InChain {
+                    if header_chain.status(&hash) != BlockStatus::InChain {
+                        let mut tx = DBTransaction::new();
+                        if let Ok(pending) = header_chain.insert(&mut tx, &header.encoded(), None) {
+                            header_chain.apply_pending(tx, pending);
+                            info!(target: "sync", "New block header #{} - {}, imported from {}@{}.", header.number(), hash, node.get_node_id(), node.get_ip_addr());
+                        }
+                    }
+                }
+
                 let client = SyncStorage::get_block_chain();
                 match client.block_header(BlockId::Hash(*parent_hash)) {
                     Some(_) => {
