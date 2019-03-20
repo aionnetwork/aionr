@@ -377,9 +377,7 @@ impl Sync {
         let header_chain_info = header_chain.chain_info();
         let best_header_number = header_chain_info.best_block_number;
         let best_block_number = SyncStorage::get_synced_block_number();
-        if best_header_number >= best_block_number {
-            SyncStorage::set_requested_block_number_last_time(best_header_number);
-        } else {
+        if best_header_number < best_block_number {
             let block_chain = SyncStorage::get_block_chain();
             for number in 1..best_block_number {
                 if let Some(ref header) = block_chain.block_header(BlockId::Number(number)) {
