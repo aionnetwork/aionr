@@ -79,6 +79,8 @@ impl BlockBodiesHandler {
                         number += 1;
                     }
                 }
+            } else {
+                number += 1;
             }
         }
 

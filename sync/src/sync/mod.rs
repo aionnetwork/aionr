@@ -233,9 +233,6 @@ impl SyncMgr {
                         SyncStorage::get_chain_info().best_block_number,
                     );
 
-                    info!(target: "sync", "clear_queue!!!!!!!!!!!!!!!!!!!!!!!");
-                    // P2pMgr::reset();
-
                     SyncStorage::clear_staged_blocks();
                     SyncStorage::set_max_staged_block_number(0);
                 }
