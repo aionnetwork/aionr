@@ -124,7 +124,7 @@ impl P2pMgr {
     }
 
     pub fn create_client(mut peer_node: Node, handle: fn(node: &mut Node, req: ChannelBuffer)) {
-        info!(target: "net", "Try to connect to node {}", peer_node.get_ip_addr());
+        debug!(target: "net", "Try to connect to node {}", peer_node.get_ip_addr());
         let peer_ip = peer_node.get_ip();
         if P2pMgr::is_black_ip(&peer_ip) {
             return;

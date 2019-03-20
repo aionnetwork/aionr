@@ -392,7 +392,7 @@ impl Sync {
                             let mut tx = DBTransaction::new();
                             if let Ok(pending) = header_chain.insert(&mut tx, header, None) {
                                 header_chain.apply_pending(tx, pending);
-                                trace!(target: "sync", "New block header #{} - {} imported.", number, hash);
+                                info!(target: "sync", "New block header #{} - {} imported.", number, hash);
                             }
                         }
                     }

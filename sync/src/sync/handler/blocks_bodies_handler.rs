@@ -40,8 +40,7 @@ impl BlockBodiesHandler {
             return;
         }
 
-        if SyncStorage::get_synced_block_number() + 4
-            > SyncStorage::get_network_best_block_number()
+        if SyncStorage::get_synced_block_number() + 2 > SyncStorage::get_network_best_block_number()
         {
             return;
         }
@@ -67,7 +66,7 @@ impl BlockBodiesHandler {
                 headers.push(hash);
 
                 if headers.len() == REQUEST_SIZE as usize {
-                    info!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - REQUEST_SIZE, number);
+                    trace!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - REQUEST_SIZE, number);
                     Self::send_blocks_bodies_req(node, headers);
                     return;
                 } else {
@@ -84,7 +83,7 @@ impl BlockBodiesHandler {
         }
 
         if headers.len() > 0 {
-            info!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - headers.len() as u64, number);
+            trace!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - headers.len() as u64, number);
             Self::send_blocks_bodies_req(node, headers);
         }
     }
@@ -158,7 +157,7 @@ impl BlockBodiesHandler {
     }
 
     pub fn handle_blocks_bodies_res(node: &mut Node, req: ChannelBuffer) {
-        info!(target: "sync", "BLOCKSBODIESRES received from: {}.", node.get_ip_addr());
+        trace!(target: "sync", "BLOCKSBODIESRES received from: {}.", node.get_ip_addr());
 
         let node_hash = node.node_hash;
 
@@ -179,7 +178,6 @@ impl BlockBodiesHandler {
                         for i in 0..count {
                             let hash = hashes[i];
                             let status = block_chain.block_status(BlockId::Hash(hash));
-                            info!(target: "sync", "meiyou {}, #{:?} - {} status: {:?}", node.get_ip_addr(), block_chain.block_number(BlockId::Hash(hash)), hash, status);
                             if status == BlockStatus::Unknown {
                                 if let Some(header) = header_chain.block_header(BlockId::Hash(hash))
                                 {
@@ -195,7 +193,6 @@ impl BlockBodiesHandler {
                                             SyncStorage::insert_requested_time(hash);
                                             let result =
                                                 block_chain.import_block(block.as_raw().to_vec());
-                                            info!(target: "sync", "Imported result: {:?}", result);
                                             match result {
                                                 Ok(_) => {
                                                     node.inc_reputation(2);
@@ -222,24 +219,17 @@ impl BlockBodiesHandler {
                                                         error!(target: "sync", "Invalid peer {}@{} !!!", node.get_ip_addr(), node.get_node_id());
                                                         P2pMgr::remove_peer(node.node_hash);
                                                     } else {
-                                                        info!(target: "sync", "hash {}, number {}, parent_hash {}", hash, number, parent_hash);
-
                                                         if let Some(parent_header) = header_chain
                                                             .block_header(BlockId::Hash(
                                                                 parent_hash,
                                                             )) {
-                                                            info!(target: "sync", "{:?}", parent_header);
-
                                                             if number > 1 {
                                                                 Self::send_blocks_bodies_req(
                                                                     node,
                                                                     vec![parent_hash],
                                                                 );
                                                             }
-                                                        } else {
-                                                            info!(target: "sync", "meiyou !!!!!!!!!!!!");
                                                         }
-                                                        info!(target: "sync", "node.target_total_difficulty {}, network_total_diff {}", node.target_total_difficulty, SyncStorage::get_network_total_diff());
                                                         SyncEvent::update_node_state(
                                                             node,
                                                             SyncEvent::OnBlockBodiesRes,
@@ -288,15 +278,10 @@ impl BlockBodiesHandler {
                                             }
                                         }
                                     }
-                                } else {
-                                    info!(target: "sync", "meiyou header");
                                 }
-                            } else {
-                                info!(target: "sync", "meiyou status error.");
                             }
                         }
                     } else {
-                        info!(target: "sync", "meiyou 1, batch_status: {:?}, queue_info: {:?}", batch_status, block_chain.queue_info());
                         if block_chain.queue_info().verifying_queue_size >= REQUEST_SIZE as usize {
                             block_chain.clear_queue();
                         }
@@ -306,13 +291,9 @@ impl BlockBodiesHandler {
                         P2pMgr::update_node(node_hash, node);
                         return;
                     }
-                } else {
-                    info!(target: "sync", "meiyou 2 {}", node.get_ip_addr());
                 }
             }
-            None => {
-                info!(target: "sync", "meiyou {}", node.get_ip_addr());
-            }
+            None => {}
         }
 
         SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesRes);
