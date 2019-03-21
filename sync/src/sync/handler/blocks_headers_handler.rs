@@ -41,7 +41,7 @@ pub struct BlockHeadersHandler;
 
 impl BlockHeadersHandler {
     pub fn get_headers(node: &mut Node, mut from: u64) {
-        if node.last_request_timestamp + Duration::from_millis(50) > SystemTime::now() {
+        if from == 0 && node.last_request_timestamp + Duration::from_millis(50) > SystemTime::now() {
             return;
         }
         if P2pMgr::get_network_config().sync_from_boot_nodes_only
@@ -170,13 +170,21 @@ impl BlockHeadersHandler {
                 if header_chain.status(parent_hash) == BlockStatus::InChain {
                     if header_chain.status(&hash) != BlockStatus::InChain {
                         let mut tx = DBTransaction::new();
-                        if let Ok(pending) = header_chain.insert(&mut tx, &header.encoded(), None) {
+                        let is_side_chain = if node.target_total_difficulty
+                            >= SyncStorage::get_network_total_diff()
+                            && number < SyncStorage::get_synced_block_number()
+                        {
+                            true
+                        } else {
+                            false
+                        };
+                        if let Ok(pending) =
+                            header_chain.insert(&mut tx, &header.encoded(), None, is_side_chain)
+                        {
                             header_chain.apply_pending(tx, pending);
                             hases.push(hash);
                             trace!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
-                            if node.target_total_difficulty >= SyncStorage::get_network_total_diff()
-                                && number < SyncStorage::get_synced_block_number()
-                            {
+                            if is_side_chain {
                                 info!(target: "sync", "Recovering from side chain..., number: {}", number);
                                 BlockHeadersHandler::get_headers(node, number + 1);
                                 break;

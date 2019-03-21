@@ -240,7 +240,7 @@ impl P2pMgr {
         if let Ok(mut sockets_map) = SOCKETS_MAP.lock() {
             match sockets_map.get(&node.node_hash) {
                 Some(_) => {
-                    warn!(target: "net", "Known node: {}, ...", node.node_hash);
+                    warn!(target: "net", "Known connected peer: {}@{}, ...", node.get_node_id(), node.get_ip_addr());
                 }
                 None => {
                     let mut active_nodes_count = P2pMgr::get_nodes_count(ALIVE);
@@ -249,10 +249,10 @@ impl P2pMgr {
                         if active_nodes_count < max_peers_num {
                             match peer_nodes.get(&node.node_hash) {
                                 Some(_) => {
-                                    warn!(target: "net", "Known node...");
+                                    warn!(target: "net", "Known peer: {}@{}, ...", node.get_node_id(), node.get_ip_addr());
                                 }
                                 None => {
-                                    trace!(target: "net", "A new peer added: {}@{}, node_hash: {}", node.get_node_id(), node.get_ip_addr(), node.node_hash);
+                                    trace!(target: "net", "New peer added: {}@{}, node_hash: {}", node.get_node_id(), node.get_ip_addr(), node.node_hash);
                                     sockets_map.insert(node.node_hash, socket);
                                     peer_nodes.insert(node.node_hash, node);
                                     return;
@@ -295,7 +295,7 @@ impl P2pMgr {
             if nodes_map.len() < max_peers_num * 2 {
                 match nodes_map.get(&node.node_hash) {
                     Some(_) => {
-                        warn!(target: "net", "Known node...");
+                        warn!(target: "net", "Known node {}@{}, ...", node.get_node_id(), node.get_ip_addr());
                     }
                     None => {
                         nodes_map.insert(node.node_hash, node);
@@ -509,7 +509,6 @@ impl P2pMgr {
         let raw_fd = socket.as_raw_fd();
         let std_stream = unsafe { StdTcpStream::from_raw_fd(raw_fd) };
         P2pMgr::add_peer(peer_node.clone(), std_stream);
-        trace!(target: "net", "A new peer added: {}", raw_fd);
 
         let mut node_hash = peer_node.node_hash;
         // process request from the incoming stream
@@ -532,6 +531,7 @@ impl P2pMgr {
         );
         let peer_ip_addr = peer_node.get_ip_addr();
         thread_pool.spawn(write.then(move |_| {
+            P2pMgr::remove_peer(node_hash);
             info!(target:"net", "Connection with {} closed.", peer_ip_addr);
 
             Ok(())
@@ -576,6 +576,7 @@ impl P2pMgr {
             rx.map_err(|()| io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")),
         );
         thread_pool.spawn(write.then(move |_| {
+            P2pMgr::remove_peer(node_hash);
             trace!(target:"net", "Connection with {:?} closed.", peer_ip);
             Ok(())
         }));

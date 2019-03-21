@@ -83,7 +83,7 @@ fn benchtest_sync_mainnet() {
             P2pMgr::get_nodes_count(1),
             active_nodes.len()
         );
-        println!("Address\t\t\tSeed\tBlock No.\tSynced No.\tMode\tLQN\tLQT");
+        println!("Address\t\t\tSeed\tBlock No.\tSynced No.\tLQN\tLQT");
         for node in active_nodes.iter() {
             let duration = node.last_request_timestamp.elapsed().unwrap();
             println!(
@@ -92,7 +92,6 @@ fn benchtest_sync_mainnet() {
                 node.is_from_boot_list,
                 node.best_block_num,
                 node.synced_block_num,
-                node.mode,
                 node.requested_block_num,
                 duration
             );

@@ -61,7 +61,7 @@ impl NetManager {
         NET_RUNTIME.set(RwLock::new(
             Builder::new()
                 .core_threads(3)
-                .name_prefix("NET-Task")
+                .name_prefix("NET-Task #")
                 .build()
                 .expect("Tokio Runtime"),
         ));

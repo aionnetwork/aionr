@@ -385,7 +385,7 @@ impl Sync {
                         let hash = header.hash();
                         if header_chain.status(&hash) != BlockStatus::InChain {
                             let mut tx = DBTransaction::new();
-                            if let Ok(pending) = header_chain.insert(&mut tx, header, None) {
+                            if let Ok(pending) = header_chain.insert(&mut tx, header, None, false) {
                                 header_chain.apply_pending(tx, pending);
                                 info!(target: "sync", "New block header #{} - {} imported.", number, hash);
                             }

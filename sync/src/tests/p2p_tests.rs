@@ -21,7 +21,7 @@
 
 use p2p::*;
 use std::{thread, time};
-use tokio::runtime::Runtime;
+use std::time::Duration;
 
 use super::common::*;
 
@@ -31,13 +31,11 @@ fn handle(node: &mut Node, req: ChannelBuffer) {
 
 #[test]
 fn test_create_server() {
-    let rt = Runtime::new().unwrap();
-    let executor_handle = rt.executor();
     let net_config = get_network_config();
 
     P2pMgr::enable(net_config);
     let server_addr = String::from("127.0.0.1:30000");
-    P2pMgr::create_server(&executor_handle, &server_addr, handle);
+    P2pMgr::create_server(server_addr, handle);
     let peer_node = Node::new_with_addr(server_addr.parse().unwrap());
     P2pMgr::create_client(peer_node, handle);
     let mut value = server_addr;
@@ -50,7 +48,7 @@ fn test_create_server() {
         P2pMgr::send(peer_node.node_hash, msg);
     }
     thread::sleep(time::Duration::from_millis(2000));
-    rt.shutdown_now();
+    P2pMgr::disable();
 }
 
 #[test]
@@ -58,6 +56,8 @@ fn test_connection() {
     let net_config = get_network_config();
 
     P2pMgr::enable(net_config);
+    thread::sleep(Duration::from_secs(8));
+    P2pMgr::disable();
 }
 
 #[test]

@@ -291,7 +291,7 @@ impl HeaderChain {
             info!(target: "chain", "created header chain : {:?}", decoded_header );
 
             let mut tx = DBTransaction::new();
-            if let Ok(pending) = chain.insert(&mut tx, &spec.genesis_header().encoded(), None) {
+            if let Ok(pending) = chain.insert(&mut tx, &spec.genesis_header().encoded(), None, false) {
                 chain.apply_pending(tx, pending);
             }
             chain
@@ -331,9 +331,10 @@ impl HeaderChain {
         transaction: &mut DBTransaction,
         header: &encoded::Header,
         transition_proof: Option<Vec<u8>>,
+        is_force_reorg: bool
     ) -> Result<PendingChanges, String>
     {
-        self.insert_inner(transaction, header, None, transition_proof)
+        self.insert_inner(transaction, header, None, transition_proof, is_force_reorg)
     }
 
     /// Insert a pre-verified header, with a known total difficulty. Similary to `insert`.
@@ -352,6 +353,7 @@ impl HeaderChain {
             header,
             Some(total_difficulty),
             transition_proof,
+            true
         )
     }
 
@@ -361,6 +363,7 @@ impl HeaderChain {
         header: &encoded::Header,
         total_difficulty: Option<U256>,
         transition_proof: Option<Vec<u8>>,
+        is_force_reorg: bool
     ) -> Result<PendingChanges, String>
     {
         let hash = header.hash();
@@ -444,7 +447,7 @@ impl HeaderChain {
 
         // reorganize ancestors so canonical entries are first in their
         // respective candidates vectors.
-        if is_new_best {
+        if is_new_best || is_force_reorg {
             let mut canon_hash = hash;
             for (&height, entry) in candidates
                 .iter_mut()
