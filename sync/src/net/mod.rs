@@ -47,8 +47,8 @@ lazy_static! {
     static ref NET_RUNTIME: Storage<RwLock<Runtime>> = Storage::new();
 }
 
-const RECONNECT_BOOT_NODES_INTERVAL: u64 = 10;
-const RECONNECT_NORMAL_NODES_INTERVAL: u64 = 1;
+const RECONNECT_BOOT_NODES_INTERVAL: u64 = 20;
+const RECONNECT_NORMAL_NODES_INTERVAL: u64 = 5;
 const NODE_ACTIVE_REQ_INTERVAL: u64 = 10;
 
 #[derive(Clone, Copy)]

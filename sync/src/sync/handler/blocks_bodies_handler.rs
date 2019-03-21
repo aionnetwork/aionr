@@ -174,8 +174,7 @@ impl BlockBodiesHandler {
                     } else {
                         item_count
                     };
-                    let batch_status =
-                        block_chain.block_status(BlockId::Hash(hashes[item_count - 1]));
+                    let batch_status = block_chain.block_status(BlockId::Hash(hashes[count - 1]));
                     if batch_status == BlockStatus::Unknown {
                         for i in 0..count {
                             let hash = hashes[i];
@@ -221,7 +220,7 @@ impl BlockBodiesHandler {
                                                         error!(target: "sync", "Invalid peer {}@{} !!!", node.get_ip_addr(), node.get_node_id());
                                                         P2pMgr::remove_peer(node.node_hash);
                                                     } else {
-                                                        if let Some(parent_header) = header_chain
+                                                        if let Some(_parent_header) = header_chain
                                                             .block_header(BlockId::Hash(
                                                                 parent_hash,
                                                             )) {
@@ -239,31 +238,30 @@ impl BlockBodiesHandler {
                                                         P2pMgr::update_node(node_hash, node);
                                                         return;
                                                         // Staging...
-                                                            /*
-                                                            if let Ok(mut staged_blocks) = SyncStorage::get_staged_blocks().lock() {
-                                                                if !staged_blocks.contains_key(&parent_hash) {
-                                                                    let mut blks = Vec::new();
-                                                                    for j in i..item_count {
-                                                                        let hash = hashes[i];
-                                                                        if let Some(header) = header_chain.block_header(BlockId::Hash(hash)) {
-                                                                            if let Ok(body) = block_bodies.at(j) {
-                                                                                if let Ok(txs) = body.at(0) {
-                                                                                    let mut data = header.into_inner();
-                                                                                    data.extend_from_slice(txs.as_raw());
-                                                                                    let mut block = RlpStream::new_list(2);
-                                                                                    block.append_raw(&data, 2);
-                                                                                    blks.push(block);
-                                                                                }
+                                                        /*
+                                                        if let Ok(mut staged_blocks) = SyncStorage::get_staged_blocks().lock() {
+                                                            if !staged_blocks.contains_key(&parent_hash) {
+                                                                let mut blks = Vec::new();
+                                                                for j in i..item_count {
+                                                                    let hash = hashes[i];
+                                                                    if let Some(header) = header_chain.block_header(BlockId::Hash(hash)) {
+                                                                        if let Ok(body) = block_bodies.at(j) {
+                                                                            if let Ok(txs) = body.at(0) {
+                                                                                let mut data = header.into_inner();
+                                                                                data.extend_from_slice(txs.as_raw());
+                                                                                let mut block = RlpStream::new_list(2);
+                                                                                block.append_raw(&data, 2);
+                                                                                blks.push(block);
                                                                             }
                                                                         }
                                                                     }
-                                                                    if !blks.is_empty() {
-                                                                        staged_blocks.insert(parent_hash, blks);
-                                                                    }
+                                                                }
+                                                                if !blks.is_empty() {
+                                                                    staged_blocks.insert(parent_hash, blks);
                                                                 }
                                                             }
-                                                            trace!(target: "sync", "Staged block #{} - {} - {}", number, hash, node.get_ip_addr());
-                                                            */                                                    }
+                                                        }
+                                                        trace!(target: "sync", "Staged block #{} - {} - {}", number, hash, node.get_ip_addr());*/                                                    }
                                                 }
                                                 Err(e) => {
                                                     if !node.is_over_repeated_threshold() {

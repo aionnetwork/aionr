@@ -39,6 +39,6 @@ impl fmt::Display for LightEvent {
 
 #[test]
 fn display_event_test() {
-    println!("SyncEvent: {}", SyncEvent::OnDeMandReq);
-    println!("SyncEvent: {}", SyncEvent::OnDeMandRes);
+    println!("SyncEvent: {}", LightEvent::OnDeMandReq);
+    println!("SyncEvent: {}", LightEvent::OnDeMandRes);
 }
