@@ -101,7 +101,7 @@ impl BroadcastsHandler {
                 if header_chain.status(&header.parent_hash()) == BlockStatus::InChain {
                     if header_chain.status(block_hash) != BlockStatus::InChain {
                         let mut tx = DBTransaction::new();
-                        if let Ok(pending) = header_chain.insert(&mut tx, &header, None, true) {
+                        if let Ok(pending) = header_chain.insert(&mut tx, &header, None, false) {
                             header_chain.apply_pending(tx, pending);
                             info!(target: "sync", "New block header #{} - {}, imported from local.", header.number(), block_hash);
                         }
@@ -149,7 +149,7 @@ impl BroadcastsHandler {
                 if header_chain.status(&parent_hash) == BlockStatus::InChain {
                     if header_chain.status(&hash) != BlockStatus::InChain {
                         let mut tx = DBTransaction::new();
-                        if let Ok(pending) = header_chain.insert(&mut tx, &header.encoded(), None, true) {
+                        if let Ok(pending) = header_chain.insert(&mut tx, &header.encoded(), None, false) {
                             header_chain.apply_pending(tx, pending);
                             info!(target: "sync", "New block header #{} - {}, imported from {}@{}.", header.number(), hash, node.get_node_id(), node.get_ip_addr());
                         }

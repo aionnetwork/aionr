@@ -41,7 +41,8 @@ pub struct BlockHeadersHandler;
 
 impl BlockHeadersHandler {
     pub fn get_headers(node: &mut Node, mut from: u64) {
-        if from == 0 && node.last_request_timestamp + Duration::from_millis(50) > SystemTime::now() {
+        if from == 0 && node.last_request_timestamp + Duration::from_millis(50) > SystemTime::now()
+        {
             return;
         }
         if P2pMgr::get_network_config().sync_from_boot_nodes_only
@@ -159,6 +160,7 @@ impl BlockHeadersHandler {
         let rlp = UntrustedRlp::new(req.body.as_slice());
         let header_chain = SyncStorage::get_block_header_chain();
         let mut hases = Vec::new();
+        let mut from = 0;
 
         for header_rlp in rlp.iter() {
             if let Ok(hd) = header_rlp.as_val() {
@@ -185,9 +187,7 @@ impl BlockHeadersHandler {
                             hases.push(hash);
                             trace!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
                             if is_side_chain {
-                                info!(target: "sync", "Recovering from side chain..., number: {}", number);
-                                BlockHeadersHandler::get_headers(node, number + 1);
-                                break;
+                                from = number + 1;
                             }
                         }
                     }
@@ -205,7 +205,6 @@ impl BlockHeadersHandler {
                             break;
                         } else {
                             P2pMgr::remove_peer(node_hash);
-                            P2pMgr::add_black_ip(node.get_ip());
                         }
                     }
                 }
@@ -225,11 +224,16 @@ impl BlockHeadersHandler {
         SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
         P2pMgr::update_node(node_hash, node);
 
-        if SyncStorage::get_synced_block_number() + 128
-            < SyncStorage::get_network_best_block_number()
-        {
-            if let Some(ref mut peer_node) = P2pMgr::get_an_active_node() {
-                BlockHeadersHandler::get_headers(peer_node, 0);
+        if from > 0 {
+            info!(target: "sync", "Recovering from side chain..., number: {}", from);
+            BlockHeadersHandler::get_headers(node, from);
+        } else {
+            if SyncStorage::get_synced_block_number() + 128
+                < SyncStorage::get_network_best_block_number()
+            {
+                if let Some(ref mut peer_node) = P2pMgr::get_an_active_node() {
+                    BlockHeadersHandler::get_headers(peer_node, 0);
+                }
             }
         }
     }
