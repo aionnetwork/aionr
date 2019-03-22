@@ -26,7 +26,7 @@ use std::fs;
 use std::io::{BufRead,BufReader};
 
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
-use acore::client::{BlockChainClient, Client, DatabaseCompactionProfile, VMType};
+use acore::client::{Client, DatabaseCompactionProfile, VMType};
 use acore::miner::external::ExternalMiner;
 use acore::miner::{Miner, MinerOptions, MinerService};
 use acore::miner::{Stratum, StratumOptions};
@@ -297,7 +297,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // create sync object
     let sync_params = Params {
         config: SyncConfig::default(),
-        client: client.clone() as Arc<BlockChainClient>,
+        client: client.clone(),
         network_config: net_conf,
         spec: spec,
         db: service.db().clone(),

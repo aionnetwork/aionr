@@ -96,19 +96,21 @@ impl BroadcastsHandler {
             req.head.action = SyncAction::BROADCASTBLOCK.value();
 
             let header_chain = SyncStorage::get_block_header_chain();
-            if let Some(block_rlp) = client.block(BlockId::Hash(*block_hash)) {
-                let header = block_rlp.header();
+            if let Some(block) = client.block(BlockId::Hash(*block_hash)) {
+                let header = block.header();
                 if header_chain.status(&header.parent_hash()) == BlockStatus::InChain {
                     if header_chain.status(block_hash) != BlockStatus::InChain {
                         let mut tx = DBTransaction::new();
                         if let Ok(pending) = header_chain.insert(&mut tx, &header, None, false) {
                             header_chain.apply_pending(tx, pending);
-                            info!(target: "sync", "New block header #{} - {}, imported from local.", header.number(), block_hash);
+                            trace!(target: "sync", "New block header #{} - {}, imported from local.", header.number(), block_hash);
                         }
                     }
                 }
-
-                req.body.put_slice(&block_rlp.into_inner());
+                trace!(target: "sync",
+                            "New block #{} {}, with {} txs added in chain from local.",
+                            header.number(), block_hash, block.transactions_count());
+                req.body.put_slice(&block.into_inner());
 
                 req.head.len = req.body.len() as u32;
 
@@ -149,9 +151,11 @@ impl BroadcastsHandler {
                 if header_chain.status(&parent_hash) == BlockStatus::InChain {
                     if header_chain.status(&hash) != BlockStatus::InChain {
                         let mut tx = DBTransaction::new();
-                        if let Ok(pending) = header_chain.insert(&mut tx, &header.encoded(), None, false) {
+                        if let Ok(pending) =
+                            header_chain.insert(&mut tx, &header.encoded(), None, false)
+                        {
                             header_chain.apply_pending(tx, pending);
-                            info!(target: "sync", "New block header #{} - {}, imported from {}@{}.", header.number(), hash, node.get_node_id(), node.get_ip_addr());
+                            trace!(target: "sync", "New block header #{} - {}, imported from {}@{}.", header.number(), hash, node.get_node_id(), node.get_ip_addr());
                         }
                     }
                 }
@@ -159,6 +163,7 @@ impl BroadcastsHandler {
                 let client = SyncStorage::get_block_chain();
                 match client.block_header(BlockId::Hash(*parent_hash)) {
                     Some(_) => {
+                        SyncStorage::insert_requested_time(hash);
                         let result = client.import_block(block_rlp.as_raw().to_vec());
 
                         match result {

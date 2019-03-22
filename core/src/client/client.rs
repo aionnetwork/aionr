@@ -1148,7 +1148,7 @@ impl Client {
             // delete col_headers && col_boides
             let hash = self
                 .block_hash(BlockId::Number(blk))
-                .expect("can not found block , db may crashed");
+                .expect(&format!("can not found block #{} , db may crashed", blk));
             batch.delete(::db::COL_HEADERS, &hash);
             batch.delete(::db::COL_BODIES, &hash);
             // delete col_extra

@@ -18,7 +18,7 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use acore::client::{BlockId, BlockImportError, BlockStatus};
+use acore::client::{BlockChainClient, BlockId, BlockImportError, BlockStatus};
 use acore::error::{BlockError, ImportError};
 use aion_types::H256;
 use bytes::BufMut;
@@ -28,6 +28,7 @@ use super::super::action::SyncAction;
 use super::super::event::SyncEvent;
 use super::super::storage::SyncStorage;
 use p2p::*;
+use super::super::SyncMgr;
 
 const HASH_LEN: usize = 32;
 const REQUEST_SIZE: u64 = 96;
@@ -56,7 +57,7 @@ impl BlockBodiesHandler {
         } else {
             number = best_block_number - 1;
         }
-
+        info!(target: "sync", "send_blocks_bodies_req, {} - {} - {} - {} - {}.", node.best_block_num, SyncStorage::get_synced_block_number(), SyncStorage::get_network_best_block_number(), number, best_header_number);
         if number == best_header_number {
             return;
         }
@@ -66,7 +67,7 @@ impl BlockBodiesHandler {
                 headers.push(hash);
 
                 if headers.len() == REQUEST_SIZE as usize {
-                    trace!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - REQUEST_SIZE, number);
+                    info!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - REQUEST_SIZE, number);
                     Self::send_blocks_bodies_req(node, headers);
                     return;
                 } else {
@@ -85,8 +86,10 @@ impl BlockBodiesHandler {
         }
 
         if headers.len() > 0 {
-            trace!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - headers.len() as u64, number);
+            info!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - headers.len() as u64, number);
             Self::send_blocks_bodies_req(node, headers);
+        } else {
+            info!(target: "sync", "send_blocks_bodies_req, {} - {}.", best_header_number, best_block_number);
         }
     }
 
@@ -159,7 +162,7 @@ impl BlockBodiesHandler {
     }
 
     pub fn handle_blocks_bodies_res(node: &mut Node, req: ChannelBuffer) {
-        trace!(target: "sync", "BLOCKSBODIESRES received from: {}.", node.get_ip_addr());
+        info!(target: "sync", "BLOCKSBODIESRES received from: {}.", node.get_ip_addr());
 
         let node_hash = node.node_hash;
 
@@ -206,7 +209,7 @@ impl BlockBodiesHandler {
                                                     ImportError::AlreadyQueued,
                                                 )) => {
                                                     node.inc_reputation(1);
-                                                    trace!(target: "sync", "Skipped block #{} - {} - {}", number, hash, node.get_ip_addr());
+                                                    info!(target: "sync", "Skipped block #{} - {} - {}", number, hash, node.get_ip_addr());
                                                 }
                                                 Err(BlockImportError::Block(
                                                     BlockError::UnknownParent(_),
@@ -225,11 +228,15 @@ impl BlockBodiesHandler {
                                                                 parent_hash,
                                                             )) {
                                                             if number > 1 {
+                                                                error!(target: "sync", "block : #{} - {}", number - 1, parent_hash);
                                                                 Self::send_blocks_bodies_req(
                                                                     node,
                                                                     vec![parent_hash],
                                                                 );
                                                             }
+                                                        } else {
+                                                            SyncMgr::build_header_chain(number);
+                                                            info!(target: "sync", "Attempting build header chain based on #{} - {}.", number, hash);
                                                         }
                                                         SyncEvent::update_node_state(
                                                             node,
@@ -283,7 +290,7 @@ impl BlockBodiesHandler {
                         }
                     } else {
                         if block_chain.queue_info().verifying_queue_size >= REQUEST_SIZE as usize {
-                            block_chain.clear_queue();
+                            block_chain.flush_queue();
                         }
                         block_chain.clear_bad();
 

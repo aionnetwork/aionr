@@ -22,17 +22,25 @@
 
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
-use std::time::{self, Duration, Instant};
 use std::thread;
+use std::time::{self, Duration, Instant};
 
 use account_provider::AccountProvider;
 use aion_types::{Address, H256, U256};
 use ansi_term::Colour;
+use block::{Block, ClosedBlock, IsBlock};
 use bytes::Bytes;
+use client::{BlockId, MiningBlockChainClient, TransactionId};
 use engines::{EthEngine, Seal};
 use error::*;
+use executive::contract_address;
+use header::{BlockNumber, Header};
+use io::IoChannel;
 use miner::{MinerService, MinerStatus, NotifyWork};
 use parking_lot::{Mutex, RwLock};
+use receipt::{Receipt, RichReceipt};
+use spec::Spec;
+use state::State;
 use transaction::banning_queue::{BanningTransactionQueue, Threshold};
 use transaction::local_transactions::{Status as LocalTransactionStatus, TxIoMessage};
 use transaction::transaction_queue::{
@@ -46,14 +54,6 @@ use transaction::{
     UnverifiedTransaction,
 };
 use using_queue::{GetAction, UsingQueue};
-use block::{ClosedBlock, IsBlock, Block};
-use client::{MiningBlockChainClient, BlockId, TransactionId};
-use executive::contract_address;
-use header::{Header, BlockNumber};
-use io::IoChannel;
-use receipt::{Receipt, RichReceipt};
-use spec::Spec;
-use state::State;
 
 /// Different possible definitions for pending transaction set.
 #[derive(Debug, PartialEq)]
@@ -187,8 +187,7 @@ impl Miner {
         spec: &Spec,
         accounts: Option<Arc<AccountProvider>>,
         message_channel: IoChannel<TxIoMessage>,
-    ) -> Arc<Miner>
-    {
+    ) -> Arc<Miner> {
         Arc::new(Miner::new_raw(options, spec, accounts, message_channel))
     }
 
@@ -198,8 +197,7 @@ impl Miner {
         spec: &Spec,
         accounts: Option<Arc<AccountProvider>>,
         message_channel: IoChannel<TxIoMessage>,
-    ) -> Miner
-    {
+    ) -> Miner {
         let mem_limit = options
             .tx_queue_memory_limit
             .unwrap_or_else(usize::max_value);
@@ -244,7 +242,9 @@ impl Miner {
     }
 
     /// get the interval to prepare a new / update an existing block
-    pub fn prepare_block_interval(&self) -> Duration { self.options.prepare_block_interval.clone() }
+    pub fn prepare_block_interval(&self) -> Duration {
+        self.options.prepare_block_interval.clone()
+    }
 
     /// Replace tx message channel. Useful for testing.
     pub fn set_tx_message_channel(&self, tx_message: IoChannel<TxIoMessage>) {
@@ -271,14 +271,15 @@ impl Miner {
     }
 
     /// Clear all pending block states
-    pub fn clear(&self) { self.sealing_work.lock().queue.reset(); }
+    pub fn clear(&self) {
+        self.sealing_work.lock().queue.reset();
+    }
 
     /// Get `Some` `clone()` of the current pending block's state or `None` if we're not sealing.
     pub fn pending_state(
         &self,
         latest_block_number: BlockNumber,
-    ) -> Option<State<::state_db::StateDB>>
-    {
+    ) -> Option<State<::state_db::StateDB>> {
         self.map_pending_block(|b| b.state().clone(), latest_block_number)
     }
 
@@ -298,7 +299,9 @@ impl Miner {
     }
 
     fn map_pending_block<F, T>(&self, f: F, latest_block_number: BlockNumber) -> Option<T>
-    where F: FnOnce(&ClosedBlock) -> T {
+    where
+        F: FnOnce(&ClosedBlock) -> T,
+    {
         self.from_pending_block(latest_block_number, || None, |block| Some(f(block)))
     }
 
@@ -386,8 +389,7 @@ impl Miner {
                 Banning::Enabled {
                     ref offend_threshold,
                     ..
-                }
-                    if &took > offend_threshold =>
+                } if &took > offend_threshold =>
                 {
                     match self.transaction_queue.write().ban_transaction(&hash) {
                         true => {
@@ -423,10 +425,7 @@ impl Miner {
                 }
                 // Invalid nonce error can happen only if previous transaction is skipped because of gas limit.
                 // If there is errornous state of transaction queue it will be fixed when next block is imported.
-                Err(Error::Execution(ExecutionError::InvalidNonce {
-                    expected,
-                    got,
-                })) => {
+                Err(Error::Execution(ExecutionError::InvalidNonce { expected, got })) => {
                     debug!(target: "block", "Skipping adding transaction to block because of invalid nonce: {:?} (expected: {:?}, got: {:?})", hash, expected, got);
                 }
                 // already have transaction - ignore
@@ -515,8 +514,7 @@ impl Miner {
         &self,
         client: &MiningBlockChainClient,
         block: ClosedBlock,
-    ) -> bool
-    {
+    ) -> bool {
         if !block.transactions().is_empty()
             || self.forced_sealing()
             || Instant::now() > *self.next_mandatory_reseal.read()
@@ -666,8 +664,7 @@ impl Miner {
         &self,
         client: &MiningBlockChainClient,
         transaction: SignedTransaction,
-    ) -> Result<SignedTransaction, Error>
-    {
+    ) -> Result<SignedTransaction, Error> {
         // Verify basic gas limit
         let basic_gas: U256 = transaction.gas_required();
         if transaction.gas < basic_gas {
@@ -713,8 +710,7 @@ impl Miner {
         &self,
         client: &MiningBlockChainClient,
         transaction: UnverifiedTransaction,
-    ) -> Result<SignedTransaction, Error>
-    {
+    ) -> Result<SignedTransaction, Error> {
         let hash = transaction.hash();
         let best_block_header = client.best_block_header().decode();
         if client
@@ -770,8 +766,7 @@ impl Miner {
         transaction: SignedTransaction,
         default_origin: TransactionOrigin,
         condition: Option<TransactionCondition>,
-    ) -> Result<TransactionImportResult, Error>
-    {
+    ) -> Result<TransactionImportResult, Error> {
         let insertion_time = client.chain_info().best_block_number;
         let origin = self
             .accounts
@@ -789,21 +784,15 @@ impl Miner {
         // Be sure to release the lock before we call prepare_work_sealing
         let mut transaction_queue = self.transaction_queue.write();
         let result = match origin {
-            TransactionOrigin::Local | TransactionOrigin::RetractedBlock => {
-                transaction_queue.add(
-                    transaction,
-                    origin,
-                    insertion_time,
-                    condition,
-                    &details_provider,
-                )?
-            }
+            TransactionOrigin::Local | TransactionOrigin::RetractedBlock => transaction_queue.add(
+                transaction,
+                origin,
+                insertion_time,
+                condition,
+                &details_provider,
+            )?,
             TransactionOrigin::External => {
-                transaction_queue.add_with_banlist(
-                    transaction,
-                    insertion_time,
-                    &details_provider,
-                )?
+                transaction_queue.add_with_banlist(transaction, insertion_time, &details_provider)?
             }
         };
         debug!(target: "rpc_tx", "{:?} tx finished importing [{:?}]", thread::current().id(), time::Instant::now());
@@ -835,7 +824,9 @@ impl Miner {
     // }
 
     /// Are we allowed to do a non-mandatory reseal?
-    fn tx_reseal_allowed(&self) -> bool { Instant::now() > *self.next_allowed_reseal.lock() }
+    fn tx_reseal_allowed(&self) -> bool {
+        Instant::now() > *self.next_allowed_reseal.lock()
+    }
 
     fn from_pending_block<H, F, G>(
         &self,
@@ -894,26 +885,38 @@ impl MinerService for Miner {
         *self.author.write() = author;
     }
 
-    fn set_extra_data(&self, extra_data: Bytes) { *self.extra_data.write() = extra_data; }
+    fn set_extra_data(&self, extra_data: Bytes) {
+        *self.extra_data.write() = extra_data;
+    }
 
     /// Set the gas limit we wish to target when sealing a new block.
-    fn set_gas_floor_target(&self, target: U256) { self.gas_range_target.write().0 = target; }
+    fn set_gas_floor_target(&self, target: U256) {
+        self.gas_range_target.write().0 = target;
+    }
 
-    fn set_gas_ceil_target(&self, target: U256) { self.gas_range_target.write().1 = target; }
+    fn set_gas_ceil_target(&self, target: U256) {
+        self.gas_range_target.write().1 = target;
+    }
 
     fn set_minimal_gas_price(&mut self, min_gas_price: U256) {
         self.options.minimal_gas_price = min_gas_price;
     }
 
-    fn minimal_gas_price(&self) -> U256 { self.options.minimal_gas_price }
+    fn minimal_gas_price(&self) -> U256 {
+        self.options.minimal_gas_price
+    }
 
     fn set_maximal_gas_price(&mut self, max_gas_price: U256) {
         self.options.maximal_gas_price = max_gas_price;
     }
 
-    fn maximal_gas_price(&self) -> U256 { self.options.maximal_gas_price }
+    fn maximal_gas_price(&self) -> U256 {
+        self.options.maximal_gas_price
+    }
 
-    fn local_maximal_gas_price(&self) -> U256 { self.options.local_max_gas_price }
+    fn local_maximal_gas_price(&self) -> U256 {
+        self.options.local_max_gas_price
+    }
 
     fn set_local_maximal_gas_price(&mut self, local_max_gas_price: U256) {
         self.options.local_max_gas_price = local_max_gas_price;
@@ -926,31 +929,44 @@ impl MinerService for Miner {
 
     // fn sensible_gas_limit(&self) -> U256 { self.gas_range_target.read().0 / 5.into() }
 
-    fn default_gas_limit(&self) -> U256 { 2_000_000.into() }
+    fn default_gas_limit(&self) -> U256 {
+        2_000_000.into()
+    }
 
-    fn set_tx_gas_limit(&mut self, limit: U256) { self.options.tx_gas_limit = limit; }
+    fn set_tx_gas_limit(&mut self, limit: U256) {
+        self.options.tx_gas_limit = limit;
+    }
 
-    fn tx_gas_limit(&self) -> U256 { self.options.tx_gas_limit }
+    fn tx_gas_limit(&self) -> U256 {
+        self.options.tx_gas_limit
+    }
 
     /// Get the author that we will seal blocks as.
-    fn author(&self) -> Address { *self.author.read() }
+    fn author(&self) -> Address {
+        *self.author.read()
+    }
 
     /// Get the extra_data that we will seal blocks with.
-    fn extra_data(&self) -> Bytes { self.extra_data.read().clone() }
+    fn extra_data(&self) -> Bytes {
+        self.extra_data.read().clone()
+    }
 
     /// Get the gas limit we wish to target when sealing a new block.
-    fn gas_floor_target(&self) -> U256 { self.gas_range_target.read().0 }
+    fn gas_floor_target(&self) -> U256 {
+        self.gas_range_target.read().0
+    }
 
     /// Get the gas limit we wish to target when sealing a new block.
-    fn gas_ceil_target(&self) -> U256 { self.gas_range_target.read().1 }
+    fn gas_ceil_target(&self) -> U256 {
+        self.gas_range_target.read().1
+    }
 
     /// Verify and import external transactions to transaction queue
     fn import_external_transactions(
         &self,
         client: &MiningBlockChainClient,
         transactions: Vec<UnverifiedTransaction>,
-    ) -> Vec<Result<TransactionImportResult, Error>>
-    {
+    ) -> Vec<Result<TransactionImportResult, Error>> {
         trace!(target: "client", "Importing external transactions");
         let mut is_imported: bool = false;
 
@@ -984,8 +1000,7 @@ impl MinerService for Miner {
         &self,
         client: &MiningBlockChainClient,
         pending: PendingTransaction,
-    ) -> Result<TransactionImportResult, Error>
-    {
+    ) -> Result<TransactionImportResult, Error> {
         trace!(target: "own_tx", "Importing transaction: {:?}", pending);
         debug!(target: "rpc_tx", "{:?} tx start importing [{:?}]", thread::current().id(), time::Instant::now());
 
@@ -1056,37 +1071,32 @@ impl MinerService for Miner {
         &self,
         best_block: BlockNumber,
         best_block_timestamp: u64,
-    ) -> Vec<PendingTransaction>
-    {
+    ) -> Vec<PendingTransaction> {
         let queue = self.transaction_queue.read();
         match self.options.pending_set {
             PendingSet::AlwaysQueue => queue.pending_transactions(best_block, best_block_timestamp),
-            PendingSet::SealingOrElseQueue => {
-                self.from_pending_block(
-                    best_block,
-                    || queue.pending_transactions(best_block, best_block_timestamp),
-                    |sealing| {
-                        sealing
-                            .transactions()
-                            .iter()
-                            .map(|t| t.clone().into())
-                            .collect()
-                    },
-                )
-            }
-            PendingSet::AlwaysSealing => {
-                self.from_pending_block(
-                    best_block,
-                    || vec![],
-                    |sealing| {
-                        sealing
-                            .transactions()
-                            .iter()
-                            .map(|t| t.clone().into())
-                            .collect()
-                    },
-                )
-            }
+            PendingSet::SealingOrElseQueue => self.from_pending_block(
+                best_block,
+                || queue.pending_transactions(best_block, best_block_timestamp),
+                |sealing| {
+                    sealing
+                        .transactions()
+                        .iter()
+                        .map(|t| t.clone().into())
+                        .collect()
+                },
+            ),
+            PendingSet::AlwaysSealing => self.from_pending_block(
+                best_block,
+                || vec![],
+                |sealing| {
+                    sealing
+                        .transactions()
+                        .iter()
+                        .map(|t| t.clone().into())
+                        .collect()
+                },
+            ),
         }
     }
 
@@ -1094,20 +1104,16 @@ impl MinerService for Miner {
         let queue = self.transaction_queue.read();
         match self.options.pending_set {
             PendingSet::AlwaysQueue => queue.pending_hashes(),
-            PendingSet::SealingOrElseQueue => {
-                self.from_pending_block(
-                    best_block,
-                    || queue.pending_hashes(),
-                    |sealing| sealing.transactions().iter().map(|t| t.hash()).collect(),
-                )
-            }
-            PendingSet::AlwaysSealing => {
-                self.from_pending_block(
-                    best_block,
-                    || vec![],
-                    |sealing| sealing.transactions().iter().map(|t| t.hash()).collect(),
-                )
-            }
+            PendingSet::SealingOrElseQueue => self.from_pending_block(
+                best_block,
+                || queue.pending_hashes(),
+                |sealing| sealing.transactions().iter().map(|t| t.hash()).collect(),
+            ),
+            PendingSet::AlwaysSealing => self.from_pending_block(
+                best_block,
+                || vec![],
+                |sealing| sealing.transactions().iter().map(|t| t.hash()).collect(),
+            ),
         }
     }
 
@@ -1115,34 +1121,30 @@ impl MinerService for Miner {
         let queue = self.transaction_queue.read();
         match self.options.pending_set {
             PendingSet::AlwaysQueue => queue.find(hash),
-            PendingSet::SealingOrElseQueue => {
-                self.from_pending_block(
-                    best_block,
-                    || queue.find(hash),
-                    |sealing| {
-                        sealing
-                            .transactions()
-                            .iter()
-                            .find(|t| &t.hash() == hash)
-                            .cloned()
-                            .map(Into::into)
-                    },
-                )
-            }
-            PendingSet::AlwaysSealing => {
-                self.from_pending_block(
-                    best_block,
-                    || None,
-                    |sealing| {
-                        sealing
-                            .transactions()
-                            .iter()
-                            .find(|t| &t.hash() == hash)
-                            .cloned()
-                            .map(Into::into)
-                    },
-                )
-            }
+            PendingSet::SealingOrElseQueue => self.from_pending_block(
+                best_block,
+                || queue.find(hash),
+                |sealing| {
+                    sealing
+                        .transactions()
+                        .iter()
+                        .find(|t| &t.hash() == hash)
+                        .cloned()
+                        .map(Into::into)
+                },
+            ),
+            PendingSet::AlwaysSealing => self.from_pending_block(
+                best_block,
+                || None,
+                |sealing| {
+                    sealing
+                        .transactions()
+                        .iter()
+                        .find(|t| &t.hash() == hash)
+                        .cloned()
+                        .map(Into::into)
+                },
+            ),
         }
     }
 
@@ -1150,8 +1152,7 @@ impl MinerService for Miner {
         &self,
         chain: &MiningBlockChainClient,
         hash: &H256,
-    ) -> Option<PendingTransaction>
-    {
+    ) -> Option<PendingTransaction> {
         let mut queue = self.transaction_queue.write();
         let tx = queue.find(hash);
         if tx.is_some() {
@@ -1213,7 +1214,9 @@ impl MinerService for Miner {
         self.transaction_queue.read().last_nonce(address)
     }
 
-    fn can_produce_work_package(&self) -> bool { self.engine.seals_internally().is_none() }
+    fn can_produce_work_package(&self) -> bool {
+        self.engine.seals_internally().is_none()
+    }
 
     /// Update sealing if required.
     /// Prepare the block and work if the Engine does not seal internally.
@@ -1246,10 +1249,14 @@ impl MinerService for Miner {
         }
     }
 
-    fn is_currently_sealing(&self) -> bool { self.sealing_work.lock().queue.is_in_use() }
+    fn is_currently_sealing(&self) -> bool {
+        self.sealing_work.lock().queue.is_in_use()
+    }
 
     fn map_sealing_work<F, T>(&self, client: &MiningBlockChainClient, f: F) -> Option<T>
-    where F: FnOnce(&ClosedBlock) -> T {
+    where
+        F: FnOnce(&ClosedBlock) -> T,
+    {
         trace!(target: "miner", "map_sealing_work: entering");
         self.prepare_work_sealing(client);
         trace!(target: "miner", "map_sealing_work: sealing prepared");
@@ -1264,8 +1271,7 @@ impl MinerService for Miner {
         client: &MiningBlockChainClient,
         block_hash: H256,
         seal: Vec<Bytes>,
-    ) -> Result<(), Error>
-    {
+    ) -> Result<(), Error> {
         let result = if let Some(b) = self.sealing_work.lock().queue.get_used_if(
             if self.options.enable_resubmission {
                 GetAction::Clone
@@ -1289,8 +1295,9 @@ impl MinerService for Miner {
         result.and_then(|sealed| {
             let n = sealed.header().number();
             let h = sealed.header().hash();
+            let txn = sealed.transactions().len();
             client.import_sealed_block(sealed)?;
-            info!(target: "miner", "Submitted block imported OK. #{}: {}", Colour::White.bold().paint(format!("{}", n)), Colour::White.bold().paint(format!("{:x}", h)));
+            info!(target: "miner", "Submitted block #{}: {}, with {} txs imported OK.", Colour::White.bold().paint(format!("{}", n)), Colour::White.bold().paint(format!("{:x}", h)), Colour::White.bold().paint(format!("{}", txn)));
             Ok(())
         })
     }
@@ -1302,8 +1309,7 @@ impl MinerService for Miner {
         _invalid: &[H256],
         enacted: &[H256],
         retracted: &[H256],
-    )
-    {
+    ) {
         trace!(target: "block", "chain_new_blocks");
 
         // 1. We ignore blocks that were `imported` unless resealing on new uncles is enabled.
@@ -1335,11 +1341,9 @@ impl MinerService for Miner {
 
         // ...and at the end remove the old ones
         {
-            let fetch_account = |a: &Address| {
-                AccountDetails {
-                    nonce: client.latest_nonce(a),
-                    balance: client.latest_balance(a),
-                }
+            let fetch_account = |a: &Address| AccountDetails {
+                nonce: client.latest_nonce(a),
+                balance: client.latest_balance(a),
             };
             let time = client.chain_info().best_block_number;
             self.transaction_queue
@@ -1381,9 +1385,7 @@ struct TransactionDetailsProvider<'a> {
 
 impl<'a> TransactionDetailsProvider<'a> {
     pub fn new(client: &'a MiningBlockChainClient) -> Self {
-        TransactionDetailsProvider {
-            client: client,
-        }
+        TransactionDetailsProvider { client: client }
     }
 }
 
@@ -1400,14 +1402,14 @@ impl<'a> TransactionQueueDetailsProvider for TransactionDetailsProvider<'a> {
 mod tests {
     use super::*;
     use aion_types::U256;
-    use keychain;
-    use rustc_hex::FromHex;
-    use transaction::transaction_queue::PrioritizationStrategy;
-    use transaction::Transaction;
-    use transaction::Action;
     use client::{BlockChainClient, EachBlockWith, TestBlockChainClient};
+    use keychain;
     use miner::MinerService;
+    use rustc_hex::FromHex;
     use tests::helpers::generate_dummy_client;
+    use transaction::transaction_queue::PrioritizationStrategy;
+    use transaction::Action;
+    use transaction::Transaction;
 
     #[test]
     fn should_prepare_block_to_seal() {
@@ -1465,9 +1467,8 @@ mod tests {
             &Spec::new_test(),
             None, // accounts provider
             IoChannel::disconnected(),
-        ))
-        .ok()
-        .expect("Miner was just created.")
+        )).ok()
+            .expect("Miner was just created.")
     }
 
     fn transaction() -> SignedTransaction {
@@ -1484,11 +1485,12 @@ mod tests {
             gas_price_bytes: Vec::new(),
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
-        }
-        .sign(keypair.secret(), None)
+        }.sign(keypair.secret(), None)
     }
 
-    fn default_gas_price() -> U256 { 0u64.into() }
+    fn default_gas_price() -> U256 {
+        0u64.into()
+    }
 
     #[test]
     fn should_make_pending_block_when_importing_own_transaction() {

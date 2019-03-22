@@ -18,13 +18,13 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use acore::client::{BlockChainClient, BlockId, BlockStatus, ChainNotify};
+use acore::client::{cht, BlockChainClient, BlockId, BlockStatus, ChainNotify, Client};
 use acore::spec::Spec;
 use acore::transaction::UnverifiedTransaction;
 use aion_types::H256;
 use futures::future::{loop_fn, Loop};
 use futures::{Future, Stream};
-use kvdb::{KeyValueDB, DBTransaction};
+use kvdb::{DBTransaction, KeyValueDB};
 use rlp::UntrustedRlp;
 use std::collections::BTreeMap;
 use std::ops::Index;
@@ -59,7 +59,7 @@ pub mod storage;
 
 const STATUS_REQ_INTERVAL: u64 = 2;
 const GET_BLOCK_HEADERS_INTERVAL: u64 = 500;
-const BLOCKS_BODIES_REQ_INTERVAL: u64 = 500;
+const BLOCKS_BODIES_REQ_INTERVAL: u64 = 1500;
 const STATICS_INTERVAL: u64 = 30;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const REPUTATION_HANDLE_INTERVAL: u64 = 300;
@@ -156,15 +156,15 @@ impl SyncMgr {
 
         let statics_task = Interval::new(Instant::now(), Duration::from_secs(STATICS_INTERVAL))
             .for_each(move |_| {
-                // let connected_nodes = P2pMgr::get_nodes(CONNECTED);
-                // for node in connected_nodes.iter() {
-                //     if node.last_request_timestamp + Duration::from_secs(STATICS_INTERVAL * 12)
-                //         < SystemTime::now()
-                //     {
-                //         info!(target: "sync", "Disconnect with idle node: {}@{}.", node.get_node_id(), node.get_ip_addr());
-                //         P2pMgr::remove_peer(node.node_hash);
-                //     }
-                // }
+                let connected_nodes = P2pMgr::get_nodes(CONNECTED);
+                for node in connected_nodes.iter() {
+                    if node.last_request_timestamp + Duration::from_secs(STATICS_INTERVAL * 10)
+                        < SystemTime::now()
+                    {
+                        info!(target: "sync", "Disconnect with idle node: {}@{}.", node.get_node_id(), node.get_ip_addr());
+                        P2pMgr::remove_peer(node.node_hash);
+                    }
+                }
 
                 let chain_info = SyncStorage::get_chain_info();
                 let block_number_last_time = SyncStorage::get_synced_block_number_last_time();
@@ -185,7 +185,7 @@ impl SyncMgr {
                     active_nodes_count,
                 );
                 info!(target: "sync", "{:-^127}","");
-                info!(target: "sync","      Total Diff    Blk No.    Blk Hash                 Address                 Revision      Conn  Seed  LstReq No.");
+                info!(target: "sync","      Total Diff    Blk No.    Blk Hash                 Address                 Revision      Conn  Seed");
                 info!(target: "sync", "{:-^127}","");
                 active_nodes.sort_by(|a, b| {
                     if a.target_total_difficulty != b.target_total_difficulty {
@@ -198,7 +198,7 @@ impl SyncMgr {
                 for node in active_nodes.iter() {
                     if let Ok(_) = node.last_request_timestamp.elapsed() {
                         info!(target: "sync",
-                            "{:>16}{:>11}{:>12}{:>24}{:>25}{:>10}{:>6}{:>12}",
+                            "{:>16}{:>11}{:>12}{:>24}{:>25}{:>10}{:>6}",
                             format!("{}",node.target_total_difficulty),
                             node.best_block_num,
                             format!("{}",node.best_hash),
@@ -211,8 +211,7 @@ impl SyncMgr {
                             match node.is_from_boot_list{
                                 true => "Y",
                                 _ => ""
-                            },
-                            node.requested_block_num
+                            }
                         );
                         count += 1;
                         if count == SYNC_STATIC_CAPACITY {
@@ -317,6 +316,39 @@ impl SyncMgr {
         SyncStorage::set_is_syncing(false);
         SyncStorage::reset();
     }
+
+    fn build_header_chain(to: u64) {
+        let header_chain = SyncStorage::get_block_header_chain();
+        let header_chain_info = header_chain.chain_info();
+        let best_header_number = header_chain_info.best_block_number;
+
+        if best_header_number < to {
+            let cht_number =
+                cht::block_to_cht_number(to).expect(&format!("Invalid block number #{} !", to));
+            let from = cht::start_number(cht_number);
+
+            let block_chain = SyncStorage::get_block_chain();
+            for number in from..to + 1 {
+                if let Some(ref header) = block_chain.block_header(BlockId::Number(number)) {
+                    let block_total_difficulty =
+                        block_chain.block_total_difficulty(BlockId::Number(number));
+                    let hash = header.hash();
+                    if header_chain.status(&hash) != BlockStatus::InChain {
+                        let mut tx = DBTransaction::new();
+                        if let Ok(pending) = header_chain.insert_with_td(
+                            &mut tx,
+                            header,
+                            block_total_difficulty,
+                            None,
+                        ) {
+                            header_chain.apply_pending(tx, pending);
+                            debug!(target: "sync", "New block header {} imported.", number);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 /// Sync configuration
@@ -339,7 +371,7 @@ pub struct Params {
     /// Configuration.
     pub config: SyncConfig,
     /// Blockchain client.
-    pub client: Arc<BlockChainClient>,
+    pub client: Arc<Client>,
     /// Network layer configuration.
     pub network_config: NetworkConfig,
     /// Spec
@@ -372,28 +404,8 @@ impl Sync {
 
         SyncStorage::set_synced_block_number(starting_block_number);
         SyncStorage::set_synced_block_number_last_time(starting_block_number);
-
-        let header_chain = SyncStorage::get_block_header_chain();
-        let header_chain_info = header_chain.chain_info();
-        let best_header_number = header_chain_info.best_block_number;
         let best_block_number = SyncStorage::get_synced_block_number();
-        if best_header_number < best_block_number {
-            let block_chain = SyncStorage::get_block_chain();
-            for number in 1..best_block_number {
-                if let Some(ref header) = block_chain.block_header(BlockId::Number(number)) {
-                    if header_chain.status(&header.parent_hash()) == BlockStatus::InChain {
-                        let hash = header.hash();
-                        if header_chain.status(&hash) != BlockStatus::InChain {
-                            let mut tx = DBTransaction::new();
-                            if let Ok(pending) = header_chain.insert(&mut tx, header, None, false) {
-                                header_chain.apply_pending(tx, pending);
-                                info!(target: "sync", "New block header #{} - {} imported.", number, hash);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        SyncMgr::build_header_chain(best_block_number);
 
         let service = NetworkService {
             config: params.network_config.clone(),
@@ -541,7 +553,6 @@ impl ChainNotify for Sync {
             let mut max_imported_block_number = 0;
             let client = SyncStorage::get_block_chain();
             for hash in imported.iter() {
-                // ImportHandler::import_staged_blocks(&hash);
                 let block_id = BlockId::Hash(*hash);
                 if client.block_status(block_id) == BlockStatus::InChain {
                     if let Some(block_number) = client.block_number(block_id) {
@@ -558,6 +569,8 @@ impl ChainNotify for Sync {
             }
 
             SyncStorage::set_synced_block_number(max_imported_block_number);
+            let total_difficulty = client.chain_info().total_difficulty;
+            SyncStorage::set_total_difficulty(total_difficulty);
 
             for block_number in min_imported_block_number..max_imported_block_number + 1 {
                 let block_id = BlockId::Number(block_number);

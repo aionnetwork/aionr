@@ -18,7 +18,7 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
+use acore::client::BlockChainClient;
 use bytes::BufMut;
 
 use super::super::action::LightAction;

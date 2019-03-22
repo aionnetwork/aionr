@@ -148,9 +148,13 @@ impl Decodable for Entry {
     }
 }
 
-fn cht_key(number: u64) -> String { format!("{:08x}_canonical", number) }
+fn cht_key(number: u64) -> String {
+    format!("{:08x}_canonical", number)
+}
 
-fn era_key(number: u64) -> String { format!("candidates_{}", number) }
+fn era_key(number: u64) -> String {
+    format!("candidates_{}", number)
+}
 
 fn transition_key(block_hash: H256) -> H264 {
     const LEADING: u8 = 2;
@@ -288,10 +292,11 @@ impl HeaderChain {
                 db: db.clone(),
                 cache,
             };
-            info!(target: "chain", "created header chain : {:?}", decoded_header );
 
             let mut tx = DBTransaction::new();
-            if let Ok(pending) = chain.insert(&mut tx, &spec.genesis_header().encoded(), None, false) {
+            if let Ok(pending) =
+                chain.insert(&mut tx, &spec.genesis_header().encoded(), None, false)
+            {
                 chain.apply_pending(tx, pending);
             }
             chain
@@ -309,7 +314,6 @@ impl HeaderChain {
             {
                 let mut batch = DBTransaction::new();
                 let data = encode_canonical_transition(&decoded_header, &genesis_data);
-                info!(target: "chain", "inserted genesis epoch data : {:?}", data );
                 batch.put_vec(COL, LAST_CANONICAL_TRANSITION, data);
                 chain.db.write(batch).unwrap();
             }
@@ -331,9 +335,8 @@ impl HeaderChain {
         transaction: &mut DBTransaction,
         header: &encoded::Header,
         transition_proof: Option<Vec<u8>>,
-        is_force_reorg: bool
-    ) -> Result<PendingChanges, String>
-    {
+        is_force_reorg: bool,
+    ) -> Result<PendingChanges, String> {
         self.insert_inner(transaction, header, None, transition_proof, is_force_reorg)
     }
 
@@ -344,16 +347,15 @@ impl HeaderChain {
         &self,
         transaction: &mut DBTransaction,
         header: &encoded::Header,
-        total_difficulty: U256,
+        total_difficulty: Option<U256>,
         transition_proof: Option<Vec<u8>>,
-    ) -> Result<PendingChanges, String>
-    {
+    ) -> Result<PendingChanges, String> {
         self.insert_inner(
             transaction,
             header,
-            Some(total_difficulty),
+            total_difficulty,
             transition_proof,
-            true
+            false,
         )
     }
 
@@ -363,23 +365,18 @@ impl HeaderChain {
         header: &encoded::Header,
         total_difficulty: Option<U256>,
         transition_proof: Option<Vec<u8>>,
-        is_force_reorg: bool
-    ) -> Result<PendingChanges, String>
-    {
+        is_force_reorg: bool,
+    ) -> Result<PendingChanges, String> {
         let hash = header.hash();
         let number = header.number();
         let parent_hash = header.parent_hash();
-        let transition = transition_proof.map(|proof| {
-            EpochTransition {
-                block_hash: hash,
-                block_number: number,
-                proof,
-            }
+        let transition = transition_proof.map(|proof| EpochTransition {
+            block_hash: hash,
+            block_number: number,
+            proof,
         });
 
-        let mut pending = PendingChanges {
-            best_block: None,
-        };
+        let mut pending = PendingChanges { best_block: None };
 
         // hold candidates the whole time to guard import order.
         let mut candidates = self.candidates.write();
@@ -405,11 +402,9 @@ impl HeaderChain {
 
         // insert headers and candidates entries and write era to disk.
         {
-            let cur_era = candidates.entry(number).or_insert_with(|| {
-                Entry {
-                    candidates: SmallVec::new(),
-                    canonical_hash: hash,
-                }
+            let cur_era = candidates.entry(number).or_insert_with(|| Entry {
+                candidates: SmallVec::new(),
+                canonical_hash: hash,
             });
             cur_era.candidates.push(Candidate {
                 hash,
@@ -461,28 +456,25 @@ impl HeaderChain {
                 trace!(target: "chain", "Setting new canonical block {} for block height {}",
 					canon_hash, height);
 
-                let canon_pos = entry
-                    .candidates
-                    .iter()
-                    .position(|x| x.hash == canon_hash)
-                    .expect(
-                        "blocks are only inserted if parent is present; or this is the block we \
-                         just added; qed",
-                    );
+                if let Some(canon_pos) = entry.candidates.iter().position(|x| x.hash == canon_hash)
+                {
+                    // move the new canonical entry to the front and set the
+                    // era's canonical hash.
+                    entry.candidates.swap(0, canon_pos);
 
-                // move the new canonical entry to the front and set the
-                // era's canonical hash.
-                entry.candidates.swap(0, canon_pos);
-                entry.canonical_hash = canon_hash;
+                    entry.canonical_hash = canon_hash;
 
-                // what about reorgs > cht::SIZE + HISTORY?
-                // resetting to the last block of a given CHT should be possible.
-                canon_hash = entry.candidates[0].parent_hash;
+                    // what about reorgs > cht::SIZE + HISTORY?
+                    // resetting to the last block of a given CHT should be possible.
+                    canon_hash = entry.candidates[0].parent_hash;
 
-                // write altered era to disk
-                if height != number {
-                    let rlp_era = ::rlp::encode(&*entry);
-                    transaction.put(COL, era_key(height).as_bytes(), &rlp_era);
+                    // write altered era to disk
+                    if height != number {
+                        let rlp_era = ::rlp::encode(&*entry);
+                        transaction.put(COL, era_key(height).as_bytes(), &rlp_era);
+                    }
+                } else {
+                    break;
                 }
             }
 
@@ -532,12 +524,10 @@ impl HeaderChain {
 												", e);
                                                 None
                                             }
-                                            Ok(None) => {
-                                                panic!(
-                                                    "stored candidates always have corresponding \
-                                                     headers; qed"
-                                                )
-                                            }
+                                            Ok(None) => panic!(
+                                                "stored candidates always have corresponding \
+                                                 headers; qed"
+                                            ),
                                             Ok(Some(header)) => {
                                                 let header_rlp = UntrustedRlp::new(header.as_ref());
                                                 let header_value = header_rlp
@@ -621,23 +611,19 @@ impl HeaderChain {
 
             match cache.block_header(&hash) {
                 Some(header) => Some(header),
-                None => {
-                    match self.db.get(COL, &hash) {
-                        Ok(db_value) => {
-                            db_value
-                                .map(|x| x.into_vec())
-                                .map(encoded::Header::new)
-                                .and_then(|header| {
-                                    cache.insert_block_header(hash, header.clone());
-                                    Some(header)
-                                })
-                        }
-                        Err(e) => {
-                            warn!(target: "chain", "Failed to read from database: {}", e);
-                            None
-                        }
+                None => match self.db.get(COL, &hash) {
+                    Ok(db_value) => db_value
+                        .map(|x| x.into_vec())
+                        .map(encoded::Header::new)
+                        .and_then(|header| {
+                            cache.insert_block_header(hash, header.clone());
+                            Some(header)
+                        }),
+                    Err(e) => {
+                        warn!(target: "chain", "Failed to read from database: {}", e);
+                        None
                     }
-                }
+                },
             }
         };
 
@@ -681,18 +667,15 @@ impl HeaderChain {
         match id {
             BlockId::Earliest | BlockId::Number(0) => Some(self.genesis_header.difficulty()),
             BlockId::Hash(hash) if hash == genesis_hash => Some(self.genesis_header.difficulty()),
-            BlockId::Hash(hash) => {
-                match self.block_header(BlockId::Hash(hash)) {
-                    Some(header) => {
-                        self.candidates
-                            .read()
-                            .get(&header.number())
-                            .and_then(|era| era.candidates.iter().find(|e| e.hash == hash))
-                            .map(|c| c.total_difficulty)
-                    }
-                    None => None,
-                }
-            }
+            BlockId::Hash(hash) => match self.block_header(BlockId::Hash(hash)) {
+                Some(header) => self
+                    .candidates
+                    .read()
+                    .get(&header.number())
+                    .and_then(|era| era.candidates.iter().find(|e| e.hash == hash))
+                    .map(|c| c.total_difficulty),
+                None => None,
+            },
             BlockId::Number(num) => {
                 let candidates = self.candidates.read();
                 if self.best_block.read().number < num {
@@ -750,10 +733,14 @@ impl HeaderChain {
     }
 
     /// Get the genesis hash.
-    pub fn genesis_hash(&self) -> H256 { self.genesis_header.hash() }
+    pub fn genesis_hash(&self) -> H256 {
+        self.genesis_header.hash()
+    }
 
     /// Get the best block's data.
-    pub fn best_block(&self) -> BlockDescriptor { self.best_block.read().clone() }
+    pub fn best_block(&self) -> BlockDescriptor {
+        self.best_block.read().clone()
+    }
 
     /// If there is a gap between the genesis and the rest
     /// of the stored blocks, return the first post-gap block.
@@ -761,18 +748,16 @@ impl HeaderChain {
         let candidates = self.candidates.read();
         match candidates.iter().next() {
             None | Some((&1, _)) => None,
-            Some((&height, entry)) => {
-                Some(BlockDescriptor {
-                    number: height,
-                    hash: entry.canonical_hash,
-                    total_difficulty: entry
-                        .candidates
-                        .iter()
-                        .find(|x| x.hash == entry.canonical_hash)
-                        .expect("entry always stores canonical candidate; qed")
-                        .total_difficulty,
-                })
-            }
+            Some((&height, entry)) => Some(BlockDescriptor {
+                number: height,
+                hash: entry.canonical_hash,
+                total_difficulty: entry
+                    .candidates
+                    .iter()
+                    .find(|x| x.hash == entry.canonical_hash)
+                    .expect("entry always stores canonical candidate; qed")
+                    .total_difficulty,
+            }),
         }
     }
 
@@ -791,19 +776,22 @@ impl HeaderChain {
         _batch: &mut DBTransaction,
         _hash: H256,
         _t: &PendingEpochTransition,
-    )
-    {
+    ) {
     }
 
     /// Get pending transition for a specific block hash.
-    pub fn pending_transition(&self, _hash: H256) -> Option<PendingEpochTransition> { None }
+    pub fn pending_transition(&self, _hash: H256) -> Option<PendingEpochTransition> {
+        None
+    }
 
     /// Get the transition to the epoch the given parent hash is part of
     /// or transitions to.
     /// This will give the epoch that any children of this parent belong to.
     ///
     /// The header corresponding the the parent hash must be stored already.
-    pub fn epoch_transition_for(&self, _parent_hash: H256) -> Option<(Header, Vec<u8>)> { None }
+    pub fn epoch_transition_for(&self, _parent_hash: H256) -> Option<(Header, Vec<u8>)> {
+        None
+    }
 
     /// chain info
     pub fn chain_info(&self) -> BlockChainInfo {
@@ -824,7 +812,9 @@ impl HeaderChain {
 }
 
 impl HeapSizeOf for HeaderChain {
-    fn heap_size_of_children(&self) -> usize { self.candidates.read().heap_size_of_children() }
+    fn heap_size_of_children(&self) -> usize {
+        self.candidates.read().heap_size_of_children()
+    }
 }
 
 /// Iterator over a block's ancestry.

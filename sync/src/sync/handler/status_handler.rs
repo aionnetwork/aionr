@@ -23,6 +23,7 @@ use aion_types::{H256, U256};
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use std::mem;
+use std::time::SystemTime;
 
 use super::super::action::SyncAction;
 use super::super::event::SyncEvent;
@@ -110,6 +111,7 @@ impl StatusHandler {
         node.current_total_difficulty = chain_info.total_difficulty;
 
         node.target_total_difficulty = U256::from(total_difficulty);
+        node.last_request_timestamp = SystemTime::now();
         SyncEvent::update_node_state(node, SyncEvent::OnStatusRes);
         node.inc_reputation(1);
         P2pMgr::update_node(node_hash, node);

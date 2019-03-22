@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use acore::block::Block;
-use acore::client::{header_chain::HeaderChain, BlockChainClient, BlockChainInfo, BlockQueueInfo};
+use acore::client::{BlockChainClient, header_chain::HeaderChain, BlockChainInfo, BlockQueueInfo, Client};
 use acore::header::Header as BlockHeader;
 use acore::spec::Spec;
 use aion_types::{H256, U256};
@@ -57,7 +57,7 @@ pub const MAX_CACHED_BLOCK_HASHES: usize = 8192;
 
 #[derive(Clone)]
 struct BlockChain {
-    inner: Option<Arc<BlockChainClient>>,
+    inner: Option<Arc<Client>>,
 }
 
 #[derive(Clone)]
@@ -68,7 +68,7 @@ struct SyncExecutor {
 pub struct SyncStorage;
 
 impl SyncStorage {
-    pub fn init(client: Arc<BlockChainClient>, spec: Spec, db: Arc<KeyValueDB>) {
+    pub fn init(client: Arc<Client>, spec: Spec, db: Arc<KeyValueDB>) {
         if let Some(_) = BLOCK_CHAIN.try_get() {
             if let Ok(mut block_chain) = BLOCK_CHAIN.get().write() {
                 if let Some(_) = block_chain.inner {
@@ -108,7 +108,7 @@ impl SyncStorage {
         }
     }
 
-    pub fn get_block_chain() -> Arc<BlockChainClient> {
+    pub fn get_block_chain() -> Arc<Client> {
         BLOCK_CHAIN
             .get()
             .read()
@@ -140,6 +140,16 @@ impl SyncStorage {
             .inner
             .expect("get_executor error");
         rt.executor()
+    }
+    
+    pub fn set_total_difficulty(total_difficulty: U256) {
+        let mut local_status = LOCAL_STATUS.write();
+        local_status.total_difficulty = total_difficulty;
+    }
+
+    pub fn get_total_difficulty() -> U256 {
+        let local_status = LOCAL_STATUS.read();
+        return local_status.total_difficulty;
     }
 
     pub fn set_synced_block_number(synced_block_number: u64) {
@@ -392,6 +402,7 @@ pub enum SyncState {
 
 #[derive(Clone)]
 pub struct LocalStatus {
+    pub total_difficulty: U256,
     pub synced_block_number: u64,
     pub synced_block_number_last_time: u64,
     pub requested_block_number_last_time: u64,
@@ -403,6 +414,7 @@ pub struct LocalStatus {
 impl LocalStatus {
     pub fn new() -> Self {
         LocalStatus {
+            total_difficulty: U256::default(),
             synced_block_number: 0,
             synced_block_number_last_time: 0,
             requested_block_number_last_time: 0,
@@ -416,6 +428,11 @@ impl LocalStatus {
 impl fmt::Display for LocalStatus {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         try!(write!(f, "LocalStatus: \n"));
+        try!(write!(
+            f,
+            "    total difficulty: {}\n",
+            self.total_difficulty
+        ));
         try!(write!(
             f,
             "    synced block number: {}\n",
