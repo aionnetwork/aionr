@@ -85,6 +85,7 @@ struct SubmitPayload {
 
 impl SubmitPayload {
     fn from_args(payload: Vec<String>) -> Result<Self, PayloadError> {
+        trace!(target: "stratum", "payload = {:?}", payload);
         if payload.len() != 3 {
             return Err(PayloadError::ArgumentsAmountUnexpected(payload.len()));
         }

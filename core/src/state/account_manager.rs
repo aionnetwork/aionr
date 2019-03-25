@@ -201,7 +201,10 @@ impl VMAccountManager<FVMAccount> {
     ) -> trie::Result<U>
     where F: Fn(Option<&FVMAccount>) -> U,
     {
+        //Debug info of trie
+        debug!(target: "vm", "root = {:?}", root);
         // get from local cache
+        debug!(target: "vm", "local cache = {:?}", self.cache);
         if let Some(ref mut maybe_acc) = self.cache.borrow_mut().get_mut(a) {
             if let Some(ref mut account) = maybe_acc.account {
                 let accountdb = factories
@@ -237,8 +240,9 @@ impl VMAccountManager<FVMAccount> {
                 let state_db = factories
                     .trie
                     .readonly(db.as_hashstore(), &root)?;
-                println!("search in database: {:?}", a);
+                println!("search fvm account in database: {:?}", a);
                 let mut maybe_acc = state_db.get_with(a, FVMAccount::from_rlp)?;
+                debug!(target: "vm", "maybe account = {:?}", maybe_acc);
                 if let Some(ref mut account) = maybe_acc.as_mut() {
                     if account.account_type != AccType::FVM {
                         return Err(Box::new(TrieError::IncompleteDatabase(root)));
@@ -261,7 +265,7 @@ impl VMAccountManager<FVMAccount> {
 }
 
 impl VMAccountManager<AVMAccount> {
-    pub fn get_cached<F, U, B: Backend>(
+    pub fn get_cached<F, U: ::std::fmt::Debug, B: Backend>(
         &self,
         a: &Address,
         db: &B,
@@ -273,6 +277,8 @@ impl VMAccountManager<AVMAccount> {
     ) -> trie::Result<U>
     where F: Fn(Option<&AVMAccount>) -> U,
     {
+        // debug trie info
+        debug!(target: "vm", "trie state root = {:?}", root);
         // get from local cache
         if let Some(ref mut maybe_acc) = self.cache.borrow_mut().get_mut(a) {
             if let Some(ref mut account) = maybe_acc.account {
@@ -286,7 +292,7 @@ impl VMAccountManager<AVMAccount> {
         }
 
         // get from global cache
-
+        println!("search in avm global cache");
         let result = db.get_avm_cached(a, |mut acc| {
             if let Some(ref mut account) = acc {
                 let accountdb = factories
@@ -296,6 +302,7 @@ impl VMAccountManager<AVMAccount> {
             }
             f(acc.map(|a| &*a))
         });
+        println!("avm glocal cache returns: {:?}", result);
         match result {
             Some(r) => Ok(r),
             None => {
@@ -308,6 +315,7 @@ impl VMAccountManager<AVMAccount> {
                 let state_db = factories
                     .trie
                     .readonly(db.as_hashstore(), &root)?;
+                println!("search avm account in database: {:?}", a);
                 let mut maybe_acc = state_db.get_with(a, AVMAccount::from_rlp)?;
                 if let Some(ref mut account) = maybe_acc.as_mut() {
                     if account.account_type != AccType::AVM {

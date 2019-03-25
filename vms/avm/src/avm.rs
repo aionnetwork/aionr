@@ -23,7 +23,7 @@ use hash::{BLAKE2B_EMPTY};
 /// thread needs to attach the thread to the JVM instance first and deattach
 /// after finishing the interaction.
 static mut JVM_SINGLETON: AtomicPtr<ffi::JavaVM> = AtomicPtr::new(ptr::null_mut());
-const AVM_JARS: [&str; 17] = [
+const AVM_JARS: [&str; 16] = [
     "asm-6.2.1.jar",
     "asm-analysis-6.2.1.jar",
     "asm-commons-6.2.1.jar",
@@ -35,7 +35,7 @@ const AVM_JARS: [&str; 17] = [
     "org-aion-avm-core.jar",
     "org-aion-avm-rt.jar",
     "org-aion-avm-tooling.jar",
-    "org-aion-avm-userlib.jar",
+    //"org-aion-avm-userlib.jar",
     "scratch-deps.jar",
     "slf4j-api-1.7.25.jar",
     "spongycastle-1.58.0.0.jar",
@@ -236,7 +236,6 @@ impl AVM {
             if obj.is_null() {
                 Err("The execute() method failed")
             } else {
-                println!("return avm result, try to decode");
                 let bytes = vm.jvm.load_byte_array(&obj);
                 self.dettach();
                 Self::decode_transaction_results(&bytes)

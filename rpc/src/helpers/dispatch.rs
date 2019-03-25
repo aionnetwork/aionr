@@ -173,6 +173,7 @@ impl<C: MiningBlockChainClient, M: MinerService> Dispatcher for FullDispatcher<C
                 .unwrap_or_else(|| self.miner.default_gas_limit()),
             value: request.value.unwrap_or_else(|| 0.into()),
             data: request.data.unwrap_or_else(Vec::new),
+            tx_type: request.tx_type.unwrap_or_else(|| 0x01.into()),
             condition: request.condition,
         }))
     }

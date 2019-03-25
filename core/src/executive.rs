@@ -250,7 +250,9 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             }
 
             //TODO: gas limit for AVM; validate passed, just run AION VM
-            let init_gas = t.gas - base_gas_required;
+            debug!(target: "vm", "tx gas = {:?}, base gas required = {:?}", t.gas, base_gas_required);
+            //let init_gas = t.gas - base_gas_required;
+            let init_gas = t.gas;
 
             // Transactions are now handled in different ways depending on whether it's
             // action type is Create or Call.
@@ -2356,7 +2358,7 @@ Address};
     fn hello_avm() {
         // Create contract on already existing address
         let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        file.push("src/tests/AVMDapps/HelloWorld.jar");
+        file.push("src/tests/AVMDapps/dapp.jar");
         let file_str = file.to_str().expect("Failed to locate the helloworld.jar");
         let mut code = read_file(file_str).expect("unable to open avm dapp");
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
@@ -2365,8 +2367,9 @@ Address};
         params.address = address.clone();
         params.sender = sender.clone();
         params.origin = sender.clone();
-        params.gas = U256::from(1_000_000);
+        params.gas = U256::from(5_000_000);
         let mut avm_code: Vec<u8> = (code.len() as u32).to_vm_bytes();
+        println!("code of hello_avm = {:?}", code.len());
         avm_code.append(&mut code);
         params.code = Some(Arc::new(avm_code.clone()));
         params.value = 0.into();
@@ -2374,7 +2377,7 @@ Address};
         params.gas_price = 1.into();
         let mut state = get_temp_state();
         state
-            .add_balance(&sender, &U256::from(5_000_000), CleanupMode::NoEmpty)
+            .add_balance(&sender, &U256::from(10_000_000), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
         let machine = make_aion_machine();
@@ -2426,12 +2429,17 @@ Address};
     use std::fs::File;
     use std::io::Read;
     use std::path::PathBuf;
+    use std::path::Path;
 
     fn read_file(path: &str) -> Result<Vec<u8>, Error> {
+        let path = Path::new(path);
         println!("path = {:?}", path);
         let mut file = File::open(path)?;
         let mut buf = Vec::<u8>::new();
+        // let mut buf = String::new();
         file.read_to_end(&mut buf)?;
+        // file.sync_all()?;
+        //Ok(buf.as_bytes().to_vec())
         Ok(buf)
     }
 

@@ -55,7 +55,7 @@ use trie;
 use trie::recorder::Recorder;
 use trie::{Trie, TrieDB, TrieError};
 
-mod controller;
+mod account_manager;
 mod substate;
 
 pub mod backend;
@@ -75,7 +75,7 @@ pub use account::{
 pub use self::backend::Backend;
 pub use self::substate::Substate;
 
-use self::controller::{
+use self::account_manager::{
     AccountEntry,
     VMAccountManager,
     AccountCacheOps,
@@ -302,7 +302,6 @@ impl<B: Backend> State<B> {
             kvdb: kvdb,
             fvm_manager: VMAccountManager::<FVMAccount>::new(account_start_nonce),
             avm_manager:  VMAccountManager::<AVMAccount>::new(account_start_nonce),
-            // avm_mgr: AVMAccMgr::new(),
         };
 
         Ok(state)
@@ -484,6 +483,7 @@ impl<B: Backend> State<B> {
 
     /// Determine whether an account exists.
     pub fn exists(&self, a: &Address) -> trie::Result<bool> {
+        debug!(target: "vm", "check account");
         // Bloom filter does not contain empty accounts, so it is important here to
         // check if account exists in the database directly before EIP-161 is in effect.
         // self.ensure_fvm_cached(a, RequireCache::None, false, |a| a.is_some())
@@ -505,6 +505,7 @@ impl<B: Backend> State<B> {
 
     /// Determine whether an account exists and if not empty.
     pub fn exists_and_not_null(&self, a: &Address) -> trie::Result<bool> {
+        debug!(target: "vm", "exist and not null");
         let result = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| {
             a.map_or(false, |a| !a.is_null())
         });
@@ -519,6 +520,7 @@ impl<B: Backend> State<B> {
 
     /// Determine whether an account exists and has code or non-zero nonce.
     pub fn exists_and_has_code_or_nonce(&self, a: &Address) -> trie::Result<bool> {
+        debug!(target: "vm", "exist and has code or nonce");
         let result = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::CodeSize, false, |a| {
             a.map_or(false, |a| {
                 a.code_hash() != BLAKE2B_EMPTY || *a.nonce() != self.fvm_manager.account_start_nonce
@@ -537,6 +539,7 @@ impl<B: Backend> State<B> {
 
     /// Get the balance of account `a`.
     pub fn balance(&self, a: &Address) -> trie::Result<U256> {
+        debug!(target: "vm", "get balance");
         let fvm_balance = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref()
                 .map_or(U256::zero(), |account| *account.balance())
@@ -553,6 +556,7 @@ impl<B: Backend> State<B> {
 
     /// Get the nonce of account `a`.
     pub fn nonce(&self, a: &Address) -> trie::Result<U256> {
+        debug!(target: "vm", "get nonce");
         let nonce = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref()
                 .map_or(self.fvm_manager.account_start_nonce, |account| *account.nonce())
@@ -569,6 +573,7 @@ impl<B: Backend> State<B> {
 
     /// Get the storage root of account `a`.
     pub fn storage_root(&self, a: &Address) -> trie::Result<Option<H256>> {
+        debug!(target: "vm", "get storage root");
         let root = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref()
                 .and_then(|account| account.storage_root().cloned())
@@ -743,6 +748,7 @@ impl<B: Backend> State<B> {
 
     /// Get accounts' code.
     pub fn code(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
+        debug!(target: "vm", "get code");
         let code = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::Code, true, |a| {
             a.as_ref().map_or(None, |a| a.code().clone())
         });
@@ -762,6 +768,7 @@ impl<B: Backend> State<B> {
 
     /// Get an account's code hash.
     pub fn code_hash(&self, a: &Address) -> trie::Result<H256> {
+        debug!(target: "vm", "get code hash");
         let hash = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref().map_or(BLAKE2B_EMPTY, |a| a.code_hash())
         });
@@ -776,6 +783,7 @@ impl<B: Backend> State<B> {
 
     /// Get accounts' code size.
     pub fn code_size(&self, a: &Address) -> trie::Result<Option<usize>> {
+        debug!(target: "vm", "get code size");
         let code_size = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::CodeSize, true, |a| {
             a.as_ref().and_then(|a| a.code_size())
         });
@@ -798,7 +806,6 @@ impl<B: Backend> State<B> {
     ) -> trie::Result<()>
     {
         debug!(target: "state", "add_balance({}, {}): {}", a, incr, self.balance(a)?);
-        println!("state before add balance = {:?}", self);
         let is_value_transfer = !incr.is_zero();
         if is_value_transfer || (cleanup_mode == CleanupMode::ForceCreate && !self.exists(a)?) {
             self.require(a, false)?.add_balance(incr);
@@ -809,7 +816,6 @@ impl<B: Backend> State<B> {
                 self.touch(a)?;
             }
         }
-        println!("state after add balance = {:?}", self);
         Ok(())
     }
 
@@ -1044,7 +1050,6 @@ impl<B: Backend> State<B> {
 
     /// Commits our cached account changes into the trie.
     pub fn commit(&mut self) -> Result<(), Error> {
-        println!("state = {:?}", self);
         // first, commit the sub trees.
         let mut accounts = self.fvm_manager.cache.borrow_mut();
         debug!(target: "cons", "commit fvm accounts = {:?}", accounts);
@@ -1067,7 +1072,7 @@ impl<B: Backend> State<B> {
                         || address == &H256::from(
                             "0000000000000000000000000000000000000000000000000000000000000200",
                         ) {
-                        account
+                            account
                             .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
                     } else if !account.storage_changes().0.is_empty()
                         || !account.storage_changes().1.is_empty()
@@ -1095,7 +1100,7 @@ impl<B: Backend> State<B> {
 
         // update AVM accounts
         let mut avm_accounts = self.avm_manager.cache.borrow_mut();
-        debug!(target: "cons", "commit avm accounts = {:?}", accounts);
+        debug!(target: "cons", "commit avm accounts = {:?}", avm_accounts);
         for (address, ref mut a) in avm_accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
             debug!(target: "cons", "found avm account: {:?} at address {:?}", a, address);
             if let Some(ref mut account) = a.account {
@@ -1130,6 +1135,7 @@ impl<B: Backend> State<B> {
         }
 
         {
+            // commit fvm accounts
             let mut trie = self
                 .factories
                 .trie
@@ -1138,6 +1144,7 @@ impl<B: Backend> State<B> {
                 a.state = AccountState::Committed;
                 match a.account {
                     Some(ref mut account) => {
+                        debug!(target: "cons", "insert account = {:?}, address = {:?}", account, address);
                         trie.insert(address, &account.rlp())?;
                     }
                     None => {
@@ -1146,8 +1153,9 @@ impl<B: Backend> State<B> {
                 };
             }
 
+
             // commit avm accounts
-            for (address, ref mut a) in accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
+            for (address, ref mut a) in avm_accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
                 a.state = AccountState::Committed;
                 match a.account {
                     Some(ref mut account) => {
@@ -1159,7 +1167,8 @@ impl<B: Backend> State<B> {
                 };
             }
         }
-        debug!(target: "cons", "after commit accounts = {:?}", accounts);
+        //println!("new state = {:?}", self);
+        debug!(target: "cons", "after commit: fvm accounts = {:?}, avm accounts = {:?}, state root = {:?}", accounts, avm_accounts, self.root);
 
         Ok(())
     }
@@ -1612,7 +1621,7 @@ impl<B: Backend> State<B> {
 }
 
 impl<B: Backend> fmt::Debug for State<B> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "fvm accounts = {:?}, avm accounts = {:?}", self.fvm_manager.cache.borrow(), self.avm_manager.cache.borrow()) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "fvm accounts = {:?}, avm accounts = {:?}, state_root = {:?}", self.fvm_manager.cache.borrow(), self.avm_manager.cache.borrow(), self.root()) }
 }
 
 // TODO: cloning for `State` shouldn't be possible in general; Remove this and use
@@ -1731,6 +1740,35 @@ mod tests {
 
         state.inc_nonce(&a).unwrap();
         state.commit().unwrap();
+    }
+
+    #[test]
+    fn balance_from_database() {
+        let a = Address::zero();
+        let (root, db) = {
+            let mut state = get_temp_state();
+            state
+                .require_fvm_or_from(
+                    &a,
+                    false,
+                    || FVMAccount::new_contract(42.into(), 0.into()),
+                    |_| {},
+                )
+                .unwrap();
+            state.commit().unwrap();
+            assert_eq!(state.balance(&a).unwrap(), 42.into());
+            state.drop()
+        };
+
+        let state = State::from_existing(
+            db,
+            root,
+            U256::from(0u8),
+            Default::default(),
+            Arc::new(MemoryDBRepository::new()),
+        )
+        .unwrap();
+        assert_eq!(state.balance(&a).unwrap(), 42.into());
     }
 
     #[test]

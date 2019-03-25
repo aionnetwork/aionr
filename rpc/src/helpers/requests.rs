@@ -42,6 +42,8 @@ pub struct TransactionRequest {
     pub data: Option<Bytes>,
     /// Transaction's nonce
     pub nonce: Option<U256>,
+    /// Transaction type
+    pub tx_type: Option<u8>,
     /// Delay until this condition is met.
     pub condition: Option<TransactionCondition>,
 }
@@ -84,6 +86,8 @@ pub struct FilledTransactionRequest {
     pub data: Bytes,
     /// Transaction's nonce
     pub nonce: Option<U256>,
+    /// Transaction type
+    pub tx_type: u8,
     /// Delay until this condition is met.
     pub condition: Option<TransactionCondition>,
 }
@@ -98,6 +102,7 @@ impl From<FilledTransactionRequest> for TransactionRequest {
             value: Some(r.value),
             data: Some(r.data),
             nonce: r.nonce,
+            tx_type: Some(r.tx_type),
             condition: r.condition,
         }
     }
