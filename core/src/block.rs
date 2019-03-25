@@ -353,6 +353,10 @@ impl<'x> OpenBlock<'x> {
     /// Push a transaction into the block.
     ///
     /// If valid, it will be executed, and archived together with the receipt.
+    /// This method is triggered both by sync and miner:
+    /// sync module really call push_transactions, and we do bulk pushes during sync;
+    /// however miner do not use push_transactions due to some special logic: 
+    /// transaction penalisation .etc
     pub fn push_transaction(
         &mut self,
         t: SignedTransaction,
@@ -363,8 +367,17 @@ impl<'x> OpenBlock<'x> {
             return Err(From::from(TransactionError::AlreadyImported));
         }
 
+        let mut result = Vec::new();
         let env_info = self.env_info();
-        match self.block.state.apply(&env_info, self.engine.machine(), &t) {
+        debug!(target: "vm", "tx type = {:?}", t.tx_type());
+        if t.tx_type() == AVM_TRANSACTION_TYPE {
+            result.append(&mut self.block.state.apply_batch(&env_info, self.engine.machine(), &[t.clone()]));
+        } else {
+            result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
+        }
+
+        
+        match result.pop().unwrap() {
             Ok(outcome) => {
                 self.block
                     .transactions_set

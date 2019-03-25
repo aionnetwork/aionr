@@ -49,6 +49,7 @@ use spec::Genesis;
 use spec::seal::Generic as GenericSeal;
 use state::backend::Basic as BasicBackend;
 use state::{Backend, State, Substate};
+use transaction::DEFAULT_TRANSACTION_TYPE;
 
 // helper for formatting errors.
 fn fmt_err<F: ::std::fmt::Display>(f: F) -> String { format!("Spec json is invalid: {}", f) }
@@ -522,6 +523,7 @@ impl Spec {
                 Action::Call(a),
                 U256::default(),
                 d,
+                DEFAULT_TRANSACTION_TYPE,
             )
             .fake_sign(from);
 

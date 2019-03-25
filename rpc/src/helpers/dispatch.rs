@@ -232,6 +232,7 @@ fn sign_transaction(
         filled.to.map_or(Action::Create, Action::Call),
         filled.value,
         filled.data,
+        filled.tx_type,
     );
 
     let timestamp = i64_to_bytes(to_epoch_micro());

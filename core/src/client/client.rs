@@ -64,7 +64,7 @@ use spec::Spec;
 use state::{self, State, FVMKey, FVMValue};
 use state_db::StateDB;
 use transaction::{
-    Action, LocalizedTransaction, PendingTransaction, SignedTransaction, Transaction,
+    Action, LocalizedTransaction, PendingTransaction, SignedTransaction, Transaction, DEFAULT_TRANSACTION_TYPE, AVM_TRANSACTION_TYPE,
 };
 use types::filter::Filter;
 use verification;
@@ -1052,6 +1052,7 @@ impl Client {
             Action::Call(address),
             U256::default(),
             data,
+            DEFAULT_TRANSACTION_TYPE,
         )
         .fake_sign(from)
     }

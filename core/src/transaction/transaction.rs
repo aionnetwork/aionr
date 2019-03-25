@@ -133,6 +133,7 @@ impl Transaction {
         action: Action,
         value: U256,
         data: Bytes,
+        tx_type: u8,
     ) -> Transaction
     {
         Transaction {
@@ -146,7 +147,7 @@ impl Transaction {
             value,
             value_bytes: Bytes::new(),
             data,
-            transaction_type: DEFAULT_TRANSACTION_TYPE,
+            transaction_type: tx_type,
         }
     }
 
