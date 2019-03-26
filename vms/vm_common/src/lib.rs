@@ -90,6 +90,8 @@ pub enum CallType {
     DelegateCall,
     /// STATICCALL
     StaticCall,
+    /// Avm balance transfer
+    BulkBalance,
 }
 
 impl Encodable for CallType {
@@ -100,6 +102,8 @@ impl Encodable for CallType {
             CallType::CallCode => 2,
             CallType::DelegateCall => 3,
             CallType::StaticCall => 4,
+            // this is for avm
+            CallType::BulkBalance => 4,
         };
         Encodable::rlp_append(&v, s);
     }
@@ -113,6 +117,7 @@ impl Decodable for CallType {
                 1 => CallType::Call,
                 2 => CallType::CallCode,
                 3 => CallType::DelegateCall,
+                //TODO: conflicted, so cannot get BulkBalance from decoder
                 4 => CallType::StaticCall,
                 _ => return Err(DecoderError::Custom("Invalid value of CallType item")),
             })

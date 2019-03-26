@@ -42,7 +42,7 @@ use header::{Header, Seal};
 use receipt::Receipt;
 use state::State;
 use state_db::StateDB;
-use transaction::{UnverifiedTransaction, SignedTransaction, Error as TransactionError, AVM_TRANSACTION_TYPE};
+use transaction::{UnverifiedTransaction, SignedTransaction, Error as TransactionError, AVM_TRANSACTION_TYPE, Action};
 use verification::PreverifiedBlock;
 use kvdb::KeyValueDB;
 
@@ -666,6 +666,30 @@ pub fn enact(
 }
 
 #[inline]
+fn is_normal(
+    block: &mut OpenBlock,
+    tx: &SignedTransaction,
+) -> bool
+{
+    if let Action::Call(a) = tx.action {
+        if block.block.state.code(&a).unwrap().is_some() {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+#[inline]
+fn is_for_avm(
+    block: &mut OpenBlock,
+    tx: &SignedTransaction,
+) -> bool
+{
+    return tx.tx_type() == AVM_TRANSACTION_TYPE || is_normal(block, tx);
+}
+
+#[inline]
 #[cfg(not(feature = "slow-blocks"))]
 fn push_transactions(
     block: &mut OpenBlock,
@@ -676,7 +700,7 @@ fn push_transactions(
 
     debug!(target: "vm", "transactions = {:?}, len = {:?}", transactions, transactions.len());
     for tx in transactions {
-        if tx.tx_type() != AVM_TRANSACTION_TYPE {
+        if is_for_avm(block, tx) {
             if tx_batch.len() >= 1 {
                 block.apply_batch_txs(tx_batch.as_slice(), None);
                 tx_batch.clear();

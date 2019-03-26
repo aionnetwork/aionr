@@ -276,6 +276,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     }
                 }
                 Action::Call(ref address) => {
+                    let call_type = match self.state.code(&address).unwrap().is_some() {
+                        true => CallType::Call,
+                        false => CallType::BulkBalance,
+                    };
+
                     AVMActionParams {
                         code_address: address.clone(),
                         address: address.clone(),
@@ -287,7 +292,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         code: self.state.code(address).unwrap(),
                         code_hash: Some(self.state.code_hash(address).unwrap()),
                         data: Some(t.data.clone()),
-                        call_type: CallType::Call,
+                        call_type: call_type,
                         transaction_hash: t.hash(),
                         original_transaction_hash: t.hash(),
                         nonce: nonce.low_u64(),
@@ -929,7 +934,7 @@ Address};
     use machine::EthereumMachine;
     use state::{Substate, CleanupMode};
     use tests::helpers::*;
-    use transaction::{Action, Transaction, SignedTransaction};
+    use transaction::{Action, Transaction, SignedTransaction, DEFAULT_TRANSACTION_TYPE};
     use bytes::Bytes;
     use error::ExecutionError;
     use avm_abi::{ToBytes};
@@ -1711,6 +1716,7 @@ Address};
             Action::Create,
             0.into(),
             Bytes::new(),
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1735,6 +1741,7 @@ Address};
             Action::Create,
             0.into(),
             Bytes::new(),
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1757,6 +1764,7 @@ Address};
             Action::Call(0.into()),
             0.into(),
             Bytes::new(),
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1780,6 +1788,7 @@ Address};
             Action::Create,
             0.into(),
             data,
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1803,6 +1812,7 @@ Address};
             Action::Call(0.into()),
             0.into(),
             data,
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1825,6 +1835,7 @@ Address};
             Action::Call(0.into()),
             1000.into(),
             Bytes::new(),
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1847,6 +1858,7 @@ Address};
             Action::Call(0.into()),
             0.into(),
             Bytes::new(),
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -2452,6 +2464,40 @@ Address};
         assert_eq!(value, vec![0,0,0,2]);
         state.set_avm_storage(&address, vec![1,2,3,4,5,6,7,8,9,0], vec![1,2,3,4,5,0,0,0,2]).expect("avm set storage failed");
         println!("state = {:?}", state);
+    }
+
+    #[test]
+    fn avm_balance_transfer() {
+        let mut state = get_temp_state();
+        let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
+        let mut params = AVMActionParams::default();
+        let address = contract_address(&sender, &U256::zero()).0;
+        params.address = address.clone();
+        params.sender = sender.clone();
+        params.origin = sender.clone();
+        params.gas = U256::from(1_000_000);
+        params.code = Some(Arc::new(vec![]));
+        params.value = 100.into();
+        params.call_type = CallType::BulkBalance;
+        params.gas_price = 1.into();
+        state
+            .add_balance(&sender, &U256::from(50_000_000), CleanupMode::NoEmpty)
+            .unwrap();
+        let info = EnvInfo::default();
+        let machine = make_aion_machine();
+        let substate = Substate::new();
+        let mut params2 = params.clone();
+        params2.address = contract_address(&sender, &U256::one()).0;
+        params2.value = 99.into();
+        params2.nonce = params.nonce + 1;
+        let results = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.call_avm(vec![params.clone(), params2.clone()], &mut [substate.clone(), substate.clone()])
+        };
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(state.balance(&address), Ok(100.into()));
+        assert_eq!(state.balance(&params2.address), Ok(99.into()));
     }
 
     use avm_abi::{AVMEncoder, AbiToken};

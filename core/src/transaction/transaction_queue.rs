@@ -1492,7 +1492,7 @@ pub mod test {
     use super::*;
     use key::{generate_keypair};
     use rustc_hex::FromHex;
-    use transaction::Transaction;
+    use transaction::{Transaction, DEFAULT_TRANSACTION_TYPE};
     use io::IoService;
 
     pub struct DummyTransactionDetailsProvider {
@@ -1546,6 +1546,7 @@ pub mod test {
             transaction::Action::Create,
             U256::from(100),
             "3331600055".from_hex().unwrap(),
+            DEFAULT_TRANSACTION_TYPE,
         )
     }
 

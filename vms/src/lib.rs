@@ -30,7 +30,6 @@ extern crate heapsize;
 extern crate blake2b as hash;
 extern crate memory_cache;
 extern crate acore_bytes as bytes;
-extern crate common_types as types;
 extern crate ajson;
 extern crate fastvm;
 extern crate avm;

@@ -113,7 +113,7 @@ impl Factory for FastVMFactory {
             CallType::Call => execution_kind::CALL,
             CallType::CallCode => execution_kind::CALLCODE,
             CallType::DelegateCall => execution_kind::DELEGATECALL,
-            CallType::StaticCall => execution_kind::CALL,
+            _ => execution_kind::CALL,
         };
         let flags: i32 = params.static_flag.into();
 
@@ -243,6 +243,7 @@ impl Factory for AVMFactory {
             let depth = ext.depth() as i32;
             let kind = match params.call_type {
                 CallType::None => AVM_CREATE,
+                CallType::BulkBalance => AVM_BALANCE_TRANSFER,
                 _ => AVM_CALL,
             };
 

@@ -230,6 +230,7 @@ mod tests {
     use key::generate_keypair;
     use rustc_hex::FromHex;
     use transaction::transaction_queue::test::DummyTransactionDetailsProvider;
+    use transaction::DEFAULT_TRANSACTION_TYPE;
     use aion_types::{U256, Address};
 
     fn queue() -> BanningTransactionQueue {
@@ -254,6 +255,7 @@ mod tests {
             action,
             U256::from(100),
             "3331600055".from_hex().unwrap(),
+            DEFAULT_TRANSACTION_TYPE,            
         )
         .sign(keypair.secret(), None)
     }
