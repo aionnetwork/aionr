@@ -648,7 +648,7 @@ impl FVMAccount {
                 Ok(FVMValue::Normal(value))
             },
             FVMKey::Wide(key) => {
-                let item: U256 = db.get_with(key, ::rlp::decode)?.unwrap_or_else(U256::zero);
+                let item: H256 = db.get_with(key, ::rlp::decode)?.unwrap_or_else(H256::zero);
                 let value: H256 = item.into();
                 self.storage_cache
                     .1
