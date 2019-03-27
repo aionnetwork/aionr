@@ -349,13 +349,14 @@ impl HeaderChain {
         header: &encoded::Header,
         total_difficulty: Option<U256>,
         transition_proof: Option<Vec<u8>>,
+        is_force_reorg: bool,
     ) -> Result<PendingChanges, String> {
         self.insert_inner(
             transaction,
             header,
             total_difficulty,
             transition_proof,
-            false,
+            is_force_reorg,
         )
     }
 

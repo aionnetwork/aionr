@@ -32,6 +32,7 @@ use std::time::{Duration, SystemTime};
 use super::super::action::SyncAction;
 use super::super::event::{SyncEvent, STATUS_GOT};
 use super::super::storage::SyncStorage;
+use super::blocks_bodies_handler::BlockBodiesHandler;
 
 use p2p::*;
 
@@ -75,10 +76,9 @@ impl BlockHeadersHandler {
             }
             node.requested_block_num = from + REQUEST_SIZE;
 
-            info!(target: "sync", "request headers: from number: {}, node: {}, rn: {}.", from, node.get_ip_addr(), node.requested_block_num);
+            debug!(target: "sync", "request headers: from number: {}, node: {}, rn: {}.", from, node.get_ip_addr(), node.requested_block_num);
 
             Self::send_blocks_headers_req(node.node_hash, from, REQUEST_SIZE as u32);
-            SyncStorage::set_requested_block_number_last_time(from + REQUEST_SIZE as u64);
             P2pMgr::update_node(node.node_hash, node);
         }
     }
@@ -152,7 +152,7 @@ impl BlockHeadersHandler {
     }
 
     pub fn handle_blocks_headers_res(node: &mut Node, req: ChannelBuffer) {
-        info!(target: "sync", "BLOCKSHEADERSRES received.");
+        trace!(target: "sync", "BLOCKSHEADERSRES received.");
 
         let node_hash = node.node_hash;
         let rlp = UntrustedRlp::new(req.body.as_slice());
@@ -160,6 +160,7 @@ impl BlockHeadersHandler {
         let mut hases = Vec::new();
         let mut from = 0;
         let mut is_side_chain = false;
+        let block_chain = SyncStorage::get_block_chain();
 
         for header_rlp in rlp.iter() {
             if let Ok(hd) = header_rlp.as_val() {
@@ -173,23 +174,49 @@ impl BlockHeadersHandler {
                         let mut tx = DBTransaction::new();
                         if !is_side_chain {
                             is_side_chain = if node.target_total_difficulty
-                                >= SyncStorage::get_network_total_diff()
-                                && number <= SyncStorage::get_synced_block_number()
+                                >= block_chain.chain_info().total_difficulty
+                                && number <= block_chain.chain_info().best_block_number
                             {
                                 true
                             } else {
                                 false
                             };
                         }
-                        if let Ok(pending) =
-                            header_chain.insert(&mut tx, &header.encoded(), None, is_side_chain)
-                        {
-                            header_chain.apply_pending(tx, pending);
-                            hases.push(hash);
-                            info!(target: "sync", "New block header #{} - {}, imported from {}@{}, {}.", number, hash, node.get_ip_addr(), node.get_node_id(), is_side_chain);
-                            if is_side_chain {
-                                from = number + 1;
+                        let mut total_difficulty = header_chain.score(BlockId::Hash(*parent_hash));
+                        if total_difficulty.is_none() {
+                            total_difficulty =
+                                block_chain.block_total_difficulty(BlockId::Hash(*parent_hash));
+                        }
+                        if let Some(total_difficulty) = total_difficulty {
+                            if let Ok(pending) = header_chain.insert_with_td(
+                                &mut tx,
+                                &header.encoded(),
+                                Some(total_difficulty + *header.difficulty()),
+                                None,
+                                is_side_chain,
+                            ) {
+                                header_chain.apply_pending(tx, pending);
+                                hases.push(hash);
+                                debug!(target: "sync", "New block header #{} - {}, imported from {}@{}, {}.", number, hash, node.get_ip_addr(), node.get_node_id(), is_side_chain);
                             }
+                        } else {
+                            if let Ok(pending) =
+                                header_chain.insert(&mut tx, &header.encoded(), None, is_side_chain)
+                            {
+                                header_chain.apply_pending(tx, pending);
+                                hases.push(hash);
+                                debug!(target: "sync", "New block header #{} - {}, imported from {}@{}, {}.", number, hash, node.get_ip_addr(), node.get_node_id(), is_side_chain);
+                                if is_side_chain {
+                                    from = number + 1;
+                                }
+                            }
+                        }
+                    }
+
+                    if is_side_chain {
+                        from = number + 1;
+                        if node.synced_block_num == 0 {
+                            node.synced_block_num = number;
                         }
                     }
                 } else {
@@ -221,6 +248,10 @@ impl BlockHeadersHandler {
                 info!(target: "sync", "peer node removed.");
                 return;
             }
+        }
+
+        if is_side_chain && hases.len() > 0 {
+            BlockBodiesHandler::send_blocks_bodies_req(node, hases);
         }
 
         SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);

@@ -138,6 +138,7 @@ impl BroadcastsHandler {
                 let header: BlockHeader = h;
                 let last_imported_number = SyncStorage::get_synced_block_number();
                 let hash = header.hash();
+                let number = header.number();
 
                 if last_imported_number > header.number()
                     && last_imported_number - header.number() > MAX_NEW_BLOCK_AGE
@@ -155,7 +156,7 @@ impl BroadcastsHandler {
                             header_chain.insert(&mut tx, &header.encoded(), None, false)
                         {
                             header_chain.apply_pending(tx, pending);
-                            trace!(target: "sync", "New block header #{} - {}, imported from {}@{}.", header.number(), hash, node.get_node_id(), node.get_ip_addr());
+                            trace!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_node_id(), node.get_ip_addr());
                         }
                     }
                 }
@@ -168,7 +169,10 @@ impl BroadcastsHandler {
 
                         match result {
                             Ok(_) => {
-                                trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
+                                trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, number);
+                                if node.synced_block_num > 0 {
+                                    SyncStorage::set_synced_block_number(number);
+                                }
                                 let active_nodes = P2pMgr::get_nodes(ALIVE);
                                 for n in active_nodes.iter() {
                                     // broadcast new block

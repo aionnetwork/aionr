@@ -319,31 +319,31 @@ impl SyncMgr {
 
     fn build_header_chain(to: u64) {
         let header_chain = SyncStorage::get_block_header_chain();
-        let header_chain_info = header_chain.chain_info();
-        let best_header_number = header_chain_info.best_block_number;
+        if to == 0 {
+            return;
+        }
 
-        if best_header_number < to {
-            let cht_number =
-                cht::block_to_cht_number(to).expect(&format!("Invalid block number #{} !", to));
-            let from = cht::start_number(cht_number);
+        let cht_number =
+            cht::block_to_cht_number(to).expect(&format!("Invalid block number #{} !", to));
+        let from = cht::start_number(cht_number);
 
-            let block_chain = SyncStorage::get_block_chain();
-            for number in from..to + 1 {
-                if let Some(ref header) = block_chain.block_header(BlockId::Number(number)) {
-                    let block_total_difficulty =
-                        block_chain.block_total_difficulty(BlockId::Number(number));
-                    let hash = header.hash();
-                    if header_chain.status(&hash) != BlockStatus::InChain {
-                        let mut tx = DBTransaction::new();
-                        if let Ok(pending) = header_chain.insert_with_td(
-                            &mut tx,
-                            header,
-                            block_total_difficulty,
-                            None,
-                        ) {
-                            header_chain.apply_pending(tx, pending);
-                            debug!(target: "sync", "New block header {} imported.", number);
-                        }
+        let block_chain = SyncStorage::get_block_chain();
+        for number in from..to + 1 {
+            if let Some(ref header) = block_chain.block_header(BlockId::Number(number)) {
+                let block_total_difficulty =
+                    block_chain.block_total_difficulty(BlockId::Number(number));
+                let hash = header.hash();
+                if header_chain.status(&hash) != BlockStatus::InChain {
+                    let mut tx = DBTransaction::new();
+                    if let Ok(pending) = header_chain.insert_with_td(
+                        &mut tx,
+                        header,
+                        block_total_difficulty,
+                        None,
+                        false,
+                    ) {
+                        header_chain.apply_pending(tx, pending);
+                        debug!(target: "sync", "New block header {} imported.", number);
                     }
                 }
             }
@@ -569,6 +569,7 @@ impl ChainNotify for Sync {
             }
 
             SyncStorage::set_synced_block_number(max_imported_block_number);
+
             let total_difficulty = client.chain_info().total_difficulty;
             SyncStorage::set_total_difficulty(total_difficulty);
 

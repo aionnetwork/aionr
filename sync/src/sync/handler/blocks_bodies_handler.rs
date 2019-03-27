@@ -27,8 +27,8 @@ use rlp::{RlpStream, UntrustedRlp};
 use super::super::action::SyncAction;
 use super::super::event::SyncEvent;
 use super::super::storage::SyncStorage;
-use p2p::*;
 use super::super::SyncMgr;
+use p2p::*;
 
 const HASH_LEN: usize = 32;
 const REQUEST_SIZE: u64 = 96;
@@ -37,7 +37,9 @@ pub struct BlockBodiesHandler;
 
 impl BlockBodiesHandler {
     pub fn get_blocks_bodies(node: &mut Node) {
-        if node.best_block_num <= SyncStorage::get_synced_block_number() {
+        if node.synced_block_num > 0
+            || node.best_block_num <= SyncStorage::get_synced_block_number()
+        {
             return;
         }
 
@@ -57,7 +59,7 @@ impl BlockBodiesHandler {
         } else {
             number = best_block_number - 1;
         }
-        info!(target: "sync", "send_blocks_bodies_req, {} - {} - {} - {} - {}.", node.best_block_num, SyncStorage::get_synced_block_number(), SyncStorage::get_network_best_block_number(), number, best_header_number);
+        debug!(target: "sync", "send_blocks_bodies_req, {} - {} - {} - {} - {}.", node.synced_block_num, SyncStorage::get_synced_block_number(), SyncStorage::get_network_best_block_number(), number, best_header_number);
         if number == best_header_number {
             return;
         }
@@ -67,7 +69,7 @@ impl BlockBodiesHandler {
                 headers.push(hash);
 
                 if headers.len() == REQUEST_SIZE as usize {
-                    info!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - REQUEST_SIZE, number);
+                    debug!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - REQUEST_SIZE, number);
                     Self::send_blocks_bodies_req(node, headers);
                     return;
                 } else {
@@ -81,19 +83,19 @@ impl BlockBodiesHandler {
                     }
                 }
             } else {
-                number += 1;
+                break;
             }
         }
 
         if headers.len() > 0 {
-            info!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - headers.len() as u64, number);
+            debug!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - headers.len() as u64, number);
             Self::send_blocks_bodies_req(node, headers);
         } else {
-            info!(target: "sync", "send_blocks_bodies_req, {} - {}.", best_header_number, best_block_number);
+            debug!(target: "sync", "send_blocks_bodies_req, {} - {}.", best_header_number, best_block_number);
         }
     }
 
-    fn send_blocks_bodies_req(node: &mut Node, hashes: Vec<H256>) {
+    pub fn send_blocks_bodies_req(node: &mut Node, hashes: Vec<H256>) {
         let mut get_headers_with_bodies_requested =
             SyncStorage::get_headers_with_bodies_requested().lock();
         {
@@ -162,7 +164,7 @@ impl BlockBodiesHandler {
     }
 
     pub fn handle_blocks_bodies_res(node: &mut Node, req: ChannelBuffer) {
-        info!(target: "sync", "BLOCKSBODIESRES received from: {}.", node.get_ip_addr());
+        trace!(target: "sync", "BLOCKSBODIESRES received from: {}.", node.get_ip_addr());
 
         let node_hash = node.node_hash;
 
@@ -200,7 +202,17 @@ impl BlockBodiesHandler {
                                             match result {
                                                 Ok(_) => {
                                                     node.inc_reputation(2);
-                                                    trace!(target: "sync", "Imported block #{} - {} - {}", number, hash, node.get_ip_addr());
+                                                    debug!(target: "sync", "Imported block #{} - {} - {}", number, hash, node.get_ip_addr());
+                                                    if node.target_total_difficulty
+                                                        >= SyncStorage::get_network_total_diff()
+                                                    {
+                                                        if node.synced_block_num > 0 {
+                                                            SyncStorage::set_synced_block_number(
+                                                                number,
+                                                            );
+                                                            node.synced_block_num = 0;
+                                                        }
+                                                    }
                                                 }
                                                 Err(BlockImportError::Import(
                                                     ImportError::AlreadyInChain,
@@ -209,7 +221,7 @@ impl BlockBodiesHandler {
                                                     ImportError::AlreadyQueued,
                                                 )) => {
                                                     node.inc_reputation(1);
-                                                    info!(target: "sync", "Skipped block #{} - {} - {}", number, hash, node.get_ip_addr());
+                                                    debug!(target: "sync", "Skipped block #{} - {} - {}", number, hash, node.get_ip_addr());
                                                 }
                                                 Err(BlockImportError::Block(
                                                     BlockError::UnknownParent(_),
@@ -228,7 +240,7 @@ impl BlockBodiesHandler {
                                                                 parent_hash,
                                                             )) {
                                                             if number > 1 {
-                                                                error!(target: "sync", "block : #{} - {}", number - 1, parent_hash);
+                                                                debug!(target: "sync", "Try to get parent block : #{} - {} - {}", number - 1, parent_hash, node.synced_block_num);
                                                                 Self::send_blocks_bodies_req(
                                                                     node,
                                                                     vec![parent_hash],
@@ -244,31 +256,7 @@ impl BlockBodiesHandler {
                                                         );
                                                         P2pMgr::update_node(node_hash, node);
                                                         return;
-                                                        // Staging...
-                                                        /*
-                                                        if let Ok(mut staged_blocks) = SyncStorage::get_staged_blocks().lock() {
-                                                            if !staged_blocks.contains_key(&parent_hash) {
-                                                                let mut blks = Vec::new();
-                                                                for j in i..item_count {
-                                                                    let hash = hashes[i];
-                                                                    if let Some(header) = header_chain.block_header(BlockId::Hash(hash)) {
-                                                                        if let Ok(body) = block_bodies.at(j) {
-                                                                            if let Ok(txs) = body.at(0) {
-                                                                                let mut data = header.into_inner();
-                                                                                data.extend_from_slice(txs.as_raw());
-                                                                                let mut block = RlpStream::new_list(2);
-                                                                                block.append_raw(&data, 2);
-                                                                                blks.push(block);
-                                                                            }
-                                                                        }
-                                                                    }
-                                                                }
-                                                                if !blks.is_empty() {
-                                                                    staged_blocks.insert(parent_hash, blks);
-                                                                }
-                                                            }
-                                                        }
-                                                        trace!(target: "sync", "Staged block #{} - {} - {}", number, hash, node.get_ip_addr());*/                                                    }
+                                                    }
                                                 }
                                                 Err(e) => {
                                                     if !node.is_over_repeated_threshold() {
@@ -288,6 +276,7 @@ impl BlockBodiesHandler {
                                 }
                             }
                         }
+                        block_chain.flush_queue();
                     } else {
                         if block_chain.queue_info().verifying_queue_size >= REQUEST_SIZE as usize {
                             block_chain.flush_queue();
@@ -311,25 +300,6 @@ impl BlockBodiesHandler {
         {
             if let Some(ref mut peer_node) = P2pMgr::get_an_active_node() {
                 BlockBodiesHandler::get_blocks_bodies(peer_node);
-            }
-        }
-    }
-
-    pub fn import_staged_block(parent_hash: H256) {
-        if let Some(blocks) = SyncStorage::get_staged_blocks_with_hash(parent_hash) {
-            let block_chain = SyncStorage::get_block_chain();
-            for block in blocks.iter() {
-                let result = block_chain.import_block(block.as_raw().to_vec());
-                match result {
-                    Ok(_)
-                    | Err(BlockImportError::Import(ImportError::AlreadyInChain))
-                    | Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
-                        trace!(target: "sync", "Imported staged block, result: {:?}", result);
-                    }
-                    Err(_) => {
-                        return;
-                    }
-                }
             }
         }
     }
