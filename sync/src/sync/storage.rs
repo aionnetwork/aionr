@@ -26,12 +26,12 @@ use acore::spec::Spec;
 use aion_types::{H256, U256};
 use kvdb::KeyValueDB;
 use lru_cache::LruCache;
-use parking_lot::{Mutex as PLMutex, RwLock as PLRwLock};
+use parking_lot::{Mutex, RwLock};
 use rlp::RlpStream;
 use state::Storage;
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::runtime::{Builder, Runtime, TaskExecutor};
 
@@ -39,9 +39,9 @@ lazy_static! {
     static ref BLOCK_CHAIN: Storage<RwLock<BlockChain>> = Storage::new();
     static ref BLOCK_HEADER_CHAIN: Storage<HeaderChain> = Storage::new();
     static ref SYNC_EXECUTORS: Storage<RwLock<SyncExecutor>> = Storage::new();
-    static ref LOCAL_STATUS: PLRwLock<LocalStatus> = PLRwLock::new(LocalStatus::new());
-    static ref NETWORK_STATUS: PLRwLock<NetworkStatus> = PLRwLock::new(NetworkStatus::new());
-    static ref HEADERS_WITH_BODIES_REQUESTED: Storage<PLMutex<HashMap<u64, Vec<H256>>>> =
+    static ref LOCAL_STATUS: RwLock<LocalStatus> = RwLock::new(LocalStatus::new());
+    static ref NETWORK_STATUS: RwLock<NetworkStatus> = RwLock::new(NetworkStatus::new());
+    static ref HEADERS_WITH_BODIES_REQUESTED: Storage<Mutex<HashMap<u64, Vec<H256>>>> =
         Storage::new();
     static ref REQUESTED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, SystemTime>>> = Storage::new();
     static ref SENT_TRANSACTION_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
@@ -70,7 +70,7 @@ pub struct SyncStorage;
 impl SyncStorage {
     pub fn init(client: Arc<Client>, spec: Spec, db: Arc<KeyValueDB>) {
         if let Some(_) = BLOCK_CHAIN.try_get() {
-            if let Ok(mut block_chain) = BLOCK_CHAIN.get().write() {
+            if let Some(mut block_chain) = BLOCK_CHAIN.get().try_write() {
                 if let Some(_) = block_chain.inner {
                 } else {
                     block_chain.inner = Some(client);
@@ -97,7 +97,7 @@ impl SyncStorage {
             let mut received_transactions = VecDeque::new();
             let mut staged_blocks = LruCache::new(MAX_CACHED_BLOCK_HASHES);
 
-            HEADERS_WITH_BODIES_REQUESTED.set(PLMutex::new(HashMap::new()));
+            HEADERS_WITH_BODIES_REQUESTED.set(Mutex::new(HashMap::new()));
             REQUESTED_BLOCK_HASHES.set(Mutex::new(requested_block_hashes));
             SENT_TRANSACTION_HASHES.set(Mutex::new(sent_transaction_hases));
             RECEIVED_TRANSACTIONS.set(Mutex::new(received_transactions));
@@ -111,7 +111,7 @@ impl SyncStorage {
     pub fn get_block_chain() -> Arc<Client> {
         BLOCK_CHAIN
             .get()
-            .read()
+            .try_read()
             .expect("get_block_chain error")
             .clone()
             .inner
@@ -121,7 +121,7 @@ impl SyncStorage {
     pub fn get_chain_info() -> BlockChainInfo {
         let client = BLOCK_CHAIN
             .get()
-            .read()
+            .try_read()
             .expect("get_block_chain error")
             .clone()
             .inner
@@ -134,14 +134,14 @@ impl SyncStorage {
     pub fn get_sync_executor() -> TaskExecutor {
         let rt = SYNC_EXECUTORS
             .get()
-            .read()
+            .try_read()
             .expect("get_executor error")
             .clone()
             .inner
             .expect("get_executor error");
         rt.executor()
     }
-    
+
     pub fn set_total_difficulty(total_difficulty: U256) {
         let mut local_status = LOCAL_STATUS.write();
         local_status.total_difficulty = total_difficulty;
@@ -212,7 +212,7 @@ impl SyncStorage {
         return local_status.is_syncing;
     }
 
-    pub fn get_headers_with_bodies_requested() -> &'static PLMutex<HashMap<u64, Vec<H256>>> {
+    pub fn get_headers_with_bodies_requested() -> &'static Mutex<HashMap<u64, Vec<H256>>> {
         HEADERS_WITH_BODIES_REQUESTED.get()
     }
 
@@ -246,7 +246,7 @@ impl SyncStorage {
     }
 
     pub fn insert_requested_time(hash: H256) {
-        if let Ok(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().lock() {
+        if let Some(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().try_lock() {
             if !requested_block_hashes.contains_key(&hash) {
                 requested_block_hashes.insert(hash, SystemTime::now());
             }
@@ -254,7 +254,7 @@ impl SyncStorage {
     }
 
     pub fn get_requested_time(hash: &H256) -> Option<SystemTime> {
-        if let Ok(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().lock() {
+        if let Some(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().try_lock() {
             if let Some(time) = requested_block_hashes.get_mut(hash) {
                 return Some(time.clone());
             }
@@ -263,7 +263,7 @@ impl SyncStorage {
     }
 
     pub fn clear_requested_blocks() {
-        if let Ok(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().lock() {
+        if let Some(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().try_lock() {
             requested_block_hashes.clear();
         }
     }
@@ -291,7 +291,7 @@ impl SyncStorage {
     }
 
     pub fn get_received_transactions_count() -> usize {
-        if let Ok(received_transactions) = RECEIVED_TRANSACTIONS.get().lock() {
+        if let Some(received_transactions) = RECEIVED_TRANSACTIONS.get().try_lock() {
             return received_transactions.len();
         } else {
             0
@@ -299,8 +299,8 @@ impl SyncStorage {
     }
 
     pub fn insert_received_transaction(transaction: Vec<u8>) {
-        let mut lock = RECEIVED_TRANSACTIONS.get().lock();
-        if let Ok(ref mut received_transactions) = lock {
+        let mut lock = RECEIVED_TRANSACTIONS.get().try_lock();
+        if let Some(ref mut received_transactions) = lock {
             if received_transactions.len() <= MAX_RECEIVED_TRANSACTIONS_COUNT {
                 received_transactions.push_back(transaction);
             }
@@ -314,14 +314,14 @@ impl SyncStorage {
     }
 
     pub fn get_staged_blocks_with_hash(hash: H256) -> Option<Vec<RlpStream>> {
-        if let Ok(mut staged_block_hashes) = STAGED_BLOCKS.get().lock() {
+        if let Some(mut staged_block_hashes) = STAGED_BLOCKS.get().try_lock() {
             return staged_block_hashes.remove(&hash);
         }
         None
     }
 
     pub fn clear_staged_blocks() {
-        if let Ok(mut staged_blocks) = STAGED_BLOCKS.get().lock() {
+        if let Some(mut staged_blocks) = STAGED_BLOCKS.get().try_lock() {
             staged_blocks.clear();
         }
     }
@@ -329,12 +329,12 @@ impl SyncStorage {
     pub fn reset() {
         SYNC_EXECUTORS
             .get()
-            .write()
+            .try_write()
             .expect("get_executor error")
             .inner = None;
         BLOCK_CHAIN
             .get()
-            .write()
+            .try_write()
             .expect("get_block_chain error")
             .inner = None;
     }

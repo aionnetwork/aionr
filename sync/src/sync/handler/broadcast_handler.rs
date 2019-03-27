@@ -45,7 +45,8 @@ impl BroadcastsHandler {
         // broadcast new transactions
         let mut transactions = Vec::new();
         let mut size = 0;
-        if let Ok(mut received_transactions) = SyncStorage::get_received_transactions().try_lock() {
+        if let Some(mut received_transactions) = SyncStorage::get_received_transactions().try_lock()
+        {
             while let Some(transaction) = received_transactions.pop_front() {
                 transactions.extend_from_slice(&transaction);
                 size += 1;
@@ -228,7 +229,9 @@ impl BroadcastsHandler {
 
         let transactions_rlp = UntrustedRlp::new(req.body.as_slice());
         let mut transactions = Vec::new();
-        if let Ok(ref mut transaction_hashes) = SyncStorage::get_sent_transaction_hashes().lock() {
+        if let Some(ref mut transaction_hashes) =
+            SyncStorage::get_sent_transaction_hashes().try_lock()
+        {
             for transaction_rlp in transactions_rlp.iter() {
                 if !transaction_rlp.is_empty() {
                     if let Ok(t) = transaction_rlp.as_val() {

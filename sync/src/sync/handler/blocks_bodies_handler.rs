@@ -177,7 +177,12 @@ impl BlockBodiesHandler {
                     let count = if hashes.len() < item_count {
                         hashes.len()
                     } else {
-                        item_count
+                        if item_count > 0 {
+                            item_count
+                        } else {
+                            debug!(target: "sync", "Body res is empty");
+                            return;
+                        }
                     };
                     let batch_status = block_chain.block_status(BlockId::Hash(hashes[count - 1]));
                     if batch_status == BlockStatus::Unknown {
