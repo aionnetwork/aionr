@@ -27,7 +27,6 @@ use aion_types::H256;
 use bytes::BufMut;
 use kvdb::DBTransaction;
 use rlp::{RlpStream, UntrustedRlp};
-use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime};
 
@@ -86,7 +85,7 @@ impl BroadcastsHandler {
         }
     }
 
-    pub fn propagate_new_blocks(block_hash: &H256, client: Arc<BlockChainClient>) {
+    pub fn propagate_new_blocks(block_hash: &H256) {
         // broadcast new blocks
         let active_nodes = P2pMgr::get_nodes(ALIVE);
 
@@ -97,14 +96,26 @@ impl BroadcastsHandler {
             req.head.action = SyncAction::BROADCASTBLOCK.value();
 
             let header_chain = SyncStorage::get_block_header_chain();
-            if let Some(block) = client.block(BlockId::Hash(*block_hash)) {
+            let block_chain = SyncStorage::get_block_chain();
+            if let Some(block) = block_chain.block(BlockId::Hash(*block_hash)) {
                 let header = block.header();
-                if header_chain.status(&header.parent_hash()) == BlockStatus::InChain {
+                let parent_hash = header.parent_hash();
+                if header_chain.status(&parent_hash) == BlockStatus::InChain {
                     if header_chain.status(block_hash) != BlockStatus::InChain {
-                        let mut tx = DBTransaction::new();
-                        if let Ok(pending) = header_chain.insert(&mut tx, &header, None, false) {
-                            header_chain.apply_pending(tx, pending);
-                            trace!(target: "sync", "New block header #{} - {}, imported from local.", header.number(), block_hash);
+                        if let Some(total_difficulty) =
+                            block_chain.block_total_difficulty(BlockId::Hash(parent_hash))
+                        {
+                            let mut tx = DBTransaction::new();
+                            if let Ok(pending) = header_chain.insert_with_td(
+                                &mut tx,
+                                &header,
+                                Some(total_difficulty + header.difficulty()),
+                                None,
+                                false,
+                            ) {
+                                header_chain.apply_pending(tx, pending);
+                                debug!(target: "sync", "New block header #{} - {}, imported from local.", header.number(), block_hash);
+                            }
                         }
                     }
                 }
@@ -142,7 +153,7 @@ impl BroadcastsHandler {
                 let number = header.number();
 
                 if last_imported_number > header.number()
-                    && last_imported_number - header.number() > MAX_NEW_BLOCK_AGE
+                    && last_imported_number > MAX_NEW_BLOCK_AGE + header.number()
                 {
                     trace!(target: "sync", "Ignored ancient new block {:?}", header.hash());
                     return;
@@ -150,30 +161,41 @@ impl BroadcastsHandler {
 
                 let parent_hash = header.parent_hash();
                 let header_chain = SyncStorage::get_block_header_chain();
+                let block_chain = SyncStorage::get_block_chain();
                 if header_chain.status(&parent_hash) == BlockStatus::InChain {
                     if header_chain.status(&hash) != BlockStatus::InChain {
-                        let mut tx = DBTransaction::new();
-                        if let Ok(pending) =
-                            header_chain.insert(&mut tx, &header.encoded(), None, false)
+                        if let Some(total_difficulty) =
+                            block_chain.block_total_difficulty(BlockId::Hash(*parent_hash))
                         {
-                            header_chain.apply_pending(tx, pending);
-                            trace!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_node_id(), node.get_ip_addr());
+                            let mut tx = DBTransaction::new();
+                            if let Ok(pending) = header_chain.insert_with_td(
+                                &mut tx,
+                                &header.encoded(),
+                                Some(total_difficulty + *header.difficulty()),
+                                None,
+                                false,
+                            ) {
+                                header_chain.apply_pending(tx, pending);
+                                debug!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
+                            }
                         }
                     }
                 }
 
-                let client = SyncStorage::get_block_chain();
-                match client.block_header(BlockId::Hash(*parent_hash)) {
+                match block_chain.block_header(BlockId::Hash(*parent_hash)) {
                     Some(_) => {
                         SyncStorage::insert_requested_time(hash);
-                        let result = client.import_block(block_rlp.as_raw().to_vec());
+                        let result = block_chain.import_block(block_rlp.as_raw().to_vec());
 
                         match result {
                             Ok(_) => {
                                 trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, number);
-                                if node.synced_block_num > 0 {
+                                if node.target_total_difficulty
+                                    >= SyncStorage::get_network_total_diff()
+                                {
                                     SyncStorage::set_synced_block_number(number);
                                 }
+
                                 let active_nodes = P2pMgr::get_nodes(ALIVE);
                                 for n in active_nodes.iter() {
                                     // broadcast new block

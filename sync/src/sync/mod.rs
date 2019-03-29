@@ -18,18 +18,15 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use acore::client::{cht, BlockChainClient, BlockId, BlockStatus, ChainNotify, Client};
-use acore::spec::Spec;
+use acore::client::{cht, BlockChainClient, BlockId, BlockStatus, ChainNotify, Client, header_chain::HeaderChain};
 use acore::transaction::UnverifiedTransaction;
 use aion_types::H256;
-use futures::future::{loop_fn, Loop};
 use futures::{Future, Stream};
-use kvdb::{DBTransaction, KeyValueDB};
+use kvdb::DBTransaction;
 use rlp::UntrustedRlp;
 use std::collections::BTreeMap;
 use std::ops::Index;
 use std::sync::Arc;
-use std::thread;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::timer::Interval;
 
@@ -59,10 +56,10 @@ pub mod storage;
 
 const STATUS_REQ_INTERVAL: u64 = 2;
 const GET_BLOCK_HEADERS_INTERVAL: u64 = 500;
-const BLOCKS_BODIES_REQ_INTERVAL: u64 = 1500;
+const BLOCKS_BODIES_REQ_INTERVAL: u64 = 500;
 const STATICS_INTERVAL: u64 = 30;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
-const REPUTATION_HANDLE_INTERVAL: u64 = 300;
+const REPUTATION_HANDLE_INTERVAL: u64 = 1800;
 const SYNC_STATIC_CAPACITY: usize = 25;
 
 #[derive(Clone)]
@@ -72,65 +69,59 @@ impl SyncMgr {
     fn enable() {
         let executor = SyncStorage::get_sync_executor();
 
-        let status_req_task = loop_fn(0, |_| {
-            // status req
-            StatusHandler::send_status_req();
+        let status_req_task =
+            Interval::new(Instant::now(), Duration::from_secs(STATUS_REQ_INTERVAL))
+                .for_each(move |_| {
+                    // status req
+                    StatusHandler::send_status_req();
 
-            thread::sleep(Duration::from_secs(STATUS_REQ_INTERVAL));
-            if SyncStorage::is_syncing() {
-                Ok(Loop::Continue(0))
-            } else {
-                Ok(Loop::Break(()))
-            }
-        });
+                    Ok(())
+                })
+                .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(status_req_task);
 
-        let get_block_headers_task = loop_fn(0, |_| {
+        let get_block_headers_task = Interval::new(
+            Instant::now(),
+            Duration::from_millis(GET_BLOCK_HEADERS_INTERVAL),
+        ).for_each(move |_| {
             if let Some(ref mut node) = P2pMgr::get_an_alive_node() {
                 BlockHeadersHandler::get_headers(node, 0);
             }
 
-            thread::sleep(Duration::from_millis(GET_BLOCK_HEADERS_INTERVAL));
-            if SyncStorage::is_syncing() {
-                Ok(Loop::Continue(0))
-            } else {
-                Ok(Loop::Break(()))
-            }
-        });
+            Ok(())
+        })
+            .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(get_block_headers_task);
 
-        let blocks_bodies_req_task = loop_fn(0, |counter| {
+        let blocks_bodies_req_task = Interval::new(
+            Instant::now(),
+            Duration::from_millis(BLOCKS_BODIES_REQ_INTERVAL),
+        ).for_each(move |_| {
             // blocks bodies req
             if let Some(ref mut node) = P2pMgr::get_an_alive_node() {
-                BlockBodiesHandler::get_blocks_bodies(node);
+                BlockBodiesHandler::get_blocks_bodies(node, 0);
             }
-            thread::sleep(Duration::from_millis(BLOCKS_BODIES_REQ_INTERVAL));
 
-            if SyncStorage::is_syncing() {
-                Ok(Loop::Continue(counter + 1))
-            } else {
-                Ok(Loop::Break(()))
-            }
-        });
+            Ok(())
+        })
+            .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(blocks_bodies_req_task);
 
         let broadcast_transactions_task = Interval::new(
             Instant::now(),
             Duration::from_millis(BROADCAST_TRANSACTIONS_INTERVAL),
-        )
-        .for_each(move |_| {
+        ).for_each(move |_| {
             BroadcastsHandler::broad_new_transactions();
 
             Ok(())
         })
-        .map_err(|e| error!("interval errored; err={:?}", e));
+            .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(broadcast_transactions_task);
 
         let reputation_handle_task = Interval::new(
             Instant::now(),
             Duration::from_secs(REPUTATION_HANDLE_INTERVAL),
-        )
-        .for_each(move |_| {
+        ).for_each(move |_| {
             let mut active_nodes = P2pMgr::get_nodes(ALIVE);
             active_nodes.sort_by(|a, b| {
                 if a.reputation != b.reputation {
@@ -150,10 +141,11 @@ impl SyncMgr {
             } else {
                 P2pMgr::refresh_top8_node_hashes(top8_nodes);
             }
+            SyncStorage::clear_headers_with_bodies_requested();
             P2pMgr::reset_reputation();
             Ok(())
         })
-        .map_err(|e| error!("interval errored; err={:?}", e));
+            .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(reputation_handle_task);
 
         let statics_task = Interval::new(Instant::now(), Duration::from_secs(STATICS_INTERVAL))
@@ -178,7 +170,7 @@ impl SyncMgr {
                 info!(target: "sync", "{:=^127}", " Sync Statics ");
                 info!(target: "sync", "Best block number: {}, hash: {}, total difficulty: {}", chain_info.best_block_number, chain_info.best_block_hash, chain_info.total_difficulty);
                 info!(target: "sync", "Network Best block number: {}, hash: {}", SyncStorage::get_network_best_block_number(), SyncStorage::get_network_best_block_hash());
-                info!(target: "sync", "Max staged block number: {}", SyncStorage::get_max_staged_block_number());
+                info!(target: "sync", "Max staged block number: {}", SyncStorage::get_block_header_chain().chain_info().best_block_number);
                 info!(target: "sync", "Sync speed: {} blks/sec", sync_speed);
                 info!(target: "sync",
                     "Total/Connected/Active peers: {}/{}/{}",
@@ -223,30 +215,18 @@ impl SyncMgr {
                 }
                 info!(target: "sync", "{:-^127}","");
 
-                if block_number_now + 8 < SyncStorage::get_network_best_block_number()
-                    && block_number_now - block_number_last_time < 2
+                if SyncStorage::get_network_best_block_number() > 0
+                    && block_number_now + 8 < SyncStorage::get_network_best_block_number()
+                    && block_number_now - block_number_last_time < 1
                 {
-                    SyncStorage::get_block_chain().clear_queue();
-                    SyncStorage::get_block_chain().clear_bad();
-                    SyncStorage::clear_requested_blocks();
-                    // SyncStorage::clear_headers_with_bodies_requested();
-                    SyncStorage::set_synced_block_number(
-                        SyncStorage::get_chain_info().best_block_number,
-                    );
-
-                    SyncStorage::clear_staged_blocks();
-                    SyncStorage::set_max_staged_block_number(0);
+                    let block_chain = SyncStorage::get_block_chain();
+                    block_chain.flush_queue();
+                    block_chain.clear_bad();
+                    SyncStorage::clear_headers_with_bodies_requested();
                 }
 
                 SyncStorage::set_synced_block_number_last_time(block_number_now);
                 SyncStorage::set_sync_speed(sync_speed as u16);
-
-                if SyncStorage::get_network_best_block_number()
-                    <= SyncStorage::get_synced_block_number()
-                {
-                    // full synced
-                    SyncStorage::clear_staged_blocks();
-                }
 
                 Ok(())
             })
@@ -376,10 +356,8 @@ pub struct Params {
     pub client: Arc<Client>,
     /// Network layer configuration.
     pub network_config: NetworkConfig,
-    /// Spec
-    pub spec: Spec,
-    /// DB
-    pub db: Arc<KeyValueDB>,
+    /// Header Chain
+    pub header_chain: Arc<HeaderChain>,
 }
 pub struct NetworkService {
     pub config: NetworkConfig,
@@ -398,7 +376,7 @@ impl Sync {
     pub fn get_instance(params: Params) -> Arc<Sync> {
         let chain_info = params.client.chain_info();
 
-        SyncStorage::init(params.client, params.spec, params.db);
+        SyncStorage::init(params.client, params.header_chain);
 
         SyncStorage::set_is_syncing(true);
         // starting block number is the local best block number during kernel startup.
@@ -467,20 +445,22 @@ impl SyncProvider for Sync {
         peer_info_list
     }
 
-    fn enode(&self) -> Option<String> { Some(P2pMgr::get_local_node().get_node_id()) }
+    fn enode(&self) -> Option<String> {
+        Some(P2pMgr::get_local_node().get_node_id())
+    }
 
-    fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats> { BTreeMap::new() }
+    fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats> {
+        BTreeMap::new()
+    }
 
     fn active(&self) -> Vec<ActivePeerInfo> {
         let ac_nodes = P2pMgr::get_nodes(ALIVE);
         ac_nodes
             .into_iter()
-            .map(|node| {
-                ActivePeerInfo {
-                    highest_block_number: node.best_block_num,
-                    id: node.node_id.to_hex(),
-                    ip: node.ip_addr.ip.to_hex(),
-                }
+            .map(|node| ActivePeerInfo {
+                highest_block_number: node.best_block_num,
+                id: node.node_id.to_hex(),
+                ip: node.ip_addr.ip.to_hex(),
             })
             .collect()
     }
@@ -528,7 +508,9 @@ impl NetworkManager for Sync {
         P2pMgr::disable();
     }
 
-    fn network_config(&self) -> NetworkConfig { NetworkConfig::from(self.network.config.clone()) }
+    fn network_config(&self) -> NetworkConfig {
+        NetworkConfig::from(self.network.config.clone())
+    }
 }
 
 impl ChainNotify for Sync {
@@ -541,8 +523,7 @@ impl ChainNotify for Sync {
         sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
         _duration: u64,
-    )
-    {
+    ) {
         if P2pMgr::get_all_nodes_count() == 0 {
             return;
         }
@@ -567,7 +548,7 @@ impl ChainNotify for Sync {
                 return;
             }
 
-            SyncStorage::set_synced_block_number(max_imported_block_number);
+            // SyncStorage::set_synced_block_number(max_imported_block_number);
 
             let total_difficulty = client.chain_info().total_difficulty;
             SyncStorage::set_total_difficulty(total_difficulty);
@@ -588,10 +569,7 @@ impl ChainNotify for Sync {
 
         if !sealed.is_empty() {
             debug!(target: "sync", "Propagating blocks...");
-            BroadcastsHandler::propagate_new_blocks(
-                sealed.index(0),
-                SyncStorage::get_block_chain(),
-            );
+            BroadcastsHandler::propagate_new_blocks(sealed.index(0));
         }
     }
 

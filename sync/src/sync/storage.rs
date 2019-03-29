@@ -20,11 +20,11 @@
  ******************************************************************************/
 
 use acore::block::Block;
-use acore::client::{BlockChainClient, header_chain::HeaderChain, BlockChainInfo, BlockQueueInfo, Client};
+use acore::client::{
+    BlockChainClient, BlockChainInfo, BlockQueueInfo, Client, header_chain::HeaderChain
+};
 use acore::header::Header as BlockHeader;
-use acore::spec::Spec;
 use aion_types::{H256, U256};
-use kvdb::KeyValueDB;
 use lru_cache::LruCache;
 use parking_lot::{Mutex, RwLock};
 use rlp::RlpStream;
@@ -37,7 +37,7 @@ use tokio::runtime::{Builder, Runtime, TaskExecutor};
 
 lazy_static! {
     static ref BLOCK_CHAIN: Storage<RwLock<BlockChain>> = Storage::new();
-    static ref BLOCK_HEADER_CHAIN: Storage<HeaderChain> = Storage::new();
+    static ref BLOCK_HEADER_CHAIN: Storage<RwLock<BlockHeaderChain>> = Storage::new();
     static ref SYNC_EXECUTORS: Storage<RwLock<SyncExecutor>> = Storage::new();
     static ref LOCAL_STATUS: RwLock<LocalStatus> = RwLock::new(LocalStatus::new());
     static ref NETWORK_STATUS: RwLock<NetworkStatus> = RwLock::new(NetworkStatus::new());
@@ -61,6 +61,11 @@ struct BlockChain {
 }
 
 #[derive(Clone)]
+struct BlockHeaderChain {
+    inner: Option<Arc<HeaderChain>>,
+}
+
+#[derive(Clone)]
 struct SyncExecutor {
     inner: Option<Arc<Runtime>>,
 }
@@ -68,7 +73,7 @@ struct SyncExecutor {
 pub struct SyncStorage;
 
 impl SyncStorage {
-    pub fn init(client: Arc<Client>, spec: Spec, db: Arc<KeyValueDB>) {
+    pub fn init(client: Arc<Client>, header_chain: Arc<HeaderChain>) {
         if let Some(_) = BLOCK_CHAIN.try_get() {
             if let Some(mut block_chain) = BLOCK_CHAIN.get().try_write() {
                 if let Some(_) = block_chain.inner {
@@ -81,6 +86,10 @@ impl SyncStorage {
                 inner: Some(client),
             };
 
+            let block_header_chain = BlockHeaderChain {
+                inner: Some(header_chain),
+            };
+
             let sync_executor = SyncExecutor {
                 inner: Some(Arc::new(
                     Builder::new()
@@ -91,7 +100,6 @@ impl SyncStorage {
                 )),
             };
 
-            let block_header_chain = HeaderChain::new(db, &spec).unwrap();
             let mut requested_block_hashes = LruCache::new(MAX_CACHED_BLOCK_HASHES);
             let mut sent_transaction_hases = LruCache::new(MAX_CACHED_TRANSACTION_HASHES);
             let mut received_transactions = VecDeque::new();
@@ -103,7 +111,7 @@ impl SyncStorage {
             RECEIVED_TRANSACTIONS.set(Mutex::new(received_transactions));
             STAGED_BLOCKS.set(Mutex::new(staged_blocks));
             BLOCK_CHAIN.set(RwLock::new(block_chain));
-            BLOCK_HEADER_CHAIN.set(block_header_chain);
+            BLOCK_HEADER_CHAIN.set(RwLock::new(block_header_chain));
             SYNC_EXECUTORS.set(RwLock::new(sync_executor));
         }
     }
@@ -129,7 +137,15 @@ impl SyncStorage {
         client.chain_info()
     }
 
-    pub fn get_block_header_chain() -> &'static HeaderChain { BLOCK_HEADER_CHAIN.get() }
+    pub fn get_block_header_chain() -> Arc<HeaderChain> {
+        BLOCK_HEADER_CHAIN
+            .get()
+            .try_read()
+            .expect("get_block_header_chain error")
+            .clone()
+            .inner
+            .expect("get_block_header_chain error")
+    }
 
     pub fn get_sync_executor() -> TaskExecutor {
         let rt = SYNC_EXECUTORS
@@ -276,8 +292,7 @@ impl SyncStorage {
         best_block_num: u64,
         best_hash: H256,
         target_total_difficulty: U256,
-    )
-    {
+    ) {
         let mut network_status = NETWORK_STATUS.write();
         if target_total_difficulty > network_status.total_diff {
             network_status.best_block_num = best_block_num;

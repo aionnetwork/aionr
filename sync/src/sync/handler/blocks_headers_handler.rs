@@ -36,7 +36,7 @@ use super::blocks_bodies_handler::BlockBodiesHandler;
 
 use p2p::*;
 
-const REQUEST_SIZE: u64 = 48;
+const REQUEST_SIZE: u64 = 24;
 
 pub struct BlockHeadersHandler;
 
@@ -48,7 +48,7 @@ impl BlockHeadersHandler {
         }
         if P2pMgr::get_network_config().sync_from_boot_nodes_only
             && !node.is_from_boot_list
-            && node.state_code & STATUS_GOT == STATUS_GOT
+            || node.state_code & STATUS_GOT != STATUS_GOT
         {
             return;
         }
@@ -62,9 +62,10 @@ impl BlockHeadersHandler {
                 if from == 0 {
                     from = 1;
                 }
-                if SyncStorage::get_synced_block_number() + 512 < from {
-                    return;
-                }
+            }
+
+            if SyncStorage::get_synced_block_number() + 1024 < from {
+                return;
             }
 
             if node.requested_block_num == from + REQUEST_SIZE {
@@ -160,22 +161,23 @@ impl BlockHeadersHandler {
         let mut hases = Vec::new();
         let mut from = 0;
         let mut is_side_chain = false;
-        let block_chain = SyncStorage::get_block_chain();
+        let mut number = 0;
 
         for header_rlp in rlp.iter() {
             if let Ok(hd) = header_rlp.as_val() {
                 let header: BlockHeader = hd;
                 let hash = header.hash();
-                let number = header.number();
+                number = header.number();
                 let parent_hash = header.parent_hash();
 
                 if header_chain.status(parent_hash) == BlockStatus::InChain {
                     if header_chain.status(&hash) != BlockStatus::InChain {
                         let mut tx = DBTransaction::new();
                         if !is_side_chain {
+                            let chain_info = SyncStorage::get_chain_info();
                             is_side_chain = if node.target_total_difficulty
-                                >= block_chain.chain_info().total_difficulty
-                                && number <= block_chain.chain_info().best_block_number
+                                > chain_info.total_difficulty
+                                && number < chain_info.best_block_number
                             {
                                 true
                             } else {
@@ -184,6 +186,7 @@ impl BlockHeadersHandler {
                         }
                         let mut total_difficulty = header_chain.score(BlockId::Hash(*parent_hash));
                         if total_difficulty.is_none() {
+                            let block_chain = SyncStorage::get_block_chain();
                             total_difficulty =
                                 block_chain.block_total_difficulty(BlockId::Hash(*parent_hash));
                         }
@@ -197,7 +200,7 @@ impl BlockHeadersHandler {
                             ) {
                                 header_chain.apply_pending(tx, pending);
                                 hases.push(hash);
-                                debug!(target: "sync", "New block header #{} - {}, imported from {}@{}, {}.", number, hash, node.get_ip_addr(), node.get_node_id(), is_side_chain);
+                                debug!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
                             }
                         } else {
                             if let Ok(pending) =
@@ -222,7 +225,7 @@ impl BlockHeadersHandler {
                 } else {
                     if number <= header_chain.chain_info().best_block_number {
                         if node.target_total_difficulty >= SyncStorage::get_network_total_diff() {
-                            info!(target: "sync", "Side chain found from {}@{}, number: {}.", node.get_ip_addr(), node.get_node_id(), number);
+                            info!(target: "sync", "Side chain found from {}@{}, #{} - {} with parent #{} - {}.", node.get_ip_addr(), node.get_node_id(), number, hash, number - 1, parent_hash);
                             from = if number > REQUEST_SIZE {
                                 number - REQUEST_SIZE
                             } else {
@@ -258,14 +261,13 @@ impl BlockHeadersHandler {
         P2pMgr::update_node(node_hash, node);
 
         if from > 0 {
-            info!(target: "sync", "Recovering from side chain..., number: {}", from);
             BlockHeadersHandler::get_headers(node, from);
         } else {
             if SyncStorage::get_synced_block_number() + 128
                 < SyncStorage::get_network_best_block_number()
             {
                 if let Some(ref mut peer_node) = P2pMgr::get_an_active_node() {
-                    BlockHeadersHandler::get_headers(peer_node, 0);
+                    BlockHeadersHandler::get_headers(peer_node, number);
                 }
             }
         }
