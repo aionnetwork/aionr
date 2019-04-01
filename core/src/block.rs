@@ -700,7 +700,7 @@ fn push_transactions(
 
     debug!(target: "vm", "transactions = {:?}, len = {:?}", transactions, transactions.len());
     for tx in transactions {
-        if is_for_avm(block, tx) {
+        if !is_for_avm(block, tx) {
             if tx_batch.len() >= 1 {
                 block.apply_batch_txs(tx_batch.as_slice(), None);
                 tx_batch.clear();
