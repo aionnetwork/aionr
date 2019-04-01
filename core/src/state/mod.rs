@@ -1054,7 +1054,6 @@ impl<B: Backend> State<B> {
         let mut accounts = self.fvm_manager.cache.borrow_mut();
         debug!(target: "cons", "commit fvm accounts = {:?}", accounts);
         for (address, ref mut a) in accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
-            debug!(target: "cons", "found fastvm account: {:?} at address {:?}", a, address);
             if let Some(ref mut account) = a.account {
                 let addr_hash = account.address_hash(address);
                 {
@@ -1102,7 +1101,6 @@ impl<B: Backend> State<B> {
         let mut avm_accounts = self.avm_manager.cache.borrow_mut();
         debug!(target: "cons", "commit avm accounts = {:?}", avm_accounts);
         for (address, ref mut a) in avm_accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
-            debug!(target: "cons", "found avm account: {:?} at address {:?}", a, address);
             if let Some(ref mut account) = a.account {
                 let addr_hash = account.address_hash(address);
                 {
@@ -1144,7 +1142,6 @@ impl<B: Backend> State<B> {
                 a.state = AccountState::Committed;
                 match a.account {
                     Some(ref mut account) => {
-                        debug!(target: "cons", "insert account = {:?}, address = {:?}", account, address);
                         trie.insert(address, &account.rlp())?;
                     }
                     None => {

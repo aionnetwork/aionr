@@ -470,6 +470,8 @@ macro_rules! impl_account {
             }
 
             fn is_null(&self) -> bool {
+                debug!(target: "vm", "check null: balance = {:?}, nonce = {:?}, code_hash = {:?}",
+                    self.balance.is_zero(), self.nonce.is_zero(), self.code_hash == BLAKE2B_EMPTY);
                 self.balance.is_zero() && self.nonce.is_zero() && self.code_hash == BLAKE2B_EMPTY
             }
 
@@ -725,7 +727,7 @@ impl FVMAccount {
 
 impl AVMAccount {
     pub fn storage_at(&self, db: &HashStore, key: &Bytes) -> trie::Result<Bytes> {
-        println!("get storage: key = {:?}", key);
+        debug!(target: "vm", "get storage: key = {:?}", key);
         if let Some(value) = self.cached_storage_at(key) {
             return Ok(value);
         }
@@ -735,12 +737,12 @@ impl AVMAccount {
         self.storage_cache
             .borrow_mut()
             .insert(key.clone(), value.clone());
-        println!("get storage value from db: key = {:?}, value = {:?}", key, value);
+        debug!(target: "vm", "get storage value from db: key = {:?}, value = {:?}", key, value);
         Ok(value)
     }
 
     pub fn cached_storage_at(&self, key: &Bytes) -> Option<Bytes> {
-        println!("search storage_changes: {:?}", self.storage_changes);
+        debug!(target: "vm", "search storage_changes: {:?}", self.storage_changes);
         if let Some(value) = self.storage_changes.get(key) {
             return Some(value.clone());
         }
@@ -752,11 +754,11 @@ impl AVMAccount {
     }
 
     pub fn set_storage(&mut self, key: Bytes, value: Bytes) {
-        println!("pre storage_changes = {:?}", self.storage_changes);
+        debug!(target: "vm", "pre storage_changes = {:?}", self.storage_changes);
         self.storage_changes.insert(key, value);
         let raw_changes: *mut HashMap<Vec<u8>, Vec<u8>> = unsafe {::std::mem::transmute(&self.storage_changes)};
-        println!("storage_changes ptr = {:?}", raw_changes);
-        println!("post storage_changes = {:?}", self.storage_changes);
+        debug!(target: "vm", "storage_changes ptr = {:?}", raw_changes);
+        debug!(target: "vm", "post storage_changes = {:?}", self.storage_changes);
     }
 }
 

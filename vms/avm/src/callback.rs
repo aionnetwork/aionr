@@ -105,8 +105,8 @@ extern {
 #[no_mangle]
 pub extern fn avm_create_account(handle: *const c_void, address: *const avm_address) {
     let ext: &mut Box<AVMExt> = unsafe { mem::transmute(handle) };
-    println!("create new AVM account");
     let addr: &Address = unsafe { mem::transmute(address) };
+    debug!(target: "vm", "create new AVM account with address: {:?}", addr);
     ext.create_account(addr);
 }
 
@@ -127,10 +127,10 @@ pub extern fn avm_put_code(
     let ext: &mut Box<AVMExt> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
     let code: &avm_bytes = unsafe { mem::transmute(code) };
-    println!("avm_put_code, ext ptr = {:?}", handle);
+    debug!(target: "vm", "avm_put_code at: {:?}", addr);
     let ext_code: &[u8] =
         unsafe { ::std::slice::from_raw_parts(code.pointer, code.length as usize) };
-    //println!("code = {:?}", ext_code);
+    //debug!(target: "vm", "code = {:?}", ext_code);
     ext.save_code(addr, ext_code.to_vec());
 }
 
@@ -139,7 +139,7 @@ pub extern fn avm_get_code(handle: *const c_void, address: *const avm_address) -
     let ext: &mut Box<AVMExt> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
 
-    println!("avm_get_code: 0x{:?}", addr);
+    debug!(target: "vm", "avm_get_code: 0x{:?}", addr);
 
     match ext.get_code(addr) {
         None => {
@@ -168,7 +168,7 @@ pub extern fn avm_put_storage(
 )
 {
     //raw debug info
-    println!("handler = {:?}, address ptr: {:?}; origin key = {:?}, origin value = {:?}",
+    debug!(target: "vm", "handler = {:?}, address ptr: {:?}; origin key = {:?}, origin value = {:?}",
         handle,
         address,
         unsafe {(*key)},
@@ -180,7 +180,7 @@ pub extern fn avm_put_storage(
     let key: &[u8] = unsafe {slice::from_raw_parts((*key).pointer, (*key).length as usize)};
     let value: &[u8] = unsafe {slice::from_raw_parts((*value).pointer, (*value).length as usize)};
 
-    println!("avm_put_storage: addr = 0x{:?}, key = {:?}, value = {:?}", addr, key, value);
+    debug!(target: "vm", "avm_put_storage: addr = 0x{:?}, key = {:?}, value = {:?}", addr, key, value);
 
     ext.sstore(addr, key.into(), value.into());
 }
@@ -196,12 +196,12 @@ pub extern fn avm_get_storage(
     let addr = unsafe {&(*address).bytes.into()};
     let key: &[u8] = unsafe {slice::from_raw_parts((*key).pointer, (*key).length as usize)};
 
-    println!("avm_get_storage: addr = 0x{:?}, key = {:?}", addr, key);
+    debug!(target: "vm", "avm_get_storage: addr = 0x{:?}, key = {:?}", addr, key);
 
     match ext.sload(addr, &key.into()) {
         Some(v) => {
            if v.len() > 0 {
-               println!("storage value = {:?}", v);
+               debug!(target: "vm", "storage value = {:?}", v);
                unsafe {
                    let mut ret = new_fixed_bytes(v.len() as u32);
                    ptr::copy(&v.as_slice()[0], ret.pointer, v.len());
@@ -212,7 +212,7 @@ pub extern fn avm_get_storage(
            }
         },
         None => {
-            println!("value is None");
+            debug!(target: "vm", "value is None");
             unsafe {new_null_bytes()}
         }
     }
@@ -223,7 +223,7 @@ pub extern fn avm_delete_account(handle: *const c_void, address: *const avm_addr
     let ext: &mut Box<AVMExt> = unsafe {mem::transmute(handle)};
     let addr: &Address = unsafe {mem::transmute(address)};
 
-    println!("avm_selfdestruct: {:?}", addr);
+    debug!(target: "vm", "avm_selfdestruct: {:?}", addr);
 
     ext.remove_account(addr);
 }
@@ -237,7 +237,7 @@ pub extern fn avm_get_balance(handle: *const c_void, address: *const avm_address
         bytes: ext.avm_balance(addr).into(),
     };
 
-     println!("avm_get_balance: 0x{:?} = {:?}", addr, balance);
+     debug!(target: "vm", "avm_get_balance: 0x{:?} = {:?}", addr, balance);
 
      balance
 }
@@ -253,7 +253,7 @@ pub extern fn avm_increase_balance(
     let addr: &Address = unsafe {mem::transmute(address)};
     let value: &avm_value = unsafe {{mem::transmute(value)}};
 
-    println!("avm_inc_balance: 0x{:?} += {:?}", addr, value);
+    debug!(target: "vm", "avm_inc_balance: 0x{:?} += {:?}", addr, value);
 
     ext.inc_balance(addr, &value.bytes.into());
 }
@@ -269,7 +269,7 @@ pub extern fn avm_decrease_balance(
     let addr: &Address = unsafe {mem::transmute(address)};
     let value: &avm_value = unsafe {{mem::transmute(value)}};
 
-    println!("avm_inc_balance: 0x{:?} -= {:?}", addr, value);
+    debug!(target: "vm", "avm_inc_balance: 0x{:?} -= {:?}", addr, value);
 
     ext.dec_balance(addr, &value.bytes.into());
 }
@@ -280,7 +280,7 @@ pub extern fn avm_get_nonce(handle: *const c_void, address: *const avm_address) 
     let addr: &Address = unsafe {mem::transmute(address)};
     let nonce = ext.get_nonce(addr);
 
-    println!("avm_get_nonce: 0x{:?} = {:?}", addr, nonce);
+    debug!(target: "vm", "avm_get_nonce: 0x{:?} = {:?}", addr, nonce);
     return nonce;
 }
 
@@ -289,7 +289,7 @@ pub extern fn avm_increment_nonce(handle: *const c_void, address: *const avm_add
     let ext: &mut Box<AVMExt> = unsafe {mem::transmute(handle)};
     let addr: &Address = unsafe {mem::transmute(address)};
 
-    println!("avm_inc_nonce: 0x{:?}", addr);
+    debug!(target: "vm", "avm_inc_nonce: 0x{:?}", addr);
 
     ext.inc_nonce(addr);
 }

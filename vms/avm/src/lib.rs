@@ -9,6 +9,8 @@ extern crate avm_abi;
 extern crate acore_bytes as bytes;
 extern crate blake2b as hash;
 extern crate rand;
+#[macro_use]
+extern crate log;
 
 pub mod avm;
 pub mod callback;

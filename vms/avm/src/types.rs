@@ -113,7 +113,7 @@ impl TransactionContext {
             energy_limit: nrg_limit,
             energy_price: nrg_price,
             transaction_hash: tx_hash,
-            basic_cost: 200_000,
+            basic_cost: 0,//200_000,
             transaction_timestamp: 0 as u64, //TODO:
             block_timestamp: block_timestamp as u64,
             block_number: block_number,
