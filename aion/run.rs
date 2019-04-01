@@ -26,7 +26,7 @@ use std::fs;
 use std::io::{BufRead,BufReader};
 
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
-use acore::client::{Client, DatabaseCompactionProfile, VMType};
+use acore::client::{Client, DatabaseCompactionProfile, header_chain::HeaderChain, VMType};
 use acore::miner::external::ExternalMiner;
 use acore::miner::{Miner, MinerOptions, MinerService};
 use acore::miner::{Stratum, StratumOptions};
@@ -237,6 +237,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     }
 
     let client = service.client();
+    let header_chain = Arc::new(HeaderChain::new(service.db(), &spec).expect("Invalid db..."));
 
     // initialize the local node information store.
     let store = {
@@ -299,8 +300,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         config: SyncConfig::default(),
         client: client.clone(),
         network_config: net_conf,
-        spec: spec,
-        db: service.db().clone(),
+        header_chain: header_chain,
     };
 
     let (sync_provider, network_manager, chain_notify) =

@@ -220,9 +220,6 @@ impl BlockBodiesHandler {
                                                     if node.target_total_difficulty
                                                         >= SyncStorage::get_network_total_diff()
                                                     {
-                                                        SyncStorage::set_synced_block_number(
-                                                            number,
-                                                        );
                                                         node.synced_block_num = 0;
                                                     }
                                                 }
@@ -288,10 +285,10 @@ impl BlockBodiesHandler {
                                 }
                             }
                         }
-                        block_chain.flush_queue();
                     } else {
-                        info!(target: "sync", "BLOCKSBODIESRES received from: {}, batch_status: {:?}, {:?}.", node.get_ip_addr(), batch_status, number);
+                        info!(target: "sync", "BLOCKSBODIESRES received from: {}, batch_status: {:?}, {:?}.", node.get_ip_addr(), batch_status, block_chain.block_number(BlockId::Hash(hashes[count - 1])));
                         block_chain.clear_bad();
+                        block_chain.clear_queue();
                         SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesRes);
                         P2pMgr::update_node(node_hash, node);
                         return;

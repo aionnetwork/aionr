@@ -18,7 +18,9 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use acore::client::{cht, BlockChainClient, BlockId, BlockStatus, ChainNotify, Client, header_chain::HeaderChain};
+use acore::client::{
+    cht, header_chain::HeaderChain, BlockChainClient, BlockId, BlockStatus, ChainNotify, Client,
+};
 use acore::transaction::UnverifiedTransaction;
 use aion_types::H256;
 use futures::{Future, Stream};
@@ -217,10 +219,11 @@ impl SyncMgr {
 
                 if SyncStorage::get_network_best_block_number() > 0
                     && block_number_now + 8 < SyncStorage::get_network_best_block_number()
-                    && block_number_now - block_number_last_time < 1
+                    && block_number_now <= block_number_last_time
                 {
                     let block_chain = SyncStorage::get_block_chain();
                     block_chain.flush_queue();
+                    block_chain.clear_queue();
                     block_chain.clear_bad();
                     SyncStorage::clear_headers_with_bodies_requested();
                 }
@@ -529,12 +532,13 @@ impl ChainNotify for Sync {
         }
 
         if !imported.is_empty() {
+            let client = SyncStorage::get_block_chain();
             let min_imported_block_number = SyncStorage::get_synced_block_number() + 1;
             let mut max_imported_block_number = 0;
-            let client = SyncStorage::get_block_chain();
             for hash in imported.iter() {
                 let block_id = BlockId::Hash(*hash);
-                if client.block_status(block_id) == BlockStatus::InChain {
+                let block_status = client.block_status(block_id);
+                if block_status == BlockStatus::InChain || block_status == BlockStatus::Queued {
                     if let Some(block_number) = client.block_number(block_id) {
                         if max_imported_block_number < block_number {
                             max_imported_block_number = block_number;
@@ -548,7 +552,7 @@ impl ChainNotify for Sync {
                 return;
             }
 
-            // SyncStorage::set_synced_block_number(max_imported_block_number);
+            SyncStorage::set_synced_block_number(max_imported_block_number);
 
             let total_difficulty = client.chain_info().total_difficulty;
             SyncStorage::set_total_difficulty(total_difficulty);
@@ -562,7 +566,6 @@ impl ChainNotify for Sync {
                             "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
                             block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
                     }
-                    //BlockBodiesHandler::import_staged_block(block_hash);
                 }
             }
         }

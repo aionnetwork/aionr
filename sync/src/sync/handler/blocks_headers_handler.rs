@@ -176,7 +176,7 @@ impl BlockHeadersHandler {
                         if !is_side_chain {
                             let chain_info = SyncStorage::get_chain_info();
                             is_side_chain = if node.target_total_difficulty
-                                > chain_info.total_difficulty
+                                >= SyncStorage::get_network_total_diff()
                                 && number < chain_info.best_block_number
                             {
                                 true
@@ -224,7 +224,7 @@ impl BlockHeadersHandler {
                     }
                 } else {
                     if number <= header_chain.chain_info().best_block_number {
-                        if node.target_total_difficulty >= SyncStorage::get_network_total_diff() {
+                        if node.target_total_difficulty > SyncStorage::get_network_total_diff() {
                             info!(target: "sync", "Side chain found from {}@{}, #{} - {} with parent #{} - {}.", node.get_ip_addr(), node.get_node_id(), number, hash, number - 1, parent_hash);
                             from = if number > REQUEST_SIZE {
                                 number - REQUEST_SIZE
