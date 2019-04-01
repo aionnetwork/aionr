@@ -486,7 +486,7 @@ impl Client {
             return 0;
         }
 
-        let max_blocks_to_import = 4;
+        let max_blocks_to_import = 16;
         let (
             imported_blocks,
             import_results,

@@ -70,7 +70,7 @@ impl BlockBodiesHandler {
                 headers.push(hash);
 
                 if headers.len() == REQUEST_SIZE as usize {
-                    info!(target: "sync", "send_blocks_bodies_req, #{} ~ #{}, to {}.", number - REQUEST_SIZE, number, node.get_ip_addr());
+                    debug!(target: "sync", "send_blocks_bodies_req, #{} ~ #{}, to {}.", number - REQUEST_SIZE, number, node.get_ip_addr());
                     Self::send_blocks_bodies_req(node, headers);
                     return;
                 } else {
@@ -93,13 +93,13 @@ impl BlockBodiesHandler {
         }
 
         if headers.len() > 0 {
-            info!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - headers.len() as u64, number);
+            debug!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - headers.len() as u64, number);
             Self::send_blocks_bodies_req(node, headers);
         } else {
             if let Some(hash) = header_chain.block_hash(BlockId::Number(best_header_number)) {
                 Self::send_blocks_bodies_req(node, vec![hash]);
             }
-            info!(target: "sync", "send_blocks_bodies_req, {} - {}.", best_header_number, best_block_number);
+            debug!(target: "sync", "send_blocks_bodies_req, {} - {}.", best_header_number, best_block_number);
         }
     }
 
@@ -172,7 +172,7 @@ impl BlockBodiesHandler {
     }
 
     pub fn handle_blocks_bodies_res(node: &mut Node, req: ChannelBuffer) {
-        info!(target: "sync", "BLOCKSBODIESRES received from: {}.", node.get_ip_addr());
+        trace!(target: "sync", "BLOCKSBODIESRES received from: {}.", node.get_ip_addr());
 
         let node_hash = node.node_hash;
         let mut number = 1;
@@ -286,9 +286,7 @@ impl BlockBodiesHandler {
                             }
                         }
                     } else {
-                        info!(target: "sync", "BLOCKSBODIESRES received from: {}, batch_status: {:?}, {:?}.", node.get_ip_addr(), batch_status, block_chain.block_number(BlockId::Hash(hashes[count - 1])));
-                        block_chain.clear_bad();
-                        block_chain.clear_queue();
+                        debug!(target: "sync", "BLOCKSBODIESRES from: {}, batch_status: {:?}, {:?}.", node.get_ip_addr(), batch_status, block_chain.block_number(BlockId::Hash(hashes[count - 1])));
                         SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesRes);
                         P2pMgr::update_node(node_hash, node);
                         return;

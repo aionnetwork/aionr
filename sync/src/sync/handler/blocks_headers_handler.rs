@@ -53,7 +53,7 @@ impl BlockHeadersHandler {
             return;
         }
 
-        if node.target_total_difficulty >= SyncStorage::get_total_difficulty() {
+        if node.target_total_difficulty >= SyncStorage::get_total_difficulty() && node.best_block_num > SyncStorage::get_synced_block_number() {
             if from == 0 {
                 from = SyncStorage::get_block_header_chain()
                     .chain_info()
@@ -224,7 +224,7 @@ impl BlockHeadersHandler {
                     }
                 } else {
                     if number <= header_chain.chain_info().best_block_number {
-                        if node.target_total_difficulty > SyncStorage::get_network_total_diff() {
+                        if node.target_total_difficulty >= SyncStorage::get_network_total_diff() {
                             info!(target: "sync", "Side chain found from {}@{}, #{} - {} with parent #{} - {}.", node.get_ip_addr(), node.get_node_id(), number, hash, number - 1, parent_hash);
                             from = if number > REQUEST_SIZE {
                                 number - REQUEST_SIZE

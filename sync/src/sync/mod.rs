@@ -222,7 +222,6 @@ impl SyncMgr {
                     && block_number_now <= block_number_last_time
                 {
                     let block_chain = SyncStorage::get_block_chain();
-                    block_chain.flush_queue();
                     block_chain.clear_queue();
                     block_chain.clear_bad();
                     SyncStorage::clear_headers_with_bodies_requested();
@@ -495,9 +494,8 @@ impl NetworkManager for Sync {
         let light_handler = DefaultHandler {
             callback: LightSyncManager::handle,
         };
-
         P2pMgr::enable(self.network_config());
-        debug!(target: "sync", "###### P2P enabled... ######");
+        debug!(target: "sync", "###### Pblock_chain.clear_queue();2P enabled... ######");
 
         NetManager::enable(sync_handler, light_handler);
         debug!(target: "sync", "###### network enabled... ######");
