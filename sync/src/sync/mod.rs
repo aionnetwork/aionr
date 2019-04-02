@@ -332,6 +332,7 @@ impl SyncMgr {
                 }
             }
         }
+        header_chain.flush();
     }
 }
 

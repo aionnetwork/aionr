@@ -299,6 +299,8 @@ impl HeaderChain {
             {
                 chain.apply_pending(tx, pending);
             }
+            chain.flush();
+            
             chain
         };
 
@@ -579,10 +581,16 @@ impl HeaderChain {
     /// Apply pending changes from a previous `insert` operation.
     /// Must be done before the next `insert` call.
     pub fn apply_pending(&self, tx: DBTransaction, pending: PendingChanges) {
-        self.db.write(tx).unwrap();
+        self.db.write_buffered(tx);
         if let Some(best_block) = pending.best_block {
             *self.best_block.write() = best_block;
         }
+    }
+
+    /// Flush db
+    pub fn flush(&self) {
+        let result = self.db.flush();
+        trace!(target: "chain", "Header chain DB flushed: {:?}", result);
     }
 
     /// Get a block's hash by ID. In the case of query by number, only canonical results
