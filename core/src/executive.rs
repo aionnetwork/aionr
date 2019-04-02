@@ -601,6 +601,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             };
 
             let cost = builtin.cost(data);
+            debug!(target: "vm", "builtin gas cost = {:?}", cost);
             if cost <= params.gas {
                 let mut unconfirmed_substate = Substate::new();
                 let mut result = {
@@ -614,6 +615,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         BuiltinExtImpl::new(self.state, builtin_context, &mut unconfirmed_substate);
                     builtin.execute(&mut ext, data)
                 };
+
+                debug!(target: "vm", "builtin result = {:?}", result);
 
                 if result.status_code == ExecStatus::Success {
                     result.gas_left = params.gas - cost;

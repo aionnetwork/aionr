@@ -483,7 +483,7 @@ impl<B: Backend> State<B> {
 
     /// Determine whether an account exists.
     pub fn exists(&self, a: &Address) -> trie::Result<bool> {
-        debug!(target: "vm", "check account");
+        debug!(target: "vm", "check account of: {:?}", a);
         // Bloom filter does not contain empty accounts, so it is important here to
         // check if account exists in the database directly before EIP-161 is in effect.
         // self.ensure_fvm_cached(a, RequireCache::None, false, |a| a.is_some())
@@ -539,7 +539,7 @@ impl<B: Backend> State<B> {
 
     /// Get the balance of account `a`.
     pub fn balance(&self, a: &Address) -> trie::Result<U256> {
-        debug!(target: "vm", "get balance");
+        debug!(target: "vm", "get balance of: {:?}", a);
         let fvm_balance = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref()
                 .map_or(U256::zero(), |account| *account.balance())
@@ -556,7 +556,7 @@ impl<B: Backend> State<B> {
 
     /// Get the nonce of account `a`.
     pub fn nonce(&self, a: &Address) -> trie::Result<U256> {
-        debug!(target: "vm", "get nonce");
+        debug!(target: "vm", "get nonce of {:?}", a);
         let nonce = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref()
                 .map_or(self.fvm_manager.account_start_nonce, |account| *account.nonce())
@@ -573,7 +573,7 @@ impl<B: Backend> State<B> {
 
     /// Get the storage root of account `a`.
     pub fn storage_root(&self, a: &Address) -> trie::Result<Option<H256>> {
-        debug!(target: "vm", "get storage root");
+        debug!(target: "vm", "get storage root of: {:?}", a);
         let root = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref()
                 .and_then(|account| account.storage_root().cloned())
@@ -748,7 +748,7 @@ impl<B: Backend> State<B> {
 
     /// Get accounts' code.
     pub fn code(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
-        debug!(target: "vm", "get code");
+        debug!(target: "vm", "get code of: {:?}", a);
         let code = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::Code, true, |a| {
             a.as_ref().map_or(None, |a| a.code().clone())
         });
@@ -768,7 +768,7 @@ impl<B: Backend> State<B> {
 
     /// Get an account's code hash.
     pub fn code_hash(&self, a: &Address) -> trie::Result<H256> {
-        debug!(target: "vm", "get code hash");
+        debug!(target: "vm", "get code hash of: {:?}", a);
         let hash = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref().map_or(BLAKE2B_EMPTY, |a| a.code_hash())
         });
