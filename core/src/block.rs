@@ -685,6 +685,11 @@ fn is_normal(
         println!("target address = {:?} is normal account", a);
     }
 
+    // fastvm create
+    if let Action::Create = tx.action {
+        return false;
+    }
+
     return true;
 }
 
