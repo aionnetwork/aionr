@@ -217,7 +217,7 @@ impl VMAccountManager<FVMAccount> {
         }
 
         // get from global cache
-        println!("search in fvm global cache");
+        debug!(target: "vm", "search in fvm global cache");
         let result = db.get_cached(a, |mut acc| {
             if let Some(ref mut account) = acc {
                 let accountdb = factories
@@ -227,7 +227,7 @@ impl VMAccountManager<FVMAccount> {
             }
             f(acc.map(|a| &*a))
         });
-        println!("fvm glocal cache returns: {:?}", result);
+        debug!(target: "vm", "fvm glocal cache returns: {:?}", result);
         match result {
             Some(r) => Ok(r),
             None => {
@@ -240,7 +240,7 @@ impl VMAccountManager<FVMAccount> {
                 let state_db = factories
                     .trie
                     .readonly(db.as_hashstore(), &root)?;
-                println!("search fvm account in database: {:?}", a);
+                debug!(target: "vm", "search fvm account in database: {:?}", a);
                 let mut maybe_acc = state_db.get_with(a, FVMAccount::from_rlp)?;
                 debug!(target: "vm", "maybe account = {:?}", maybe_acc);
                 if let Some(ref mut account) = maybe_acc.as_mut() {
@@ -292,7 +292,7 @@ impl VMAccountManager<AVMAccount> {
         }
 
         // get from global cache
-        println!("search in avm global cache");
+        debug!(target: "vm", "search in avm global cache");
         let result = db.get_avm_cached(a, |mut acc| {
             if let Some(ref mut account) = acc {
                 let accountdb = factories
@@ -302,7 +302,7 @@ impl VMAccountManager<AVMAccount> {
             }
             f(acc.map(|a| &*a))
         });
-        println!("avm glocal cache returns: {:?}", result);
+        debug!(target: "vm", "avm glocal cache returns: {:?}", result);
         match result {
             Some(r) => Ok(r),
             None => {
@@ -315,7 +315,7 @@ impl VMAccountManager<AVMAccount> {
                 let state_db = factories
                     .trie
                     .readonly(db.as_hashstore(), &root)?;
-                println!("search avm account in database: {:?}", a);
+                debug!(target: "vm", "search avm account in database: {:?}", a);
                 let mut maybe_acc = state_db.get_with(a, AVMAccount::from_rlp)?;
                 if let Some(ref mut account) = maybe_acc.as_mut() {
                     if account.account_type != AccType::AVM {

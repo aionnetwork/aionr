@@ -215,8 +215,11 @@ impl Factory for AVMFactory {
                 "evmjit max gas is 2 ^ 63"
             );
 
-            let raw_code = Arc::into_raw(params.code.unwrap());
-            let code: &Vec<u8> = unsafe { ::std::mem::transmute(raw_code) };
+            let mut code: &Vec<u8> = &Vec::new();
+            if params.code.is_some() {
+                let raw_code = Arc::into_raw(params.code.unwrap());
+                code = unsafe { ::std::mem::transmute(raw_code) };
+            }
 
             let mut call_data = params.data.unwrap_or_else(Vec::new);
 
