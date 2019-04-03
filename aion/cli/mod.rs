@@ -473,15 +473,15 @@ usage! {
 //            "--cache-size-db=[MB]",
 //            "Override database cache size.",
 
-            ARG arg_cache_size_blocks: (u32) = 8u32, or |c: &Config| c.db.as_ref()?.cache_size_blocks.clone(),
+            ARG arg_cache_size_blocks: (u32) = 32u32, or |c: &Config| c.db.as_ref()?.cache_size_blocks.clone(),
             "--cache-size-blocks=[MB]",
             "Specify the prefered size of the blockchain cache in megabytes.",
 
-            ARG arg_cache_size_queue: (u32) = 40u32, or |c: &Config| c.db.as_ref()?.cache_size_queue.clone(),
+            ARG arg_cache_size_queue: (u32) = 128u32, or |c: &Config| c.db.as_ref()?.cache_size_queue.clone(),
             "--cache-size-queue=[MB]",
             "Specify the maximum size of memory to use for block queue.",
 
-            ARG arg_cache_size_state: (u32) = 25u32, or |c: &Config| c.db.as_ref()?.cache_size_state.clone(),
+            ARG arg_cache_size_state: (u32) = 64u32, or |c: &Config| c.db.as_ref()?.cache_size_state.clone(),
             "--cache-size-state=[MB]",
             "Specify the maximum size of memory to use for the state cache.",
 
