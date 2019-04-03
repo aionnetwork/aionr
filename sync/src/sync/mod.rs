@@ -126,7 +126,7 @@ impl SyncMgr {
             let block_chain = SyncStorage::get_block_chain();
             block_chain.flush_queue();
 
-            thread::sleep(Duration::from_millis(200));
+            thread::sleep(Duration::from_millis(500));
             if SyncStorage::is_syncing() {
                 Ok(Loop::Continue(0))
             } else {

@@ -154,8 +154,7 @@ impl Client {
         db: Arc<KeyValueDB>,
         miner: Arc<Miner>,
         message_channel: IoChannel<ClientIoMessage>,
-    ) -> Result<Arc<Client>, ::error::Error>
-    {
+    ) -> Result<Arc<Client>, ::error::Error> {
         let trie_spec = match config.fat_db {
             true => TrieSpec::Fat,
             false => TrieSpec::Secure,
@@ -301,10 +300,14 @@ impl Client {
     }
 
     /// Returns engine reference.
-    pub fn engine(&self) -> &EthEngine { &*self.engine }
+    pub fn engine(&self) -> &EthEngine {
+        &*self.engine
+    }
 
     fn notify<F>(&self, f: F)
-    where F: Fn(&ChainNotify) {
+    where
+        F: Fn(&ChainNotify),
+    {
         for np in self.notify.read().iter() {
             if let Some(n) = np.upgrade() {
                 f(&*n);
@@ -313,9 +316,15 @@ impl Client {
     }
     /// Flush the block import queue.
     pub fn flush_queue(&self) {
-        self.block_queue.flush();
+        //self.block_queue.flush();
+        let mut is_flush = false;
         while !self.block_queue.queue_info().is_empty() {
             self.import_verified_blocks();
+            is_flush = true;
+        }
+        if is_flush {
+            let result = self.db.read().flush();
+            trace!(target: "client", "DB flushed, result: {:?}.", result);
         }
     }
 
@@ -328,16 +337,14 @@ impl Client {
     /// The env info as of a given block.
     /// returns `None` if the block unknown.
     pub fn env_info(&self, id: BlockId) -> Option<EnvInfo> {
-        self.block_header(id).map(|header| {
-            EnvInfo {
-                number: header.number(),
-                author: header.author(),
-                timestamp: header.timestamp(),
-                difficulty: header.difficulty(),
-                last_hashes: self.build_last_hashes(header.parent_hash()),
-                gas_used: U256::default(),
-                gas_limit: header.gas_limit(),
-            }
+        self.block_header(id).map(|header| EnvInfo {
+            number: header.number(),
+            author: header.author(),
+            timestamp: header.timestamp(),
+            difficulty: header.difficulty(),
+            last_hashes: self.build_last_hashes(header.parent_hash()),
+            gas_used: U256::default(),
+            gas_limit: header.gas_limit(),
         })
     }
 
@@ -450,8 +457,7 @@ impl Client {
     fn calculate_enacted_retracted(
         &self,
         import_results: &[ImportRoute],
-    ) -> (Vec<H256>, Vec<H256>)
-    {
+    ) -> (Vec<H256>, Vec<H256>) {
         fn map_to_vec(map: Vec<(H256, bool)>) -> Vec<H256> {
             map.into_iter().map(|(k, _v)| k).collect()
         }
@@ -486,7 +492,7 @@ impl Client {
             return 0;
         }
 
-        let max_blocks_to_import = 16;
+        let max_blocks_to_import = 8;
         let (
             imported_blocks,
             import_results,
@@ -579,9 +585,6 @@ impl Client {
             }
         }
 
-        let result = self.db.read().flush();
-        trace!(target: "client", "DB flushed, result: {:?}.", result);
-        
         imported
     }
 
@@ -592,8 +595,7 @@ impl Client {
         &self,
         block_bytes: Bytes,
         receipts_bytes: Bytes,
-    ) -> Result<H256, ::error::Error>
-    {
+    ) -> Result<H256, ::error::Error> {
         let block = BlockView::new(&block_bytes);
         let header = block.header();
         let receipts = ::rlp::decode_list(&receipts_bytes);
@@ -656,7 +658,9 @@ impl Client {
     //
     // The header passed is from the original block data and is sealed.
     fn commit_block<B>(&self, block: B, header: &Header, block_data: &[u8]) -> ImportRoute
-    where B: IsBlock + Drain {
+    where
+        B: IsBlock + Drain,
+    {
         let hash = &header.hash();
         let number = header.number();
         let parent = header.parent_hash();
@@ -714,8 +718,7 @@ impl Client {
         state_db: &StateDB,
         chain: &BlockChain,
         batch: &mut DBTransaction,
-    )
-    {
+    ) {
         use engines::EpochChange;
 
         let hash = header.hash();
@@ -759,8 +762,9 @@ impl Client {
                                 self.engine.account_start_nonce(header.number()),
                                 self.factories.clone(),
                                 self.db.read().clone(),
-                            )
-                            .expect("state known to be available for just-imported block; qed");
+                            ).expect(
+                                "state known to be available for just-imported block; qed",
+                            );
 
                             let res = Executive::new(&mut state, &env_info, self.engine.machine())
                                 .transact(&transaction, false, false);
@@ -793,9 +797,7 @@ impl Client {
 
                 debug!(target: "client", "Block {} signals epoch end.", hash);
 
-                let pending = PendingTransition {
-                    proof: proof,
-                };
+                let pending = PendingTransition { proof: proof };
                 chain.insert_pending_transition(batch, hash, pending);
             }
             EpochChange::No => {}
@@ -837,7 +839,9 @@ impl Client {
 
     // use a state-proving closure for the given block.
     fn with_proving_caller<F, T>(&self, id: BlockId, with_call: F) -> T
-    where F: FnOnce(&::machine::Call) -> T {
+    where
+        F: FnOnce(&::machine::Call) -> T,
+    {
         let call = |a, d| {
             let tx = self.contract_call_tx(id, a, d);
             let (result, items) = self
@@ -898,7 +902,9 @@ impl Client {
     }
 
     /// Get shared miner reference.
-    pub fn miner(&self) -> Arc<Miner> { self.miner.clone() }
+    pub fn miner(&self) -> Arc<Miner> {
+        self.miner.clone()
+    }
 
     /// Replace io channel. Useful for testing.
     pub fn set_io_channel(&self, io_channel: IoChannel<ClientIoMessage>) {
@@ -943,8 +949,7 @@ impl Client {
                 self.engine.account_start_nonce(block_number),
                 self.factories.clone(),
                 self.db.read().clone(),
-            )
-            .ok()
+            ).ok()
         })
     }
 
@@ -956,12 +961,10 @@ impl Client {
         // fast path for latest state.
         match id {
             BlockId::Pending => self.state_at(BlockId::Latest),
-            id => {
-                match self.block_number(id) {
-                    None | Some(0) => None,
-                    Some(n) => self.state_at(BlockId::Number(n - 1)),
-                }
-            }
+            id => match self.block_number(id) {
+                None | Some(0) => None,
+                Some(n) => self.state_at(BlockId::Number(n - 1)),
+            },
         }
     }
 
@@ -974,12 +977,13 @@ impl Client {
             self.engine.account_start_nonce(header.number()),
             self.factories.clone(),
             self.db.read().clone(),
-        )
-        .expect("State root of best block header always valid.")
+        ).expect("State root of best block header always valid.")
     }
 
     /// Get info on the cache.
-    pub fn blockchain_cache_info(&self) -> BlockChainCacheSize { self.chain.read().cache_size() }
+    pub fn blockchain_cache_info(&self) -> BlockChainCacheSize {
+        self.chain.read().cache_size()
+    }
 
     /// Get the report.
     pub fn report(&self) -> ClientReport {
@@ -990,7 +994,9 @@ impl Client {
 
     /// Tick the client.
     // TODO: manage by real events.
-    pub fn tick(&self) { self.check_garbage(); }
+    pub fn tick(&self) {
+        self.check_garbage();
+    }
 
     fn check_garbage(&self) {
         self.chain.read().collect_garbage();
@@ -998,7 +1004,9 @@ impl Client {
     }
 
     /// Ask the client what the history parameter is.
-    pub fn pruning_history(&self) -> u64 { self.history }
+    pub fn pruning_history(&self) -> u64 {
+        self.history
+    }
 
     fn block_hash(chain: &BlockChain, miner: &Miner, id: BlockId) -> Option<H256> {
         match id {
@@ -1006,11 +1014,9 @@ impl Client {
             BlockId::Number(number) => chain.block_hash(number),
             BlockId::Earliest => chain.block_hash(0),
             BlockId::Latest => Some(chain.best_block_hash()),
-            BlockId::Pending => {
-                miner
-                    .pending_block_header(chain.best_block_number())
-                    .map(|header| header.hash())
-            }
+            BlockId::Pending => miner
+                .pending_block_header(chain.best_block_number())
+                .map(|header| header.hash()),
         }
     }
 
@@ -1035,8 +1041,7 @@ impl Client {
         block_id: BlockId,
         address: Address,
         data: Bytes,
-    ) -> SignedTransaction
-    {
+    ) -> SignedTransaction {
         let from = Address::default();
         //        Transaction {
         //            nonce: self.nonce(&from, block_id).unwrap_or_else(|| self.engine.account_start_nonce(0)),
@@ -1054,8 +1059,7 @@ impl Client {
             Action::Call(address),
             U256::default(),
             data,
-        )
-        .fake_sign(from)
+        ).fake_sign(from)
     }
 
     fn do_virtual_call(
@@ -1064,16 +1068,14 @@ impl Client {
         state: &mut State<StateDB>,
         t: &SignedTransaction,
         analytics: CallAnalytics,
-    ) -> Result<Executed, CallError>
-    {
+    ) -> Result<Executed, CallError> {
         fn call(
             state: &mut State<StateDB>,
             env_info: &EnvInfo,
             machine: &::machine::EthereumMachine,
             state_diff: bool,
             transaction: &SignedTransaction,
-        ) -> Result<Executed, CallError>
-        {
+        ) -> Result<Executed, CallError> {
             let original_state = if state_diff {
                 Some(state.clone())
             } else {
@@ -1221,8 +1223,7 @@ impl BlockChainClient for Client {
         transaction: &SignedTransaction,
         analytics: CallAnalytics,
         block: BlockId,
-    ) -> Result<Executed, CallError>
-    {
+    ) -> Result<Executed, CallError> {
         let mut env_info = self.env_info(block).ok_or(CallError::StatePruned)?;
         env_info.gas_limit = U256::max_value();
 
@@ -1237,8 +1238,7 @@ impl BlockChainClient for Client {
         &self,
         transactions: &[(SignedTransaction, CallAnalytics)],
         block: BlockId,
-    ) -> Result<Vec<Executed>, CallError>
-    {
+    ) -> Result<Vec<Executed>, CallError> {
         let mut env_info = self.env_info(block).ok_or(CallError::StatePruned)?;
         env_info.gas_limit = U256::max_value();
 
@@ -1302,7 +1302,9 @@ impl BlockChainClient for Client {
         /// Returns the lowest value between `lower` and `upper` for which `cond` returns true.
         /// We assert: `cond(lower) = false`, `cond(upper) = true`
         fn binary_chop<F, E>(mut lower: U256, mut upper: U256, mut cond: F) -> Result<U256, E>
-        where F: FnMut(U256) -> Result<bool, E> {
+        where
+            F: FnMut(U256) -> Result<bool, E>,
+        {
             while upper - lower > 1.into() {
                 let mid = (lower + upper) / 2.into();
                 trace!(target: "estimate_gas", "{} .. {} .. {}", lower, mid, upper);
@@ -1339,8 +1341,7 @@ impl BlockChainClient for Client {
         &self,
         block: BlockId,
         analytics: CallAnalytics,
-    ) -> Result<Box<Iterator<Item = Executed>>, CallError>
-    {
+    ) -> Result<Box<Iterator<Item = Executed>>, CallError> {
         let mut env_info = self.env_info(block).ok_or(CallError::StatePruned)?;
         let body = self.block_body(block).ok_or(CallError::StatePruned)?;
         let mut state = self
@@ -1368,9 +1369,13 @@ impl BlockChainClient for Client {
         self.clear_queue();
     }
 
-    fn spec_name(&self) -> String { self.config.spec_name.clone() }
+    fn spec_name(&self) -> String {
+        self.config.spec_name.clone()
+    }
 
-    fn best_block_header(&self) -> encoded::Header { self.chain.read().best_block_header() }
+    fn best_block_header(&self) -> encoded::Header {
+        self.chain.read().best_block_header()
+    }
 
     fn block_header(&self, id: BlockId) -> Option<::encoded::Header> {
         let chain = self.chain.read();
@@ -1386,7 +1391,9 @@ impl BlockChainClient for Client {
         Self::block_hash(&chain, &self.miner, id).and_then(|hash| chain.block_header_data(&hash))
     }
 
-    fn block_number(&self, id: BlockId) -> Option<BlockNumber> { self.block_number_ref(&id) }
+    fn block_number(&self, id: BlockId) -> Option<BlockNumber> {
+        self.block_number_ref(&id)
+    }
 
     fn block_body(&self, id: BlockId) -> Option<encoded::Body> {
         let chain = self.chain.read();
@@ -1492,8 +1499,7 @@ impl BlockChainClient for Client {
         id: BlockId,
         after: Option<&Address>,
         count: u64,
-    ) -> Option<Vec<Address>>
-    {
+    ) -> Option<Vec<Address>> {
         if !self.factories.trie.is_fat() {
             trace!(target: "fatdb", "list_accounts: Not a fat DB");
             return None;
@@ -1538,8 +1544,7 @@ impl BlockChainClient for Client {
         account: &Address,
         after: Option<&H128>,
         count: u64,
-    ) -> Option<Vec<H128>>
-    {
+    ) -> Option<Vec<H128>> {
         if !self.factories.trie.is_fat() {
             trace!(target: "fatdb", "list_stroage: Not a fat DB");
             return None;
@@ -1679,8 +1684,7 @@ impl BlockChainClient for Client {
         &self,
         block_bytes: Bytes,
         receipts_bytes: Bytes,
-    ) -> Result<H256, BlockImportError>
-    {
+    ) -> Result<H256, BlockImportError> {
         {
             // check block order
             let header = BlockView::new(&block_bytes).header_view();
@@ -1698,11 +1702,17 @@ impl BlockChainClient for Client {
             .map_err(Into::into)
     }
 
-    fn queue_info(&self) -> BlockQueueInfo { self.block_queue.queue_info() }
+    fn queue_info(&self) -> BlockQueueInfo {
+        self.block_queue.queue_info()
+    }
 
-    fn clear_queue(&self) { self.block_queue.clear(); }
+    fn clear_queue(&self) {
+        self.block_queue.clear();
+    }
 
-    fn clear_bad(&self) { self.block_queue.clear_bad(); }
+    fn clear_bad(&self) {
+        self.block_queue.clear_bad();
+    }
 
     fn chain_info(&self) -> BlockChainInfo {
         let mut chain_info = self.chain.read().chain_info();
@@ -1787,8 +1797,7 @@ impl BlockChainClient for Client {
         block_id: BlockId,
         address: Address,
         data: Bytes,
-    ) -> Result<Bytes, String>
-    {
+    ) -> Result<Bytes, String> {
         let transaction = self.contract_call_tx(block_id, address, data);
 
         self.call(&transaction, Default::default(), block_id)
@@ -1796,7 +1805,9 @@ impl BlockChainClient for Client {
             .map(|executed| executed.output)
     }
 
-    fn registrar_address(&self) -> Option<Address> { self.registrar_address.clone() }
+    fn registrar_address(&self) -> Option<Address> {
+        self.registrar_address.clone()
+    }
 
     fn registry_address(&self, name: String, block: BlockId) -> Option<Address> {
         let address = match self.registrar_address {
@@ -1823,8 +1834,7 @@ impl BlockChainClient for Client {
         &self,
         key1: H256,
         id: BlockId,
-    ) -> Option<(Vec<Bytes>, ::types::basic_account::BasicAccount)>
-    {
+    ) -> Option<(Vec<Bytes>, ::types::basic_account::BasicAccount)> {
         self.state_at(id)
             .and_then(move |state| state.prove_account(key1).ok())
     }
@@ -1833,8 +1843,7 @@ impl BlockChainClient for Client {
         &self,
         transaction: SignedTransaction,
         id: BlockId,
-    ) -> Option<(Bytes, Vec<DBValue>)>
-    {
+    ) -> Option<(Bytes, Vec<DBValue>)> {
         let (header, mut env_info) = match (self.block_header(id), self.env_info(id)) {
             (Some(s), Some(e)) => (s, e),
             _ => return None,
@@ -1866,15 +1875,16 @@ impl BlockChainClient for Client {
 }
 
 impl MiningBlockChainClient for Client {
-    fn as_block_chain_client(&self) -> &BlockChainClient { self }
+    fn as_block_chain_client(&self) -> &BlockChainClient {
+        self
+    }
 
     fn prepare_open_block(
         &self,
         author: Address,
         gas_range_target: (U256, U256),
         extra_data: Bytes,
-    ) -> OpenBlock
-    {
+    ) -> OpenBlock {
         let engine = &*self.engine;
         let chain = self.chain.read();
         let h = chain.best_block_hash();
@@ -1897,8 +1907,7 @@ impl MiningBlockChainClient for Client {
             extra_data,
             is_epoch_begin,
             self.db.read().clone(),
-        )
-        .expect(
+        ).expect(
             "OpenBlock::new only fails if parent state root invalid; state root of best block's \
              header is never invalid; qed",
         );
@@ -1912,7 +1921,9 @@ impl MiningBlockChainClient for Client {
         block
     }
 
-    fn vm_factory(&self) -> &VmFactory { &self.factories.vm }
+    fn vm_factory(&self) -> &VmFactory {
+        &self.factories.vm
+    }
 
     fn broadcast_transaction(&self, transaction: Bytes) {
         self.notify(|notify| {
@@ -1971,11 +1982,15 @@ impl MiningBlockChainClient for Client {
         Ok(h)
     }
 
-    fn prepare_block_interval(&self) -> Duration { self.miner.prepare_block_interval() }
+    fn prepare_block_interval(&self) -> Duration {
+        self.miner.prepare_block_interval()
+    }
 }
 
 impl super::traits::EngineClient for Client {
-    fn update_sealing(&self) { self.miner.update_sealing(self) }
+    fn update_sealing(&self) {
+        self.miner.update_sealing(self)
+    }
 
     fn submit_seal(&self, block_hash: H256, seal: Vec<Bytes>) {
         if self.miner.submit_seal(self, block_hash, seal).is_err() {
@@ -1991,9 +2006,13 @@ impl super::traits::EngineClient for Client {
         self.chain.read().epoch_transition_for(parent_hash)
     }
 
-    fn chain_info(&self) -> BlockChainInfo { BlockChainClient::chain_info(self) }
+    fn chain_info(&self) -> BlockChainInfo {
+        BlockChainClient::chain_info(self)
+    }
 
-    fn as_full_client(&self) -> Option<&BlockChainClient> { Some(self) }
+    fn as_full_client(&self) -> Option<&BlockChainClient> {
+        Some(self)
+    }
 
     fn block_number(&self, id: BlockId) -> Option<BlockNumber> {
         BlockChainClient::block_number(self, id)
@@ -2005,7 +2024,9 @@ impl super::traits::EngineClient for Client {
 }
 
 impl Drop for Client {
-    fn drop(&mut self) { self.engine.stop(); }
+    fn drop(&mut self) {
+        self.engine.stop();
+    }
 }
 
 /// Returns `LocalizedReceipt` given `LocalizedTransaction`
@@ -2013,8 +2034,7 @@ impl Drop for Client {
 fn transaction_receipt(
     mut tx: LocalizedTransaction,
     mut receipts: Vec<Receipt>,
-) -> LocalizedReceipt
-{
+) -> LocalizedReceipt {
     assert_eq!(
         receipts.len(),
         tx.transaction_index + 1,
@@ -2048,16 +2068,14 @@ fn transaction_receipt(
             .logs()
             .into_iter()
             .enumerate()
-            .map(|(i, log)| {
-                LocalizedLogEntry {
-                    entry: log.clone(),
-                    block_hash: block_hash,
-                    block_number: block_number,
-                    transaction_hash: transaction_hash,
-                    transaction_index: transaction_index,
-                    transaction_log_index: i,
-                    log_index: no_of_logs + i,
-                }
+            .map(|(i, log)| LocalizedLogEntry {
+                entry: log.clone(),
+                block_hash: block_hash,
+                block_number: block_number,
+                transaction_hash: transaction_hash,
+                transaction_index: transaction_index,
+                transaction_log_index: i,
+                log_index: no_of_logs + i,
             })
             .collect(),
         log_bloom: receipt.log_bloom().clone(),
