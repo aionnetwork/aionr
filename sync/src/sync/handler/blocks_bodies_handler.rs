@@ -49,7 +49,7 @@ impl BlockBodiesHandler {
         }
 
         let header_chain = SyncStorage::get_block_header_chain();
-        let mut best_header_number = header_chain.chain_info().best_block_number;
+        let mut best_header_number = header_chain.best_block().number;
         let mut best_block_number = SyncStorage::get_chain_info().best_block_number;
         let mut headers = Vec::new();
         let mut number;
@@ -74,7 +74,7 @@ impl BlockBodiesHandler {
                     Self::send_blocks_bodies_req(node, headers);
                     return;
                 } else {
-                    best_header_number = header_chain.chain_info().best_block_number;
+                    best_header_number = header_chain.best_block().number;
                     best_block_number = SyncStorage::get_chain_info().best_block_number;
 
                     if from == 0 {
@@ -273,10 +273,11 @@ impl BlockBodiesHandler {
                                                 Err(e) => {
                                                     warn!(target: "sync", "Bad block #{} - {:?} - {}, {:?}", number, hash, node.get_ip_addr(), e);
                                                     node.inc_repeated();
+                                                    block_chain.clear_bad();
                                                     P2pMgr::remove_peer(node_hash);
 
-                                                    let from = if number > 4 {
-                                                        number - 4
+                                                    let from = if number > REQUEST_SIZE * 2 {
+                                                        number - REQUEST_SIZE * 2
                                                     } else {
                                                         1
                                                     };
@@ -285,8 +286,7 @@ impl BlockBodiesHandler {
                                                     {
                                                         warn!(target: "sync", "Try to get block : #{}", from);
                                                         BlockBodiesHandler::get_blocks_bodies(
-                                                            peer_node,
-                                                            from,
+                                                            peer_node, from,
                                                         );
                                                     }
 

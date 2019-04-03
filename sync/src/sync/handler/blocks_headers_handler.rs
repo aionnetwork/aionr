@@ -226,7 +226,7 @@ impl BlockHeadersHandler {
                         }
                     }
                 } else {
-                    if number <= header_chain.chain_info().best_block_number {
+                    if number < header_chain.best_block().number {
                         if node.target_total_difficulty >= SyncStorage::get_network_total_diff() {
                             info!(target: "sync", "Side chain found from {}@{}, #{} - {} with parent #{} - {}.", node.get_ip_addr(), node.get_node_id(), number, hash, number - 1, parent_hash);
                             from = if number > REQUEST_SIZE {
