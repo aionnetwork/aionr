@@ -96,6 +96,8 @@ pub enum BlockError {
     UnknownParent(H256),
     /// No transition to epoch number.
     UnknownEpochTransition(u64),
+    /// Grant parent given is unknown.
+    UnknownGrantParent(H256),
 }
 
 impl fmt::Display for BlockError {
@@ -137,6 +139,7 @@ impl fmt::Display for BlockError {
                 format!("Unknown transition to epoch number: {}", num)
             }
             TooManyTransactions(ref address) => format!("Too many transactions from: {}", address),
+            UnknownGrantParent(ref hash) => format!("Unknown grant parent: {}", hash),
         };
 
         f.write_fmt(format_args!("Block error ({})", msg))

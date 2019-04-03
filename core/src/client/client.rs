@@ -579,7 +579,9 @@ impl Client {
             }
         }
 
-        self.db.read().flush().expect("DB flush failed.");
+        let result = self.db.read().flush();
+        trace!(target: "client", "DB flushed, result: {:?}.", result);
+        
         imported
     }
 

@@ -20,9 +20,9 @@
  ******************************************************************************/
 
 use super::DifficultyCalc;
-use error::{Error,BlockError};
+use error::{BlockError, Error};
 use header::Header;
-use unexpected::{Mismatch};
+use unexpected::Mismatch;
 
 pub trait GrantParentHeaderValidator {
     fn validate(
@@ -43,8 +43,7 @@ impl<'a> GrantParentHeaderValidator for DifficultyValidator<'a> {
         header: &Header,
         parent_header: &Header,
         grant_parent_header: Option<&Header>,
-    ) -> Result<(), Error>
-    {
+    ) -> Result<(), Error> {
         let difficulty = *header.difficulty();
         let parent_difficulty = *parent_header.difficulty();
         if parent_header.number() == 0u64 {
@@ -52,18 +51,14 @@ impl<'a> GrantParentHeaderValidator for DifficultyValidator<'a> {
                 return Err(BlockError::InvalidDifficulty(Mismatch {
                     expected: parent_difficulty,
                     found: difficulty,
-                })
-                .into());
+                }).into());
             } else {
                 return Ok(());
             }
         }
 
         if grant_parent_header.is_none() {
-            panic!(
-                "non-1st block must have grant parent. block num: {}",
-                header.number()
-            );
+            Err(BlockError::UnknownGrantParent(*parent_header.parent_hash()).into())
         } else {
             let calc_difficulty = self.difficulty_calc.calculate_difficulty(
                 header,
@@ -74,8 +69,7 @@ impl<'a> GrantParentHeaderValidator for DifficultyValidator<'a> {
                 Err(BlockError::InvalidDifficulty(Mismatch {
                     expected: calc_difficulty,
                     found: difficulty,
-                })
-                .into())
+                }).into())
             } else {
                 Ok(())
             }

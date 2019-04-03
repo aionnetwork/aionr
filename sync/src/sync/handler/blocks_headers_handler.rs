@@ -172,19 +172,21 @@ impl BlockHeadersHandler {
                 let parent_hash = header.parent_hash();
 
                 if header_chain.status(parent_hash) == BlockStatus::InChain {
-                    if header_chain.status(&hash) != BlockStatus::InChain {
-                        let mut tx = DBTransaction::new();
-                        if !is_side_chain {
-                            let chain_info = SyncStorage::get_chain_info();
+                    if !is_side_chain {
+                        let chain_info = SyncStorage::get_chain_info();
+                        if number < chain_info.best_block_number {
                             is_side_chain = if node.target_total_difficulty
                                 >= SyncStorage::get_network_total_diff()
-                                && number < chain_info.best_block_number
                             {
                                 true
                             } else {
                                 false
                             };
                         }
+                    }
+
+                    if header_chain.status(&hash) != BlockStatus::InChain {
+                        let mut tx = DBTransaction::new();
                         let mut total_difficulty = header_chain.score(BlockId::Hash(*parent_hash));
                         if total_difficulty.is_none() {
                             let block_chain = SyncStorage::get_block_chain();

@@ -179,7 +179,7 @@ impl QueueSignal {
             == false
         {
             let channel = self.message_channel.lock().clone();
-            if let Err(e) = channel.send_sync(ClientIoMessage::BlockVerified) {
+            if let Err(e) = channel.send(ClientIoMessage::BlockVerified) {
                 debug!(target: "verification","Error sending BlockVerified message: {:?}", e);
             }
         }

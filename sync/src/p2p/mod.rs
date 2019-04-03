@@ -23,6 +23,7 @@ use bincode::config;
 use bytes::BytesMut;
 use futures::sync::mpsc;
 use futures::{Future, Stream};
+use parking_lot::{Mutex, RwLock};
 use rand::{thread_rng, Rng};
 use state::Storage;
 use std::collections::{hash_map::DefaultHasher, HashMap, HashSet};
@@ -30,7 +31,6 @@ use std::hash::{Hash, Hasher};
 use std::io;
 use std::net::{Shutdown, TcpStream as StdTcpStream};
 use std::os::unix::io::{AsRawFd, FromRawFd};
-use parking_lot::{Mutex, RwLock};
 use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
@@ -87,32 +87,42 @@ impl P2pMgr {
             let listener = TcpListener::bind(&addr).expect("Failed to bind");
             info!(target: "net", "Listening on: {}", local_addr);
             let thread_pool = Self::get_thread_pool();
-            let network_config = P2pMgr::get_network_config();
             let server = listener
                 .incoming()
                 .map_err(|e| error!(target: "net", "Failed to accept socket; error = {:?}", e))
                 .for_each(move |socket| {
                     if let Ok(peer_addr) = socket.peer_addr() {
-                        let peer_ip = peer_addr.ip().to_string();
-                        if !Self::is_black_ip(&peer_ip) {
-                            socket
-                                .set_recv_buffer_size(1 << 24)
-                                .expect("set_recv_buffer_size failed");
-
-                            socket
-                                .set_keepalive(Some(Duration::from_secs(30)))
-                                .expect("set_keepalive failed");
-
-                            let mut peer_node = Node::new_with_addr(peer_addr);
-                            Self::process_inbounds(socket, &mut peer_node, handle);
-                        } else {
-                            info!(target: "net", "Too many peers, the limitation is {}", network_config.max_peers);
+                        let max_peers = P2pMgr::get_network_config().max_peers;
+                        if P2pMgr::get_nodes_count(ALIVE) >= max_peers as usize {
+                            info!(target: "net", "Too many peers, the limitation is {}", max_peers);
                             if let Err(e) = socket.shutdown(Shutdown::Both) {
                                 error!(target: "net", "Invalid socket， {}", e);
+                            }
+                        } else {
+                            let peer_ip = peer_addr.ip().to_string();
+                            if !Self::is_black_ip(&peer_ip) {
+                                socket
+                                    .set_recv_buffer_size(1 << 24)
+                                    .expect("set_recv_buffer_size failed");
+
+                                socket
+                                    .set_keepalive(Some(Duration::from_secs(30)))
+                                    .expect("set_keepalive failed");
+
+                                let mut peer_node = Node::new_with_addr(peer_addr);
+                                Self::process_inbounds(socket, &mut peer_node, handle);
+                            } else {
+                                info!(target: "net", "Blocked IP {}", peer_ip);
+                                if let Err(e) = socket.shutdown(Shutdown::Both) {
+                                    error!(target: "net", "Invalid socket， {}", e);
+                                }
                             }
                         }
                     } else {
                         error!(target: "net", "Invalid socket: {:?}", socket);
+                        if let Err(e) = socket.shutdown(Shutdown::Both) {
+                            error!(target: "net", "Invalid socket， {}", e);
+                        }
                     }
 
                     Ok(())
@@ -160,9 +170,13 @@ impl P2pMgr {
         }
     }
 
-    pub fn get_thread_pool() -> &'static ThreadPool { TP.get() }
+    pub fn get_thread_pool() -> &'static ThreadPool {
+        TP.get()
+    }
 
-    pub fn get_network_config() -> &'static NetworkConfig { NETWORK_CONFIG.get() }
+    pub fn get_network_config() -> &'static NetworkConfig {
+        NETWORK_CONFIG.get()
+    }
 
     pub fn is_black_ip(ip: &String) -> bool {
         if let Some(ip_black_list) = IP_BLACK_LIST.try_read() {
@@ -204,9 +218,13 @@ impl P2pMgr {
         boot_nodes
     }
 
-    pub fn get_local_node() -> &'static Node { LOCAL_NODE.get() }
+    pub fn get_local_node() -> &'static Node {
+        LOCAL_NODE.get()
+    }
 
-    pub fn disable() { Self::reset(); }
+    pub fn disable() {
+        Self::reset();
+    }
 
     pub fn reset() {
         if let Some(mut sockets_map) = SOCKETS_MAP.try_lock() {
@@ -476,8 +494,7 @@ impl P2pMgr {
         socket: TcpStream,
         peer_node: &mut Node,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    )
-    {
+    ) {
         let local_ip = P2pMgr::get_local_node().ip_addr.get_ip();
         let mut value = peer_node.ip_addr.get_addr();
         value.push_str(&local_ip);
@@ -535,8 +552,7 @@ impl P2pMgr {
         socket: TcpStream,
         mut peer_node: Node,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    )
-    {
+    ) {
         let node_hash = peer_node.node_hash;
         let (tx, rx) = mpsc::channel(32);
         peer_node.tx = Some(tx);
@@ -578,15 +594,13 @@ impl P2pMgr {
 
     pub fn send(node_hash: u64, msg: ChannelBuffer) {
         match Self::get_tx(node_hash) {
-            Some(mut tx) => {
-                match tx.try_send(msg) {
-                    Ok(()) => {}
-                    Err(e) => {
-                        Self::remove_peer(node_hash);
-                        debug!(target: "net", "Failed to send the msg, Err: {}", e);
-                    }
+            Some(mut tx) => match tx.try_send(msg) {
+                Ok(()) => {}
+                Err(e) => {
+                    Self::remove_peer(node_hash);
+                    debug!(target: "net", "Failed to send the msg, Err: {}", e);
                 }
-            }
+            },
             None => {
                 Self::remove_peer(node_hash);
                 debug!(target: "net", "Invalid peer !, node_hash: {}", node_hash);
@@ -692,7 +706,9 @@ pub struct NetworkConfig {
 }
 
 impl Default for NetworkConfig {
-    fn default() -> Self { NetworkConfig::new() }
+    fn default() -> Self {
+        NetworkConfig::new()
+    }
 }
 
 impl NetworkConfig {

@@ -300,7 +300,7 @@ impl HeaderChain {
                 chain.apply_pending(tx, pending);
             }
             chain.flush();
-            
+
             chain
         };
 
@@ -506,22 +506,22 @@ impl HeaderChain {
                     // iterable function which removes the candidates as it goes
                     // along. this will only be called until the CHT is complete.
                     let iter = || {
-                        let era_entry = candidates
-                            .remove(&i)
-                            .expect("all eras are sequential with no gaps; qed");
-                        transaction.delete(COL, era_key(i).as_bytes());
+                        if let Some(era_entry) = candidates.remove(&i) {
+                            transaction.delete(COL, era_key(i).as_bytes());
 
-                        i += 1;
+                            i += 1;
 
-                        // prune old blocks and epoch proofs.
-                        for ancient in &era_entry.candidates {
-                            let maybe_transition = live_epoch_proofs.remove(&ancient.hash);
-                            if let Some(epoch_transition) = maybe_transition {
-                                transaction.delete(COL, &*transition_key(ancient.hash));
+                            // prune old blocks and epoch proofs.
+                            for ancient in &era_entry.candidates {
+                                let maybe_transition = live_epoch_proofs.remove(&ancient.hash);
+                                if let Some(epoch_transition) = maybe_transition {
+                                    transaction.delete(COL, &*transition_key(ancient.hash));
 
-                                if ancient.hash == era_entry.canonical_hash {
-                                    last_canonical_transition =
-                                        match self.db.get(COL, &ancient.hash) {
+                                    if ancient.hash == era_entry.canonical_hash {
+                                        last_canonical_transition = match self
+                                            .db
+                                            .get(COL, &ancient.hash)
+                                        {
                                             Err(e) => {
                                                 warn!(target: "chain", "Error reading from DB: {}\n
 												", e);
@@ -539,14 +539,17 @@ impl HeaderChain {
                                                 Some((epoch_transition, header_value))
                                             }
                                         };
+                                    }
                                 }
+
+                                transaction.delete(COL, &ancient.hash);
                             }
 
-                            transaction.delete(COL, &ancient.hash);
+                            let canon = &era_entry.candidates[0];
+                            (canon.hash, canon.total_difficulty)
+                        } else {
+                            (H256::default(), U256::default())
                         }
-
-                        let canon = &era_entry.candidates[0];
-                        (canon.hash, canon.total_difficulty)
                     };
                     cht::compute_root(cht_num, ::itertools::repeat_call(iter))
                         .expect("fails only when too few items; this is checked; qed")

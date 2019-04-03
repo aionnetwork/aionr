@@ -204,6 +204,7 @@ impl BlockBodiesHandler {
                                     if let Ok(body) = block_bodies.at(i) {
                                         if let Ok(txs) = body.at(0) {
                                             let parent_hash = header.parent_hash();
+                                            let difficulty = header.difficulty();
                                             number = header.number();
                                             let mut data = header.into_inner();
                                             data.extend_from_slice(txs.as_raw());
@@ -239,10 +240,12 @@ impl BlockBodiesHandler {
                                                         error!(target: "sync", "Invalid genesis !!!");
                                                         return;
                                                     } else if node.target_total_difficulty
+                                                        + difficulty * 2
                                                         < SyncStorage::get_network_total_diff()
                                                     {
                                                         error!(target: "sync", "Invalid peer {}@{} !!!", node.get_ip_addr(), node.get_node_id());
                                                         P2pMgr::remove_peer(node.node_hash);
+                                                        return;
                                                     } else {
                                                         if let Some(_parent_header) = header_chain
                                                             .block_header(BlockId::Hash(
@@ -268,15 +271,25 @@ impl BlockBodiesHandler {
                                                     }
                                                 }
                                                 Err(e) => {
-                                                    if !node.is_over_repeated_threshold() {
-                                                        warn!(target: "sync", "Bad block #{} - {:?} - {}, {:?}", number, hash, node.get_ip_addr(), e);
-                                                        block_chain.clear_bad();
-                                                        block_chain.clear_queue();
-                                                        node.inc_repeated();
+                                                    warn!(target: "sync", "Bad block #{} - {:?} - {}, {:?}", number, hash, node.get_ip_addr(), e);
+                                                    node.inc_repeated();
+                                                    P2pMgr::remove_peer(node_hash);
+
+                                                    let from = if number > 4 {
+                                                        number - 4
                                                     } else {
-                                                        warn!(target: "sync", "Bad block #{} - {:?} - {}@{}, {:?}, peer node remove.", number, hash, node.get_node_id(), node.get_ip_addr(), e);
-                                                        P2pMgr::remove_peer(node.node_hash);
+                                                        1
+                                                    };
+                                                    if let Some(ref mut peer_node) =
+                                                        P2pMgr::get_an_active_node()
+                                                    {
+                                                        warn!(target: "sync", "Try to get block : #{}", from);
+                                                        BlockBodiesHandler::get_blocks_bodies(
+                                                            peer_node,
+                                                            from,
+                                                        );
                                                     }
+
                                                     return;
                                                 }
                                             }
