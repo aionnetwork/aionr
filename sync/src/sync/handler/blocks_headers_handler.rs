@@ -159,7 +159,7 @@ impl BlockHeadersHandler {
         let node_hash = node.node_hash;
         let rlp = UntrustedRlp::new(req.body.as_slice());
         let header_chain = SyncStorage::get_block_header_chain();
-        let mut hases = Vec::new();
+        let mut hashes = Vec::new();
         let mut from = 0;
         let mut is_side_chain = false;
         let mut number = 0;
@@ -202,7 +202,7 @@ impl BlockHeadersHandler {
                                 is_side_chain,
                             ) {
                                 header_chain.apply_pending(tx, pending);
-                                hases.push(hash);
+                                hashes.push(hash);
                                 debug!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
                             }
                         } else {
@@ -210,7 +210,7 @@ impl BlockHeadersHandler {
                                 header_chain.insert(&mut tx, &header.encoded(), None, is_side_chain)
                             {
                                 header_chain.apply_pending(tx, pending);
-                                hases.push(hash);
+                                hashes.push(hash);
                                 debug!(target: "sync", "New block header #{} - {}, imported from {}@{}, {}.", number, hash, node.get_ip_addr(), node.get_node_id(), is_side_chain);
                                 if is_side_chain {
                                     from = number + 1;
@@ -263,8 +263,8 @@ impl BlockHeadersHandler {
             header_chain.flush();
         }
 
-        if is_side_chain && hases.len() > 0 {
-            BlockBodiesHandler::send_blocks_bodies_req(node, hases);
+        if is_side_chain && hashes.len() > 0 {
+            BlockBodiesHandler::send_blocks_bodies_req(node, hashes);
         }
 
         SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
