@@ -316,14 +316,14 @@ impl Client {
     }
     /// Flush the block import queue.
     pub fn flush_queue(&self) {
-        //self.block_queue.flush();
+        // self.block_queue.flush();
         let mut is_flush = false;
         while !self.block_queue.queue_info().is_empty() {
             self.import_verified_blocks();
             is_flush = true;
         }
         if is_flush {
-            let result = self.db.read().flush();
+            let result = self.db.write().flush();
             trace!(target: "client", "DB flushed, result: {:?}.", result);
         }
     }

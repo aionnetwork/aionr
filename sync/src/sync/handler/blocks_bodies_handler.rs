@@ -276,8 +276,8 @@ impl BlockBodiesHandler {
                                                     block_chain.clear_bad();
                                                     P2pMgr::remove_peer(node_hash);
 
-                                                    let from = if number > REQUEST_SIZE * 2 {
-                                                        number - REQUEST_SIZE * 2
+                                                    let from = if number > REQUEST_SIZE {
+                                                        number - REQUEST_SIZE
                                                     } else {
                                                         1
                                                     };

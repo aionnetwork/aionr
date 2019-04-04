@@ -61,7 +61,7 @@ pub mod storage;
 const STATUS_REQ_INTERVAL: u64 = 2;
 const GET_BLOCK_HEADERS_INTERVAL: u64 = 500;
 const BLOCKS_BODIES_REQ_INTERVAL: u64 = 500;
-const STATICS_INTERVAL: u64 = 30;
+const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const REPUTATION_HANDLE_INTERVAL: u64 = 1800;
 const SYNC_STATIC_CAPACITY: usize = 25;
@@ -126,7 +126,7 @@ impl SyncMgr {
             let block_chain = SyncStorage::get_block_chain();
             block_chain.flush_queue();
 
-            thread::sleep(Duration::from_millis(500));
+            thread::sleep(Duration::from_millis(200));
             if SyncStorage::is_syncing() {
                 Ok(Loop::Continue(0))
             } else {
@@ -236,9 +236,11 @@ impl SyncMgr {
                     && block_number_now + 8 < SyncStorage::get_network_best_block_number()
                     && block_number_now <= block_number_last_time
                 {
-                    let block_chain = SyncStorage::get_block_chain();
-                    block_chain.clear_queue();
-                    block_chain.clear_bad();
+                    {
+                        let block_chain = SyncStorage::get_block_chain();
+                        block_chain.clear_queue();
+                        block_chain.clear_bad();
+                    }
                     SyncStorage::clear_headers_with_bodies_requested();
                 }
 
