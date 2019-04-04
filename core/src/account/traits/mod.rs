@@ -15,8 +15,8 @@ pub enum AccType {
 impl From<U256> for AccType {
     fn from(t: U256) -> AccType {
         match t.low_u32() {
-            0x01 => AccType::AVM,
-            _ => AccType::FVM,
+            0x01 => AccType::FVM,
+            _ => AccType::AVM,
         }
     }
 }
@@ -24,8 +24,8 @@ impl From<U256> for AccType {
 impl From<AccType> for U256 {
     fn from(t: AccType) -> U256 {
         match t {
-            AccType::AVM => 0x01.into(),
-            AccType::FVM => 0x00.into(),
+            AccType::AVM => 0x0f.into(),
+            AccType::FVM => 0x01.into(),
         }
     }
 }

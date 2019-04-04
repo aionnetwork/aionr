@@ -22,7 +22,8 @@
 
 //! Transaction Execution environment.
 use std::sync::{Arc, Mutex};
-use blake2b::{blake2b, BLAKE2B_EMPTY};
+use std::collections::HashSet;
+use blake2b::{blake2b};
 use aion_types::{H256, U256, U512, Address};
 #[cfg(test)]
 use aion_types::U128;
@@ -48,6 +49,9 @@ use transaction::{Action, SignedTransaction};
 use crossbeam;
 pub use executed::Executed;
 use precompiled::builtin::{BuiltinExtImpl, BuiltinContext};
+
+use std::thread;
+use std::sync::mpsc::{channel, Sender};
 
 #[cfg(debug_assertions)]
 /// Roughly estimate what stack size each level of evm depth will use. (Debug build)
@@ -139,6 +143,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     pub fn as_avm_externalities<'any>(
         &'any mut self,
         substates: &'any mut [Substate],
+        tx_chnnl: Sender<i32>,
     ) -> AVMExternalities<'any, B>
     {
         AVMExternalities::new(
@@ -147,6 +152,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             self.machine,
             self.depth,
             substates,
+            tx_chnnl,
         )
     }
 
@@ -320,13 +326,28 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         let depth_threshold =
             local_stack_size.saturating_sub(STACK_SIZE_ENTRY_OVERHEAD) / STACK_SIZE_PER_DEPTH;
 
+        // start a new thread to listen avm signal
+        let (tx, rx) = channel();
+        thread::spawn(move || {
+            let mut signal = rx.recv().expect("Unable to receive from channel");
+            while signal >= 0 {
+                match signal {
+                    0 => println!("commit state"),
+                    _ => println!("unknown signal"),
+                }
+                signal = rx.recv().expect("Unable to receive from channel");
+            }
+
+            println!("received {:?}, kill channel", signal);
+        });
+
         // Ordinary execution - keep VM in same thread
         debug!(target: "vm", "depth threshold = {:?}", depth_threshold);
         if self.depth != depth_threshold {
             let mut vm_factory = self.state.vm_factory();
             // consider put global callback in ext
             let mut ext = self
-                .as_avm_externalities(unconfirmed_substate);
+                .as_avm_externalities(unconfirmed_substate, tx.clone());
             //TODO: make create/exec compatible with fastvm
             let vm = vm_factory.create(VMType::AVM);
             return vm.exec_v1(params, &mut ext);
@@ -337,7 +358,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let mut vm_factory = self.state.vm_factory();
 
             let mut ext = self
-                .as_avm_externalities(unconfirmed_substate);
+                .as_avm_externalities(unconfirmed_substate, tx.clone());
 
             scope
                 .builder()
@@ -816,6 +837,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             //let refund_value = gas_left * t.gas_price;
             let fees_value = gas_used * t.gas_price;
 
+            let mut touched = HashSet::new();
+            for account in substate.touched {
+                touched.insert(account);
+            }
+
             final_results.push(Ok(Executed {
                 exception: result.exception,
                 gas: t.gas,
@@ -827,6 +853,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 output: result.return_data.mem,
                 state_diff: None,
                 transaction_fee: fees_value,
+                touched: touched,
+                state_root: result.state_root,
             }))
         }
 
@@ -897,6 +925,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             output: result.return_data.mem,
             state_diff: None,
             transaction_fee: fees_value,
+            touched: HashSet::new(),
         })
     }
 
@@ -941,6 +970,7 @@ Address};
     use bytes::Bytes;
     use error::ExecutionError;
     use avm_abi::{ToBytes};
+    use blake2b::BLAKE2B_EMPTY;
 
     fn make_aion_machine() -> EthereumMachine {
         let machine = ::ethereum::new_aion_test_machine();

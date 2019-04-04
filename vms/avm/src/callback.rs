@@ -61,6 +61,8 @@ pub struct avm_callbacks {
         extern fn(handle: *const c_void, address: *const avm_address, value: *const avm_value),
     pub get_nonce: extern fn(handle: *const c_void, address: *const avm_address) -> u64,
     pub increment_nonce: extern fn(handle: *const c_void, address: *const avm_address),
+    pub touch_account: extern fn(handle: *const c_void, address: *const avm_address, idx: i32),
+    pub send_signal: extern fn(handle: *const c_void, sig_num: i32) -> avm_bytes,
 }
 
 impl fmt::Display for avm_address {
@@ -294,6 +296,29 @@ pub extern fn avm_increment_nonce(handle: *const c_void, address: *const avm_add
     ext.inc_nonce(addr);
 }
 
+#[no_mangle]
+pub extern fn avm_touch_account(handle: *const c_void, address: *const avm_address, index: i32) {
+    let ext: &mut Box<AVMExt> = unsafe {mem::transmute(handle)};
+    let addr: &Address  = unsafe {mem::transmute(address)};
+
+    println!("touch account: {:?} - {:?}", addr, index);
+    
+    ext.touch_account(addr, index);
+}
+
+#[no_mangle]
+pub extern fn avm_send_signal(handle: *const c_void, sig_num: i32) -> avm_bytes {
+    let ext: &mut Box<AVMExt> = unsafe {mem::transmute(handle)};
+    ext.send_signal(sig_num);
+    ext.commit();
+    let root = ext.root();
+    unsafe {
+        let ret = new_fixed_bytes(32);
+        ptr::copy(&root[0], ret.pointer, 32);
+        ret
+    }
+}
+
 pub fn register_callbacks() {
     unsafe {
         callbacks.create_account = avm_create_account;
@@ -308,6 +333,8 @@ pub fn register_callbacks() {
         callbacks.decrease_balance = avm_decrease_balance;
         callbacks.get_nonce = avm_get_nonce;
         callbacks.increment_nonce = avm_increment_nonce;
+        callbacks.touch_account = avm_touch_account;
+        callbacks.send_signal = avm_send_signal;
     }
 }
 

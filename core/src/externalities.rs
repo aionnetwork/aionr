@@ -23,6 +23,7 @@
 //! Transaction Execution environment.
 use std::cmp;
 use std::sync::Arc;
+use std::sync::mpsc::Sender;
 use aion_types::{H256, U256, H128, Address};
 use bytes::Bytes;
 use state::{Backend as StateBackend, State, Substate, CleanupMode, AccType, FVMKey, FVMValue};
@@ -81,6 +82,7 @@ where B: StateBackend
     machine: &'a Machine,
     depth: usize,
     substates: &'a mut [Substate],
+    tx: Sender<i32>,
 }
 
 impl<'a, B: 'a> AVMExternalities<'a, B>
@@ -93,6 +95,7 @@ where B: StateBackend
         machine: &'a Machine,
         depth: usize,
         substates: &'a mut [Substate],
+        tx: Sender<i32>,
     ) -> Self
     {
         AVMExternalities {
@@ -101,6 +104,7 @@ where B: StateBackend
             machine: machine,
             depth: depth,
             substates: substates,
+            tx: tx,
         }
     }
 }
@@ -188,6 +192,22 @@ where B: StateBackend
         self.state
             .inc_nonce(a)
             .expect("increment nonce failed")
+    }
+
+    fn touch_account(&mut self, a: &Address, index: i32) {
+        self.substates[index as usize].touched.insert(*a);
+    }
+
+    fn send_signal(&mut self, signal: i32) {
+        self.tx.send(signal);
+    }
+
+    fn commit(&mut self) {
+        self.state.commit();
+    }
+
+    fn root(&self) -> H256{
+        self.state.root().clone()
     }
 }
 

@@ -12,11 +12,13 @@ use std::sync::atomic::AtomicPtr;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
+use std::sync::mpsc::channel;
 use types::{TransactionContext, TransactionResult};
 use vm_common::{EnvInfo, CallType};
 use bytes::Bytes;
 use aion_types::{Address, U256, H256};
 use hash::{BLAKE2B_EMPTY};
+
 
 /// We keep a single JVM instance in the background, which will be shared
 /// among multiple threads. Before invoking any JNI methods, the executing
@@ -263,7 +265,8 @@ impl AVM {
         let length = decoder.decode_int()?;
         for _i in 0..length {
             let result = decoder.decode_bytes()?;
-            results.push(TransactionResult::new(result)?);
+            let state_root = decoder.decode_bytes()?;
+            results.push(TransactionResult::new(result, state_root)?);
         }
 
         Ok(results)
@@ -285,6 +288,10 @@ pub trait AVMExt {
     fn inc_nonce(&mut self, address: &Address);
     fn env_info(&self) -> &EnvInfo;
     fn depth(&self) -> usize;
+    fn touch_account(&mut self, address: &Address, index: i32);
+    fn send_signal(&mut self, signal: i32);
+    fn commit(&mut self);
+    fn root(&self) -> H256;
 }
 
 // TODO: should be a trait, possible to avoid cloning everything from a Transaction(/View).

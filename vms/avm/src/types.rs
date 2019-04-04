@@ -1,5 +1,5 @@
 use super::codec::{NativeDecoder, NativeEncoder};
-use aion_types::{Address};
+use aion_types::{Address, U256};
 use vm_common::ExecStatus;
 
 use std::fmt;
@@ -164,41 +164,21 @@ pub struct TransactionResult {
     pub code: u32,
     pub return_data: Bytes,
     pub energy_used: u64,
-    // pub storage_root_hash: u32,
-    // pub logs: Vec<Log>,
+    pub state_root: U256,
 }
 
 impl TransactionResult {
-    pub fn new(bytes: Bytes) -> Result<TransactionResult, &'static str> {
+    pub fn new(bytes: Bytes, state_root: Bytes) -> Result<TransactionResult, &'static str> {
         let mut decoder = NativeDecoder::new(&bytes);
         let code = decoder.decode_int()?;
         let return_data = decoder.decode_bytes()?;
         let energy_used = decoder.decode_long()?;
-        //let storage_root_hash = decoder.decode_int()?;
-
-        // let mut logs = Vec::<Log>::new();
-        // let num_of_logs = decoder.decode_int()?;
-        // for _i in 0..num_of_logs {
-        //     let address = decoder.decode_bytes()?;
-        //     let mut topics = Vec::<Bytes>::new();
-        //     let num_of_topics = decoder.decode_int()?;
-        //     for _j in 0..num_of_topics {
-        //         topics.push(decoder.decode_bytes()?);
-        //     }
-        //     let data = decoder.decode_bytes()?;
-        //     logs.push(Log {
-        //         address,
-        //         topics,
-        //         data,
-        //     });
-        // }
 
         Ok(TransactionResult {
             code,
             return_data,
             energy_used,
-            //storage_root_hash,
-            // logs,
+            state_root,
         })
     }
 }
