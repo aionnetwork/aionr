@@ -1,5 +1,5 @@
 use super::codec::{NativeDecoder, NativeEncoder};
-use aion_types::{Address, U256};
+use aion_types::{Address, H256};
 use vm_common::ExecStatus;
 
 use std::fmt;
@@ -164,7 +164,7 @@ pub struct TransactionResult {
     pub code: u32,
     pub return_data: Bytes,
     pub energy_used: u64,
-    pub state_root: U256,
+    pub state_root: H256,
 }
 
 impl TransactionResult {
@@ -178,7 +178,7 @@ impl TransactionResult {
             code,
             return_data,
             energy_used,
-            state_root,
+            state_root: state_root.as_slice().into(),
         })
     }
 }

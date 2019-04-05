@@ -361,6 +361,7 @@ where B: StateBackend
                         "Cannot get origin address and nonce from database. Database corruption \
                          may encountered.",
                     ),
+                    state_root: H256::default(),
                 };
             }
         };
@@ -407,6 +408,7 @@ where B: StateBackend
                     exception: String::from(
                         "inc_nonce failed. Database corruption may encountered.",
                     ),
+                    state_root: H256::default(),
                 };
             }
 
@@ -421,6 +423,7 @@ where B: StateBackend
                     exception: String::from(
                         "inc_nonce failed. Database corruption may encountered.",
                     ),
+                    state_root: H256::default(),
                 };
             }
         }
@@ -456,6 +459,7 @@ where B: StateBackend
                     status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from("Code not founded."),
+                    state_root: H256::default(),
                 }
             }
         };

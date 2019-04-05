@@ -223,7 +223,6 @@ pub fn prove_transaction<H: AsHashStore + Send + Sync>(
 /// checkpoint can be discarded with `discard_checkpoint`. All of the orignal
 /// backed-up values are moved into a parent checkpoint (if any).
 ///
-#[derive(Clone)]
 pub struct State<B: Backend> {
     db: B,
     root: H256,

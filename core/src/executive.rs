@@ -587,6 +587,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         status_code: ExecStatus::Failure,
                         return_data: ReturnData::empty(),
                         exception: String::from("Error in balance transfer"),
+                        state_root: H256::default(),
                     };
                 }
             }
@@ -655,6 +656,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from("Not enough gas to execute precompiled contract."),
+                    state_root: H256::default(),
                 };
             }
         } else {
@@ -679,6 +681,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     status_code: ExecStatus::Success,
                     return_data: ReturnData::empty(),
                     exception: String::default(),
+                    state_root: H256::default(),
                 };
             }
         }
@@ -700,6 +703,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         status_code: ExecStatus::Failure,
                         return_data: ReturnData::empty(),
                         exception: String::from("Error in balance transfer"),
+                        state_root: H256::default(),
                     };
                 }
             }
@@ -760,6 +764,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     "Contract creation address already exists, or checking contract existance \
                      failed.",
                 ),
+                state_root: H256::default(),
             };
         }
 
@@ -793,6 +798,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from("Error in balance transfer"),
+                    state_root: H256::default(),
                 };
             }
             self.state
@@ -926,6 +932,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             state_diff: None,
             transaction_fee: fees_value,
             touched: HashSet::new(),
+            state_root: H256::default(),
         })
     }
 
