@@ -970,7 +970,8 @@ impl<B: Backend> State<B> {
         txs: &[SignedTransaction],
     ) -> Vec<ApplyResult>
     {
-        let exec_results = self.execute_bulk(env_info, machine, txs, true, false);
+        
+        let exec_results = self.execute_bulk(env_info, machine, txs, false, false);
 
         let mut receipts = Vec::new();
         for result in exec_results {

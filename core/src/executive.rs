@@ -195,6 +195,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     {
         let mut vm_params = Vec::new();
         // validate transactions
+        println!("start executing {:?} transactions", txs.len());
         for t in txs {
             let sender = t.sender();
             let nonce = self.state.nonce(&sender).unwrap();
@@ -278,7 +279,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         call_type: CallType::None,
                         transaction_hash: t.hash(),
                         original_transaction_hash: t.hash(),
-                        nonce: nonce.low_u64(),
+                        nonce: t.nonce.low_u64(),
                     }
                 }
                 Action::Call(ref address) => {
@@ -301,7 +302,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         call_type: call_type,
                         transaction_hash: t.hash(),
                         original_transaction_hash: t.hash(),
-                        nonce: nonce.low_u64(),
+                        nonce: t.nonce.low_u64(),
                     }
                 }
             };
@@ -1035,6 +1036,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1060,6 +1062,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1113,6 +1116,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1157,6 +1161,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             println!("call executor");
@@ -1184,6 +1189,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1210,6 +1216,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1236,6 +1243,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1262,6 +1270,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1298,6 +1307,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1339,6 +1349,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1373,6 +1384,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1407,6 +1419,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1445,6 +1458,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1478,6 +1492,7 @@ Address};
             status_code: _,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1511,6 +1526,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1554,6 +1570,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1593,6 +1610,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1629,6 +1647,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1659,6 +1678,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1687,6 +1707,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1721,6 +1742,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1941,6 +1963,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1959,6 +1982,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1999,6 +2023,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -2032,6 +2057,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -2064,6 +2090,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -2100,6 +2127,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -2122,6 +2150,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -2153,6 +2182,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -2185,6 +2215,7 @@ Address};
             status_code,
             return_data,
             exception,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -2238,6 +2269,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2261,6 +2293,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2284,6 +2317,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2307,6 +2341,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2329,6 +2364,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2352,6 +2388,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2375,6 +2412,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2398,6 +2436,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2445,6 +2484,7 @@ Address};
                 gas_left,
                 return_data,
                 exception: _,
+                state_root: _,
             } = r;
 
             assert_eq!(status_code, ExecStatus::Success);
@@ -2469,6 +2509,7 @@ Address};
                 gas_left,
                 return_data,
                 exception: _,
+                state_root: _,
             } = r;
             assert_eq!(status_code, ExecStatus::Success);
             assert_eq!(return_data.mem, vec![17, 0, 5, 72, 101, 108, 108, 111]);
@@ -2527,7 +2568,7 @@ Address};
         let machine = make_aion_machine();
         let substate = Substate::new();
         let mut params2 = params.clone();
-        params2.address = contract_address(&sender, &U256::one()).0;
+        //params2.address = contract_address(&sender, &U256::one()).0;
         params2.value = 99.into();
         params2.nonce = params.nonce + 1;
         let results = {
@@ -2587,6 +2628,7 @@ Address};
                 gas_left,
                 return_data,
                 exception: _,
+                state_root: _,
             } = r;
 
             println!(
