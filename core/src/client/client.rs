@@ -316,6 +316,7 @@ impl Client {
     }
     /// Flush the block import queue.
     pub fn flush_queue(&self) {
+        info!(target: "client", "!!!!!!!!!!!!!!!!!!!!!!!!!!!!DB flushed.");
         // self.block_queue.flush();
         let mut is_flush = false;
         while !self.block_queue.queue_info().is_empty() {

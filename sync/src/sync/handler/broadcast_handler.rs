@@ -114,7 +114,6 @@ impl BroadcastsHandler {
                                 false,
                             ) {
                                 header_chain.apply_pending(tx, pending);
-                                header_chain.flush();
                                 debug!(target: "sync", "New block header #{} - {}, imported from local.", header.number(), block_hash);
                             }
                         }
@@ -177,7 +176,6 @@ impl BroadcastsHandler {
                                 false,
                             ) {
                                 header_chain.apply_pending(tx, pending);
-                                header_chain.flush();
                                 debug!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
                             }
                         }

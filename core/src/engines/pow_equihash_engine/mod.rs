@@ -115,14 +115,17 @@ impl DifficultyCalc {
         grant_parent: Option<&Header>,
     ) -> U256
     {
+        let mut output_difficulty = U256::default();
         if header.number() == 0 {
-            panic!("Can't calculate genesis block difficulty.");
+            error!(target: "equihash", "Can't calculate genesis block difficulty.");
+            return output_difficulty;
         }
         if parent.number() == 0 {
             return parent.difficulty().clone();
         }
         if header.number() != 2 && grant_parent.is_none() {
-            panic!("grant_parent must exist.");
+            error!(target: "equihash", "grant_parent must exist.");
+            return output_difficulty;
         }
 
         let parent_difficulty = *parent.difficulty();
@@ -142,7 +145,6 @@ impl DifficultyCalc {
 
         // split into our ranges 0 <= x <= min_block_time, min_block_time < x <
         // max_block_time, max_block_time < x
-        let mut output_difficulty: U256;
         if delta <= self.block_time_lower_bound {
             output_difficulty = parent_difficulty + diff_base;
         } else if self.block_time_lower_bound < delta && delta < self.block_time_upper_bound {

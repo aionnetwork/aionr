@@ -299,7 +299,6 @@ impl HeaderChain {
             {
                 chain.apply_pending(tx, pending);
             }
-            chain.flush();
 
             chain
         };
@@ -494,7 +493,7 @@ impl HeaderChain {
                 .next()
                 .expect("at least one era just created; qed");
 
-            if earliest_era != 0 && earliest_era + HISTORY + cht::SIZE <= number {
+            if earliest_era != 0 && earliest_era + HISTORY + cht::SIZE <= number && candidates.contains_key(&earliest_era) {
                 let cht_num = cht::block_to_cht_number(earliest_era)
                     .expect("fails only for number == 0; genesis never imported; qed");
 
@@ -585,12 +584,6 @@ impl HeaderChain {
         if let Some(best_block) = pending.best_block {
             *self.best_block.write() = best_block;
         }
-    }
-
-    /// Flush db
-    pub fn flush(&self) {
-        let result = self.db.flush();
-        trace!(target: "chain", "Header chain DB flushed: {:?}", result);
     }
 
     /// Get a block's hash by ID. In the case of query by number, only canonical results

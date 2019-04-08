@@ -239,9 +239,6 @@ impl BlockHeadersHandler {
                         } else {
                             SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
                             P2pMgr::update_node(node_hash, node);
-                            if number > 0 {
-                                header_chain.flush();
-                            }
                             return;
                         }
                     }
@@ -257,10 +254,6 @@ impl BlockHeadersHandler {
                 info!(target: "sync", "peer node removed.");
                 return;
             }
-        }
-
-        if number > 0 {
-            header_chain.flush();
         }
 
         if is_side_chain && hashes.len() > 0 {

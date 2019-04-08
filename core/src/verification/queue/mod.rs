@@ -179,7 +179,7 @@ impl QueueSignal {
             == false
         {
             let channel = self.message_channel.lock().clone();
-            if let Err(e) = channel.send(ClientIoMessage::BlockVerified) {
+            if let Err(e) = channel.send_sync(ClientIoMessage::BlockVerified) {
                 debug!(target: "verification","Error sending BlockVerified message: {:?}", e);
             }
         }
@@ -379,7 +379,7 @@ impl<K: Kind> VerificationQueue<K> {
             };
 
             let hash = item.hash();
-            let _ = match K::verify(item, &*engine, verification.check_seal) {
+            let is_ready = match K::verify(item, &*engine, verification.check_seal) {
                 Ok(verified) => {
                     let mut verifying = verification.verifying.lock();
                     let mut idx = None;
@@ -432,10 +432,10 @@ impl<K: Kind> VerificationQueue<K> {
                     }
                 }
             };
-            // if is_ready {
-            //     // Import the block immediately
-            //     ready.set_sync();
-            // }
+            if is_ready {
+                // Import the block immediately
+                ready.set_sync();
+            }
         }
     }
 
@@ -634,10 +634,10 @@ impl<K: Kind> VerificationQueue<K> {
             .verified
             .fetch_sub(drained_size, AtomicOrdering::SeqCst);
 
-        // self.ready_signal.reset();
-        // if !verified.is_empty() {
-        //     self.ready_signal.set_async();
-        // }
+        self.ready_signal.reset();
+        if !verified.is_empty() {
+            self.ready_signal.set_async();
+        }
         result
     }
 

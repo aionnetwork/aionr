@@ -122,18 +122,18 @@ impl SyncMgr {
             .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(broadcast_transactions_task);
 
-        let flush_task = loop_fn(0, |_| {
-            let block_chain = SyncStorage::get_block_chain();
-            block_chain.flush_queue();
+        // let flush_task = loop_fn(0, |_| {
+        //     let block_chain = SyncStorage::get_block_chain();
+        //     block_chain.flush_queue();
 
-            thread::sleep(Duration::from_millis(200));
-            if SyncStorage::is_syncing() {
-                Ok(Loop::Continue(0))
-            } else {
-                Ok(Loop::Break(()))
-            }
-        });
-        executor.spawn(flush_task);
+        //     thread::sleep(Duration::from_millis(200));
+        //     if SyncStorage::is_syncing() {
+        //         Ok(Loop::Continue(0))
+        //     } else {
+        //         Ok(Loop::Break(()))
+        //     }
+        // });
+        // executor.spawn(flush_task);
 
         let reputation_handle_task = Interval::new(
             Instant::now(),
@@ -349,7 +349,6 @@ impl SyncMgr {
                 }
             }
         }
-        header_chain.flush();
     }
 }
 
