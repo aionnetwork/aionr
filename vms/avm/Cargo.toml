@@ -16,3 +16,4 @@ acore-bytes = { path = "../../util/bytes" }
 blake2b = { path = "../../util/blake2b" }
 rand = "*"
 log = "0.3"
+rlp = {path = "../../util/rlp"}

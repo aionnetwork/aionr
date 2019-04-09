@@ -292,6 +292,7 @@ pub trait AVMExt {
     fn send_signal(&mut self, signal: i32);
     fn commit(&mut self);
     fn root(&self) -> H256;
+    fn avm_log(&mut self, address: &Address, topics: Vec<H256>, data: Vec<u8>, idx: i32);
 }
 
 // TODO: should be a trait, possible to avoid cloning everything from a Transaction(/View).
