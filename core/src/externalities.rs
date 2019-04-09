@@ -229,6 +229,15 @@ where B: StateBackend
     fn root(&self) -> H256{
         self.state.lock().unwrap().root().clone()
     }
+
+    fn avm_log(&mut self, address: &Address, topics: Vec<H256>, data: Vec<u8>, index: i32) {
+        use log_entry::LogEntry;
+        self.substates[index as usize].logs.push(LogEntry {
+            address: address.clone(),
+            topics,
+            data,
+        });
+    }
 }
 
 /// Implementation of evm Externalities.

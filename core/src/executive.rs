@@ -201,22 +201,22 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let nonce = self.state.nonce(&sender).unwrap();
 
             // 1. Check transaction nonce
-            if check_nonce && t.nonce != nonce {
-                return vec![Err(From::from(ExecutionError::InvalidNonce {
-                    expected: nonce,
-                    got: t.nonce,
-                }))];
-            }
+            // if check_nonce && t.nonce != nonce {
+            //     return vec![Err(From::from(ExecutionError::InvalidNonce {
+            //         expected: nonce,
+            //         got: t.nonce,
+            //     }))];
+            // }
 
             // 2. Check gas limit
             // 2.1 Gas limit should not be less than the basic gas requirement
             let base_gas_required: U256 = t.gas_required();
-            if t.gas < base_gas_required {
-                return vec![Err(From::from(ExecutionError::NotEnoughBaseGas {
-                    required: base_gas_required,
-                    got: t.gas,
-                }))];
-            }
+            // if t.gas < base_gas_required {
+            //     return vec![Err(From::from(ExecutionError::NotEnoughBaseGas {
+            //         required: base_gas_required,
+            //         got: t.gas,
+            //     }))];
+            // }
             debug!(target: "vm", "base_gas_required = {}", base_gas_required);
 
             // 2.2 Gas limit should not exceed the maximum gas limit depending on
@@ -228,33 +228,33 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
             // Don't check max gas limit for local call.
             // Local node has the right (and is free) to execute "big" calls with its own resources.
-            if !is_local_call && t.gas > max_gas_limit {
-                return vec![Err(From::from(ExecutionError::ExceedMaxGasLimit {
-                    max: max_gas_limit,
-                    got: t.gas,
-                }))];
-            }
+            // if !is_local_call && t.gas > max_gas_limit {
+            //     return vec![Err(From::from(ExecutionError::ExceedMaxGasLimit {
+            //         max: max_gas_limit,
+            //         got: t.gas,
+            //     }))];
+            // }
 
             // 2.3 Gas limit should not exceed the remaining gas limit of the current block
-            if self.info.gas_used + t.gas > self.info.gas_limit {
-                return vec![Err(From::from(ExecutionError::BlockGasLimitReached {
-                    gas_limit: self.info.gas_limit,
-                    gas_used: self.info.gas_used,
-                    gas: t.gas,
-                }))];
-            }
+            // if self.info.gas_used + t.gas > self.info.gas_limit {
+            //     return vec![Err(From::from(ExecutionError::BlockGasLimitReached {
+            //         gas_limit: self.info.gas_limit,
+            //         gas_used: self.info.gas_used,
+            //         gas: t.gas,
+            //     }))];
+            // }
 
             // 3. Check balance, avoid unaffordable transactions
             // TODO: we might need bigints here, or at least check overflows.
-            let balance: U512 = U512::from(self.state.balance(&sender).unwrap());
-            let gas_cost: U512 = t.gas.full_mul(t.gas_price);
-            let total_cost: U512 = U512::from(t.value) + gas_cost;
-            if balance < total_cost {
-                return vec![Err(From::from(ExecutionError::NotEnoughCash {
-                    required: total_cost,
-                    got: balance,
-                }))];
-            }
+            // let balance: U512 = U512::from(self.state.balance(&sender).unwrap());
+            // let gas_cost: U512 = t.gas.full_mul(t.gas_price);
+            // let total_cost: U512 = U512::from(t.value) + gas_cost;
+            // if balance < total_cost {
+            //     return vec![Err(From::from(ExecutionError::NotEnoughCash {
+            //         required: total_cost,
+            //         got: balance,
+            //     }))];
+            // }
 
             //TODO: gas limit for AVM; validate passed, just run AION VM
             debug!(target: "vm", "tx gas = {:?}, base gas required = {:?}", t.gas, base_gas_required);
