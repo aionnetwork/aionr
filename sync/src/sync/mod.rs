@@ -60,7 +60,7 @@ pub mod storage;
 
 const STATUS_REQ_INTERVAL: u64 = 2;
 const GET_BLOCK_HEADERS_INTERVAL: u64 = 500;
-const BLOCKS_BODIES_REQ_INTERVAL: u64 = 500;
+const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50000;
 const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const REPUTATION_HANDLE_INTERVAL: u64 = 1800;
@@ -102,9 +102,6 @@ impl SyncMgr {
             Duration::from_millis(BLOCKS_BODIES_REQ_INTERVAL),
         ).for_each(move |_| {
             // blocks bodies req
-            if let Some(ref mut node) = P2pMgr::get_an_alive_node() {
-                BlockBodiesHandler::get_blocks_bodies(node, 0);
-            }
 
             Ok(())
         })
@@ -122,18 +119,26 @@ impl SyncMgr {
             .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(broadcast_transactions_task);
 
-        // let flush_task = loop_fn(0, |_| {
-        //     let block_chain = SyncStorage::get_block_chain();
-        //     block_chain.flush_queue();
+        let flush_task = loop_fn(0, |block_number| {
+            let block_chain = SyncStorage::get_block_chain();
+            block_chain.flush_queue();
 
-        //     thread::sleep(Duration::from_millis(200));
-        //     if SyncStorage::is_syncing() {
-        //         Ok(Loop::Continue(0))
-        //     } else {
-        //         Ok(Loop::Break(()))
-        //     }
-        // });
-        // executor.spawn(flush_task);
+            let synced_block_number = block_chain.chain_info().best_block_number;
+
+            if block_number == synced_block_number {
+                if let Some(ref mut node) = P2pMgr::get_an_alive_node() {
+                    BlockBodiesHandler::get_blocks_bodies(node, 0);
+                }
+                thread::sleep(Duration::from_millis(200));
+            }
+            thread::sleep(Duration::from_millis(300));
+            if SyncStorage::is_syncing() {
+                Ok(Loop::Continue(synced_block_number))
+            } else {
+                Ok(Loop::Break(()))
+            }
+        });
+        executor.spawn(flush_task);
 
         let reputation_handle_task = Interval::new(
             Instant::now(),
@@ -239,7 +244,6 @@ impl SyncMgr {
                     {
                         let block_chain = SyncStorage::get_block_chain();
                         block_chain.clear_queue();
-                        block_chain.clear_bad();
                     }
                     SyncStorage::clear_headers_with_bodies_requested();
                 }

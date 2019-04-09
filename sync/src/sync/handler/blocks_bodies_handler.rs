@@ -66,8 +66,8 @@ impl BlockBodiesHandler {
         }
 
         while number <= best_header_number {
-            if let Some(hash) = header_chain.block_hash(BlockId::Number(number)) {
-                headers.push(hash);
+            if let Some(header) = header_chain.block_header(BlockId::Number(number)) {
+                headers.push(header.hash());
 
                 if headers.len() == REQUEST_SIZE as usize {
                     debug!(target: "sync", "send_blocks_bodies_req, #{} ~ #{}, to {}.", number - REQUEST_SIZE, number, node.get_ip_addr());
@@ -96,10 +96,10 @@ impl BlockBodiesHandler {
             debug!(target: "sync", "send_blocks_bodies_req, from #{} to #{}.", number - headers.len() as u64, number);
             Self::send_blocks_bodies_req(node, headers);
         } else {
-            if let Some(hash) = header_chain.block_hash(BlockId::Number(best_header_number)) {
+            if let Some(hash) = header_chain.block_hash(BlockId::Number(number)) {
                 Self::send_blocks_bodies_req(node, vec![hash]);
+                debug!(target: "sync", "send_blocks_bodies_req, {} - {} - {}.", number, best_header_number, best_block_number);
             }
-            debug!(target: "sync", "send_blocks_bodies_req, {} - {}.", best_header_number, best_block_number);
         }
     }
 
@@ -246,7 +246,9 @@ impl BlockBodiesHandler {
                                                         error!(target: "sync", "Invalid peer {}@{} !!!", node.get_ip_addr(), node.get_node_id());
                                                         P2pMgr::remove_peer(node.node_hash);
                                                         return;
-                                                    } else {
+                                                    } else if number
+                                                        <= SyncStorage::get_synced_block_number()
+                                                    {
                                                         if let Some(_parent_header) = header_chain
                                                             .block_header(BlockId::Hash(
                                                                 parent_hash,
@@ -268,6 +270,11 @@ impl BlockBodiesHandler {
                                                         );
                                                         P2pMgr::update_node(node_hash, node);
                                                         return;
+                                                    } else {
+                                                        warn!(target: "sync", "Early coming block #{} - {:?} from {}", number, hash, node.get_ip_addr());
+                                                        number =
+                                                            SyncStorage::get_synced_block_number();
+                                                        break;
                                                     }
                                                 }
                                                 Err(e) => {
@@ -312,8 +319,9 @@ impl BlockBodiesHandler {
         SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesRes);
         P2pMgr::update_node(node_hash, node);
 
-        if SyncStorage::get_synced_block_number() + 128
-            < SyncStorage::get_network_best_block_number()
+        if number > 1
+            && SyncStorage::get_synced_block_number() + 128
+                < SyncStorage::get_network_best_block_number()
         {
             if let Some(ref mut peer_node) = P2pMgr::get_an_active_node() {
                 BlockBodiesHandler::get_blocks_bodies(peer_node, number + 1);

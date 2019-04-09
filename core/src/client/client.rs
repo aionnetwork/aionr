@@ -316,16 +316,15 @@ impl Client {
     }
     /// Flush the block import queue.
     pub fn flush_queue(&self) {
-        info!(target: "client", "!!!!!!!!!!!!!!!!!!!!!!!!!!!!DB flushed.");
-        // self.block_queue.flush();
+        self.block_queue.flush();
         let mut is_flush = false;
         while !self.block_queue.queue_info().is_empty() {
             self.import_verified_blocks();
             is_flush = true;
         }
         if is_flush {
-            let result = self.db.write().flush();
-            trace!(target: "client", "DB flushed, result: {:?}.", result);
+            let _ = self.db.write().flush();
+            trace!(target: "client", "DB flushed.");
         }
     }
 
@@ -493,7 +492,7 @@ impl Client {
             return 0;
         }
 
-        let max_blocks_to_import = 8;
+        let max_blocks_to_import = 96;
         let (
             imported_blocks,
             import_results,
@@ -1708,6 +1707,8 @@ impl BlockChainClient for Client {
     }
 
     fn clear_queue(&self) {
+        let _ = self.db.write().flush();
+        trace!(target: "client", "DB flushed.");
         self.block_queue.clear();
     }
 

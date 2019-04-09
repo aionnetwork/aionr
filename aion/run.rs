@@ -237,7 +237,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     }
 
     let client = service.client();
-    let header_chain = Arc::new(HeaderChain::new(service.db(), &spec).expect("Invalid db..."));
+    let header_chain = Arc::new(HeaderChain::new(&client_path, &spec).expect("Invalid db..."));
 
     // initialize the local node information store.
     let store = {

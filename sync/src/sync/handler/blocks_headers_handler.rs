@@ -36,7 +36,7 @@ use super::blocks_bodies_handler::BlockBodiesHandler;
 
 use p2p::*;
 
-const REQUEST_SIZE: u64 = 24;
+const REQUEST_SIZE: u64 = 32;
 
 pub struct BlockHeadersHandler;
 
@@ -172,20 +172,20 @@ impl BlockHeadersHandler {
                 let parent_hash = header.parent_hash();
 
                 if header_chain.status(parent_hash) == BlockStatus::InChain {
-                    if !is_side_chain {
-                        let chain_info = SyncStorage::get_chain_info();
-                        if number < chain_info.best_block_number {
-                            is_side_chain = if node.target_total_difficulty
-                                >= SyncStorage::get_network_total_diff()
-                            {
-                                true
-                            } else {
-                                false
-                            };
-                        }
-                    }
-
                     if header_chain.status(&hash) != BlockStatus::InChain {
+                        if !is_side_chain {
+                            let chain_info = SyncStorage::get_chain_info();
+                            if number < chain_info.best_block_number {
+                                is_side_chain = if node.target_total_difficulty
+                                    >= SyncStorage::get_network_total_diff()
+                                {
+                                    true
+                                } else {
+                                    false
+                                };
+                            }
+                        }
+ 
                         let mut tx = DBTransaction::new();
                         let mut total_difficulty = header_chain.score(BlockId::Hash(*parent_hash));
                         if total_difficulty.is_none() {
@@ -203,19 +203,10 @@ impl BlockHeadersHandler {
                             ) {
                                 header_chain.apply_pending(tx, pending);
                                 hashes.push(hash);
-                                debug!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
+                                info!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
                             }
                         } else {
-                            if let Ok(pending) =
-                                header_chain.insert(&mut tx, &header.encoded(), None, is_side_chain)
-                            {
-                                header_chain.apply_pending(tx, pending);
-                                hashes.push(hash);
-                                debug!(target: "sync", "New block header #{} - {}, imported from {}@{}, {}.", number, hash, node.get_ip_addr(), node.get_node_id(), is_side_chain);
-                                if is_side_chain {
-                                    from = number + 1;
-                                }
-                            }
+                            warn!(target: "sync", "Late coming block header #{} - {} from {}@{}, {}.", number, hash, node.get_ip_addr(), node.get_node_id(), is_side_chain);
                         }
                     }
 
@@ -226,21 +217,24 @@ impl BlockHeadersHandler {
                         }
                     }
                 } else {
-                    if number < header_chain.best_block().number {
+                    if number <= header_chain.best_block().number {
                         if node.target_total_difficulty >= SyncStorage::get_network_total_diff() {
-                            info!(target: "sync", "Side chain found from {}@{}, #{} - {} with parent #{} - {}.", node.get_ip_addr(), node.get_node_id(), number, hash, number - 1, parent_hash);
-                            from = if number > REQUEST_SIZE {
-                                number - REQUEST_SIZE
-                            } else {
-                                1
-                            };
-                            node.requested_block_num = 0;
-                            break;
-                        } else {
-                            SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
-                            P2pMgr::update_node(node_hash, node);
-                            return;
+                            if header_chain.status(parent_hash) != BlockStatus::InChain
+                                && header_chain.status(&hash) != BlockStatus::InChain
+                            {
+                                info!(target: "sync", "Side chain found from {}@{}, #{} - {} with parent #{} - {}.", node.get_ip_addr(), node.get_node_id(), number, hash, number - 1, parent_hash);
+                                from = if number > REQUEST_SIZE {
+                                    number - REQUEST_SIZE
+                                } else {
+                                    1
+                                };
+                                node.requested_block_num = 0;
+                                break;
+                            }
                         }
+                        SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
+                        P2pMgr::update_node(node_hash, node);
+                        return;
                     }
                 }
 

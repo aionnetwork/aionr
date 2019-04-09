@@ -34,7 +34,7 @@ use engines::epoch::{PendingTransition as PendingEpochTransition, Transition as 
 use error::BlockError;
 use header::Header;
 use heapsize::HeapSizeOf;
-use kvdb::{DBTransaction, KeyValueDB};
+use kvdb::{DatabaseConfig, DbRepository, DBTransaction, KeyValueDB, RepositoryConfig};
 use parking_lot::{Mutex, RwLock};
 use plain_hasher::PlainHasher;
 use rlp::{Decodable, DecoderError, Encodable, RlpStream, UntrustedRlp};
@@ -42,6 +42,7 @@ use smallvec::SmallVec;
 use spec::Spec;
 use std::collections::HashMap;
 use std::hash;
+use std::path::Path;
 use std::time::Duration;
 use types::block_status::BlockStatus;
 use types::ids::BlockId;
@@ -53,7 +54,7 @@ const COL: &'static str = "header_chain";
 /// Store at least this many candidate headers at all times.
 /// Also functions as the delay for computing CHTs as they aren't
 /// relevant to any blocks we've got in memory.
-const HISTORY: u64 = 2048;
+const HISTORY: u64 = 4096;
 
 /// The best block key. Maps to an RLP list: [best_era, last_era]
 const CURRENT_KEY: &[u8] = &*b"best_and_latest";
@@ -197,7 +198,7 @@ pub struct HeaderChain {
 
 impl HeaderChain {
     /// Create a new header chain given this genesis block and database to read from.
-    pub fn new(db: Arc<KeyValueDB>, spec: &Spec) -> Result<Self, String> {
+    pub fn new(client_path: &Path, spec: &Spec) -> Result<Self, String> {
         let mut live_epoch_proofs = ::std::collections::HashMap::default();
         let cache = Arc::new(Mutex::new(Cache::new(
             Default::default(),
@@ -206,6 +207,17 @@ impl HeaderChain {
 
         let genesis = ::rlp::encode(&spec.genesis_header());
         let decoded_header = spec.genesis_header();
+
+        let db_path = client_path.join(COL);
+        let mut db_configs = Vec::new();
+            db_configs.push(RepositoryConfig {
+                db_name: COL.to_string(),
+                db_config: DatabaseConfig::default(),
+                db_path: db_path.to_string_lossy().into(),
+            });
+        
+        let header_chain_db = DbRepository::init(db_configs).map_err(|e| format!("Unable to initialize DB: {}", e))?;
+        let db = Arc::new(header_chain_db);
 
         let chain = if let Some(current) = db.get(COL, CURRENT_KEY).unwrap_or(None) {
             let curr_rlp = UntrustedRlp::new(current.as_ref());
@@ -493,7 +505,7 @@ impl HeaderChain {
                 .next()
                 .expect("at least one era just created; qed");
 
-            if earliest_era != 0 && earliest_era + HISTORY + cht::SIZE <= number && candidates.contains_key(&earliest_era) {
+            if earliest_era != 0 && earliest_era + cht::SIZE <= number && earliest_era + HISTORY + cht::SIZE >= number {
                 let cht_num = cht::block_to_cht_number(earliest_era)
                     .expect("fails only for number == 0; genesis never imported; qed");
 
@@ -507,7 +519,7 @@ impl HeaderChain {
                     let iter = || {
                         let era_entry = candidates
                             .remove(&i)
-                            .expect("all eras are sequential with no gaps; qed");
+                            .expect(&format!("all eras are sequential with no gaps; qed {} - {} - {}", i, earliest_era, header.number()));
                         transaction.delete(COL, era_key(i).as_bytes());
 
                         i += 1;
@@ -580,10 +592,15 @@ impl HeaderChain {
     /// Apply pending changes from a previous `insert` operation.
     /// Must be done before the next `insert` call.
     pub fn apply_pending(&self, tx: DBTransaction, pending: PendingChanges) {
-        self.db.write_buffered(tx);
+        let _ = self.db.write(tx);
         if let Some(best_block) = pending.best_block {
             *self.best_block.write() = best_block;
         }
+    }
+    
+    /// Flush db
+    pub fn flush(&self) {
+        let _ = self.db.flush();
     }
 
     /// Get a block's hash by ID. In the case of query by number, only canonical results
