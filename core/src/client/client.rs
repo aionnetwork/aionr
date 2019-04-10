@@ -61,7 +61,7 @@ use receipt::{LocalizedReceipt, Receipt};
 use rlp::*;
 use service::ClientIoMessage;
 use spec::Spec;
-use state::{self, State, FVMKey, FVMValue};
+use state::{self, State};
 use state_db::StateDB;
 use transaction::{
     Action, LocalizedTransaction, PendingTransaction, SignedTransaction, Transaction, DEFAULT_TRANSACTION_TYPE, AVM_TRANSACTION_TYPE,
@@ -1485,12 +1485,9 @@ impl BlockChainClient for Client {
 
     fn storage_at(&self, address: &Address, position: &H128, id: BlockId) -> Option<H128> {
         let value = self.state_at(id)
-            .and_then(|s| s.storage_at(address, &FVMKey::Normal(*position)).ok());
+            .and_then(|s| s.storage_at(address, &position[..].to_vec()).ok());
         if let Some(v) = value {
-            match v {
-                FVMValue::Normal(_v) => Some(_v),
-                FVMValue::Long(_) => None,
-            }
+            Some(v[..].into())
         } else {
             None
         }

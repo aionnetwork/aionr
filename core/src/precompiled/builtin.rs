@@ -30,7 +30,7 @@ use std::fmt;
 use state::{State, Substate, Backend as StateBackend,CleanupMode};
 use vms::ExecutionResult;
 use log_entry::LogEntry;
-use state::{FVMKey, FVMValue};
+// use state::{};
 
 pub trait BuiltinContract: Send + Sync {
     /// gas cost.
@@ -170,33 +170,27 @@ where B: StateBackend
 {
     fn storage_at(&self, key: &H128) -> H128 {
         let value = self.state
-            .storage_at(&self.context.address, &FVMKey::Normal(*key))
+            .storage_at(&self.context.address, &key[..].to_vec())
             .expect("Fatal error occurred when getting storage.");
-        match value {
-            FVMValue::Normal(v) => v,
-            FVMValue::Long(_) => panic!("expected fvm storage value"),
-        }
+        value.as_slice().into()
     }
 
     fn set_storage(&mut self, key: H128, value: H128) {
         self.state
-            .set_storage(&self.context.address, FVMKey::Normal(key), FVMValue::Normal(value))
+            .set_storage(&self.context.address, key[..].into(), value[..].into())
             .expect("Fatal error occurred when putting storage.")
     }
 
     fn storage_at_dword(&self, key: &H128) -> H256 {
         let value = self.state
-            .storage_at(&self.context.address, &FVMKey::Wide(*key))
+            .storage_at(&self.context.address, &key[..].to_vec())
             .expect("Fatal error occurred when getting storage.");
-        match value {
-            FVMValue::Normal(_) => panic!("unexpected fvm value"),
-            FVMValue::Long(v) => v,
-        }
+        value[..].into()
     }
 
     fn set_storage_dword(&mut self, key: H128, value: H256) {
         self.state
-            .set_storage(&self.context.address, FVMKey::Wide(key), FVMValue::Long(value))
+            .set_storage(&self.context.address, key[..].into(), value[..].into())
             .expect("Fatal error occurred when putting storage.")
     }
 

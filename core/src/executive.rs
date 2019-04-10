@@ -2462,10 +2462,10 @@ Address};
     fn avm_storage() {
         let mut state = get_temp_state();
         let address = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-        state.set_avm_storage(&address, vec![0,0,0,1], vec![0,0,0,2]).expect("avm set storage failed");
-        let value = state.avm_storage_at(&address, &vec![0,0,0,1]).expect("avm get storage failed");
+        state.set_storage(&address, vec![0,0,0,1], vec![0,0,0,2]).expect("avm set storage failed");
+        let value = state.storage_at(&address, &vec![0,0,0,1]).expect("avm get storage failed");
         assert_eq!(value, vec![0,0,0,2]);
-        state.set_avm_storage(&address, vec![1,2,3,4,5,6,7,8,9,0], vec![1,2,3,4,5,0,0,0,2]).expect("avm set storage failed");
+        state.set_storage(&address, vec![1,2,3,4,5,6,7,8,9,0], vec![1,2,3,4,5,0,0,0,2]).expect("avm set storage failed");
         println!("state = {:?}", state);
     }
 

@@ -22,10 +22,10 @@
 
 //! Transaction Execution environment.
 use std::cmp;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use aion_types::{H256, U256, H128, Address};
 use bytes::Bytes;
-use state::{Backend as StateBackend, State, Substate, CleanupMode, AccType, FVMKey, FVMValue};
+use state::{Backend as StateBackend, State, Substate, CleanupMode, AccType};
 use machine::EthereumMachine as Machine;
 use executive::*;
 use vms::{
@@ -76,7 +76,7 @@ impl OriginInfo {
 pub struct AVMExternalities<'a, B: 'a>
 where B: StateBackend
 {
-    state: &'a mut State<B>,
+    state: Mutex<&'a mut State<B>>,
     env_info: &'a EnvInfo,
     machine: &'a Machine,
     depth: usize,
@@ -96,7 +96,7 @@ where B: StateBackend
     ) -> Self
     {
         AVMExternalities {
-            state: state,
+            state: Mutex::new(state),
             env_info: env_info,
             machine: machine,
             depth: depth,
@@ -114,11 +114,15 @@ where B: StateBackend
 
     fn create_account(&mut self, a: &Address) {
         self.state
+            .lock()
+            .unwrap()
             .new_contract(a, 0.into(), 0.into(), AccType::AVM)
     }
 
     fn account_exists(&self, a: &Address) -> bool {
         self.state
+            .lock()
+            .unwrap()
             .exists(a)
             .expect("check avm account failed")
     }
@@ -126,13 +130,15 @@ where B: StateBackend
     fn save_code(&mut self, address: &Address, code: Vec<u8>) {
         println!("AVMExt save code");
         self.state
+            .lock()
+            .unwrap()
             .init_code(address, code, AccType::AVM)
             .expect("save avm code should not fail");
     }
 
     fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
         println!("AVM get code");
-        match self.state.code(address) {
+        match self.state.lock().unwrap().code(address) {
             Ok(code) => {
                 //println!("code = {:?}", code);
                 code
@@ -143,12 +149,14 @@ where B: StateBackend
 
     fn sstore(&mut self, a: &Address, key: Vec<u8>, value: Vec<u8>) {
         self.state
-            .set_avm_storage(a, key, value)
+            .lock()
+            .unwrap()
+            .set_storage(a, key, value)
             .expect("Fatal error occured when set storage");
     }
 
     fn sload(&self, a: &Address, key: &Vec<u8>) -> Option<Vec<u8>> {
-        match self.state.avm_storage_at(a, key) {
+        match self.state.lock().unwrap().storage_at(a, key) {
             Ok(value) => Some(value),
             Err(_) => None,
         }
@@ -156,17 +164,23 @@ where B: StateBackend
 
     fn remove_account(&mut self, a: &Address) {
         self.state
+            .lock()
+            .unwrap()
             .kill_account(a, AccType::AVM)
     }
 
     fn avm_balance(&self, a: &Address) -> U256 {
         self.state
+            .lock()
+            .unwrap()
             .balance(a)
             .expect("Fatal error during get balance")
     }
 
     fn inc_balance(&mut self, a: &Address, value: &U256) {
         self.state
+            .lock()
+            .unwrap()
             .add_balance(a, value, CleanupMode::NoEmpty)
             .expect("add balance failed");
 
@@ -174,18 +188,24 @@ where B: StateBackend
 
     fn dec_balance(&mut self, a: &Address, value: &U256) {
         self.state
+            .lock()
+            .unwrap()
             .sub_balance(a, value, &mut CleanupMode::NoEmpty)
             .expect("decrease balance failed")
     }
 
     fn get_nonce(&self, a: &Address) -> u64 {
         self.state
+            .lock()
+            .unwrap()
             .nonce(a)
             .expect("get nonce failed").low_u64()
     }
 
     fn inc_nonce(&mut self, a: &Address) {
         self.state
+            .lock()
+            .unwrap()
             .inc_nonce(a)
             .expect("increment nonce failed")
     }
@@ -235,33 +255,27 @@ where B: StateBackend
 {
     fn storage_at(&self, key: &H128) -> H128 {
         let value = self.state
-            .storage_at(&self.origin_info[0].address, &FVMKey::Normal(*key))
+            .storage_at(&self.origin_info[0].address, &key[..].to_vec())
             .expect("Fatal error occurred when getting storage.");
-        match value {
-            FVMValue::Normal(v) => v,
-            FVMValue::Long(_) => panic!("unexpected storage value"),
-        }
+        value.as_slice().into()
     }
 
     fn set_storage(&mut self, key: H128, value: H128) {
         self.state
-            .set_storage(&self.origin_info[0].address, FVMKey::Normal(key), FVMValue::Normal(value))
+            .set_storage(&self.origin_info[0].address, key[..].to_vec(), value[..].to_vec())
             .expect("Fatal error occurred when putting storage.");
     }
 
     fn storage_at_dword(&self, key: &H128) -> H256 {
         let value =self.state
-            .storage_at(&self.origin_info[0].address, &FVMKey::Wide(*key))
+            .storage_at(&self.origin_info[0].address, &key[..].to_vec())
             .expect("Fatal error occurred when getting storage.");
-        match value {
-            FVMValue::Long(v) => v,
-            FVMValue::Normal(_) => panic!("unexpected fvm storage value"),
-        }
+        value.as_slice().into()
     }
 
     fn set_storage_dword(&mut self, key: H128, value: H256) {
         self.state
-            .set_storage(&self.origin_info[0].address, FVMKey::Wide(key), FVMValue::Long(value))
+            .set_storage(&self.origin_info[0].address, key[..].to_vec(), value[..].to_vec())
             .expect("Fatal error occurred when putting storage.")
     }
 

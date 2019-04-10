@@ -26,7 +26,7 @@
 //! or rolled back.
 
 use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP};
-use std::cell::{RefMut};
+use std::cell::{RefMut, RefCell};
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
@@ -61,15 +61,10 @@ mod substate;
 pub mod backend;
 
 pub use account::{
-    FVMAccount,
-    AVMAccount,
+    AionVMAccount,
     Account,
     VMAccount,
     AccType,
-    FVMCache,
-    FVMStorageChange,
-    FVMKey,
-    FVMValue,
     RequireCache,
 };
 pub use self::backend::Backend;
@@ -77,8 +72,6 @@ pub use self::substate::Substate;
 
 use self::account_manager::{
     AccountEntry,
-    VMAccountManager,
-    AccountCacheOps,
     AccountState,
 };
 
@@ -226,18 +219,14 @@ pub fn prove_transaction<H: AsHashStore + Send + Sync>(
 pub struct State<B: Backend> {
     db: B,
     root: H256,
-    // cache: RefCell<HashMap<Address, AccountEntry<>>>,
-    // // The original account is preserved in
-    // checkpoints: RefCell<Vec<HashMap<Address, Option<AccountEntry>>>>,
-    // account_start_nonce: U256,
+
+    cache: RefCell<HashMap<Address, AccountEntry<AionVMAccount>>>,
+    // The original account is preserved in
+    checkpoints: RefCell<Vec<HashMap<Address, Option<AccountEntry<AionVMAccount>>>>>,
+    account_start_nonce: U256,
+
     factories: Factories,
     kvdb: Arc<KeyValueDB>,
-
-    fvm_manager: VMAccountManager<FVMAccount>,
-    avm_manager: VMAccountManager<AVMAccount>,
-
-    // avm account info
-    // avm_mgr: AVMAccMgr,
 }
 
 /// Mode of dealing with null accounts.
@@ -276,9 +265,9 @@ impl<B: Backend> State<B> {
             root: root,
             factories: factories,
             kvdb: kvdb,
-            fvm_manager: VMAccountManager::<FVMAccount>::new(account_start_nonce),
-            avm_manager: VMAccountManager::<AVMAccount>::new(account_start_nonce),
-            // avm_mgr: AVMAccMgr::new()
+            cache: RefCell::new(HashMap::new()),
+            checkpoints: RefCell::new(Vec::new()),
+            account_start_nonce: account_start_nonce,
         }
     }
 
@@ -300,8 +289,9 @@ impl<B: Backend> State<B> {
             root: root,
             factories: factories,
             kvdb: kvdb,
-            fvm_manager: VMAccountManager::<FVMAccount>::new(account_start_nonce),
-            avm_manager:  VMAccountManager::<AVMAccount>::new(account_start_nonce),
+            cache: RefCell::new(HashMap::new()),
+            checkpoints: RefCell::new(Vec::new()),
+            account_start_nonce: account_start_nonce,
         };
 
         Ok(state)
@@ -320,117 +310,86 @@ impl<B: Backend> State<B> {
             root: self.root,
             factories: self.factories,
             kvdb: self.kvdb,
-
-            fvm_manager: VMAccountManager::<FVMAccount>::new(self.fvm_manager.account_start_nonce),
-            avm_manager:  VMAccountManager::<AVMAccount>::new(self.avm_manager.account_start_nonce),
-            // avm_mgr: AVMAccMgr::new(),
+            cache: self.cache,
+            checkpoints: self.checkpoints,
+            account_start_nonce: self.account_start_nonce,
         }
     }
 
-    // pub fn avm_mgr(&mut self) -> &mut AVMAccMgr {
-    //     &mut self.avm_mgr
-    // }
-
     /// Create a recoverable checkpoint of this state.
     pub fn checkpoint(&mut self, account_type: AccType) {
-        match account_type {
-            AccType::FVM => self.fvm_manager.checkpoints.get_mut().push(HashMap::new()),
-            AccType::AVM => self.avm_manager.checkpoints.get_mut().push(HashMap::new()),
-        }
+        self.checkpoints.get_mut().push(HashMap::new())
     }
 
     /// Merge last checkpoint with previous.
     pub fn discard_checkpoint(&mut self, account_type: AccType) {
         // merge with previous checkpoint
-        match account_type {
-            AccType::FVM => {
-                let last = self.fvm_manager.checkpoints.get_mut().pop();
-                if let Some(mut checkpoint) = last {
-                    if let Some(ref mut prev) = self.fvm_manager.checkpoints.get_mut().last_mut() {
-                        if prev.is_empty() {
-                            **prev = checkpoint;
-                        } else {
-                            for (k, v) in checkpoint.drain() {
-                                prev.entry(k).or_insert(v);
-                            }
-                        }
+        let last = self.checkpoints.get_mut().pop();
+        if let Some(mut checkpoint) = last {
+            if let Some(ref mut prev) = self.checkpoints.get_mut().last_mut() {
+                if prev.is_empty() {
+                    **prev = checkpoint;
+                } else {
+                    for (k, v) in checkpoint.drain() {
+                        prev.entry(k).or_insert(v);
                     }
                 }
-            },
-            AccType::AVM => {
-                let last = self.avm_manager.checkpoints.get_mut().pop();
-                if let Some(mut checkpoint) = last {
-                    if let Some(ref mut prev) = self.avm_manager.checkpoints.get_mut().last_mut() {
-                        if prev.is_empty() {
-                            **prev = checkpoint;
-                        } else {
-                            for (k, v) in checkpoint.drain() {
-                                prev.entry(k).or_insert(v);
-                            }
-                        }
-                    }
-                }
-            },
+            }
         }
     }
 
     /// Revert to the last checkpoint and discard it.
     pub fn revert_to_checkpoint(&mut self, vm_type: AccType) {
-        match vm_type {
-            AccType::FVM => {
-                if let Some(mut checkpoint) = self.fvm_manager.checkpoints.get_mut().pop() {
-                    for (k, v) in checkpoint.drain() {
-                        match v {
-                            Some(v) => {
-                                match self.fvm_manager.cache.get_mut().entry(k) {
-                                    Entry::Occupied(mut e) => {
-                                        // Merge checkpointed changes back into the main account
-                                        // storage preserving the cache.
-                                        e.get_mut().overwrite_with(v);
-                                    }
-                                    Entry::Vacant(e) => {
-                                        e.insert(v);
-                                    }
-                                }
+        if let Some(mut checkpoint) = self.checkpoints.get_mut().pop() {
+            for (k, v) in checkpoint.drain() {
+                match v {
+                    Some(v) => {
+                        match self.cache.get_mut().entry(k) {
+                            Entry::Occupied(mut e) => {
+                                // Merge checkpointed changes back into the main account
+                                // storage preserving the cache.
+                                e.get_mut().overwrite_with(v);
                             }
-                            None => {
-                                if let Entry::Occupied(e) = self.fvm_manager.cache.get_mut().entry(k) {
-                                    if e.get().is_dirty() {
-                                        e.remove();
-                                    }
-                                }
+                            Entry::Vacant(e) => {
+                                e.insert(v);
+                            }
+                        }
+                    }
+                    None => {
+                        if let Entry::Occupied(e) = self.cache.get_mut().entry(k) {
+                            if e.get().is_dirty() {
+                                e.remove();
                             }
                         }
                     }
                 }
-            },
-            AccType::AVM => {
-                if let Some(mut checkpoint) = self.avm_manager.checkpoints.get_mut().pop() {
-                    for (k, v) in checkpoint.drain() {
-                        match v {
-                            Some(v) => {
-                                match self.avm_manager.cache.get_mut().entry(k) {
-                                    Entry::Occupied(mut e) => {
-                                        // Merge checkpointed changes back into the main account
-                                        // storage preserving the cache.
-                                        e.get_mut().overwrite_with(v);
-                                    }
-                                    Entry::Vacant(e) => {
-                                        e.insert(v);
-                                    }
-                                }
-                            }
-                            None => {
-                                if let Entry::Occupied(e) = self.avm_manager.cache.get_mut().entry(k) {
-                                    if e.get().is_dirty() {
-                                        e.remove();
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            },
+            }
+        }
+    }
+
+    fn insert_cache(&self, address: &Address, account: AccountEntry<AionVMAccount>) {
+        // Dirty account which is not in the cache means this is a new account.
+        // It goes directly into the checkpoint as there's nothing to rever to.
+        //
+        // In all other cases account is read as clean first, and after that made
+        // dirty in and added to the checkpoint with `note_cache`.
+        let is_dirty = account.is_dirty();
+        let old_value = self.cache.borrow_mut().insert(*address, account);
+        if is_dirty {
+            if let Some(ref mut checkpoint) = self.checkpoints.borrow_mut().last_mut() {
+                checkpoint.entry(*address).or_insert(old_value);
+            }
+        }
+    }
+
+    fn note_cache(&self, address: &Address) {
+        if let Some(ref mut checkpoint) = self.checkpoints.borrow_mut().last_mut() {
+            checkpoint.entry(*address).or_insert_with(|| {
+                self.cache
+                    .borrow()
+                    .get(address)
+                    .map(AccountEntry::clone_dirty)
+            });
         }
     }
 
@@ -446,39 +405,19 @@ impl<B: Backend> State<B> {
     /// Create a new contract at address `contract`. If there is already an account at the address
     /// it will have its code reset, ready for `init_code()`.
     pub fn new_contract(&mut self, contract: &Address, balance: U256, nonce_offset: U256, acc_type: AccType){
-        match acc_type {
-            AccType::FVM => {
-                self.fvm_manager.insert_cache(
-                    contract,
-                    AccountEntry::new_dirty(Some(FVMAccount::new_contract(
-                        balance,
-                        self.fvm_manager.account_start_nonce + nonce_offset,
-                    ))),
-                );
-            },
-            AccType::AVM => {
-                self.avm_manager.insert_cache(
-                    contract,
-                    AccountEntry::new_dirty(Some(AVMAccount::new_contract(
-                        balance,
-                        self.avm_manager.account_start_nonce + nonce_offset,
-                    ))),
-                );
-            },
+        self.insert_cache(
+            contract,
+            AccountEntry::new_dirty(Some(AionVMAccount::new_contract(
+                balance,
+                self.account_start_nonce + nonce_offset,
+            ))),
+        );
         }
-    }
 
     /// Remove an existing account.
     pub fn kill_account(&mut self, account: &Address, acc_type: AccType) {
         println!("kill account: {:?}", account);
-        match acc_type {
-            AccType::FVM => {
-                self.fvm_manager.insert_cache(account, AccountEntry::<FVMAccount>::new_dirty(None));
-            },
-            AccType::AVM => {
-                self.avm_manager.insert_cache(account, AccountEntry::<AVMAccount>::new_dirty(None));
-            },
-        }
+        self.insert_cache(account, AccountEntry::<AionVMAccount>::new_dirty(None));
     }
 
     /// Determine whether an account exists.
@@ -487,109 +426,56 @@ impl<B: Backend> State<B> {
         // Bloom filter does not contain empty accounts, so it is important here to
         // check if account exists in the database directly before EIP-161 is in effect.
         // self.ensure_fvm_cached(a, RequireCache::None, false, |a| a.is_some())
-        let result = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| a.is_some());
-
-        match result {
-            Ok(r) => {
-                if r == false {
-                    println!("try to check avm cache");
-                    self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| a.is_some())
-                } else {
-                    println!("found fvm exists");
-                    result
-                }
-            },
-            Err(_) => result,
-        }
+        self.ensure_cached(a, RequireCache::None, false, |a| a.is_some())
     }
 
     /// Determine whether an account exists and if not empty.
     pub fn exists_and_not_null(&self, a: &Address) -> trie::Result<bool> {
         debug!(target: "vm", "exist and not null");
-        let result = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| {
+        self.ensure_cached(a, RequireCache::None, false, |a| {
             a.map_or(false, |a| !a.is_null())
-        });
-        if result.is_ok() {
-            result
-        } else {
-            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, false, |a| {
-                a.map_or(false, |a| !a.is_null())
-            })
-        }
+        })
     }
 
     /// Determine whether an account exists and has code or non-zero nonce.
     pub fn exists_and_has_code_or_nonce(&self, a: &Address) -> trie::Result<bool> {
         debug!(target: "vm", "exist and has code or nonce");
-        let result = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::CodeSize, false, |a| {
+        self.ensure_cached(a, RequireCache::CodeSize, false, |a| {
             a.map_or(false, |a| {
-                a.code_hash() != BLAKE2B_EMPTY || *a.nonce() != self.fvm_manager.account_start_nonce
+                a.code_hash() != BLAKE2B_EMPTY || *a.nonce() != self.account_start_nonce
             })
-        });
-        if result.is_ok() {
-            result
-        } else {
-            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::CodeSize, false, |a| {
-                a.map_or(false, |a| {
-                    a.code_hash() != BLAKE2B_EMPTY || *a.nonce() != self.avm_manager.account_start_nonce
-                })
-            })
-        }
+        })
     }
 
     /// Get the balance of account `a`.
     pub fn balance(&self, a: &Address) -> trie::Result<U256> {
         debug!(target: "vm", "get balance of: {:?}", a);
-        let fvm_balance = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
+        self.ensure_cached(a, RequireCache::None, true, |a| {
             a.as_ref()
                 .map_or(U256::zero(), |account| *account.balance())
-        });
-        if fvm_balance.is_ok() {
-            return fvm_balance;
-        } else {
-            return self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
-                a.as_ref()
-                    .map_or(U256::zero(), |account| *account.balance())
-            });
-        }
+        })
     }
 
     /// Get the nonce of account `a`.
     pub fn nonce(&self, a: &Address) -> trie::Result<U256> {
         debug!(target: "vm", "get nonce of {:?}", a);
-        let nonce = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
+        self.ensure_cached(a, RequireCache::None, true, |a| {
             a.as_ref()
-                .map_or(self.fvm_manager.account_start_nonce, |account| *account.nonce())
-        });
-        if nonce.is_ok() {
-            return nonce;
-        } else {
-            return self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
-                a.as_ref()
-                    .map_or(self.avm_manager.account_start_nonce, |account| *account.nonce())
-            });
-        }
+                .map_or(self.account_start_nonce, |account| *account.nonce())
+        })
     }
 
     /// Get the storage root of account `a`.
     pub fn storage_root(&self, a: &Address) -> trie::Result<Option<H256>> {
         debug!(target: "vm", "get storage root of: {:?}", a);
-        let root = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
+        self.ensure_cached(a, RequireCache::None, true, |a| {
             a.as_ref()
                 .and_then(|account| account.storage_root().cloned())
-        });
-        if root.is_ok() {
-            root
-        } else {
-            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
-                a.as_ref()
-                    .and_then(|account| account.storage_root().cloned())
-            })
-        }
+        })
     }
 
     /// Mutate storage of account `address` so that it is `value` for `key`.
-    pub fn avm_storage_at(&self, address: &Address, key: &Bytes) -> trie::Result<Bytes> {
+    pub fn storage_at(&self, address: &Address, key: &Bytes) -> trie::Result<Bytes> {
         // Storage key search and update works like this:
         // 1. If there's an entry for the account in the local cache check for the key and return it if found.
         // 2. If there's an entry for the account in the global cache check for the key or load it into that account.
@@ -597,7 +483,7 @@ impl<B: Backend> State<B> {
 
         // check local cache first without updating
         {
-            let local_cache = self.avm_manager.cache.borrow_mut();
+            let local_cache = self.cache.borrow_mut();
             let account = local_cache.get(address);
             let mut local_account = None;
             if let Some(maybe_acc) = account {
@@ -609,92 +495,13 @@ impl<B: Backend> State<B> {
                             local_account = Some(maybe_acc);
                         }
                     }
-                    _ => return Ok(Vec::new()),
-                }
-            }
-            // check the global cache and and cache storage key there if found,
-            let trie_res = self.db.get_avm_cached(address, |acc| {
-                match acc {
-                    None => Ok(Vec::new()),
-                    Some(a) => {
-                        let account_db = self
-                            .factories
-                            .accountdb
-                            .readonly(self.db.as_hashstore(), a.address_hash(address));
-                        a.storage_at(account_db.as_hashstore(), key)
-                    }
-                }
-            });
-
-            if let Some(res) = trie_res {
-                return res;
-            }
-
-            // otherwise cache the account localy and cache storage key there.
-            if let Some(ref mut acc) = local_account {
-                if let Some(ref account) = acc.account {
-                    let account_db = self
-                        .factories
-                        .accountdb
-                        .readonly(self.db.as_hashstore(), account.address_hash(address));
-                    return account.storage_at(account_db.as_hashstore(), key);
-                } else {
-                    return Ok(Vec::new());
-                }
-            }
-        }
-
-        // check if the account could exist before any requests to trie
-        if self.db.is_known_null(address) {
-            return Ok(Vec::new());
-        }
-
-        // account is not found in the global cache, get from the DB and insert into local
-        let db = self
-            .factories
-            .trie
-            .readonly(self.db.as_hashstore(), &self.root)
-            .expect(SEC_TRIE_DB_UNWRAP_STR);
-        let maybe_acc = db.get_with(address, AVMAccount::from_rlp)?;
-        let r = maybe_acc.as_ref().map_or(Ok(Vec::new()), |a| {
-            let account_db = self
-                .factories
-                .accountdb
-                .readonly(self.db.as_hashstore(), a.address_hash(address));
-            a.storage_at(account_db.as_hashstore(), key)
-        });
-        self.avm_manager.insert_cache(address, AccountEntry::new_clean(maybe_acc));
-        r
-    }
-
-    /// Mutate storage of account `address` so that it is `value` for `key`.
-    pub fn storage_at(&self, address: &Address, key: &FVMKey) -> trie::Result<FVMValue> {
-        // Storage key search and update works like this:
-        // 1. If there's an entry for the account in the local cache check for the key and return it if found.
-        // 2. If there's an entry for the account in the global cache check for the key or load it into that account.
-        // 3. If account is missing in the global cache load it into the local cache and cache the key there.
-
-        // check local cache first without updating
-        {
-            let local_cache = self.fvm_manager.cache.borrow_mut();
-            let account = local_cache.get(address);
-            let mut local_account = None;
-            if let Some(maybe_acc) = account {
-                match maybe_acc.account {
-                    Some(ref account) => {
-                        if let Some(value) = account.cached_storage_at(key) {
-                            return Ok(value);
-                        } else {
-                            local_account = Some(maybe_acc);
-                        }
-                    }
-                    _ => return Ok(FVMValue::Normal(H128::new())),
+                    _ => return Ok(vec![]),
                 }
             }
             // check the global cache and and cache storage key there if found,
             let trie_res = self.db.get_cached(address, |acc| {
                 match acc {
-                    None => Ok(FVMValue::Normal(H128::new())),
+                    None => Ok(vec![]),
                     Some(a) => {
                         let account_db = self
                             .factories
@@ -718,14 +525,14 @@ impl<B: Backend> State<B> {
                         .readonly(self.db.as_hashstore(), account.address_hash(address));
                     return account.storage_at(account_db.as_hashstore(), key);
                 } else {
-                    return Ok(FVMValue::Normal(H128::new()));
+                    return Ok(vec![]);
                 }
             }
         }
 
         // check if the account could exist before any requests to trie
         if self.db.is_known_null(address) {
-            return Ok(FVMValue::Normal(H128::zero()));
+            return Ok(vec![]);
         }
 
         // account is not found in the global cache, get from the DB and insert into local
@@ -734,67 +541,40 @@ impl<B: Backend> State<B> {
             .trie
             .readonly(self.db.as_hashstore(), &self.root)
             .expect(SEC_TRIE_DB_UNWRAP_STR);
-        let maybe_acc = db.get_with(address, FVMAccount::from_rlp)?;
-        let r = maybe_acc.as_ref().map_or(Ok(FVMValue::Normal(H128::new())), |a| {
+        let maybe_acc = db.get_with(address, AionVMAccount::from_rlp)?;
+        let r = maybe_acc.as_ref().map_or(Ok(vec![]), |a| {
             let account_db = self
                 .factories
                 .accountdb
                 .readonly(self.db.as_hashstore(), a.address_hash(address));
             a.storage_at(account_db.as_hashstore(), key)
         });
-        self.fvm_manager.insert_cache(address, AccountEntry::new_clean(maybe_acc));
+        self.insert_cache(address, AccountEntry::new_clean(maybe_acc));
         r
     }
 
     /// Get accounts' code.
     pub fn code(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
         debug!(target: "vm", "get code of: {:?}", a);
-        let code = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::Code, true, |a| {
+        self.ensure_cached(a, RequireCache::Code, true, |a| {
             a.as_ref().map_or(None, |a| a.code().clone())
-        });
-
-        match code.as_ref() {
-            Ok(v) => {
-                if v.is_some() {
-                    code.clone()
-                } else {
-                    self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::Code, true, |a| {
-                        a.as_ref().map_or(None, |a| a.code().clone())})
-                }
-            },
-            Err(_) => code.clone(),
-        }
+        })
     }
 
     /// Get an account's code hash.
     pub fn code_hash(&self, a: &Address) -> trie::Result<H256> {
         debug!(target: "vm", "get code hash of: {:?}", a);
-        let hash = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
+        self.ensure_cached(a, RequireCache::None, true, |a| {
             a.as_ref().map_or(BLAKE2B_EMPTY, |a| a.code_hash())
-        });
-        if hash.is_ok() {
-            hash
-        } else {
-            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
-                a.as_ref().map_or(BLAKE2B_EMPTY, |a| a.code_hash())
-            })
-        }
+        })
     }
 
     /// Get accounts' code size.
     pub fn code_size(&self, a: &Address) -> trie::Result<Option<usize>> {
         debug!(target: "vm", "get code size");
-        let code_size = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::CodeSize, true, |a| {
+        self.ensure_cached(a, RequireCache::CodeSize, true, |a| {
             a.as_ref().and_then(|a| a.code_size())
-        });
-
-        if code_size.is_ok() {
-            code_size
-        } else {
-            self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::CodeSize, true, |a| {
-                a.as_ref().and_then(|a| a.code_size())
-            })
-        }
+        })
     }
 
     /// Add `incr` to the balance of account `a`.
@@ -857,51 +637,30 @@ impl<B: Backend> State<B> {
     }
 
     /// Mutate storage of account `a` so that it is `value` for `key`.
-    pub fn set_storage(&mut self, a: &Address, key: FVMKey, value: FVMValue) -> trie::Result<()> {
+    pub fn set_storage(&mut self, a: &Address, key: Bytes, value: Bytes) -> trie::Result<()> {
         trace!(target: "state", "set_storage({}:{:?} to {:?})", a, key, value);
         self.require(a, false)?.set_storage(key, value);
-        Ok(())
-    }
-
-    pub fn set_avm_storage(&mut self, a: &Address, key: Bytes, value: Bytes) -> trie::Result<()> {
-        trace!(target: "state", "set_storage({}:{:?} to {:?})", a, key, value);
-        self.require_avm(a, false)?.set_storage(key, value);
         Ok(())
     }
 
     /// Initialise the code of account `a` so that it is `code`.
     /// NOTE: Account should have been created with `new_contract`.
     pub fn init_code(&mut self, a: &Address, code: Bytes, acc_type: AccType) -> trie::Result<()> {
-        match acc_type {
-            AccType::FVM => {
-                self.require_fvm_or_from(
-                    a,
-                    true,
-                    || FVMAccount::new_contract(0.into(), self.fvm_manager.account_start_nonce),
-                    |_| {},
-                )?
-                .init_code(code);
-            },
-            AccType::AVM => {
-                println!("save AVM code in local cache");
-                self.require_avm_or_from(
-                    a,
-                    true,
-                    || AVMAccount::new_contract(0.into(), self.avm_manager.account_start_nonce),
-                    |_| {},
-                )?
-                .init_code(code);
-            },
-        }
-
+        self.require_or_from(
+            a,
+            true,
+            || Account::new_contract(0.into(), self.account_start_nonce),
+            |_| {},
+        )?
+        .init_code(code);
         Ok(())
     }
 
     pub fn set_empty_but_commit(&mut self, a: &Address) -> trie::Result<()> {
-        self.require_fvm_or_from(
+        self.require_or_from(
             a,
             true,
-            || FVMAccount::new_contract(0.into(), self.fvm_manager.account_start_nonce),
+            || AionVMAccount::new_contract(0.into(), self.account_start_nonce),
             |_| {},
         )?
         .set_empty_but_commit();
@@ -910,28 +669,14 @@ impl<B: Backend> State<B> {
 
     /// Reset the code of account `a` so that it is `code`.
     pub fn reset_code(&mut self, a: &Address, code: Bytes, acc_type: AccType) -> trie::Result<()> {
-        match acc_type {
-            AccType::FVM => {
-                self.require_fvm_or_from(
-                    a,
-                    true,
-                    || FVMAccount::new_contract(0.into(), self.fvm_manager.account_start_nonce),
-                    |_| {},
-                )?
-                .reset_code(code);
-                Ok(())
-            },
-            AccType::AVM => {
-                self.require_avm_or_from(
-                    a,
-                    true,
-                    || AVMAccount::new_contract(0.into(), self.avm_manager.account_start_nonce),
-                    |_| {},
-                )?
-                .reset_code(code);
-                Ok(())
-            },
-        }
+        self.require_or_from(
+            a,
+            true,
+            || Account::new_contract(0.into(), self.account_start_nonce),
+            |_| {},
+        )?
+        .reset_code(code);
+        Ok(())
     }
 
     /// Execute a given transaction, producing a receipt.
@@ -1051,7 +796,7 @@ impl<B: Backend> State<B> {
     /// Commits our cached account changes into the trie.
     pub fn commit(&mut self) -> Result<(), Error> {
         // first, commit the sub trees.
-        let mut accounts = self.fvm_manager.cache.borrow_mut();
+        let mut accounts = self.cache.borrow_mut();
         debug!(target: "cons", "commit fvm accounts = {:?}", accounts);
         for (address, ref mut a) in accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
             if let Some(ref mut account) = a.account {
@@ -1073,8 +818,7 @@ impl<B: Backend> State<B> {
                         ) {
                             account
                             .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
-                    } else if !account.storage_changes().0.is_empty()
-                        || !account.storage_changes().1.is_empty()
+                    } else if !account.storage_changes().is_empty()
                     {
                         account.discard_storage_changes();
                         a.state = AccountState::CleanFresh;
@@ -1098,7 +842,7 @@ impl<B: Backend> State<B> {
         }
 
         // update AVM accounts
-        let mut avm_accounts = self.avm_manager.cache.borrow_mut();
+        let mut avm_accounts = self.cache.borrow_mut();
         debug!(target: "cons", "commit avm accounts = {:?}", avm_accounts);
         for (address, ref mut a) in avm_accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
             if let Some(ref mut account) = a.account {
@@ -1172,7 +916,7 @@ impl<B: Backend> State<B> {
 
     /// Propagate local cache into shared canonical state cache.
     fn propagate_to_global_cache(&mut self) {
-        let mut addresses = self.fvm_manager.cache.borrow_mut();
+        let mut addresses = self.cache.borrow_mut();
         trace!(target:"state","Committing cache {:?} entries", addresses.len());
         for (address, a) in addresses.drain().filter(|&(_, ref a)| {
             a.state == AccountState::Committed || a.state == AccountState::CleanFresh
@@ -1184,28 +928,28 @@ impl<B: Backend> State<B> {
 
     /// Clear state cache
     pub fn clear(&mut self) {
-        self.fvm_manager.cache.borrow_mut().clear();
-        self.avm_manager.cache.borrow_mut().clear();
+        self.cache.borrow_mut().clear();
+        self.cache.borrow_mut().clear();
     }
 
     /// Populate the state from `accounts`.
     /// Used for tests.
     pub fn populate_from(&mut self, accounts: PodState) {
-        assert!(self.fvm_manager.checkpoints.borrow().is_empty());
+        assert!(self.checkpoints.borrow().is_empty());
         for (add, acc) in accounts.drain().into_iter() {
-            self.fvm_manager.cache
+            self.cache
                 .borrow_mut()
-                .insert(add, AccountEntry::new_dirty(Some(FVMAccount::from_pod(acc))));
+                .insert(add, AccountEntry::new_dirty(Some(AionVMAccount::from_pod(acc))));
         }
     }
 
     /// Populate a PodAccount map from this state.
     pub fn to_pod(&self) -> PodState {
-        assert!(self.fvm_manager.checkpoints.borrow().is_empty());
+        assert!(self.checkpoints.borrow().is_empty());
         // TODO: handle database rather than just the cache.
         // will need fat db.
         PodState::from(
-            self.fvm_manager.cache
+            self.cache
                 .borrow()
                 .iter()
                 .fold(BTreeMap::new(), |mut m, (add, opt)| {
@@ -1221,12 +965,12 @@ impl<B: Backend> State<B> {
     fn touched_addresses(&self, acc_type: AccType) -> Vec<Address> {
         match acc_type {
             AccType::FVM => {
-                assert!(self.fvm_manager.checkpoints.borrow().is_empty());
-                self.fvm_manager.cache.borrow().iter().map(|(add, _)| *add).collect()
+                assert!(self.checkpoints.borrow().is_empty());
+                self.cache.borrow().iter().map(|(add, _)| *add).collect()
             },
             AccType::AVM => {
-                assert!(self.avm_manager.checkpoints.borrow().is_empty());
-                self.avm_manager.cache.borrow().iter().map(|(add, _)| *add).collect()
+                assert!(self.checkpoints.borrow().is_empty());
+                self.cache.borrow().iter().map(|(add, _)| *add).collect()
             },
         }
     }
@@ -1235,10 +979,7 @@ impl<B: Backend> State<B> {
         let pod = query.get();
 
         for address in touched_addresses {
-            if match acc_type {
-                AccType::FVM => !self.ensure_fvm_cached(address, RequireCache::Code, true, |a| a.is_some())?,
-                AccType::AVM => !self.ensure_avm_cached(address, RequireCache::Code, true, |a| a.is_some())?,
-            } {
+            if !self.ensure_cached(address, RequireCache::Code, true, |a| a.is_some())? {
                 continue;
             }
 
@@ -1246,11 +987,7 @@ impl<B: Backend> State<B> {
                 // needs to be split into two parts for the refcell code here
                 // to work.
                 for key in pod_account.storage.keys() {
-                    self.storage_at(address, &FVMKey::Normal(*key))?;
-                }
-
-                for key in pod_account.storage_dword.keys() {
-                    self.storage_at(address, &FVMKey::Wide(*key))?;
+                    self.storage_at(address, &key[..].to_vec())?;
                 }
             }
         }
@@ -1271,7 +1008,7 @@ impl<B: Backend> State<B> {
     /// Check caches for required data
     /// First searches for account in the local, then the shared cache.
     /// Populates local cache if nothing found.
-    fn ensure_fvm_cached<F, U>(
+    fn ensure_cached<F, U>(
         &self,
         a: &Address,
         require: RequireCache,
@@ -1279,10 +1016,10 @@ impl<B: Backend> State<B> {
         f: F,
     ) -> trie::Result<U>
     where
-        F: Fn(Option<&FVMAccount>) -> U,
+        F: Fn(Option<&AionVMAccount>) -> U,
     {
         // check local cache first
-        if let Some(ref mut maybe_acc) = self.fvm_manager.cache.borrow_mut().get_mut(a) {
+        if let Some(ref mut maybe_acc) = self.cache.borrow_mut().get_mut(a) {
             if let Some(ref mut account) = maybe_acc.account {
                 let accountdb = self
                     .factories
@@ -1317,7 +1054,7 @@ impl<B: Backend> State<B> {
                     .factories
                     .trie
                     .readonly(self.db.as_hashstore(), &self.root)?;
-                let mut maybe_acc = db.get_with(a, FVMAccount::from_rlp)?;
+                let mut maybe_acc = db.get_with(a, AionVMAccount::from_rlp)?;
                 if let Some(ref mut account) = maybe_acc.as_mut() {
                     let accountdb = self
                         .factories
@@ -1330,203 +1067,57 @@ impl<B: Backend> State<B> {
                     );
                 }
                 let r = f(maybe_acc.as_ref());
-                self.fvm_manager.insert_cache(a, AccountEntry::new_clean(maybe_acc));
-                Ok(r)
-            }
-        }
-    }
-
-    /// Check caches for required data
-    /// First searches for account in the local, then the shared cache.
-    /// Populates local cache if nothing found.
-    fn ensure_avm_cached<F, U>(
-        &self,
-        a: &Address,
-        require: RequireCache,
-        check_null: bool,
-        f: F,
-    ) -> trie::Result<U>
-    where
-        F: Fn(Option<&AVMAccount>) -> U,
-    {
-        // check local cache first
-        if let Some(ref mut maybe_acc) = self.avm_manager.cache.borrow_mut().get_mut(a) {
-            if let Some(ref mut account) = maybe_acc.account {
-                let accountdb = self
-                    .factories
-                    .accountdb
-                    .readonly(self.db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(require, &self.db, accountdb.as_hashstore());
-                return Ok(f(Some(account)));
-            }
-            return Ok(f(None));
-        }
-        // check global cache
-        let result = self.db.get_avm_cached(a, |mut acc| {
-            if let Some(ref mut account) = acc {
-                let accountdb = self
-                    .factories
-                    .accountdb
-                    .readonly(self.db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(require, &self.db, accountdb.as_hashstore());
-            }
-            f(acc.map(|a| &*a))
-        });
-        match result {
-            Some(r) => Ok(r),
-            None => {
-                // first check if it is not in database for sure
-                if check_null && self.db.is_known_null(a) {
-                    return Ok(f(None));
-                }
-
-                // not found in the global cache, get from the DB and insert into local
-                let db = self
-                    .factories
-                    .trie
-                    .readonly(self.db.as_hashstore(), &self.root)?;
-                let mut maybe_acc = db.get_with(a, AVMAccount::from_rlp)?;
-                if let Some(ref mut account) = maybe_acc.as_mut() {
-                    let accountdb = self
-                        .factories
-                        .accountdb
-                        .readonly(self.db.as_hashstore(), account.address_hash(a));
-                    account.update_account_cache(
-                        require,
-                        &self.db,
-                        accountdb.as_hashstore(),
-                    );
-                }
-                let r = f(maybe_acc.as_ref());
-                self.avm_manager.insert_cache(a, AccountEntry::new_clean(maybe_acc));
+                self.insert_cache(a, AccountEntry::new_clean(maybe_acc));
                 Ok(r)
             }
         }
     }
 
     /// Pull account `a` in our cache from the trie DB. `require_code` requires that the code be cached, too.
-    fn require<'a>(&'a self, a: &Address, require_code: bool) -> trie::Result<RefMut<'a, FVMAccount>> {
-        self.require_fvm_or_from(
+    fn require<'a>(&'a self, a: &Address, require_code: bool) -> trie::Result<RefMut<'a, AionVMAccount>> {
+        self.require_or_from(
             a,
             require_code,
-            || FVMAccount::new_basic(0u8.into(), self.fvm_manager.account_start_nonce),
-            |_| {},
-        )
-    }
-
-    /// Pull account `a` in our cache from the trie DB. `require_code` requires that the code be cached, too.
-    fn require_avm<'a>(&'a self, a: &Address, require_code: bool) -> trie::Result<RefMut<'a, AVMAccount>> {
-        self.require_avm_or_from(
-            a,
-            require_code,
-            || AVMAccount::new_basic(0u8.into(), self.avm_manager.account_start_nonce),
+            || AionVMAccount::new_basic(0u8.into(), self.account_start_nonce),
             |_| {},
         )
     }
 
     /// Pull account `a` in our cache from the trie DB. `require_code` requires that the code be cached, too.
     /// If it doesn't exist, make account equal the evaluation of `default`.
-    fn require_avm_or_from<'a, F, G>(
+    fn require_or_from<'a, F, G>(
         &'a self,
         a: &Address,
         require_code: bool,
         default: F,
         not_default: G,
-    ) -> trie::Result<RefMut<'a, AVMAccount>>
+    ) -> trie::Result<RefMut<'a, AionVMAccount>>
     where
-        F: FnOnce() -> AVMAccount,
-        G: FnOnce(&mut AVMAccount),
+        F: FnOnce() -> AionVMAccount,
+        G: FnOnce(&mut AionVMAccount),
     {
-        let contains_key = self.avm_manager.cache.borrow().contains_key(a);
-        if !contains_key {
-            match self.db.get_avm_cached_account(a) {
-                Some(acc) => self.avm_manager.insert_cache(a, AccountEntry::new_clean_cached(acc)),
-                None => {
-                    println!("No AVM account in local cache");
-                    let maybe_acc = if !self.db.is_known_null(a) {
-                        let db = self
-                            .factories
-                            .trie
-                            .readonly(self.db.as_hashstore(), &self.root)?;
-                        AccountEntry::new_clean(db.get_with(a, AVMAccount::from_rlp)?)
-                    } else {
-                        AccountEntry::new_clean(None)
-                    };
-                    self.avm_manager.insert_cache(a, maybe_acc);
-                }
-            }
-        }
-        self.avm_manager.note_cache(a);
-
-        // at this point the entry is guaranteed to be in the cache.
-        Ok(RefMut::map(self.avm_manager.cache.borrow_mut(), |c| {
-            let entry = c
-                .get_mut(a)
-                .expect("entry known to exist in the cache; qed");
-
-            match &mut entry.account {
-                &mut Some(ref mut acc) => not_default(acc),
-                slot => *slot = Some(default()),
-            }
-
-            // set the dirty flag after changing account data.
-            entry.state = AccountState::Dirty;
-            match entry.account {
-                Some(ref mut account) => {
-                    if require_code {
-                        let addr_hash = account.address_hash(a);
-                        let accountdb = self
-                            .factories
-                            .accountdb
-                            .readonly(self.db.as_hashstore(), addr_hash);
-                        account.update_account_cache(
-                            RequireCache::Code,
-                            &self.db,
-                            accountdb.as_hashstore(),
-                        );
-                    }
-                    account
-                }
-                _ => panic!("Required account must always exist; qed"),
-            }
-        }))
-    }
-
-    /// Pull account `a` in our cache from the trie DB. `require_code` requires that the code be cached, too.
-    /// If it doesn't exist, make account equal the evaluation of `default`.
-    fn require_fvm_or_from<'a, F, G>(
-        &'a self,
-        a: &Address,
-        require_code: bool,
-        default: F,
-        not_default: G,
-    ) -> trie::Result<RefMut<'a, FVMAccount>>
-    where
-        F: FnOnce() -> FVMAccount,
-        G: FnOnce(&mut FVMAccount),
-    {
-        let contains_key = self.fvm_manager.cache.borrow().contains_key(a);
+        let contains_key = self.cache.borrow().contains_key(a);
         if !contains_key {
             match self.db.get_cached_account(a) {
-                Some(acc) => self.fvm_manager.insert_cache(a, AccountEntry::new_clean_cached(acc)),
+                Some(acc) => self.insert_cache(a, AccountEntry::new_clean_cached(acc)),
                 None => {
                     let maybe_acc = if !self.db.is_known_null(a) {
                         let db = self
                             .factories
                             .trie
                             .readonly(self.db.as_hashstore(), &self.root)?;
-                        AccountEntry::new_clean(db.get_with(a, FVMAccount::from_rlp)?)
+                        AccountEntry::new_clean(db.get_with(a, AionVMAccount::from_rlp)?)
                     } else {
                         AccountEntry::new_clean(None)
                     };
-                    self.fvm_manager.insert_cache(a, maybe_acc);
+                    self.insert_cache(a, maybe_acc);
                 }
             }
         }
-        self.fvm_manager.note_cache(a);
+        self.note_cache(a);
 
         // at this point the entry is guaranteed to be in the cache.
-        Ok(RefMut::map(self.fvm_manager.cache.borrow_mut(), |c| {
+        Ok(RefMut::map(self.cache.borrow_mut(), |c| {
             let entry = c
                 .get_mut(a)
                 .expect("entry known to exist in the cache; qed");
@@ -1577,7 +1168,7 @@ impl<B: Backend> State<B> {
         let account = maybe_account.unwrap_or_else(|| {
             BasicAccount {
                 balance: 0.into(),
-                nonce: self.fvm_manager.account_start_nonce,
+                nonce: self.account_start_nonce,
                 code_hash: BLAKE2B_EMPTY,
                 storage_root: BLAKE2B_NULL_RLP,
             }
@@ -1604,7 +1195,7 @@ impl<B: Backend> State<B> {
         // address, not blake2b(address).
         let trie = TrieDB::new(self.db.as_hashstore(), &self.root)?;
         //TODO: update account type
-        let acc = match trie.get_with(&account_key, FVMAccount::from_rlp)? {
+        let acc = match trie.get_with(&account_key, AionVMAccount::from_rlp)? {
             Some(acc) => acc,
             None => return Ok((Vec::new(), H256::new())),
         };
@@ -1618,7 +1209,7 @@ impl<B: Backend> State<B> {
 }
 
 impl<B: Backend> fmt::Debug for State<B> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "fvm accounts = {:?}, avm accounts = {:?}, state_root = {:?}", self.fvm_manager.cache.borrow(), self.avm_manager.cache.borrow(), self.root()) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "fvm accounts = {:?}, avm accounts = {:?}, state_root = {:?}", self.cache.borrow(), self.cache.borrow(), self.root()) }
 }
 
 // TODO: cloning for `State` shouldn't be possible in general; Remove this and use
@@ -1626,18 +1217,8 @@ impl<B: Backend> fmt::Debug for State<B> {
 impl Clone for State<StateDB> {
     fn clone(&self) -> State<StateDB> {
         let cache = {
-            let mut cache: HashMap<Address, AccountEntry<FVMAccount>> = HashMap::new();
-            for (key, val) in self.fvm_manager.cache.borrow().iter() {
-                if let Some(entry) = val.clone_if_dirty() {
-                    cache.insert(key.clone(), entry);
-                }
-            }
-            cache
-        };
-
-        let cache2 = {
-            let mut cache: HashMap<Address, AccountEntry<AVMAccount>> = HashMap::new();
-            for (key, val) in self.avm_manager.cache.borrow().iter() {
+            let mut cache: HashMap<Address, AccountEntry<AionVMAccount>> = HashMap::new();
+            for (key, val) in self.cache.borrow().iter() {
                 if let Some(entry) = val.clone_if_dirty() {
                     cache.insert(key.clone(), entry);
                 }
@@ -1650,8 +1231,9 @@ impl Clone for State<StateDB> {
             root: self.root.clone(),
             factories: self.factories.clone(),
             kvdb: self.kvdb.clone(),
-            fvm_manager: VMAccountManager::<FVMAccount>::new_with_cache(cache, self.fvm_manager.account_start_nonce.clone()),
-            avm_manager: VMAccountManager::<AVMAccount>::new_with_cache(cache2, self.avm_manager.account_start_nonce.clone()),
+            cache: RefCell::new(cache),
+            checkpoints: RefCell::new(Vec::new()),
+            account_start_nonce: self.account_start_nonce.clone(),
         }
     }
 }
@@ -1745,10 +1327,10 @@ mod tests {
         let (root, db) = {
             let mut state = get_temp_state();
             state
-                .require_fvm_or_from(
+                .require_or_from(
                     &a,
                     false,
-                    || FVMAccount::new_contract(42.into(), 0.into()),
+                    || AionVMAccount::new_contract(42.into(), 0.into()),
                     |_| {},
                 )
                 .unwrap();
@@ -1774,10 +1356,10 @@ mod tests {
         let (root, db) = {
             let mut state = get_temp_state();
             state
-                .require_fvm_or_from(
+                .require_or_from(
                     &a,
                     false,
-                    || FVMAccount::new_contract(42.into(), 0.into()),
+                    || AionVMAccount::new_contract(42.into(), 0.into()),
                     |_| {},
                 )
                 .unwrap();
@@ -1807,8 +1389,8 @@ mod tests {
             state
                 .set_storage(
                     &a,
-                    FVMKey::Normal(H128::from(U128::from(2u64))),
-                    FVMValue::Normal(H128::from(U128::from(69u64))),
+                    vec![2],
+                    vec![69],
                 )
                 .unwrap();
             state.commit().unwrap();
@@ -1824,8 +1406,8 @@ mod tests {
         )
         .unwrap();
         assert_eq!(
-            s.storage_at(&a, &FVMKey::Normal(H128::from(U128::from(2u64)))).unwrap(),
-            FVMValue::Normal(H128::from(U128::from(69u64)))
+            s.storage_at(&a, &vec![2]).unwrap(),
+            vec![69]
         );
     }
 
@@ -2094,10 +1676,10 @@ mod tests {
         state
             .add_balance(&a, &256.into(), CleanupMode::NoEmpty)
             .unwrap();
-        state.set_storage(&a, FVMKey::Normal(0xb.into()), FVMValue::Normal(0xc.into())).unwrap();
+        state.set_storage(&a, vec![0x0b], vec![0x0c]).unwrap();
 
         let mut new_state = state.clone();
-        new_state.set_storage(&a, FVMKey::Normal(0xb.into()), FVMValue::Normal(0xd.into())).unwrap();
+        new_state.set_storage(&a, vec![0x0b],vec![0x0d]).unwrap();
 
         new_state.diff_from(state, AccType::FVM).unwrap();
     }

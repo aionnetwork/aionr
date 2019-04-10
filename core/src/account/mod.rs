@@ -24,9 +24,12 @@ use state::Backend;
 
 const STORAGE_CACHE_ITEMS: usize = 8192;
 
-pub type FVMCache = (RefCell<LruCache<H128, H128>>, RefCell<LruCache<H128, H256>>);
-pub type FVMStorageChange = (HashMap<H128, H128>, HashMap<H128, H256>);
-pub type FVMAccount = Account<FVMCache, FVMStorageChange>;
+// pub type FVMCache = (RefCell<LruCache<VMKey::Normal, VMValue::Normal>>, RefCell<LruCache<H128, H256>>);
+// pub type FVMStorageChange = (HashMap<H128, H128>, HashMap<H128, H256>);
+// pub type FVMAccount = Account<FVMCache, FVMStorageChange>;
+type VMCache = RefCell<LruCache<Bytes, Bytes>>;
+type VMStorageChange = HashMap<Bytes, Bytes>;
+pub type AionVMAccount = Account<VMCache, VMStorageChange>;
 
 #[derive(Copy, Clone)]
 pub enum RequireCache {
@@ -35,24 +38,24 @@ pub enum RequireCache {
     Code,
 }
 
-impl FVMAccount {
-    fn empty_storage_cache() -> FVMCache {
-        (RefCell::new(LruCache::new(STORAGE_CACHE_ITEMS)), RefCell::new(LruCache::new(STORAGE_CACHE_ITEMS)))
+impl AionVMAccount {
+    fn empty_storage_cache() -> VMCache {
+        RefCell::new(LruCache::new(STORAGE_CACHE_ITEMS))
     }
 
-    fn empty_storage_change() -> FVMStorageChange {
-        (HashMap::new(), HashMap::new())
+    fn empty_storage_change() -> VMStorageChange {
+        HashMap::new()
     }
 }
 
-impl From<BasicAccount> for FVMAccount {
+impl From<BasicAccount> for AionVMAccount {
     fn from(basic: BasicAccount) -> Self {
         Account {
             balance: basic.balance,
             nonce: basic.nonce,
             storage_root: basic.storage_root,
             storage_cache: Self::empty_storage_cache(),
-            storage_changes: (HashMap::new(), HashMap::new()),
+            storage_changes: HashMap::new(),
             code_hash: basic.code_hash,
             code_size: None,
             code_cache: Arc::new(vec![]),
@@ -64,7 +67,7 @@ impl From<BasicAccount> for FVMAccount {
     }
 }
 
-impl FVMAccount {
+impl AionVMAccount {
     pub fn new_contract(balance: U256, nonce: U256) -> Self {
         Self {
             balance: balance,
@@ -100,12 +103,16 @@ impl FVMAccount {
     }
 
     pub fn from_pod(pod: PodAccount) -> Self {
-        FVMAccount {
+        let mut storage_changes = HashMap::new();
+        for item in pod.storage.into_iter() {
+            storage_changes.insert(item.0[..].to_vec(), item.1[..].to_vec());
+        }
+        AionVMAccount {
             balance: pod.balance,
             nonce: pod.nonce,
             storage_root: BLAKE2B_NULL_RLP,
             storage_cache: Self::empty_storage_cache(),
-            storage_changes: (pod.storage.into_iter().collect(), HashMap::new()),
+            storage_changes: storage_changes,
             code_hash: pod.code.as_ref().map_or(BLAKE2B_EMPTY, |c| blake2b(c)),
             code_filth: Filth::Dirty,
             code_size: Some(pod.code.as_ref().map_or(0, |c| c.len())),
@@ -123,7 +130,7 @@ impl FVMAccount {
     }
 
     fn storage_is_clean(&self) -> bool {
-        self.storage_changes.0.is_empty() && self.storage_changes.1.is_empty()
+        self.storage_changes.is_empty()
     }
 
     /// Commit the `storage_changes` to the backing DB and update `storage_root`.
@@ -134,38 +141,33 @@ impl FVMAccount {
     ) -> trie::Result<()>
     {
         let mut t = trie_factory.from_existing(db, &mut self.storage_root)?;
-        for (k, v) in self.storage_changes.0.drain() {
+        for (k, v) in self.storage_changes.drain() {
             // cast key and value to trait type,
             // so we can call overloaded `to_bytes` method
-            match v.is_zero() {
-                true => t.remove(&k)?,
-                false => t.insert(&k, &encode(&U128::from(&*v)))?,
-            };
-
-            self.storage_cache.0.borrow_mut().insert(k, v);
-        }
-
-        for (k, v) in self.storage_changes.1.drain() {
-            // cast key and value to trait type,
-            // so we can call overloaded `to_bytes` method
-            match v.is_zero() {
+            let mut is_zero = true;
+            for item in v.clone() {
+                if item != 0x00 {
+                    is_zero = false;
+                    break;
+                }
+            }
+            match is_zero {
                 true => t.remove(&k)?,
                 false => t.insert(&k, &encode(&v))?,
             };
 
-            self.storage_cache.1.borrow_mut().insert(k, v);
+            self.storage_cache.borrow_mut().insert(k, v);
         }
 
         Ok(())
     }
 
     pub fn discard_storage_changes(&mut self) {
-        self.storage_changes.0.clear();
-        self.storage_changes.1.clear();
+        self.storage_changes.clear();
     }
 
     /// Return the storage overlay.
-    pub fn storage_changes(&self) -> &FVMStorageChange {
+    pub fn storage_changes(&self) -> &VMStorageChange {
         &self.storage_changes
     }
 
@@ -189,36 +191,6 @@ impl FVMAccount {
         }
     }
 
-    /// Clone account data, dirty storage keys and cached storage keys.
-    // fn clone_all(&self) -> Self {
-    //     let mut account = self.clone_dirty();
-    //     account.storage_cache = self.storage_cache.clone();
-    //     account
-    // }
-
-    pub fn set_empty_but_commit(&mut self) { self.empty_but_commit = true; }
-}
-
-impl AVMAccount {
-    pub fn new_contract(balance: U256, nonce: U256) -> Self {
-        Self {
-            balance: balance,
-            nonce: nonce,
-            storage_root: BLAKE2B_NULL_RLP,
-            storage_cache: Self::empty_storage_cache(),
-            storage_changes: Self::empty_storage_change(),
-            code_hash: BLAKE2B_EMPTY,
-            code_cache: Arc::new(vec![]),
-            code_size: None,
-            code_filth: Filth::Clean,
-            address_hash: Cell::new(None),
-            empty_but_commit: false,
-            account_type: AccType::AVM,
-        }
-    }
-     /// Replace self with the data from other account merging storage cache.
-    /// Basic account data and all modifications are overwritten
-    /// with new values.
     pub fn overwrite_with(&mut self, other: Self) {
         self.balance = other.balance;
         self.nonce = other.nonce;
@@ -235,121 +207,20 @@ impl AVMAccount {
         }
         self.storage_changes = other.storage_changes;
     }
-}
 
-impl From<BasicAccount> for AVMAccount {
-    fn from(basic: BasicAccount) -> Self {
-        Account {
-            balance: basic.balance,
-            nonce: basic.nonce,
-            storage_root: basic.storage_root,
-            storage_cache: Self::empty_storage_cache(),
-            storage_changes: Self::empty_storage_change(),
-            code_hash: basic.code_hash,
-            code_size: None,
-            code_cache: Arc::new(vec![]),
-            code_filth: Filth::Clean,
-            address_hash: Cell::new(None),
-            empty_but_commit: false,
-            account_type: AccType::AVM,
-        }
-    }
-}
+    /// Clone account data, dirty storage keys and cached storage keys.
+    // fn clone_all(&self) -> Self {
+    //     let mut account = self.clone_dirty();
+    //     account.storage_cache = self.storage_cache.clone();
+    //     account
+    // }
 
-type AVMCache = RefCell<LruCache<Bytes, Bytes>>;
-type AVMStorageChange = HashMap<Bytes, Bytes>;
-pub type AVMAccount = Account<AVMCache, AVMStorageChange>;
-
-impl AVMAccount {
-    fn empty_storage_cache() -> AVMCache {
-        RefCell::new(LruCache::new(STORAGE_CACHE_ITEMS))
-    }
-
-    fn empty_storage_change() -> AVMStorageChange {
-        HashMap::new()
-    }
-
-    pub fn new_basic(balance: U256, nonce: U256) -> Self {
-        Self {
-            balance: balance,
-            nonce: nonce,
-            storage_root: BLAKE2B_NULL_RLP,
-            storage_cache: Self::empty_storage_cache(),
-            storage_changes: HashMap::new(),
-            code_hash: BLAKE2B_EMPTY,
-            code_cache: Arc::new(vec![]),
-            code_size: Some(0),
-            code_filth: Filth::Clean,
-            address_hash: Cell::new(None),
-            empty_but_commit: false,
-            account_type: AccType::AVM,
-        }
-    }
-
-    /// Determine whether there are any un-`commit()`-ed storage-setting operations.
-    fn storage_is_clean(&self) -> bool {
-        self.storage_changes.is_empty() 
-    }
-
-    /// Clone basic account data
-    pub fn clone_basic(&self) -> Self {
-        Self {
-            balance: self.balance.clone(),
-            nonce: self.nonce.clone(),
-            storage_root: self.storage_root.clone(),
-            storage_cache: Self::empty_storage_cache(),
-            storage_changes: Self::empty_storage_change(),
-            code_hash: self.code_hash.clone(),
-            code_size: self.code_size.clone(),
-            code_cache: self.code_cache.clone(),
-            code_filth: self.code_filth,
-            address_hash: self.address_hash.clone(),
-            empty_but_commit: self.empty_but_commit.clone(),
-            account_type: self.account_type.clone(),
-        }
-    }
-
-    // commit avm storage changes to the Backing DB
-    pub fn commit_storage(
-        &mut self,
-        trie_factory: &TrieFactory,
-        db: &mut HashStore,
-    ) -> trie::Result<()>
-    {
-        let mut t = trie_factory.from_existing(db, &mut self.storage_root)?;
-        for (k, v) in self.storage_changes.drain() {
-            // cast key and value to trait type,
-            // so we can call overloaded `to_bytes` method
-            let mut is_zero = true;
-            for item in &v {
-                if *item != 0x00_u8 {
-                    is_zero = false;
-                    break;
-                }
-            }
-            match is_zero {
-                true => t.remove(&k)?,
-                false => t.insert(&k, &encode(&v))?,
-            };
-
-            self.storage_cache.borrow_mut().insert(k, v);
-        }
-
-        Ok(())
-    }
-
-    pub fn storage_changes(&self) -> &AVMStorageChange {
-        &self.storage_changes
-    }
-
-    pub fn discard_storage_changes(&mut self) {
-        self.storage_changes.clear()
-    }
+    pub fn set_empty_but_commit(&mut self) { self.empty_but_commit = true; }
 }
 
 macro_rules! impl_account {
-    ($T: ty, $fixed_strg: expr) => {
-        impl VMAccount for $T {
+    ($T: ty) => {
+        impl VMAccount for AionVMAccount {
             fn from_rlp(rlp: &[u8]) -> $T {
                 let basic: BasicAccount = ::rlp::decode(rlp);
                 basic.into()
@@ -617,174 +488,37 @@ macro_rules! impl_account {
     };
 }
 
-impl_account!(FVMAccount, true);
-impl_account!(AVMAccount, false);
+impl_account!(AionVMAccount);
 
-#[derive(Debug)]
-pub enum FVMKey {
-    Normal(H128),
-    Wide(H128),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum FVMValue {
-    Normal(H128),
-    Long(H256),
-}
-
-impl FVMAccount {
-    pub fn storage_at(&self, db: &HashStore, key: &FVMKey) -> trie::Result<FVMValue> {
-        if let Some(value) = self.cached_storage_at(key) {
-            return Ok(value);
-        }
-        let db = SecTrieDB::new(db, &self.storage_root)?;
-
-        match key {
-            FVMKey::Normal(key) => {
-                let item: U128 = db.get_with(key, ::rlp::decode)?.unwrap_or_else(U128::zero);
-                let value: H128 = item.into();
-                self.storage_cache
-                    .0
-                    .borrow_mut()
-                    .insert(key.clone(), value.clone());
-                Ok(FVMValue::Normal(value))
-            },
-            FVMKey::Wide(key) => {
-                let item: H256 = db.get_with(key, ::rlp::decode)?.unwrap_or_else(H256::zero);
-                let value: H256 = item.into();
-                self.storage_cache
-                    .1
-                    .borrow_mut()
-                    .insert(key.clone(), value.clone());
-                Ok(FVMValue::Long(value))
-            },
-        }
-    }
-
-    pub fn cached_storage_at(&self, key: &FVMKey) -> Option<FVMValue> {
-        match key {
-            FVMKey::Normal(key) => {
-                if let Some(value) = self.storage_changes.0.get(key) {
-                    return Some(FVMValue::Normal(value.clone()));
-                }
-                if let Some(value) = self.storage_cache.0.borrow_mut().get_mut(key) {
-                    return Some(FVMValue::Normal(value.clone()));
-                }
-                None
-            },
-            FVMKey::Wide(key) => {
-                if let Some(value) = self.storage_changes.1.get(key) {
-                    return Some(FVMValue::Long(value.clone()));
-                }
-                if let Some(value) = self.storage_cache.1.borrow_mut().get_mut(key) {
-                    return Some(FVMValue::Long(value.clone()));
-                }
-                None
-            },
-        }
-    }
-
-    pub fn set_storage(&mut self, key: FVMKey, value: FVMValue) {
-        match key {
-            FVMKey::Normal(key) => {
-                if let FVMValue::Normal(value) = value {
-                    self.storage_changes.0.insert(key, value);
-                } else {
-                    panic!("unexpected key/value pair: maybe the value is too long");
-                }
-            },
-            FVMKey::Wide(key) => {
-                if let FVMValue::Long(value) = value {
-                    self.storage_changes.1.insert(key, value);
-                } else {
-                    panic!("unexpected key/value pair: maybe the value is too short");
-                }
-            },
-        }
-    }
-
-    pub fn overwrite_with(&mut self, other: Self) {
-        self.balance = other.balance;
-        self.nonce = other.nonce;
-        self.storage_root = other.storage_root;
-        self.code_hash = other.code_hash;
-        self.code_filth = other.code_filth;
-        self.code_cache = other.code_cache;
-        self.code_size = other.code_size;
-        self.address_hash = other.address_hash;
-        let mut cache = self.storage_cache.0.borrow_mut();
-        for (k, v) in other.storage_cache.0.into_inner() {
-            cache.insert(k.clone(), v.clone()); //TODO: cloning should not be required here
-        }
-
-        let mut cache = self.storage_cache.1.borrow_mut();
-        for (k, v) in other.storage_cache.1.into_inner() {
-            cache.insert(k.clone(), v.clone()); //TODO: cloning should not be required here
-        }
-        self.storage_changes = other.storage_changes;
-    }
-}
-
-impl AVMAccount {
+impl AionVMAccount {
     pub fn storage_at(&self, db: &HashStore, key: &Bytes) -> trie::Result<Bytes> {
-        debug!(target: "vm", "get storage: key = {:?}", key);
         if let Some(value) = self.cached_storage_at(key) {
             return Ok(value);
         }
         let db = SecTrieDB::new(db, &self.storage_root)?;
 
-        let value: Vec<u8> = db.get_with(key, ::rlp::decode)?.unwrap_or_else(|| vec![]);
+        let item: Bytes = db.get_with(key, ::rlp::decode)?.unwrap_or_else(|| vec![]);
         self.storage_cache
             .borrow_mut()
-            .insert(key.clone(), value.clone());
-        debug!(target: "vm", "get storage value from db: key = {:?}, value = {:?}", key, value);
-        Ok(value)
+            .insert(key.clone(), item.clone());
+        Ok(item)
     }
 
     pub fn cached_storage_at(&self, key: &Bytes) -> Option<Bytes> {
-        debug!(target: "vm", "search storage_changes: {:?}", self.storage_changes);
         if let Some(value) = self.storage_changes.get(key) {
-            return Some(value.clone());
-        }
-
-        if let Some(value) = self.storage_cache.borrow_mut().get_mut(key) {
             return Some(value.clone());
         }
         None
     }
 
     pub fn set_storage(&mut self, key: Bytes, value: Bytes) {
-        debug!(target: "vm", "pre storage_changes = {:?}", self.storage_changes);
         self.storage_changes.insert(key, value);
-        let raw_changes: *mut HashMap<Vec<u8>, Vec<u8>> = unsafe {::std::mem::transmute(&self.storage_changes)};
-        debug!(target: "vm", "storage_changes ptr = {:?}", raw_changes);
-        debug!(target: "vm", "post storage_changes = {:?}", self.storage_changes);
     }
 }
 
-impl fmt::Debug for FVMAccount {
+impl fmt::Debug for AionVMAccount {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("FVMAccount")
-            .field("balance", &self.balance)
-            .field("nonce", &self.nonce)
-            .field("code", &self.code())
-            .field(
-                "storage",
-                &self.storage_changes.0.iter().collect::<BTreeMap<_, _>>(),
-            )
-            .field(
-                "storage dword", 
-                &self.storage_changes.1.iter().collect::<BTreeMap<_, _>>(),
-            )
-            .field("storage_root", &self.storage_root)
-            .field("empty_but_commit", &self.empty_but_commit)
-            .finish()
-    }
-}
-
-impl fmt::Debug for AVMAccount {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("AVMAccount")
             .field("balance", &self.balance)
             .field("nonce", &self.nonce)
             .field("code", &self.code())
@@ -793,6 +527,7 @@ impl fmt::Debug for AVMAccount {
                 &self.storage_changes.iter().collect::<BTreeMap<_, _>>(),
             )
             .field("storage_root", &self.storage_root)
+            .field("empty_but_commit", &self.empty_but_commit)
             .finish()
     }
 }
@@ -808,31 +543,31 @@ mod tests {
         let mut db = MemoryDB::new();
         let mut db = AccountDBMut::new(&mut db, &Address::new());
         let rlp = {
-            let mut a = FVMAccount::new_contract(69.into(), 0.into());
-            a.set_storage(FVMKey::Normal(H128::from(0x00u64)), FVMValue::Normal(H128::from(0x1234u64)));
+            let mut a = AionVMAccount::new_contract(69.into(), 0.into());
+            a.set_storage(vec![0x00], vec![0x12, 0x34]);
             a.commit_storage(&Default::default(), &mut db).unwrap();
             a.init_code(vec![]);
             a.commit_code(&mut db);
             a.rlp()
         };
 
-        let a = FVMAccount::from_rlp(&rlp);
+        let a = AionVMAccount::from_rlp(&rlp);
         assert_eq!(
             *a.storage_root().unwrap(),
             "d2e59a50e7414e56da75917275d1542a13fd345bf88a657a4222a0d50ad58868".into()
         );
-        let value = a.storage_at(&db.immutable(), &FVMKey::Normal(H128::from(0x00u64))).unwrap();
+        let value = a.storage_at(&db.immutable(), &vec![0x00]).unwrap();
         assert_eq!(
             value,
-            FVMValue::Normal(0x1234u64.into())
+            vec![0x12, 0x34]
         );
-        let value = a.storage_at(&db.immutable(), &FVMKey::Normal(0x01u64.into())).unwrap();
+        let value = a.storage_at(&db.immutable(), &vec![0x01]).unwrap();
         assert_eq!(
             value,
-            FVMValue::Normal(H128::default())
+            vec![]
         );
     }
 }
 
-unsafe impl Sync for FVMAccount {}
-unsafe impl Sync for AVMAccount {}
+// account will not actually be shared between threads
+unsafe impl Sync for AionVMAccount {}
