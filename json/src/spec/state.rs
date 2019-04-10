@@ -26,6 +26,8 @@ use std::collections::BTreeMap;
 use hash::Address;
 use bytes::Bytes;
 use spec::{Account, Builtin};
+use aion_types::U256;
+use uint::Uint;
 
 /// Blockchain test state deserializer.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -53,6 +55,13 @@ impl State {
             .iter()
             .filter_map(|(add, ref acc)| acc.constructor.clone().map(|b| (add.clone(), b)))
             .collect()
+    }
+
+    /// Returns premine number.
+    pub fn premine(&self) -> U256 {
+        self.0
+            .iter()
+            .fold(U256::from(0), |sum, (_add, ref acc)| sum + acc.balance.clone().unwrap_or(Uint(U256::from(0))).0)
     }
 }
 
