@@ -19,7 +19,7 @@ pub mod types;
 
 pub use avm::{
     AVM,
-    AVMExt,
+    // AVMExt,
     AVMActionParams,
 };
 

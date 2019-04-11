@@ -60,14 +60,14 @@ impl PodAccount {
             storage: acc
                 .storage_changes()
                 .iter()
-                .filter(|(k, v)| {
+                .filter(|(_, v)| {
                     v.len() == 16
                 })
                 .fold(BTreeMap::new(), |mut m, (k, v)| {
                     m.insert(k.clone().as_slice().into(), v.clone().as_slice().into());
                     m
                 }),
-            storage_dword: acc.storage_changes().iter().filter(|(k,v)| {
+            storage_dword: acc.storage_changes().iter().filter(|(_, v)| {
                 v.len() == 32
             }).fold(
                 BTreeMap::new(),

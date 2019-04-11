@@ -9,3 +9,4 @@ rlp = { path = "../../util/rlp" }
 blake2b = { path = "../../util/blake2b" }
 common-types = { path = "../../core/types" }
 ajson = { path = "../../json" }
+acore-bytes = { path = "../../util/bytes" }

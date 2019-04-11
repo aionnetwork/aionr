@@ -25,7 +25,7 @@ use std::cmp;
 use std::sync::{Arc, Mutex};
 use aion_types::{H256, U256, H128, Address};
 use bytes::Bytes;
-use state::{Backend as StateBackend, State, Substate, CleanupMode, AccType};
+use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use executive::*;
 use vms::{
@@ -37,9 +37,8 @@ use vms::{
     ExecutionResult,
     ExecStatus,
     ReturnData,
-    AVMExt,
+    ParamsType,
 };
-use vms::vm::{self};
 use kvdb::KeyValueDB;
 use db::{self, Readable};
 
@@ -54,7 +53,7 @@ pub struct OriginInfo {
 
 impl OriginInfo {
     /// Populates origin info from action params.
-    pub fn from(params: &[ActionParams]) -> Vec<Self> {
+    pub fn from(params: &[&ActionParams]) -> Vec<Self> {
         params
             .iter()
             .map(|p| {
@@ -73,6 +72,7 @@ impl OriginInfo {
 }
 
 /// Implementation of evm Externalities.
+#[allow(dead_code)]
 pub struct AVMExternalities<'a, B: 'a>
 where B: StateBackend
 {
@@ -102,112 +102,6 @@ where B: StateBackend
             depth: depth,
             substates: substates,
         }
-    }
-}
-
-impl<'a, B: 'a> AVMExt for AVMExternalities<'a, B>
-where B: StateBackend
-{
-    fn env_info(&self) -> &EnvInfo { self.env_info }
-
-    fn depth(&self) -> usize { self.depth }
-
-    fn create_account(&mut self, a: &Address) {
-        self.state
-            .lock()
-            .unwrap()
-            .new_contract(a, 0.into(), 0.into(), AccType::AVM)
-    }
-
-    fn account_exists(&self, a: &Address) -> bool {
-        self.state
-            .lock()
-            .unwrap()
-            .exists(a)
-            .expect("check avm account failed")
-    }
-
-    fn save_code(&mut self, address: &Address, code: Vec<u8>) {
-        println!("AVMExt save code");
-        self.state
-            .lock()
-            .unwrap()
-            .init_code(address, code, AccType::AVM)
-            .expect("save avm code should not fail");
-    }
-
-    fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
-        println!("AVM get code");
-        match self.state.lock().unwrap().code(address) {
-            Ok(code) => {
-                //println!("code = {:?}", code);
-                code
-            },
-            Err(_x) => None,
-        }
-    }
-
-    fn sstore(&mut self, a: &Address, key: Vec<u8>, value: Vec<u8>) {
-        self.state
-            .lock()
-            .unwrap()
-            .set_storage(a, key, value)
-            .expect("Fatal error occured when set storage");
-    }
-
-    fn sload(&self, a: &Address, key: &Vec<u8>) -> Option<Vec<u8>> {
-        match self.state.lock().unwrap().storage_at(a, key) {
-            Ok(value) => Some(value),
-            Err(_) => None,
-        }
-    }
-
-    fn remove_account(&mut self, a: &Address) {
-        self.state
-            .lock()
-            .unwrap()
-            .kill_account(a, AccType::AVM)
-    }
-
-    fn avm_balance(&self, a: &Address) -> U256 {
-        self.state
-            .lock()
-            .unwrap()
-            .balance(a)
-            .expect("Fatal error during get balance")
-    }
-
-    fn inc_balance(&mut self, a: &Address, value: &U256) {
-        self.state
-            .lock()
-            .unwrap()
-            .add_balance(a, value, CleanupMode::NoEmpty)
-            .expect("add balance failed");
-
-    }
-
-    fn dec_balance(&mut self, a: &Address, value: &U256) {
-        self.state
-            .lock()
-            .unwrap()
-            .sub_balance(a, value, &mut CleanupMode::NoEmpty)
-            .expect("decrease balance failed")
-    }
-
-    fn get_nonce(&self, a: &Address) -> u64 {
-        self.state
-            .lock()
-            .unwrap()
-            .nonce(a)
-            .expect("get nonce failed").low_u64()
-    }
-
-    fn inc_nonce(&mut self, a: &Address) {
-        self.state
-            .lock()
-            .unwrap()
-            .inc_nonce(a)
-            .expect("increment nonce failed")
     }
 }
 
@@ -373,9 +267,11 @@ where B: StateBackend
             data: None,
             call_type: CallType::None,
             static_flag: false,
-            params_type: vm::ParamsType::Embedded,
+            params_type: ParamsType::Embedded,
             transaction_hash: H256::default(),
             original_transaction_hash: self.origin_info[0].origin_tx_hash.clone(),
+            // this field is just for avm;
+            nonce: 0,
         };
 
         let mut result = {
@@ -479,13 +375,15 @@ where B: StateBackend
             data: Some(data.to_vec()),
             call_type: call_type,
             static_flag: static_flag,
-            params_type: vm::ParamsType::Separate,
+            params_type: ParamsType::Separate,
             transaction_hash: H256::default(),
             original_transaction_hash: self.origin_info[0].origin_tx_hash,
+            // call fastvm here, nonce has no usage
+            nonce: 0,
         };
 
         let mut ex = Executive::from_parent(self.state, self.env_info, self.machine, self.depth);
-        ex.call(params, self.substate, AccType::FVM)
+        ex.call(params, self.substate)
     }
 
     fn extcode(&self, address: &Address) -> Arc<Bytes> {
@@ -551,11 +449,29 @@ where B: StateBackend
         //      Need more thoughts how to handle and return init_code exception
         //      from vm module to kernel.
         self.state
-            .init_code(&self.origin_info[0].address, code, AccType::FVM)
+            .init_code(&self.origin_info[0].address, code)
             .expect(
                 "init_code should not fail as account should
             already be created before",
             );
+    }
+
+    fn save_code_at(&mut self, address: &Address, code: Bytes) {
+        debug!(target: "vm", "AVM save code at: {:?}", address);
+        self.state
+            .init_code(address, code)
+            .expect("save avm code should not fail");
+    }
+
+    fn code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
+        println!("AVM get code from: {:?}", address);
+        match self.state.code(address) {
+            Ok(code) => {
+                //println!("code = {:?}", code);
+                code
+            },
+            Err(_x) => None,
+        }
     }
 
     // triggered when create a contract account with code = None
@@ -563,6 +479,251 @@ where B: StateBackend
         self.state
             .set_empty_but_commit(&self.origin_info[0].address)
             .expect("set empty_but_commit flags should not fail");
+    }
+
+    fn create_account(&mut self, a: &Address) {
+        self.state
+            .new_contract(a, 0.into(), 0.into())
+    }
+
+    fn sstore(&mut self, a: &Address, key: Vec<u8>, value: Vec<u8>) {
+        self.state
+            .set_storage(a, key, value)
+            .expect("Fatal error occured when set storage");
+    }
+
+    fn sload(&self, a: &Address, key: &Vec<u8>) -> Option<Vec<u8>> {
+        match self.state.storage_at(a, key) {
+            Ok(value) => Some(value),
+            Err(_) => None,
+        }
+    }
+
+    fn kill_account(&mut self, a: &Address) {
+        self.state
+            .kill_account(a)
+    }
+
+    fn inc_balance(&mut self, a: &Address, value: &U256) {
+        self.state
+            .add_balance(a, value, CleanupMode::NoEmpty)
+            .expect("add balance failed");
+
+    }
+
+    fn dec_balance(&mut self, a: &Address, value: &U256) {
+        self.state
+            .sub_balance(a, value, &mut CleanupMode::NoEmpty)
+            .expect("decrease balance failed")
+    }
+
+    fn nonce(&self, a: &Address) -> u64 {
+        self.state
+            .nonce(a)
+            .expect("get nonce failed").low_u64()
+    }
+
+    fn inc_nonce(&mut self, a: &Address) {
+        self.state
+            .inc_nonce(a)
+            .expect("increment nonce failed")
+    }
+}
+
+#[allow(unused)]
+impl<'a, B: 'a> Ext for AVMExternalities<'a, B>
+where B: StateBackend
+{
+    fn storage_at(&self, _key: &H128) -> H128 {
+       unimplemented!()
+    }
+
+    fn set_storage(&mut self, _key: H128, value: H128) {
+        unimplemented!()
+    }
+
+    fn storage_at_dword(&self, key: &H128) -> H256 {
+        unimplemented!()
+    }
+
+    fn set_storage_dword(&mut self, key: H128, value: H256) {
+        unimplemented!()
+    }
+
+    fn exists(&self, address: &Address) -> bool {
+        self.state
+            .lock()
+            .unwrap()
+            .exists(address)
+            .expect("Fatal error occurred when checking account existance.")
+    }
+
+    fn exists_and_not_null(&self, address: &Address) -> bool {
+        self.state
+            .lock()
+            .unwrap()
+            .exists_and_not_null(address)
+            .expect("Fatal error occurred when checking account existance.")
+    }
+
+    fn origin_balance(&self) -> U256 { unimplemented!() }
+
+    fn balance(&self, address: &Address) -> U256 {
+        self.state
+            .lock()
+            .unwrap()
+            .balance(address)
+            .expect("Fatal error occurred when getting balance.")
+    }
+
+    fn blockhash(&mut self, number: &U256) -> H256 {
+        unimplemented!()
+    }
+
+    /// Create new contract account
+    fn create(&mut self, gas: &U256, value: &U256, code: &[u8]) -> ExecutionResult {
+        unimplemented!()
+    }
+
+    /// Call contract
+    fn call(
+        &mut self,
+        gas: &U256,
+        sender_address: &Address,
+        receive_address: &Address,
+        value: Option<U256>,
+        data: &[u8],
+        code_address: &Address,
+        call_type: CallType,
+        static_flag: bool,
+    ) -> ExecutionResult
+    {
+        unimplemented!()
+    }
+
+    fn extcode(&self, address: &Address) -> Arc<Bytes> {
+        self.state
+            .lock()
+            .unwrap()
+            .code(address)
+            .expect("Fatal error occurred when getting code.")
+            .unwrap_or_else(|| Arc::new(vec![]))
+    }
+
+    fn extcodesize(&self, address: &Address) -> usize {
+        self.state
+            .lock()
+            .unwrap()
+            .code_size(address)
+            .expect("Fatal error occurred when getting code size.")
+            .unwrap_or(0)
+    }
+
+    fn log(&mut self, topics: Vec<H256>, data: &[u8]) {
+        unimplemented!()
+    }
+
+    fn suicide(&mut self, refund_address: &Address) {
+        unimplemented!()
+    }
+
+    fn env_info(&self) -> &EnvInfo { self.env_info }
+
+    fn depth(&self) -> usize { self.depth }
+
+    fn inc_sstore_clears(&mut self) {
+        unimplemented!()
+    }
+
+    fn save_code(&mut self, code: Bytes) {
+        unimplemented!()
+    }
+
+    fn save_code_at(&mut self, address: &Address, code: Bytes) {
+        debug!(target: "vm", "AVM save code at: {:?}", address);
+        self.state
+            .lock()
+            .unwrap()
+            .init_code(address, code)
+            .expect("save avm code should not fail");
+    }
+
+    fn code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
+        println!("AVM get code from: {:?}", address);
+        match self.state.lock().unwrap().code(address) {
+            Ok(code) => {
+                //println!("code = {:?}", code);
+                code
+            },
+            Err(_x) => None,
+        }
+    }
+
+    // triggered when create a contract account with code = None
+    fn set_special_empty_flag(&mut self) {
+        unimplemented!()
+    }
+
+    fn create_account(&mut self, a: &Address) {
+        self.state
+            .lock()
+            .unwrap()
+            .new_contract(a, 0.into(), 0.into())
+    }
+
+    fn sstore(&mut self, a: &Address, key: Vec<u8>, value: Vec<u8>) {
+        self.state
+            .lock()
+            .unwrap()
+            .set_storage(a, key, value)
+            .expect("Fatal error occured when set storage");
+    }
+
+    fn sload(&self, a: &Address, key: &Vec<u8>) -> Option<Vec<u8>> {
+        match self.state.lock().unwrap().storage_at(a, key) {
+            Ok(value) => Some(value),
+            Err(_) => None,
+        }
+    }
+
+    fn kill_account(&mut self, a: &Address) {
+        self.state
+            .lock()
+            .unwrap()
+            .kill_account(a)
+    }
+
+    fn inc_balance(&mut self, a: &Address, value: &U256) {
+        self.state
+            .lock()
+            .unwrap()
+            .add_balance(a, value, CleanupMode::NoEmpty)
+            .expect("add balance failed");
+
+    }
+
+    fn dec_balance(&mut self, a: &Address, value: &U256) {
+        self.state
+            .lock()
+            .unwrap()
+            .sub_balance(a, value, &mut CleanupMode::NoEmpty)
+            .expect("decrease balance failed")
+    }
+
+    fn nonce(&self, a: &Address) -> u64 {
+        self.state
+            .lock()
+            .unwrap()
+            .nonce(a)
+            .expect("get nonce failed").low_u64()
+    }
+
+    fn inc_nonce(&mut self, a: &Address) {
+        self.state
+            .lock()
+            .unwrap()
+            .inc_nonce(a)
+            .expect("increment nonce failed")
     }
 }
 

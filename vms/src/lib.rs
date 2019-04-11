@@ -39,20 +39,29 @@ extern crate log;
 extern crate rlp;
 extern crate vm_common;
 
+#[cfg(test)]
+mod tests;
+
 pub use factory::{Factory, FastVMFactory, AVMFactory};
 pub use vmtype::VMType;
 pub use fastvm::vm::{
     self,
-    Vm,
-    ActionParams,
-    ActionValue,
-    ParamsType,
-    Ext,
     Error
 };
 
-pub use avm::{AVMExt, AVMActionParams};
+//pub use avm::{AVMActionParams};
 
 pub use fastvm::basetypes::constants;
 
-pub use vm_common::{ReturnData, ExecutionResult, ExecStatus, CallType, EnvInfo, LastHashes};
+pub use vm_common::{
+    ReturnData,
+    ExecutionResult,
+    ExecStatus,
+    CallType,
+    EnvInfo,
+    LastHashes,
+    ParamsType,
+    ActionParams,
+    ActionValue,
+    Ext
+};

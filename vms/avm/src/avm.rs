@@ -13,7 +13,7 @@ use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
 use types::{TransactionContext, TransactionResult};
-use vm_common::{EnvInfo, CallType};
+use vm_common::{CallType};
 use bytes::Bytes;
 use aion_types::{Address, U256, H256};
 use hash::{BLAKE2B_EMPTY};
@@ -270,22 +270,22 @@ impl AVM {
     }
 }
 
-pub trait AVMExt {
-    fn create_account(&mut self, address: &Address);
-    fn account_exists(&self, address: &Address) -> bool;
-    fn save_code(&mut self, address: &Address, code: Vec<u8>);
-    fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>>;
-    fn sstore(&mut self, address: &Address, key: Vec<u8>, value: Vec<u8>);
-    fn sload(&self, address: &Address, key: &Vec<u8>) -> Option<Vec<u8>>;
-    fn remove_account(&mut self, address: &Address);
-    fn avm_balance(&self, address: &Address) -> U256;
-    fn inc_balance(&mut self, address: &Address, inc: &U256);
-    fn dec_balance(&mut self, address: &Address, dec: &U256);
-    fn get_nonce(&self, address: &Address) -> u64;
-    fn inc_nonce(&mut self, address: &Address);
-    fn env_info(&self) -> &EnvInfo;
-    fn depth(&self) -> usize;
-}
+// pub trait AVMExt {
+//     fn create_account(&mut self, address: &Address);
+//     fn account_exists(&self, address: &Address) -> bool;
+//     fn save_code(&mut self, address: &Address, code: Vec<u8>);
+//     fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>>;
+//     fn sstore(&mut self, address: &Address, key: Vec<u8>, value: Vec<u8>);
+//     fn sload(&self, address: &Address, key: &Vec<u8>) -> Option<Vec<u8>>;
+//     fn remove_account(&mut self, address: &Address);
+//     fn avm_balance(&self, address: &Address) -> U256;
+//     fn inc_balance(&mut self, address: &Address, inc: &U256);
+//     fn dec_balance(&mut self, address: &Address, dec: &U256);
+//     fn get_nonce(&self, address: &Address) -> u64;
+//     fn inc_nonce(&mut self, address: &Address);
+//     fn env_info(&self) -> &EnvInfo;
+//     fn depth(&self) -> usize;
+// }
 
 // TODO: should be a trait, possible to avoid cloning everything from a Transaction(/View).
 /// Action (call/create) input params. Everything else should be specified in Externalities.

@@ -27,8 +27,6 @@ use vms::{
     Factory,
     FastVMFactory,
     AVMFactory,
-    ActionParams,
-    AVMActionParams
 };
 
 /// Virtual machine factory

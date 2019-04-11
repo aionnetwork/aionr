@@ -47,7 +47,7 @@ use types::basic_account::BasicAccount;
 use types::state_diff::StateDiff;
 use vms::EnvInfo;
 
-use aion_types::{Address, H128, H256, U256};
+use aion_types::{Address, H256, U256};
 use bytes::Bytes;
 use kvdb::{KeyValueDB, AsHashStore, DBValue, MemoryDBRepository};
 
@@ -317,12 +317,13 @@ impl<B: Backend> State<B> {
     }
 
     /// Create a recoverable checkpoint of this state.
-    pub fn checkpoint(&mut self, account_type: AccType) {
+    /// AVM has no need of checkpoints
+    pub fn checkpoint(&mut self) {
         self.checkpoints.get_mut().push(HashMap::new())
     }
 
     /// Merge last checkpoint with previous.
-    pub fn discard_checkpoint(&mut self, account_type: AccType) {
+    pub fn discard_checkpoint(&mut self) {
         // merge with previous checkpoint
         let last = self.checkpoints.get_mut().pop();
         if let Some(mut checkpoint) = last {
@@ -339,7 +340,7 @@ impl<B: Backend> State<B> {
     }
 
     /// Revert to the last checkpoint and discard it.
-    pub fn revert_to_checkpoint(&mut self, vm_type: AccType) {
+    pub fn revert_to_checkpoint(&mut self) {
         if let Some(mut checkpoint) = self.checkpoints.get_mut().pop() {
             for (k, v) in checkpoint.drain() {
                 match v {
@@ -404,7 +405,7 @@ impl<B: Backend> State<B> {
 
     /// Create a new contract at address `contract`. If there is already an account at the address
     /// it will have its code reset, ready for `init_code()`.
-    pub fn new_contract(&mut self, contract: &Address, balance: U256, nonce_offset: U256, acc_type: AccType){
+    pub fn new_contract(&mut self, contract: &Address, balance: U256, nonce_offset: U256) {
         self.insert_cache(
             contract,
             AccountEntry::new_dirty(Some(AionVMAccount::new_contract(
@@ -415,7 +416,7 @@ impl<B: Backend> State<B> {
         }
 
     /// Remove an existing account.
-    pub fn kill_account(&mut self, account: &Address, acc_type: AccType) {
+    pub fn kill_account(&mut self, account: &Address) {
         println!("kill account: {:?}", account);
         self.insert_cache(account, AccountEntry::<AionVMAccount>::new_dirty(None));
     }
@@ -645,7 +646,7 @@ impl<B: Backend> State<B> {
 
     /// Initialise the code of account `a` so that it is `code`.
     /// NOTE: Account should have been created with `new_contract`.
-    pub fn init_code(&mut self, a: &Address, code: Bytes, acc_type: AccType) -> trie::Result<()> {
+    pub fn init_code(&mut self, a: &Address, code: Bytes) -> trie::Result<()> {
         self.require_or_from(
             a,
             true,
@@ -668,7 +669,7 @@ impl<B: Backend> State<B> {
     }
 
     /// Reset the code of account `a` so that it is `code`.
-    pub fn reset_code(&mut self, a: &Address, code: Bytes, acc_type: AccType) -> trie::Result<()> {
+    pub fn reset_code(&mut self, a: &Address, code: Bytes) -> trie::Result<()> {
         self.require_or_from(
             a,
             true,
@@ -841,41 +842,6 @@ impl<B: Backend> State<B> {
             }
         }
 
-        // update AVM accounts
-        let mut avm_accounts = self.cache.borrow_mut();
-        debug!(target: "cons", "commit avm accounts = {:?}", avm_accounts);
-        for (address, ref mut a) in avm_accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
-            if let Some(ref mut account) = a.account {
-                let addr_hash = account.address_hash(address);
-                {
-                    let mut account_db = self
-                        .factories
-                        .accountdb
-                        .create(self.db.as_hashstore_mut(), addr_hash);
-                    account.commit_code(account_db.as_hashstore_mut());
-                    // Tmp workaround to ignore storage changes on null accounts
-                    // until java kernel fixed the problem
-                    if !account.is_null() {
-                        account
-                            .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
-                    } else if !account.storage_changes().is_empty()
-                    {
-                        account.discard_storage_changes();
-                        a.state = AccountState::CleanFresh;
-                    } else {
-                        if a.state == AccountState::Dirty
-                            && account.code_hash() == BLAKE2B_EMPTY
-                        {
-                            a.state = AccountState::CleanFresh;
-                        }
-                    }
-                }
-                if !account.is_empty() {
-                    self.db.note_non_null_account(address);
-                }
-            }
-        }
-
         {
             // commit fvm accounts
             let mut trie = self
@@ -893,23 +859,9 @@ impl<B: Backend> State<B> {
                     }
                 };
             }
-
-
-            // commit avm accounts
-            for (address, ref mut a) in avm_accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
-                a.state = AccountState::Committed;
-                match a.account {
-                    Some(ref mut account) => {
-                        trie.insert(address, &account.rlp())?;
-                    }
-                    None => {
-                        trie.remove(address)?;
-                    }
-                };
-            }
         }
         //println!("new state = {:?}", self);
-        debug!(target: "cons", "after commit: fvm accounts = {:?}, avm accounts = {:?}, state root = {:?}", accounts, avm_accounts, self.root);
+        debug!(target: "cons", "after commit: accounts = {:?}, state root = {:?}", accounts, self.root);
 
         Ok(())
     }
@@ -962,20 +914,12 @@ impl<B: Backend> State<B> {
     }
 
     // Return a list of all touched addresses in cache.
-    fn touched_addresses(&self, acc_type: AccType) -> Vec<Address> {
-        match acc_type {
-            AccType::FVM => {
-                assert!(self.checkpoints.borrow().is_empty());
-                self.cache.borrow().iter().map(|(add, _)| *add).collect()
-            },
-            AccType::AVM => {
-                assert!(self.checkpoints.borrow().is_empty());
-                self.cache.borrow().iter().map(|(add, _)| *add).collect()
-            },
-        }
+    fn touched_addresses(&self) -> Vec<Address> {
+        assert!(self.checkpoints.borrow().is_empty());
+        self.cache.borrow().iter().map(|(add, _)| *add).collect()
     }
 
-    fn query_pod(&mut self, query: &PodState, touched_addresses: &[Address], acc_type: AccType) -> trie::Result<()> {
+    fn query_pod(&mut self, query: &PodState, touched_addresses: &[Address]) -> trie::Result<()> {
         let pod = query.get();
 
         for address in touched_addresses {
@@ -997,11 +941,11 @@ impl<B: Backend> State<B> {
 
     /// Returns a `StateDiff` describing the difference from `orig` to `self`.
     /// Consumes self.
-    pub fn diff_from<X: Backend>(&self, orig: State<X>, acc_type: AccType) -> trie::Result<StateDiff> {
-        let addresses_post = self.touched_addresses(AccType::FVM);
+    pub fn diff_from<X: Backend>(&self, orig: State<X>) -> trie::Result<StateDiff> {
+        let addresses_post = self.touched_addresses();
         let pod_state_post = self.to_pod();
         let mut state_pre = orig;
-        state_pre.query_pod(&pod_state_post, &addresses_post, acc_type)?;
+        state_pre.query_pod(&pod_state_post, &addresses_post)?;
         Ok(pod_state::diff_pod(&state_pre.to_pod(), &pod_state_post))
     }
 
@@ -1363,7 +1307,7 @@ mod tests {
                     |_| {},
                 )
                 .unwrap();
-            state.init_code(&a, vec![1, 2, 3], AccType::FVM).unwrap();
+            state.init_code(&a, vec![1, 2, 3]).unwrap();
             assert_eq!(state.code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
             state.commit().unwrap();
             assert_eq!(state.code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
@@ -1625,19 +1569,19 @@ mod tests {
     fn checkpoint_basic() {
         let mut state = get_temp_state();
         let a = Address::zero();
-        state.checkpoint(AccType::FVM);
+        state.checkpoint();
         state
             .add_balance(&a, &U256::from(69u64), CleanupMode::NoEmpty)
             .unwrap();
         assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.discard_checkpoint(AccType::FVM);
+        state.discard_checkpoint();
         assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.checkpoint(AccType::FVM);
+        state.checkpoint();
         state
             .add_balance(&a, &U256::from(1u64), CleanupMode::NoEmpty)
             .unwrap();
         assert_eq!(state.balance(&a).unwrap(), U256::from(70u64));
-        state.revert_to_checkpoint(AccType::FVM);
+        state.revert_to_checkpoint();
         assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
     }
 
@@ -1645,15 +1589,15 @@ mod tests {
     fn checkpoint_nested() {
         let mut state = get_temp_state();
         let a = Address::zero();
-        state.checkpoint(AccType::FVM);
-        state.checkpoint(AccType::FVM);
+        state.checkpoint();
+        state.checkpoint();
         state
             .add_balance(&a, &U256::from(69u64), CleanupMode::NoEmpty)
             .unwrap();
         assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.discard_checkpoint(AccType::FVM);
+        state.discard_checkpoint();
         assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.revert_to_checkpoint(AccType::FVM);
+        state.revert_to_checkpoint();
         assert_eq!(state.balance(&a).unwrap(), U256::from(0));
     }
 
@@ -1672,7 +1616,7 @@ mod tests {
         let mut state = get_temp_state();
 
         let a: Address = 0xa.into();
-        state.init_code(&a, b"abcdefg".to_vec(), AccType::FVM).unwrap();;
+        state.init_code(&a, b"abcdefg".to_vec()).unwrap();;
         state
             .add_balance(&a, &256.into(), CleanupMode::NoEmpty)
             .unwrap();

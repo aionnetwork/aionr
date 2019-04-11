@@ -24,8 +24,7 @@ use libc;
 use basetypes::{EvmMessage, constants};
 use ffi::{EvmResult, EvmStatusCode};
 use aion_types::{U128, H256, U256, Address};
-use vm::Ext;
-use vm_common::CallType;
+use vm_common::{CallType, Ext};
 
 // definitions of callbacks used by fastvm.so; obj : &Callback
 #[no_mangle]
@@ -219,10 +218,10 @@ pub extern fn call(_obj: *mut libc::c_void, _info: *mut u8, _msg: *const u8) -> 
 
     result_info.gas_left = result.gas_left.low_u64() as i64;
     result_info.status_code = result.status_code.into();
-    result_info.output_size = result.return_data.size;
+    result_info.output_size = result.return_data.len();
     debug!(target: "vm", "output_data: {:?}", result.return_data);
     if result_info.output_size > 0 {
-        result_info.output_data = unsafe { ::std::mem::transmute(&result.return_data.mem[0]) };
+        result_info.output_data = unsafe { ::std::mem::transmute(&result.return_data[0]) };
     }
     result_info.output_data
 }

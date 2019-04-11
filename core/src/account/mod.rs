@@ -1,3 +1,25 @@
+/*******************************************************************************
+ * Copyright (c) 2015-2018 Parity Technologies (UK) Ltd.
+ * Copyright (c) 2018-2019 Aion foundation.
+ *
+ *     This file is part of the aion network project.
+ *
+ *     The aion network project is free software: you can redistribute it
+ *     and/or modify it under the terms of the GNU General Public License
+ *     as published by the Free Software Foundation, either version 3 of
+ *     the License, or any later version.
+ *
+ *     The aion network project is distributed in the hope that it will
+ *     be useful, but WITHOUT ANY WARRANTY; without even the implied
+ *     warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *     See the GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with the aion network project source files.
+ *     If not, see <https://www.gnu.org/licenses/>.
+ *
+ ******************************************************************************/
+
 mod generic;
 mod traits;
 
@@ -7,7 +29,7 @@ use std::collections::{HashMap, BTreeMap};
 use std::sync::Arc;
 use std::fmt;
 
-use aion_types::{H128, U128, H256, U256, Address};
+use aion_types::{H256, U256, Address};
 use bytes::{Bytes, ToPretty};
 use self::generic::{Filth, BasicAccount};
 use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP, blake2b};
@@ -564,7 +586,7 @@ mod tests {
         let value = a.storage_at(&db.immutable(), &vec![0x01]).unwrap();
         assert_eq!(
             value,
-            vec![]
+            Vec::<u8>::new()
         );
     }
 }

@@ -30,10 +30,10 @@ use block::{ExecutedBlock, IsBlock};
 use precompiled::builtin::BuiltinContract;
 use client::BlockChainClient;
 use error::Error;
-use executive::Executive;
+use executive::{Executive};
 use header::{BlockNumber, Header};
 use spec::CommonParams;
-use state::{CleanupMode, Substate, AccType};
+use state::{CleanupMode, Substate};
 use transaction::{self, SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
 use tx_filter::TransactionFilter;
 
@@ -96,13 +96,14 @@ impl EthereumMachine {
             params_type: ParamsType::Separate,
             transaction_hash: H256::default(),
             original_transaction_hash: H256::default(),
+            nonce: 0,
         };
         let mut ex = Executive::new(&mut state, &env_info, self);
         let mut substate = Substate::new();
-        let result = ex.call(params, &mut substate, AccType::FVM);
+        let result = ex.call(params, &mut substate);
         match result.exception.as_str() {
             "" => {
-                return Ok(result.return_data.mem);
+                return Ok(result.return_data.to_vec());
             }
             error => {
                 warn!(target:"executive","Encountered error on making system call: {}", error);

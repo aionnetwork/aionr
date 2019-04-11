@@ -35,12 +35,12 @@ use blake2b::{BLAKE2B_NULL_RLP, blake2b};
 use kvdb::{MemoryDB, MemoryDBRepository};
 use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
-use vms::{CallType, ActionValue, ActionParams, ParamsType, EnvInfo};
+use vms::{CallType, ActionValue, ParamsType, EnvInfo, ActionParams};
 
 use precompiled::builtin::{BuiltinContract, builtin_contract};
 use engines::{POWEquihashEngine, EthEngine, NullEngine, InstantSeal};
 use error::Error;
-use executive::Executive;
+use executive::{Executive};
 use factory::Factories;
 use header::Header;
 use machine::EthereumMachine;
@@ -359,6 +359,7 @@ impl Spec {
                     params_type: ParamsType::Embedded,
                     transaction_hash: H256::default(),
                     original_transaction_hash: H256::default(),
+                    nonce: 0,
                 };
 
                 let mut substate = Substate::new();

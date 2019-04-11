@@ -22,11 +22,11 @@
 
 //! Transaction Execution environment.
 use std::sync::{Arc, Mutex};
-use blake2b::{blake2b, BLAKE2B_EMPTY};
+use blake2b::{blake2b};
 use aion_types::{H256, U256, U512, Address};
 #[cfg(test)]
 use aion_types::U128;
-use state::{Backend as StateBackend, State, Substate, CleanupMode, AccType};
+use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use error::ExecutionError;
 use vms::{
@@ -35,7 +35,6 @@ use vms::{
     ActionValue,
     CallType,
     EnvInfo,
-    AVMActionParams,
     ExecutionResult,
     ExecStatus,
     ReturnData,
@@ -258,7 +257,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             // action type is Create or Call.
             let params = match t.action {
                 Action::Create => {
-                    AVMActionParams {
+                    ActionParams {
                         code_address: Address::default(),
                         code_hash: None,
                         address: Address::default(),
@@ -266,13 +265,15 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         origin: sender.clone(),
                         gas: init_gas,
                         gas_price: t.gas_price,
-                        value: t.value,
+                        value: ActionValue::Transfer(t.value),
                         code: Some(Arc::new(t.data.clone())),
                         data: None,
                         call_type: CallType::None,
                         transaction_hash: t.hash(),
                         original_transaction_hash: t.hash(),
                         nonce: nonce.low_u64(),
+                        static_flag: false,
+                        params_type: vms::ParamsType::Embedded
                     }
                 }
                 Action::Call(ref address) => {
@@ -281,14 +282,14 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         false => CallType::BulkBalance,
                     };
 
-                    AVMActionParams {
+                    ActionParams {
                         code_address: address.clone(),
                         address: address.clone(),
                         sender: sender.clone(),
                         origin: sender.clone(),
                         gas: init_gas,
                         gas_price: t.gas_price,
-                        value: t.value,
+                        value: ActionValue::Transfer(t.value),
                         code: self.state.code(address).unwrap(),
                         code_hash: Some(self.state.code_hash(address).unwrap()),
                         data: Some(t.data.clone()),
@@ -296,6 +297,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         transaction_hash: t.hash(),
                         original_transaction_hash: t.hash(),
                         nonce: nonce.low_u64(),
+                        params_type: vms::ParamsType::Embedded,
+                        static_flag: false,
                     }
                 }
             };
@@ -312,7 +315,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
     fn exec_avm(
         &mut self,
-        params: Vec<AVMActionParams>,
+        params: Vec<ActionParams>,
         unconfirmed_substate: &mut [Substate],
     ) -> Vec<ExecutionResult>
     {
@@ -329,7 +332,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 .as_avm_externalities(unconfirmed_substate);
             //TODO: make create/exec compatible with fastvm
             let vm = vm_factory.create(VMType::AVM);
-            return vm.exec_v1(params, &mut ext);
+            return vm.exec(params, &mut ext);   
         }
 
         //Start in new thread with stack size needed up to max depth
@@ -348,7 +351,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 ))
                 .spawn(move || {
                     let vm = vm_factory.create(VMType::AVM);
-                    vm.exec_v1(params, &mut ext)
+                    vm.exec(params, &mut ext)
                 })
                 .expect("Sub-thread creation cannot fail; the host might run out of resources; qed")
         })
@@ -460,6 +463,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     params_type: vms::ParamsType::Embedded,
                     transaction_hash: t.hash(),
                     original_transaction_hash: t.hash(),
+                    nonce: t.nonce.low_u64(),
                 };
                 self.create(params, &mut substate)
             }
@@ -480,9 +484,9 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     params_type: vms::ParamsType::Separate,
                     transaction_hash: t.hash(),
                     original_transaction_hash: t.hash(),
+                    nonce: t.nonce.low_u64(),
                 };
-                let tx_type :U256 = t.transaction_type.into();
-                self.call(params, &mut substate, tx_type.into())
+                self.call(params, &mut substate)
             }
         };
 
@@ -506,7 +510,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let mut vm_factory = self.state.vm_factory();
             // consider put global callback in ext
             let mut ext =
-                self.as_externalities(OriginInfo::from(&[params.clone()]), unconfirmed_substate);
+                self.as_externalities(OriginInfo::from(&[&params as &ActionParams]), unconfirmed_substate);
             //TODO: make create/exec compatible with fastvm
             let vm = vm_factory.create(VMType::FastVM);
             return vm.exec(vec![params], &mut ext).first().unwrap().clone();
@@ -517,7 +521,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let mut vm_factory = self.state.vm_factory();
 
             let mut ext =
-                self.as_externalities(OriginInfo::from(&[params.clone()]), unconfirmed_substate);
+                self.as_externalities(OriginInfo::from(&[&params as &ActionParams]), unconfirmed_substate);
 
             scope
                 .builder()
@@ -539,7 +543,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     /// NOTE. It does not finalize the transaction (doesn't do refunds, nor suicides).
     /// Modifies the substate.
     /// Returns either gas_left or `vm::Error`.
-    pub fn call(&mut self, params: ActionParams, substate: &mut Substate, acc_type: AccType) -> ExecutionResult {
+    pub fn call(&mut self, params: ActionParams, substate: &mut Substate) -> ExecutionResult {
         trace!(
             target: "executive",
             "Executive::call(params={:?}) self.env_info={:?}",
@@ -548,7 +552,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         );
 
         // backup current state in case of error to rollback
-        self.state.checkpoint(acc_type.clone());
+        self.state.checkpoint();
 
         if self.depth >= 1 {
             // at first, transfer value to destination
@@ -581,7 +585,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 && !self.state.exists(&params.code_address).unwrap()
             {
                 self.state
-                    .new_contract(&params.code_address, 0.into(), 0.into(), acc_type);
+                    .new_contract(&params.code_address, 0.into(), 0.into());
             }
             // Engines aren't supposed to return builtins until activation, but
             // prefer to fail rather than silently break consensus.
@@ -623,12 +627,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     // Handle state and substates
                     self.enact_result(&result, substate, unconfirmed_substate);
                 } else {
-                    self.state.revert_to_checkpoint(acc_type);
+                    self.state.revert_to_checkpoint();
                 }
                 res = result;
             } else {
                 // If not enough gas, rollback state and return failure status
-                self.state.revert_to_checkpoint(acc_type);
+                self.state.revert_to_checkpoint();
                 res = ExecutionResult {
                     gas_left: 0.into(),
                     status_code: ExecStatus::Failure,
@@ -651,7 +655,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             } else {
                 // otherwise it's just a basic transaction.
                 debug!(target: "vm", "deal with normal tx");
-                self.state.discard_checkpoint(acc_type);
+                self.state.discard_checkpoint();
 
                 res = ExecutionResult {
                     gas_left: params.gas,
@@ -689,11 +693,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
     pub fn create_avm(
         &mut self,
-        params: Vec<AVMActionParams>,
+        params: Vec<ActionParams>,
         _substates: &mut [Substate],
     ) -> Vec<ExecutionResult>
     {
-        self.state.checkpoint(AccType::AVM);
+        self.state.checkpoint();
 
         let mut unconfirmed_substates = vec![Substate::new(); params.len()];
 
@@ -704,11 +708,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
     pub fn call_avm(
         &mut self,
-        params: Vec<AVMActionParams>,
+        params: Vec<ActionParams>,
         _substates: &mut [Substate],
     ) -> Vec<ExecutionResult>
     {
-        self.state.checkpoint(AccType::AVM);
+        self.state.checkpoint();
 
         let mut unconfirmed_substates = vec![Substate::new(); params.len()];
 
@@ -750,7 +754,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         );
 
         // backup used in case of running out of gas
-        self.state.checkpoint(AccType::FVM);
+        self.state.checkpoint();
 
         // part of substate that may be reverted
         let mut unconfirmed_substate = Substate::new();
@@ -775,10 +779,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 };
             }
             self.state
-                .new_contract(&params.address, val + prev_bal, nonce_offset, AccType::FVM);
+                .new_contract(&params.address, val + prev_bal, nonce_offset);
         } else {
             self.state
-                .new_contract(&params.address, prev_bal, nonce_offset, AccType::FVM);
+                .new_contract(&params.address, prev_bal, nonce_offset);
         }
 
         let res = self.exec_vm(params, &mut unconfirmed_substate);
@@ -805,7 +809,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let substate = substates[idx].clone();
             // perform suicides
             for address in &substate.suicides {
-                self.state.kill_account(address, AccType::AVM);
+                self.state.kill_account(address);
             }
             let gas_left = match result.status_code {
                 ExecStatus::Success | ExecStatus::Revert => result.gas_left,
@@ -824,7 +828,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 cumulative_gas_used: self.info.gas_used + gas_used,
                 logs: substate.logs,
                 contracts_created: substate.contracts_created,
-                output: result.return_data.mem,
+                output: result.return_data.to_vec(),
                 state_diff: None,
                 transaction_fee: fees_value,
             }))
@@ -883,7 +887,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         // perform suicides
         for address in &substate.suicides {
-            self.state.kill_account(address, AccType::FVM);
+            self.state.kill_account(address);
         }
 
         Ok(Executed {
@@ -894,7 +898,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             cumulative_gas_used: self.info.gas_used + gas_used,
             logs: substate.logs,
             contracts_created: substate.contracts_created,
-            output: result.return_data.mem,
+            output: result.return_data.to_vec(),
             state_diff: None,
             transaction_fee: fees_value,
         })
@@ -913,12 +917,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             // Commit state changes by discarding checkpoint only when
             // return status code is Success
             ExecStatus::Success => {
-                self.state.discard_checkpoint(AccType::FVM);
+                self.state.discard_checkpoint();
                 substate.accrue(un_substate);
             }
             _ => {
                 // Rollback state changes by reverting to checkpoint
-                self.state.revert_to_checkpoint(AccType::FVM);
+                self.state.revert_to_checkpoint();
             }
         }
     }

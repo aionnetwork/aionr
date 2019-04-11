@@ -19,24 +19,19 @@
  *
  ******************************************************************************/
 
-use aion_types::U128;
-use aion_types::U256;
+use aion_types::{U128, U256};
 use fastvm::{EvmStatusCode, FastVM};
 use fastvm::basetypes::{constants::GAS_CODE_DEPOSIT, DataWord};
 use fastvm::context::{execution_kind, ExecutionContext, TransactionResult};
-use fastvm::vm::{Ext, ActionParams, ActionValue};
-use vm_common::{ExecutionResult, ExecStatus, CallType, ReturnData};
+use vm_common::{ExecutionResult, ExecStatus, CallType, ReturnData, ActionParams, ActionValue, Ext};
 use std::sync::Arc;
 use avm::{
-    AVM,
-    AVMExt,
-    AVMActionParams
+    AVM
 };
 use avm::types::{TransactionContext as AVMTxContext, AvmStatusCode};
 
 pub trait Factory {
     fn exec(&mut self, params: Vec<ActionParams>, ext: &mut Ext) -> Vec<ExecutionResult>;
-    fn exec_v1(&mut self, params: Vec<AVMActionParams>, ext: &mut AVMExt) -> Vec<ExecutionResult>;
 }
 
 #[derive(Clone)]
@@ -55,9 +50,9 @@ impl FastVMFactory {
 }
 
 impl Factory for FastVMFactory {
-    fn exec(&mut self, fvm_params: Vec<ActionParams>, ext: &mut Ext) -> Vec<ExecutionResult> {
-        assert!(fvm_params.len() == 1);
-        let params = fvm_params[0].clone();
+    fn exec(&mut self, params: Vec<ActionParams>, ext: &mut Ext) -> Vec<ExecutionResult> {
+        assert!(params.len() == 1);
+        let params = params[0].clone();
         assert!(
             params.gas <= U256::from(i64::max_value() as u64),
             "evmjit max gas is 2 ^ 63"
@@ -67,7 +62,7 @@ impl Factory for FastVMFactory {
             "evmjit max gas is 2 ^ 63"
         );
 
-        let raw_code = Arc::into_raw(params.code.unwrap());
+        let raw_code = Arc::into_raw(params.code.unwrap_or_else(|| Arc::new(Vec::new())));
         let code: &Vec<u8> = unsafe { ::std::mem::transmute(raw_code) };
 
         let call_data = params.data.unwrap_or_else(Vec::new);
@@ -175,9 +170,6 @@ impl Factory for FastVMFactory {
             },
         }]
     }
-    fn exec_v1(&mut self, params: Vec<AVMActionParams>, ext: &mut AVMExt) -> Vec<ExecutionResult> {
-        unimplemented!()
-    }
 }
 
 const AVM_CREATE: i32 = 3;
@@ -199,13 +191,10 @@ impl AVMFactory {
 }
 
 impl Factory for AVMFactory {
-    fn exec(&mut self, fvm_params: Vec<ActionParams>, ext: &mut Ext) -> Vec<ExecutionResult> {
-        unimplemented!()
-    }
-    fn exec_v1(&mut self, avm_params: Vec<AVMActionParams>, ext: &mut AVMExt) -> Vec<ExecutionResult> {
+    fn exec(&mut self, params: Vec<ActionParams>, ext: &mut Ext) -> Vec<ExecutionResult> {
         let mut avm_tx_contexts = Vec::new();
 
-        for params in avm_params {
+        for params in params {
             assert!(
                 params.gas <= U256::from(i64::max_value() as u64),
                 "evmjit max gas is 2 ^ 63"
@@ -227,11 +216,11 @@ impl Factory for AVMFactory {
             let gas_price = params.gas_price.low_u64();
             let address = params.address;
             let caller = params.sender;
-            println!("caller = {:?}", caller);
+            debug!(target: "vm", "caller = {:?}", caller);
             let origin = params.origin;
             let transfer_value: [u8; 32] = params.value.into();
             let call_value = transfer_value.to_vec();
-            println!("call_value = {:?}", call_value);
+            debug!(target: "vm", "call_value = {:?}", call_value);
             debug!(target: "vm", "call_data = {:?}", call_data);
             debug!(target: "vm", "gas limit = {:?}", gas_limit);
 

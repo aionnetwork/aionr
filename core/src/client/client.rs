@@ -49,7 +49,7 @@ use client::{
 use encoded;
 use engines::{EpochTransition, EthEngine};
 use error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
-use executive::{contract_address, Executed, Executive};
+use executive::{Executed, Executive};
 use factory::{Factories, VmFactory};
 use header::{BlockNumber, Header, Seal};
 use io::*;
@@ -64,7 +64,7 @@ use spec::Spec;
 use state::{self, State};
 use state_db::StateDB;
 use transaction::{
-    Action, LocalizedTransaction, PendingTransaction, SignedTransaction, Transaction, DEFAULT_TRANSACTION_TYPE, AVM_TRANSACTION_TYPE,
+    Action, LocalizedTransaction, PendingTransaction, SignedTransaction, Transaction, DEFAULT_TRANSACTION_TYPE,
 };
 use types::filter::Filter;
 use verification;
@@ -1083,8 +1083,7 @@ impl Client {
                 Executive::new(state, env_info, machine).transact_virtual(transaction, false)?;
 
             if let Some(original) = original_state {
-                let tx_type :U256 = transaction.transaction_type.into();
-                ret.state_diff = Some(state.diff_from(original, tx_type.into()).map_err(ExecutionError::from)?);
+                ret.state_diff = Some(state.diff_from(original).map_err(ExecutionError::from)?);
             }
             Ok(ret)
         }

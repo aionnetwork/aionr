@@ -2900,6 +2900,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 name = "vm_common"
 version = "0.1.0"
 dependencies = [
+ "acore-bytes 0.1.0",
  "aion-types 0.1.0",
  "ajson 0.1.0",
  "blake2b 0.1.0",
