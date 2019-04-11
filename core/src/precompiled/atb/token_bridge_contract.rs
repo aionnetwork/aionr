@@ -73,6 +73,7 @@ impl TokenBridgeContract {
             status_code: ExecStatus::Failure,
             return_data: ReturnData::empty(),
             exception: err_msg,
+            state_root: H256::default(),
         }
     }
 
@@ -83,6 +84,7 @@ impl TokenBridgeContract {
             status_code: ExecStatus::Success,
             return_data: ReturnData::new(return_data, 0, length),
             exception: String::default(),
+            state_root: H256::default(),
         }
     }
 }

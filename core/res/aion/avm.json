@@ -12,7 +12,8 @@
                 "gasLimitBoundDivisor": "0x0400",
                 "registrar" : "0xe3389675d0338462dC76C6f9A3e432550c36A142000000000000000000000000",
                 "maximumExtraDataSize": "0x20",
-                "minGasLimit": "0x100590"
+                "minGasLimit": "0x100590",
+                "monetaryPolicyUpdate": "0"
         },
         "genesis": {
                                 "seal": {
@@ -24,7 +25,7 @@
                 "difficulty": "0x0004",
                 "author": "0xa0d6dec327f522f9c8d342921148a6c42f40a3ce45c1f56baa7bfa752200d9e5",
                 "timestamp": "1525924800",
-                "parentHash": "0xb6700480221e21473a53a55c5459d3fe0bc804a1000000000000000000000000",
+                "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
                 "extraData": "0x000000000000000000000000000000000000000000000000000000000000001f",
                 "gasLimit": "0xE4E1C0"
         },

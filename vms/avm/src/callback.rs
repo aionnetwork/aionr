@@ -8,7 +8,9 @@ use libc::c_void;
 use std::{mem, ptr};
 use num_bigint::BigUint;
 use avm::AVMExt;
-use aion_types::Address;
+use aion_types::{Address, U256, H256};
+use hash::blake2b;
+use codec::NativeDecoder;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -61,6 +63,10 @@ pub struct avm_callbacks {
         extern fn(handle: *const c_void, address: *const avm_address, value: *const avm_value),
     pub get_nonce: extern fn(handle: *const c_void, address: *const avm_address) -> u64,
     pub increment_nonce: extern fn(handle: *const c_void, address: *const avm_address),
+    pub touch_account: extern fn(handle: *const c_void, address: *const avm_address, idx: i32),
+    pub send_signal: extern fn(handle: *const c_void, sig_num: i32) -> avm_bytes,
+    pub contract_address: extern fn(sender: *const avm_address, nonce: *const avm_bytes) -> avm_bytes,
+    pub add_log: extern fn(handle: *const c_void, logs: *const avm_bytes, idx: i32),
 }
 
 impl fmt::Display for avm_address {
@@ -294,6 +300,73 @@ pub extern fn avm_increment_nonce(handle: *const c_void, address: *const avm_add
     ext.inc_nonce(addr);
 }
 
+#[no_mangle]
+pub extern fn avm_touch_account(handle: *const c_void, address: *const avm_address, index: i32) {
+    let ext: &mut Box<AVMExt> = unsafe {mem::transmute(handle)};
+    let addr: &Address  = unsafe {mem::transmute(address)};
+
+    println!("touch account: {:?} - {:?}", addr, index);
+    
+    ext.touch_account(addr, index);
+}
+
+#[no_mangle]
+pub extern fn avm_send_signal(handle: *const c_void, sig_num: i32) -> avm_bytes {
+    let ext: &mut Box<AVMExt> = unsafe {mem::transmute(handle)};
+    ext.send_signal(sig_num);
+    ext.commit();
+    let root = ext.root();
+    unsafe {
+        let ret = new_fixed_bytes(32);
+        ptr::copy(&root[0], ret.pointer, 32);
+        ret
+    }
+}
+
+fn contract_address(sender: &Address, nonce: &U256) -> (Address, Option<H256>) {
+    use rlp::RlpStream;
+    let mut stream = RlpStream::new_list(2);
+    stream.append(sender);
+    stream.append(nonce);
+    let origin: [u8; 32] = blake2b(stream.as_raw()).into();
+    let mut buffer = [0xa0u8; 32];
+    &mut buffer[1..].copy_from_slice(&origin[1..]);
+    (buffer.into(), None)
+}
+
+#[no_mangle]
+pub extern fn avm_contract_address(sender: *const avm_address, nonce: *const avm_bytes) -> avm_bytes {
+    let addr: &Address = unsafe {mem::transmute(sender)};
+    let n = unsafe {slice::from_raw_parts((*nonce).pointer, (*nonce).length as usize)};
+
+    let mut decoder = NativeDecoder::new(&n.to_vec());
+
+    let (new_contract, _) = contract_address(addr, &(decoder.decode_long().unwrap()).into());
+
+    unsafe {
+        let ret = new_fixed_bytes(32);
+        ptr::copy(&new_contract[0], ret.pointer, 32);
+        ret
+    }
+}
+
+#[no_mangle]
+pub extern fn avm_add_log(handle: *const c_void, avm_log: *const avm_bytes, index: i32) {
+    let ext: &mut Box<AVMExt> = unsafe {mem::transmute(handle)};
+    let log_data = unsafe {slice::from_raw_parts((*avm_log).pointer, (*avm_log).length as usize)};
+    let mut decoder = NativeDecoder::new(&log_data.to_vec());
+    let address: Address = decoder.decode_bytes().unwrap()[..].into();
+    let topic_num = decoder.decode_int().unwrap();
+    let mut topics: Vec<H256> = Vec::new();
+    for _ in 0..topic_num {
+        topics.push(decoder.decode_bytes().unwrap().as_slice().into());
+    }
+
+    let data = decoder.decode_bytes().unwrap();
+
+    ext.avm_log(&address, topics, data, index);
+}
+
 pub fn register_callbacks() {
     unsafe {
         callbacks.create_account = avm_create_account;
@@ -308,6 +381,10 @@ pub fn register_callbacks() {
         callbacks.decrease_balance = avm_decrease_balance;
         callbacks.get_nonce = avm_get_nonce;
         callbacks.increment_nonce = avm_increment_nonce;
+        callbacks.touch_account = avm_touch_account;
+        callbacks.send_signal = avm_send_signal;
+        callbacks.contract_address = avm_contract_address;
+        callbacks.add_log = avm_add_log;
     }
 }
 

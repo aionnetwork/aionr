@@ -672,9 +672,22 @@ fn is_normal(
 ) -> bool
 {
     if let Action::Call(a) = tx.action {
-        if block.block.state.code(&a).unwrap().is_some() {
+        if block.block.state.code(&a).unwrap().is_some()
+            || a == H256::from(
+                "0000000000000000000000000000000000000000000000000000000000000100"
+            )
+            || a == H256::from(
+                "0000000000000000000000000000000000000000000000000000000000000200"
+            ) {
+            println!("target address = {:?} is fastvm contract", a);
             return false;
         }
+        println!("target address = {:?} is normal account", a);
+    }
+
+    // fastvm create
+    if let Action::Create = tx.action {
+        return false;
     }
 
     return true;
@@ -713,6 +726,7 @@ fn push_transactions(
 
     if !tx_batch.is_empty() {
         block.apply_batch_txs(tx_batch.as_slice(), None);
+        tx_batch.clear();
     }
 
     debug!(target: "vm", "push transactions done");

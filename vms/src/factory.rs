@@ -19,8 +19,7 @@
  *
  ******************************************************************************/
 
-use aion_types::U128;
-use aion_types::U256;
+use aion_types::{U128, U256, H256};
 use fastvm::{EvmStatusCode, FastVM};
 use fastvm::basetypes::{constants::GAS_CODE_DEPOSIT, DataWord};
 use fastvm::context::{execution_kind, ExecutionContext, TransactionResult};
@@ -79,6 +78,7 @@ impl Factory for FastVMFactory {
                 status_code: ExecStatus::Success,
                 return_data: ReturnData::empty(),
                 exception: String::default(),
+                state_root: H256::default(),
             }];
         }
 
@@ -173,6 +173,7 @@ impl Factory for FastVMFactory {
                 EvmStatusCode::Success => String::default(),
                 code => code.to_string(),
             },
+            state_root: H256::default(),
         }]
     }
     fn exec_v1(&mut self, params: Vec<AVMActionParams>, ext: &mut AVMExt) -> Vec<ExecutionResult> {
@@ -215,8 +216,11 @@ impl Factory for AVMFactory {
                 "evmjit max gas is 2 ^ 63"
             );
 
-            let raw_code = Arc::into_raw(params.code.unwrap());
-            let code: &Vec<u8> = unsafe { ::std::mem::transmute(raw_code) };
+            let mut code: &Vec<u8> = &Vec::new();
+            if params.code.is_some() {
+                let raw_code = Arc::into_raw(params.code.unwrap());
+                code = unsafe { ::std::mem::transmute(raw_code) };
+            }
 
             let mut call_data = params.data.unwrap_or_else(Vec::new);
 
@@ -302,6 +306,7 @@ impl Factory for AVMFactory {
                         AvmStatusCode::Success => String::default(),
                         code => code.to_string(),
                     },
+                    state_root: result.state_root.clone(),
                 });
             }
         } else {

@@ -63,6 +63,8 @@ pub struct ExecutionResult {
     pub exception: String,
     // storage root : AVM
     //pub storage_root: u32,
+    /// avm state root after each execution
+    pub state_root: H256,
 }
 
 impl Default for ExecutionResult {
@@ -73,6 +75,7 @@ impl Default for ExecutionResult {
             return_data: ReturnData::empty(),
             exception: String::new(),
             //storage_root: 0,
+            state_root: H256::default(),
         }
     }
 }

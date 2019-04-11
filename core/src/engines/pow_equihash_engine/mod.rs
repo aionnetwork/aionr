@@ -25,13 +25,15 @@ mod grant_parent_header_validators;
 
 use ajson;
 use machine::EthereumMachine;
-use std::sync::Arc;
 use engines::Engine;
-use aion_types::U256;
+use aion_types::{U256, U512};
 use header::Header;
 use block::ExecutedBlock;
 use error::Error;
 use std::cmp;
+use std::sync::Mutex;
+use std::sync::Arc;
+use types::BlockNumber;
 
 use equihash::EquihashValidator;
 use self::dependent_header_validators::{
@@ -49,6 +51,9 @@ use self::header_validators::{
     EquihashSolutionValidator
 };
 use self::grant_parent_header_validators::{GrantParentHeaderValidator, DifficultyValidator};
+
+const ANNUAL_BLOCK_MOUNT : u64 = 3110400;
+const COMPOUND_YEAR_MAX : u64 = 128;
 
 #[derive(Debug, PartialEq)]
 pub struct POWEquihashEngineParams {
@@ -170,14 +175,27 @@ pub struct RewardsCalculator {
     rampup_start_value: U256,
     lower_block_reward: U256,
     upper_block_reward: U256,
+    monetary_policy_update: Option<BlockNumber>,
     m: U256,
+    current_term: Mutex<u64>,
+    current_reward: Mutex<U256>,
+    compound_lookup_table: Vec<U256>,
 }
 
 impl RewardsCalculator {
-    fn new(params: &POWEquihashEngineParams) -> RewardsCalculator {
+    fn new(params: &POWEquihashEngineParams, monetary_policy_update: Option<BlockNumber>, premine: U256) -> RewardsCalculator {
         // precalculate the desired increment.
         let delta = params.rampup_upper_bound - params.rampup_lower_bound;
         let m = (params.rampup_end_value - params.rampup_start_value) / delta;
+
+        let mut compound_lookup_table : Vec<U256> = Vec::new();
+        if let Some(number) = monetary_policy_update {
+            let total_supply = Self::calculate_total_supply_before_monetary_update(premine, number, params);
+
+            for i in 0..COMPOUND_YEAR_MAX {
+                compound_lookup_table.push(Self::calculate_compound(i, total_supply));
+            }
+        }
 
         RewardsCalculator {
             rampup_upper_bound: params.rampup_upper_bound,
@@ -185,11 +203,21 @@ impl RewardsCalculator {
             rampup_start_value: params.rampup_start_value,
             lower_block_reward: params.lower_block_reward,
             upper_block_reward: params.upper_block_reward,
-            m: m,
+            monetary_policy_update,
+            m,
+            current_term: Mutex::new(0),
+            current_reward: Mutex::new(U256::from(0)),
+            compound_lookup_table,
         }
     }
 
     fn calculate_reward(&self, header: &Header) -> U256 {
+        if let Some(n) = self.monetary_policy_update {
+            if header.number() > n {
+                return self.calculate_reward_after_monetary_update(header.number());
+            }
+        }
+
         let number = U256::from(header.number());
         if number <= self.rampup_lower_bound {
             self.lower_block_reward
@@ -197,6 +225,60 @@ impl RewardsCalculator {
             (number - self.rampup_lower_bound) * self.m + self.rampup_start_value
         } else {
             self.upper_block_reward
+        }
+    }
+
+    fn calculate_total_supply_before_monetary_update(initial_supply: U256, monetary_change_block_num: u64, params: &POWEquihashEngineParams) -> U256 {
+        if monetary_change_block_num < 1 {
+            return initial_supply;
+        } else {
+            let mut ts = initial_supply;
+            let delta = params.rampup_upper_bound - params.rampup_lower_bound;
+            let m = (params.rampup_end_value - params.rampup_start_value) / delta;
+            for i in 1..(monetary_change_block_num + 1) {
+                ts = ts + Self::calculate_reward_before_monetary_update(i, params, m);
+            }
+            return ts;
+        }
+    }
+
+    fn calculate_compound(term: u64, initial_supply: U256) -> U256 {
+        let mut compound = initial_supply.full_mul(U256::from(10000));
+        let mut pre_compound = compound;
+        for _i in 0..term {
+            pre_compound = compound;
+            compound = pre_compound * 10100 / U512::from(10000);
+        }
+        compound = compound - pre_compound;
+        compound = (compound / U512::from(ANNUAL_BLOCK_MOUNT)) / U512::from(10000);
+
+        return U256::from(compound);
+    }
+
+    fn calculate_reward_after_monetary_update(&self, number: u64) -> U256 {
+        let term = (number - self.monetary_policy_update.unwrap() - 1) / ANNUAL_BLOCK_MOUNT + 1;
+        let mut current_term = self.current_term.lock().unwrap();
+        let mut current_reward = self.current_reward.lock().unwrap();
+
+        if term != *current_term {
+            for i in self.compound_lookup_table.iter() {
+            }
+            *current_reward = self.compound_lookup_table.get(term as usize).unwrap_or(&U256::from(0)).clone();
+            *current_term = term;
+        }
+
+        return *current_reward;
+    }
+
+    fn calculate_reward_before_monetary_update(number: u64, params: &POWEquihashEngineParams, m: U256) -> U256 {
+        let num : U256 = U256::from(number);
+
+        if num <= params.rampup_lower_bound {
+            return params.lower_block_reward;
+        } else if num <= params.rampup_upper_bound {
+            return (num - params.rampup_lower_bound) * m + params.rampup_start_value;
+        } else {
+            return params.upper_block_reward;
         }
     }
 }
@@ -211,7 +293,7 @@ pub struct POWEquihashEngine {
 impl POWEquihashEngine {
     /// Create a new instance of Equihash engine
     pub fn new(params: POWEquihashEngineParams, machine: EthereumMachine) -> Arc<Self> {
-        let rewards_calculator = RewardsCalculator::new(&params);
+        let rewards_calculator = RewardsCalculator::new(&params, machine.params().monetary_policy_update, machine.premine());
         let difficulty_calc = DifficultyCalc::new(&params);
         Arc::new(POWEquihashEngine {
             machine,
@@ -278,8 +360,9 @@ impl Engine<EthereumMachine> for Arc<POWEquihashEngine> {
         let author;
         {
             let header = LiveBlock::header(&*block);
-            //result_block_reward = self.calculate_reward(&header);
-            result_block_reward = U256::from(3028549382716049382u64);
+            result_block_reward = self.calculate_reward(&header);
+            //result_block_reward = U256::from(3028549382716049382u64);
+            println!("verify number: {}, reward: {} ", header.number(),  result_block_reward);
             author = *header.author();
         }
         block.header_mut().set_reward(result_block_reward.clone());
@@ -368,7 +451,7 @@ mod tests {
             block_time_upper_bound: 0u64,
             minimum_difficulty: U256::zero(),
         };
-        let calculator = RewardsCalculator::new(&params);
+        let calculator = RewardsCalculator::new(&params, None, U256::from(0));
         let mut header = Header::default();
         header.set_number(1);
         assert_eq!(
@@ -391,7 +474,7 @@ mod tests {
             block_time_upper_bound: 0u64,
             minimum_difficulty: U256::zero(),
         };
-        let calculator = RewardsCalculator::new(&params);
+        let calculator = RewardsCalculator::new(&params, None, U256::from(0));
         let mut header = Header::default();
         header.set_number(10000);
         assert_eq!(
@@ -414,7 +497,7 @@ mod tests {
             block_time_upper_bound: 0u64,
             minimum_difficulty: U256::zero(),
         };
-        let calculator = RewardsCalculator::new(&params);
+        let calculator = RewardsCalculator::new(&params, None, U256::from(0));
         let mut header = Header::default();
         header.set_number(259200);
         assert_eq!(
@@ -437,7 +520,7 @@ mod tests {
             block_time_upper_bound: 0u64,
             minimum_difficulty: U256::zero(),
         };
-        let calculator = RewardsCalculator::new(&params);
+        let calculator = RewardsCalculator::new(&params, None, U256::from(0));
         let mut header = Header::default();
         header.set_number(300000);
         assert_eq!(

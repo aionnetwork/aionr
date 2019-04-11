@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use super::builtin::{BuiltinContract, BuiltinExt, BuiltinParams};
-use aion_types::{U256, Address};
+use aion_types::{U256, H256, Address};
 use vms::{ExecutionResult, ExecStatus, ReturnData};
 use rcrypto::ed25519::verify;
 
@@ -57,6 +57,7 @@ impl BuiltinContract for EDVerifyContract {
                 status_code: ExecStatus::Failure,
                 return_data: ReturnData::empty(),
                 exception: "Incorrect input length".into(),
+                state_root: H256::default(),
             };
         }
 
@@ -70,6 +71,7 @@ impl BuiltinContract for EDVerifyContract {
                 status_code: ExecStatus::Success,
                 return_data: ReturnData::new(pub_key.to_vec(), 0, pub_key.len()),
                 exception: String::default(),
+                state_root: H256::default(),
             }
         } else {
             let return_data = Address::zero();
@@ -78,6 +80,7 @@ impl BuiltinContract for EDVerifyContract {
                 status_code: ExecStatus::Success,
                 return_data: ReturnData::new(return_data.to_vec(), 0, return_data.len()),
                 exception: String::default(),
+                state_root: H256::default(),
             }
         }
     }

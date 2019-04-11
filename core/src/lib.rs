@@ -143,6 +143,7 @@ mod tx_filter;
 pub mod tests;
 #[cfg(test)]
 extern crate fastvm;
+extern crate core;
 
 pub use types::*;
 pub use executive::contract_address;
