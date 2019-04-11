@@ -34,7 +34,7 @@ use engines::epoch::{PendingTransition as PendingEpochTransition, Transition as 
 use error::BlockError;
 use header::Header;
 use heapsize::HeapSizeOf;
-use kvdb::{DatabaseConfig, DbRepository, DBTransaction, KeyValueDB, RepositoryConfig};
+use kvdb::{DBTransaction, DatabaseConfig, DbRepository, KeyValueDB, RepositoryConfig};
 use parking_lot::{Mutex, RwLock};
 use plain_hasher::PlainHasher;
 use rlp::{Decodable, DecoderError, Encodable, RlpStream, UntrustedRlp};
@@ -210,13 +210,14 @@ impl HeaderChain {
 
         let db_path = client_path.join(COL);
         let mut db_configs = Vec::new();
-            db_configs.push(RepositoryConfig {
-                db_name: COL.to_string(),
-                db_config: DatabaseConfig::default(),
-                db_path: db_path.to_string_lossy().into(),
-            });
-        
-        let header_chain_db = DbRepository::init(db_configs).map_err(|e| format!("Unable to initialize DB: {}", e))?;
+        db_configs.push(RepositoryConfig {
+            db_name: COL.to_string(),
+            db_config: DatabaseConfig::default(),
+            db_path: db_path.to_string_lossy().into(),
+        });
+
+        let header_chain_db =
+            DbRepository::init(db_configs).map_err(|e| format!("Unable to initialize DB: {}", e))?;
         let db = Arc::new(header_chain_db);
 
         let chain = if let Some(current) = db.get(COL, CURRENT_KEY).unwrap_or(None) {
@@ -505,7 +506,10 @@ impl HeaderChain {
                 .next()
                 .expect("at least one era just created; qed");
 
-            if earliest_era != 0 && earliest_era + cht::SIZE <= number && earliest_era + HISTORY + cht::SIZE >= number {
+            if earliest_era != 0
+                && earliest_era + cht::SIZE <= number
+                && earliest_era + HISTORY + cht::SIZE >= number
+            {
                 let cht_num = cht::block_to_cht_number(earliest_era)
                     .expect("fails only for number == 0; genesis never imported; qed");
 
@@ -517,22 +521,22 @@ impl HeaderChain {
                     // iterable function which removes the candidates as it goes
                     // along. this will only be called until the CHT is complete.
                     let iter = || {
-                        let era_entry = candidates
-                            .remove(&i)
-                            .expect(&format!("all eras are sequential with no gaps; qed {} - {} - {}", i, earliest_era, header.number()));
-                        transaction.delete(COL, era_key(i).as_bytes());
+                        if let Some(era_entry) = candidates.remove(&i) {
+                            // transaction.delete(COL, era_key(i).as_bytes());
 
-                        i += 1;
+                            i += 1;
 
-                        // prune old blocks and epoch proofs.
-                        for ancient in &era_entry.candidates {
-                            let maybe_transition = live_epoch_proofs.remove(&ancient.hash);
-                            if let Some(epoch_transition) = maybe_transition {
-                                transaction.delete(COL, &*transition_key(ancient.hash));
+                            // prune old blocks and epoch proofs.
+                            for ancient in &era_entry.candidates {
+                                let maybe_transition = live_epoch_proofs.remove(&ancient.hash);
+                                if let Some(epoch_transition) = maybe_transition {
+                                    transaction.delete(COL, &*transition_key(ancient.hash));
 
-                                if ancient.hash == era_entry.canonical_hash {
-                                    last_canonical_transition =
-                                        match self.db.get(COL, &ancient.hash) {
+                                    if ancient.hash == era_entry.canonical_hash {
+                                        last_canonical_transition = match self
+                                            .db
+                                            .get(COL, &ancient.hash)
+                                        {
                                             Err(e) => {
                                                 warn!(target: "chain", "Error reading from DB: {}\n
 												", e);
@@ -550,14 +554,17 @@ impl HeaderChain {
                                                 Some((epoch_transition, header_value))
                                             }
                                         };
+                                    }
                                 }
+
+                                transaction.delete(COL, &ancient.hash);
                             }
 
-                            transaction.delete(COL, &ancient.hash);
+                            let canon = &era_entry.candidates[0];
+                            (canon.hash, canon.total_difficulty)
+                        } else {
+                            (H256::default(), U256::default())
                         }
-
-                        let canon = &era_entry.candidates[0];
-                        (canon.hash, canon.total_difficulty)
                     };
                     cht::compute_root(cht_num, ::itertools::repeat_call(iter))
                         .expect("fails only when too few items; this is checked; qed")
@@ -597,7 +604,7 @@ impl HeaderChain {
             *self.best_block.write() = best_block;
         }
     }
-    
+
     /// Flush db
     pub fn flush(&self) {
         let _ = self.db.flush();
@@ -613,10 +620,18 @@ impl HeaderChain {
                 if self.best_block.read().number < num {
                     return None;
                 }
-                self.candidates
-                    .read()
-                    .get(&num)
-                    .map(|entry| entry.canonical_hash)
+                if let Some(entry) = self.candidates.read().get(&num) {
+                    return Some(entry.canonical_hash);
+                } else {
+                    if let Some(entry) = self.db.get(COL, era_key(num).as_bytes()).unwrap_or(None) {
+                        let entry_rlp = UntrustedRlp::new(entry.as_ref());
+                        let entry_value = entry_rlp.as_val().expect("decoding db value failed");
+                        let entry: Entry = entry_value;
+                        return Some(entry.canonical_hash);
+                    } else {
+                        return None;
+                    }
+                }
             }
             BlockId::Pending | BlockId::Latest => Some(self.best_block.read().hash),
         }

@@ -56,9 +56,8 @@ impl BlockHeadersHandler {
             && node.best_block_num > SyncStorage::get_synced_block_number()
         {
             if from == 0 {
-                from = SyncStorage::get_block_header_chain()
-                    .chain_info()
-                    .best_block_number;
+                let header_chain = SyncStorage::get_block_header_chain();
+                from = header_chain.best_block().number;
 
                 if from == 0 {
                     from = 1;
@@ -159,6 +158,7 @@ impl BlockHeadersHandler {
         let node_hash = node.node_hash;
         let rlp = UntrustedRlp::new(req.body.as_slice());
         let header_chain = SyncStorage::get_block_header_chain();
+        let block_chain = SyncStorage::get_block_chain();
         let mut hashes = Vec::new();
         let mut from = 0;
         let mut is_side_chain = false;
@@ -185,11 +185,10 @@ impl BlockHeadersHandler {
                                 };
                             }
                         }
- 
+
                         let mut tx = DBTransaction::new();
                         let mut total_difficulty = header_chain.score(BlockId::Hash(*parent_hash));
                         if total_difficulty.is_none() {
-                            let block_chain = SyncStorage::get_block_chain();
                             total_difficulty =
                                 block_chain.block_total_difficulty(BlockId::Hash(*parent_hash));
                         }
@@ -202,7 +201,11 @@ impl BlockHeadersHandler {
                                 is_side_chain,
                             ) {
                                 header_chain.apply_pending(tx, pending);
-                                hashes.push(hash);
+                                if block_chain.block_status(BlockId::Hash(hash))
+                                    != BlockStatus::InChain
+                                {
+                                    hashes.push(hash);
+                                }
                                 info!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
                             }
                         } else {

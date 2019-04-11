@@ -246,13 +246,11 @@ impl BlockBodiesHandler {
                                                         error!(target: "sync", "Invalid peer {}@{} !!!", node.get_ip_addr(), node.get_node_id());
                                                         P2pMgr::remove_peer(node.node_hash);
                                                         return;
-                                                    } else if number
-                                                        <= SyncStorage::get_synced_block_number()
-                                                    {
-                                                        if let Some(_parent_header) = header_chain
-                                                            .block_header(BlockId::Hash(
+                                                    } else {
+                                                        if header_chain
+                                                            .block_hash(BlockId::Hash(
                                                                 parent_hash,
-                                                            )) {
+                                                            )).is_some() {
                                                             if number > 1 {
                                                                 debug!(target: "sync", "Try to get parent block : #{} - {} - {}", number - 1, parent_hash, node.synced_block_num);
                                                                 Self::send_blocks_bodies_req(
@@ -270,11 +268,6 @@ impl BlockBodiesHandler {
                                                         );
                                                         P2pMgr::update_node(node_hash, node);
                                                         return;
-                                                    } else {
-                                                        warn!(target: "sync", "Early coming block #{} - {:?} from {}", number, hash, node.get_ip_addr());
-                                                        number =
-                                                            SyncStorage::get_synced_block_number();
-                                                        break;
                                                     }
                                                 }
                                                 Err(e) => {
