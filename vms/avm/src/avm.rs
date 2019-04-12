@@ -41,7 +41,7 @@ const AVM_JARS: [&str; 17] = [
     "scratch-deps.jar",
     "slf4j-api-1.7.25.jar",
     "spongycastle-1.58.0.0.jar",
-    "vm-api-e8657a6.jar",
+    "vm-api-d1d5e7c.jar",
     "org-aion-avm-jni.jar",
 ];
 
@@ -364,7 +364,7 @@ mod test {
     use avm_abi::{AbiToken, AVMEncoder};
 
     #[test]
-    fn test_avm_hello_world() {
+    fn avm_hello_world() {
         let avm = AVM::new();
         let transactions = prepare_transactions();
         let results = avm.execute(0, &transactions).unwrap();
@@ -397,7 +397,7 @@ mod test {
             block_energy_limit: 5_000_000,
             block_coinbase: [4u8; 32].to_vec(),
             block_previous_hash: [5u8; 32].to_vec(),
-            block_difficulty: Vec::new(),
+            block_difficulty: [0u8; 16].to_vec(),
             internal_call_depth: 0,
         };
 
@@ -422,7 +422,7 @@ mod test {
             block_energy_limit: 5_000_000,
             block_coinbase: [4u8; 32].to_vec(),
             block_previous_hash: [5u8; 32].to_vec(),
-            block_difficulty: Vec::new(),
+            block_difficulty: [0u8; 16].to_vec(),
             internal_call_depth: 0,
         };
 
@@ -444,7 +444,7 @@ mod test {
             block_energy_limit: 5_000_000,
             block_coinbase: [4u8; 32].to_vec(),
             block_previous_hash: [5u8; 32].to_vec(),
-            block_difficulty: Vec::new(),
+            block_difficulty: [0u8; 16].to_vec(),
             internal_call_depth: 0,
         };
 

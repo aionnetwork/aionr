@@ -132,7 +132,7 @@ where B: StateBackend
     }
 
     fn save_code(&mut self, address: &Address, code: Vec<u8>) {
-        println!("AVMExt save code");
+        println!("AVMExt save code: address = {:?}", address);
         self.state
             .lock()
             .unwrap()

@@ -316,6 +316,7 @@ pub extern fn avm_send_signal(handle: *const c_void, sig_num: i32) -> avm_bytes 
     ext.send_signal(sig_num);
     ext.commit();
     let root = ext.root();
+    println!("state root = {:?}", root);
     unsafe {
         let ret = new_fixed_bytes(32);
         ptr::copy(&root[0], ret.pointer, 32);
@@ -339,7 +340,12 @@ pub extern fn avm_contract_address(sender: *const avm_address, nonce: *const avm
     let addr: &Address = unsafe {mem::transmute(sender)};
     let n = unsafe {slice::from_raw_parts((*nonce).pointer, (*nonce).length as usize)};
 
-    let mut decoder = NativeDecoder::new(&n.to_vec());
+    println!("avm new contract: sender = {:?}, nonce = {:?}", addr, n);
+    let mut tmp_nonce = vec![0u8; 8];
+    for idx in 0..n.len() {
+        tmp_nonce[idx] = n[idx];
+    }
+    let mut decoder = NativeDecoder::new(&tmp_nonce);
 
     let (new_contract, _) = contract_address(addr, &(decoder.decode_long().unwrap()).into());
 

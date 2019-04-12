@@ -713,21 +713,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         return res;
     }
 
-    pub fn create_avm(
-        &mut self,
-        params: Vec<AVMActionParams>,
-        _substates: &mut [Substate],
-    ) -> Vec<ExecutionResult>
-    {
-        self.state.checkpoint(AccType::AVM);
-
-        let mut unconfirmed_substates = vec![Substate::new(); params.len()];
-
-        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice());
-
-        res
-    }
-
     pub fn call_avm(
         &mut self,
         params: Vec<AVMActionParams>,
@@ -2449,7 +2434,7 @@ Address};
     fn hello_avm() {
         // Create contract on already existing address
         let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        file.push("src/tests/AVMDapps/dapp.jar");
+        file.push("src/tests/AVMDapps/HelloWorld.jar");
         let file_str = file.to_str().expect("Failed to locate the helloworld.jar");
         let mut code = read_file(file_str).expect("unable to open avm dapp");
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
@@ -2475,7 +2460,7 @@ Address};
         let substate = Substate::new();
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.create_avm(vec![params.clone()], &mut [substate])
+            ex.call_avm(vec![params.clone()], &mut [substate])
         };
 
         for r in execution_results {
@@ -2490,7 +2475,10 @@ Address};
             assert_eq!(status_code, ExecStatus::Success);
 
             params.address = return_data.mem.as_slice().into();
+            println!("return data = {:?}", return_data);
         }
+
+        assert!(state.code(&params.address).unwrap().is_some());
 
         params.call_type = CallType::Call;
         let call_data = vec![0x21,0x00,0x08,0x73,0x61,0x79,0x48,0x65,0x6c,0x6c,0x6f];
@@ -2509,13 +2497,13 @@ Address};
                 gas_left,
                 return_data,
                 exception: _,
-                state_root: _,
+                state_root,
             } = r;
-            assert_eq!(status_code, ExecStatus::Success);
-            assert_eq!(return_data.mem, vec![17, 0, 5, 72, 101, 108, 108, 111]);
-        }
 
-        assert_eq!(state.commit().is_ok(), true);
+            assert_eq!(status_code, ExecStatus::Success);
+            println!("result state root = {:?}, return_data = {:?}", state_root, return_data);
+            assert_eq!(return_data.to_vec(), vec![17, 0, 5, 72, 101, 108, 108, 111]);
+        }
     }
 
     use std::io::Error;
@@ -2568,7 +2556,7 @@ Address};
         let machine = make_aion_machine();
         let substate = Substate::new();
         let mut params2 = params.clone();
-        //params2.address = contract_address(&sender, &U256::one()).0;
+        params2.address = contract_address(&sender, &U256::one()).0;
         params2.value = 99.into();
         params2.nonce = params.nonce + 1;
         let results = {
@@ -2616,7 +2604,7 @@ Address};
         let substate = Substate::new();
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.create_avm(vec![params.clone()], &mut [substate.clone()])
+            ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
 
         assert_eq!(execution_results.len(), 1);
