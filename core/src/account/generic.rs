@@ -44,6 +44,16 @@ pub struct Account<T, U> {
     pub code_size: Option<usize>,
     // Code cache of the account.
     pub code_cache: Arc<Bytes>,
+    // AVM: Code hash of the account.
+    pub transformed_code_hash: H256,
+    // AVM: Size of the transformed code.
+    pub transformed_code_size: Option<usize>,
+    // avm specific code cache
+    pub transformed_code_cache: Arc<Bytes>,
+    // avm object graph
+    pub object_graph_cache: Arc<Bytes>,
+    pub objectgraph_hash: H256,
+    pub object_graph_size: Option<usize>,
     // Account code new or has been modified.
     pub code_filth: Filth,
     // Cached address hash.

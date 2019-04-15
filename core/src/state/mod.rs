@@ -766,6 +766,14 @@ impl<B: Backend> State<B> {
         }
     }
 
+    /// Get accounts' code. avm specific code (dedundant code saving)
+    pub fn transformed_code(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
+        debug!(target: "vm", "get transformed code of: {:?}", a);
+        return self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::Code, true, |a| {
+            a.as_ref().map_or(None, |a| a.transformed_code().clone())
+        });
+    }
+
     /// Get an account's code hash.
     pub fn code_hash(&self, a: &Address) -> trie::Result<H256> {
         debug!(target: "vm", "get code hash of: {:?}", a);
@@ -895,6 +903,41 @@ impl<B: Backend> State<B> {
         }
 
         println!("save code done");
+
+        Ok(())
+    }
+
+    pub fn init_transformed_code(&mut self, a: &Address, code: Bytes) -> trie::Result<()> {
+        self.require_avm_or_from(
+            a,
+            true,
+            || AVMAccount::new_contract(0.into(), self.avm_manager.account_start_nonce),
+            |_| {},
+        )?
+        .init_transformed_code(code);
+
+        println!("save transformed code done");
+
+        Ok(())
+    }
+
+    pub fn get_objectgraph(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
+        debug!(target: "vm", "get object graph of: {:?}", a);
+        return self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::Code, true, |a| {
+            a.as_ref().map_or(None, |a| a.objectgraph().clone())
+        });
+    }
+
+    pub fn set_objectgraph(&mut self, a: &Address, data: Bytes) -> trie::Result<()> {
+        self.require_avm_or_from(
+            a,
+            true,
+            || AVMAccount::new_contract(0.into(), self.avm_manager.account_start_nonce),
+            |_| {},
+        )?
+        .init_objectgraph(data);
+
+        println!("save object graph done");
 
         Ok(())
     }

@@ -276,10 +276,10 @@ impl AVM {
 pub trait AVMExt {
     fn create_account(&mut self, address: &Address);
     fn account_exists(&self, address: &Address) -> bool;
-    fn save_code(&mut self, address: &Address, code: Vec<u8>);
-    fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>>;
-    fn sstore(&mut self, address: &Address, key: Vec<u8>, value: Vec<u8>);
-    fn sload(&self, address: &Address, key: &Vec<u8>) -> Option<Vec<u8>>;
+    fn save_code(&mut self, address: &Address, code: Bytes);
+    fn get_code(&self, address: &Address) -> Option<Arc<Bytes>>;
+    fn sstore(&mut self, address: &Address, key: Bytes, value: Bytes);
+    fn sload(&self, address: &Address, key: &Bytes) -> Option<Bytes>;
     fn remove_account(&mut self, address: &Address);
     fn avm_balance(&self, address: &Address) -> U256;
     fn inc_balance(&mut self, address: &Address, inc: &U256);
@@ -292,7 +292,11 @@ pub trait AVMExt {
     fn send_signal(&mut self, signal: i32);
     fn commit(&mut self);
     fn root(&self) -> H256;
-    fn avm_log(&mut self, address: &Address, topics: Vec<H256>, data: Vec<u8>, idx: i32);
+    fn avm_log(&mut self, address: &Address, topics: Vec<H256>, data: Bytes, idx: i32);
+    fn get_transformed_code(&self, address: &Address) -> Option<Arc<Bytes>>;
+    fn save_transformed_code(&mut self, address: &Address, code: Bytes);
+    fn get_objectgraph(&self, address: &Address) -> Option<Arc<Bytes>>;
+    fn set_objectgraph(&mut self, address: &Address, data: Bytes);
 }
 
 // TODO: should be a trait, possible to avoid cloning everything from a Transaction(/View).

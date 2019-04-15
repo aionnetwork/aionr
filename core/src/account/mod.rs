@@ -56,6 +56,12 @@ impl From<BasicAccount> for FVMAccount {
             code_hash: basic.code_hash,
             code_size: None,
             code_cache: Arc::new(vec![]),
+            transformed_code_hash: BLAKE2B_EMPTY,
+            transformed_code_size: None,
+            transformed_code_cache: Arc::new(vec![]),
+            objectgraph_hash: BLAKE2B_EMPTY,
+            object_graph_size: None,
+            object_graph_cache: Arc::new(vec![]),
             code_filth: Filth::Clean,
             address_hash: Cell::new(None),
             empty_but_commit: false,
@@ -74,6 +80,12 @@ impl FVMAccount {
             storage_changes: Self::empty_storage_change(),
             code_hash: BLAKE2B_EMPTY,
             code_cache: Arc::new(vec![]),
+            transformed_code_hash: BLAKE2B_EMPTY,
+            transformed_code_size: None,
+            transformed_code_cache: Arc::new(vec![]),
+            objectgraph_hash: BLAKE2B_EMPTY,
+            object_graph_size: None,
+            object_graph_cache: Arc::new(vec![]),
             code_size: None,
             code_filth: Filth::Clean,
             address_hash: Cell::new(None),
@@ -91,6 +103,12 @@ impl FVMAccount {
             storage_changes: Self::empty_storage_change(),
             code_hash: BLAKE2B_EMPTY,
             code_cache: Arc::new(vec![]),
+            transformed_code_hash: BLAKE2B_EMPTY,
+            transformed_code_size: None,
+            transformed_code_cache: Arc::new(vec![]),
+            objectgraph_hash: BLAKE2B_EMPTY,
+            object_graph_size: None,
+            object_graph_cache: Arc::new(vec![]),
             code_size: Some(0),
             code_filth: Filth::Clean,
             address_hash: Cell::new(None),
@@ -116,6 +134,12 @@ impl FVMAccount {
                 },
                 |c| c,
             )),
+            transformed_code_hash: BLAKE2B_EMPTY,
+            transformed_code_size: None,
+            transformed_code_cache: Arc::new(vec![]),
+            objectgraph_hash: BLAKE2B_EMPTY,
+            object_graph_size: None,
+            object_graph_cache: Arc::new(vec![]),
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
@@ -182,6 +206,12 @@ impl FVMAccount {
             code_hash: self.code_hash.clone(),
             code_size: self.code_size.clone(),
             code_cache: self.code_cache.clone(),
+            transformed_code_hash: self.transformed_code_hash.clone(),
+            transformed_code_size: self.transformed_code_size.clone(),
+            transformed_code_cache: self.transformed_code_cache.clone(),
+            objectgraph_hash: self.objectgraph_hash(),
+            object_graph_size: self.object_graph_size.clone(),
+            object_graph_cache: self.object_graph_cache.clone(),
             code_filth: self.code_filth,
             address_hash: self.address_hash.clone(),
             empty_but_commit: self.empty_but_commit.clone(),
@@ -209,6 +239,12 @@ impl AVMAccount {
             storage_changes: Self::empty_storage_change(),
             code_hash: BLAKE2B_EMPTY,
             code_cache: Arc::new(vec![]),
+            transformed_code_hash: BLAKE2B_EMPTY,
+            transformed_code_size: None,
+            transformed_code_cache: Arc::new(vec![]),
+            objectgraph_hash: BLAKE2B_EMPTY,
+            object_graph_size: None,
+            object_graph_cache: Arc::new(vec![]),
             code_size: None,
             code_filth: Filth::Clean,
             address_hash: Cell::new(None),
@@ -248,6 +284,12 @@ impl From<BasicAccount> for AVMAccount {
             code_hash: basic.code_hash,
             code_size: None,
             code_cache: Arc::new(vec![]),
+            transformed_code_hash: BLAKE2B_EMPTY,
+            transformed_code_size: None,
+            transformed_code_cache: Arc::new(vec![]),
+            objectgraph_hash: BLAKE2B_EMPTY,
+            object_graph_size: None,
+            object_graph_cache: Arc::new(vec![]),
             code_filth: Filth::Clean,
             address_hash: Cell::new(None),
             empty_but_commit: false,
@@ -278,6 +320,12 @@ impl AVMAccount {
             storage_changes: HashMap::new(),
             code_hash: BLAKE2B_EMPTY,
             code_cache: Arc::new(vec![]),
+            transformed_code_hash: BLAKE2B_EMPTY,
+            transformed_code_size: None,
+            transformed_code_cache: Arc::new(vec![]),
+            objectgraph_hash: BLAKE2B_EMPTY,
+            object_graph_size: None,
+            object_graph_cache: Arc::new(vec![]),
             code_size: Some(0),
             code_filth: Filth::Clean,
             address_hash: Cell::new(None),
@@ -302,6 +350,12 @@ impl AVMAccount {
             code_hash: self.code_hash.clone(),
             code_size: self.code_size.clone(),
             code_cache: self.code_cache.clone(),
+            transformed_code_hash: self.transformed_code_hash.clone(),
+            transformed_code_size: self.transformed_code_size.clone(),
+            transformed_code_cache: self.transformed_code_cache.clone(),
+            objectgraph_hash: self.objectgraph_hash.clone(),
+            object_graph_size: self.object_graph_size.clone(),
+            object_graph_cache: self.object_graph_cache.clone(),
             code_filth: self.code_filth,
             address_hash: self.address_hash.clone(),
             empty_but_commit: self.empty_but_commit.clone(),
@@ -362,6 +416,26 @@ macro_rules! impl_account {
                 self.code_filth = Filth::Dirty;
             }
 
+            fn init_transformed_code(&mut self, code: Bytes) {
+                self.transformed_code_hash = blake2b(&code);
+                self.transformed_code_cache = Arc::new(code);
+                self.transformed_code_size = Some(self.transformed_code_cache.len());
+                self.code_filth = Filth::Dirty;
+            }
+
+            fn init_objectgraph(&mut self, data: Bytes) {
+                self.object_graph_cache = Arc::new(data);
+                self.code_filth = Filth::Dirty;
+            }
+
+            fn objectgraph(&self) -> Option<Arc<Bytes>> {
+                if self.object_graph_cache.is_empty() {
+                    return None;
+                }
+
+                Some(self.object_graph_cache.clone())
+            }
+
             fn reset_code(&mut self, code: Bytes) {
                 self.init_code(code);
             }
@@ -371,6 +445,10 @@ macro_rules! impl_account {
             fn nonce(&self) -> &U256 {&self.nonce}
 
             fn code_hash(&self) -> H256 {self.code_hash.clone()}
+
+            fn transformed_code_hash(&self) -> H256 {self.transformed_code_hash.clone()}
+
+            fn objectgraph_hash(&self) -> H256 {self.objectgraph_hash.clone()}
 
             fn address_hash(&self, address: &Address) -> H256 {
                 let hash = self.address_hash.get();
@@ -389,11 +467,31 @@ macro_rules! impl_account {
                 Some(self.code_cache.clone())
             }
 
+            fn transformed_code(&self) -> Option<Arc<Bytes>> {
+                if self.transformed_code_cache.is_empty() {
+                    return None;
+                }
+
+                Some(self.transformed_code_cache.clone())
+            }
+
             fn code_size(&self) -> Option<usize>{self.code_size.clone()}
+
+            fn transformed_code_size(&self) -> Option<usize> {self.transformed_code_size.clone()}
             
             fn is_cached(&self) -> bool {
                 !self.code_cache.is_empty()
                     || (self.code_cache.is_empty() && self.code_hash == BLAKE2B_EMPTY)
+            }
+
+            fn is_transformed_cached(&self) -> bool {
+                !self.transformed_code_cache.is_empty()
+                    || (self.transformed_code_cache.is_empty() && self.transformed_code_hash == BLAKE2B_EMPTY)
+            }
+
+            fn is_objectgraph_cached(&self) -> bool {
+                !self.object_graph_cache.is_empty()
+                    || (self.object_graph_cache.is_empty() && self.objectgraph_hash == BLAKE2B_EMPTY)
             }
 
             fn cache_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>> {
@@ -423,6 +521,42 @@ macro_rules! impl_account {
                 }
             }
 
+            fn cache_transformed_code(&mut self, db:&HashStore) -> Option<Arc<Bytes>> {
+                 if self.is_transformed_cached() {
+                    return Some(self.transformed_code_cache.clone());
+                }
+
+                match db.get(&self.transformed_code_hash) {
+                    Some(x) => {
+                        self.transformed_code_size = Some(x.len());
+                        self.transformed_code_cache = Arc::new(x.into_vec());
+                        Some(self.transformed_code_cache.clone())
+                    }
+                    _ => {
+                        warn!(target: "account","Failed reverse get of {}", self.transformed_code_hash);
+                        None
+                    }
+                }
+            }
+
+            fn cache_objectgraph(&mut self, db: &HashStore) -> Option<Arc<Bytes>> {
+                if self.is_objectgraph_cached() {
+                    return Some(self.object_graph_cache.clone());
+                }
+
+                match db.get(&self.objectgraph_hash) {
+                    Some(x) => {
+                        self.object_graph_size = Some(x.len());
+                        self.object_graph_cache = Arc::new(x.into_vec());
+                        Some(self.object_graph_cache.clone())
+                    }
+                    _ => {
+                        warn!(target: "account","Failed reverse get of {}", self.objectgraph_hash);
+                        None
+                    }
+                }
+            }
+
             fn cache_given_code(&mut self, code: Arc<Bytes>) {
                 trace!(
                     target: "account",
@@ -434,6 +568,24 @@ macro_rules! impl_account {
 
                 self.code_size = Some(code.len());
                 self.code_cache = code;
+            }
+
+            fn cache_given_transformed_code(&mut self, code: Arc<Bytes>) {
+                trace!(
+                    target: "account",
+                    "Account::cache_given_code: ic={}; self.code_hash={:?}, self.code_cache={}",
+                    self.is_transformed_cached(),
+                    self.transformed_code_hash,
+                    self.transformed_code_cache.pretty()
+                );
+
+                self.transformed_code_size = Some(code.len());
+                self.transformed_code_cache = code;
+            }
+
+            fn cache_given_objectgraph(&mut self, data: Arc<Bytes>) {
+                self.object_graph_size = Some(data.len());
+                self.object_graph_cache = data;
             }
 
             fn cache_code_size(&mut self, db: &HashStore) -> bool {
@@ -461,6 +613,40 @@ macro_rules! impl_account {
                 }
             }
 
+            fn cache_transformed_code_size(&mut self, db: &HashStore) -> bool {
+                self.transformed_code_size.is_some() || if self.transformed_code_hash != BLAKE2B_EMPTY {
+                    match db.get(&self.transformed_code_hash) {
+                        Some(x) => {
+                            self.transformed_code_size = Some(x.len());
+                            true
+                        }
+                        _ => {
+                            warn!(target: "account","Failed reverse get of {}", self.transformed_code_hash);
+                            false
+                        }
+                    }
+                } else {
+                    false
+                }
+            }
+
+            fn cache_objectgraph_size(&mut self, db: &HashStore) -> bool {
+                self.object_graph_size.is_some() || if self.objectgraph_hash != BLAKE2B_EMPTY {
+                    match db.get(&self.objectgraph_hash) {
+                        Some(x) => {
+                            self.object_graph_size = Some(x.len());
+                            true
+                        }
+                        _ => {
+                            warn!(target: "account","Failed reverse get of {}", self.objectgraph_hash);
+                            false
+                        }
+                    }
+                } else {
+                    false
+                }
+            }
+
             fn is_empty(&self) -> bool {
                 assert!(
                     self.storage_is_clean(),
@@ -476,7 +662,7 @@ macro_rules! impl_account {
             }
 
             fn is_basic(&self) -> bool {
-                self.code_hash == BLAKE2B_EMPTY
+                self.code_hash == BLAKE2B_EMPTY && self.transformed_code_hash == BLAKE2B_EMPTY
             }
 
             fn storage_root(&self) -> Option<&H256> {
@@ -508,12 +694,12 @@ macro_rules! impl_account {
                     self.code_filth == Filth::Dirty,
                     self.code_cache.is_empty()
                 );
-                match (self.code_filth == Filth::Dirty, self.code_cache.is_empty()) {
-                    (true, true) => {
+                match (self.code_filth == Filth::Dirty, self.code_cache.is_empty(), self.transformed_code_cache.is_empty()) {
+                    (true, true, true) => {
                         self.code_size = Some(0);
                         self.code_filth = Filth::Clean;
                     }
-                    (true, false) => {
+                    (true, false, true) => {
                         db.emplace(
                             self.code_hash.clone(),
                             DBValue::from_slice(&*self.code_cache),
@@ -521,7 +707,29 @@ macro_rules! impl_account {
                         self.code_size = Some(self.code_cache.len());
                         self.code_filth = Filth::Clean;
                     }
-                    (false, _) => {}
+                    (true, true, false) => {
+                        db.emplace(
+                            self.transformed_code_hash.clone(),
+                            DBValue::from_slice(&*self.transformed_code_cache),
+                        );
+                        self.transformed_code_size = Some(self.transformed_code_cache.len());
+                        self.code_filth = Filth::Clean;
+                    }
+                    (true, false, false) => {
+                        db.emplace(
+                            self.code_hash.clone(),
+                            DBValue::from_slice(&*self.code_cache),
+                        );
+                        self.code_size = Some(self.code_cache.len());
+
+                        db.emplace(
+                            self.transformed_code_hash.clone(),
+                            DBValue::from_slice(&*self.transformed_code_cache),
+                        );
+                        self.transformed_code_size = Some(self.transformed_code_cache.len());
+                        self.code_filth = Filth::Clean;
+                    }
+                    (false, _, _) => {}
                 }
             }
 
@@ -532,7 +740,6 @@ macro_rules! impl_account {
                 stream.append(&self.balance);
                 stream.append(&self.storage_root);
                 stream.append(&self.code_hash);
-                //stream.append(&self.acc_type());
                 stream.out()
             }
 
@@ -541,6 +748,7 @@ macro_rules! impl_account {
                 let mut account = self.clone_basic();
                 account.storage_changes = self.storage_changes.clone();
                 account.code_cache = self.code_cache.clone();
+                account.transformed_code_cache = self.transformed_code_cache.clone();
                 account
             }
 
@@ -549,6 +757,7 @@ macro_rules! impl_account {
                 return 0x00.into()
             }
 
+            /// avm should update object graph cache
             fn update_account_cache<B: Backend>(
                 &mut self,
                 require: RequireCache,
@@ -560,7 +769,7 @@ macro_rules! impl_account {
                     return;
                 }
 
-                if self.is_cached() {
+                if self.is_cached() && self.is_transformed_cached() && self.is_objectgraph_cached() {
                     return;
                 }
 
@@ -580,6 +789,47 @@ macro_rules! impl_account {
                             }
                             RequireCache::CodeSize => {
                                 self.cache_code_size(db);
+                            }
+                        }
+                    }
+                }
+
+                // if there's already code in the global cache, always cache it localy
+                let hash = self.transformed_code_hash();
+                match state_db.get_cached_code(&hash) {
+                    Some(code) => self.cache_given_transformed_code(code),
+                    None => {
+                        match require {
+                            RequireCache::None => {}
+                            RequireCache::Code => {
+                                if let Some(code) = self.cache_transformed_code(db) {
+                                    // propagate code loaded from the database to
+                                    // the global code cache.
+                                    state_db.cache_code(hash, code)
+                                }
+                            }
+                            RequireCache::CodeSize => {
+                                self.cache_transformed_code_size(db);
+                            }
+                        }
+                    }
+                }
+
+                let hash = self.objectgraph_hash();
+                match state_db.get_cached_code(&hash) {
+                    Some(code) => self.cache_given_objectgraph(code),
+                    None => {
+                        match require {
+                            RequireCache::None => {}
+                            RequireCache::Code => {
+                                if let Some(code) = self.cache_objectgraph(db) {
+                                    // propagate code loaded from the database to
+                                    // the global code cache.
+                                    state_db.cache_code(hash, code)
+                                }
+                            }
+                            RequireCache::CodeSize => {
+                                self.cache_objectgraph_size(db);
                             }
                         }
                     }

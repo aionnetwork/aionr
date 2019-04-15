@@ -67,6 +67,10 @@ pub struct avm_callbacks {
     pub send_signal: extern fn(handle: *const c_void, sig_num: i32) -> avm_bytes,
     pub contract_address: extern fn(sender: *const avm_address, nonce: *const avm_bytes) -> avm_bytes,
     pub add_log: extern fn(handle: *const c_void, logs: *const avm_bytes, idx: i32),
+    pub get_transformed_code: extern fn(handle: *const c_void, addr: *const avm_address) -> avm_bytes,
+    pub put_transformed_code: extern fn(handle: *const c_void, addr: *const avm_address, code: *const avm_bytes),
+    pub get_objectgraph: extern fn(handle: *const c_void, addr: *const avm_address) -> avm_bytes,
+    pub set_objectgraph: extern fn(handle: *const c_void, addr: *const avm_address, data: *const avm_bytes),
 }
 
 impl fmt::Display for avm_address {
@@ -373,7 +377,84 @@ pub extern fn avm_add_log(handle: *const c_void, avm_log: *const avm_bytes, inde
     ext.avm_log(&address, topics, data, index);
 }
 
+#[no_mangle]
+pub extern fn avm_get_transformed_code(handle: *const c_void, address: *const avm_address) -> avm_bytes {
+    let ext: &mut Box<AVMExt> = unsafe { mem::transmute(handle) };
+    let addr: &Address = unsafe { mem::transmute(address) };
+
+    debug!(target: "vm", "avm_get_transformed_code: 0x{:?}", addr);
+
+    match ext.get_transformed_code(addr) {
+        None => {
+            unsafe {new_null_bytes()}
+        }
+        Some(code) => {
+            if code.len() == 0 {
+                unsafe {new_null_bytes()}
+            } else {
+                unsafe {
+                    let ret = new_fixed_bytes(code.len() as u32);
+                    ptr::copy(&code.as_slice()[0], ret.pointer, code.len());
+                    ret
+                }
+            }
+        }
+    }
+}
+
+#[no_mangle]
+pub extern fn avm_put_transformed_code(handle: *const c_void, address: *const avm_address, code: *const avm_bytes) {
+    let ext: &mut Box<AVMExt> = unsafe { mem::transmute(handle) };
+    let addr: &Address = unsafe { mem::transmute(address) };
+    let code: &avm_bytes = unsafe { mem::transmute(code) };
+    debug!(target: "vm", "avm_put_transformed_code at: {:?}", addr);
+    let ext_code: &[u8] =
+        unsafe { ::std::slice::from_raw_parts(code.pointer, code.length as usize) };
+    //debug!(target: "vm", "code = {:?}", ext_code);
+    ext.save_transformed_code(addr, ext_code.to_vec());
+}
+
+#[no_mangle]
+pub extern fn avm_get_objectgraph(handle: *const c_void, address: *const avm_address) -> avm_bytes {
+    println!("avm_get_objectgraph");
+    let ext: &mut Box<AVMExt> = unsafe { mem::transmute(handle) };
+    let addr: &Address = unsafe { mem::transmute(address) };
+
+    debug!(target: "vm", "avm_get_transformed_code: 0x{:?}", addr);
+
+    match ext.get_objectgraph(addr) {
+        None => {
+            unsafe {new_null_bytes()}
+        }
+        Some(graph) => {
+            if graph.len() == 0 {
+                unsafe {new_null_bytes()}
+            } else {
+                unsafe {
+                    let ret = new_fixed_bytes(graph.len() as u32);
+                    ptr::copy(&graph.as_slice()[0], ret.pointer, graph.len());
+                    ret
+                }
+            }
+        }
+    }
+}
+
+#[no_mangle]
+pub extern fn avm_set_objectgraph(handle: *const c_void, address: *const avm_address, data: *const avm_bytes) {
+    println!("avm_set_objectgraph");
+    let ext: &mut Box<AVMExt> = unsafe { mem::transmute(handle) };
+    let addr: &Address = unsafe { mem::transmute(address) };
+    let graph: &avm_bytes = unsafe { mem::transmute(data) };
+    debug!(target: "vm", "avm_set_objectgraph at: {:?}", addr);
+    let ext_graph: &[u8] =
+        unsafe { ::std::slice::from_raw_parts(graph.pointer, graph.length as usize) };
+    // println!("AVM: set object graph = {:?}", ext_graph);
+    ext.set_objectgraph(addr, ext_graph.to_vec());
+}
+
 pub fn register_callbacks() {
+    // println!("set_objectgraph ptr = {:?}", avm_set_objectgraph);
     unsafe {
         callbacks.create_account = avm_create_account;
         callbacks.has_account_state = avm_has_account_state;
@@ -391,6 +472,10 @@ pub fn register_callbacks() {
         callbacks.send_signal = avm_send_signal;
         callbacks.contract_address = avm_contract_address;
         callbacks.add_log = avm_add_log;
+        callbacks.get_transformed_code = avm_get_transformed_code;
+        callbacks.put_transformed_code = avm_put_transformed_code;
+        callbacks.get_objectgraph = avm_get_objectgraph;
+        callbacks.set_objectgraph = avm_set_objectgraph;
     }
 }
 
@@ -403,7 +488,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_set_storage() {
+    fn set_storage() {
         //debug key/value
         let mut key: Vec<u8> = (1..10).map(|_| {
             rand::random()

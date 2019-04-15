@@ -2502,7 +2502,7 @@ Address};
 
             assert_eq!(status_code, ExecStatus::Success);
             println!("result state root = {:?}, return_data = {:?}", state_root, return_data);
-            assert_eq!(return_data.to_vec(), vec![17, 0, 5, 72, 101, 108, 108, 111]);
+            assert_eq!(return_data.to_vec(), vec![72, 101, 108, 108, 111]);
         }
     }
 

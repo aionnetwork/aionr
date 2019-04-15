@@ -219,11 +219,11 @@ where B: StateBackend
     }
 
     fn send_signal(&mut self, signal: i32) {
-        self.tx.send(signal);
+        self.tx.send(signal).expect("ext send failed");
     }
 
     fn commit(&mut self) {
-        self.state.lock().unwrap().commit();
+        self.state.lock().unwrap().commit().expect("commit state should not fail");
     }
 
     fn root(&self) -> H256{
@@ -237,6 +237,46 @@ where B: StateBackend
             topics,
             data,
         });
+    }
+
+    fn get_transformed_code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
+        println!("AVM get transformed code");
+        match self.state.lock().unwrap().transformed_code(address) {
+            Ok(code) => {
+                // println!("transformed code = {:?}", code);
+                code
+            },
+            Err(_x) => None,
+        }
+    }
+
+    fn save_transformed_code(&mut self, address: &Address, code: Bytes) {
+        println!("AVMExt save transformed code: address = {:?}", address);
+        self.state
+            .lock()
+            .unwrap()
+            .init_transformed_code(address, code)
+            .expect("save avm transformed code should not fail");
+    }
+
+    fn get_objectgraph(&self, address: &Address) -> Option<Arc<Bytes>> {
+        println!("AVM get object graph");
+        match self.state.lock().unwrap().get_objectgraph(address) {
+            Ok(data) => {
+                // println!("transformed code = {:?}", code);
+                data
+            },
+            Err(_x) => None,
+        }
+    }
+
+    fn set_objectgraph(&mut self, address: &Address, data: Bytes) {
+        println!("AVMExt save object graph: address = {:?}", address);
+        self.state
+            .lock()
+            .unwrap()
+            .set_objectgraph(address, data)
+            .expect("save avm object graph should not fail");
     }
 }
 
