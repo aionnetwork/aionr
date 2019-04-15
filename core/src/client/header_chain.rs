@@ -521,7 +521,7 @@ impl HeaderChain {
                     // iterable function which removes the candidates as it goes
                     // along. this will only be called until the CHT is complete.
                     let iter = || {
-                        if let Some(era_entry) = candidates.remove(&i) {
+                        if let Some(era_entry) = candidates.get(&i) {
                             // transaction.delete(COL, era_key(i).as_bytes());
 
                             i += 1;

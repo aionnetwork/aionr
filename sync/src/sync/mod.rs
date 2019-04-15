@@ -591,6 +591,13 @@ impl ChainNotify for Sync {
 
         if !sealed.is_empty() {
             debug!(target: "sync", "Propagating blocks...");
+            if SyncStorage::get_synced_block_number() + 4
+                < SyncStorage::get_network_best_block_number()
+            {
+                // Ignore Propagated blocks
+                trace!(target: "sync", "Syncing..., ignore propagated blocks.");
+                return;
+            }
             BroadcastsHandler::propagate_new_blocks(sealed.index(0));
         }
     }

@@ -69,19 +69,24 @@ impl BlockHeadersHandler {
             }
 
             if node.requested_block_num == from + REQUEST_SIZE {
+                node.inc_repeated();
                 if node.last_request_timestamp + Duration::from_secs(10) > SystemTime::now() {
+                    debug!(target: "sync", "emiyou {}", node.requested_block_num);
                     return;
                 }
             } else {
                 node.last_request_timestamp = SystemTime::now();
+                node.reset_repeated();
             }
             node.requested_block_num = from + REQUEST_SIZE;
 
             debug!(target: "sync", "request headers: from number: {}, node: {}, rn: {}.", from, node.get_ip_addr(), node.requested_block_num);
 
             Self::send_blocks_headers_req(node.node_hash, from, REQUEST_SIZE as u32);
-            P2pMgr::update_node(node.node_hash, node);
+        } else {
+            node.reset_repeated();
         }
+        P2pMgr::update_node(node.node_hash, node);
     }
 
     fn send_blocks_headers_req(node_hash: u64, from: u64, size: u32) {
@@ -165,6 +170,7 @@ impl BlockHeadersHandler {
         let mut number = 0;
 
         for header_rlp in rlp.iter() {
+            node.reset_repeated();
             if let Ok(hd) = header_rlp.as_val() {
                 let header: BlockHeader = hd;
                 let hash = header.hash();
