@@ -60,7 +60,7 @@ pub mod storage;
 
 const STATUS_REQ_INTERVAL: u64 = 2;
 const GET_BLOCK_HEADERS_INTERVAL: u64 = 500;
-const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50000;
+const BLOCKS_BODIES_REQ_INTERVAL: u64 = 30;
 const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const REPUTATION_HANDLE_INTERVAL: u64 = 1800;
@@ -99,10 +99,12 @@ impl SyncMgr {
 
         let blocks_bodies_req_task = Interval::new(
             Instant::now(),
-            Duration::from_millis(BLOCKS_BODIES_REQ_INTERVAL),
+            Duration::from_secs(BLOCKS_BODIES_REQ_INTERVAL),
         ).for_each(move |_| {
             // blocks bodies req
-
+            if let Some(ref mut node) = P2pMgr::get_an_alive_node() {
+                BlockBodiesHandler::get_blocks_bodies(node, 0);
+            }
             Ok(())
         })
             .map_err(|e| error!("interval errored; err={:?}", e));

@@ -521,7 +521,7 @@ impl HeaderChain {
                     // iterable function which removes the candidates as it goes
                     // along. this will only be called until the CHT is complete.
                     let iter = || {
-                        if let Some(era_entry) = candidates.get(&i) {
+                        if let Some(era_entry) = candidates.remove(&i) {
                             // transaction.delete(COL, era_key(i).as_bytes());
 
                             i += 1;
@@ -530,7 +530,7 @@ impl HeaderChain {
                             for ancient in &era_entry.candidates {
                                 let maybe_transition = live_epoch_proofs.remove(&ancient.hash);
                                 if let Some(epoch_transition) = maybe_transition {
-                                    transaction.delete(COL, &*transition_key(ancient.hash));
+                                    // transaction.delete(COL, &*transition_key(ancient.hash));
 
                                     if ancient.hash == era_entry.canonical_hash {
                                         last_canonical_transition = match self
@@ -557,7 +557,7 @@ impl HeaderChain {
                                     }
                                 }
 
-                                transaction.delete(COL, &ancient.hash);
+                                // transaction.delete(COL, &ancient.hash);
                             }
 
                             let canon = &era_entry.candidates[0];
@@ -599,14 +599,14 @@ impl HeaderChain {
     /// Apply pending changes from a previous `insert` operation.
     /// Must be done before the next `insert` call.
     pub fn apply_pending(&self, tx: DBTransaction, pending: PendingChanges) {
-        let _ = self.db.write(tx);
+        let _ = self.db.write_buffered(tx);
         if let Some(best_block) = pending.best_block {
             *self.best_block.write() = best_block;
         }
     }
 
     /// Flush db
-    pub fn flush(&self) {
+    pub fn fl3ush(&self) {
         let _ = self.db.flush();
     }
 
