@@ -1707,8 +1707,8 @@ impl BlockChainClient for Client {
     }
 
     fn clear_queue(&self) {
-        let _ = self.db.write().flush();
-        trace!(target: "client", "DB flushed.");
+        // let _ = self.db.write().flush();
+        // trace!(target: "client", "DB flushed.");
         self.block_queue.clear();
     }
 

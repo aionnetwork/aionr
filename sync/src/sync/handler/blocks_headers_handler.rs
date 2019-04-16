@@ -275,6 +275,8 @@ impl BlockHeadersHandler {
                 if let Some(ref mut peer_node) = P2pMgr::get_an_active_node() {
                     BlockHeadersHandler::get_headers(peer_node, number);
                 }
+                ::std::thread::sleep(Duration::from_millis(50));
+                BlockHeadersHandler::get_headers(node, 0);
             }
         }
     }
