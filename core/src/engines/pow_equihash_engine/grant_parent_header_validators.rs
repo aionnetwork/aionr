@@ -43,7 +43,8 @@ impl<'a> GrantParentHeaderValidator for DifficultyValidator<'a> {
         header: &Header,
         parent_header: &Header,
         grant_parent_header: Option<&Header>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    {
         let difficulty = *header.difficulty();
         let parent_difficulty = *parent_header.difficulty();
         if parent_header.number() == 0u64 {
@@ -51,7 +52,8 @@ impl<'a> GrantParentHeaderValidator for DifficultyValidator<'a> {
                 return Err(BlockError::InvalidDifficulty(Mismatch {
                     expected: parent_difficulty,
                     found: difficulty,
-                }).into());
+                })
+                .into());
             } else {
                 return Ok(());
             }
@@ -69,7 +71,8 @@ impl<'a> GrantParentHeaderValidator for DifficultyValidator<'a> {
                 Err(BlockError::InvalidDifficulty(Mismatch {
                     expected: calc_difficulty,
                     found: difficulty,
-                }).into())
+                })
+                .into())
             } else {
                 Ok(())
             }
