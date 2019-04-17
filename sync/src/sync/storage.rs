@@ -75,11 +75,10 @@ pub struct SyncStorage;
 impl SyncStorage {
     pub fn init(client: Arc<Client>, header_chain: Arc<HeaderChain>) {
         if let Some(_) = BLOCK_CHAIN.try_get() {
-            if let Some(mut block_chain) = BLOCK_CHAIN.get().try_write() {
-                if let Some(_) = block_chain.inner {
-                } else {
-                    block_chain.inner = Some(client);
-                }
+            let mut block_chain = BLOCK_CHAIN.get().write();
+            if let Some(_) = block_chain.inner {
+            } else {
+                block_chain.inner = Some(client);
             }
         } else {
             let block_chain = BlockChain {
@@ -119,8 +118,7 @@ impl SyncStorage {
     pub fn get_block_chain() -> Arc<Client> {
         BLOCK_CHAIN
             .get()
-            .try_read()
-            .expect("get_block_chain error")
+            .read()
             .clone()
             .inner
             .expect("get_client error")
@@ -129,8 +127,7 @@ impl SyncStorage {
     pub fn get_chain_info() -> BlockChainInfo {
         let client = BLOCK_CHAIN
             .get()
-            .try_read()
-            .expect("get_block_chain error")
+            .read()
             .clone()
             .inner
             .expect("get_chain_info error");
@@ -140,8 +137,7 @@ impl SyncStorage {
     pub fn get_block_header_chain() -> Arc<HeaderChain> {
         BLOCK_HEADER_CHAIN
             .get()
-            .try_read()
-            .expect("get_block_header_chain error")
+            .read()
             .clone()
             .inner
             .expect("get_block_header_chain error")
@@ -150,8 +146,7 @@ impl SyncStorage {
     pub fn get_sync_executor() -> TaskExecutor {
         let rt = SYNC_EXECUTORS
             .get()
-            .try_read()
-            .expect("get_executor error")
+            .read()
             .clone()
             .inner
             .expect("get_executor error");
@@ -262,26 +257,23 @@ impl SyncStorage {
     }
 
     pub fn insert_requested_time(hash: H256) {
-        if let Some(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().try_lock() {
-            if !requested_block_hashes.contains_key(&hash) {
-                requested_block_hashes.insert(hash, SystemTime::now());
-            }
+        let mut requested_block_hashes = REQUESTED_BLOCK_HASHES.get().lock();
+        if !requested_block_hashes.contains_key(&hash) {
+            requested_block_hashes.insert(hash, SystemTime::now());
         }
     }
 
     pub fn get_requested_time(hash: &H256) -> Option<SystemTime> {
-        if let Some(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().try_lock() {
-            if let Some(time) = requested_block_hashes.get_mut(hash) {
-                return Some(time.clone());
-            }
+        let mut requested_block_hashes = REQUESTED_BLOCK_HASHES.get().lock();
+        if let Some(time) = requested_block_hashes.get_mut(hash) {
+            return Some(time.clone());
         }
         None
     }
 
     pub fn clear_requested_blocks() {
-        if let Some(ref mut requested_block_hashes) = REQUESTED_BLOCK_HASHES.get().try_lock() {
-            requested_block_hashes.clear();
-        }
+        let mut requested_block_hashes = REQUESTED_BLOCK_HASHES.get().lock();
+        requested_block_hashes.clear();
     }
 
     pub fn get_sent_transaction_hashes() -> &'static Mutex<LruCache<H256, u8>> {
@@ -292,7 +284,8 @@ impl SyncStorage {
         best_block_num: u64,
         best_hash: H256,
         target_total_difficulty: U256,
-    ) {
+    )
+    {
         let mut network_status = NETWORK_STATUS.write();
         if target_total_difficulty > network_status.total_diff {
             network_status.best_block_num = best_block_num;
@@ -306,21 +299,14 @@ impl SyncStorage {
     }
 
     pub fn get_received_transactions_count() -> usize {
-        if let Some(received_transactions) = RECEIVED_TRANSACTIONS.get().try_lock() {
-            return received_transactions.len();
-        } else {
-            0
-        }
+        let received_transactions = RECEIVED_TRANSACTIONS.get().lock();
+        return received_transactions.len();
     }
 
     pub fn insert_received_transaction(transaction: Vec<u8>) {
-        let mut lock = RECEIVED_TRANSACTIONS.get().try_lock();
-        if let Some(ref mut received_transactions) = lock {
-            if received_transactions.len() <= MAX_RECEIVED_TRANSACTIONS_COUNT {
-                received_transactions.push_back(transaction);
-            }
-        } else {
-            warn!(target: "sync", "downloaded_headers_mutex lock failed");
+        let mut received_transactions = RECEIVED_TRANSACTIONS.get().lock();
+        if received_transactions.len() <= MAX_RECEIVED_TRANSACTIONS_COUNT {
+            received_transactions.push_back(transaction);
         }
     }
 
@@ -329,29 +315,18 @@ impl SyncStorage {
     }
 
     pub fn get_staged_blocks_with_hash(hash: H256) -> Option<Vec<RlpStream>> {
-        if let Some(mut staged_block_hashes) = STAGED_BLOCKS.get().try_lock() {
-            return staged_block_hashes.remove(&hash);
-        }
-        None
+        let mut staged_block_hashes = STAGED_BLOCKS.get().lock();
+        return staged_block_hashes.remove(&hash);
     }
 
     pub fn clear_staged_blocks() {
-        if let Some(mut staged_blocks) = STAGED_BLOCKS.get().try_lock() {
-            staged_blocks.clear();
-        }
+        let mut staged_blocks = STAGED_BLOCKS.get().lock();
+        staged_blocks.clear();
     }
 
     pub fn reset() {
-        SYNC_EXECUTORS
-            .get()
-            .try_write()
-            .expect("get_executor error")
-            .inner = None;
-        BLOCK_CHAIN
-            .get()
-            .try_write()
-            .expect("get_block_chain error")
-            .inner = None;
+        SYNC_EXECUTORS.get().write().inner = None;
+        BLOCK_CHAIN.get().write().inner = None;
     }
 }
 

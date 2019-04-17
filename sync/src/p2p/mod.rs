@@ -170,91 +170,78 @@ impl P2pMgr {
         }
     }
 
-    pub fn get_thread_pool() -> &'static ThreadPool {
-        TP.get()
-    }
+    pub fn get_thread_pool() -> &'static ThreadPool { TP.get() }
 
-    pub fn get_network_config() -> &'static NetworkConfig {
-        NETWORK_CONFIG.get()
-    }
+    pub fn get_network_config() -> &'static NetworkConfig { NETWORK_CONFIG.get() }
 
     pub fn is_black_ip(ip: &String) -> bool {
-        if let Some(ip_black_list) = IP_BLACK_LIST.try_read() {
-            if ip_black_list.contains(ip) {
-                return true;
-            }
+        let ip_black_list = IP_BLACK_LIST.read();
+        if ip_black_list.contains(ip) {
+            return true;
         }
         false
     }
 
     pub fn add_black_ip(ip: String) {
-        if let Some(mut ip_black_list) = IP_BLACK_LIST.try_write() {
-            ip_black_list.insert(ip);
-        }
+        let mut ip_black_list = IP_BLACK_LIST.write();
+        ip_black_list.insert(ip);
     }
 
     pub fn remove_black_ip(ip: &String) {
-        if let Some(mut ip_black_list) = IP_BLACK_LIST.try_write() {
-            ip_black_list.remove(ip);
-        }
+        let mut ip_black_list = IP_BLACK_LIST.write();
+        ip_black_list.remove(ip);
     }
 
     pub fn load_boot_nodes(boot_nodes_str: Vec<String>) -> Vec<Node> {
         let mut boot_nodes = Vec::new();
-        if let Some(mut top8) = TOP8_NODE_HASHES.try_write() {
-            for boot_node_str in boot_nodes_str {
-                if boot_node_str.len() != 0 {
-                    let mut boot_node = Node::new_with_node_str(boot_node_str.to_string());
-                    boot_node.node_hash = P2pMgr::calculate_hash(&boot_node.get_node_id());
-                    top8.push(boot_node.node_hash);
-                    boot_node.is_from_boot_list = true;
-                    boot_nodes.push(boot_node);
-                }
+        let mut top8 = TOP8_NODE_HASHES.write();
+        for boot_node_str in boot_nodes_str {
+            if boot_node_str.len() != 0 {
+                let mut boot_node = Node::new_with_node_str(boot_node_str.to_string());
+                boot_node.node_hash = P2pMgr::calculate_hash(&boot_node.get_node_id());
+                top8.push(boot_node.node_hash);
+                boot_node.is_from_boot_list = true;
+                boot_nodes.push(boot_node);
             }
-            if top8.len() > 8 {
-                top8.split_off(8);
-            }
+        }
+        if top8.len() > 8 {
+            top8.split_off(8);
         }
         boot_nodes
     }
 
-    pub fn get_local_node() -> &'static Node {
-        LOCAL_NODE.get()
-    }
+    pub fn get_local_node() -> &'static Node { LOCAL_NODE.get() }
 
-    pub fn disable() {
-        Self::reset();
-    }
+    pub fn disable() { Self::reset(); }
 
     pub fn reset() {
-        if let Some(mut sockets_map) = SOCKETS_MAP.try_lock() {
+        {
+            let mut sockets_map = SOCKETS_MAP.lock();
             for (_, socket) in sockets_map.iter_mut() {
                 let result = socket.shutdown(Shutdown::Both);
                 trace!(target: "net", "Shutdown socket: {:?}.", result);
             }
         }
-        if let Some(mut nodes_map) = GLOBAL_NODES_MAP.try_write() {
-            nodes_map.clear();
-        }
+        let mut nodes_map = GLOBAL_NODES_MAP.write();
+        nodes_map.clear();
     }
 
     pub fn get_peer(node_hash: u64) -> Option<StdTcpStream> {
-        if let Some(mut socktes_map) = SOCKETS_MAP.try_lock() {
-            return socktes_map.remove(&node_hash);
-        }
-
-        None
+        let mut socktes_map = SOCKETS_MAP.lock();
+        return socktes_map.remove(&node_hash);
     }
 
     pub fn add_peer(node: Node, socket: StdTcpStream) {
-        if let Some(mut sockets_map) = SOCKETS_MAP.try_lock() {
+        {
+            let mut sockets_map = SOCKETS_MAP.lock();
             match sockets_map.get(&node.node_hash) {
                 Some(_) => {
                     warn!(target: "net", "Known connected peer: {}@{}, ...", node.get_node_id(), node.get_ip_addr());
                 }
                 None => {
                     let mut active_nodes_count = P2pMgr::get_nodes_count(ALIVE);
-                    if let Some(mut peer_nodes) = GLOBAL_NODES_MAP.try_write() {
+                    {
+                        let mut peer_nodes = GLOBAL_NODES_MAP.write();
                         let max_peers_num = NETWORK_CONFIG.get().max_peers as usize;
                         if active_nodes_count < max_peers_num {
                             match peer_nodes.get(&node.node_hash) {
@@ -280,14 +267,16 @@ impl P2pMgr {
     }
 
     pub fn remove_peer(node_hash: u64) -> Option<Node> {
-        if let Some(mut sockets_map) = SOCKETS_MAP.try_lock() {
+        {
+            let mut sockets_map = SOCKETS_MAP.lock();
             if let Some(socket) = sockets_map.remove(&node_hash) {
                 let result = socket.shutdown(Shutdown::Both);
                 trace!(target: "net", "remove_peer socket, {:?}", result);
                 debug!(target: "net", "remove_peer connection， peer_node node_hash {}", node_hash);
             }
         }
-        if let Some(mut peer_nodes) = GLOBAL_NODES_MAP.try_write() {
+        {
+            let mut peer_nodes = GLOBAL_NODES_MAP.write();
             if let Some(node) = peer_nodes.remove(&node_hash) {
                 debug!(target: "net", "remove_peer， peer_node {}@{}, node_hash: {}", node.get_node_id(), node.get_ip_addr(), node_hash);
             }
@@ -301,26 +290,24 @@ impl P2pMgr {
         if P2pMgr::is_black_ip(&node.get_ip()) {
             return;
         }
-        if let Some(mut nodes_map) = GLOBAL_NODES_MAP.try_write() {
-            if nodes_map.len() < max_peers_num * 2 {
-                match nodes_map.get(&node.node_hash) {
-                    Some(_) => {
-                        warn!(target: "net", "Known node {}@{}, ...", node.get_node_id(), node.get_ip_addr());
-                    }
-                    None => {
-                        nodes_map.insert(node.node_hash, node);
-                        return;
-                    }
+        let mut nodes_map = GLOBAL_NODES_MAP.write();
+        if nodes_map.len() < max_peers_num * 2 {
+            match nodes_map.get(&node.node_hash) {
+                Some(_) => {
+                    warn!(target: "net", "Known node {}@{}, ...", node.get_node_id(), node.get_ip_addr());
+                }
+                None => {
+                    nodes_map.insert(node.node_hash, node);
+                    return;
                 }
             }
         }
     }
 
     fn get_tx(node_hash: u64) -> Option<Tx> {
-        if let Some(nodes_map) = GLOBAL_NODES_MAP.try_read() {
-            if let Some(node) = nodes_map.get(&node_hash) {
-                return node.tx.clone();
-            }
+        let nodes_map = GLOBAL_NODES_MAP.read();
+        if let Some(node) = nodes_map.get(&node_hash) {
+            return node.tx.clone();
         }
         None
     }
@@ -337,11 +324,10 @@ impl P2pMgr {
 
     pub fn get_nodes_count(state_code: u32) -> usize {
         let mut nodes_count = 0;
-        if let Some(nodes_map) = GLOBAL_NODES_MAP.try_read() {
-            for val in nodes_map.values() {
-                if val.state_code & state_code == state_code {
-                    nodes_count += 1;
-                }
+        let nodes_map = GLOBAL_NODES_MAP.read();
+        for val in nodes_map.values() {
+            if val.state_code & state_code == state_code {
+                nodes_count += 1;
             }
         }
         nodes_count
@@ -349,33 +335,30 @@ impl P2pMgr {
 
     pub fn get_all_nodes_count() -> u16 {
         let mut count = 0;
-        if let Some(nodes_map) = GLOBAL_NODES_MAP.try_read() {
-            for _ in nodes_map.values() {
-                count += 1;
-            }
+        let nodes_map = GLOBAL_NODES_MAP.read();
+        for _ in nodes_map.values() {
+            count += 1;
         }
         count
     }
 
     pub fn get_all_nodes() -> Vec<Node> {
         let mut nodes = Vec::new();
-        if let Some(nodes_map) = GLOBAL_NODES_MAP.try_read() {
-            for val in nodes_map.values() {
-                let node = val.clone();
-                nodes.push(node);
-            }
+        let nodes_map = GLOBAL_NODES_MAP.read();
+        for val in nodes_map.values() {
+            let node = val.clone();
+            nodes.push(node);
         }
         nodes
     }
 
     pub fn get_nodes(state_code_mask: u32) -> Vec<Node> {
         let mut nodes = Vec::new();
-        if let Some(nodes_map) = GLOBAL_NODES_MAP.try_read() {
-            for val in nodes_map.values() {
-                let node = val.clone();
-                if node.state_code & state_code_mask == state_code_mask {
-                    nodes.push(node);
-                }
+        let nodes_map = GLOBAL_NODES_MAP.read();
+        for val in nodes_map.values() {
+            let node = val.clone();
+            if node.state_code & state_code_mask == state_code_mask {
+                nodes.push(node);
             }
         }
         nodes
@@ -417,7 +400,8 @@ impl P2pMgr {
     }
 
     pub fn get_an_active_node() -> Option<Node> {
-        if let Some(refresh_top8_nodes) = TOP8_NODE_HASHES.try_read() {
+        {
+            let refresh_top8_nodes = TOP8_NODE_HASHES.read();
             let node_count = refresh_top8_nodes.len();
             if node_count > 0 {
                 let mut rng = thread_rng();
@@ -441,52 +425,44 @@ impl P2pMgr {
     }
 
     pub fn get_node(node_hash: u64) -> Option<Node> {
-        if let Some(nodes_map) = GLOBAL_NODES_MAP.try_read() {
-            if let Some(node) = nodes_map.get(&node_hash) {
-                return Some(node.clone());
-            }
+        let nodes_map = GLOBAL_NODES_MAP.read();
+        if let Some(node) = nodes_map.get(&node_hash) {
+            return Some(node.clone());
         }
         None
     }
 
     pub fn update_node(node_hash: u64, node: &mut Node) {
-        if let Some(mut nodes_map) = GLOBAL_NODES_MAP.try_write() {
-            if let Some(n) = nodes_map.get_mut(&node_hash) {
-                n.update(node);
-            }
+        let mut nodes_map = GLOBAL_NODES_MAP.write();
+        if let Some(n) = nodes_map.get_mut(&node_hash) {
+            n.update(node);
         }
     }
 
     pub fn replace_top8_node_hashes(node_hashes: Vec<u64>) {
-        if let Some(mut refresh_top8_nodes) = TOP8_NODE_HASHES.try_write() {
-            refresh_top8_nodes.clear();
-            refresh_top8_nodes.extend(node_hashes);
-        }
+        let mut refresh_top8_nodes = TOP8_NODE_HASHES.write();
+        refresh_top8_nodes.clear();
+        refresh_top8_nodes.extend(node_hashes);
     }
 
     pub fn refresh_top8_node_hashes(node_hashes: Vec<u64>) {
-        if let Some(mut refresh_top8_nodes) = TOP8_NODE_HASHES.try_write() {
-            refresh_top8_nodes.retain(|node_hash| !node_hashes.contains(node_hash));
-            refresh_top8_nodes.splice(..0, node_hashes.iter().cloned());
-            if refresh_top8_nodes.len() > 8 {
-                refresh_top8_nodes.split_off(8);
-            }
+        let mut refresh_top8_nodes = TOP8_NODE_HASHES.write();
+        refresh_top8_nodes.retain(|node_hash| !node_hashes.contains(node_hash));
+        refresh_top8_nodes.splice(..0, node_hashes.iter().cloned());
+        if refresh_top8_nodes.len() > 8 {
+            refresh_top8_nodes.split_off(8);
         }
     }
 
     pub fn get_top8_node_hashes() -> HashSet<u64> {
-        if let Some(top8) = TOP8_NODE_HASHES.try_read() {
-            top8.iter().map(|hash| *hash).collect::<HashSet<_>>()
-        } else {
-            HashSet::new()
-        }
+        let top8 = TOP8_NODE_HASHES.read();
+        top8.iter().map(|hash| *hash).collect::<HashSet<_>>()
     }
 
     pub fn reset_reputation() {
-        if let Some(mut nodes_map) = GLOBAL_NODES_MAP.try_write() {
-            for node in nodes_map.values_mut() {
-                node.reputation = 1000;
-            }
+        let mut nodes_map = GLOBAL_NODES_MAP.write();
+        for node in nodes_map.values_mut() {
+            node.reputation = 1000;
         }
     }
 
@@ -494,7 +470,8 @@ impl P2pMgr {
         socket: TcpStream,
         peer_node: &mut Node,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    ) {
+    )
+    {
         let local_ip = P2pMgr::get_local_node().ip_addr.get_ip();
         let mut value = peer_node.ip_addr.get_addr();
         value.push_str(&local_ip);
@@ -552,7 +529,8 @@ impl P2pMgr {
         socket: TcpStream,
         mut peer_node: Node,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    ) {
+    )
+    {
         let node_hash = peer_node.node_hash;
         let (tx, rx) = mpsc::channel(32);
         peer_node.tx = Some(tx);
@@ -594,13 +572,15 @@ impl P2pMgr {
 
     pub fn send(node_hash: u64, msg: ChannelBuffer) {
         match Self::get_tx(node_hash) {
-            Some(mut tx) => match tx.try_send(msg) {
-                Ok(()) => {}
-                Err(e) => {
-                    Self::remove_peer(node_hash);
-                    debug!(target: "net", "Failed to send the msg, Err: {}", e);
+            Some(mut tx) => {
+                match tx.try_send(msg) {
+                    Ok(()) => {}
+                    Err(e) => {
+                        Self::remove_peer(node_hash);
+                        debug!(target: "net", "Failed to send the msg, Err: {}", e);
+                    }
                 }
-            },
+            }
             None => {
                 Self::remove_peer(node_hash);
                 debug!(target: "net", "Invalid peer !, node_hash: {}", node_hash);
@@ -706,9 +686,7 @@ pub struct NetworkConfig {
 }
 
 impl Default for NetworkConfig {
-    fn default() -> Self {
-        NetworkConfig::new()
-    }
+    fn default() -> Self { NetworkConfig::new() }
 }
 
 impl NetworkConfig {

@@ -87,38 +87,41 @@ impl SyncMgr {
         let get_block_headers_task = Interval::new(
             Instant::now(),
             Duration::from_secs(GET_BLOCK_HEADERS_INTERVAL),
-        ).for_each(move |_| {
+        )
+        .for_each(move |_| {
             if let Some(ref mut node) = P2pMgr::get_an_alive_node() {
                 BlockHeadersHandler::get_headers(node, 0);
             }
 
             Ok(())
         })
-            .map_err(|e| error!("interval errored; err={:?}", e));
+        .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(get_block_headers_task);
 
         let blocks_bodies_req_task = Interval::new(
             Instant::now(),
             Duration::from_secs(BLOCKS_BODIES_REQ_INTERVAL),
-        ).for_each(move |_| {
+        )
+        .for_each(move |_| {
             // blocks bodies req
             if let Some(ref mut node) = P2pMgr::get_an_alive_node() {
                 BlockBodiesHandler::get_blocks_bodies(node, 0);
             }
             Ok(())
         })
-            .map_err(|e| error!("interval errored; err={:?}", e));
+        .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(blocks_bodies_req_task);
 
         let broadcast_transactions_task = Interval::new(
             Instant::now(),
             Duration::from_millis(BROADCAST_TRANSACTIONS_INTERVAL),
-        ).for_each(move |_| {
+        )
+        .for_each(move |_| {
             BroadcastsHandler::broad_new_transactions();
 
             Ok(())
         })
-            .map_err(|e| error!("interval errored; err={:?}", e));
+        .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(broadcast_transactions_task);
 
         let flush_task = loop_fn(0, |block_number| {
@@ -145,7 +148,8 @@ impl SyncMgr {
         let reputation_handle_task = Interval::new(
             Instant::now(),
             Duration::from_secs(REPUTATION_HANDLE_INTERVAL),
-        ).for_each(move |_| {
+        )
+        .for_each(move |_| {
             let mut active_nodes = P2pMgr::get_nodes(ALIVE);
             active_nodes.sort_by(|a, b| {
                 if a.reputation != b.reputation {
@@ -169,7 +173,7 @@ impl SyncMgr {
             P2pMgr::reset_reputation();
             Ok(())
         })
-            .map_err(|e| error!("interval errored; err={:?}", e));
+        .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(reputation_handle_task);
 
         let statics_task = Interval::new(Instant::now(), Duration::from_secs(STATICS_INTERVAL))
@@ -470,22 +474,20 @@ impl SyncProvider for Sync {
         peer_info_list
     }
 
-    fn enode(&self) -> Option<String> {
-        Some(P2pMgr::get_local_node().get_node_id())
-    }
+    fn enode(&self) -> Option<String> { Some(P2pMgr::get_local_node().get_node_id()) }
 
-    fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats> {
-        BTreeMap::new()
-    }
+    fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats> { BTreeMap::new() }
 
     fn active(&self) -> Vec<ActivePeerInfo> {
         let ac_nodes = P2pMgr::get_nodes(ALIVE);
         ac_nodes
             .into_iter()
-            .map(|node| ActivePeerInfo {
-                highest_block_number: node.best_block_num,
-                id: node.node_id.to_hex(),
-                ip: node.ip_addr.ip.to_hex(),
+            .map(|node| {
+                ActivePeerInfo {
+                    highest_block_number: node.best_block_num,
+                    id: node.node_id.to_hex(),
+                    ip: node.ip_addr.ip.to_hex(),
+                }
             })
             .collect()
     }
@@ -518,7 +520,7 @@ impl NetworkManager for Sync {
             callback: LightSyncManager::handle,
         };
         P2pMgr::enable(self.network_config());
-        debug!(target: "sync", "###### Pblock_chain.clear_queue();2P enabled... ######");
+        debug!(target: "sync", "###### P2P enabled... ######");
 
         NetManager::enable(sync_handler, light_handler);
         debug!(target: "sync", "###### network enabled... ######");
@@ -532,9 +534,7 @@ impl NetworkManager for Sync {
         P2pMgr::disable();
     }
 
-    fn network_config(&self) -> NetworkConfig {
-        NetworkConfig::from(self.network.config.clone())
-    }
+    fn network_config(&self) -> NetworkConfig { NetworkConfig::from(self.network.config.clone()) }
 }
 
 impl ChainNotify for Sync {
@@ -547,7 +547,8 @@ impl ChainNotify for Sync {
         sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
         _duration: u64,
-    ) {
+    )
+    {
         if P2pMgr::get_all_nodes_count() == 0 {
             return;
         }
@@ -621,13 +622,11 @@ impl ChainNotify for Sync {
                 let transaction: UnverifiedTransaction = tx;
                 let hash = transaction.hash();
                 let sent_transaction_hashes_mutex = SyncStorage::get_sent_transaction_hashes();
-                let mut lock = sent_transaction_hashes_mutex.try_lock();
+                let mut sent_transaction_hashes = sent_transaction_hashes_mutex.lock();
 
-                if let Some(ref mut sent_transaction_hashes) = lock {
-                    if !sent_transaction_hashes.contains_key(&hash) {
-                        sent_transaction_hashes.insert(hash, 0);
-                        SyncStorage::insert_received_transaction(transaction_rlp);
-                    }
+                if !sent_transaction_hashes.contains_key(&hash) {
+                    sent_transaction_hashes.insert(hash, 0);
+                    SyncStorage::insert_received_transaction(transaction_rlp);
                 }
             }
         }

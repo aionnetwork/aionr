@@ -44,8 +44,8 @@ impl BroadcastsHandler {
         // broadcast new transactions
         let mut transactions = Vec::new();
         let mut size = 0;
-        if let Some(mut received_transactions) = SyncStorage::get_received_transactions().try_lock()
         {
+            let mut received_transactions = SyncStorage::get_received_transactions().lock();
             while let Some(transaction) = received_transactions.pop_front() {
                 transactions.extend_from_slice(&transaction);
                 size += 1;
@@ -251,9 +251,8 @@ impl BroadcastsHandler {
 
         let transactions_rlp = UntrustedRlp::new(req.body.as_slice());
         let mut transactions = Vec::new();
-        if let Some(ref mut transaction_hashes) =
-            SyncStorage::get_sent_transaction_hashes().try_lock()
         {
+            let mut transaction_hashes = SyncStorage::get_sent_transaction_hashes().lock();
             for transaction_rlp in transactions_rlp.iter() {
                 if !transaction_rlp.is_empty() {
                     if let Ok(t) = transaction_rlp.as_val() {
@@ -270,15 +269,15 @@ impl BroadcastsHandler {
                     }
                 }
             }
-
-            if transactions.len() > 0 {
-                let client = SyncStorage::get_block_chain();
-                client.import_queued_transactions(transactions);
-                node.inc_reputation(1);
-                P2pMgr::update_node(node.node_hash, node);
-            }
-            node.last_broadcast_timestamp = SystemTime::now();
         }
+
+        if transactions.len() > 0 {
+            let client = SyncStorage::get_block_chain();
+            client.import_queued_transactions(transactions);
+            node.inc_reputation(1);
+            P2pMgr::update_node(node.node_hash, node);
+        }
+        node.last_broadcast_timestamp = SystemTime::now();
 
         SyncEvent::update_node_state(node, SyncEvent::OnBroadCastTx);
         P2pMgr::update_node(node.node_hash, node);
