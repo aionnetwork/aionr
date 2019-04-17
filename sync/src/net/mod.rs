@@ -48,7 +48,7 @@ lazy_static! {
 }
 
 const RECONNECT_BOOT_NODES_INTERVAL: u64 = 20;
-const RECONNECT_NORMAL_NODES_INTERVAL: u64 = 5;
+const RECONNECT_NORMAL_NODES_INTERVAL: u64 = 1;
 const NODE_ACTIVE_REQ_INTERVAL: u64 = 10;
 
 #[derive(Clone, Copy)]

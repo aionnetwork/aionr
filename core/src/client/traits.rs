@@ -181,7 +181,7 @@ pub trait BlockChainClient: Sync + Send {
     fn queue_info(&self) -> BlockQueueInfo;
 
     /// Clear block queue and abort all import activity.
-    fn clear_queue(&self);
+    fn clear_queue(&self, is_flush_db: bool);
 
     /// Clear bad block queue.
     fn clear_bad(&self);

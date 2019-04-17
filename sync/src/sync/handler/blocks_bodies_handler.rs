@@ -248,9 +248,9 @@ impl BlockBodiesHandler {
                                                         return;
                                                     } else {
                                                         if header_chain
-                                                            .block_hash(BlockId::Hash(
-                                                                parent_hash,
-                                                            )).is_some() {
+                                                            .block_hash(BlockId::Hash(parent_hash))
+                                                            .is_some()
+                                                        {
                                                             if number > 1 {
                                                                 debug!(target: "sync", "Try to get parent block : #{} - {} - {}", number - 1, parent_hash, node.synced_block_num);
                                                                 Self::send_blocks_bodies_req(
@@ -274,21 +274,17 @@ impl BlockBodiesHandler {
                                                     warn!(target: "sync", "Bad block #{} - {:?} - {}, {:?}", number, hash, node.get_ip_addr(), e);
                                                     node.inc_repeated();
                                                     block_chain.clear_bad();
-                                                    P2pMgr::remove_peer(node_hash);
 
-                                                    let from = if number > REQUEST_SIZE {
-                                                        number - REQUEST_SIZE
+                                                    let from = if number + 1 > REQUEST_SIZE {
+                                                        number - REQUEST_SIZE - 1
                                                     } else {
                                                         1
                                                     };
-                                                    if let Some(ref mut peer_node) =
-                                                        P2pMgr::get_an_active_node()
-                                                    {
-                                                        warn!(target: "sync", "Try to get block : #{}", from);
-                                                        BlockBodiesHandler::get_blocks_bodies(
-                                                            peer_node, from,
-                                                        );
-                                                    }
+
+                                                    warn!(target: "sync", "Try to get block : #{}", from);
+                                                    BlockBodiesHandler::get_blocks_bodies(
+                                                        node, from,
+                                                    );
 
                                                     return;
                                                 }

@@ -776,7 +776,7 @@ impl BlockChainClient for TestBlockChainClient {
         }
     }
 
-    fn clear_queue(&self) {}
+    fn clear_queue(&self, _is_flush_db: bool) {}
 
     fn clear_bad(&self) {}
 
