@@ -7,6 +7,10 @@ pub trait ToBytes {
     fn to_vm_bytes(&self) -> Vec<u8>;
 }
 
+pub trait FromBytes {
+    fn to_u32(&self) -> u32;
+}
+
 pub trait ToBe<T> {
     fn to_be(&self) -> T;
 }
@@ -22,6 +26,21 @@ impl ToBe<u64> for f64 {
     fn to_be(&self) -> u64 {
         let data = unsafe {mem::transmute::<f64, u64>(*self)};
         data.to_be()
+    }
+}
+
+impl FromBytes for [u8; 4] {
+    fn to_u32(&self) -> u32 {
+        let ret: &u32 = unsafe {mem::transmute(self)};
+        return ret.to_be();
+    }
+}
+
+impl FromBytes for [u8] {
+    fn to_u32(&self) -> u32 {
+        assert!(self.len() >= 4);
+        let ret: &u32 = unsafe {mem::transmute(&self[0])};
+        return ret.to_be();
     }
 }
 
@@ -209,5 +228,11 @@ mod tests {
         assert_eq!(data_0.encode(), vec![0x08, 0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
         data_0 = AbiToken::ADOUBLE(&[1.0, 2.0]);
         assert_eq!(data_0.encode(), vec![24, 63, 240, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn decode() {
+        let raw = [0x1u8, 0, 0, 0];
+        assert_eq!(raw.to_u32(), 16777216);
     }
 }

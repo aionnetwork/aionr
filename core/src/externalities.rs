@@ -240,7 +240,7 @@ where B: StateBackend
     }
 
     fn get_transformed_code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
-        println!("AVM get transformed code");
+        println!("AVM get transformed code at: {:?}", address);
         match self.state.lock().unwrap().transformed_code(address) {
             Ok(code) => {
                 // println!("transformed code = {:?}", code);

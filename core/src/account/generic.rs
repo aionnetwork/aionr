@@ -31,6 +31,8 @@ pub struct Account<T, U> {
     pub nonce: U256,
     // Trie-backed storage.
     pub storage_root: H256,
+    // avm storage root
+    pub delta_root: H256,
     // LRU Cache of the trie-backed storage.
     // This is limited to `STORAGE_CACHE_ITEMS` recent queries
     pub storage_cache: T,
@@ -62,6 +64,7 @@ pub struct Account<T, U> {
     pub empty_but_commit: bool,
     // account type: 0x00 = normal; 0x01 = EVM; 0x02 = AVM
     pub account_type: AccType,
+    pub vm_create: bool,
 }
 
 /// Boolean type for clean/dirty status.

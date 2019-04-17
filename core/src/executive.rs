@@ -218,6 +218,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             //     }))];
             // }
             debug!(target: "vm", "base_gas_required = {}", base_gas_required);
+            println!("base_gas_required = {}", base_gas_required);
 
             // 2.2 Gas limit should not exceed the maximum gas limit depending on
             // the transaction's action type

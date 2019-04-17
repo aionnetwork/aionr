@@ -16,7 +16,9 @@ use pod_account::*;
 use trie;
 use trie::{Trie, SecTrieDB, TrieFactory, TrieError};
 
-use kvdb::{DBValue, HashStore};
+use kvdb::{DBValue, HashStore, DBTransaction};
+use avm_abi::{ToBytes, FromBytes};
+use db::{self};
 
 pub use self::generic::Account;
 pub use self::traits::{VMAccount, AccType};
@@ -51,6 +53,7 @@ impl From<BasicAccount> for FVMAccount {
             balance: basic.balance,
             nonce: basic.nonce,
             storage_root: basic.storage_root,
+            delta_root: basic.storage_root,
             storage_cache: Self::empty_storage_cache(),
             storage_changes: (HashMap::new(), HashMap::new()),
             code_hash: basic.code_hash,
@@ -66,6 +69,7 @@ impl From<BasicAccount> for FVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
+            vm_create: false,
         }
     }
 }
@@ -76,6 +80,7 @@ impl FVMAccount {
             balance: balance,
             nonce: nonce,
             storage_root: BLAKE2B_NULL_RLP,
+            delta_root: BLAKE2B_NULL_RLP,
             storage_cache: Self::empty_storage_cache(),
             storage_changes: Self::empty_storage_change(),
             code_hash: BLAKE2B_EMPTY,
@@ -91,6 +96,7 @@ impl FVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
+            vm_create: false,
         }
     }
 
@@ -99,6 +105,7 @@ impl FVMAccount {
             balance: balance,
             nonce: nonce,
             storage_root: BLAKE2B_NULL_RLP,
+            delta_root: BLAKE2B_NULL_RLP,
             storage_cache: Self::empty_storage_cache(),
             storage_changes: Self::empty_storage_change(),
             code_hash: BLAKE2B_EMPTY,
@@ -114,6 +121,7 @@ impl FVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
+            vm_create: false,
         }
     }
 
@@ -122,6 +130,7 @@ impl FVMAccount {
             balance: pod.balance,
             nonce: pod.nonce,
             storage_root: BLAKE2B_NULL_RLP,
+            delta_root: BLAKE2B_NULL_RLP,
             storage_cache: Self::empty_storage_cache(),
             storage_changes: (pod.storage.into_iter().collect(), HashMap::new()),
             code_hash: pod.code.as_ref().map_or(BLAKE2B_EMPTY, |c| blake2b(c)),
@@ -143,6 +152,7 @@ impl FVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
+            vm_create: false,
         }
     }
 
@@ -201,6 +211,7 @@ impl FVMAccount {
             balance: self.balance.clone(),
             nonce: self.nonce.clone(),
             storage_root: self.storage_root.clone(),
+            delta_root: self.delta_root.clone(),
             storage_cache: Self::empty_storage_cache(),
             storage_changes: Self::empty_storage_change(),
             code_hash: self.code_hash.clone(),
@@ -216,6 +227,7 @@ impl FVMAccount {
             address_hash: self.address_hash.clone(),
             empty_but_commit: self.empty_but_commit.clone(),
             account_type: self.account_type.clone(),
+            vm_create: self.vm_create.clone(),
         }
     }
 
@@ -235,6 +247,7 @@ impl AVMAccount {
             balance: balance,
             nonce: nonce,
             storage_root: BLAKE2B_NULL_RLP,
+            delta_root: BLAKE2B_NULL_RLP,
             storage_cache: Self::empty_storage_cache(),
             storage_changes: Self::empty_storage_change(),
             code_hash: BLAKE2B_EMPTY,
@@ -250,6 +263,7 @@ impl AVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::AVM,
+            vm_create: false,
         }
     }
      /// Replace self with the data from other account merging storage cache.
@@ -279,6 +293,7 @@ impl From<BasicAccount> for AVMAccount {
             balance: basic.balance,
             nonce: basic.nonce,
             storage_root: basic.storage_root,
+            delta_root: basic.storage_root,
             storage_cache: Self::empty_storage_cache(),
             storage_changes: Self::empty_storage_change(),
             code_hash: basic.code_hash,
@@ -294,6 +309,7 @@ impl From<BasicAccount> for AVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::AVM,
+            vm_create: true,
         }
     }
 }
@@ -316,6 +332,7 @@ impl AVMAccount {
             balance: balance,
             nonce: nonce,
             storage_root: BLAKE2B_NULL_RLP,
+            delta_root: BLAKE2B_NULL_RLP,
             storage_cache: Self::empty_storage_cache(),
             storage_changes: HashMap::new(),
             code_hash: BLAKE2B_EMPTY,
@@ -331,6 +348,7 @@ impl AVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::AVM,
+            vm_create: false,
         }
     }
 
@@ -345,6 +363,7 @@ impl AVMAccount {
             balance: self.balance.clone(),
             nonce: self.nonce.clone(),
             storage_root: self.storage_root.clone(),
+            delta_root: self.delta_root.clone(),
             storage_cache: Self::empty_storage_cache(),
             storage_changes: Self::empty_storage_change(),
             code_hash: self.code_hash.clone(),
@@ -360,6 +379,7 @@ impl AVMAccount {
             address_hash: self.address_hash.clone(),
             empty_but_commit: self.empty_but_commit.clone(),
             account_type: self.account_type.clone(),
+            vm_create: self.vm_create.clone(),
         }
     }
 
@@ -389,6 +409,12 @@ impl AVMAccount {
             self.storage_cache.borrow_mut().insert(k, v);
         }
 
+        // store object graph for avm
+        if self.objectgraph_hash != BLAKE2B_EMPTY {
+            let mut db_tx = DBTransaction::new();
+            db_tx.put(db::COL_EXTRA, &self.objectgraph_hash[..], self.object_graph_cache.clone().as_slice());
+        }
+
         Ok(())
     }
 
@@ -410,6 +436,9 @@ macro_rules! impl_account {
             }
 
             fn init_code(&mut self, code: Bytes) {
+                if self.code_hash == BLAKE2B_EMPTY {
+                    self.vm_create = true;
+                }
                 self.code_hash = blake2b(&code);
                 self.code_cache = Arc::new(code);
                 self.code_size = Some(self.code_cache.len());
@@ -424,8 +453,8 @@ macro_rules! impl_account {
             }
 
             fn init_objectgraph(&mut self, data: Bytes) {
+                self.objectgraph_hash = blake2b(&data);
                 self.object_graph_cache = Arc::new(data);
-                self.code_filth = Filth::Dirty;
             }
 
             fn objectgraph(&self) -> Option<Arc<Bytes>> {
@@ -508,11 +537,16 @@ macro_rules! impl_account {
                     return Some(self.code_cache.clone());
                 }
 
+                println!("update code cache");
                 match db.get(&self.code_hash) {
                     Some(x) => {
-                        self.code_size = Some(x.len());
-                        self.code_cache = Arc::new(x.into_vec());
-                        Some(self.code_cache.clone())
+                        let code_size = x[0..4].to_u32() as usize;
+                        self.code_size = Some(code_size);
+                        self.code_cache = Arc::new(x[4..(4+code_size)].to_vec());
+                        self.transformed_code_cache = Arc::new(x[4+code_size..].to_vec());
+                        // println!("transformed code = {:?}", self.transformed_code_cache);
+                        self.transformed_code_size = Some(x[4+code_size..].len());
+                        Some(Arc::new(x.to_vec()).clone())
                     }
                     _ => {
                         warn!(target: "account","Failed reverse get of {}", self.code_hash);
@@ -566,8 +600,13 @@ macro_rules! impl_account {
                     self.code_cache.pretty()
                 );
 
-                self.code_size = Some(code.len());
-                self.code_cache = code;
+                let code_size = code[0..4].to_u32() as usize;
+                self.code_size = Some(code_size);
+                self.code_cache = Arc::new(code[4..(4+code_size)].to_vec());
+                self.transformed_code_cache = Arc::new(code[4+code_size..].to_vec());
+                // println!("transformed code = {:?}", self.transformed_code_cache);
+                self.transformed_code_size = Some(code[4+code_size..].len());
+                self.transformed_code_hash = blake2b(&code[4+code_size..].to_vec());
             }
 
             fn cache_given_transformed_code(&mut self, code: Arc<Bytes>) {
@@ -700,31 +739,38 @@ macro_rules! impl_account {
                         self.code_filth = Filth::Clean;
                     }
                     (true, false, true) => {
+                        let mut code = Vec::new();
+                        code.append(&mut (self.code_cache.len() as u32).to_vm_bytes());
+                        code.extend(&*self.code_cache);
                         db.emplace(
                             self.code_hash.clone(),
-                            DBValue::from_slice(&*self.code_cache),
+                            DBValue::from_slice(code.as_slice()),
                         );
                         self.code_size = Some(self.code_cache.len());
                         self.code_filth = Filth::Clean;
                     }
                     (true, true, false) => {
+                        let mut code = Vec::new();
+                        code.append(&mut (0 as u32).to_vm_bytes());
+                        code.extend(&*self.transformed_code_cache);
                         db.emplace(
-                            self.transformed_code_hash.clone(),
-                            DBValue::from_slice(&*self.transformed_code_cache),
+                            self.code_hash.clone(),
+                            DBValue::from_slice(code.as_slice()),
                         );
                         self.transformed_code_size = Some(self.transformed_code_cache.len());
                         self.code_filth = Filth::Clean;
                     }
                     (true, false, false) => {
-                        db.emplace(
-                            self.code_hash.clone(),
-                            DBValue::from_slice(&*self.code_cache),
-                        );
+                        let mut code = Vec::new();
+                        code.append(&mut (self.code_cache.len() as u32).to_vm_bytes());
+                        code.extend(&*self.code_cache);
+                        code.extend(&*self.transformed_code_cache);
+                    
                         self.code_size = Some(self.code_cache.len());
 
                         db.emplace(
-                            self.transformed_code_hash.clone(),
-                            DBValue::from_slice(&*self.transformed_code_cache),
+                            self.code_hash.clone(),
+                            DBValue::from_slice(code.as_slice()),
                         );
                         self.transformed_code_size = Some(self.transformed_code_cache.len());
                         self.code_filth = Filth::Clean;
@@ -738,7 +784,13 @@ macro_rules! impl_account {
                 let mut stream = RlpStream::new_list(4);
                 stream.append(&self.nonce);
                 stream.append(&self.balance);
-                stream.append(&self.storage_root);
+                let vm_type: AccType = self.acc_type().into();
+                if vm_type == AccType::AVM {
+                    println!("rlp encode using delta_root");
+                    stream.append(&self.delta_root);
+                } else {
+                    stream.append(&self.storage_root);
+                }
                 stream.append(&self.code_hash);
                 stream.out()
             }
@@ -760,19 +812,39 @@ macro_rules! impl_account {
             /// avm should update object graph cache
             fn update_account_cache<B: Backend>(
                 &mut self,
+                a: &Address,
                 require: RequireCache,
                 state_db: &B,
                 db: &HashStore,
             )
             {
+                // always cache object graph and key/value storage root
+                println!("try to get object graph from: {:?}", self.delta_root);
+                match db.get(&self.delta_root) {
+                    Some(data) => {
+                        self.object_graph_size = Some(data.len());
+                        self.objectgraph_hash = blake2b(&data);
+                        self.object_graph_cache = Arc::new(data[..].to_vec());
+                    },
+                    None => {
+                        self.object_graph_size = None;
+                        self.objectgraph_hash = BLAKE2B_EMPTY;
+                    }
+                }
+
+                if let Some(root) = db.get(a) {
+                    self.storage_root = root[..].into();
+                }
+
                 if let RequireCache::None = require {
                     return;
                 }
 
-                if self.is_cached() && self.is_transformed_cached() && self.is_objectgraph_cached() {
+                if self.is_cached() && self.is_transformed_cached() {
                     return;
                 }
 
+                println!("update code cache");
                 // if there's already code in the global cache, always cache it localy
                 let hash = self.code_hash();
                 match state_db.get_cached_code(&hash) {
@@ -789,47 +861,6 @@ macro_rules! impl_account {
                             }
                             RequireCache::CodeSize => {
                                 self.cache_code_size(db);
-                            }
-                        }
-                    }
-                }
-
-                // if there's already code in the global cache, always cache it localy
-                let hash = self.transformed_code_hash();
-                match state_db.get_cached_code(&hash) {
-                    Some(code) => self.cache_given_transformed_code(code),
-                    None => {
-                        match require {
-                            RequireCache::None => {}
-                            RequireCache::Code => {
-                                if let Some(code) = self.cache_transformed_code(db) {
-                                    // propagate code loaded from the database to
-                                    // the global code cache.
-                                    state_db.cache_code(hash, code)
-                                }
-                            }
-                            RequireCache::CodeSize => {
-                                self.cache_transformed_code_size(db);
-                            }
-                        }
-                    }
-                }
-
-                let hash = self.objectgraph_hash();
-                match state_db.get_cached_code(&hash) {
-                    Some(code) => self.cache_given_objectgraph(code),
-                    None => {
-                        match require {
-                            RequireCache::None => {}
-                            RequireCache::Code => {
-                                if let Some(code) = self.cache_objectgraph(db) {
-                                    // propagate code loaded from the database to
-                                    // the global code cache.
-                                    state_db.cache_code(hash, code)
-                                }
-                            }
-                            RequireCache::CodeSize => {
-                                self.cache_objectgraph_size(db);
                             }
                         }
                     }
@@ -1010,6 +1041,45 @@ impl AVMAccount {
         debug!(target: "vm", "storage_changes ptr = {:?}", raw_changes);
         debug!(target: "vm", "post storage_changes = {:?}", self.storage_changes);
     }
+
+    pub fn update_root(&mut self) {
+        println!("vm_create: {:?}; account type: {:?}", self.vm_create, self.acc_type());
+        let vm_type: AccType = self.acc_type().into();
+        if self.vm_create && vm_type == AccType::AVM {
+            let mut concatenated_root = Vec::new();
+            concatenated_root.extend_from_slice(&self.storage_root[..]);
+            concatenated_root.extend_from_slice(&self.objectgraph_hash[..]);
+            debug!(target: "vm", "concatenated root = {:?}", concatenated_root);
+            self.delta_root = blake2b(&concatenated_root);
+            println!("updated storage root = {:?}, delta_root = {:?}, code hash = {:?}", 
+                self.storage_root, self.delta_root, self.code_hash);
+        }
+    }
+
+    pub fn save_object_graph(&mut self, address: &Address, db: &mut HashStore) {
+        // save object graph
+        println!("hash for object graph = {:?}", self.delta_root);
+        db.emplace(
+            self.delta_root.clone(),
+            DBValue::from_slice(self.object_graph_cache.as_slice()),
+        );
+        // save key/valud storage root
+        db.emplace(
+            address.clone(), 
+            DBValue::from_slice(&self.storage_root[..]));
+    }
+
+    pub fn update_object_graph(&mut self, db: &HashStore) {
+        match db.get(&self.storage_root) {
+            Some(x) => {
+                self.object_graph_size = Some(x.len());
+                self.object_graph_cache = Arc::new(x[..].to_vec());
+            },
+            None => {
+                self.object_graph_size = None;
+            }
+        }
+    }
 }
 
 impl fmt::Debug for FVMAccount {
@@ -1038,6 +1108,8 @@ impl fmt::Debug for AVMAccount {
             .field("balance", &self.balance)
             .field("nonce", &self.nonce)
             .field("code", &self.code())
+            .field("transformed_code", &self.transformed_code())
+            .field("object_graph", &self.objectgraph())
             .field(
                 "storage",
                 &self.storage_changes.iter().collect::<BTreeMap<_, _>>(),

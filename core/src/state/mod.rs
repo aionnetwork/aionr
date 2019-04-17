@@ -50,6 +50,7 @@ use vms::EnvInfo;
 use aion_types::{Address, H128, H256, U256};
 use bytes::Bytes;
 use kvdb::{KeyValueDB, AsHashStore, DBValue, MemoryDBRepository};
+use db::{self, Readable};
 
 use trie;
 use trie::recorder::Recorder;
@@ -276,8 +277,8 @@ impl<B: Backend> State<B> {
             root: root,
             factories: factories,
             kvdb: kvdb,
-            fvm_manager: VMAccountManager::<FVMAccount>::new(account_start_nonce),
-            avm_manager: VMAccountManager::<AVMAccount>::new(account_start_nonce),
+            fvm_manager: VMAccountManager::<FVMAccount>::new(account_start_nonce, 0x01u8),
+            avm_manager: VMAccountManager::<AVMAccount>::new(account_start_nonce, 0x0fu8),
             // avm_mgr: AVMAccMgr::new()
         }
     }
@@ -300,8 +301,8 @@ impl<B: Backend> State<B> {
             root: root,
             factories: factories,
             kvdb: kvdb,
-            fvm_manager: VMAccountManager::<FVMAccount>::new(account_start_nonce),
-            avm_manager:  VMAccountManager::<AVMAccount>::new(account_start_nonce),
+            fvm_manager: VMAccountManager::<FVMAccount>::new(account_start_nonce, 0x01),
+            avm_manager:  VMAccountManager::<AVMAccount>::new(account_start_nonce, 0x0f),
         };
 
         Ok(state)
@@ -321,8 +322,8 @@ impl<B: Backend> State<B> {
             factories: self.factories,
             kvdb: self.kvdb,
 
-            fvm_manager: VMAccountManager::<FVMAccount>::new(self.fvm_manager.account_start_nonce),
-            avm_manager:  VMAccountManager::<AVMAccount>::new(self.avm_manager.account_start_nonce),
+            fvm_manager: VMAccountManager::<FVMAccount>::new(self.fvm_manager.account_start_nonce, 0x01),
+            avm_manager:  VMAccountManager::<AVMAccount>::new(self.avm_manager.account_start_nonce, 0x0f),
             // avm_mgr: AVMAccMgr::new(),
         }
     }
@@ -769,6 +770,7 @@ impl<B: Backend> State<B> {
     /// Get accounts' code. avm specific code (dedundant code saving)
     pub fn transformed_code(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
         debug!(target: "vm", "get transformed code of: {:?}", a);
+        println!("get transformed code of: {:?}", a);
         return self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::Code, true, |a| {
             a.as_ref().map_or(None, |a| a.transformed_code().clone())
         });
@@ -1283,6 +1285,11 @@ impl<B: Backend> State<B> {
                     if !account.is_null() {
                         account
                             .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
+                        if account.transformed_code_hash() != BLAKE2B_EMPTY {
+                            println!("update storage root");
+                            account.update_root();
+                            account.save_object_graph(address, account_db.as_hashstore_mut());
+                        }
                     } else if !account.storage_changes().is_empty()
                     {
                         account.discard_storage_changes();
@@ -1457,7 +1464,7 @@ impl<B: Backend> State<B> {
                     .factories
                     .accountdb
                     .readonly(self.db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(require, &self.db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
                 return Ok(f(Some(account)));
             }
             return Ok(f(None));
@@ -1469,7 +1476,7 @@ impl<B: Backend> State<B> {
                     .factories
                     .accountdb
                     .readonly(self.db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(require, &self.db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
             }
             f(acc.map(|a| &*a))
         });
@@ -1493,6 +1500,7 @@ impl<B: Backend> State<B> {
                         .accountdb
                         .readonly(self.db.as_hashstore(), account.address_hash(a));
                     account.update_account_cache(
+                        a,
                         require,
                         &self.db,
                         accountdb.as_hashstore(),
@@ -1525,7 +1533,7 @@ impl<B: Backend> State<B> {
                     .factories
                     .accountdb
                     .readonly(self.db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(require, &self.db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
                 return Ok(f(Some(account)));
             }
             return Ok(f(None));
@@ -1537,7 +1545,7 @@ impl<B: Backend> State<B> {
                     .factories
                     .accountdb
                     .readonly(self.db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(require, &self.db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
             }
             f(acc.map(|a| &*a))
         });
@@ -1561,6 +1569,7 @@ impl<B: Backend> State<B> {
                         .accountdb
                         .readonly(self.db.as_hashstore(), account.address_hash(a));
                     account.update_account_cache(
+                        a,
                         require,
                         &self.db,
                         accountdb.as_hashstore(),
@@ -1649,6 +1658,7 @@ impl<B: Backend> State<B> {
                             .accountdb
                             .readonly(self.db.as_hashstore(), addr_hash);
                         account.update_account_cache(
+                            a,
                             RequireCache::Code,
                             &self.db,
                             accountdb.as_hashstore(),
@@ -1716,6 +1726,7 @@ impl<B: Backend> State<B> {
                             .accountdb
                             .readonly(self.db.as_hashstore(), addr_hash);
                         account.update_account_cache(
+                            a,
                             RequireCache::Code,
                             &self.db,
                             accountdb.as_hashstore(),
@@ -1819,8 +1830,8 @@ impl Clone for State<StateDB> {
             root: self.root.clone(),
             factories: self.factories.clone(),
             kvdb: self.kvdb.clone(),
-            fvm_manager: VMAccountManager::<FVMAccount>::new_with_cache(cache, self.fvm_manager.account_start_nonce.clone()),
-            avm_manager: VMAccountManager::<AVMAccount>::new_with_cache(cache2, self.avm_manager.account_start_nonce.clone()),
+            fvm_manager: VMAccountManager::<FVMAccount>::new_with_cache(cache, self.fvm_manager.account_start_nonce.clone(), 0x01),
+            avm_manager: VMAccountManager::<AVMAccount>::new_with_cache(cache2, self.avm_manager.account_start_nonce.clone(), 0x0f),
         }
     }
 }

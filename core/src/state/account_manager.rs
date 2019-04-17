@@ -128,6 +128,7 @@ where T: VMAccount
     // The original account is preserved in
     pub checkpoints: RefCell<Vec<HashMap<Address, Option<AccountEntry<T>>>>>,
     pub account_start_nonce: U256,
+    pub mgr_type: u8,
 }
 
 pub trait AccountCacheOps<T>
@@ -137,6 +138,10 @@ where T: VMAccount
     fn insert_cache(&self, address: &Address, account: AccountEntry<T>);
     ///
     fn note_cache(&self, address: &Address);
+
+    fn remove_cache(&self, address: &Address);
+
+    fn try_remove(&self, address: &Address);
 }
 
 impl<T: VMAccount> AccountCacheOps<T> for VMAccountManager<T> {
@@ -165,22 +170,40 @@ impl<T: VMAccount> AccountCacheOps<T> for VMAccountManager<T> {
             });
         }
     }
+
+    fn remove_cache(&self, address: &Address) {
+        self.cache.borrow_mut().remove(&*address);
+    }
+
+    fn try_remove(&self, address: &Address) {
+        let cache = self.cache.borrow_mut();
+        let acc = cache.get(address);
+        if let Some(acc) = acc {
+            if let Some(ref maybe_acc) = acc.account {
+                if maybe_acc.acc_type() != self.mgr_type.into() {
+                    self.remove_cache(address);
+                }
+            }       
+        }
+    }
 }
 
 impl<T: VMAccount> VMAccountManager<T> {
-    pub fn new(account_start_nonce: U256) -> Self {
+    pub fn new(account_start_nonce: U256, id: u8) -> Self {
         Self {
             cache: RefCell::new(HashMap::new()),
             checkpoints: RefCell::new(Vec::new()),
             account_start_nonce: account_start_nonce,
+            mgr_type: id,
         }
     }
 
-    pub fn new_with_cache(cache: HashMap<Address, AccountEntry<T>>, account_start_nonce: U256) -> Self {
+    pub fn new_with_cache(cache: HashMap<Address, AccountEntry<T>>, account_start_nonce: U256, id: u8) -> Self {
         Self {
             cache: RefCell::new(cache),
             checkpoints: RefCell::new(Vec::new()),
             account_start_nonce: account_start_nonce,
+            mgr_type: id,
         }
     }
 }
@@ -210,7 +233,7 @@ impl VMAccountManager<FVMAccount> {
                 let accountdb = factories
                     .accountdb
                     .readonly(db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(require, db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, db, accountdb.as_hashstore());
                 return Ok(f(Some(account)));
             }
             return Ok(f(None));
@@ -223,7 +246,7 @@ impl VMAccountManager<FVMAccount> {
                 let accountdb = factories
                     .accountdb
                     .readonly(db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(require, db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, db, accountdb.as_hashstore());
             }
             f(acc.map(|a| &*a))
         });
@@ -244,13 +267,12 @@ impl VMAccountManager<FVMAccount> {
                 let mut maybe_acc = state_db.get_with(a, FVMAccount::from_rlp)?;
                 debug!(target: "vm", "maybe account = {:?}", maybe_acc);
                 if let Some(ref mut account) = maybe_acc.as_mut() {
-                    if account.account_type != AccType::FVM {
-                        return Err(Box::new(TrieError::IncompleteDatabase(root)));
-                    }
                     let accountdb = factories
                         .accountdb
                         .readonly(db.as_hashstore(), account.address_hash(a));
+                    println!("account code hash = {:?}", account.code_hash());
                     account.update_account_cache(
+                        a,
                         require,
                         db,
                         accountdb.as_hashstore(),
@@ -285,7 +307,7 @@ impl VMAccountManager<AVMAccount> {
                 let accountdb = factories
                     .accountdb
                     .readonly(db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(require, db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, db, accountdb.as_hashstore());
                 return Ok(f(Some(account)));
             }
             return Ok(f(None));
@@ -298,7 +320,7 @@ impl VMAccountManager<AVMAccount> {
                 let accountdb = factories
                     .accountdb
                     .readonly(db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(require, db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, db, accountdb.as_hashstore());
             }
             f(acc.map(|a| &*a))
         });
@@ -318,13 +340,11 @@ impl VMAccountManager<AVMAccount> {
                 debug!(target: "vm", "search avm account in database: {:?}", a);
                 let mut maybe_acc = state_db.get_with(a, AVMAccount::from_rlp)?;
                 if let Some(ref mut account) = maybe_acc.as_mut() {
-                    if account.account_type != AccType::AVM {
-                        return Err(Box::new(TrieError::IncompleteDatabase(root)));
-                    }
                     let accountdb = factories
                         .accountdb
                         .readonly(db.as_hashstore(), account.address_hash(a));
                     account.update_account_cache(
+                        a,
                         require,
                         db,
                         accountdb.as_hashstore(),

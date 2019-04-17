@@ -21,6 +21,15 @@ impl From<U256> for AccType {
     }
 }
 
+impl From<u8> for AccType {
+    fn from(t: u8) -> AccType {
+        match t {
+            0x01 => AccType::FVM,
+            _ => AccType::AVM,
+        }
+    }
+}
+
 impl From<AccType> for U256 {
     fn from(t: AccType) -> U256 {
         match t {
@@ -145,6 +154,7 @@ pub trait VMAccount: Sync + Send {
 
     fn update_account_cache<B: Backend>(
         &mut self,
+        a: &Address,
         require: RequireCache,
         state_db: &B,
         db: &HashStore,
