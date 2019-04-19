@@ -32,16 +32,19 @@ use sync::*;
 
 #[test]
 fn benchtest_sync_mainnet() {
+    remove_test_db("./sync_mainnet/");
     let test_spec = new_spec();
     let client = get_client(&test_spec);
+    let header_chain = get_header_chain("./sync_mainnet/", &test_spec);
 
     let sync_config = SyncConfig::default();
     let net_config = get_network_config();
 
     let sync = Sync::get_instance(Params {
         config: sync_config,
-        client: client.clone() as Arc<BlockChainClient>,
+        client: client.clone(),
         network_config: net_config,
+        header_chain: header_chain,
     });
 
     let (sync_provider, network_manager, _chain_notify) = (
@@ -87,7 +90,7 @@ fn benchtest_sync_mainnet() {
         for node in active_nodes.iter() {
             let duration = node.last_request_timestamp.elapsed().unwrap();
             println!(
-                "{}\t{}\t{}\t\t{}\t\t{}\t{}\t{:#?}",
+                "{}\t{}\t{}\t\t{}\t\t{}\t{:#?}",
                 node.get_ip_addr(),
                 node.is_from_boot_list,
                 node.best_block_num,
@@ -106,7 +109,7 @@ fn benchtest_sync_mainnet() {
         "[benchtest_sync_mainnet] Duration of sync 1000 blocks(ms): {:#?}",
         duration.subsec_millis() as u64 + duration.as_secs() * 1000
     );
-    assert!(duration < Duration::from_secs(110));
+    assert!(duration < Duration::from_secs(70));
 
     let chain_info = client.chain_info();
     assert!(chain_info.best_block_number >= 1000);
@@ -115,11 +118,13 @@ fn benchtest_sync_mainnet() {
         block_1000.hash()
             == H256::from("0x765baf520b24fb81f95d2f7f9fa28069a203b372f66401f947c5e5a62735bb22")
     );
+    remove_test_db("./sync_mainnet/")
 }
 
 #[test]
 fn benchtest_sync_storage_get_client() {
-    init_sync_storage();
+    remove_test_db("./sync_storage_get_client/");
+    init_sync_storage("./sync_storage_get_client/");
     let start_time = SystemTime::now();
 
     let mut threads = Vec::new();
@@ -142,11 +147,13 @@ fn benchtest_sync_storage_get_client() {
     );
 
     assert!(duration < Duration::from_secs(1));
+    remove_test_db("./sync_storage_get_client/");
 }
 
 #[test]
 fn benchtest_sync_storage_get_block_chain() {
-    init_sync_storage();
+    remove_test_db("./sync_storage_get_block_chain/");
+    init_sync_storage("./sync_storage_get_block_chain/");
     let start_time = SystemTime::now();
 
     let mut threads = Vec::new();
@@ -168,14 +175,13 @@ fn benchtest_sync_storage_get_block_chain() {
         duration.subsec_millis() as u64 + duration.as_secs() * 1000
     );
     assert!(duration < Duration::from_secs(1));
+    remove_test_db("./sync_storage_get_block_chain/");
 }
 
 #[test]
 fn benchtest_sync_storage_get_chain_info() {
-    init_sync_storage();
-    let test_spec = new_spec();
-    let client = get_client(&test_spec);
-    SyncStorage::init(client.clone() as Arc<BlockChainClient>);
+    remove_test_db("./sync_storage_get_chain_info/");
+    init_sync_storage("./sync_storage_get_chain_info/");
 
     let start_time = SystemTime::now();
 
@@ -198,11 +204,13 @@ fn benchtest_sync_storage_get_chain_info() {
         duration.subsec_millis() as u64 + duration.as_secs() * 1000
     );
     assert!(duration < Duration::from_secs(1));
+    remove_test_db("./sync_storage_get_chain_info/");
 }
 
 #[test]
 fn benchtest_sync_storage_synced_block_number() {
-    init_sync_storage();
+    remove_test_db("./sync_storage_synced_block_number/");
+    init_sync_storage("./sync_storage_synced_block_number/");
     let start_time = SystemTime::now();
 
     let mut threads = Vec::new();
@@ -224,5 +232,6 @@ fn benchtest_sync_storage_synced_block_number() {
         "[benchtest_sync_storage_get_synced_block_number] Duration of 500000 sets/gets: {:#?}",
         duration.subsec_millis() as u64 + duration.as_secs() * 1000
     );
-    assert!(duration < Duration::from_secs(1));
+    assert!(duration < Duration::from_secs(2));
+    remove_test_db("./sync_storage_synced_block_number/");
 }

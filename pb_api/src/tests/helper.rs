@@ -20,10 +20,12 @@
  ******************************************************************************/
 
 use acore::client::{Client, ClientConfig, BlockChainClient};
+use acore::client::header_chain::HeaderChain;
 use aion_rpc::impls::EthClient;
 use acore::spec::Spec;
 use kvdb::{MockDbRepository, KeyValueDB};
 use std::sync::Arc;
+use std::path::Path;
 use acore::db;
 use acore::miner::Miner;
 use acore::miner::external::ExternalMiner;
@@ -72,11 +74,12 @@ fn new_client(spec: &Spec, miner: Arc<Miner>) -> Arc<Client> {
     .unwrap()
 }
 
-fn new_sync(client: Arc<Client>) -> Arc<Sync> {
+fn new_sync(client: Arc<Client>, header_chain: Arc<HeaderChain>) -> Arc<Sync> {
     Sync::get_instance(Params {
         config: SyncConfig::default(),
         client: client.clone(),
         network_config: NetworkConfig::default(),
+        header_chain: header_chain,
     })
 }
 
@@ -85,12 +88,13 @@ pub fn api_process_instance() -> ApiProcess {
     let io_service = IoService::<TxIoMessage>::start().unwrap();
     let miner = new_miner(&spec, io_service.channel());
     let client = new_client(&spec, miner.clone());
+    let header_chain = get_header_chain(&spec);
     // import a block
     let _ = client.import_block(ENCODEBLOCK.to_vec()).unwrap();
     // commit block
     ::std::thread::sleep(::std::time::Duration::from_millis(1000));
     client.import_verified_blocks();
-    let sync = new_sync(client.clone());
+    let sync = new_sync(client.clone(), header_chain);
     // start net work
     let net_manager: Arc<NetworkManager> = sync.clone();
     net_manager.start_network();
@@ -102,7 +106,18 @@ pub fn api_process_instance() -> ApiProcess {
         &Arc::new(ExternalMiner::default()),
         Default::default(),
     ));
+    remove_test_db();
     ApiProcess::new(ethclient.clone(), io_service)
+}
+
+pub fn get_header_chain(spec: &Spec) -> Arc<HeaderChain> {
+    let header_chain = HeaderChain::new(&Path::new("./test_db/"), spec).unwrap();
+    return Arc::new(header_chain);
+}
+
+pub fn remove_test_db() {
+    let path = Path::new("./test_db/");
+    ::std::fs::remove_dir_all(path);
 }
 
 static ENCODEBLOCK: &[u8] = &[

@@ -19,13 +19,15 @@
  *
  ******************************************************************************/
 
-use acore::client::{BlockChainClient, Client, ClientConfig};
+use acore::client::{Client, ClientConfig};
 use acore::db;
 use acore::miner::Miner;
 use acore::spec::Spec;
 use acore_io::IoChannel;
 use kvdb::{KeyValueDB, MockDbRepository};
 use std::sync::Arc;
+use acore::client::header_chain::HeaderChain;
+use std::path::Path;
 
 use p2p::NetworkConfig;
 use sync::storage::SyncStorage;
@@ -84,10 +86,11 @@ pub fn get_network_config() -> NetworkConfig {
     net_config
 }
 
-pub fn init_sync_storage() {
+pub fn init_sync_storage(path: &str) {
     let spec = new_spec();
     let client = get_client(&spec);
-    SyncStorage::init(client.clone() as Arc<BlockChainClient>);
+    let header_chain = get_header_chain(path, &spec);
+    SyncStorage::init(client.clone(), header_chain);
 }
 
 pub fn get_client(spec: &Spec) -> Arc<Client> {
@@ -101,4 +104,14 @@ pub fn get_client(spec: &Spec) -> Arc<Client> {
         channel.clone(),
     )
     .unwrap()
+}
+
+pub fn get_header_chain(path: &str, spec: &Spec) -> Arc<HeaderChain> {
+    let header_chain = HeaderChain::new(&Path::new(path), spec).unwrap();
+    return Arc::new(header_chain);
+}
+
+pub fn remove_test_db(path: &str) {
+    let path = Path::new(path);
+    let _ = ::std::fs::remove_dir_all(path);
 }

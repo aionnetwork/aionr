@@ -25,9 +25,9 @@ const MIN_BC_CACHE_MB: u32 = 4;
 const MIN_DB_CACHE_MB: u32 = 8;
 const MIN_BLOCK_QUEUE_SIZE_LIMIT_MB: u32 = 16;
 //const DEFAULT_DB_CACHE_SIZE: u32 = 128;
-const DEFAULT_BC_CACHE_SIZE: u32 = 8;
-const DEFAULT_BLOCK_QUEUE_SIZE_LIMIT_MB: u32 = 40;
-const DEFAULT_STATE_CACHE_SIZE: u32 = 25;
+const DEFAULT_BC_CACHE_SIZE: u32 = 32;
+const DEFAULT_BLOCK_QUEUE_SIZE_LIMIT_MB: u32 = 128;
+const DEFAULT_STATE_CACHE_SIZE: u32 = 64;
 
 /// Configuration for application cache sizes.
 /// All    values are represented in MB.
@@ -103,7 +103,7 @@ mod tests {
         let config = CacheConfig::new_with_total_cache_size(60 /*200*/);
         //        assert_eq!(config.db, 140);
         assert_eq!(config.blockchain(), 20);
-        assert_eq!(config.queue(), 40);
+        assert_eq!(config.queue(), 128);
         assert_eq!(config.state(), 30);
         assert_eq!(config.jump_tables(), 10);
     }

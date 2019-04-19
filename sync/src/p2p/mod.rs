@@ -266,7 +266,7 @@ impl P2pMgr {
         }
     }
 
-    pub fn remove_peer(node_hash: u64) -> Option<Node> {
+    pub fn remove_peer(node_hash: u64) {
         {
             let mut sockets_map = SOCKETS_MAP.lock();
             if let Some(socket) = sockets_map.remove(&node_hash) {
@@ -281,8 +281,6 @@ impl P2pMgr {
                 debug!(target: "net", "remove_peer， peer_node {}@{}, node_hash: {}", node.get_node_id(), node.get_ip_addr(), node_hash);
             }
         }
-
-        None
     }
 
     pub fn add_node(node: Node) {
