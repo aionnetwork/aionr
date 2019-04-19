@@ -50,7 +50,7 @@ impl BlockBodiesHandler {
 
         let header_chain = SyncStorage::get_block_header_chain();
         let mut best_header_number = header_chain.best_block().number;
-        let mut best_block_number = SyncStorage::get_chain_info().best_block_number;
+        let mut best_block_number = SyncStorage::get_synced_block_number();
         let mut headers = Vec::new();
         let mut number;
 
@@ -182,20 +182,18 @@ impl BlockBodiesHandler {
                 let block_bodies = UntrustedRlp::new(req.body.as_slice());
                 let header_chain = SyncStorage::get_block_header_chain();
                 if let Ok(item_count) = block_bodies.item_count() {
-                    let count = if hashes.len() < item_count {
-                        hashes.len()
-                    } else {
-                        if item_count > 0 {
-                            item_count
-                        } else {
-                            debug!(target: "sync", "Body res is empty");
-                            return;
-                        }
-                    };
+                    if item_count > hashes.len() || item_count == 0 {
+                        warn!(target: "sync", "Invalid BLOCKSBODIESRES with {} bodies", item_count);
+                        SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesRes);
+                        P2pMgr::update_node(node_hash, node);
+                        return;
+                    }
+
                     let block_chain = SyncStorage::get_block_chain();
-                    let batch_status = block_chain.block_status(BlockId::Hash(hashes[count - 1]));
+                    let batch_status =
+                        block_chain.block_status(BlockId::Hash(hashes[item_count - 1]));
                     if batch_status == BlockStatus::Unknown {
-                        for i in 0..count {
+                        for i in 0..item_count {
                             let hash = hashes[i];
                             let status = block_chain.block_status(BlockId::Hash(hash));
                             if status == BlockStatus::Unknown {
@@ -247,9 +245,8 @@ impl BlockBodiesHandler {
                                                         P2pMgr::remove_peer(node.node_hash);
                                                         return;
                                                     } else {
-                                                        if header_chain
-                                                            .block_hash(BlockId::Hash(parent_hash))
-                                                            .is_some()
+                                                        if header_chain.status(&parent_hash)
+                                                            == BlockStatus::InChain
                                                         {
                                                             if number > 1 {
                                                                 debug!(target: "sync", "Try to get parent block : #{} - {} - {}", number - 1, parent_hash, node.synced_block_num);
@@ -295,7 +292,7 @@ impl BlockBodiesHandler {
                             }
                         }
                     } else {
-                        debug!(target: "sync", "BLOCKSBODIESRES from: {}, batch_status: {:?}, {:?}.", node.get_ip_addr(), batch_status, block_chain.block_number(BlockId::Hash(hashes[count - 1])));
+                        debug!(target: "sync", "BLOCKSBODIESRES from: {}, batch_status: {:?}, {:?}.", node.get_ip_addr(), batch_status, block_chain.block_number(BlockId::Hash(hashes[item_count - 1])));
                         SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesRes);
                         P2pMgr::update_node(node_hash, node);
                         return;

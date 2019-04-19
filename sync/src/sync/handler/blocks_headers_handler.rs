@@ -25,6 +25,7 @@ use acore_bytes::to_hex;
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use kvdb::DBTransaction;
+use parking_lot::Mutex;
 use rlp::{RlpStream, UntrustedRlp};
 use std::mem;
 use std::time::{Duration, SystemTime};
@@ -35,6 +36,10 @@ use super::super::storage::SyncStorage;
 use super::blocks_bodies_handler::BlockBodiesHandler;
 
 use p2p::*;
+
+lazy_static! {
+    static ref DB_TRANSACTION: Mutex<DBTransaction> = { Mutex::new(DBTransaction::new()) };
+}
 
 const REQUEST_SIZE: u64 = 32;
 
@@ -177,73 +182,76 @@ impl BlockHeadersHandler {
                 number = header.number();
                 let parent_hash = header.parent_hash();
 
-                if header_chain.status(parent_hash) == BlockStatus::InChain {
-                    if header_chain.status(&hash) != BlockStatus::InChain {
-                        if !is_side_chain {
-                            let chain_info = SyncStorage::get_chain_info();
-                            if number < chain_info.best_block_number {
-                                is_side_chain = if node.target_total_difficulty
-                                    >= SyncStorage::get_network_total_diff()
-                                {
-                                    true
-                                } else {
-                                    false
-                                };
-                            }
-                        }
+                {
+                    let mut tx = DB_TRANSACTION.lock().clone();
 
-                        let mut tx = DBTransaction::new();
-                        let mut total_difficulty = header_chain.score(BlockId::Hash(*parent_hash));
-                        if total_difficulty.is_none() {
-                            total_difficulty =
-                                block_chain.block_total_difficulty(BlockId::Hash(*parent_hash));
-                        }
-                        if let Some(total_difficulty) = total_difficulty {
-                            if let Ok(pending) = header_chain.insert_with_td(
-                                &mut tx,
-                                &header.encoded(),
-                                Some(total_difficulty + *header.difficulty()),
-                                None,
-                                is_side_chain,
-                            ) {
-                                header_chain.apply_pending(tx, pending);
-                                if block_chain.block_status(BlockId::Hash(hash))
-                                    != BlockStatus::InChain
-                                {
-                                    hashes.push(hash);
+                    if header_chain.status(parent_hash) == BlockStatus::InChain {
+                        if header_chain.status(&hash) != BlockStatus::InChain {
+                            if !is_side_chain {
+                                if number < SyncStorage::get_synced_block_number() {
+                                    is_side_chain = if node.target_total_difficulty
+                                        >= SyncStorage::get_network_total_diff()
+                                    {
+                                        true
+                                    } else {
+                                        false
+                                    };
                                 }
-                                info!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
                             }
-                        } else {
-                            warn!(target: "sync", "Late coming block header #{} - {} from {}@{}, {}.", number, hash, node.get_ip_addr(), node.get_node_id(), is_side_chain);
-                        }
-                    }
 
-                    if is_side_chain {
-                        from = number + 1;
-                        if node.synced_block_num == 0 {
-                            node.synced_block_num = number;
-                        }
-                    }
-                } else {
-                    if number <= header_chain.best_block().number {
-                        if node.target_total_difficulty >= SyncStorage::get_network_total_diff() {
-                            if header_chain.status(parent_hash) != BlockStatus::InChain
-                                && header_chain.status(&hash) != BlockStatus::InChain
-                            {
-                                info!(target: "sync", "Side chain found from {}@{}, #{} - {} with parent #{} - {}.", node.get_ip_addr(), node.get_node_id(), number, hash, number - 1, parent_hash);
-                                from = if number > REQUEST_SIZE {
-                                    number - REQUEST_SIZE
-                                } else {
-                                    1
-                                };
-                                node.requested_block_num = 0;
-                                break;
+                            let mut total_difficulty =
+                                header_chain.score(BlockId::Hash(*parent_hash));
+                            if total_difficulty.is_none() {
+                                total_difficulty =
+                                    block_chain.block_total_difficulty(BlockId::Hash(*parent_hash));
+                            }
+                            if let Some(total_difficulty) = total_difficulty {
+                                if let Ok(num) = header_chain.insert_with_td(
+                                    tx,
+                                    &header.encoded(),
+                                    Some(total_difficulty + *header.difficulty()),
+                                    None,
+                                    is_side_chain,
+                                ) {
+                                    if block_chain.block_status(BlockId::Hash(hash))
+                                        != BlockStatus::InChain
+                                    {
+                                        hashes.push(hash);
+                                    }
+                                    info!(target: "sync", "New block header #{} - {}, imported from {}@{}.", num, hash, node.get_ip_addr(), node.get_node_id());
+                                }
+                            } else {
+                                warn!(target: "sync", "Late coming block header #{} - {} from {}@{}, {}.", number, hash, node.get_ip_addr(), node.get_node_id(), is_side_chain);
                             }
                         }
-                        SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
-                        P2pMgr::update_node(node_hash, node);
-                        return;
+
+                        if is_side_chain {
+                            from = number + 1;
+                            if node.synced_block_num == 0 {
+                                node.synced_block_num = number;
+                            }
+                        }
+                    } else {
+                        if number <= header_chain.best_block().number {
+                            if node.target_total_difficulty >= SyncStorage::get_network_total_diff()
+                            {
+                                if header_chain.status(parent_hash) != BlockStatus::InChain
+                                    && header_chain.status(&hash) != BlockStatus::InChain
+                                {
+                                    info!(target: "sync", "Side chain found from {}@{}, #{} - {} with parent #{} - {}.", node.get_ip_addr(), node.get_node_id(), number, hash, number - 1, parent_hash);
+                                    from = if number > REQUEST_SIZE {
+                                        number - REQUEST_SIZE
+                                    } else {
+                                        1
+                                    };
+                                    node.requested_block_num = 0;
+                                    break;
+                                }
+                            }
+                            SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
+                            P2pMgr::update_node(node_hash, node);
+                            return;
+                        }
                     }
                 }
 
@@ -258,6 +266,8 @@ impl BlockHeadersHandler {
                 return;
             }
         }
+
+        // header_chain.flush();
 
         if is_side_chain && hashes.len() > 0 {
             BlockBodiesHandler::send_blocks_bodies_req(node, hashes);

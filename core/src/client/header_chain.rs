@@ -303,11 +303,7 @@ impl HeaderChain {
             };
 
             let mut tx = DBTransaction::new();
-            if let Ok(pending) =
-                chain.insert(&mut tx, &spec.genesis_header().encoded(), None, false)
-            {
-                chain.apply_pending(tx, pending);
-            }
+            let _ = chain.insert(tx, &spec.genesis_header().encoded(), None, false);
 
             chain
         };
@@ -342,11 +338,11 @@ impl HeaderChain {
     /// the header.
     pub fn insert(
         &self,
-        transaction: &mut DBTransaction,
+        mut transaction: DBTransaction,
         header: &encoded::Header,
         transition_proof: Option<Vec<u8>>,
         is_force_reorg: bool,
-    ) -> Result<PendingChanges, String>
+    ) -> Result<u64, String>
     {
         self.insert_inner(transaction, header, None, transition_proof, is_force_reorg)
     }
@@ -356,12 +352,12 @@ impl HeaderChain {
     /// This blindly trusts that the data given to it is sensible.
     pub fn insert_with_td(
         &self,
-        transaction: &mut DBTransaction,
+        mut transaction: DBTransaction,
         header: &encoded::Header,
         total_difficulty: Option<U256>,
         transition_proof: Option<Vec<u8>>,
         is_force_reorg: bool,
-    ) -> Result<PendingChanges, String>
+    ) -> Result<u64, String>
     {
         self.insert_inner(
             transaction,
@@ -374,12 +370,12 @@ impl HeaderChain {
 
     fn insert_inner(
         &self,
-        transaction: &mut DBTransaction,
+        mut transaction: DBTransaction,
         header: &encoded::Header,
         total_difficulty: Option<U256>,
         transition_proof: Option<Vec<u8>>,
         is_force_reorg: bool,
-    ) -> Result<PendingChanges, String>
+    ) -> Result<u64, String>
     {
         let hash = header.hash();
         let number = header.number();
@@ -600,16 +596,12 @@ impl HeaderChain {
             let curr = BestAndLatest::new(best_num, latest_num);
             transaction.put(COL, CURRENT_KEY, &::rlp::encode(&curr))
         }
-        Ok(pending)
-    }
 
-    /// Apply pending changes from a previous `insert` operation.
-    /// Must be done before the next `insert` call.
-    pub fn apply_pending(&self, tx: DBTransaction, pending: PendingChanges) {
-        let _ = self.db.write_buffered(tx);
+        let _ = self.db.write_buffered(transaction);
         if let Some(best_block) = pending.best_block {
             *self.best_block.write() = best_block;
         }
+        Ok(header.number())
     }
 
     /// Flush db

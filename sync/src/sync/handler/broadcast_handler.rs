@@ -106,15 +106,15 @@ impl BroadcastsHandler {
                             block_chain.block_total_difficulty(BlockId::Hash(parent_hash))
                         {
                             let mut tx = DBTransaction::new();
-                            if let Ok(pending) = header_chain.insert_with_td(
-                                &mut tx,
+                            if let Ok(num) = header_chain.insert_with_td(
+                                tx,
                                 &header,
                                 Some(total_difficulty + header.difficulty()),
                                 None,
                                 false,
                             ) {
-                                header_chain.apply_pending(tx, pending);
-                                debug!(target: "sync", "New block header #{} - {}, imported from local.", header.number(), block_hash);
+                                header_chain.flush();
+                                debug!(target: "sync", "New block header #{} - {}, imported from local.", num, block_hash);
                             }
                         }
                     }
@@ -168,15 +168,15 @@ impl BroadcastsHandler {
                             block_chain.block_total_difficulty(BlockId::Hash(*parent_hash))
                         {
                             let mut tx = DBTransaction::new();
-                            if let Ok(pending) = header_chain.insert_with_td(
-                                &mut tx,
+                            if let Ok(num) = header_chain.insert_with_td(
+                                tx,
                                 &header.encoded(),
                                 Some(total_difficulty + *header.difficulty()),
                                 None,
                                 false,
                             ) {
-                                header_chain.apply_pending(tx, pending);
-                                debug!(target: "sync", "New block header #{} - {}, imported from {}@{}.", number, hash, node.get_ip_addr(), node.get_node_id());
+                                header_chain.flush();
+                                debug!(target: "sync", "New block header #{} - {}, imported from {}@{}.", num, hash, node.get_ip_addr(), node.get_node_id());
                             }
                         }
                     }

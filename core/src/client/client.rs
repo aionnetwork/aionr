@@ -313,7 +313,7 @@ impl Client {
     }
     /// Flush the block import queue.
     pub fn flush_queue(&self) {
-        //self.block_queue.flush();
+        self.block_queue.flush();
         while !self.block_queue.queue_info().is_empty() {
             self.import_verified_blocks();
         }

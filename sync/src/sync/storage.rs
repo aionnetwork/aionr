@@ -21,13 +21,12 @@
 
 use acore::block::Block;
 use acore::client::{
-    BlockChainClient, BlockChainInfo, BlockQueueInfo, Client, header_chain::HeaderChain
+    header_chain::HeaderChain, BlockChainClient, BlockChainInfo, BlockQueueInfo, Client,
 };
 use acore::header::Header as BlockHeader;
 use aion_types::{H256, U256};
 use lru_cache::LruCache;
 use parking_lot::{Mutex, RwLock};
-use rlp::RlpStream;
 use state::Storage;
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
@@ -36,9 +35,15 @@ use std::time::SystemTime;
 use tokio::runtime::{Builder, Runtime, TaskExecutor};
 
 lazy_static! {
-    static ref BLOCK_CHAIN: Storage<RwLock<BlockChain>> = Storage::new();
-    static ref BLOCK_HEADER_CHAIN: Storage<RwLock<BlockHeaderChain>> = Storage::new();
-    static ref SYNC_EXECUTORS: Storage<RwLock<SyncExecutor>> = Storage::new();
+    static ref BLOCK_CHAIN: RwLock<BlockChain> = RwLock::new(BlockChain {
+        inner: None
+    });
+    static ref BLOCK_HEADER_CHAIN: RwLock<BlockHeaderChain> = RwLock::new(BlockHeaderChain {
+        inner: None
+    });
+    static ref SYNC_EXECUTORS: RwLock<SyncExecutor> = RwLock::new(SyncExecutor {
+        inner: None
+    });
     static ref LOCAL_STATUS: RwLock<LocalStatus> = RwLock::new(LocalStatus::new());
     static ref NETWORK_STATUS: RwLock<NetworkStatus> = RwLock::new(NetworkStatus::new());
     static ref HEADERS_WITH_BODIES_REQUESTED: Storage<Mutex<HashMap<u64, Vec<H256>>>> =
@@ -46,7 +51,6 @@ lazy_static! {
     static ref REQUESTED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, SystemTime>>> = Storage::new();
     static ref SENT_TRANSACTION_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
     static ref RECEIVED_TRANSACTIONS: Storage<Mutex<VecDeque<Vec<u8>>>> = Storage::new();
-    static ref STAGED_BLOCKS: Storage<Mutex<LruCache<H256, Vec<RlpStream>>>> = Storage::new();
 }
 
 const MAX_CACHED_TRANSACTION_HASHES: usize = 20480;
@@ -74,59 +78,29 @@ pub struct SyncStorage;
 
 impl SyncStorage {
     pub fn init(client: Arc<Client>, header_chain: Arc<HeaderChain>) {
-        if let Some(_) = BLOCK_CHAIN.try_get() {
-            let mut block_chain = BLOCK_CHAIN.get().write();
-            if let Some(_) = block_chain.inner {
-            } else {
-                block_chain.inner = Some(client);
-            }
-        } else {
-            let block_chain = BlockChain {
-                inner: Some(client),
-            };
+        let sync_executor = Arc::new(
+            Builder::new()
+                .core_threads(20)
+                .name_prefix("SYNC-Task")
+                .build()
+                .expect("SYNC_RUNTIME error."),
+        );
 
-            let block_header_chain = BlockHeaderChain {
-                inner: Some(header_chain),
-            };
-
-            let sync_executor = SyncExecutor {
-                inner: Some(Arc::new(
-                    Builder::new()
-                        .core_threads(10)
-                        .name_prefix("SYNC-Task")
-                        .build()
-                        .expect("SYNC_RUNTIME error."),
-                )),
-            };
-
-            let mut requested_block_hashes = LruCache::new(MAX_CACHED_BLOCK_HASHES);
-            let mut sent_transaction_hases = LruCache::new(MAX_CACHED_TRANSACTION_HASHES);
-            let mut received_transactions = VecDeque::new();
-            let mut staged_blocks = LruCache::new(MAX_CACHED_BLOCK_HASHES);
-
-            HEADERS_WITH_BODIES_REQUESTED.set(Mutex::new(HashMap::new()));
-            REQUESTED_BLOCK_HASHES.set(Mutex::new(requested_block_hashes));
-            SENT_TRANSACTION_HASHES.set(Mutex::new(sent_transaction_hases));
-            RECEIVED_TRANSACTIONS.set(Mutex::new(received_transactions));
-            STAGED_BLOCKS.set(Mutex::new(staged_blocks));
-            BLOCK_CHAIN.set(RwLock::new(block_chain));
-            BLOCK_HEADER_CHAIN.set(RwLock::new(block_header_chain));
-            SYNC_EXECUTORS.set(RwLock::new(sync_executor));
-        }
+        HEADERS_WITH_BODIES_REQUESTED.set(Mutex::new(HashMap::new()));
+        REQUESTED_BLOCK_HASHES.set(Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHES)));
+        SENT_TRANSACTION_HASHES.set(Mutex::new(LruCache::new(MAX_CACHED_TRANSACTION_HASHES)));
+        RECEIVED_TRANSACTIONS.set(Mutex::new(VecDeque::new()));
+        BLOCK_CHAIN.write().inner = Some(client);
+        BLOCK_HEADER_CHAIN.write().inner = Some(header_chain);;
+        SYNC_EXECUTORS.write().inner = Some(sync_executor);
     }
 
     pub fn get_block_chain() -> Arc<Client> {
-        BLOCK_CHAIN
-            .get()
-            .read()
-            .clone()
-            .inner
-            .expect("get_client error")
+        BLOCK_CHAIN.read().clone().inner.expect("get_client error")
     }
 
     pub fn get_chain_info() -> BlockChainInfo {
         let client = BLOCK_CHAIN
-            .get()
             .read()
             .clone()
             .inner
@@ -136,7 +110,6 @@ impl SyncStorage {
 
     pub fn get_block_header_chain() -> Arc<HeaderChain> {
         BLOCK_HEADER_CHAIN
-            .get()
             .read()
             .clone()
             .inner
@@ -145,7 +118,6 @@ impl SyncStorage {
 
     pub fn get_sync_executor() -> TaskExecutor {
         let rt = SYNC_EXECUTORS
-            .get()
             .read()
             .clone()
             .inner
@@ -310,23 +282,9 @@ impl SyncStorage {
         }
     }
 
-    pub fn get_staged_blocks() -> &'static Mutex<LruCache<H256, Vec<RlpStream>>> {
-        STAGED_BLOCKS.get()
-    }
-
-    pub fn get_staged_blocks_with_hash(hash: H256) -> Option<Vec<RlpStream>> {
-        let mut staged_block_hashes = STAGED_BLOCKS.get().lock();
-        return staged_block_hashes.remove(&hash);
-    }
-
-    pub fn clear_staged_blocks() {
-        let mut staged_blocks = STAGED_BLOCKS.get().lock();
-        staged_blocks.clear();
-    }
-
     pub fn reset() {
-        SYNC_EXECUTORS.get().write().inner = None;
-        BLOCK_CHAIN.get().write().inner = None;
+        SYNC_EXECUTORS.write().inner = None;
+        BLOCK_CHAIN.write().inner = None;
     }
 }
 

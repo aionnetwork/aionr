@@ -126,7 +126,7 @@ impl SyncMgr {
 
         let flush_task = loop_fn(0, |block_number| {
             let block_chain = SyncStorage::get_block_chain();
-            block_chain.flush_queue();
+            block_chain.import_verified_blocks();
 
             let synced_block_number = block_chain.chain_info().best_block_number;
 
@@ -348,15 +348,10 @@ impl SyncMgr {
                 let hash = header.hash();
                 if header_chain.status(&hash) != BlockStatus::InChain {
                     let mut tx = DBTransaction::new();
-                    if let Ok(pending) = header_chain.insert_with_td(
-                        &mut tx,
-                        header,
-                        block_total_difficulty,
-                        None,
-                        false,
-                    ) {
-                        header_chain.apply_pending(tx, pending);
-                        debug!(target: "sync", "New block header {} imported.", number);
+                    if let Ok(num) =
+                        header_chain.insert_with_td(tx, header, block_total_difficulty, None, false)
+                    {
+                        debug!(target: "sync", "New block header {} imported.", num);
                     }
                 }
             }
