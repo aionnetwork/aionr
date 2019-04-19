@@ -11,6 +11,7 @@ extern crate blake2b as hash;
 extern crate rand;
 #[macro_use]
 extern crate log;
+extern crate rlp;
 
 pub mod avm;
 pub mod callback;

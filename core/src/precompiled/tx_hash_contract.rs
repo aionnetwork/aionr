@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use super::builtin::{BuiltinParams, BuiltinContract, BuiltinExt};
-use aion_types::U256;
+use aion_types::{U256, H256};
 use vms::{ExecutionResult, ExecStatus, ReturnData};
 
 pub struct TxHashContract {
@@ -53,6 +53,7 @@ impl BuiltinContract for TxHashContract {
             status_code: ExecStatus::Success,
             return_data: ReturnData::new(tx_hash.to_vec(), 0, tx_hash.len()),
             exception: String::default(),
+            state_root: H256::default(),
         }
     }
 }

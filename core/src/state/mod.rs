@@ -62,9 +62,9 @@ pub mod backend;
 
 pub use account::{
     AionVMAccount,
-    Account,
+    // Account,
     VMAccount,
-    AccType,
+    // AccType,
     RequireCache,
 };
 pub use self::backend::Backend;
@@ -562,6 +562,44 @@ impl<B: Backend> State<B> {
         })
     }
 
+     pub fn init_transformed_code(&mut self, a: &Address, code: Bytes) -> trie::Result<()> {
+        self.require_or_from(
+            a,
+            true,
+            || AionVMAccount::new_contract(0.into(), self.account_start_nonce),
+            |_| {},
+        )?
+        .init_transformed_code(code);
+        Ok(())
+     }
+
+     pub fn get_objectgraph(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
+        debug!(target: "vm", "get object graph of: {:?}", a);
+        self.ensure_cached(a, RequireCache::Code, true, |a| {
+            a.as_ref().map_or(None, |a| a.objectgraph().clone())
+        })
+    }
+
+    pub fn set_objectgraph(&mut self, a: &Address, data: Bytes) -> trie::Result<()> {
+        self.require_or_from(
+            a,
+            true,
+            || AionVMAccount::new_contract(0.into(), self.account_start_nonce),
+            |_| {},
+        )?
+        .init_objectgraph(data);
+        Ok(())
+    }
+
+    /// Get accounts' code. avm specific code (dedundant code saving)
+    pub fn transformed_code(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
+        debug!(target: "vm", "get transformed code of: {:?}", a);
+        println!("get transformed code of: {:?}", a);
+        self.ensure_cached(a, RequireCache::Code, true, |a| {
+            a.as_ref().map_or(None, |a| a.transformed_code().clone())
+        })
+    }
+
     /// Get an account's code hash.
     pub fn code_hash(&self, a: &Address) -> trie::Result<H256> {
         debug!(target: "vm", "get code hash of: {:?}", a);
@@ -650,7 +688,7 @@ impl<B: Backend> State<B> {
         self.require_or_from(
             a,
             true,
-            || Account::new_contract(0.into(), self.account_start_nonce),
+            || AionVMAccount::new_contract(0.into(), self.account_start_nonce),
             |_| {},
         )?
         .init_code(code);
@@ -673,7 +711,7 @@ impl<B: Backend> State<B> {
         self.require_or_from(
             a,
             true,
-            || Account::new_contract(0.into(), self.account_start_nonce),
+            || AionVMAccount::new_contract(0.into(), self.account_start_nonce),
             |_| {},
         )?
         .reset_code(code);
@@ -716,19 +754,15 @@ impl<B: Backend> State<B> {
         txs: &[SignedTransaction],
     ) -> Vec<ApplyResult>
     {
-        let exec_results = self.execute_bulk(env_info, machine, txs, true, false);
-
-        match self.commit() {
-            Err(x) => return vec![Err(Error::from(x))],
-            _ => {}
-        }
-
-        let state_root = self.root().clone();
+        
+        let exec_results = self.execute_bulk(env_info, machine, txs, false, false);
 
         let mut receipts = Vec::new();
         for result in exec_results {
+            //self.commit_touched(result.clone().unwrap().touched);
             let outcome = match result {
                 Ok(e) => {
+                    let state_root = e.state_root.clone();
                     let receipt = Receipt::new(
                         state_root,
                         e.gas_used,
@@ -791,6 +825,10 @@ impl<B: Backend> State<B> {
 
     fn touch(&mut self, a: &Address) -> trie::Result<()> {
         self.require(a, false)?;
+        Ok(())
+    }
+
+    pub fn commit_touched(&mut self, _accounts: HashSet<Address>) -> Result<(), Error> {
         Ok(())
     }
 
@@ -969,7 +1007,7 @@ impl<B: Backend> State<B> {
                     .factories
                     .accountdb
                     .readonly(self.db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(require, &self.db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
                 return Ok(f(Some(account)));
             }
             return Ok(f(None));
@@ -981,7 +1019,7 @@ impl<B: Backend> State<B> {
                     .factories
                     .accountdb
                     .readonly(self.db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(require, &self.db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
             }
             f(acc.map(|a| &*a))
         });
@@ -1005,6 +1043,7 @@ impl<B: Backend> State<B> {
                         .accountdb
                         .readonly(self.db.as_hashstore(), account.address_hash(a));
                     account.update_account_cache(
+                        a,
                         require,
                         &self.db,
                         accountdb.as_hashstore(),
@@ -1082,6 +1121,7 @@ impl<B: Backend> State<B> {
                             .accountdb
                             .readonly(self.db.as_hashstore(), addr_hash);
                         account.update_account_cache(
+                            a,
                             RequireCache::Code,
                             &self.db,
                             accountdb.as_hashstore(),

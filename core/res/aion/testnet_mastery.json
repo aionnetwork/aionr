@@ -12,7 +12,8 @@
 		"gasLimitBoundDivisor": "0x0400",
 		"registrar" : "0xe3389675d0338462dC76C6f9A3e432550c36A142000000000000000000000000",
 		"maximumExtraDataSize": "0x20",
-		"minGasLimit": "0x100590"
+		"minGasLimit": "0x100590",
+                "monetaryPolicyUpdate": "2392000"
 	},
 	"genesis": {
 		"seal": {

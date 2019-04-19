@@ -394,6 +394,7 @@ impl BridgeController {
             status_code: ExecStatus::Success,
             return_data: ReturnData::empty(),
             exception: String::default(),
+            state_root: H256::default(),
         })
     }
 }

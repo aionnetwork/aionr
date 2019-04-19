@@ -666,23 +666,27 @@ pub fn enact(
 }
 
 #[inline]
-fn is_normal(
+fn is_normal_or_avm_call(
     block: &mut OpenBlock,
     tx: &SignedTransaction,
 ) -> bool
 {
     if let Action::Call(a) = tx.action {
-        if block.block.state.code(&a).unwrap().is_some()
-            || a == H256::from(
+        let code = block.block.state.code(&a).unwrap_or(None);
+        if a == H256::from(
                 "0000000000000000000000000000000000000000000000000000000000000100"
             )
             || a == H256::from(
                 "0000000000000000000000000000000000000000000000000000000000000200"
             ) {
-            println!("target address = {:?} is fastvm contract", a);
             return false;
+        } else {
+            if let Some(c) = code {
+                println!("pre bytes = {:?}", &c[0..2]);
+                return c[0..2] == [0x50u8, 0x4B];
+            }
+            return true;
         }
-        println!("target address = {:?} is normal account", a);
     }
 
     // fastvm create
@@ -699,7 +703,8 @@ fn is_for_avm(
     tx: &SignedTransaction,
 ) -> bool
 {
-    return tx.tx_type() == AVM_TRANSACTION_TYPE || is_normal(block, tx);
+    // AVM creation = 0x0F; normal call = 0x01
+    return tx.tx_type() == AVM_TRANSACTION_TYPE || is_normal_or_avm_call(block, tx);
 }
 
 #[inline]
@@ -720,6 +725,7 @@ fn push_transactions(
             }
             block.push_transaction(tx.clone(), None)?;
         } else {
+            println!("found avm transaction");
             tx_batch.push(tx.clone())
         }
     }

@@ -31,6 +31,8 @@ pub struct Account<T, U> {
     pub nonce: U256,
     // Trie-backed storage.
     pub storage_root: H256,
+    // avm storage root
+    pub delta_root: H256,
     // LRU Cache of the trie-backed storage.
     // This is limited to `STORAGE_CACHE_ITEMS` recent queries
     pub storage_cache: T,
@@ -44,6 +46,16 @@ pub struct Account<T, U> {
     pub code_size: Option<usize>,
     // Code cache of the account.
     pub code_cache: Arc<Bytes>,
+    // AVM: Code hash of the account.
+    pub transformed_code_hash: H256,
+    // AVM: Size of the transformed code.
+    pub transformed_code_size: Option<usize>,
+    // avm specific code cache
+    pub transformed_code_cache: Arc<Bytes>,
+    // avm object graph
+    pub object_graph_cache: Arc<Bytes>,
+    pub objectgraph_hash: H256,
+    pub object_graph_size: Option<usize>,
     // Account code new or has been modified.
     pub code_filth: Filth,
     // Cached address hash.
@@ -52,6 +64,7 @@ pub struct Account<T, U> {
     pub empty_but_commit: bool,
     // account type: 0x00 = normal; 0x01 = EVM; 0x02 = AVM
     pub account_type: AccType,
+    pub vm_create: bool,
 }
 
 /// Boolean type for clean/dirty status.

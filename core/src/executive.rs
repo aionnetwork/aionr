@@ -22,6 +22,7 @@
 
 //! Transaction Execution environment.
 use std::sync::{Arc, Mutex};
+use std::collections::HashSet;
 use blake2b::{blake2b};
 use aion_types::{H256, U256, U512, Address};
 #[cfg(test)]
@@ -47,6 +48,9 @@ use transaction::{Action, SignedTransaction};
 use crossbeam;
 pub use executed::Executed;
 use precompiled::builtin::{BuiltinExtImpl, BuiltinContext};
+
+use std::thread;
+use std::sync::mpsc::{channel, Sender};
 
 #[cfg(debug_assertions)]
 /// Roughly estimate what stack size each level of evm depth will use. (Debug build)
@@ -138,6 +142,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     pub fn as_avm_externalities<'any>(
         &'any mut self,
         substates: &'any mut [Substate],
+        tx_chnnl: Sender<i32>,
     ) -> AVMExternalities<'any, B>
     {
         AVMExternalities::new(
@@ -146,6 +151,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             self.machine,
             self.depth,
             substates,
+            tx_chnnl,
         )
     }
 
@@ -182,71 +188,73 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     pub fn transact_bulk(
         &'a mut self,
         txs: &[SignedTransaction],
-        check_nonce: bool,
-        is_local_call: bool,
+        _check_nonce: bool,
+        _is_local_call: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
         let mut vm_params = Vec::new();
         // validate transactions
+        println!("start executing {:?} transactions", txs.len());
         for t in txs {
             let sender = t.sender();
             let nonce = self.state.nonce(&sender).unwrap();
 
             // 1. Check transaction nonce
-            if check_nonce && t.nonce != nonce {
-                return vec![Err(From::from(ExecutionError::InvalidNonce {
-                    expected: nonce,
-                    got: t.nonce,
-                }))];
-            }
+            // if check_nonce && t.nonce != nonce {
+            //     return vec![Err(From::from(ExecutionError::InvalidNonce {
+            //         expected: nonce,
+            //         got: t.nonce,
+            //     }))];
+            // }
 
             // 2. Check gas limit
             // 2.1 Gas limit should not be less than the basic gas requirement
             let base_gas_required: U256 = t.gas_required();
-            if t.gas < base_gas_required {
-                return vec![Err(From::from(ExecutionError::NotEnoughBaseGas {
-                    required: base_gas_required,
-                    got: t.gas,
-                }))];
-            }
+            // if t.gas < base_gas_required {
+            //     return vec![Err(From::from(ExecutionError::NotEnoughBaseGas {
+            //         required: base_gas_required,
+            //         got: t.gas,
+            //     }))];
+            // }
             debug!(target: "vm", "base_gas_required = {}", base_gas_required);
+            println!("base_gas_required = {}", base_gas_required);
 
             // 2.2 Gas limit should not exceed the maximum gas limit depending on
             // the transaction's action type
-            let max_gas_limit: U256 = match t.action {
-                Action::Create => GAS_CREATE_MAX,
-                Action::Call(_) => GAS_CALL_MAX,
-            };
+            // let max_gas_limit: U256 = match t.action {
+            //     Action::Create => GAS_CREATE_MAX,
+            //     Action::Call(_) => GAS_CALL_MAX,
+            // };
 
             // Don't check max gas limit for local call.
             // Local node has the right (and is free) to execute "big" calls with its own resources.
-            if !is_local_call && t.gas > max_gas_limit {
-                return vec![Err(From::from(ExecutionError::ExceedMaxGasLimit {
-                    max: max_gas_limit,
-                    got: t.gas,
-                }))];
-            }
+            // if !is_local_call && t.gas > max_gas_limit {
+            //     return vec![Err(From::from(ExecutionError::ExceedMaxGasLimit {
+            //         max: max_gas_limit,
+            //         got: t.gas,
+            //     }))];
+            // }
 
             // 2.3 Gas limit should not exceed the remaining gas limit of the current block
-            if self.info.gas_used + t.gas > self.info.gas_limit {
-                return vec![Err(From::from(ExecutionError::BlockGasLimitReached {
-                    gas_limit: self.info.gas_limit,
-                    gas_used: self.info.gas_used,
-                    gas: t.gas,
-                }))];
-            }
+            // if self.info.gas_used + t.gas > self.info.gas_limit {
+            //     return vec![Err(From::from(ExecutionError::BlockGasLimitReached {
+            //         gas_limit: self.info.gas_limit,
+            //         gas_used: self.info.gas_used,
+            //         gas: t.gas,
+            //     }))];
+            // }
 
             // 3. Check balance, avoid unaffordable transactions
             // TODO: we might need bigints here, or at least check overflows.
-            let balance: U512 = U512::from(self.state.balance(&sender).unwrap());
-            let gas_cost: U512 = t.gas.full_mul(t.gas_price);
-            let total_cost: U512 = U512::from(t.value) + gas_cost;
-            if balance < total_cost {
-                return vec![Err(From::from(ExecutionError::NotEnoughCash {
-                    required: total_cost,
-                    got: balance,
-                }))];
-            }
+            // let balance: U512 = U512::from(self.state.balance(&sender).unwrap());
+            // let gas_cost: U512 = t.gas.full_mul(t.gas_price);
+            // let total_cost: U512 = U512::from(t.value) + gas_cost;
+            // if balance < total_cost {
+            //     return vec![Err(From::from(ExecutionError::NotEnoughCash {
+            //         required: total_cost,
+            //         got: balance,
+            //     }))];
+            // }
 
             //TODO: gas limit for AVM; validate passed, just run AION VM
             debug!(target: "vm", "tx gas = {:?}, base gas required = {:?}", t.gas, base_gas_required);
@@ -323,13 +331,28 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         let depth_threshold =
             local_stack_size.saturating_sub(STACK_SIZE_ENTRY_OVERHEAD) / STACK_SIZE_PER_DEPTH;
 
+        // start a new thread to listen avm signal
+        let (tx, rx) = channel();
+        thread::spawn(move || {
+            let mut signal = rx.recv().expect("Unable to receive from channel");
+            while signal >= 0 {
+                match signal {
+                    0 => println!("commit state"),
+                    _ => println!("unknown signal"),
+                }
+                signal = rx.recv().expect("Unable to receive from channel");
+            }
+
+            println!("received {:?}, kill channel", signal);
+        });
+
         // Ordinary execution - keep VM in same thread
         debug!(target: "vm", "depth threshold = {:?}", depth_threshold);
         if self.depth != depth_threshold {
             let mut vm_factory = self.state.vm_factory();
             // consider put global callback in ext
             let mut ext = self
-                .as_avm_externalities(unconfirmed_substate);
+                .as_avm_externalities(unconfirmed_substate, tx.clone());
             //TODO: make create/exec compatible with fastvm
             let vm = vm_factory.create(VMType::AVM);
             return vm.exec(params, &mut ext);   
@@ -340,7 +363,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let mut vm_factory = self.state.vm_factory();
 
             let mut ext = self
-                .as_avm_externalities(unconfirmed_substate);
+                .as_avm_externalities(unconfirmed_substate, tx.clone());
 
             scope
                 .builder()
@@ -570,6 +593,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         status_code: ExecStatus::Failure,
                         return_data: ReturnData::empty(),
                         exception: String::from("Error in balance transfer"),
+                        state_root: H256::default(),
                     };
                 }
             }
@@ -638,6 +662,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from("Not enough gas to execute precompiled contract."),
+                    state_root: H256::default(),
                 };
             }
         } else {
@@ -662,6 +687,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     status_code: ExecStatus::Success,
                     return_data: ReturnData::empty(),
                     exception: String::default(),
+                    state_root: H256::default(),
                 };
             }
         }
@@ -683,6 +709,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         status_code: ExecStatus::Failure,
                         return_data: ReturnData::empty(),
                         exception: String::from("Error in balance transfer"),
+                        state_root: H256::default(),
                     };
                 }
             }
@@ -743,6 +770,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     "Contract creation address already exists, or checking contract existance \
                      failed.",
                 ),
+                state_root: H256::default(),
             };
         }
 
@@ -776,6 +804,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from("Error in balance transfer"),
+                    state_root: H256::default(),
                 };
             }
             self.state
@@ -820,6 +849,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             //let refund_value = gas_left * t.gas_price;
             let fees_value = gas_used * t.gas_price;
 
+            let mut touched = HashSet::new();
+            for account in substate.touched {
+                touched.insert(account);
+            }
+
             final_results.push(Ok(Executed {
                 exception: result.exception,
                 gas: t.gas,
@@ -831,6 +865,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 output: result.return_data.to_vec(),
                 state_diff: None,
                 transaction_fee: fees_value,
+                touched: touched,
+                state_root: result.state_root,
             }))
         }
 
@@ -901,6 +937,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             output: result.return_data.to_vec(),
             state_diff: None,
             transaction_fee: fees_value,
+            touched: HashSet::new(),
+            state_root: H256::default(),
         })
     }
 
@@ -945,6 +983,7 @@ Address};
     use bytes::Bytes;
     use error::ExecutionError;
     use avm_abi::{ToBytes};
+    use blake2b::BLAKE2B_EMPTY;
 
     fn make_aion_machine() -> EthereumMachine {
         let machine = ::ethereum::new_aion_test_machine();
@@ -1002,6 +1041,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1027,6 +1067,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1080,6 +1121,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1124,6 +1166,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             println!("call executor");
@@ -1151,6 +1194,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1177,6 +1221,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1203,6 +1248,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1229,6 +1275,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1265,6 +1312,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1306,6 +1354,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1340,6 +1389,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1374,6 +1424,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1412,6 +1463,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1445,6 +1497,7 @@ Address};
             status_code: _,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1478,6 +1531,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1521,6 +1575,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1560,6 +1615,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1596,6 +1652,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1626,6 +1683,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1654,6 +1712,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1688,6 +1747,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1908,6 +1968,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1926,6 +1987,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -1966,6 +2028,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -1999,6 +2062,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -2031,6 +2095,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -2067,6 +2132,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -2089,6 +2155,7 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -2120,6 +2187,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate, AccType::FVM)
@@ -2152,6 +2220,7 @@ Address};
             status_code,
             return_data,
             exception,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
@@ -2205,6 +2274,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2228,6 +2298,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2251,6 +2322,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2274,6 +2346,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2296,6 +2369,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2319,6 +2393,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2342,6 +2417,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2365,6 +2441,7 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate, AccType::FVM)
@@ -2377,7 +2454,7 @@ Address};
     fn hello_avm() {
         // Create contract on already existing address
         let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        file.push("src/tests/AVMDapps/dapp.jar");
+        file.push("src/tests/AVMDapps/HelloWorld.jar");
         let file_str = file.to_str().expect("Failed to locate the helloworld.jar");
         let mut code = read_file(file_str).expect("unable to open avm dapp");
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
@@ -2403,7 +2480,7 @@ Address};
         let substate = Substate::new();
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.create_avm(vec![params.clone()], &mut [substate])
+            ex.call_avm(vec![params.clone()], &mut [substate])
         };
 
         for r in execution_results {
@@ -2412,12 +2489,16 @@ Address};
                 gas_left,
                 return_data,
                 exception: _,
+                state_root: _,
             } = r;
 
             assert_eq!(status_code, ExecStatus::Success);
 
             params.address = return_data.mem.as_slice().into();
+            println!("return data = {:?}", return_data);
         }
+
+        assert!(state.code(&params.address).unwrap().is_some());
 
         params.call_type = CallType::Call;
         let call_data = vec![0x21,0x00,0x08,0x73,0x61,0x79,0x48,0x65,0x6c,0x6c,0x6f];
@@ -2436,12 +2517,13 @@ Address};
                 gas_left,
                 return_data,
                 exception: _,
+                state_root,
             } = r;
-            assert_eq!(status_code, ExecStatus::Success);
-            assert_eq!(return_data.mem, vec![17, 0, 5, 72, 101, 108, 108, 111]);
-        }
 
-        assert_eq!(state.commit().is_ok(), true);
+            assert_eq!(status_code, ExecStatus::Success);
+            println!("result state root = {:?}, return_data = {:?}", state_root, return_data);
+            assert_eq!(return_data.to_vec(), vec![72, 101, 108, 108, 111]);
+        }
     }
 
     use std::io::Error;
@@ -2542,7 +2624,7 @@ Address};
         let substate = Substate::new();
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.create_avm(vec![params.clone()], &mut [substate.clone()])
+            ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
 
         assert_eq!(execution_results.len(), 1);
@@ -2554,6 +2636,7 @@ Address};
                 gas_left,
                 return_data,
                 exception: _,
+                state_root: _,
             } = r;
 
             println!(

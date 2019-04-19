@@ -45,6 +45,7 @@ pub struct EthereumMachine {
     params: CommonParams,
     builtins: Arc<BTreeMap<Address, Box<BuiltinContract>>>,
     tx_filter: Option<Arc<TransactionFilter>>,
+    premine: U256,
 }
 
 impl EthereumMachine {
@@ -52,6 +53,7 @@ impl EthereumMachine {
     pub fn regular(
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
+        premine: U256,
     ) -> EthereumMachine
     {
         let tx_filter = TransactionFilter::from_params(&params).map(Arc::new);
@@ -59,6 +61,7 @@ impl EthereumMachine {
             params: params,
             builtins: Arc::new(builtins),
             tx_filter: tx_filter,
+            premine: premine,
         }
     }
 }
@@ -161,6 +164,8 @@ impl EthereumMachine {
 
     /// Builtin-contracts for the chain..
     pub fn builtins(&self) -> &BTreeMap<Address, Box<BuiltinContract>> { &*self.builtins }
+
+    pub fn premine(&self) -> U256 { self.premine }
 
     /// Attempt to get a handle to a built-in contract.
     /// Only returns references to activated built-ins.

@@ -12,11 +12,13 @@ use std::sync::atomic::AtomicPtr;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
+use std::sync::mpsc::channel;
 use types::{TransactionContext, TransactionResult};
 use vm_common::{CallType};
 use bytes::Bytes;
 use aion_types::{Address, U256, H256};
 use hash::{BLAKE2B_EMPTY};
+
 
 /// We keep a single JVM instance in the background, which will be shared
 /// among multiple threads. Before invoking any JNI methods, the executing
@@ -39,7 +41,7 @@ const AVM_JARS: [&str; 17] = [
     "scratch-deps.jar",
     "slf4j-api-1.7.25.jar",
     "spongycastle-1.58.0.0.jar",
-    "vm-api-e8657a6.jar",
+    "vm-api-d1d5e7c.jar",
     "org-aion-avm-jni.jar",
 ];
 
@@ -263,7 +265,8 @@ impl AVM {
         let length = decoder.decode_int()?;
         for _i in 0..length {
             let result = decoder.decode_bytes()?;
-            results.push(TransactionResult::new(result)?);
+            let state_root = decoder.decode_bytes()?;
+            results.push(TransactionResult::new(result, state_root)?);
         }
 
         Ok(results)
@@ -356,7 +359,7 @@ mod test {
     use avm_abi::{AbiToken, AVMEncoder};
 
     #[test]
-    fn test_avm_hello_world() {
+    fn avm_hello_world() {
         let avm = AVM::new();
         let transactions = prepare_transactions();
         let results = avm.execute(0, &transactions).unwrap();
@@ -389,7 +392,7 @@ mod test {
             block_energy_limit: 5_000_000,
             block_coinbase: [4u8; 32].to_vec(),
             block_previous_hash: [5u8; 32].to_vec(),
-            block_difficulty: Vec::new(),
+            block_difficulty: [0u8; 16].to_vec(),
             internal_call_depth: 0,
         };
 
@@ -414,7 +417,7 @@ mod test {
             block_energy_limit: 5_000_000,
             block_coinbase: [4u8; 32].to_vec(),
             block_previous_hash: [5u8; 32].to_vec(),
-            block_difficulty: Vec::new(),
+            block_difficulty: [0u8; 16].to_vec(),
             internal_call_depth: 0,
         };
 
@@ -436,7 +439,7 @@ mod test {
             block_energy_limit: 5_000_000,
             block_coinbase: [4u8; 32].to_vec(),
             block_previous_hash: [5u8; 32].to_vec(),
-            block_difficulty: Vec::new(),
+            block_difficulty: [0u8; 16].to_vec(),
             internal_call_depth: 0,
         };
 

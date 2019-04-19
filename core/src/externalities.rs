@@ -23,6 +23,7 @@
 //! Transaction Execution environment.
 use std::cmp;
 use std::sync::{Arc, Mutex};
+use std::sync::mpsc::Sender;
 use aion_types::{H256, U256, H128, Address};
 use bytes::Bytes;
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
@@ -81,6 +82,7 @@ where B: StateBackend
     machine: &'a Machine,
     depth: usize,
     substates: &'a mut [Substate],
+    tx: Sender<i32>,
 }
 
 impl<'a, B: 'a> AVMExternalities<'a, B>
@@ -93,6 +95,7 @@ where B: StateBackend
         machine: &'a Machine,
         depth: usize,
         substates: &'a mut [Substate],
+        tx: Sender<i32>,
     ) -> Self
     {
         AVMExternalities {
@@ -101,6 +104,7 @@ where B: StateBackend
             machine: machine,
             depth: depth,
             substates: substates,
+            tx: tx,
         }
     }
 }
@@ -249,6 +253,7 @@ where B: StateBackend
                         "Cannot get origin address and nonce from database. Database corruption \
                          may encountered.",
                     ),
+                    state_root: H256::default(),
                 };
             }
         };
@@ -297,6 +302,7 @@ where B: StateBackend
                     exception: String::from(
                         "inc_nonce failed. Database corruption may encountered.",
                     ),
+                    state_root: H256::default(),
                 };
             }
 
@@ -311,6 +317,7 @@ where B: StateBackend
                     exception: String::from(
                         "inc_nonce failed. Database corruption may encountered.",
                     ),
+                    state_root: H256::default(),
                 };
             }
         }
@@ -346,6 +353,7 @@ where B: StateBackend
                     status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from("Code not founded."),
+                    state_root: H256::default(),
                 }
             }
         };
@@ -528,6 +536,43 @@ where B: StateBackend
             .inc_nonce(a)
             .expect("increment nonce failed")
     }
+
+    /// avm specific methods
+    fn touch_account(&mut self, _a: &Address, _index: i32) {
+        unimplemented!()
+    }
+
+    fn send_signal(&mut self, _signal: i32) {
+        unimplemented!()
+    }
+
+    fn commit(&mut self) {
+        unimplemented!()
+    }
+
+    fn root(&self) -> H256{
+        unimplemented!()
+    }
+
+    fn avm_log(&mut self, _address: &Address, _topics: Vec<H256>, _data: Vec<u8>, _index: i32) {
+        unimplemented!()
+    }
+
+    fn get_transformed_code(&self, _address: &Address) -> Option<Arc<Vec<u8>>> {
+        unimplemented!()
+    }
+
+    fn save_transformed_code(&mut self, _address: &Address, _code: Bytes) {
+        unimplemented!()
+    }
+
+    fn get_objectgraph(&self, _address: &Address) -> Option<Arc<Bytes>> {
+        unimplemented!()
+    }
+
+    fn set_objectgraph(&mut self, _address: &Address, _data: Bytes) {
+        unimplemented!()
+    }
 }
 
 #[allow(unused)]
@@ -542,11 +587,11 @@ where B: StateBackend
         unimplemented!()
     }
 
-    fn storage_at_dword(&self, key: &H128) -> H256 {
+    fn storage_at_dword(&self, _key: &H128) -> H256 {
         unimplemented!()
     }
 
-    fn set_storage_dword(&mut self, key: H128, value: H256) {
+    fn set_storage_dword(&mut self, _key: H128, _value: H256) {
         unimplemented!()
     }
 
@@ -724,6 +769,71 @@ where B: StateBackend
             .unwrap()
             .inc_nonce(a)
             .expect("increment nonce failed")
+    }
+
+    fn touch_account(&mut self, a: &Address, index: i32) {
+        self.substates[index as usize].touched.insert(*a);
+    }
+
+    fn send_signal(&mut self, signal: i32) {
+        self.tx.send(signal).expect("ext send failed");
+    }
+
+    fn commit(&mut self) {
+        self.state.lock().unwrap().commit().expect("commit state should not fail");
+    }
+
+    fn root(&self) -> H256{
+        self.state.lock().unwrap().root().clone()
+    }
+
+    fn avm_log(&mut self, address: &Address, topics: Vec<H256>, data: Vec<u8>, index: i32) {
+        use log_entry::LogEntry;
+        self.substates[index as usize].logs.push(LogEntry {
+            address: address.clone(),
+            topics,
+            data,
+        });
+    }
+
+    fn get_transformed_code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
+        println!("AVM get transformed code at: {:?}", address);
+        match self.state.lock().unwrap().transformed_code(address) {
+            Ok(code) => {
+                // println!("transformed code = {:?}", code);
+                code
+            },
+            Err(_x) => None,
+        }
+    }
+
+    fn save_transformed_code(&mut self, address: &Address, code: Bytes) {
+        println!("AVMExt save transformed code: address = {:?}", address);
+        self.state
+            .lock()
+            .unwrap()
+            .init_transformed_code(address, code)
+            .expect("save avm transformed code should not fail");
+    }
+
+    fn get_objectgraph(&self, address: &Address) -> Option<Arc<Bytes>> {
+        println!("AVM get object graph");
+        match self.state.lock().unwrap().get_objectgraph(address) {
+            Ok(data) => {
+                // println!("transformed code = {:?}", code);
+                data
+            },
+            Err(_x) => None,
+        }
+    }
+
+    fn set_objectgraph(&mut self, address: &Address, data: Bytes) {
+        println!("AVMExt save object graph: address = {:?}", address);
+        self.state
+            .lock()
+            .unwrap()
+            .set_objectgraph(address, data)
+            .expect("save avm object graph should not fail");
     }
 }
 

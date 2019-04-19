@@ -106,6 +106,9 @@ pub trait Ext: {
     /// get code
     fn code(&self, address: &Address) -> Option<Arc<Bytes>>;
 
+    /// TODO: special account flag for fastvm which is empty but should be committed
+    fn set_special_empty_flag(&mut self);
+
     /// avm set storage
     fn sstore(&mut self, address: &Address, key: Bytes, value: Bytes);
 
@@ -133,6 +136,21 @@ pub trait Ext: {
     /// avm save code at address
     fn save_code_at(&mut self, address: &Address, code: Bytes);
 
-    /// TODO: special account flag for fastvm which is empty but should be committed
-    fn set_special_empty_flag(&mut self);
+    fn touch_account(&mut self, address: &Address, index: i32);
+
+    fn send_signal(&mut self, signal: i32);
+
+    fn commit(&mut self);
+
+    fn root(&self) -> H256;
+
+    fn avm_log(&mut self, address: &Address, topics: Vec<H256>, data: Bytes, idx: i32);
+
+    fn get_transformed_code(&self, address: &Address) -> Option<Arc<Bytes>>;
+
+    fn save_transformed_code(&mut self, address: &Address, code: Bytes);
+
+    fn get_objectgraph(&self, address: &Address) -> Option<Arc<Bytes>>;
+    
+    fn set_objectgraph(&mut self, address: &Address, data: Bytes);
 }
