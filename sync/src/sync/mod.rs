@@ -249,7 +249,7 @@ impl SyncMgr {
                 {
                     {
                         let block_chain = SyncStorage::get_block_chain();
-                        block_chain.clear_queue();
+                        block_chain.clear_queue(false);
                     }
                     SyncStorage::clear_headers_with_bodies_requested();
                 }
@@ -325,6 +325,8 @@ impl SyncMgr {
 
     fn disable() {
         SyncStorage::set_is_syncing(false);
+        let block_chain = SyncStorage::get_block_chain();
+        block_chain.clear_queue(true);
         SyncStorage::reset();
     }
 
@@ -414,7 +416,11 @@ impl Sync {
         SyncStorage::set_synced_block_number(starting_block_number);
         SyncStorage::set_synced_block_number_last_time(starting_block_number);
         let best_block_number = SyncStorage::get_synced_block_number();
-        SyncMgr::build_header_chain(best_block_number);
+
+        let best_header_number = SyncStorage::get_block_header_chain().best_block().number;
+        if best_header_number < best_block_number {
+            SyncMgr::build_header_chain(best_block_number);
+        }
 
         let service = NetworkService {
             config: params.network_config.clone(),
