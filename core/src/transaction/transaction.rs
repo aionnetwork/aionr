@@ -48,7 +48,7 @@ pub const SYSTEM_ADDRESS: Address = H256([
 ]);
 
 pub const DEFAULT_TRANSACTION_TYPE: u8 = 0x01;
-pub const AVM_TRANSACTION_TYPE: u8 = 0xf;
+pub const AVM_TRANSACTION_TYPE: u8 = 0x02;
 
 struct TransactionEnergyRule;
 impl TransactionEnergyRule {

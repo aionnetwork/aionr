@@ -243,7 +243,7 @@ impl Factory for AVMFactory {
             let block_number = ext.env_info().number;
             // don't really know why jit timestamp is int..
             let block_timestamp = ext.env_info().timestamp as i64;
-            let tx_hash = vec![0; 32];
+            let tx_hash = params.transaction_hash.to_vec();
             let depth = ext.depth() as i32;
             let kind = match params.call_type {
                 CallType::None => AVM_CREATE,

@@ -177,7 +177,7 @@ where B: StateBackend
         self.state
             .lock()
             .unwrap()
-            .balance(a)
+            .avm_balance(a)
             .expect("Fatal error during get balance")
     }
 
@@ -185,7 +185,7 @@ where B: StateBackend
         self.state
             .lock()
             .unwrap()
-            .add_balance(a, value, CleanupMode::NoEmpty)
+            .avm_add_balance(a, value, CleanupMode::NoEmpty)
             .expect("add balance failed");
 
     }
@@ -194,7 +194,7 @@ where B: StateBackend
         self.state
             .lock()
             .unwrap()
-            .sub_balance(a, value, &mut CleanupMode::NoEmpty)
+            .avm_sub_balance(a, value, &mut CleanupMode::NoEmpty)
             .expect("decrease balance failed")
     }
 
@@ -202,7 +202,7 @@ where B: StateBackend
         self.state
             .lock()
             .unwrap()
-            .nonce(a)
+            .avm_nonce(a)
             .expect("get nonce failed").low_u64()
     }
 
@@ -210,7 +210,7 @@ where B: StateBackend
         self.state
             .lock()
             .unwrap()
-            .inc_nonce(a)
+            .avm_inc_nonce(a)
             .expect("increment nonce failed")
     }
 
@@ -223,11 +223,17 @@ where B: StateBackend
     }
 
     fn commit(&mut self) {
-        self.state.lock().unwrap().commit().expect("commit state should not fail");
+        println!("Ext: commit avm");
+        self.state.lock().unwrap().commit_avm().expect("commit state should not fail");
+        println!("Ext: commit avm done");
+        self.state.lock().unwrap().clear_global_cache(0x00);
     }
 
-    fn root(&self) -> H256{
-        self.state.lock().unwrap().root().clone()
+    fn root(&self) -> H256 {
+        println!("Ext: get state root");
+        let root = self.state.lock().unwrap().root().clone();
+        println!("Ext: get state root done");
+        root
     }
 
     fn avm_log(&mut self, address: &Address, topics: Vec<H256>, data: Vec<u8>, index: i32) {
@@ -263,7 +269,7 @@ where B: StateBackend
         println!("AVM get object graph");
         match self.state.lock().unwrap().get_objectgraph(address) {
             Ok(data) => {
-                // println!("transformed code = {:?}", code);
+                // println!("object graph = {:?}", data);
                 data
             },
             Err(_x) => None,

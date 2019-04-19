@@ -541,35 +541,35 @@ impl<B: Backend> State<B> {
     /// Get the balance of account `a`.
     pub fn balance(&self, a: &Address) -> trie::Result<U256> {
         debug!(target: "vm", "get balance of: {:?}", a);
-        let fvm_balance = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
+        return self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref()
-                .map_or(U256::zero(), |account| *account.balance())
+            .map_or(U256::zero(), |account| *account.balance())
         });
-        if fvm_balance.is_ok() {
-            return fvm_balance;
-        } else {
-            return self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
-                a.as_ref()
-                    .map_or(U256::zero(), |account| *account.balance())
-            });
-        }
+    }
+
+    pub fn avm_balance(&self, a: &Address) -> trie::Result<U256> {
+        debug!(target: "vm", "avm get balance of: {:?}", a);
+        return self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
+            a.as_ref()
+            .map_or(U256::zero(), |account| *account.balance())
+        });
     }
 
     /// Get the nonce of account `a`.
     pub fn nonce(&self, a: &Address) -> trie::Result<U256> {
         debug!(target: "vm", "get nonce of {:?}", a);
-        let nonce = self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
+        return self.fvm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
             a.as_ref()
-                .map_or(self.fvm_manager.account_start_nonce, |account| *account.nonce())
+            .map_or(self.fvm_manager.account_start_nonce, |account| *account.nonce())
         });
-        if nonce.is_ok() {
-            return nonce;
-        } else {
-            return self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
-                a.as_ref()
-                    .map_or(self.avm_manager.account_start_nonce, |account| *account.nonce())
-            });
-        }
+    }
+
+    pub fn avm_nonce(&self, a: &Address) -> trie::Result<U256> {
+        debug!(target: "vm", "avm get nonce of {:?}", a);
+        return self.avm_manager.get_cached(a, &self.db, self.root, &self.factories, RequireCache::None, true, |a| {
+            a.as_ref()
+            .map_or(self.avm_manager.account_start_nonce, |account| *account.nonce())
+        });
     }
 
     /// Get the storage root of account `a`.
@@ -819,7 +819,26 @@ impl<B: Backend> State<B> {
         let is_value_transfer = !incr.is_zero();
         if is_value_transfer || (cleanup_mode == CleanupMode::ForceCreate && !self.exists(a)?) {
             self.require(a, false)?.add_balance(incr);
-            //panic!("hi");
+        } else if let CleanupMode::TrackTouched(set) = cleanup_mode {
+            if self.exists(a)? {
+                set.insert(*a);
+                self.touch(a)?;
+            }
+        }
+        Ok(())
+    }
+
+    pub fn avm_add_balance(
+        &mut self,
+        a: &Address,
+        incr: &U256,
+        cleanup_mode: CleanupMode,
+    ) -> trie::Result<()>
+    {
+        debug!(target: "state", "add_balance({}, {}): {}", a, incr, self.avm_balance(a)?);
+        let is_value_transfer = !incr.is_zero();
+        if is_value_transfer || (cleanup_mode == CleanupMode::ForceCreate && !self.exists(a)?) {
+            self.require_avm(a, false)?.add_balance(incr);
         } else if let CleanupMode::TrackTouched(set) = cleanup_mode {
             if self.exists(a)? {
                 set.insert(*a);
@@ -847,6 +866,23 @@ impl<B: Backend> State<B> {
         Ok(())
     }
 
+    pub fn avm_sub_balance(
+        &mut self,
+        a: &Address,
+        decr: &U256,
+        cleanup_mode: &mut CleanupMode,
+    ) -> trie::Result<()>
+    {
+        debug!(target: "state", "sub_balance({}, {}): {}", a, decr, self.avm_balance(a)?);
+        if !decr.is_zero() || !self.exists(a)? {
+            self.require_avm(a, false)?.sub_balance(decr);
+        }
+        if let CleanupMode::TrackTouched(ref mut set) = *cleanup_mode {
+            set.insert(*a);
+        }
+        Ok(())
+    }
+
     /// Subtracts `by` from the balance of `from` and adds it to that of `to`.
     pub fn transfer_balance(
         &mut self,
@@ -864,6 +900,10 @@ impl<B: Backend> State<B> {
     /// Increment the nonce of account `a` by 1.
     pub fn inc_nonce(&mut self, a: &Address) -> trie::Result<()> {
         self.require(a, false).map(|mut x| x.inc_nonce())
+    }
+
+    pub fn avm_inc_nonce(&mut self, a: &Address) -> trie::Result<()> {
+        self.require_avm(a, false).map(|mut x| x.inc_nonce())
     }
 
     /// Mutate storage of account `a` so that it is `value` for `key`.
@@ -1219,11 +1259,89 @@ impl<B: Backend> State<B> {
         Ok(())
     }
 
+    pub fn clear_global_cache(&mut self, kind: u8) {
+        // remove fvm item in global cache
+        self.db.clear_cache(kind);
+    }
+
+    pub fn commit_avm(&mut self) -> Result<(), Error> {
+        // update AVM accounts
+        let mut accounts = self.avm_manager.cache.borrow_mut();
+        debug!(target: "cons", "commit avm accounts = {:?}", accounts);
+        println!("commit avm accounts");
+        for (address, ref mut a) in accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
+            if let Some(ref mut account) = a.account {
+                let addr_hash = account.address_hash(address);
+                {
+                    let mut account_db = self
+                        .factories
+                        .accountdb
+                        .create(self.db.as_hashstore_mut(), addr_hash);
+                    account.commit_code(account_db.as_hashstore_mut());
+                    // Tmp workaround to ignore storage changes on null accounts
+                    // until java kernel fixed the problem
+                    if !account.is_null() {
+                        account
+                            .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
+                        if account.transformed_code_hash() != BLAKE2B_EMPTY {
+                            println!("update storage root of {:?}", address);
+                            account.update_root();
+                            account.save_object_graph(address, account_db.as_hashstore_mut());
+                        }
+                    } else if !account.storage_changes().is_empty()
+                    {
+                        account.discard_storage_changes();
+                        a.state = AccountState::CleanFresh;
+                    } else {
+                        if a.state == AccountState::Dirty
+                            && account.code_hash() == BLAKE2B_EMPTY
+                        {
+                            a.state = AccountState::CleanFresh;
+                        }
+                    }
+                }
+                if !account.is_empty() {
+                    self.db.note_non_null_account(address);
+                }
+            }
+        }
+
+        // commit avm accounts
+        let mut trie = self
+            .factories
+            .trie
+            .from_existing(self.db.as_hashstore_mut(), &mut self.root)?;
+        for (address, ref mut a) in accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
+            a.state = AccountState::Committed;
+            match a.account {
+                Some(ref mut account) => {
+                    let data = account.rlp();
+                    println!("update trie: address = {:?}, rlp = {:?}",  address, data);
+                    trie.insert(address, &data)?;
+                }
+                None => {
+                    trie.remove(address)?;
+                }
+            };
+        }
+
+        debug!(target: "cons", "after commit: avm accounts = {:?}", accounts);
+
+        //TODO: this should be solved by unified cache strategy
+        //when vm has an ultimate version of account.
+        // clear fvm local cache
+        let mut accounts = self.fvm_manager.cache.borrow_mut();
+        accounts.clear();
+
+        Ok(())
+    }
+
     /// Commits our cached account changes into the trie.
     pub fn commit(&mut self) -> Result<(), Error> {
         // first, commit the sub trees.
         let mut accounts = self.fvm_manager.cache.borrow_mut();
         debug!(target: "cons", "commit fvm accounts = {:?}", accounts);
+        println!("State: commit fvm accounts");
         for (address, ref mut a) in accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
             if let Some(ref mut account) = a.account {
                 let addr_hash = account.address_hash(address);
@@ -1268,46 +1386,6 @@ impl<B: Backend> State<B> {
             }
         }
 
-        // update AVM accounts
-        let mut avm_accounts = self.avm_manager.cache.borrow_mut();
-        debug!(target: "cons", "commit avm accounts = {:?}", avm_accounts);
-        for (address, ref mut a) in avm_accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
-            if let Some(ref mut account) = a.account {
-                let addr_hash = account.address_hash(address);
-                {
-                    let mut account_db = self
-                        .factories
-                        .accountdb
-                        .create(self.db.as_hashstore_mut(), addr_hash);
-                    account.commit_code(account_db.as_hashstore_mut());
-                    // Tmp workaround to ignore storage changes on null accounts
-                    // until java kernel fixed the problem
-                    if !account.is_null() {
-                        account
-                            .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
-                        if account.transformed_code_hash() != BLAKE2B_EMPTY {
-                            println!("update storage root");
-                            account.update_root();
-                            account.save_object_graph(address, account_db.as_hashstore_mut());
-                        }
-                    } else if !account.storage_changes().is_empty()
-                    {
-                        account.discard_storage_changes();
-                        a.state = AccountState::CleanFresh;
-                    } else {
-                        if a.state == AccountState::Dirty
-                            && account.code_hash() == BLAKE2B_EMPTY
-                        {
-                            a.state = AccountState::CleanFresh;
-                        }
-                    }
-                }
-                if !account.is_empty() {
-                    self.db.note_non_null_account(address);
-                }
-            }
-        }
-
         {
             // commit fvm accounts
             let mut trie = self
@@ -1318,21 +1396,9 @@ impl<B: Backend> State<B> {
                 a.state = AccountState::Committed;
                 match a.account {
                     Some(ref mut account) => {
-                        trie.insert(address, &account.rlp())?;
-                    }
-                    None => {
-                        trie.remove(address)?;
-                    }
-                };
-            }
-
-
-            // commit avm accounts
-            for (address, ref mut a) in avm_accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
-                a.state = AccountState::Committed;
-                match a.account {
-                    Some(ref mut account) => {
-                        trie.insert(address, &account.rlp())?;
+                        let data = account.rlp();
+                        println!("update trie: address = {:?}, rlp = {:?}",  address, data);
+                        trie.insert(address, &data)?;
                     }
                     None => {
                         trie.remove(address)?;
@@ -1341,7 +1407,7 @@ impl<B: Backend> State<B> {
             }
         }
         //println!("new state = {:?}", self);
-        debug!(target: "cons", "after commit: fvm accounts = {:?}, avm accounts = {:?}, state root = {:?}", accounts, avm_accounts, self.root);
+        debug!(target: "cons", "after commit: fvm accounts = {:?}, state root = {:?}", accounts, self.root);
 
         Ok(())
     }

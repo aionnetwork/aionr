@@ -57,6 +57,9 @@ pub trait Backend: Send {
 
     fn get_avm_cached_account(&self, addr: &Address) -> Option<Option<AVMAccount>>;
 
+    /// clear accounts cache
+    fn clear_cache(&mut self, piece: u8);
+
     /// Get value from a cached account.
     /// `None` is passed to the closure if the account entry cached
     /// is known not to exist.
@@ -132,6 +135,7 @@ impl Backend for ProofCheck {
     where F: FnOnce(Option<&mut FVMAccount>) -> U {
         None
     }
+    fn clear_cache(&mut self, _piece: u8) {}
     fn get_avm_cached<F, U>(&self, _a: &Address, _f: F) -> Option<U>
     where F: FnOnce(Option<&mut AVMAccount>) -> U {
         None
@@ -196,6 +200,8 @@ impl<H: AsHashStore + Send + Sync> Backend for Proving<H> {
 
     fn cache_code(&self, _: H256, _: Arc<Vec<u8>>) {}
 
+    fn clear_cache(&mut self, _: u8) {}
+
     fn get_cached_account(&self, _: &Address) -> Option<Option<FVMAccount>> { None }
 
     fn get_avm_cached_account(&self, _addr: &Address) -> Option<Option<AVMAccount>> { None }
@@ -258,6 +264,8 @@ impl<H: AsHashStore + Send + Sync> Backend for Basic<H> {
     fn add_to_account_cache(&mut self, _: Address, _: Option<FVMAccount>, _: bool) {}
 
     fn cache_code(&self, _: H256, _: Arc<Vec<u8>>) {}
+
+    fn clear_cache(&mut self, _: u8) {}
 
     fn get_cached_account(&self, _: &Address) -> Option<Option<FVMAccount>> { None }
 

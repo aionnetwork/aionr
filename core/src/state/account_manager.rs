@@ -227,7 +227,6 @@ impl VMAccountManager<FVMAccount> {
         //Debug info of trie
         debug!(target: "vm", "root = {:?}", root);
         // get from local cache
-        debug!(target: "vm", "local cache = {:?}", self.cache);
         if let Some(ref mut maybe_acc) = self.cache.borrow_mut().get_mut(a) {
             if let Some(ref mut account) = maybe_acc.account {
                 let accountdb = factories

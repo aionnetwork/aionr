@@ -41,7 +41,7 @@ const AVM_JARS: [&str; 17] = [
     "scratch-deps.jar",
     "slf4j-api-1.7.25.jar",
     "spongycastle-1.58.0.0.jar",
-    "vm-api-d1d5e7c.jar",
+    "vm-api-bcca6a8.jar",
     "org-aion-avm-jni.jar",
 ];
 

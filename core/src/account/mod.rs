@@ -786,12 +786,21 @@ macro_rules! impl_account {
                 stream.append(&self.balance);
                 let vm_type: AccType = self.acc_type().into();
                 if vm_type == AccType::AVM {
-                    println!("rlp encode using delta_root");
+                    //println!("rlp encode using delta_root = {:?}", self.delta_root);
                     stream.append(&self.delta_root);
                 } else {
                     stream.append(&self.storage_root);
                 }
                 stream.append(&self.code_hash);
+                println!("nonce = {:?}", self.nonce);
+                println!("balance = {:?}", self.balance);
+                if vm_type == AccType::AVM {
+                    println!("storage_root = {:?}", self.delta_root);
+                } else {
+                    println!("storage_root = {:?}", self.storage_root);
+                }
+                println!("code_hash = {:?}", self.code_hash);
+                
                 stream.out()
             }
 
@@ -1108,8 +1117,8 @@ impl fmt::Debug for AVMAccount {
             .field("balance", &self.balance)
             .field("nonce", &self.nonce)
             .field("code", &self.code())
-            .field("transformed_code", &self.transformed_code())
-            .field("object_graph", &self.objectgraph())
+            .field("storage_root", &self.storage_root())
+            .field("code_hash", &self.code_hash())
             .field(
                 "storage",
                 &self.storage_changes.iter().collect::<BTreeMap<_, _>>(),

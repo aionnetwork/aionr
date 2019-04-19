@@ -344,16 +344,16 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         });
 
         // Ordinary execution - keep VM in same thread
-        debug!(target: "vm", "depth threshold = {:?}", depth_threshold);
-        if self.depth != depth_threshold {
-            let mut vm_factory = self.state.vm_factory();
-            // consider put global callback in ext
-            let mut ext = self
-                .as_avm_externalities(unconfirmed_substate, tx.clone());
-            //TODO: make create/exec compatible with fastvm
-            let vm = vm_factory.create(VMType::AVM);
-            return vm.exec_v1(params, &mut ext);
-        }
+        // debug!(target: "vm", "depth threshold = {:?}", depth_threshold);
+        // if self.depth != depth_threshold {
+        //     let mut vm_factory = self.state.vm_factory();
+        //     // consider put global callback in ext
+        //     let mut ext = self
+        //         .as_avm_externalities(unconfirmed_substate, tx.clone());
+        //     //TODO: make create/exec compatible with fastvm
+        //     let vm = vm_factory.create(VMType::AVM);
+        //     return vm.exec_v1(params, &mut ext);
+        // }
 
         //Start in new thread with stack size needed up to max depth
         crossbeam::scope(|scope| {
@@ -973,7 +973,11 @@ Address};
 
     #[test]
     fn test_contract_address() {
-        let address = Address::from_slice(b"0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6");
+        let address = Address::from_slice(
+            "a03d13c46e913fee9316f363513d085915654c0bcda55bd7b4d8d2c7889b288f"
+            .from_hex()
+            .unwrap()
+            .as_slice());
         let expected_address = Address::from_slice(
             "a016b8bcce0d4c68b7e8c92ffd89ac633124c30447cd5cf48c1eb264308d5afb"
                 .from_hex()
@@ -982,7 +986,7 @@ Address};
         ); //Address::from_slice(b"3f09c73a5ed19289fb9bdc72f1742566df146f56");
         assert_eq!(
             expected_address,
-            contract_address(&address, &U256::from(88),).0
+            contract_address(&address, &U256::from(3),).0
         );
     }
 

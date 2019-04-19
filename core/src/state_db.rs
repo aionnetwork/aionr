@@ -472,6 +472,14 @@ impl state::Backend for StateDB {
         cache.insert(hash, code);
     }
 
+    fn clear_cache(&mut self, piece: u8) {
+        let mut cache = self.account_cache.lock();
+        match piece {
+            0x00 => cache.accounts.clear(),
+            _ => cache.avm_accounts.clear()
+        }
+    }
+
     fn get_cached_account(&self, addr: &Address) -> Option<Option<FVMAccount>> {
         let mut cache = self.account_cache.lock();
         if !Self::is_allowed(addr, &self.parent_hash, &cache.modifications) {
