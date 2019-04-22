@@ -91,7 +91,7 @@ impl SyncStorage {
         SENT_TRANSACTION_HASHES.set(Mutex::new(LruCache::new(MAX_CACHED_TRANSACTION_HASHES)));
         RECEIVED_TRANSACTIONS.set(Mutex::new(VecDeque::new()));
         BLOCK_CHAIN.write().inner = Some(client);
-        BLOCK_HEADER_CHAIN.write().inner = Some(header_chain);;
+        BLOCK_HEADER_CHAIN.write().inner = Some(header_chain);
         SYNC_EXECUTORS.write().inner = Some(sync_executor);
     }
 

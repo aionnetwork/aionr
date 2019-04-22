@@ -101,7 +101,7 @@ fn benchtest_sync_mainnet() {
         }
     }
 
-    // network_manager.stop_network();
+    network_manager.stop_network();
 
     let duration = start_time.elapsed().unwrap();
 
@@ -109,7 +109,7 @@ fn benchtest_sync_mainnet() {
         "[benchtest_sync_mainnet] Duration of sync 1000 blocks(ms): {:#?}",
         duration.subsec_millis() as u64 + duration.as_secs() * 1000
     );
-    assert!(duration < Duration::from_secs(70));
+    assert!(duration < Duration::from_secs(90));
 
     let chain_info = client.chain_info();
     assert!(chain_info.best_block_number >= 1000);
@@ -118,7 +118,8 @@ fn benchtest_sync_mainnet() {
         block_1000.hash()
             == H256::from("0x765baf520b24fb81f95d2f7f9fa28069a203b372f66401f947c5e5a62735bb22")
     );
-    remove_test_db("./sync_mainnet/")
+    remove_test_db("./sync_mainnet/");
+    P2pMgr::reset()
 }
 
 #[test]
@@ -148,6 +149,7 @@ fn benchtest_sync_storage_get_client() {
 
     assert!(duration < Duration::from_secs(1));
     remove_test_db("./sync_storage_get_client/");
+    P2pMgr::reset()
 }
 
 #[test]
@@ -176,6 +178,7 @@ fn benchtest_sync_storage_get_block_chain() {
     );
     assert!(duration < Duration::from_secs(1));
     remove_test_db("./sync_storage_get_block_chain/");
+    P2pMgr::reset()
 }
 
 #[test]

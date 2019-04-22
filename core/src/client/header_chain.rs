@@ -338,7 +338,7 @@ impl HeaderChain {
     /// the header.
     pub fn insert(
         &self,
-        mut transaction: DBTransaction,
+        transaction: DBTransaction,
         header: &encoded::Header,
         transition_proof: Option<Vec<u8>>,
         is_force_reorg: bool,
@@ -352,7 +352,7 @@ impl HeaderChain {
     /// This blindly trusts that the data given to it is sensible.
     pub fn insert_with_td(
         &self,
-        mut transaction: DBTransaction,
+        transaction: DBTransaction,
         header: &encoded::Header,
         total_difficulty: Option<U256>,
         transition_proof: Option<Vec<u8>>,
@@ -869,24 +869,22 @@ impl<'a> Iterator for AncestryIter<'a> {
 
 #[cfg(test)]
 mod tests {
-    use super::{HeaderChain, HardcodedSync};
-    use std::sync::Arc;
+    use super::HeaderChain;
 
     use header::Header;
     use ids::BlockId;
     use spec::Spec;
     use aion_types::U256;
-    use kvdb::{KeyValueDB,DBTransaction};
+    use kvdb::DBTransaction;
 
-    use std::time::Duration;
     use std::path::Path;
-    use parking_lot::Mutex;
 
     #[test]
     fn basic_chain() {
         let spec = Spec::new_test();
         let genesis_header = spec.genesis_header();
         let path = Path::new("./test_HC");
+        let _ = ::std::fs::remove_dir_all(path);
 
         let chain = HeaderChain::new(path.clone(), &spec).unwrap();
 
@@ -901,17 +899,14 @@ mod tests {
             parent_hash = header.hash();
 
             let mut tx = DBTransaction::new();
-            let pending = chain
-                .insert(&mut tx, &header.encoded(), None, false)
-                .unwrap();
-            chain.apply_pending(tx, pending);
+            let _ = chain.insert(tx, &header.encoded(), None, false).unwrap();
 
             rolling_timestamp += 10;
         }
 
         assert!(chain.block_header(BlockId::Number(10)).is_some());
         assert!(chain.block_header(BlockId::Number(9000)).is_some());
-        ::std::fs::remove_dir_all(path);
+        let _ = ::std::fs::remove_dir_all(path);
     }
 
     #[test]
@@ -919,6 +914,7 @@ mod tests {
         let spec = Spec::new_test();
         let genesis_header = spec.genesis_header();
         let path = Path::new("./test_HC");
+        let _ = ::std::fs::remove_dir_all(path);
 
         let chain = HeaderChain::new(path.clone(), &spec).unwrap();
 
@@ -933,10 +929,7 @@ mod tests {
             parent_hash = header.hash();
 
             let mut tx = DBTransaction::new();
-            let pending = chain
-                .insert(&mut tx, &header.encoded(), None, false)
-                .unwrap();
-            chain.apply_pending(tx, pending);
+            let _ = chain.insert(tx, &header.encoded(), None, false).unwrap();
 
             rolling_timestamp += 10;
         }
@@ -953,10 +946,7 @@ mod tests {
                 parent_hash = header.hash();
 
                 let mut tx = DBTransaction::new();
-                let pending = chain
-                    .insert(&mut tx, &header.encoded(), None, false)
-                    .unwrap();
-                chain.apply_pending(tx, pending);
+                let _ = chain.insert(tx, &header.encoded(), None, false).unwrap();
 
                 rolling_timestamp += 10;
             }
@@ -977,10 +967,7 @@ mod tests {
                 parent_hash = header.hash();
 
                 let mut tx = DBTransaction::new();
-                let pending = chain
-                    .insert(&mut tx, &header.encoded(), None, false)
-                    .unwrap();
-                chain.apply_pending(tx, pending);
+                let _ = chain.insert(tx, &header.encoded(), None, false).unwrap();
 
                 rolling_timestamp += 11;
             }
@@ -996,13 +983,14 @@ mod tests {
             canon_hash = header.parent_hash();
             num -= 1;
         }
-        ::std::fs::remove_dir_all(path);
+        let _ = ::std::fs::remove_dir_all(path);
     }
 
     #[test]
     fn earliest_is_latest() {
         let spec = Spec::new_test();
         let path = Path::new("./test_HC");
+        let _ = ::std::fs::remove_dir_all(path);
 
         let chain = HeaderChain::new(path.clone(), &spec).unwrap();
 
@@ -1012,7 +1000,7 @@ mod tests {
             chain.block_header(BlockId::Earliest).unwrap(),
             chain.block_header(BlockId::Latest).unwrap()
         );
-        ::std::fs::remove_dir_all(path);
+        let _ = ::std::fs::remove_dir_all(path);
     }
 
     #[test]
@@ -1020,6 +1008,7 @@ mod tests {
         let spec = Spec::new_test();
         let genesis_header = spec.genesis_header();
         let path = Path::new("./test_HC");
+        let _ = ::std::fs::remove_dir_all(path);
 
         {
             let chain = HeaderChain::new(path.clone(), &spec).unwrap();
@@ -1034,10 +1023,7 @@ mod tests {
                 parent_hash = header.hash();
 
                 let mut tx = DBTransaction::new();
-                let pending = chain
-                    .insert(&mut tx, &header.encoded(), None, false)
-                    .unwrap();
-                chain.apply_pending(tx, pending);
+                let _ = chain.insert(tx, &header.encoded(), None, false).unwrap();
 
                 rolling_timestamp += 10;
             }
@@ -1047,7 +1033,7 @@ mod tests {
         assert!(chain.block_header(BlockId::Number(6800)).is_none());
         assert!(chain.block_header(BlockId::Number(9000)).is_some());
         assert_eq!(chain.block_header(BlockId::Latest).unwrap().number(), 9999);
-        ::std::fs::remove_dir_all(path);
+        let _ = ::std::fs::remove_dir_all(path);
     }
 
     #[test]
@@ -1055,6 +1041,7 @@ mod tests {
         let spec = Spec::new_test();
         let genesis_header = spec.genesis_header();
         let path = Path::new("./test_HC");
+        let _ = ::std::fs::remove_dir_all(path);
 
         {
             let chain = HeaderChain::new(path.clone(), &spec).unwrap();
@@ -1071,13 +1058,12 @@ mod tests {
                 parent_hash = header.hash();
 
                 let mut tx = DBTransaction::new();
-                let pending = chain
-                    .insert(&mut tx, &header.encoded(), None, false)
-                    .unwrap();
-                chain.apply_pending(tx, pending);
+                let _ = chain.insert(tx, &header.encoded(), None, false).unwrap();
 
                 rolling_timestamp += 10;
             }
+
+            let mut parent_hash = genesis_header.hash();
 
             // push fewer high-difficulty blocks.
             for i in 1..11 {
@@ -1090,10 +1076,7 @@ mod tests {
                 parent_hash = header.hash();
 
                 let mut tx = DBTransaction::new();
-                let pending = chain
-                    .insert(&mut tx, &header.encoded(), None, false)
-                    .unwrap();
-                chain.apply_pending(tx, pending);
+                let _ = chain.insert(tx, &header.encoded(), None, false).unwrap();
 
                 rolling_timestamp += 10;
             }
@@ -1105,7 +1088,7 @@ mod tests {
         let chain = HeaderChain::new(path.clone(), &spec).unwrap();
         assert_eq!(chain.block_header(BlockId::Latest).unwrap().number(), 10);
         assert!(chain.candidates.read().get(&100).is_some());
-        ::std::fs::remove_dir_all(path);
+        let _ = ::std::fs::remove_dir_all(path);
     }
 
     #[test]
@@ -1113,6 +1096,7 @@ mod tests {
         let spec = Spec::new_test();
         let genesis_header = spec.genesis_header();
         let path = Path::new("./test_HC");
+        let _ = ::std::fs::remove_dir_all(path);
 
         let chain = HeaderChain::new(path.clone(), &spec).unwrap();
 
@@ -1123,7 +1107,85 @@ mod tests {
                 .block_header(BlockId::Hash(genesis_header.hash()))
                 .is_some()
         );
-        ::std::fs::remove_dir_all(path);
+        let _ = ::std::fs::remove_dir_all(path);
+    }
+
+    #[test]
+    fn force_reorganize() {
+        let spec = Spec::new_test();
+        let genesis_header = spec.genesis_header();
+        let path = Path::new("./test_HC");
+        let _ = ::std::fs::remove_dir_all(path);
+
+        {
+            let chain = HeaderChain::new(path.clone(), &spec).unwrap();
+            let mut parent_hash = genesis_header.hash();
+            let mut rolling_timestamp = genesis_header.timestamp();
+
+            // push 100 low-difficulty blocks.
+            for i in 1..1801 {
+                let mut header = Header::new();
+                header.set_parent_hash(parent_hash);
+                header.set_number(i);
+                header.set_timestamp(rolling_timestamp);
+                header.set_difficulty(*genesis_header.difficulty() * i as u32);
+                parent_hash = header.hash();
+
+                let mut tx = DBTransaction::new();
+                let _ = chain.insert(tx, &header.encoded(), None, false).unwrap();
+
+                rolling_timestamp += 10;
+            }
+            let mut scores = Vec::new();
+            for i in 1801..2050 {
+                let mut header = Header::new();
+                header.set_parent_hash(parent_hash);
+                header.set_number(i);
+                header.set_timestamp(rolling_timestamp);
+                header.set_difficulty(*genesis_header.difficulty() * i as u32 * 2u32);
+                parent_hash = header.hash();
+
+                let mut tx = DBTransaction::new();
+                let _ = chain.insert(tx, &header.encoded(), None, false).unwrap();
+                scores.push(chain.score(BlockId::Number(i)).unwrap());
+
+                rolling_timestamp += 10;
+            }
+
+            parent_hash = chain.block_header(BlockId::Number(1800)).unwrap().hash();
+
+            // push fewer high-difficulty blocks.
+            for i in 1801..2049 {
+                let mut header = Header::new();
+                header.set_parent_hash(parent_hash);
+                header.set_number(i);
+                header.set_timestamp(rolling_timestamp);
+                header.set_difficulty(*genesis_header.difficulty() * i as u32);
+                parent_hash = header.hash();
+
+                let mut tx = DBTransaction::new();
+                let _ = chain.insert(tx, &header.encoded(), None, true).unwrap();
+                chain.flush();
+                assert!(chain.score(BlockId::Number(i)).unwrap() != scores[i as usize - 1801usize]);
+
+                rolling_timestamp += 10;
+            }
+            let mut header = Header::new();
+            header.set_parent_hash(parent_hash);
+            header.set_number(2049);
+            header.set_timestamp(rolling_timestamp);
+            header.set_difficulty(*genesis_header.difficulty() * 2049 as u32 * 10000u32);
+            parent_hash = header.hash();
+
+            let mut tx = DBTransaction::new();
+            let _ = chain.insert(tx, &header.encoded(), None, true).unwrap();
+        }
+
+        // after restoration, non-canonical eras should still be loaded.
+        let chain = HeaderChain::new(path.clone(), &spec).unwrap();
+        assert_eq!(chain.block_header(BlockId::Latest).unwrap().number(), 2049);
+        assert!(chain.candidates.read().get(&100).is_some());
+        let _ = ::std::fs::remove_dir_all(path);
     }
 
 }

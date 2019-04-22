@@ -214,7 +214,6 @@ impl Client {
         let block_queue = BlockQueue::new(
             config.queue.clone(),
             engine.clone(),
-            message_channel.clone(),
             config.verifier_type.verifying_seal(),
         );
 

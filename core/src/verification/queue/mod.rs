@@ -31,10 +31,8 @@ use std::collections::{VecDeque, HashSet, HashMap};
 use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
 use parking_lot::{Condvar, Mutex, RwLock};
-use io::*;
 use error::*;
 use engines::EthEngine;
-use service::*;
 
 use self::kind::{BlockLike, Kind};
 
@@ -148,7 +146,6 @@ pub struct VerificationQueue<K: Kind> {
     more_to_verify: Arc<SCondvar>,
     verification: Arc<Verification<K>>,
     deleting: Arc<AtomicBool>,
-    ready_signal: Arc<QueueSignal>,
     empty: Arc<SCondvar>,
     processing: RwLock<HashMap<H256, U256>>, // hash to difficulty
     ticks_since_adjustment: AtomicUsize,
@@ -158,52 +155,6 @@ pub struct VerificationQueue<K: Kind> {
     verifier_handles: Vec<JoinHandle<()>>,
     state: Arc<(Mutex<State>, Condvar)>,
     total_difficulty: RwLock<U256>,
-}
-
-struct QueueSignal {
-    deleting: Arc<AtomicBool>,
-    signalled: AtomicBool,
-    message_channel: Mutex<IoChannel<ClientIoMessage>>,
-}
-
-impl QueueSignal {
-    fn set_sync(&self) {
-        // Do not signal when we are about to close
-        if self.deleting.load(AtomicOrdering::Relaxed) {
-            return;
-        }
-
-        if self
-            .signalled
-            .compare_and_swap(false, true, AtomicOrdering::Relaxed)
-            == false
-        {
-            let channel = self.message_channel.lock().clone();
-            if let Err(e) = channel.send_sync(ClientIoMessage::BlockVerified) {
-                debug!(target: "verification","Error sending BlockVerified message: {:?}", e);
-            }
-        }
-    }
-
-    fn set_async(&self) {
-        // Do not signal when we are about to close
-        if self.deleting.load(AtomicOrdering::Relaxed) {
-            return;
-        }
-
-        if self
-            .signalled
-            .compare_and_swap(false, true, AtomicOrdering::Relaxed)
-            == false
-        {
-            let channel = self.message_channel.lock().clone();
-            if let Err(e) = channel.send(ClientIoMessage::BlockVerified) {
-                debug!(target:"verification","Error sending BlockVerified message: {:?}", e);
-            }
-        }
-    }
-
-    fn reset(&self) { self.signalled.store(false, AtomicOrdering::Relaxed); }
 }
 
 struct Verification<K: Kind> {
@@ -220,13 +171,7 @@ struct Verification<K: Kind> {
 
 impl<K: Kind> VerificationQueue<K> {
     /// Creates a new queue instance.
-    pub fn new(
-        config: Config,
-        engine: Arc<EthEngine>,
-        message_channel: IoChannel<ClientIoMessage>,
-        check_seal: bool,
-    ) -> Self
-    {
+    pub fn new(config: Config, engine: Arc<EthEngine>, check_seal: bool) -> Self {
         let verification = Arc::new(Verification {
             unverified: Mutex::new(VecDeque::new()),
             verifying: Mutex::new(VecDeque::new()),
@@ -243,11 +188,6 @@ impl<K: Kind> VerificationQueue<K> {
         });
         let more_to_verify = Arc::new(SCondvar::new());
         let deleting = Arc::new(AtomicBool::new(false));
-        let ready_signal = Arc::new(QueueSignal {
-            deleting: deleting.clone(),
-            signalled: AtomicBool::new(false),
-            message_channel: Mutex::new(message_channel),
-        });
         let empty = Arc::new(SCondvar::new());
         let scale_verifiers = config.verifier_settings.scale_verifiers;
 
@@ -269,14 +209,13 @@ impl<K: Kind> VerificationQueue<K> {
             let verification = verification.clone();
             let engine = engine.clone();
             let wait = more_to_verify.clone();
-            let ready = ready_signal.clone();
             let empty = empty.clone();
             let state = state.clone();
 
             let handle = thread::Builder::new()
                 .name(format!("Verifier #{}", i))
                 .spawn(move || {
-                    VerificationQueue::verify(verification, engine, wait, ready, empty, state, i)
+                    VerificationQueue::verify(verification, engine, wait, empty, state, i)
                 })
                 .expect("Failed to create verifier thread.");
             verifier_handles.push(handle);
@@ -284,7 +223,6 @@ impl<K: Kind> VerificationQueue<K> {
 
         VerificationQueue {
             engine: engine,
-            ready_signal: ready_signal,
             more_to_verify: more_to_verify,
             verification: verification,
             deleting: deleting,
@@ -304,7 +242,6 @@ impl<K: Kind> VerificationQueue<K> {
         verification: Arc<Verification<K>>,
         engine: Arc<EthEngine>,
         wait: Arc<SCondvar>,
-        ready: Arc<QueueSignal>,
         empty: Arc<SCondvar>,
         state: Arc<(Mutex<State>, Condvar)>,
         id: usize,
@@ -801,7 +738,6 @@ impl<K: Kind> Drop for VerificationQueue<K> {
 
 #[cfg(test)]
 mod tests {
-    use io::*;
     use spec::*;
     use super::{BlockQueue, Config, State};
     use super::kind::blocks::Unverified;
@@ -817,7 +753,7 @@ mod tests {
 
         let mut config = Config::default();
         config.verifier_settings.scale_verifiers = auto_scale;
-        BlockQueue::new(config, engine, IoChannel::disconnected(), true)
+        BlockQueue::new(config, engine, true)
     }
 
     #[test]
@@ -825,7 +761,7 @@ mod tests {
         // TODO better test
         let spec = Spec::new_test();
         let engine = spec.engine;
-        let _ = BlockQueue::new(Config::default(), engine, IoChannel::disconnected(), true);
+        let _ = BlockQueue::new(Config::default(), engine, true);
     }
 
     #[test]
@@ -913,7 +849,7 @@ mod tests {
         let engine = spec.engine;
         let mut config = Config::default();
         config.max_mem_use = super::MIN_MEM_LIMIT; // empty queue uses about 15000
-        let queue = BlockQueue::new(config, engine, IoChannel::disconnected(), true);
+        let queue = BlockQueue::new(config, engine, true);
         assert!(!queue.queue_info().is_full());
         let mut blocks = get_good_dummy_block_seq(50);
         for b in blocks.drain(..) {
