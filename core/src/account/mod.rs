@@ -683,25 +683,25 @@ macro_rules! impl_account {
                 db: &HashStore,
             )
             {
-                // always cache object graph and key/value storage root
-                println!("try to get object graph from: {:?}", self.delta_root);
-                match db.get(&self.delta_root) {
-                    Some(data) => {
-                        self.object_graph_size = Some(data.len());
-                        self.objectgraph_hash = blake2b(&data);
-                        self.object_graph_cache = Arc::new(data[..].to_vec());
-                    },
-                    None => {
-                        self.object_graph_size = None;
-                        self.objectgraph_hash = BLAKE2B_EMPTY;
-                    }
-                }
 
                 if let Some(root) = db.get(a) {
                     self.storage_root = root[..].into();
                     // if storage_root has been stored, it should be avm created account
                     self.account_type = AccType::AVM;
                     self.vm_create = true;
+                    // always cache object graph and key/value storage root
+                    println!("try to get object graph from: {:?}", self.delta_root);
+                    match db.get(&self.delta_root) {
+                        Some(data) => {
+                            self.object_graph_size = Some(data.len());
+                            self.objectgraph_hash = blake2b(&data);
+                            self.object_graph_cache = Arc::new(data[..].to_vec());
+                        },
+                        None => {
+                            self.object_graph_size = None;
+                            self.objectgraph_hash = BLAKE2B_EMPTY;
+                        }
+                    }
                 }
 
                 if let RequireCache::None = require {

@@ -268,6 +268,29 @@ pub struct ActionParams {
     pub nonce: u64,
 }
 
+impl Default for ActionParams {
+    fn default() -> Self {
+        ActionParams {
+            code_address: Address::default(),
+            code_hash: None,
+            address: Address::default(),
+            sender: Address::default(),
+            origin: Address::default(),
+            gas: U256::default(),
+            gas_price: U256::default(),
+            value: ActionValue::Transfer(0.into()),
+            code: None,
+            data: None,
+            call_type: CallType::None,
+            static_flag: false,
+            params_type: ParamsType::Embedded,
+            transaction_hash: H256::default(),
+            original_transaction_hash: H256::default(),
+            nonce: 0
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

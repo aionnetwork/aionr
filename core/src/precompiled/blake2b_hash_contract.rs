@@ -135,9 +135,9 @@ mod tests {
         let result = contract.execute(&mut ext, &input);
         assert!(result.status_code == ExecStatus::Success);
         let ret_data = result.return_data;
-        assert_eq!(ret_data.mem.len(), 32);
+        assert_eq!((*ret_data).len(), 32);
         let expected = "aa6648de0988479263cf3730a48ef744d238b96a5954aa77d647ae965d3f7715";
-        assert_eq!(to_hex(&ret_data.mem), expected);
+        assert_eq!(to_hex(&*ret_data), expected);
     }
 
     #[test]
@@ -151,9 +151,9 @@ mod tests {
         let result = contract.execute(&mut ext, &input);
         assert!(result.status_code == ExecStatus::Success);
         let ret_data = result.return_data;
-        assert_eq!(ret_data.mem.len(), 32);
+        assert_eq!((*ret_data).len(), 32);
         let expected = "92cdf578c47085a5992256f0dcf97d0b19f1f1c9de4d5fe30c3ace6191b6e5db";
-        assert_eq!(to_hex(&ret_data.mem), expected);
+        assert_eq!(to_hex(&*ret_data), expected);
     }
 
     // uncomment if uncomment box_syntax in root crate

@@ -498,7 +498,7 @@ mod test {
         assert!(!contract.connector.get_initialized(&mut ext));
         let result = contract.execute(&mut ext, &input);
         assert_eq!(
-            Address::from(result.return_data.mem.as_slice()),
+            Address::from(&*result.return_data),
             *OWNER_ADDRESS
         );
         assert!(contract.connector.get_initialized(&mut ext));
@@ -527,7 +527,7 @@ mod test {
         assert!(query_result.status_code == ExecStatus::Success);
         assert_eq!(
             new_owner,
-            H256::from(query_result.return_data.mem.as_slice())
+            H256::from(&*query_result.return_data)
         );
     }
 
@@ -633,7 +633,7 @@ mod test {
         input_data.extend_from_slice(&BridgeFuncSig::ActionMap.hash());
         input_data.extend_from_slice(&<[u8; 32]>::from(U256::from(payload_hash)));
         let bundle_result = contract.execute(&mut submit_bundle_ext, &input_data);
-        assert_eq!(bundle_result.return_data.mem, [0u8; 32]);
+        assert_eq!(*bundle_result.return_data, [0u8; 32]);
 
         //        let signatures:[u8; 96] = Vec::with_capacity((*MEMBERS).len());
         //        for k in &*MEMBERS {
@@ -649,7 +649,7 @@ mod test {
         // ATB-4, assert that transactionHash is now properly set
         // ATB-4, do one assert here to check that transactionHash is not set
         let submit_result = contract.execute(&mut submit_bundle_ext, &input_data);
-        assert_eq!(submit_result.return_data.mem, (*TX_HASH).0);
+        assert_eq!(*submit_result.return_data, (*TX_HASH).0);
 
         for b in &transfers {
             assert_eq!(submit_bundle_ext.balance(&b.get_recipient()), U256::from(1));
@@ -745,7 +745,7 @@ mod test {
         input_data.extend_from_slice(&BridgeFuncSig::ActionMap.hash());
         input_data.extend_from_slice(&<[u8; 32]>::from(U256::from(payload_hash)));
         let bundle_result = contract.execute(&mut submit_bundle_ext, &input_data);
-        assert_eq!(bundle_result.return_data.mem, [0u8; 32]);
+        assert_eq!(*bundle_result.return_data, [0u8; 32]);
 
         let submit_bundle_payload = "46d1cc292a40cefa06ce721343497e5e6700747efd7655092eac48681c72f3e49f2ef87500000000000000000000000000000080000000000000000000000000000001d000000000000000000000000000000320000000000000000000000000000003d000000000000000000000000000000480000000000000000000000000000005300000000000000000000000000000000a0fd923ca5e7218c4ba3c3801c26a617ecdbfdaebb9c76ce2eca166e7855efbb892cdf578c47085a5992256f0dcf97d0b19f1f1c9de4d5fe30c3ace6191b6e5db31237cdb79ae1dfa7ffb87cde7ea8a80352d300ee5ac758a6cddd19d671925ec581348337b0f3e148620173daaa5f94d00d881705dcbf0aa83efdaba61d2ede1eb8649214997574e20c464388a172420d25403682bbbb80c496831c8cc1f8f0d70b201352f24bf1c9770b99f8f71201821411cf414377c9b8c2dbcee61db87d67bee3bbfb37286d6a41378082e08c12af0084f0b1b92f77983f4c3394e91b5e90a420b072ce72f6a6833576ffa74ea21dcca4ce7c025dbee7b1dae478cba6f29f95f6b30745ba7cbab07ccc59fdc83be45649c4c964909b7675ff0b57b15f585bcfd554527e31708adfbfdcaa46092238b452331f9c438a3f8b2d891648252a20000000000000000000000000000000a0fd923ca5e7218c4ba3c3801c26a617ecdbfdaebb9c76ce2eca166e7855efbb892cdf578c47085a5992256f0dcf97d0b19f1f1c9de4d5fe30c3ace6191b6e5db31237cdb79ae1dfa7ffb87cde7ea8a80352d300ee5ac758a6cddd19d671925ec581348337b0f3e148620173daaa5f94d00d881705dcbf0aa83efdaba61d2ede1eb8649214997574e20c464388a172420d25403682bbbb80c496831c8cc1f8f0d70b201352f24bf1c9770b99f8f71201821411cf414377c9b8c2dbcee61db87d67bee3bbfb37286d6a41378082e08c12af0084f0b1b92f77983f4c3394e91b5e90a420b072ce72f6a6833576ffa74ea21dcca4ce7c025dbee7b1dae478cba6f29f95f6b30745ba7cbab07ccc59fdc83be45649c4c964909b7675ff0b57b15f585bcfd554527e31708adfbfdcaa46092238b452331f9c438a3f8b2d891648252a20000000000000000000000000000000a0000000000000000000000000000000100000000000000000000000000000001000000000000000000000000000000010000000000000000000000000000000100000000000000000000000000000001000000000000000000000000000000010000000000000000000000000000000100000000000000000000000000000001000000000000000000000000000000010000000000000000000000000000000100000000000000000000000000000005f0f3f194b9cdf222f5d0bba78cbc95d7eb121f10439e06574d4d9ff323e1bb911c43b516f7751475bc994ea42e26142ffa944e452924ba2a46b0df70a76505cbf80ac5265101380c0ce5fbe3620eb6a74fb5beaa59d5facf25817b6869c9c3ccf2da0c38b25bfc48daef5eee360ab31e88ede3912e7873a67322d184450ce6c5e08a21395db2e863588a90e2405de27f777aa878f1f3a9ce20e7a8971762b57f00000000000000000000000000000005ad584f372d53de182bf4ae386aadaf4ea062f4723ddf2682aab341fd819a9198f1a157d5b94431e9edf76eb9d94e2e3b522e5c9150cadaf74e47bb330de57d139d7c20009d03248fc36a30da2ce5af2160ac7cfd9169e329ab9549a5c839dd4393f990938fd25259f89205b386779f604df11973aba078fe298abddeef3538cedfb496cce3d5f72b1b2df8f983a182da08896714b2c432d5c3399b2ea83ffb1f00000000000000000000000000000005e949b381b7455a757a5c1148bdf8a91501549ac9a70e5165f57cc666c0ed1d0c2fa0db8ac66ddab8dd526170ef3f1d0de5fb3851895707ffe85af95c09dc8b0f93ed20c7079dc48d1502b4f136682e3079f034f19d37a4bf4cb6ecaef93f640318439830c36ef0ebf50cd849d1241df06e597bdbe7ec7f5e301df042b1661706e64c6854618d466300aaac89c51de2d375037b50043d7918171db9a37dae420a".from_hex().unwrap();
         let transfer_result = contract.execute(&mut submit_bundle_ext, &submit_bundle_payload);
@@ -756,7 +756,7 @@ mod test {
         // ATB-4 assert that transactionHash is now properly set
         // ATB-4, do one assert here to check that transactionHash is not set
         let submit_result = contract.execute(&mut submit_bundle_ext, &input_data);
-        assert_eq!(submit_result.return_data.mem, (*TX_HASH).0);
+        assert_eq!(*submit_result.return_data, (*TX_HASH).0);
 
         for b in &transfers {
             assert_eq!(submit_bundle_ext.balance(&b.get_recipient()), U256::from(1));
@@ -855,7 +855,7 @@ mod test {
             input_data.extend_from_slice(&<[u8; 32]>::from(U256::from(payload_hash)));
             let bundle_result = contract.execute(&mut submit_bundle_ext, &input_data);
 
-            assert_eq!(bundle_result.return_data.mem, [0u8; 32]);
+            assert_eq!(*bundle_result.return_data, [0u8; 32]);
         }
 
         let mut incorrect_relay_submit_bundle_ext = BuiltinExtImpl::new(
@@ -1505,7 +1505,7 @@ mod test {
         assert!(res.status_code == ExecStatus::Failure);
 
         let res = contract.execute(&mut ext, input_data.as_slice());
-        assert!(res.return_data.mem.is_empty(), true);
+        assert!((*res.return_data).is_empty(), true);
 
         for tx in transfers {
             assert_eq!(ext.balance(&tx.get_recipient()), U256::from(0));
@@ -1789,7 +1789,7 @@ mod test {
         let mut merged_payload = BridgeFuncSig::ActionMap.hash().to_vec();
         merged_payload.extend_from_slice(payload_hash.as_ref());
         let result = contract.execute(&mut ext, &merged_payload);
-        assert_eq!(result.return_data.mem, [0u8; 32]);
+        assert_eq!(*result.return_data, [0u8; 32]);
 
         assert!(transfer_result.status_code == ExecStatus::Failure);
         // check that nothing has been changed from the failed transfer
@@ -1837,7 +1837,7 @@ mod test {
         let mut merged_payload = BridgeFuncSig::ActionMap.hash().to_vec();
         merged_payload.extend_from_slice(payload_hash.as_ref());
         let result = contract.execute(&mut ext, &merged_payload);
-        assert_eq!(result.return_data.mem, [0u8; 32]);
+        assert_eq!(*result.return_data, [0u8; 32]);
 
         assert!(transfer_result.status_code == ExecStatus::Failure);
         // check that nothing has been changed from the failed transfer
@@ -1967,13 +1967,13 @@ mod test {
             .unwrap();
         let transfer_result = contract.execute(&mut ext, &call_payload);
         assert!(transfer_result.status_code == ExecStatus::Success);
-        assert_eq!(transfer_result.return_data.mem, DataWord::one().data);
+        assert_eq!((*transfer_result.return_data).to_vec(), DataWord::one().data);
 
         contract.connector.set_ring_locked(&mut ext, false);
 
         let transfer_result = contract.execute(&mut ext, &call_payload);
         assert!(transfer_result.status_code == ExecStatus::Success);
-        assert_eq!(transfer_result.return_data.mem, DataWord::zero().data);
+        assert_eq!((*transfer_result.return_data).to_vec(), DataWord::zero().data);
     }
 
     #[test]
@@ -1995,7 +1995,7 @@ mod test {
         let transfer_result = contract.execute(&mut ext, &call_payload);
         assert!(transfer_result.status_code == ExecStatus::Success);
         assert_eq!(
-            transfer_result.return_data.mem,
+            (*transfer_result.return_data).to_vec(),
             DataWord::new_with_int(3).data
         );
 
@@ -2004,7 +2004,7 @@ mod test {
         let transfer_result = contract.execute(&mut ext, &call_payload);
         assert!(transfer_result.status_code == ExecStatus::Success);
         assert_eq!(
-            transfer_result.return_data.mem,
+            (*transfer_result.return_data).to_vec(),
             DataWord::new_with_int(5).data
         );
 
@@ -2013,7 +2013,7 @@ mod test {
         let transfer_result = contract.execute(&mut ext, &call_payload);
         assert!(transfer_result.status_code == ExecStatus::Success);
         assert_eq!(
-            transfer_result.return_data.mem,
+            (*transfer_result.return_data).to_vec(),
             DataWord::new_with_int(10).data
         );
     }
@@ -2037,7 +2037,7 @@ mod test {
         let transfer_result = contract.execute(&mut ext, &call_payload);
         assert!(transfer_result.status_code == ExecStatus::Success);
         assert_eq!(
-            transfer_result.return_data.mem,
+            (*transfer_result.return_data).to_vec(),
             DataWord::new_with_int(5).data
         );
 
@@ -2046,7 +2046,7 @@ mod test {
         let transfer_result = contract.execute(&mut ext, &call_payload);
         assert!(transfer_result.status_code == ExecStatus::Success);
         assert_eq!(
-            transfer_result.return_data.mem,
+            (*transfer_result.return_data).to_vec(),
             DataWord::new_with_int(10).data
         );
     }

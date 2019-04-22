@@ -94,6 +94,6 @@ mod tests {
         let result = contract.execute(&mut ext, &vec![]);
         assert_eq!(result.status_code, ExecStatus::Success);
         let ret_data = result.return_data;
-        assert_eq!(to_hex(&ret_data.mem), random_txhash.as_ref().to_hex());
+        assert_eq!(to_hex(&*ret_data), random_txhash.as_ref().to_hex());
     }
 }

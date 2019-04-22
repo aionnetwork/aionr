@@ -1002,7 +1002,7 @@ impl<B: Backend> State<B> {
         F: Fn(Option<&AionVMAccount>) -> U,
     {
         // check local cache first
-        println!("search local cache");
+        debug!(target: "vm", "search local cache");
         if let Some(ref mut maybe_acc) = self.cache.borrow_mut().get_mut(a) {
             if let Some(ref mut account) = maybe_acc.account {
                 let accountdb = self
@@ -1015,7 +1015,7 @@ impl<B: Backend> State<B> {
             return Ok(f(None));
         }
         // check global cache
-        println!("search global cache");
+        debug!(target: "vm", "search global cache");
         let result = self.db.get_cached(a, |mut acc| {
             if let Some(ref mut account) = acc {
                 let accountdb = self
@@ -1229,7 +1229,7 @@ impl Clone for State<StateDB> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aion_types::{Address, H256, U128, U256};
+    use aion_types::{Address, H256, U256};
     use key::Ed25519Secret;
     use logger::init_log;
     use receipt::SimpleReceipt;
@@ -1435,7 +1435,7 @@ mod tests {
         assert_eq!(state.exists(&a).unwrap(), true);
         assert_eq!(state.exists_and_not_null(&a).unwrap(), true);
         assert_eq!(state.nonce(&a).unwrap(), U256::from(1u64));
-        state.kill_account(&a, AccType::FVM);
+        state.kill_account(&a);
         assert_eq!(state.exists(&a).unwrap(), false);
         assert_eq!(state.exists_and_not_null(&a).unwrap(), false);
         assert_eq!(state.nonce(&a).unwrap(), U256::from(0u64));
@@ -1524,7 +1524,7 @@ mod tests {
             .unwrap();
             assert_eq!(state.exists(&a).unwrap(), true);
             assert_eq!(state.nonce(&a).unwrap(), U256::from(1u64));
-            state.kill_account(&a, AccType::FVM);
+            state.kill_account(&a);
             state.commit().unwrap();
             assert_eq!(state.exists(&a).unwrap(), false);
             assert_eq!(state.nonce(&a).unwrap(), U256::from(0u64));
@@ -1669,6 +1669,6 @@ mod tests {
         let mut new_state = state.clone();
         new_state.set_storage(&a, vec![0x0b],vec![0x0d]).unwrap();
 
-        new_state.diff_from(state, AccType::FVM).unwrap();
+        new_state.diff_from(state).unwrap();
     }
 }

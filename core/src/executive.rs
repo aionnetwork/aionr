@@ -197,7 +197,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         println!("start executing {:?} transactions", txs.len());
         for t in txs {
             let sender = t.sender();
-            let nonce = self.state.nonce(&sender).unwrap();
+            let nonce = t.nonce;
 
             // 1. Check transaction nonce
             // if check_nonce && t.nonce != nonce {
@@ -209,15 +209,15 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
             // 2. Check gas limit
             // 2.1 Gas limit should not be less than the basic gas requirement
-            let base_gas_required: U256 = t.gas_required();
+            // let base_gas_required: U256 = t.gas_required();
             // if t.gas < base_gas_required {
             //     return vec![Err(From::from(ExecutionError::NotEnoughBaseGas {
             //         required: base_gas_required,
             //         got: t.gas,
             //     }))];
             // }
-            debug!(target: "vm", "base_gas_required = {}", base_gas_required);
-            println!("base_gas_required = {}", base_gas_required);
+            // debug!(target: "vm", "base_gas_required = {}", base_gas_required);
+            // println!("base_gas_required = {}", base_gas_required);
 
             // 2.2 Gas limit should not exceed the maximum gas limit depending on
             // the transaction's action type
@@ -257,7 +257,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             // }
 
             //TODO: gas limit for AVM; validate passed, just run AION VM
-            debug!(target: "vm", "tx gas = {:?}, base gas required = {:?}", t.gas, base_gas_required);
+            // debug!(target: "vm", "tx gas = {:?}, base gas required = {:?}", t.gas, base_gas_required);
             //let init_gas = t.gas - base_gas_required;
             let init_gas = t.gas;
 
@@ -1044,7 +1044,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1070,7 +1070,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1170,7 +1170,7 @@ Address};
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             println!("call executor");
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1197,7 +1197,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1224,7 +1224,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1251,7 +1251,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1278,7 +1278,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
 
         assert_eq!(status_code, ExecStatus::Revert);
@@ -1318,16 +1318,10 @@ Address};
             ex.create(params, &mut substate)
         };
 
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-
-        assert_eq!(mem, "60506040526000356c01000000000000000000000000900463ffffffff1680632d7df21a146100335761002d565b60006000fd5b341561003f5760006000fd5b6100666004808080601001359035909160200190919290803590601001909190505061007c565b6040518082815260100191505060405180910390f35b6000600060007f66fa32225b641331dff20698cd66d310b3149e86d875926af7ea2f2a9079e80b856040518082815260100191505060405180910390a18585915091506001841115156100d55783925061016456610163565b60018282632d7df21a898960018a036000604051601001526040518463ffffffff166c010000000000000000000000000281526004018084848252816010015260200182815260100193505050506010604051808303816000888881813b151561013f5760006000fd5b5af1151561014d5760006000fd5b5050505060405180519060100150019250610164565b5b505093925050505600a165627a7a72305820c4755a8b960e01280a2c8d85fae255d08e1be318b2c2685a948e7b42660c2f5c0029".from_hex().unwrap());
+        assert_eq!((*return_data).to_vec(), "60506040526000356c01000000000000000000000000900463ffffffff1680632d7df21a146100335761002d565b60006000fd5b341561003f5760006000fd5b6100666004808080601001359035909160200190919290803590601001909190505061007c565b6040518082815260100191505060405180910390f35b6000600060007f66fa32225b641331dff20698cd66d310b3149e86d875926af7ea2f2a9079e80b856040518082815260100191505060405180910390a18585915091506001841115156100d55783925061016456610163565b60018282632d7df21a898960018a036000604051601001526040518463ffffffff166c010000000000000000000000000281526004018084848252816010015260200182815260100193505050506010604051808303816000888881813b151561013f5760006000fd5b5af1151561014d5760006000fd5b5050505060405180519060100150019250610164565b5b505093925050505600a165627a7a72305820c4755a8b960e01280a2c8d85fae255d08e1be318b2c2685a948e7b42660c2f5c0029".from_hex().unwrap());
         assert_eq!(status_code, ExecStatus::Success);
 
-        let code = mem.clone();
+        let code = &(*return_data);
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -1335,7 +1329,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1357,7 +1351,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1392,7 +1386,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
         assert_eq!(status_code, ExecStatus::Revert);
     }
@@ -1430,16 +1424,10 @@ Address};
             ex.create(params, &mut substate)
         };
 
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-
         //assert_eq!(mem, "6080604052600436106049576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063b802926914604e578063f43fa80514606a575b600080fd5b60546092565b6040518082815260200191505060405180910390f35b348015607557600080fd5b50607c60b1565b6040518082815260200191505060405180910390f35b60003073ffffffffffffffffffffffffffffffffffffffff1631905090565b600080549050905600a165627a7a72305820b64352477fa36031aab85a988e2c96456bb81f07e01036304f21fc60137cc4610029".from_hex().unwrap());
         assert_eq!(status_code, ExecStatus::Success);
 
-        let code = mem.clone();
+        let code = &*return_data;
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -1447,7 +1435,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(10));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1466,13 +1454,13 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
 
         println!("return data = {:?}", return_data);
         assert_eq!(status_code, ExecStatus::Revert);
 
-        let code = mem.clone();
+        let code = &*return_data;
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -1480,7 +1468,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(89));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1500,7 +1488,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
     }
 
@@ -1537,16 +1525,10 @@ Address};
             ex.create(params, &mut substate)
         };
 
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-
         //assert_eq!(mem, "6080604052600436106049576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063b802926914604e578063f43fa80514606a575b600080fd5b60546092565b6040518082815260200191505060405180910390f35b348015607557600080fd5b50607c60b1565b6040518082815260200191505060405180910390f35b60003073ffffffffffffffffffffffffffffffffffffffff1631905090565b600080549050905600a165627a7a72305820b64352477fa36031aab85a988e2c96456bb81f07e01036304f21fc60137cc4610029".from_hex().unwrap());
         assert_eq!(status_code, ExecStatus::Success);
 
-        let code = mem.clone();
+        let code = &*return_data;
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -1554,7 +1536,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1578,7 +1560,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
 
         println!("return data = {:?}", return_data);
@@ -1620,19 +1602,15 @@ Address};
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
+
         assert_eq!(status_code, ExecStatus::Success);
-        assert_eq!(mem, "60506040523615610054576000356c01000000000000000000000000900463ffffffff1680631e4198e01461008f5780636d73ac71146100af578063cc8066c8146100f8578063efc81a8c1461012d57610054565b5b7f656718b7d7f0803b58a7a46a3a5ca0a26696492f223276e7a227baba40fb95b7346040518082815260100191505060405180910390a15b005b6100ad6004808080601001359035909160200190919290505061015e565b005b34156100bb5760006000fd5b6100e2600480808060100135903590916020019091929080359060100190919050506101c8565b6040518082815260100191505060405180910390f35b34156101045760006000fd5b61012b60048080806010013590359091602001909192908035906010019091905050610295565b005b34156101395760006000fd5b610141610300565b604051808383825281601001526020019250505060405180910390f35b81816108fc34908115029060405160006040518083038185898989f1945050505050151561018c5760006000fd5b7f281a259dfd2e4aaf4447339f7e35909b8a423be045a738057d6c3c01e8d1f5a2346040518082815260100191505060405180910390a15b5050565b60006000600060008686925092506002838363f65a554b886000604051601001526040518263ffffffff166c01000000000000000000000000028152600401808281526010019150506010604051808303816000888881813b151561022d5760006000fd5b5af1151561023b5760006000fd5b50505050604051805190601001500190507ff56ebbc311e11d9790970c4f650e868d7c17a8c35e5c268477d6933ae010d1f4826040518082815260100191505060405180910390a180935061028b565b5050509392505050565b82826108fc83908115029060405160006040518083038185898989f194505050505015156102c35760006000fd5b7f3f418b40de968f04f1770399699cdfb8221fb37431187bf6ba88c8ef1cde63de826040518082815260100191505060405180910390a15b505050565b600060006000600061031061037e565b604051809103906000f080158215161561032a5760006000fd5b915091507f6092db4a9f98e713a99420bc27f1f1cdfcfd435af45397aeb05ffbee8d567d8e8383604051808383825281601001526020019250505060405180910390a1818193509350610378565b50509091565b60405161013e8061038f833901905600605060405234156100105760006000fd5b610015565b61011a806100246000396000f300605060405236156030576000356c01000000000000000000000000900463ffffffff168063f65a554b14606b576030565b3415603b5760006000fd5b5b7f6684c6fb8e464ba954e17ed3f5aed6e2d49231ce285b7770f422d1f52cef503b60405160405180910390a15b005b341560765760006000fd5b608a600480803590601001909190505060a0565b6040518082815260100191505060405180910390f35b600060006001830190507f3bc83dc4da931c34301105d9c2aff52e35bb96133cd1cf0a835faa9bb607422c826040518082815260100191505060405180910390a180915060e8565b509190505600a165627a7a72305820ec84292d19105cb4d6f311689eed4db3cb4e4251249a9cf06f071e1746e74de60029a165627a7a723058209d38411c6f215aa8daa7dd8150890ea7576a1b0e117cedffc3c002a95810948e0029".from_hex().unwrap());
+        assert_eq!((*return_data).to_vec(), "60506040523615610054576000356c01000000000000000000000000900463ffffffff1680631e4198e01461008f5780636d73ac71146100af578063cc8066c8146100f8578063efc81a8c1461012d57610054565b5b7f656718b7d7f0803b58a7a46a3a5ca0a26696492f223276e7a227baba40fb95b7346040518082815260100191505060405180910390a15b005b6100ad6004808080601001359035909160200190919290505061015e565b005b34156100bb5760006000fd5b6100e2600480808060100135903590916020019091929080359060100190919050506101c8565b6040518082815260100191505060405180910390f35b34156101045760006000fd5b61012b60048080806010013590359091602001909192908035906010019091905050610295565b005b34156101395760006000fd5b610141610300565b604051808383825281601001526020019250505060405180910390f35b81816108fc34908115029060405160006040518083038185898989f1945050505050151561018c5760006000fd5b7f281a259dfd2e4aaf4447339f7e35909b8a423be045a738057d6c3c01e8d1f5a2346040518082815260100191505060405180910390a15b5050565b60006000600060008686925092506002838363f65a554b886000604051601001526040518263ffffffff166c01000000000000000000000000028152600401808281526010019150506010604051808303816000888881813b151561022d5760006000fd5b5af1151561023b5760006000fd5b50505050604051805190601001500190507ff56ebbc311e11d9790970c4f650e868d7c17a8c35e5c268477d6933ae010d1f4826040518082815260100191505060405180910390a180935061028b565b5050509392505050565b82826108fc83908115029060405160006040518083038185898989f194505050505015156102c35760006000fd5b7f3f418b40de968f04f1770399699cdfb8221fb37431187bf6ba88c8ef1cde63de826040518082815260100191505060405180910390a15b505050565b600060006000600061031061037e565b604051809103906000f080158215161561032a5760006000fd5b915091507f6092db4a9f98e713a99420bc27f1f1cdfcfd435af45397aeb05ffbee8d567d8e8383604051808383825281601001526020019250505060405180910390a1818193509350610378565b50509091565b60405161013e8061038f833901905600605060405234156100105760006000fd5b610015565b61011a806100246000396000f300605060405236156030576000356c01000000000000000000000000900463ffffffff168063f65a554b14606b576030565b3415603b5760006000fd5b5b7f6684c6fb8e464ba954e17ed3f5aed6e2d49231ce285b7770f422d1f52cef503b60405160405180910390a15b005b341560765760006000fd5b608a600480803590601001909190505060a0565b6040518082815260100191505060405180910390f35b600060006001830190507f3bc83dc4da931c34301105d9c2aff52e35bb96133cd1cf0a835faa9bb607422c826040518082815260100191505060405180910390a180915060e8565b509190505600a165627a7a72305820ec84292d19105cb4d6f311689eed4db3cb4e4251249a9cf06f071e1746e74de60029a165627a7a723058209d38411c6f215aa8daa7dd8150890ea7576a1b0e117cedffc3c002a95810948e0029".from_hex().unwrap());
         assert_eq!(state.balance(&sender).unwrap(), U256::from(90));
         assert_eq!(state.balance(&address).unwrap(), U256::from(10));
         assert_eq!(state.nonce(&address).unwrap(), U256::from(0));
 
         // Transfer value through contract
-        let code = mem.clone();
+        let code = &*return_data;
         let receiver = Address::from_slice(b"ef1722f3947def4cf144679da39c4c32bdc35681");
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -1640,7 +1618,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(10));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1655,7 +1633,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
         assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&sender).unwrap(), U256::from(80));
@@ -1670,7 +1648,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1686,7 +1664,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
         assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&sender).unwrap(), U256::from(80));
@@ -1701,7 +1679,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(210_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1715,15 +1693,11 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
         assert_eq!(status_code, ExecStatus::Success);
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-        let new_address = Address::from(mem.clone().as_slice());
+
+        let new_address = Address::from(&*return_data);
         assert_eq!(state.nonce(&address).unwrap(), U256::from(1));
         assert_eq!(state.nonce(&new_address).unwrap(), U256::from(1));
 
@@ -1734,7 +1708,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1750,15 +1724,11 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
         assert_eq!(status_code, ExecStatus::Success);
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-        assert_eq!(mem, "00000000000000000000000000000004".from_hex().unwrap());
+
+        assert_eq!((*return_data).to_vec(), "00000000000000000000000000000004".from_hex().unwrap());
         assert_eq!(state.nonce(&address).unwrap(), U256::from(1));
         assert_eq!(state.nonce(&new_address).unwrap(), U256::from(1));
     }
@@ -1993,14 +1963,9 @@ Address};
             ex.create(params, &mut substate)
         };
 
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
         //assert_eq!(mem, "6080604052600436106049576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063b802926914604e578063f43fa80514606a575b600080fd5b60546092565b6040518082815260200191505060405180910390f35b348015607557600080fd5b50607c60b1565b6040518082815260200191505060405180910390f35b60003073ffffffffffffffffffffffffffffffffffffffff1631905090565b600080549050905600a165627a7a72305820b64352477fa36031aab85a988e2c96456bb81f07e01036304f21fc60137cc4610029".from_hex().unwrap());
         assert_eq!(status_code, ExecStatus::Success);
-        let code = mem.clone();
+        let code = &*return_data;
 
         // Call non payable function with value transfer
         let mut params = ActionParams::default();
@@ -2009,7 +1974,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(1));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -2031,7 +1996,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
         println!("return data = {:?}", return_data);
         assert_eq!(status_code, ExecStatus::Revert);
@@ -2043,7 +2008,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -2065,7 +2030,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
         println!("return data = {:?}", return_data);
         assert_eq!(status_code, ExecStatus::Revert);
@@ -2160,20 +2125,16 @@ Address};
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
+
         assert_eq!(status_code, ExecStatus::Success);
-        let code = mem.clone();
+        let code = &*return_data;
         let mut params = ActionParams::default();
         params.address = address.clone();
         params.code_address = address.clone();
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(100);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -2190,7 +2151,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params, &mut substate, AccType::FVM)
+            ex.call(params, &mut substate)
         };
         assert_eq!(status_code, ExecStatus::OutOfGas);
     }
@@ -2227,13 +2188,8 @@ Address};
         };
         println!("exception: {:?}", exception);
         assert_eq!(status_code, ExecStatus::Success);
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-        let vec_empty: Vec<u8> = Vec::new();
-        assert_eq!(mem, vec_empty);
+
+        assert_eq!((*return_data).is_empty(), true);
         assert_eq!(state.commit().is_ok(), true);
         assert_eq!(
             state.root().to_vec(),
@@ -2277,7 +2233,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate, AccType::FVM)
+            ex.call(params.clone(), &mut substate)
         };
         assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(0));
@@ -2301,7 +2257,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate, AccType::FVM)
+            ex.call(params.clone(), &mut substate)
         };
         assert_eq!(status_code, ExecStatus::OutOfGas);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(0));
@@ -2325,7 +2281,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate, AccType::FVM)
+            ex.call(params.clone(), &mut substate)
         };
         assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(10));
@@ -2349,7 +2305,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate, AccType::FVM)
+            ex.call(params.clone(), &mut substate)
         };
         assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(20));
@@ -2372,7 +2328,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate, AccType::FVM)
+            ex.call(params.clone(), &mut substate)
         };
         assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(30));
@@ -2396,7 +2352,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate, AccType::FVM)
+            ex.call(params.clone(), &mut substate)
         };
         assert_eq!(status_code, ExecStatus::OutOfGas);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(30));
@@ -2420,7 +2376,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate, AccType::FVM)
+            ex.call(params.clone(), &mut substate)
         };
         assert_eq!(status_code, ExecStatus::OutOfGas);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(30));
@@ -2444,7 +2400,7 @@ Address};
             state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call(params.clone(), &mut substate, AccType::FVM)
+            ex.call(params.clone(), &mut substate)
         };
         assert_eq!(status_code, ExecStatus::OutOfGas);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(30));
@@ -2459,7 +2415,7 @@ Address};
         let mut code = read_file(file_str).expect("unable to open avm dapp");
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
         let address = contract_address(&sender, &U256::zero()).0;
-        let mut params = AVMActionParams::default();
+        let mut params = ActionParams::default();
         params.address = address.clone();
         params.sender = sender.clone();
         params.origin = sender.clone();
@@ -2468,7 +2424,7 @@ Address};
         println!("code of hello_avm = {:?}", code.len());
         avm_code.append(&mut code);
         params.code = Some(Arc::new(avm_code.clone()));
-        params.value = 0.into();
+        params.value = ActionValue::Transfer(0.into());
         params.call_type = CallType::None;
         params.gas_price = 1.into();
         let mut state = get_temp_state();
@@ -2486,7 +2442,7 @@ Address};
         for r in execution_results {
             let ExecutionResult {
                 status_code,
-                gas_left,
+                gas_left: _,
                 return_data,
                 exception: _,
                 state_root: _,
@@ -2494,7 +2450,7 @@ Address};
 
             assert_eq!(status_code, ExecStatus::Success);
 
-            params.address = return_data.mem.as_slice().into();
+            params.address = (*return_data).into();
             println!("return data = {:?}", return_data);
         }
 
@@ -2514,7 +2470,7 @@ Address};
         for r in execution_results {
             let ExecutionResult {
                 status_code,
-                gas_left,
+                gas_left: _,
                 return_data,
                 exception: _,
                 state_root,
@@ -2559,14 +2515,14 @@ Address};
     fn avm_balance_transfer() {
         let mut state = get_temp_state();
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-        let mut params = AVMActionParams::default();
+        let mut params = ActionParams::default();
         let address = contract_address(&sender, &U256::zero()).0;
         params.address = address.clone();
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
         params.code = Some(Arc::new(vec![]));
-        params.value = 100.into();
+        params.value = ActionValue::Transfer(100.into());
         params.call_type = CallType::BulkBalance;
         params.gas_price = 1.into();
         state
@@ -2577,7 +2533,7 @@ Address};
         let substate = Substate::new();
         let mut params2 = params.clone();
         params2.address = contract_address(&sender, &U256::one()).0;
-        params2.value = 99.into();
+        params2.value = ActionValue::Transfer(99.into());
         params2.nonce = params.nonce + 1;
         let results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
@@ -2601,7 +2557,7 @@ Address};
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
         let address = contract_address(&sender, &U256::zero()).0;
         println!("sender = {:?}, receiver = {:?}", sender, address);
-        let mut params = AVMActionParams::default();
+        let mut params = ActionParams::default();
         params.address = address.clone();
         params.sender = sender.clone();
         params.origin = sender.clone();
@@ -2609,7 +2565,7 @@ Address};
         let mut avm_code: Vec<u8> = (code.len() as u32).to_vm_bytes();
         avm_code.append(&mut code);
         params.code = Some(Arc::new(avm_code.clone()));
-        params.value = 0.into();
+        params.value = ActionValue::Transfer(0.into());
         params.call_type = CallType::None;
         params.gas_price = 1.into();
         let mut state = get_temp_state();
@@ -2644,12 +2600,12 @@ Address};
                 return_data, status_code, gas_left
             );
             assert_eq!(status_code, ExecStatus::Success);
-            avm_contract_addr = H256::from(return_data.mem.as_slice());
+            avm_contract_addr = H256::from(&*return_data);
         }
 
         // start api test
 
-        /// nonce test
+        // nonce test
         let calldata = AbiToken::STRING(String::from("getAddress")).encode();
         params.data = Some(calldata);
         params.call_type = CallType::Call;
@@ -2674,7 +2630,7 @@ Address};
         println!("get Address test");
         assert_eq!(execution_results.len(), 1);
         assert_eq!(execution_results[0].status_code, ExecStatus::Success);
-        assert_eq!(execution_results[0].return_data.mem[1..], avm_contract_addr.to_vec()[..]);
+        assert_eq!(execution_results[0].return_data[1..], avm_contract_addr.to_vec()[..]);
 
         // check caller
         params.nonce += 1;
@@ -2685,7 +2641,7 @@ Address};
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
-        assert_eq!(execution_results[0].return_data.mem[1..], sender.to_vec()[..]);
+        assert_eq!(execution_results[0].return_data[1..], sender.to_vec()[..]);
 
         // check origin
         params.nonce += 1;
@@ -2695,7 +2651,7 @@ Address};
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
-        assert_eq!(execution_results[0].return_data.mem[1..], sender.to_vec()[..]);
+        assert_eq!(*execution_results[0].return_data, sender.to_vec()[..]);
 
         // check gas limit
         params.nonce += 1;
@@ -2706,7 +2662,7 @@ Address};
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
-        assert_eq!(execution_results[0].return_data.mem[5..], 1_000_000i32.to_vm_bytes()[..]);
+        assert_eq!(*execution_results[0].return_data, 1_000_000i32.to_vm_bytes()[..]);
 
         // check energy price
         params.nonce += 1;
@@ -2717,19 +2673,19 @@ Address};
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
-        assert_eq!(execution_results[0].return_data.mem, vec![6,0,0,0,0,0,0,0,1]);
+        assert_eq!(*execution_results[0].return_data, [6,0,0,0,0,0,0,0,1]);
 
         // check value
         params.nonce += 1;
         params.gas = U256::from(1_000_000);
         let calldata = AbiToken::STRING(String::from("getValue")).encode();
         params.data = Some(calldata);
-        params.value = 10.into();
+        params.value = ActionValue::Transfer(10.into());
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
-        assert_eq!(execution_results[0].return_data.mem, vec![6,0,0,0,0,0,0,0,10]);
+        assert_eq!(*execution_results[0].return_data, [6,0,0,0,0,0,0,0,10]);
 
         // check call data
         params.nonce += 1;
@@ -2740,7 +2696,7 @@ Address};
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
-        assert_eq!(execution_results[0].return_data.mem[3..], calldata[..]);
+        assert_eq!(*execution_results[0].return_data, calldata[..]);
 
         // check balance
         params.nonce += 1;
@@ -2754,24 +2710,24 @@ Address};
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
-        assert_eq!(execution_results[0].return_data.mem[1..], 1000_000i64.to_vm_bytes()[..]);
+        assert_eq!(*execution_results[0].return_data, 1000_000i64.to_vm_bytes()[..]);
 
         // get Balance of this contract
         params.nonce += 1;
         params.gas = U256::from(1_000_000);
-        params.value = 100.into();
+        params.value = ActionValue::Transfer(100.into());
         let calldata = AbiToken::STRING(String::from("getBalanceOfThisContract")).encode();
         params.data = Some(calldata.clone());
         let execution_results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
-        assert_eq!(execution_results[0].return_data.mem[1..], 130i64.to_vm_bytes()[..]);
+        assert_eq!(*execution_results[0].return_data, 130i64.to_vm_bytes()[..]);
 
         // get code size
         params.nonce += 1;
         params.gas = U256::from(1_000_000);
-        params.value = 0.into();
+        params.value = ActionValue::Transfer(0.into());
         let mut calldata = AbiToken::STRING(String::from("getCodeSize")).encode();
         calldata.append(&mut AbiToken::ADDRESS(params.address.into()).encode());
         params.data = Some(calldata);
@@ -2780,7 +2736,7 @@ Address};
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
         assert_eq!(execution_results[0].status_code, ExecStatus::Success);
-        assert_eq!(execution_results[0].return_data.mem, vec![5,0,0,8,218]);
+        assert_eq!(*execution_results[0].return_data, [5,0,0,8,218]);
 
         // get remaining energy
         params.nonce += 1;
@@ -2792,7 +2748,7 @@ Address};
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
 
-        assert_eq!(execution_results[0].return_data.mem, vec![6,0,0,0,0,0,14,79,212]);
+        assert_eq!(*execution_results[0].return_data, [6,0,0,0,0,0,14,79,212]);
 
         // TODO: check internal call
         // params.nonce += 1;
@@ -2887,7 +2843,7 @@ Address};
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
         assert_eq!(execution_results[0].status_code, ExecStatus::Success);
-        assert_eq!(execution_results[0].return_data.mem[3..], blake2b("hello, blake2b").to_vec()[..]);
+        assert_eq!(*execution_results[0].return_data, blake2b("hello, blake2b").to_vec()[..]);
 
         // sha256
         params.nonce += 1;
@@ -2899,7 +2855,7 @@ Address};
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
         assert_eq!(execution_results[0].status_code, ExecStatus::Success);
-        assert_eq!(execution_results[0].return_data.mem, vec![17,0,32,98,132,122,94,185,133,98,40,127,178,107,222,247,1,111,31,169,113,128,151,99,164,146,150,105,16,173,247,28,178,211,73]);
+        assert_eq!(*execution_results[0].return_data, [17u8,0,32,98,132,122,94,185,133,98,40,127,178,107,222,247,1,111,31,169,113,128,151,99,164,146,150,105,16,173,247,28,178,211,73][..]);
 
         // keccak256
         params.nonce += 1;
@@ -2911,7 +2867,8 @@ Address};
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
         assert_eq!(execution_results[0].status_code, ExecStatus::Success);
-        assert_eq!(execution_results[0].return_data.mem, vec![17,0,32,147,4,57,80,130,117,118,23,106,198,145,248,200,139,87,84,3,84,98,205,14,113,26,143,224,146,145,39,170,143,62,89]);
+        assert_eq!((*execution_results[0].return_data).len(), 35);
+        assert_eq!(*execution_results[0].return_data, [17u8,0,32,147,4,57,80,130,117,118,23,106,198,145,248,200,139,87,84,3,84,98,205,14,113,26,143,224,146,145,39,170,143,62,89][..]);
 
         // revert
         params.nonce += 1;      // nonce = 19

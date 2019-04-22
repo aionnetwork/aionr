@@ -152,7 +152,7 @@ mod tests {
         assert_eq!(result.status_code, ExecStatus::Success);
         let ret_data = result.return_data;
         let expected = "fff4317ae351bda5e4fa24352904a9366d3a89e38d1ffa51498ba9acfbc65724";
-        assert_eq!(to_hex(&ret_data.mem), expected);
+        assert_eq!(to_hex(&*ret_data), expected);
     }
 
     #[test]
@@ -167,7 +167,7 @@ mod tests {
         assert_eq!(result.status_code, ExecStatus::Success);
         let ret_data = result.return_data;
         let expected = "0000000000000000000000000000000000000000000000000000000000000000";
-        assert_eq!(to_hex(&ret_data.mem), expected);
+        assert_eq!(to_hex(&*ret_data), expected);
     }
 
     #[test]
@@ -186,7 +186,7 @@ mod tests {
         assert_eq!(result.status_code, ExecStatus::Success);
         let ret_data = result.return_data;
         let expected = "0000000000000000000000000000000000000000000000000000000000000000";
-        assert_eq!(to_hex(&ret_data.mem), expected);
+        assert_eq!(to_hex(&*ret_data), expected);
     }
 
     #[test]

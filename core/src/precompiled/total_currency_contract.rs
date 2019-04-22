@@ -348,7 +348,7 @@ mod tests {
         let query_result = { contract.execute(&mut ext, &query_input) };
         assert!(query_result.status_code == ExecStatus::Success);
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             amount
         );
     }
@@ -368,7 +368,7 @@ mod tests {
         let query_result = { contract.execute(&mut ext, &query_input) };
         assert!(query_result.status_code == ExecStatus::Success);
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             0u64
         );
     }
@@ -394,7 +394,7 @@ mod tests {
         let query_result = { contract.execute(&mut ext, &query_input) };
         assert!(query_result.status_code == ExecStatus::Success);
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             amount * 4
         );
     }
@@ -476,7 +476,7 @@ mod tests {
         let query_result = { contract.execute(&mut ext, &query_input) };
         assert!(query_result.status_code == ExecStatus::Success);
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             amount * 2
         );
 
@@ -490,7 +490,7 @@ mod tests {
         let query_result = { contract.execute(&mut ext, &query_input) };
         assert!(query_result.status_code == ExecStatus::Success);
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             0u64
         );
     }
@@ -511,9 +511,9 @@ mod tests {
         let query_input = [0u8];
         let query_result = { contract.execute(&mut ext, &query_input) };
         assert!(query_result.status_code == ExecStatus::Success);
-        println!("output buffer:{}", to_hex(&query_result.return_data.mem));
+        println!("output buffer:{}", to_hex(&*query_result.return_data));
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             0u64
         );
     }
@@ -559,27 +559,27 @@ mod tests {
         let query_input = [0u8];
         let query_result = { contract.execute(&mut ext, &query_input) };
         assert!(query_result.status_code == ExecStatus::Success);
-        println!("output buffer:{}", to_hex(&query_result.return_data.mem));
+        println!("output buffer:{}", to_hex(&*query_result.return_data));
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             amount
         );
         // query2
         let query_input = [1u8];
         let query_result = { contract.execute(&mut ext, &query_input) };
         assert!(query_result.status_code == ExecStatus::Success);
-        println!("output buffer:{}", to_hex(&query_result.return_data.mem));
+        println!("output buffer:{}", to_hex(&*query_result.return_data));
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             amount * 2
         );
         // query3
         let query_input = [16u8];
         let query_result = { contract.execute(&mut ext, &query_input) };
         assert!(query_result.status_code == ExecStatus::Success);
-        println!("output buffer:{}", to_hex(&query_result.return_data.mem));
+        println!("output buffer:{}", to_hex(&*query_result.return_data));
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             amount * 4
         );
     }
