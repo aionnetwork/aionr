@@ -40,7 +40,7 @@ const LENGTH_OF_H256: usize = 32;
 impl OnDemandHandler {
     /// req handle for normal mod
     pub fn handle_on_demand_req(node: &mut Node, req: ChannelBuffer) {
-        trace!(target: "net", "PING received.");
+        trace!(target: "on_demand", "PING received.");
 
         if req.body.len() < 1 {
             warn!(target: "on_demand", "Node {}@{} removed: Invalid on demand req length!!", node.get_node_id(), node.get_ip_addr());
@@ -69,8 +69,10 @@ impl OnDemandHandler {
                 let blk_num = block_num_bytes.read_u64::<BigEndian>().unwrap_or(0);
 
                 if blk_num <= client.chain_info().best_block_number {
-                    let block_id = BlockId::Number(blk_num);
+                    let block_id = BlockId::Number(blk_num.clone());
                     let addr_hash = H256::from(addr_hash_bytes);
+
+                    info!(target: "on_demand", "Receive Account request! \nblk_num:{} \naddr_hash:{}",blk_num ,addr_hash);
 
                     if let Some((proof, _acc)) = client.prove_account(addr_hash, block_id) {
                         let mut rlp = RlpStream::new_list(proof.len());
@@ -103,6 +105,8 @@ impl OnDemandHandler {
                 let max = max_bytes.read_u64::<BigEndian>().unwrap_or(0);
                 let max = ::std::cmp::min(MAX_HEADERS_PER_REQUEST, max);
                 let reverse = reverse[0];
+
+                info!(target: "on_demand", "Receive Headers request! \nstart_num:{} \nskip:{} \nmax:{} \nreverse:{}",start_num ,skip, max,reverse);
 
                 if max != 0 {
                     let best_num = client.chain_info().best_block_number;
@@ -150,6 +154,8 @@ impl OnDemandHandler {
                 }
                 let block_hash = H256::from(rest);
 
+                info!(target: "on_demand", "Receive Account request! \nblk_hash:{}",block_hash);
+
                 let client = SyncStorage::get_block_chain();
 
                 if let Some(body) = client.block_body(BlockId::Hash(block_hash)) {
@@ -171,6 +177,8 @@ impl OnDemandHandler {
                 let block_hash = H256::from(block_hash_bytes);
                 let addr_hash = H256::from(addr_hash_bytes);
                 let key_hash = H128::from(key_hash_bytes);
+
+                info!(target: "on_demand", "Receive Account request! \nblock_hash:{} \naddr_hash:{} \nkey_hash:{}",block_hash ,addr_hash,key_hash);
 
                 let client = SyncStorage::get_block_chain();
 
@@ -195,6 +203,8 @@ impl OnDemandHandler {
                 }
 
                 let code_hash = H256::from(rest);
+
+                info!(target: "on_demand", "Receive Account request! \ncode_hash:{}",code_hash);
 
                 let client = SyncStorage::get_block_chain();
 
