@@ -836,7 +836,7 @@ impl<B: Backend> State<B> {
     pub fn commit(&mut self) -> Result<(), Error> {
         // first, commit the sub trees.
         let mut accounts = self.cache.borrow_mut();
-        debug!(target: "cons", "commit fvm accounts = {:?}", accounts);
+        debug!(target: "cons", "commit accounts = {:?}", accounts);
         for (address, ref mut a) in accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
             if let Some(ref mut account) = a.account {
                 let addr_hash = account.address_hash(address);
@@ -857,6 +857,7 @@ impl<B: Backend> State<B> {
                         ) {
                             account
                             .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
+                            account.update_root(address, account_db.as_hashstore_mut());
                     } else if !account.storage_changes().is_empty()
                     {
                         account.discard_storage_changes();
@@ -1001,6 +1002,7 @@ impl<B: Backend> State<B> {
         F: Fn(Option<&AionVMAccount>) -> U,
     {
         // check local cache first
+        println!("search local cache");
         if let Some(ref mut maybe_acc) = self.cache.borrow_mut().get_mut(a) {
             if let Some(ref mut account) = maybe_acc.account {
                 let accountdb = self
@@ -1013,6 +1015,7 @@ impl<B: Backend> State<B> {
             return Ok(f(None));
         }
         // check global cache
+        println!("search global cache");
         let result = self.db.get_cached(a, |mut acc| {
             if let Some(ref mut account) = acc {
                 let accountdb = self
@@ -1031,6 +1034,7 @@ impl<B: Backend> State<B> {
                     return Ok(f(None));
                 }
 
+                println!("search local database");
                 // not found in the global cache, get from the DB and insert into local
                 let db = self
                     .factories

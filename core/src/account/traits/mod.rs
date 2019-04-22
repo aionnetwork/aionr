@@ -30,6 +30,15 @@ impl From<u8> for AccType {
     }
 }
 
+impl From<AccType> for u8 {
+    fn from(t: AccType) -> u8 {
+        match t {
+            AccType::AVM => 0x0f,
+            AccType::FVM => 0x01,
+        }
+    }
+}
+
 impl From<AccType> for U256 {
     fn from(t: AccType) -> U256 {
         match t {

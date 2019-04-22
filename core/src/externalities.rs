@@ -820,7 +820,7 @@ where B: StateBackend
         println!("AVM get object graph");
         match self.state.lock().unwrap().get_objectgraph(address) {
             Ok(data) => {
-                // println!("transformed code = {:?}", code);
+                // println!("objectgraph = {:?}", data);
                 data
             },
             Err(_x) => None,

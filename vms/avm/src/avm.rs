@@ -12,7 +12,6 @@ use std::sync::atomic::AtomicPtr;
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use std::thread;
-use std::sync::mpsc::channel;
 use types::{TransactionContext, TransactionResult};
 use vm_common::{CallType};
 use bytes::Bytes;
@@ -41,7 +40,7 @@ const AVM_JARS: [&str; 17] = [
     "scratch-deps.jar",
     "slf4j-api-1.7.25.jar",
     "spongycastle-1.58.0.0.jar",
-    "vm-api-d1d5e7c.jar",
+    "vm-api-bcca6a8.jar",
     "org-aion-avm-jni.jar",
 ];
 
@@ -58,7 +57,7 @@ pub fn launch_jvm() {
                 for jar_pkg in AVM_JARS.iter() {
                     let mut pkg_path = libs.clone();
                     pkg_path.push(jar_pkg);
-                    println!("add jar {:?}", pkg_path);
+                    // println!("add jar {:?}", pkg_path);
                     classpath = add_jars(
                         classpath,
                         pkg_path.to_str().expect("The `libs` folder is not found"),

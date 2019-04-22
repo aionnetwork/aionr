@@ -318,14 +318,25 @@ pub extern fn avm_touch_account(handle: *const c_void, address: *const avm_addre
 pub extern fn avm_send_signal(handle: *const c_void, sig_num: i32) -> avm_bytes {
     let ext: &mut Box<Ext> = unsafe {mem::transmute(handle)};
     ext.send_signal(sig_num);
-    ext.commit();
-    let root = ext.root();
-    println!("state root = {:?}", root);
-    unsafe {
-        let ret = new_fixed_bytes(32);
-        ptr::copy(&root[0], ret.pointer, 32);
-        ret
+    match sig_num {
+        0 => {
+            ext.commit();
+            let root = ext.root();
+            println!("state root = {:?}", root);
+            unsafe {
+                let ret = new_fixed_bytes(32);
+                ptr::copy(&root[0], ret.pointer, 32);
+                ret
+            }
+        },
+        _ => {
+            unsafe {
+                let ret = new_fixed_bytes(32);
+                ret
+            }
+        }
     }
+    
 }
 
 fn contract_address(sender: &Address, nonce: &U256) -> (Address, Option<H256>) {
@@ -345,13 +356,8 @@ pub extern fn avm_contract_address(sender: *const avm_address, nonce: *const avm
     let n = unsafe {slice::from_raw_parts((*nonce).pointer, (*nonce).length as usize)};
 
     println!("avm new contract: sender = {:?}, nonce = {:?}", addr, n);
-    let mut tmp_nonce = vec![0u8; 8];
-    for idx in 0..n.len() {
-        tmp_nonce[idx] = n[idx];
-    }
-    let mut decoder = NativeDecoder::new(&tmp_nonce);
 
-    let (new_contract, _) = contract_address(addr, &(decoder.decode_long().unwrap()).into());
+    let (new_contract, _) = contract_address(addr, &n.into());
 
     unsafe {
         let ret = new_fixed_bytes(32);

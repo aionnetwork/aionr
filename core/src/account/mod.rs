@@ -258,11 +258,21 @@ impl AionVMAccount {
         self.balance = other.balance;
         self.nonce = other.nonce;
         self.storage_root = other.storage_root;
+        self.delta_root = other.delta_root;
         self.code_hash = other.code_hash;
         self.code_filth = other.code_filth;
         self.code_cache = other.code_cache;
         self.code_size = other.code_size;
         self.address_hash = other.address_hash;
+        self.transformed_code_hash = other.transformed_code_hash;
+        self.transformed_code_size = other.transformed_code_size;
+        self.transformed_code_cache = other.transformed_code_cache;
+        self.object_graph_size = other.object_graph_size;
+        self.objectgraph_hash = other.objectgraph_hash;
+        self.object_graph_cache = other.object_graph_cache;
+        self.empty_but_commit = other.empty_but_commit;
+        self.account_type = other.account_type;
+        self.vm_create = other.vm_create;
 
         let mut cache = self.storage_cache.borrow_mut();
         for (k, v) in other.storage_cache.into_inner() {
@@ -299,11 +309,13 @@ macro_rules! impl_account {
                 self.code_filth = Filth::Dirty;
             }
 
+            // for AVM account, this must be called, so update account type to AVM
             fn init_transformed_code(&mut self, code: Bytes) {
                 self.transformed_code_hash = blake2b(&code);
                 self.transformed_code_cache = Arc::new(code);
                 self.transformed_code_size = Some(self.transformed_code_cache.len());
                 self.code_filth = Filth::Dirty;
+                self.account_type = AccType::AVM;
             }
 
             fn init_objectgraph(&mut self, data: Bytes) {
@@ -659,8 +671,7 @@ macro_rules! impl_account {
             }
 
             fn acc_type(&self) -> U256 {
-                //self.account_type.clone().into()
-                return 0x00.into()
+                self.account_type.clone().into()
             }
 
             /// avm should update object graph cache
@@ -688,6 +699,9 @@ macro_rules! impl_account {
 
                 if let Some(root) = db.get(a) {
                     self.storage_root = root[..].into();
+                    // if storage_root has been stored, it should be avm created account
+                    self.account_type = AccType::AVM;
+                    self.vm_create = true;
                 }
 
                 if let RequireCache::None = require {
@@ -779,7 +793,7 @@ impl AionVMAccount {
         self.storage_changes.insert(key, value);
     }
 
-    pub fn update_root(&mut self) {
+    pub fn update_root(&mut self, address: &Address, db: &mut HashStore) {
         println!("vm_create: {:?}; account type: {:?}", self.vm_create, self.acc_type());
         let vm_type: AccType = self.acc_type().into();
         if self.vm_create && vm_type == AccType::AVM {
@@ -790,7 +804,17 @@ impl AionVMAccount {
             self.delta_root = blake2b(&concatenated_root);
             println!("updated storage root = {:?}, delta_root = {:?}, code hash = {:?}", 
                 self.storage_root, self.delta_root, self.code_hash);
-        }
+            // save object graph
+            println!("hash for object graph = {:?}", self.delta_root);
+            db.emplace(
+                self.delta_root.clone(),
+                DBValue::from_slice(self.object_graph_cache.as_slice()),
+            );
+            // save key/valud storage root
+            db.emplace(
+                address.clone(), 
+                DBValue::from_slice(&self.storage_root[..]));
+            }
     }
 
     pub fn save_object_graph(&mut self, address: &Address, db: &mut HashStore) {

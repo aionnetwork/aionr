@@ -62,7 +62,7 @@ pub struct Account<T, U> {
     pub address_hash: Cell<Option<H256>>,
     // empty_flag: for Aion Java Kernel Only
     pub empty_but_commit: bool,
-    // account type: 0x00 = normal; 0x01 = EVM; 0x02 = AVM
+    // account type: 0x01 = EVM; 0x0f = AVM
     pub account_type: AccType,
     pub vm_create: bool,
 }
