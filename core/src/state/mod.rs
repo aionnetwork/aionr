@@ -1269,14 +1269,14 @@ impl<B: Backend> State<B> {
         &self,
         account_key: H256,
         storage_key: H128,
-    ) -> trie::Result<(Vec<Bytes>, H256)>
+    ) -> trie::Result<(Vec<Bytes>, H128)>
     {
         // TODO: probably could look into cache somehow but it's keyed by
         // address, not blake2b(address).
         let trie = TrieDB::new(self.db.as_hashstore(), &self.root)?;
         let acc = match trie.get_with(&account_key, Account::from_rlp)? {
             Some(acc) => acc,
-            None => return Ok((Vec::new(), H256::new())),
+            None => return Ok((Vec::new(), H128::new())),
         };
 
         let account_db = self

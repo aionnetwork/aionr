@@ -117,7 +117,7 @@ pub fn get_header_chain(spec: &Spec) -> Arc<HeaderChain> {
 
 pub fn remove_test_db() {
     let path = Path::new("./test_db/");
-    ::std::fs::remove_dir_all(path);
+    let _ = ::std::fs::remove_dir_all(path);
 }
 
 static ENCODEBLOCK: &[u8] = &[

@@ -208,7 +208,7 @@ impl NetManager {
                         handler.handle(node, req);
                     }
                     Control::LIGHT => {
-                        trace!(target: "on_demand", "LIGHT MOD SYNC message received.");
+                        trace!(target: "net", "LIGHT MOD SYNC message received.");
 
                         let handler = LIGHT_HANDLER.get();
                         handler.handle(node, req);

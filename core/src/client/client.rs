@@ -1816,7 +1816,7 @@ impl BlockChainClient for Client {
             .and_then(|a| if a.is_zero() { None } else { Some(a) })
     }
 
-    fn prove_storage(&self, key1: H256, key2: H128, id: BlockId) -> Option<(Vec<Bytes>, H256)> {
+    fn prove_storage(&self, key1: H256, key2: H128, id: BlockId) -> Option<(Vec<Bytes>, H128)> {
         self.state_at(id)
             .and_then(move |state| state.prove_storage(key1, key2).ok())
     }
