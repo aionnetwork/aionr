@@ -200,15 +200,19 @@ impl AionVMAccount {
             // cast key and value to trait type,
             // so we can call overloaded `to_bytes` method
             let mut is_zero = true;
+            let mut leading_zeros = 0;
             for item in v.clone() {
                 if item != 0x00 {
                     is_zero = false;
                     break;
+                } else {
+                    leading_zeros += 1;
                 }
             }
+            println!("key = {:?}, value = {:?}, is_zero = {:?}", k, v, is_zero);
             match is_zero {
                 true => t.remove(&k)?,
-                false => t.insert(&k, &encode(&v))?,
+                false => t.insert(&k, &encode(&v[leading_zeros..].to_vec()))?,
             };
 
             self.storage_cache.borrow_mut().insert(k, v);
@@ -864,6 +868,7 @@ mod tests {
     use super::*;
     use kvdb::MemoryDB;
     use account_db::*;
+    use aion_types::H128;
 
     #[test]
     fn storage_at() {
@@ -892,6 +897,20 @@ mod tests {
         assert_eq!(
             value,
             Vec::<u8>::new()
+        );
+    }
+
+    #[test]
+    fn commit_storage() {
+        let mut a = AionVMAccount::new_contract(69.into(), 0.into());
+        let mut db = MemoryDB::new();
+        let mut db = AccountDBMut::new(&mut db, &Address::new());
+        a.set_storage([0u8; 16].to_vec(), [0,0,0,0,0,0,0,0,0,0,0,0, 0x12, 0x34].to_vec());
+        assert_eq!(a.storage_root(), None);
+        a.commit_storage(&Default::default(), &mut db).unwrap();
+        assert_eq!(
+            *a.storage_root().unwrap(),
+            "d2e59a50e7414e56da75917275d1542a13fd345bf88a657a4222a0d50ad58868".into()
         );
     }
 }
