@@ -155,12 +155,23 @@ where B: StateBackend
         let value = self.state
             .storage_at(&self.origin_info[0].address, &key[..].to_vec())
             .expect("Fatal error occurred when getting storage.");
-        value.as_slice().into()
+        let mut ret: Vec<u8> = vec![0x00; 16];
+        for idx in 0..value.len() {
+            ret[16-value.len()+idx] = value[idx];
+        }
+        ret.as_slice().into()
     }
 
     fn set_storage(&mut self, key: H128, value: H128) {
+        // tansfer value to type of Bytes, deduct the leading zeros
+        let mut vm_bytes = Vec::new();
+        for item in value[..].to_vec() {
+            if item != 0x00 {
+                vm_bytes.push(item);
+            }
+        }
         self.state
-            .set_storage(&self.origin_info[0].address, key[..].to_vec(), value[..].to_vec())
+            .set_storage(&self.origin_info[0].address, key[..].to_vec(), vm_bytes)
             .expect("Fatal error occurred when putting storage.");
     }
 
@@ -168,10 +179,15 @@ where B: StateBackend
         let value =self.state
             .storage_at(&self.origin_info[0].address, &key[..].to_vec())
             .expect("Fatal error occurred when getting storage.");
-        value.as_slice().into()
+        let mut ret: Vec<u8> = vec![0x00; 32];
+        for idx in 0..value.len() {
+            ret[32-value.len()+idx] = value[idx];
+        }
+        ret.as_slice().into()
     }
 
     fn set_storage_dword(&mut self, key: H128, value: H256) {
+        // value of this is always 32-byte long
         self.state
             .set_storage(&self.origin_info[0].address, key[..].to_vec(), value[..].to_vec())
             .expect("Fatal error occurred when putting storage.")

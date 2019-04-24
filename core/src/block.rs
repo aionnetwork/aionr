@@ -370,12 +370,15 @@ impl<'x> OpenBlock<'x> {
         let mut result = Vec::new();
         let env_info = self.env_info();
         debug!(target: "vm", "tx type = {:?}", t.tx_type());
-        if t.tx_type() == AVM_TRANSACTION_TYPE {
-            result.append(&mut self.block.state.apply_batch(&env_info, self.engine.machine(), &[t.clone()]));
+        if let Some(_v) = self.engine.params().monetary_policy_update {
+            if t.tx_type() == AVM_TRANSACTION_TYPE {
+                result.append(&mut self.block.state.apply_batch(&env_info, self.engine.machine(), &[t.clone()]));
+            } else {
+                result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
+            }
         } else {
             result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
         }
-
         
         match result.pop().unwrap() {
             Ok(outcome) => {
@@ -672,6 +675,11 @@ fn is_normal_or_avm_call(
 ) -> bool
 {
     if let Action::Call(a) = tx.action {
+        // since fastvm is executed one transaction after another,
+        // code() gets the real code of contract
+        // for avm: when creation and call are in one block
+        // code() will return None. However avm solves the dependency,
+        // call will be executed after creation, and code is retrieved by avm callback
         let code = block.block.state.code(&a).unwrap_or(None);
         if a == H256::from(
                 "0000000000000000000000000000000000000000000000000000000000000100"
@@ -685,6 +693,8 @@ fn is_normal_or_avm_call(
                 println!("pre bytes = {:?}", &c[0..2]);
                 return c[0..2] == [0x50u8, 0x4B];
             }
+            // TIPS: consider the corner case:
+            // user calls a fastvm empty contract (it will be deployed when code is None)
             return true;
         }
     }
@@ -714,26 +724,32 @@ fn push_transactions(
     transactions: &[SignedTransaction],
 ) -> Result<(), Error>
 {
-    let mut tx_batch = Vec::new();
-
-    debug!(target: "vm", "transactions = {:?}, len = {:?}", transactions, transactions.len());
-    for tx in transactions {
-        if !is_for_avm(block, tx) {
-            if tx_batch.len() >= 1 {
-                block.apply_batch_txs(tx_batch.as_slice(), None);
-                tx_batch.clear();
+    if let Some(_v) = block.engine.machine().params().monetary_policy_update {
+        let mut tx_batch = Vec::new();
+        debug!(target: "vm", "transactions = {:?}, len = {:?}", transactions, transactions.len());
+        for tx in transactions {
+            if !is_for_avm(block, tx) {
+                if tx_batch.len() >= 1 {
+                    block.apply_batch_txs(tx_batch.as_slice(), None);
+                    tx_batch.clear();
+                }
+                block.push_transaction(tx.clone(), None)?;
+            } else {
+                println!("found avm transaction");
+                tx_batch.push(tx.clone())
             }
-            block.push_transaction(tx.clone(), None)?;
-        } else {
-            println!("found avm transaction");
-            tx_batch.push(tx.clone())
+        }
+
+        if !tx_batch.is_empty() {
+            block.apply_batch_txs(tx_batch.as_slice(), None);
+            tx_batch.clear();
+        }
+    } else {
+        for t in transactions {
+            block.push_transaction(t.clone(), None)?;
         }
     }
-
-    if !tx_batch.is_empty() {
-        block.apply_batch_txs(tx_batch.as_slice(), None);
-        tx_batch.clear();
-    }
+    
 
     debug!(target: "vm", "push transactions done");
 

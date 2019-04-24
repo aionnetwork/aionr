@@ -200,19 +200,18 @@ impl AionVMAccount {
             // cast key and value to trait type,
             // so we can call overloaded `to_bytes` method
             let mut is_zero = true;
-            let mut leading_zeros = 0;
             for item in v.clone() {
                 if item != 0x00 {
                     is_zero = false;
                     break;
-                } else {
-                    leading_zeros += 1;
                 }
             }
             println!("key = {:?}, value = {:?}, is_zero = {:?}", k, v, is_zero);
+            // account just commit storage key/value pairs, 
+            // the real length of value should be dealed by caller
             match is_zero {
                 true => t.remove(&k)?,
-                false => t.insert(&k, &encode(&v[leading_zeros..].to_vec()))?,
+                false => t.insert(&k, &encode(&v))?,
             };
 
             self.storage_cache.borrow_mut().insert(k, v);
@@ -780,6 +779,7 @@ impl AionVMAccount {
         let db = SecTrieDB::new(db, &self.storage_root)?;
 
         let item: Bytes = db.get_with(key, ::rlp::decode)?.unwrap_or_else(|| vec![]);
+        println!("AionVMAccount: storage value = {:?}", item);
         self.storage_cache
             .borrow_mut()
             .insert(key.clone(), item.clone());
