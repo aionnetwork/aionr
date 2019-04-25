@@ -86,7 +86,7 @@ extern "C" {
     debug("sizeof(int) = %ld, sizeof(size_t) = %ld\n", sizeof(int), sizeof(size_t));
     enter();
     if (NULL != evm_cbs_p->exists) {
-      int ret = evm_cbs_p->exists(obj, address);
+      int ret = evm_cbs_p->exists(obj, *address);
       return ret;
     }
     return 0;
@@ -105,8 +105,8 @@ extern "C" {
     enter();
 
     if (NULL != evm_cbs_p->get_storage) {
-      uint8_t *ret = evm_cbs_p->get_storage(obj, address, key);
-      memcpy(result->bytes, ret, sizeof(evm_word));
+      struct evm_word value = evm_cbs_p->get_storage(obj, *address, *key);
+      memcpy(result->bytes, value.bytes, sizeof(evm_word));
     }
   }
 
@@ -121,7 +121,7 @@ extern "C" {
     (void)context;
     enter();
     if (NULL != evm_cbs_p->put_storage)
-      evm_cbs_p->put_storage(gbl_cb_obj, address, key, value);
+      evm_cbs_p->put_storage(gbl_cb_obj, *address, *key, *value);
   }
 
   /**
@@ -135,10 +135,8 @@ extern "C" {
     enter();
     
     if (NULL != evm_cbs_p->get_balance) {
-      unsigned char *balance = evm_cbs_p->get_balance(gbl_cb_obj, address);
-      if (NULL != balance) {
-          memcpy(result->bytes, balance, sizeof(evm_word));
-      }
+      struct evm_word balance = evm_cbs_p->get_balance(gbl_cb_obj, *address);
+      memcpy(result->bytes, balance.bytes, sizeof(evm_word));
     }
   }
 
@@ -155,7 +153,7 @@ extern "C" {
     struct code_info info = {0};
 
     if (NULL != evm_cbs_p->get_code) {
-        evm_cbs_p->get_code(gbl_cb_obj, &info, address);
+        evm_cbs_p->get_code(gbl_cb_obj, &info, *address);
 
         if (result_code) {
             uint8_t *code_ptr = (uint8_t *)malloc(info.code_size);
@@ -177,7 +175,7 @@ extern "C" {
     (void)context;
     enter();
     if (NULL != evm_cbs_p->selfdestruct)
-      evm_cbs_p->selfdestruct(gbl_cb_obj, address, beneficiary);
+      evm_cbs_p->selfdestruct(gbl_cb_obj, *address, *beneficiary);
   }
 
   /**
@@ -249,10 +247,8 @@ extern "C" {
     enter();
 
     if (NULL != evm_cbs_p->get_blockhash) {
-      uint8_t *block_hash = evm_cbs_p->get_blockhash(gbl_cb_obj, number);
-      if (NULL != block_hash) {
-          memcpy(result->bytes, block_hash, sizeof(evm_hash));
-      }
+      struct evm_hash block_hash = evm_cbs_p->get_blockhash(gbl_cb_obj, number);
+      memcpy(result->bytes, block_hash.bytes, sizeof(evm_hash));
     }
   }
 
@@ -270,7 +266,7 @@ extern "C" {
 
     enter();
     if (NULL != evm_cbs_p->log) {
-        evm_cbs_p->log(gbl_cb_obj, address, data, data_size, topics, topics_count);
+        evm_cbs_p->log(gbl_cb_obj, *address, data, data_size, topics, topics_count);
     }
   }
 
@@ -389,7 +385,6 @@ extern "C" {
     recv_idx -= 1;
     if (recv_idx == -1)
       curr_recv_addr.filled = 0;
-    //DUMP_RET_RESULT
 
     // release
 #if 1

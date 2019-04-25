@@ -164,12 +164,16 @@ where B: StateBackend
 
     fn set_storage(&mut self, key: H128, value: H128) {
         // tansfer value to type of Bytes, deduct the leading zeros
-        let mut vm_bytes = Vec::new();
+        let mut zeros_num = 0;
         for item in value[..].to_vec() {
-            if item != 0x00 {
-                vm_bytes.push(item);
+            if item == 0x00 {
+                zeros_num += 1;
+            } else {
+                break;
             }
         }
+        let mut vm_bytes = Vec::new();
+        vm_bytes.extend_from_slice(&value[..][zeros_num..]);
         self.state
             .set_storage(&self.origin_info[0].address, key[..].to_vec(), vm_bytes)
             .expect("Fatal error occurred when putting storage.");
@@ -427,6 +431,7 @@ where B: StateBackend
     fn log(&mut self, topics: Vec<H256>, data: &[u8]) {
         use log_entry::LogEntry;
 
+        // origin_info.address is always contract address for fastvm
         let address = self.origin_info[0].address.clone();
         self.substate.logs.push(LogEntry {
             address: address,

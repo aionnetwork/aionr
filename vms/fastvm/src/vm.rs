@@ -22,7 +22,7 @@
 use aion_types::{U256, U128, U512};
 use ffi::EvmStatusCode;
 use std::{fmt, ops, cmp};
-use vm_common::ReturnData;
+use vm_common::{ReturnData};
 
 // result definition
 /// VM errors. from vm/src/errors.rs
@@ -292,6 +292,7 @@ mod tests {
     use aion_types::U256;
     use rlp::RlpStream;
     use super::*;
+    use vm_common::CallType;
 
     #[test]
     fn encode_calltype() {
