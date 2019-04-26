@@ -64,7 +64,6 @@ pub struct Account<T, U> {
     pub empty_but_commit: bool,
     // account type: 0x01 = EVM; 0x0f = AVM
     pub account_type: AccType,
-    pub vm_create: bool,
 }
 
 /// Boolean type for clean/dirty status.

@@ -39,7 +39,6 @@ use trie;
 use trie::{Trie, SecTrieDB, TrieFactory, TrieError};
 
 use kvdb::{DBValue, HashStore};
-use avm_abi::{FromBytes};
 
 pub use self::generic::Account;
 pub use self::traits::{VMAccount, AccType};
@@ -93,7 +92,6 @@ impl From<BasicAccount> for AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
-            vm_create: false,
         }
     }
 }
@@ -120,7 +118,6 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
-            vm_create: false,
         }
     }
 
@@ -145,7 +142,6 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
-            vm_create: false,
         }
     }
 
@@ -180,7 +176,6 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
-            vm_create: false,
         }
     }
 
@@ -253,7 +248,6 @@ impl AionVMAccount {
             address_hash: self.address_hash.clone(),
             empty_but_commit: self.empty_but_commit.clone(),
             account_type: self.account_type.clone(),
-            vm_create: self.vm_create.clone(),
         }
     }
 
@@ -275,7 +269,6 @@ impl AionVMAccount {
         self.object_graph_cache = other.object_graph_cache;
         self.empty_but_commit = other.empty_but_commit;
         self.account_type = other.account_type;
-        self.vm_create = other.vm_create;
 
         let mut cache = self.storage_cache.borrow_mut();
         for (k, v) in other.storage_cache.into_inner() {
@@ -303,9 +296,6 @@ macro_rules! impl_account {
             }
 
             fn init_code(&mut self, code: Bytes) {
-                if self.code_hash == BLAKE2B_EMPTY {
-                    self.vm_create = true;
-                }
                 self.code_hash = blake2b(&code);
                 self.code_cache = Arc::new(code);
                 self.code_size = Some(self.code_cache.len());
@@ -322,6 +312,7 @@ macro_rules! impl_account {
             }
 
             fn init_objectgraph(&mut self, data: Bytes) {
+                self.account_type = AccType::AVM;
                 self.objectgraph_hash = blake2b(&data);
                 self.object_graph_cache = Arc::new(data);
             }
@@ -384,12 +375,12 @@ macro_rules! impl_account {
 
             fn is_transformed_cached(&self) -> bool {
                 !self.transformed_code_cache.is_empty()
-                    || (self.transformed_code_cache.is_empty() && self.transformed_code_hash == BLAKE2B_EMPTY)
+                    // || (self.transformed_code_cache.is_empty() && self.transformed_code_hash == BLAKE2B_EMPTY)
             }
 
             fn is_objectgraph_cached(&self) -> bool {
                 !self.object_graph_cache.is_empty()
-                    || (self.object_graph_cache.is_empty() && self.objectgraph_hash == BLAKE2B_EMPTY)
+                    // || (self.object_graph_cache.is_empty() && self.objectgraph_hash == BLAKE2B_EMPTY)
             }
 
             fn cache_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>> {
@@ -427,6 +418,7 @@ macro_rules! impl_account {
 
                 match db.get(&blake2b(self.address_hash.get().unwrap().clone())) {
                     Some(x) => {
+                        self.account_type = AccType::AVM;
                         self.transformed_code_size = Some(x.len());
                         self.transformed_code_cache = Arc::new(x.into_vec());
                         Some(self.transformed_code_cache.clone())
@@ -438,21 +430,30 @@ macro_rules! impl_account {
                 }
             }
 
-            fn cache_objectgraph(&mut self, db: &HashStore) -> Option<Arc<Bytes>> {
-                if self.is_objectgraph_cached() {
-                    return Some(self.object_graph_cache.clone());
-                }
-
-                match db.get(&self.objectgraph_hash) {
-                    Some(x) => {
-                        self.object_graph_size = Some(x.len());
-                        self.object_graph_cache = Arc::new(x.into_vec());
-                        Some(self.object_graph_cache.clone())
+            fn cache_objectgraph(&mut self, a: &Address, db: &HashStore) -> Option<Arc<Bytes>> {
+                // objectgraph uses delta_root as key,
+                // it is cached during updating account cache
+                if let Some(root) = db.get(a) {
+                    self.storage_root = root[..].into();
+                    // if storage_root has been stored, it should be avm created account
+                    self.account_type = AccType::AVM;
+                    // always cache object graph and key/value storage root
+                    println!("try to get object graph from: {:?}", self.delta_root);
+                    match db.get(&self.delta_root) {
+                        Some(data) => {
+                            self.object_graph_size = Some(data.len());
+                            self.objectgraph_hash = blake2b(&data);
+                            self.object_graph_cache = Arc::new(data[..].to_vec());
+                            Some(self.object_graph_cache.clone())
+                        },
+                        None => {
+                            self.object_graph_size = None;
+                            self.objectgraph_hash = BLAKE2B_EMPTY;
+                            None
+                        }
                     }
-                    _ => {
-                        warn!(target: "account","Failed reverse get of {}", self.objectgraph_hash);
-                        None
-                    }
+                } else {
+                    None
                 }
             }
 
@@ -465,12 +466,8 @@ macro_rules! impl_account {
                     self.code_cache.pretty()
                 );
 
-                let code_size = code[0..4].to_u32() as usize;
-                self.code_size = Some(code_size);
-                self.code_cache = Arc::new(code[4..(4+code_size)].to_vec());
-                self.transformed_code_cache = Arc::new(code[4+code_size..].to_vec());
-                self.transformed_code_size = Some(code[4+code_size..].len());
-                self.transformed_code_hash = blake2b(&code[4+code_size..].to_vec());
+                self.code_size = Some(code.len());
+                self.code_cache = code;
             }
 
             fn cache_given_transformed_code(&mut self, code: Arc<Bytes>) {
@@ -665,12 +662,13 @@ macro_rules! impl_account {
                 account
             }
 
-            fn acc_type(&self) -> U256 {
-                self.account_type.clone().into()
+            fn acc_type(&self) -> AccType {
+                self.account_type.clone()
             }
 
             /// avm should update object graph cache
             /// at this moment, address_hash is always updated
+            /// cache code
             fn update_account_cache<B: Backend>(
                 &mut self,
                 a: &Address,
@@ -683,7 +681,6 @@ macro_rules! impl_account {
                     self.storage_root = root[..].into();
                     // if storage_root has been stored, it should be avm created account
                     self.account_type = AccType::AVM;
-                    self.vm_create = true;
                     // always cache object graph and key/value storage root
                     println!("try to get object graph from: {:?}", self.delta_root);
                     match db.get(&self.delta_root) {
@@ -810,9 +807,8 @@ impl AionVMAccount {
     }
 
     pub fn update_root(&mut self, address: &Address, db: &mut HashStore) {
-        println!("vm_create: {:?}; account type: {:?}", self.vm_create, self.acc_type());
-        let vm_type: AccType = self.acc_type().into();
-        if self.vm_create && vm_type == AccType::AVM {
+        println!("account type: {:?}", self.acc_type());
+        if self.account_type == AccType::AVM {
             let mut concatenated_root = Vec::new();
             concatenated_root.extend_from_slice(&self.storage_root[..]);
             concatenated_root.extend_from_slice(&self.objectgraph_hash[..]);
@@ -857,19 +853,35 @@ impl AionVMAccount {
             }
         }
     }
+
+    #[cfg(test)]
+    /// Provide a byte array which hashes to the `code_hash`. returns the hash as a result.
+    pub fn note_code(&mut self, code: Bytes) -> Result<(), H256> {
+        let h = blake2b(&code);
+        if self.code_hash == h {
+            self.code_cache = Arc::new(code);
+            self.code_size = Some(self.code_cache.len());
+            Ok(())
+        } else {
+            Err(h)
+        }
+    }
+
 }
 
 impl fmt::Debug for AionVMAccount {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        f.debug_struct("FVMAccount")
+        f.debug_struct("AionVMAccount")
             .field("balance", &self.balance)
             .field("nonce", &self.nonce)
             .field("code", &self.code())
+            .field("code_hash", &self.code_hash())
             .field(
                 "storage",
                 &self.storage_changes.iter().collect::<BTreeMap<_, _>>(),
             )
             .field("storage_root", &self.storage_root)
+            .field("account_type", &self.account_type)
             .field("empty_but_commit", &self.empty_but_commit)
             .finish()
     }
@@ -880,7 +892,6 @@ mod tests {
     use super::*;
     use kvdb::MemoryDB;
     use account_db::*;
-    use aion_types::H128;
 
     #[test]
     fn storage_at() {
@@ -924,6 +935,67 @@ mod tests {
             *a.storage_root().unwrap(),
             "d2e59a50e7414e56da75917275d1542a13fd345bf88a657a4222a0d50ad58868".into()
         );
+    }
+
+    #[test]
+    fn note_code() {
+        let mut db = MemoryDB::new();
+        let mut db = AccountDBMut::new(&mut db, &Address::new());
+
+        let rlp = {
+            let mut a = AionVMAccount::new_contract(69.into(), 0.into());
+            a.init_code(vec![0x55, 0x44, 0xffu8]);
+            a.commit_code(&mut db);
+            a.rlp()
+        };
+
+        let mut a = Account::from_rlp(&rlp);
+        assert!(a.cache_code(&db.immutable()).is_some());
+
+        let mut a = Account::from_rlp(&rlp);
+        assert_eq!(a.note_code(vec![0x55, 0x44, 0xffu8]), Ok(()));
+    }
+
+    #[test]
+    fn cache_transformed_code() {
+        let address = Address::new();
+        let mut db = MemoryDB::new();
+        let mut db = AccountDBMut::new(&mut db, &address);
+        let mut a = AionVMAccount::new_contract(69.into(), 0.into());
+
+        let rlp = {
+            a.init_transformed_code(vec![0x55, 0x44, 0xffu8]);
+            // update account's address hash
+            a.address_hash(&address);
+            a.commit_code(&mut db);
+            a.rlp()
+        };
+
+        let mut a = AionVMAccount::from_rlp(&rlp);
+        a.address_hash(&address);
+        assert_eq!(a.cache_code(&db.immutable()), Some(Arc::new(vec![])));
+        assert_eq!(a.account_type, AccType::FVM);
+        assert_eq!(a.cache_transformed_code(&db.immutable()), Some(Arc::new(vec![0x55, 0x44, 0xffu8])));
+        assert_eq!(a.account_type, AccType::AVM);
+    }
+
+    #[test]
+    fn cache_objectgraph() {
+        let address = Address::new();
+        let mut db = MemoryDB::new();
+        let mut db = AccountDBMut::new(&mut db, &address);
+        let mut a = AionVMAccount::new_contract(69.into(), 0.into());
+
+        let rlp = {
+            a.init_objectgraph(vec![0x55, 0x44, 0xffu8]);
+            a.commit_storage(&Default::default(), &mut db).unwrap();
+            // calculate delta_root and save it in accountDB
+            a.update_root(&address, &mut db);
+            a.rlp()
+        };
+
+        let mut a = AionVMAccount::from_rlp(&rlp);
+        assert_eq!(a.cache_objectgraph(&address, &db.immutable()), Some(Arc::new(vec![0x55, 0x44, 0xffu8])));
     }
 }
 

@@ -98,7 +98,7 @@ pub trait VMAccount: Sync + Send {
     fn cache_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>>;
 
     fn cache_transformed_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>>;
-    fn cache_objectgraph(&mut self, db: &HashStore) -> Option<Arc<Bytes>>;
+    fn cache_objectgraph(&mut self, a: &Address, db: &HashStore) -> Option<Arc<Bytes>>;
     fn cache_objectgraph_size(&mut self, db: &HashStore) -> bool;
 
     /// Provide code to cache. For correctness, should be the correct code for the
@@ -159,7 +159,7 @@ pub trait VMAccount: Sync + Send {
     // /// Clone account data, dirty storage keys and cached storage keys.
     // fn clone_all(&self) -> Self;
 
-    fn acc_type(&self) -> U256;
+    fn acc_type(&self) -> AccType;
 
     fn update_account_cache<B: Backend>(
         &mut self,

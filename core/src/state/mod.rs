@@ -55,7 +55,7 @@ use trie;
 use trie::recorder::Recorder;
 use trie::{Trie, TrieDB, TrieError};
 
-mod account_manager;
+mod account_state;
 mod substate;
 
 pub mod backend;
@@ -70,7 +70,7 @@ pub use account::{
 pub use self::backend::Backend;
 pub use self::substate::Substate;
 
-use self::account_manager::{
+use self::account_state::{
     AccountEntry,
     AccountState,
 };
@@ -573,7 +573,8 @@ impl<B: Backend> State<B> {
         Ok(())
      }
 
-     pub fn get_objectgraph(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
+    // object graph should ensure cached???
+    pub fn get_objectgraph(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
         debug!(target: "vm", "get object graph of: {:?}", a);
         self.ensure_cached(a, RequireCache::Code, true, |a| {
             a.as_ref().map_or(None, |a| a.objectgraph().clone())
