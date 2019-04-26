@@ -39,7 +39,7 @@ use trie;
 use trie::{Trie, SecTrieDB, TrieFactory, TrieError};
 
 use kvdb::{DBValue, HashStore};
-use avm_abi::{ToBytes, FromBytes};
+use avm_abi::{FromBytes};
 
 pub use self::generic::Account;
 pub use self::traits::{VMAccount, AccType};
@@ -409,13 +409,9 @@ macro_rules! impl_account {
                 println!("update code cache");
                 match db.get(&self.code_hash) {
                     Some(x) => {
-                        let code_size = x[0..4].to_u32() as usize;
-                        self.code_size = Some(code_size);
-                        self.code_cache = Arc::new(x[4..(4+code_size)].to_vec());
-                        self.transformed_code_cache = Arc::new(x[4+code_size..].to_vec());
-                        // println!("transformed code = {:?}", self.transformed_code_cache);
-                        self.transformed_code_size = Some(x[4+code_size..].len());
-                        Some(Arc::new(x.to_vec()).clone())
+                        self.code_size = Some(x.len());
+                        self.code_cache = Arc::new(x.into_vec());
+                        Some(self.code_cache.clone())
                     }
                     _ => {
                         warn!(target: "account","Failed reverse get of {}", self.code_hash);
@@ -429,7 +425,7 @@ macro_rules! impl_account {
                     return Some(self.transformed_code_cache.clone());
                 }
 
-                match db.get(&self.transformed_code_hash) {
+                match db.get(&blake2b(self.address_hash.get().unwrap().clone())) {
                     Some(x) => {
                         self.transformed_code_size = Some(x.len());
                         self.transformed_code_cache = Arc::new(x.into_vec());
@@ -473,7 +469,6 @@ macro_rules! impl_account {
                 self.code_size = Some(code_size);
                 self.code_cache = Arc::new(code[4..(4+code_size)].to_vec());
                 self.transformed_code_cache = Arc::new(code[4+code_size..].to_vec());
-                // println!("transformed code = {:?}", self.transformed_code_cache);
                 self.transformed_code_size = Some(code[4+code_size..].len());
                 self.transformed_code_hash = blake2b(&code[4+code_size..].to_vec());
             }
@@ -605,42 +600,39 @@ macro_rules! impl_account {
                 match (self.code_filth == Filth::Dirty, self.code_cache.is_empty(), self.transformed_code_cache.is_empty()) {
                     (true, true, true) => {
                         self.code_size = Some(0);
+                        self.transformed_code_size = Some(0);
                         self.code_filth = Filth::Clean;
                     }
                     (true, false, true) => {
-                        let mut code = Vec::new();
-                        code.append(&mut (self.code_cache.len() as u32).to_vm_bytes());
-                        code.extend(&*self.code_cache);
                         db.emplace(
                             self.code_hash.clone(),
-                            DBValue::from_slice(code.as_slice()),
+                            DBValue::from_slice(&*self.code_cache),
                         );
                         self.code_size = Some(self.code_cache.len());
+                        self.transformed_code_size = Some(0);
                         self.code_filth = Filth::Clean;
                     }
                     (true, true, false) => {
-                        let mut code = Vec::new();
-                        code.append(&mut (0 as u32).to_vm_bytes());
-                        code.extend(&*self.transformed_code_cache);
+                        self.code_size = Some(0);
                         db.emplace(
-                            self.code_hash.clone(),
-                            DBValue::from_slice(code.as_slice()),
+                            blake2b(self.address_hash.get().unwrap()),
+                            DBValue::from_slice(&*self.transformed_code_cache),
                         );
                         self.transformed_code_size = Some(self.transformed_code_cache.len());
                         self.code_filth = Filth::Clean;
                     }
                     (true, false, false) => {
-                        let mut code = Vec::new();
-                        code.append(&mut (self.code_cache.len() as u32).to_vm_bytes());
-                        code.extend(&*self.code_cache);
-                        code.extend(&*self.transformed_code_cache);
-                    
                         self.code_size = Some(self.code_cache.len());
-
                         db.emplace(
                             self.code_hash.clone(),
-                            DBValue::from_slice(code.as_slice()),
+                            DBValue::from_slice(&*self.code_cache),
                         );
+
+                        // use blake2b(address_hash) as key of transformed code
+                        db.emplace(
+                            blake2b(self.address_hash.get().unwrap()),
+                            DBValue::from_slice(&*self.transformed_code_cache)
+                            );
                         self.transformed_code_size = Some(self.transformed_code_cache.len());
                         self.code_filth = Filth::Clean;
                     }
@@ -678,6 +670,7 @@ macro_rules! impl_account {
             }
 
             /// avm should update object graph cache
+            /// at this moment, address_hash is always updated
             fn update_account_cache<B: Backend>(
                 &mut self,
                 a: &Address,
@@ -686,7 +679,6 @@ macro_rules! impl_account {
                 db: &HashStore,
             )
             {
-
                 if let Some(root) = db.get(a) {
                     self.storage_root = root[..].into();
                     // if storage_root has been stored, it should be avm created account
@@ -732,6 +724,26 @@ macro_rules! impl_account {
                             }
                             RequireCache::CodeSize => {
                                 self.cache_code_size(db);
+                            }
+                        }
+                    }
+                }
+
+                let hash = blake2b(self.address_hash.get().unwrap());
+                match state_db.get_cached_code(&hash) {
+                    Some(code) => self.cache_given_transformed_code(code),
+                    None => {
+                        match require {
+                            RequireCache::None => {}
+                            RequireCache::Code => {
+                                if let Some(code) = self.cache_transformed_code(db) {
+                                    // propagate code loaded from the database to
+                                    // the global code cache.
+                                    state_db.cache_code(hash, code)
+                                }
+                            }
+                            RequireCache::CodeSize => {
+                                self.cache_transformed_code_size(db);
                             }
                         }
                     }

@@ -750,7 +750,6 @@ fn push_transactions(
         }
     }
     
-
     debug!(target: "vm", "push transactions done");
 
     Ok(())
