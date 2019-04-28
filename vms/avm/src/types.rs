@@ -9,6 +9,7 @@ type Bytes = Vec<u8>;
 #[derive(Debug, PartialEq, Clone)]
 #[repr(C)]
 pub enum AvmStatusCode {
+    //Camus: Revert status should be dealed within avm.
     Success,
     Rejected,
     Failure,
@@ -42,6 +43,9 @@ impl From<AvmStatusCode> for ExecStatus {
         match status {
             AvmStatusCode::Success => ExecStatus::Success,
             AvmStatusCode::Rejected => ExecStatus::Rejected,
+            // avm failure does not cost all gas, it is actually Revert.
+            //TODO: needs a more detailed definition of avm status code
+            AvmStatusCode::Failure => ExecStatus::Revert,
             _ => ExecStatus::Failure,
         }
     }

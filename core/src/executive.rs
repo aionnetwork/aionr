@@ -2056,7 +2056,7 @@ Address};
         let machine = make_aion_machine();
         let mut substate = Substate::new();
         let ExecutionResult {
-            gas_left: _,
+            gas_left,
             status_code,
             return_data: _,
             exception: _,
@@ -2066,6 +2066,7 @@ Address};
             ex.create(params, &mut substate)
         };
         assert_eq!(status_code, ExecStatus::Failure);
+        assert_eq!(gas_left, U256::from(100_000));
     }
 
     #[test]

@@ -397,9 +397,9 @@ macro_rules! impl_account {
                     return Some(self.code_cache.clone());
                 }
 
-                println!("update code cache");
                 match db.get(&self.code_hash) {
                     Some(x) => {
+                        // println!("Account: code cache = {:?}", x);
                         self.code_size = Some(x.len());
                         self.code_cache = Arc::new(x.into_vec());
                         Some(self.code_cache.clone())
@@ -430,9 +430,9 @@ macro_rules! impl_account {
                 }
             }
 
+            // objectgraph uses delta_root as key,
+            // it is cached during updating account cache
             fn cache_objectgraph(&mut self, a: &Address, db: &HashStore) -> Option<Arc<Bytes>> {
-                // objectgraph uses delta_root as key,
-                // it is cached during updating account cache
                 if let Some(root) = db.get(a) {
                     self.storage_root = root[..].into();
                     // if storage_root has been stored, it should be avm created account
@@ -685,15 +685,18 @@ macro_rules! impl_account {
                     println!("try to get object graph from: {:?}", self.delta_root);
                     match db.get(&self.delta_root) {
                         Some(data) => {
+                            println!("Account: got object graph");
                             self.object_graph_size = Some(data.len());
                             self.objectgraph_hash = blake2b(&data);
                             self.object_graph_cache = Arc::new(data[..].to_vec());
                         },
                         None => {
+                            println!("Account: no object graph was found");
                             self.object_graph_size = None;
                             self.objectgraph_hash = BLAKE2B_EMPTY;
                         }
                     }
+                    debug!(target: "vm", "object graph = {:?}", self.object_graph_cache);
                 }
 
                 if let RequireCache::None = require {
@@ -704,11 +707,13 @@ macro_rules! impl_account {
                     return;
                 }
 
-                println!("update code cache");
+                println!("Account: update code cache");
                 // if there's already code in the global cache, always cache it localy
                 let hash = self.code_hash();
                 match state_db.get_cached_code(&hash) {
-                    Some(code) => self.cache_given_code(code),
+                    Some(code) => {
+                        self.cache_given_code(code);
+                    },
                     None => {
                         match require {
                             RequireCache::None => {}
@@ -728,6 +733,7 @@ macro_rules! impl_account {
 
                 if self.account_type == AccType::AVM {
                     // update transformed code cache
+                    println!("Account: updating tranformed code cache");
                     let hash = blake2b(self.address_hash.get().unwrap());
                     match state_db.get_cached_code(&hash) {
                         Some(code) => self.cache_given_transformed_code(code),
@@ -738,6 +744,7 @@ macro_rules! impl_account {
                                     if let Some(code) = self.cache_transformed_code(db) {
                                         // propagate code loaded from the database to
                                         // the global code cache.
+                                        // println!("Account: transformed code = {:?}", code);
                                         state_db.cache_code(hash, code)
                                     }
                                 }

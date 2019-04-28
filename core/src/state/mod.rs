@@ -575,10 +575,13 @@ impl<B: Backend> State<B> {
 
     // object graph should ensure cached???
     pub fn get_objectgraph(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
-        debug!(target: "vm", "get object graph of: {:?}", a);
-        self.ensure_cached(a, RequireCache::Code, true, |a| {
+        let ret = self.ensure_cached(a, RequireCache::Code, true, |a| {
             a.as_ref().map_or(None, |a| a.objectgraph().clone())
-        })
+        });
+
+        debug!(target: "vm", "get object graph of: {:?} = {:?}", a, ret);
+
+        return ret;
     }
 
     pub fn set_objectgraph(&mut self, a: &Address, data: Bytes) -> trie::Result<()> {
@@ -594,11 +597,13 @@ impl<B: Backend> State<B> {
 
     /// Get accounts' code. avm specific code (dedundant code saving)
     pub fn transformed_code(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
-        debug!(target: "vm", "get transformed code of: {:?}", a);
-        println!("get transformed code of: {:?}", a);
-        self.ensure_cached(a, RequireCache::Code, true, |a| {
+        let ret = self.ensure_cached(a, RequireCache::Code, true, |a| {
             a.as_ref().map_or(None, |a| a.transformed_code().clone())
-        })
+        });
+
+        debug!(target: "vm", "get transformed code of: {:?} = {:?}", a, ret);
+
+        return ret;
     }
 
     /// Get an account's code hash.
@@ -1368,6 +1373,37 @@ mod tests {
         )
         .unwrap();
         assert_eq!(state.code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
+    }
+
+    #[test]
+    fn transformed_code_from_database() {
+        let a = Address::zero();
+        let (root, db) = {
+            let mut state = get_temp_state();
+            state
+                .require_or_from(
+                    &a,
+                    false,
+                    || AionVMAccount::new_contract(42.into(), 0.into()),
+                    |_| {},
+                )
+                .unwrap();
+            state.init_transformed_code(&a, vec![1, 2, 3]).unwrap();
+            assert_eq!(state.transformed_code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
+            state.commit().unwrap();
+            assert_eq!(state.transformed_code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
+            state.drop()
+        };
+
+        let state = State::from_existing(
+            db,
+            root,
+            U256::from(0u8),
+            Default::default(),
+            Arc::new(MemoryDBRepository::new()),
+        )
+        .unwrap();
+        assert_eq!(state.transformed_code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
     }
 
     #[test]
