@@ -185,11 +185,16 @@ where B: StateBackend
 
     fn set_storage(&mut self, key: H128, value: H128) {
         let mut vm_bytes = Vec::new();
+        let mut zeros_num = 0;
         for item in value[..].to_vec() {
-            if item != 0x00 {
-                vm_bytes.push(item);
+            if item == 0x00 {
+                zeros_num += 1;
+            } else {
+                break;
             }
         }
+
+        vm_bytes.extend_from_slice(&value[..][zeros_num..]);
         self.state
             .set_storage(&self.context.address, key[..].into(), vm_bytes)
             .expect("Fatal error occurred when putting storage.")

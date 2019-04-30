@@ -199,11 +199,11 @@ pub extern fn vm_log(
 
 #[no_mangle]
 // 9 - call
-pub extern fn call(_obj: *mut libc::c_void, _info: *mut u8, _msg: *const u8) -> *const u8 {
+pub extern fn call(obj: *mut libc::c_void, info: *mut u8, msg: *const u8) -> *const u8 {
     debug!(target: "vm", "enter vm call");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(_obj) };
-    let result_info: &mut EvmResult = unsafe { mem::transmute(_info) };
-    let evm_msg: &EvmMessage = unsafe { mem::transmute(_msg) };
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    let result_info: &mut EvmResult = unsafe { mem::transmute(info) };
+    let evm_msg: &EvmMessage = unsafe { mem::transmute(msg) };
     let call_data_size = evm_msg.input_size.clone();
     let data: &[u8] = unsafe { slice::from_raw_parts(evm_msg.input as *const u8, call_data_size) };
     let call_type: CallType = match evm_msg.kind {

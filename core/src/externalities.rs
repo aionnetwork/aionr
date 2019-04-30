@@ -163,7 +163,7 @@ where B: StateBackend
     }
 
     fn set_storage(&mut self, key: H128, value: H128) {
-        // tansfer value to type of Bytes, deduct the leading zeros
+        // deduct the leading zeros
         let mut zeros_num = 0;
         for item in value[..].to_vec() {
             if item == 0x00 {

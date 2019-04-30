@@ -842,8 +842,9 @@ impl<B: Backend> State<B> {
     pub fn commit(&mut self) -> Result<(), Error> {
         // first, commit the sub trees.
         let mut accounts = self.cache.borrow_mut();
-        debug!(target: "cons", "commit accounts = {:?}", accounts);
+        // debug!(target: "cons", "commit accounts = {:?}", accounts);
         for (address, ref mut a) in accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
+            debug!(target: "cons", "commit account: [{:?} - {:?}]", address, a);
             if let Some(ref mut account) = a.account {
                 let addr_hash = account.address_hash(address);
                 {
@@ -854,6 +855,7 @@ impl<B: Backend> State<B> {
                     account.commit_code(account_db.as_hashstore_mut());
                     // Tmp workaround to ignore storage changes on null accounts
                     // until java kernel fixed the problem
+                    debug!(target: "vm", "check null of {:?}", address);
                     if !account.is_null()
                         || address == &H256::from(
                             "0000000000000000000000000000000000000000000000000000000000000100",
@@ -866,6 +868,8 @@ impl<B: Backend> State<B> {
                             account.update_root(address, account_db.as_hashstore_mut());
                     } else if !account.storage_changes().is_empty()
                     {
+                        // TODO: check key/value storage in avm
+                        // to see whether discard is needed
                         account.discard_storage_changes();
                         a.state = AccountState::CleanFresh;
                     } else {

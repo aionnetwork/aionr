@@ -46,9 +46,6 @@ use state::Backend;
 
 const STORAGE_CACHE_ITEMS: usize = 8192;
 
-// pub type FVMCache = (RefCell<LruCache<VMKey::Normal, VMValue::Normal>>, RefCell<LruCache<H128, H256>>);
-// pub type FVMStorageChange = (HashMap<H128, H128>, HashMap<H128, H256>);
-// pub type FVMAccount = Account<FVMCache, FVMStorageChange>;
 type VMCache = RefCell<LruCache<Bytes, Bytes>>;
 type VMStorageChange = HashMap<Bytes, Bytes>;
 pub type AionVMAccount = Account<VMCache, VMStorageChange>;
@@ -241,10 +238,10 @@ impl AionVMAccount {
             transformed_code_hash: self.transformed_code_hash.clone(),
             transformed_code_size: self.transformed_code_size.clone(),
             transformed_code_cache: self.transformed_code_cache.clone(),
-            objectgraph_hash: self.objectgraph_hash(),
+            objectgraph_hash: self.objectgraph_hash.clone(),
             object_graph_size: self.object_graph_size.clone(),
             object_graph_cache: self.object_graph_cache.clone(),
-            code_filth: self.code_filth,
+            code_filth: self.code_filth.clone(),
             address_hash: self.address_hash.clone(),
             empty_but_commit: self.empty_but_commit.clone(),
             account_type: self.account_type.clone(),
@@ -642,8 +639,8 @@ macro_rules! impl_account {
                 let mut stream = RlpStream::new_list(4);
                 stream.append(&self.nonce);
                 stream.append(&self.balance);
-                let vm_type: AccType = self.acc_type().into();
-                if vm_type == AccType::AVM {
+                //let vm_type: AccType = self.acc_type().into();
+                if self.acc_type() == AccType::AVM {
                     println!("rlp encode using delta_root");
                     stream.append(&self.delta_root);
                 } else {
@@ -809,6 +806,11 @@ impl AionVMAccount {
         if let Some(value) = self.storage_changes.get(key) {
             return Some(value.clone());
         }
+
+        if let Some(value) = self.storage_cache.borrow_mut().get_mut(key) {
+            return Some(value.clone());
+        }
+        
         None
     }
 
@@ -909,7 +911,8 @@ mod tests {
         let mut db = AccountDBMut::new(&mut db, &Address::new());
         let rlp = {
             let mut a = AionVMAccount::new_contract(69.into(), 0.into());
-            a.set_storage(vec![0x00], vec![0x12, 0x34]);
+            let key = vec![0u8; 16];
+            a.set_storage(key, vec![0x12, 0x34]);
             a.commit_storage(&Default::default(), &mut db).unwrap();
             a.init_code(vec![]);
             a.commit_code(&mut db);
@@ -921,7 +924,7 @@ mod tests {
             *a.storage_root().unwrap(),
             "d2e59a50e7414e56da75917275d1542a13fd345bf88a657a4222a0d50ad58868".into()
         );
-        let value = a.storage_at(&db.immutable(), &vec![0x00]).unwrap();
+        let value = a.storage_at(&db.immutable(), &vec![0x00; 16]).unwrap();
         assert_eq!(
             value,
             vec![0x12, 0x34]
@@ -938,7 +941,7 @@ mod tests {
         let mut a = AionVMAccount::new_contract(69.into(), 0.into());
         let mut db = MemoryDB::new();
         let mut db = AccountDBMut::new(&mut db, &Address::new());
-        a.set_storage([0u8; 16].to_vec(), [0,0,0,0,0,0,0,0,0,0,0,0, 0x12, 0x34].to_vec());
+        a.set_storage(vec![0u8; 16], vec![0x12, 0x34]);
         assert_eq!(a.storage_root(), None);
         a.commit_storage(&Default::default(), &mut db).unwrap();
         assert_eq!(

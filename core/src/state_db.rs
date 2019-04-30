@@ -513,7 +513,7 @@ impl state::Backend for StateDB {
 struct SyncAccount(Option<AionVMAccount>);
 /// That implementation is safe because account is never modified or accessed in any way.
 /// We only need `Sync` here to allow `StateDb` to be kept in a `RwLock`.
-/// `Account` is `!Sync` by default because of `RefCell`s inside it.
+/// `AionVNAccount` is `!Sync` by default because of `RefCell`s inside it.
 unsafe impl Sync for SyncAccount {}
 
 #[cfg(test)]
