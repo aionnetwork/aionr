@@ -810,7 +810,7 @@ impl AionVMAccount {
         if let Some(value) = self.storage_cache.borrow_mut().get_mut(key) {
             return Some(value.clone());
         }
-        
+
         None
     }
 
@@ -1009,6 +1009,21 @@ mod tests {
 
         let mut a = AionVMAccount::from_rlp(&rlp);
         assert_eq!(a.cache_objectgraph(&address, &db.immutable()), Some(Arc::new(vec![0x55, 0x44, 0xffu8])));
+    }
+
+    #[test]
+    fn cached_storage_at() {
+        let mut db = MemoryDB::new();
+        let mut db = AccountDBMut::new(&mut db, &Address::new());
+        let mut a = AionVMAccount::new_contract(69.into(), 0.into());
+
+        a.set_storage(vec![0x12, 0x34], vec![0x67, 0x78]);
+        a.commit_storage(&Default::default(), &mut db).unwrap();
+
+        assert!(a.cached_storage_at(&vec![0x12, 0x34]).is_some());
+
+        a.storage_cache.borrow_mut().clear();
+        assert!(!a.cached_storage_at(&vec![0x12, 0x34]).is_some());
     }
 }
 
