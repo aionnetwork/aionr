@@ -94,5 +94,5 @@ members = [
 	"keystore/keychain/cli",
 	"sync",
 	"util/rlp_compress",
-  "vms",
+  	"vms",
 ]

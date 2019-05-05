@@ -95,7 +95,7 @@ impl fmt::Display for avm_bytes {
     }
 }
 
-#[link(name = "avmjni")]
+#[link(name = "avmjni", kind="static")]
 extern {
     pub static mut callbacks: avm_callbacks;
 

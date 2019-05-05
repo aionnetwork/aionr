@@ -18,10 +18,12 @@ pub mod callback;
 pub mod codec;
 pub mod types;
 
+#[cfg(test)]
+mod tests;
+
 pub use avm::{
     AVM,
-    // AVMExt,
-    AVMActionParams,
+    //AVMActionParams,
 };
 
 pub use types::{

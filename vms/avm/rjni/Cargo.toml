@@ -1,7 +1,7 @@
 [package]
 name = "rjni"
 version = "0.0.1"
-authors = ["Ben Anderson <gravityscore@gmail.com>"]
+authors = ["Ben Anderson <gravityscore@gmail.com>", "Camus Qiu <camus@aion.network>"]
 
 [dependencies]
 libc = "*"

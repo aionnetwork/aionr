@@ -24,25 +24,6 @@ use hash::{BLAKE2B_EMPTY};
 /// thread needs to attach the thread to the JVM instance first and deattach
 /// after finishing the interaction.
 static mut JVM_SINGLETON: AtomicPtr<ffi::JavaVM> = AtomicPtr::new(ptr::null_mut());
-const AVM_JARS: [&str; 17] = [
-    "asm-6.2.1.jar",
-    "asm-analysis-6.2.1.jar",
-    "asm-commons-6.2.1.jar",
-    "asm-tree-6.2.1.jar",
-    "asm-util-6.2.1.jar",
-    "ed25519.jar",
-    "hamcrest-all-1.3.jar",
-    "org-aion-avm-api.jar",
-    "org-aion-avm-core.jar",
-    "org-aion-avm-rt.jar",
-    "org-aion-avm-tooling.jar",
-    "org-aion-avm-userlib.jar",
-    "scratch-deps.jar",
-    "slf4j-api-1.7.25.jar",
-    "spongycastle-1.58.0.0.jar",
-    "vm-api-bcca6a8.jar",
-    "org-aion-avm-jni.jar",
-];
 
 /// Creates a JVM instance for the first time. This method is NOT thread
 /// safe, and is intended for the "main" thread only.
@@ -53,16 +34,12 @@ pub fn launch_jvm() {
                 // prepare classpath
                 let mut classpath = Classpath::new();
                 let mut libs = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-                libs.push("libs");
-                for jar_pkg in AVM_JARS.iter() {
-                    let mut pkg_path = libs.clone();
-                    pkg_path.push(jar_pkg);
-                    // println!("add jar {:?}", pkg_path);
-                    classpath = add_jars(
-                        classpath,
-                        pkg_path.to_str().expect("The `libs` folder is not found"),
-                    );
-                }
+                libs.push("libs/aion_vm");
+                // println!("add jar {:?}", pkg_path);
+                classpath = add_jars(
+                    classpath,
+                    libs.to_str().expect("The `libs` folder is not found"),
+                );
 
                 // prepare options
                 let mut options = Options::new();

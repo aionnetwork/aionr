@@ -704,7 +704,7 @@ macro_rules! impl_account {
                     return;
                 }
 
-                println!("Account: update code cache");
+                // println!("Account: update code cache");
                 // if there's already code in the global cache, always cache it localy
                 let hash = self.code_hash();
                 match state_db.get_cached_code(&hash) {
@@ -819,17 +819,17 @@ impl AionVMAccount {
     }
 
     pub fn update_root(&mut self, address: &Address, db: &mut HashStore) {
-        println!("account type: {:?}", self.acc_type());
+        debug!(target: "vm", "account type: {:?}", self.acc_type());
         if self.account_type == AccType::AVM {
             let mut concatenated_root = Vec::new();
             concatenated_root.extend_from_slice(&self.storage_root[..]);
             concatenated_root.extend_from_slice(&self.objectgraph_hash[..]);
             debug!(target: "vm", "concatenated root = {:?}", concatenated_root);
             self.delta_root = blake2b(&concatenated_root);
-            println!("updated storage root = {:?}, delta_root = {:?}, code hash = {:?}", 
+            debug!(target: "vm", "updated storage root = {:?}, delta_root = {:?}, code hash = {:?}", 
                 self.storage_root, self.delta_root, self.code_hash);
             // save object graph
-            println!("hash for object graph = {:?}", self.delta_root);
+            debug!(target: "vm", "hash for object graph = {:?}", self.delta_root);
             db.emplace(
                 self.delta_root.clone(),
                 DBValue::from_slice(self.object_graph_cache.as_slice()),
