@@ -124,13 +124,11 @@ impl SyncMgr {
         .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(broadcast_transactions_task);
 
-        let flush_task = loop_fn(0, |block_number| {
+        let flush_task = loop_fn(0, |_| {
             let block_chain = SyncStorage::get_block_chain();
-            block_chain.import_verified_blocks();
+            let imported = block_chain.import_verified_blocks();
 
-            let synced_block_number = block_chain.chain_info().best_block_number;
-
-            if block_number == synced_block_number {
+            if imported == 0 {
                 if let Some(ref mut node) = P2pMgr::get_an_alive_node() {
                     BlockBodiesHandler::get_blocks_bodies(node, 0);
                 }
@@ -138,7 +136,7 @@ impl SyncMgr {
             }
             thread::sleep(Duration::from_millis(300));
             if SyncStorage::is_syncing() {
-                Ok(Loop::Continue(synced_block_number))
+                Ok(Loop::Continue(0))
             } else {
                 Ok(Loop::Break(()))
             }
@@ -198,7 +196,7 @@ impl SyncMgr {
                 info!(target: "sync", "{:=^127}", " Sync Statics ");
                 info!(target: "sync", "Best block number: {}, hash: {}, total difficulty: {}", chain_info.best_block_number, chain_info.best_block_hash, chain_info.total_difficulty);
                 info!(target: "sync", "Network Best block number: {}, hash: {}", SyncStorage::get_network_best_block_number(), SyncStorage::get_network_best_block_hash());
-                info!(target: "sync", "Max staged block number: {}", SyncStorage::get_block_header_chain().chain_info().best_block_number);
+                info!(target: "sync", "Max staged block number: {}", SyncStorage::get_block_header_chain().best_block().number);
                 info!(target: "sync", "Sync speed: {} blks/sec", sync_speed);
                 info!(target: "sync",
                     "Total/Connected/Active peers: {}/{}/{}",

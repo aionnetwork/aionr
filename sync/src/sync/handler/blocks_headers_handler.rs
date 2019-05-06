@@ -38,7 +38,7 @@ use super::blocks_bodies_handler::BlockBodiesHandler;
 use p2p::*;
 
 lazy_static! {
-    static ref DB_TRANSACTION: Mutex<DBTransaction> = { Mutex::new(DBTransaction::new()) };
+    static ref MUTEX: Mutex<u8> = { Mutex::new(0) };
 }
 
 const REQUEST_SIZE: u64 = 32;
@@ -183,7 +183,7 @@ impl BlockHeadersHandler {
                 let parent_hash = header.parent_hash();
 
                 {
-                    let mut tx = DB_TRANSACTION.lock().clone();
+                    let _lock = MUTEX.lock();
 
                     if header_chain.status(parent_hash) == BlockStatus::InChain {
                         if header_chain.status(&hash) != BlockStatus::InChain {
@@ -207,7 +207,7 @@ impl BlockHeadersHandler {
                             }
                             if let Some(total_difficulty) = total_difficulty {
                                 if let Ok(num) = header_chain.insert_with_td(
-                                    tx,
+                                    DBTransaction::new(),
                                     &header.encoded(),
                                     Some(total_difficulty + *header.difficulty()),
                                     None,
