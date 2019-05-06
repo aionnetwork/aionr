@@ -312,7 +312,7 @@ pub trait BlockChainClient: Sync + Send {
     ///
     /// Both provided keys assume a secure trie.
     /// Returns a vector of raw trie nodes (in order from the root) proving the storage query.
-    fn prove_storage(&self, key1: H256, key2: H128, id: BlockId) -> Option<(Vec<Bytes>, H256)>;
+    fn prove_storage(&self, key1: H256, key2: H128, id: BlockId) -> Option<(Vec<Bytes>, H128)>;
 
     /// Prove account existence at a specific block id.
     /// The key is the blake2b hash of the account's address.

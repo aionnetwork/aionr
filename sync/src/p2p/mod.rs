@@ -192,6 +192,11 @@ impl P2pMgr {
         ip_black_list.remove(ip);
     }
 
+    pub fn clear_black_list() {
+        let mut ip_black_list = IP_BLACK_LIST.write();
+        ip_black_list.clear()
+    }
+
     pub fn load_boot_nodes(boot_nodes_str: Vec<String>) -> Vec<Node> {
         let mut boot_nodes = Vec::new();
         let mut top8 = TOP8_NODE_HASHES.write();
@@ -501,6 +506,8 @@ impl P2pMgr {
         let (sink, stream) = P2pMgr::split_frame(socket);
         let read = stream.for_each(move |msg| {
             if let Some(mut peer_node) = P2pMgr::get_node(node_hash) {
+                trace!(target: "net","node_ip:{}",peer_node.ip_addr.get_addr());
+                trace!(target: "net","header:{}",msg.head);
                 handle(&mut peer_node, msg.clone());
                 node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
             }
@@ -636,7 +643,7 @@ impl Decoder for P2pCodec {
                 if let Ok(head) = decoder.deserialize(head_raw) {
                     decoded.head = head;
                     if decoded.head.ver > Version::V2.value()
-                        || decoded.head.ctrl > Control::SYNC.value()
+                        || decoded.head.ctrl > Control::LIGHT.value()
                         || decoded.head.action > MAX_VALID_ACTTION_VALUE
                     {
                         invalid = true;

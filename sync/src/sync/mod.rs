@@ -65,6 +65,7 @@ const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const REPUTATION_HANDLE_INTERVAL: u64 = 1800;
 const SYNC_STATIC_CAPACITY: usize = 25;
+const CLEAR_BLACK_LIST_INTERVAL: u64 = 3600;
 
 #[derive(Clone)]
 struct SyncMgr;
@@ -142,6 +143,17 @@ impl SyncMgr {
             }
         });
         executor.spawn(flush_task);
+
+        let clear_task = Interval::new(
+            Instant::now(),
+            Duration::from_secs(CLEAR_BLACK_LIST_INTERVAL),
+        )
+        .for_each(move |_| {
+            P2pMgr::clear_black_list();
+            Ok(())
+        })
+        .map_err(|e| error!("interval errored; err={:?}", e));
+        executor.spawn(clear_task);
 
         let reputation_handle_task = Interval::new(
             Instant::now(),

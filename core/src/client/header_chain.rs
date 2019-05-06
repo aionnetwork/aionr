@@ -1175,9 +1175,8 @@ mod tests {
             header.set_number(2049);
             header.set_timestamp(rolling_timestamp);
             header.set_difficulty(*genesis_header.difficulty() * 2049 as u32 * 10000u32);
-            parent_hash = header.hash();
 
-            let mut tx = DBTransaction::new();
+            let tx = DBTransaction::new();
             let _ = chain.insert(tx, &header.encoded(), None, true).unwrap();
         }
 

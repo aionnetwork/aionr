@@ -1190,9 +1190,9 @@ NoPadding, PkcsPadding};
         tmp[1] = 2;
         tmp[2] = 3;
         tmp[3] = 4;
-        let mut rng1: rand::StdRng = rand::SeedableRng::from_seed(tmp);
-        let mut rng2: rand::StdRng = rand::SeedableRng::from_seed(tmp);
-        let mut rng3: rand::StdRng = rand::SeedableRng::from_seed(tmp);
+        let mut rng1: rand::rngs::StdRng = rand::SeedableRng::from_seed(tmp);
+        let mut rng2: rand::rngs::StdRng = rand::SeedableRng::from_seed(tmp);
+        let mut rng3: rand::rngs::StdRng = rand::SeedableRng::from_seed(tmp);
         let max_size = cmp::max(test.get_plain().len(), test.get_cipher().len());
 
         let mut r1 = || rng1.gen_range(0, max_size);

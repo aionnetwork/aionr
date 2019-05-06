@@ -843,7 +843,7 @@ impl BlockChainClient for TestBlockChainClient {
 
     fn registry_address(&self, _name: String, _block: BlockId) -> Option<Address> { None }
 
-    fn prove_storage(&self, _: H256, _: H128, _: BlockId) -> Option<(Vec<Bytes>, H256)> { None }
+    fn prove_storage(&self, _: H256, _: H128, _: BlockId) -> Option<(Vec<Bytes>, H128)> { None }
 
     fn prove_account(&self, _: H256, _: BlockId) -> Option<(Vec<Bytes>, BasicAccount)> { None }
 

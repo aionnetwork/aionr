@@ -615,16 +615,16 @@ impl Account {
         &self,
         db: &HashStore,
         storage_key: H128,
-    ) -> Result<(Vec<Bytes>, H256), Box<TrieError>>
+    ) -> Result<(Vec<Bytes>, H128), Box<TrieError>>
     {
         use trie::recorder::Recorder;
 
         let mut recorder = Recorder::new();
         let trie = SecTrieDB::new(db, &self.storage_root)?;
-        let item: H256 = {
+        let item: H128 = {
             let query = (&mut recorder, ::rlp::decode);
             trie.get_with(&storage_key, query)?
-                .unwrap_or_else(H256::zero)
+                .unwrap_or_else(H128::zero)
         };
         Ok((
             recorder.drain().into_iter().map(|r| r.data).collect(),
