@@ -1,6 +1,6 @@
 [package]
 name = "fastvm"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Camus Qiu <camus@aion.network>"]
 build = "build.rs"
 
