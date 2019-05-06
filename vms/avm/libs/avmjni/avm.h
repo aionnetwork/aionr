@@ -212,7 +212,7 @@ extern struct avm_bytes new_null_bytes();
  */
 extern void release_bytes(struct avm_bytes *bytes);
 
-extern jint JNI_OnLoad_avmjni();
+extern jint JNI_OnLoad_avmjni_1();
 
 #if __cplusplus
 }

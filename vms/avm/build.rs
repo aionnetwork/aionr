@@ -24,16 +24,16 @@ fn main() {
             .status()
             .expect("fetch jni jar error");
     
-    // fetch avm libs
-    Command::new("wget")
-            .arg("https://github.com/aionnetwork/AVM/archive/1.0.tar.gz")
-            .args(["-O", "/tmp/avm.tar.gz"].iter())
-            .status()
-            .expect("fetch AVM error");
+    // // fetch avm libs
+    // Command::new("wget")
+    //         .arg("https://github.com/aionnetwork/AVM/archive/1.0.tar.gz")
+    //         .args(["-O", "/tmp/avm.tar.gz"].iter())
+    //         .status()
+    //         .expect("fetch AVM error");
 
-    // unpack avm package and put the jars in libs dir
-    Command::new("tar")
-    .arg("-xvf")
-    .arg("/tmp/avm.tar.gz")
-    .args(["-C", "/tmp/"].iter());
+    // // unpack avm package and put the jars in libs dir
+    // Command::new("tar")
+    // .arg("-xvf")
+    // .arg("/tmp/avm.tar.gz")
+    // .args(["-C", "/tmp/"].iter());
 }

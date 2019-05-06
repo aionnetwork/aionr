@@ -14,7 +14,7 @@ using namespace std;
  */
 struct avm_callbacks callbacks;
 
-jint JNI_OnLoad_avmjni() {
+jint JNI_OnLoad_avmjni_1() {
   return JNI_VERSION_10;
 }
 

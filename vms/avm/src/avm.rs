@@ -5,8 +5,7 @@ use rjni::{Classpath, JavaVM, Options, Type, Value, Version};
 use rjni::ffi;
 use std::fs;
 use std::io::Error;
-use std::path::Path;
-use std::path::PathBuf;
+use std::{env, path::Path, path::PathBuf};
 use std::ptr;
 use std::sync::atomic::AtomicPtr;
 use std::sync::atomic::Ordering;
@@ -33,7 +32,16 @@ pub fn launch_jvm() {
             let child = thread::spawn(move || {
                 // prepare classpath
                 let mut classpath = Classpath::new();
-                let mut libs = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                let key = "AIONR_HOME";
+                let default_var = env::var(key);
+                let mut libs;
+                if default_var.is_err() {
+                    libs = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+                    warn!("AIONR_HOME is not set, use default path: {:?}", libs);
+                } else {
+                    libs = PathBuf::from(default_var.unwrap());
+                }
+                
                 libs.push("libs/aion_vm");
                 // println!("add jar {:?}", pkg_path);
                 classpath = add_jars(
