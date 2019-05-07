@@ -198,7 +198,7 @@ impl AionVMAccount {
                     break;
                 }
             }
-            println!("key = {:?}, value = {:?}, is_zero = {:?}", k, v, is_zero);
+            debug!(target: "vm", "CommitStorage: key = {:?}, value = {:?}, is_zero = {:?}", k, v, is_zero);
             // account just commit storage key/value pairs, 
             // the real length of value should be dealed by caller
             match is_zero {

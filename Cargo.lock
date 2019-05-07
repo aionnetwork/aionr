@@ -54,7 +54,7 @@ dependencies = [
  "dir 0.1.0",
  "equihash 0.0.0",
  "ethbloom 0.5.1",
- "fastvm 0.1.0",
+ "fastvm 0.2.0",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures-cpupool 0.1.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "heapsize 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -364,7 +364,7 @@ dependencies = [
 
 [[package]]
 name = "avm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "acore-bytes 0.1.0",
  "aion-types 0.1.0",
@@ -374,7 +374,7 @@ dependencies = [
  "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-bigint 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "rand 0.3.22 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rand 0.4.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "rjni 0.0.1",
  "rlp 0.2.1",
  "rustc-hex 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -900,7 +900,7 @@ dependencies = [
 
 [[package]]
 name = "fastvm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "acore-bytes 0.1.0",
  "aion-types 0.1.0",
@@ -911,7 +911,7 @@ dependencies = [
  "db 0.0.1",
  "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "num 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "num 0.1.42 (registry+https://github.com/rust-lang/crates.io-index)",
  "num-bigint 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "patricia-trie 0.1.0",
  "rand 0.5.5 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -2916,11 +2916,11 @@ dependencies = [
  "acore-bytes 0.1.0",
  "aion-types 0.1.0",
  "ajson 0.1.0",
- "avm 0.1.0",
+ "avm 0.2.0",
  "bit-set 0.4.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "blake2b 0.1.0",
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "fastvm 0.1.0",
+ "fastvm 0.2.0",
  "heapsize 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
