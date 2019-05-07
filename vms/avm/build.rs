@@ -12,7 +12,7 @@ fn main() {
         .expect("failed to build avm");
 
     println!("cargo:rustc-link-search=native={}", outdir);
-    println!("cargo:rustc-link-lib=static=avmjni");
+    println!("cargo:rustc-link-lib=avmjni");
 
     // fetch jni jar
     let mut jni_jar_path = env!("CARGO_MANIFEST_DIR").to_string();

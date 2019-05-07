@@ -43,7 +43,6 @@ pub fn launch_jvm() {
                 }
                 
                 libs.push("libs/aion_vm");
-                // println!("add jar {:?}", pkg_path);
                 classpath = add_jars(
                     classpath,
                     libs.to_str().expect("The `libs` folder is not found"),
@@ -187,7 +186,7 @@ impl AVM {
         transactions: &Vec<TransactionContext>,
     ) -> Result<Vec<TransactionResult>, &'static str>
     {
-        println!("start rust jvm executor");
+        trace!(target: "vm", "start rust jvm executor");
         let vm = self.attach();
         // find the NativeTransactionExecutor class
         let class = vm
@@ -195,7 +194,7 @@ impl AVM {
             .class("org/aion/avm/jni/NativeTransactionExecutor")
             .expect("NativeTransactionExecutor is missing in the classpath");
 
-        println!("load native class");
+        trace!(target: "vm", "load native class");
         // the method name
         let name = "execute";
 
@@ -212,7 +211,7 @@ impl AVM {
             ),
         ];
 
-        println!("rust jvm call_static");
+        trace!(target: "vm", "rust jvm call_static");
         // invoke the method
         let ret = class
             .call_static(name, &arguments, return_type)

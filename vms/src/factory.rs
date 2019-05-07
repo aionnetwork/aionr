@@ -217,11 +217,14 @@ impl Factory for AVMFactory {
             let gas_limit = params.gas.low_u64();
             let gas_price = params.gas_price.low_u64();
             let address = params.address;
+
             let caller = params.sender;
             debug!(target: "vm", "caller = {:?}", caller);
+            
             let origin = params.origin;
             let transfer_value: [u8; 32] = params.value.into();
             let call_value = transfer_value.to_vec();
+
             debug!(target: "vm", "call_value = {:?}", call_value);
             debug!(target: "vm", "call_data = {:?}", call_data);
             debug!(target: "vm", "gas limit = {:?}", gas_limit);
@@ -268,7 +271,6 @@ impl Factory for AVMFactory {
 
         let inst = &mut self.instance;
         let ext_ptr: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(ext)) };
-        //println!("ext ptr = {:?}, avm contexts = {:?}", ext_ptr, avm_tx_contexts);
         let mut res = inst.execute(ext_ptr as i64, &avm_tx_contexts);
 
         let mut exec_results = Vec::new();
@@ -285,8 +287,6 @@ impl Factory for AVMFactory {
                 let mut gas_left =
                     U256::from(avm_tx_contexts[index].energy_limit - result.energy_used);
                 let return_data = result.return_data;
-                //let storage_root = result.storage_root_hash;
-                //println!("storage root = {}", storage_root);
                 debug!(target: "vm", "avm status code = {:?}, gas left = {:?}", status_code, gas_left);
                 exec_results.push(ExecutionResult {
                     gas_left: gas_left.into(),

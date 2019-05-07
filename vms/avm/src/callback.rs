@@ -95,7 +95,7 @@ impl fmt::Display for avm_bytes {
     }
 }
 
-#[link(name = "avmjni", kind="static")]
+#[link(name = "avmjni")]
 extern {
     pub static mut callbacks: avm_callbacks;
 
@@ -309,7 +309,7 @@ pub extern fn avm_touch_account(handle: *const c_void, address: *const avm_addre
     let ext: &mut Box<Ext> = unsafe {mem::transmute(handle)};
     let addr: &Address  = unsafe {mem::transmute(address)};
 
-    println!("touch account: {:?} - {:?}", addr, index);
+    debug!(target: "vm", "touch account: {:?} - {:?}", addr, index);
     
     ext.touch_account(addr, index);
 }
@@ -322,7 +322,7 @@ pub extern fn avm_send_signal(handle: *const c_void, sig_num: i32) -> avm_bytes 
         0 => {
             ext.commit();
             let root = ext.root();
-            println!("state root = {:?}", root);
+            debug!(target: "vm", "state root = {:?}", root);
             unsafe {
                 let ret = new_fixed_bytes(32);
                 ptr::copy(&root[0], ret.pointer, 32);
@@ -355,7 +355,7 @@ pub extern fn avm_contract_address(sender: *const avm_address, nonce: *const avm
     let addr: &Address = unsafe {mem::transmute(sender)};
     let n = unsafe {slice::from_raw_parts((*nonce).pointer, (*nonce).length as usize)};
 
-    println!("avm new contract: sender = {:?}, nonce = {:?}", addr, n);
+    debug!(target: "vm", "avm new contract: sender = {:?}, nonce = {:?}", addr, n);
 
     let (new_contract, _) = contract_address(addr, &n.into());
 
@@ -422,7 +422,6 @@ pub extern fn avm_put_transformed_code(handle: *const c_void, address: *const av
 
 #[no_mangle]
 pub extern fn avm_get_objectgraph(handle: *const c_void, address: *const avm_address) -> avm_bytes {
-    println!("avm_get_objectgraph");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
 
@@ -448,19 +447,16 @@ pub extern fn avm_get_objectgraph(handle: *const c_void, address: *const avm_add
 
 #[no_mangle]
 pub extern fn avm_set_objectgraph(handle: *const c_void, address: *const avm_address, data: *const avm_bytes) {
-    println!("avm_set_objectgraph");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
     let graph: &avm_bytes = unsafe { mem::transmute(data) };
     debug!(target: "vm", "avm_set_objectgraph at: {:?}", addr);
     let ext_graph: &[u8] =
         unsafe { ::std::slice::from_raw_parts(graph.pointer, graph.length as usize) };
-    // println!("AVM: set object graph = {:?}", ext_graph);
     ext.set_objectgraph(addr, ext_graph.to_vec());
 }
 
 pub fn register_callbacks() {
-    // println!("set_objectgraph ptr = {:?}", avm_set_objectgraph);
     unsafe {
         callbacks.create_account = avm_create_account;
         callbacks.has_account_state = avm_has_account_state;

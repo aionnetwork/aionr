@@ -690,7 +690,7 @@ fn is_normal_or_avm_call(
             return false;
         } else {
             if let Some(c) = code {
-                println!("pre bytes = {:?}", &c[0..2]);
+                debug!(target: "vm", "pre bytes = {:?}", &c[0..2]);
                 return c[0..2] == [0x50u8, 0x4B];
             }
             // TIPS: consider the corner case:
@@ -735,7 +735,7 @@ fn push_transactions(
                 }
                 block.push_transaction(tx.clone(), None)?;
             } else {
-                println!("found avm transaction");
+                trace!(target: "vm", "found avm transaction");
                 tx_batch.push(tx.clone())
             }
         }
@@ -750,7 +750,7 @@ fn push_transactions(
         }
     }
     
-    debug!(target: "vm", "push transactions done");
+    trace!(target: "vm", "push transactions done");
 
     Ok(())
 }

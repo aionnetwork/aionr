@@ -179,7 +179,7 @@ where B: StateBackend
                 ret[16-value.len()+idx] = value[idx];
             }
         }
-        println!("BuiltIn: storage value = {:?}", ret);
+        trace!(target: "vm", "BuiltIn: storage value = {:?}", ret);
         ret.as_slice().into()
     }
 

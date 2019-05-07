@@ -2411,8 +2411,8 @@ Address};
     fn hello_avm() {
         // Create contract on already existing address
         let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        file.push("src/tests/AVMDapps/HelloWorld.jar");
-        let file_str = file.to_str().expect("Failed to locate the helloworld.jar");
+        file.push("src/tests/AVMDapps/demo-0.1.0.jar");
+        let file_str = file.to_str().expect("Failed to locate the demo.jar");
         let mut code = read_file(file_str).expect("unable to open avm dapp");
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
         let address = contract_address(&sender, &U256::zero()).0;
@@ -2458,7 +2458,8 @@ Address};
         assert!(state.code(&params.address).unwrap().is_some());
 
         params.call_type = CallType::Call;
-        let call_data = vec![0x21,0x00,0x08,0x73,0x61,0x79,0x48,0x65,0x6c,0x6c,0x6f];
+        // let call_data = vec![0x21,0x00,0x08,0x73,0x61,0x79,0x48,0x65,0x6c,0x6c,0x6f];
+        let call_data = AbiToken::STRING(String::from("storageTest")).encode();
         params.data = Some(call_data);
         params.nonce += 1;
         println!("call data = {:?}", params.data);
@@ -2479,8 +2480,10 @@ Address};
 
             assert_eq!(status_code, ExecStatus::Success);
             println!("result state root = {:?}, return_data = {:?}", state_root, return_data);
-            assert_eq!(return_data.to_vec(), vec![72, 101, 108, 108, 111]);
+            assert_eq!(return_data.to_vec(), vec![17u8, 0, 4, 0, 2, 3, 4]);
         }
+
+        assert_eq!(state.storage_at(&params.address, &vec![1u8,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10,1,2]).unwrap(), vec![0u8,2,3,5]);
     }
 
     use std::io::Error;

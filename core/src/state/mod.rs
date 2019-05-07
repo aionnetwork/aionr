@@ -417,7 +417,7 @@ impl<B: Backend> State<B> {
 
     /// Remove an existing account.
     pub fn kill_account(&mut self, account: &Address) {
-        println!("kill account: {:?}", account);
+        trace!(target: "vm", "kill account: {:?}", account);
         self.insert_cache(account, AccountEntry::<AionVMAccount>::new_dirty(None));
     }
 
@@ -1044,7 +1044,7 @@ impl<B: Backend> State<B> {
                     return Ok(f(None));
                 }
 
-                println!("search local database");
+                trace!(target: "vm", "search local database");
                 // not found in the global cache, get from the DB and insert into local
                 let db = self
                     .factories
