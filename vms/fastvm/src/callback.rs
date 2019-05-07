@@ -125,7 +125,6 @@ pub extern fn get_storage(
     key: EvmWord,
 ) -> EvmWord
 {
-    println!("EVM Callback: get_storage, key = {:?}", key);
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
     debug!(target: "vm", "ext<get_storage>: key = {:?}, raw_env = {:?}", key, obj);
     let storage = ext.storage_at(&(key.bytes).into());
@@ -150,7 +149,6 @@ pub extern fn put_storage(
     value: EvmWord,
 )
 {
-    println!("EVM put_storage");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
     
     debug!(target: "vm",
@@ -162,7 +160,6 @@ pub extern fn put_storage(
         U128::from(*key).into(),
         U128::from(*value).into(),
     );
-    println!("EVM put_storage done");
 }
 
 #[no_mangle]
@@ -193,7 +190,7 @@ pub extern fn vm_log(
         let topic: &[u8; 32] = unsafe { mem::transmute(topics as usize + idx * 32) };
         new_topics.push((*topic).into());
     }
-    println!("vm topics = {:?}, data = {:?}", new_topics, data);
+    debug!(target: "vm", "vm topics = {:?}, data = {:?}", new_topics, data);
     ext.log(new_topics, data);
 }
 

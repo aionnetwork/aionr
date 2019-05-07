@@ -795,7 +795,6 @@ impl AionVMAccount {
         let db = SecTrieDB::new(db, &self.storage_root)?;
 
         let item: Bytes = db.get_with(key, ::rlp::decode)?.unwrap_or_else(|| vec![]);
-        println!("AionVMAccount: storage value = {:?}", item);
         self.storage_cache
             .borrow_mut()
             .insert(key.clone(), item.clone());

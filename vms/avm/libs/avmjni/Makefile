@@ -27,8 +27,8 @@ all: release
 	@$(CPP) $(JNIFLAGS) -c $^ -o $@
 
 debug: $(JNIOBJECTS)
-	@echo "Generating $(TARGET)"
-	@$(AR) cr $(TARGET) $(JNIOBJECTS)
+	#@echo "Generating $(TARGET)"
+	#@$(AR) cr $(TARGET) $(JNIOBJECTS)
 
 shared: $(JNIOBJECTS)
 	@echo "Generating $(SHAREDTARGET)"
