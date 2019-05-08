@@ -818,7 +818,7 @@ where B: StateBackend
     }
 
     fn get_transformed_code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
-        println!("AVM get transformed code at: {:?}", address);
+        debug!(target: "vm", "AVMExt get transformed code at: {:?}", address);
         match self.state.lock().unwrap().transformed_code(address) {
             Ok(code) => {
                 // println!("transformed code = {:?}", code);
@@ -829,7 +829,7 @@ where B: StateBackend
     }
 
     fn save_transformed_code(&mut self, address: &Address, code: Bytes) {
-        println!("AVMExt save transformed code: address = {:?}", address);
+        debug!(target: "vm", "AVMExt save transformed code: address = {:?}", address);
         self.state
             .lock()
             .unwrap()
@@ -838,7 +838,7 @@ where B: StateBackend
     }
 
     fn get_objectgraph(&self, address: &Address) -> Option<Arc<Bytes>> {
-        println!("AVM get object graph");
+        debug!(target: "vm", "AVMExt get object graph");
         match self.state.lock().unwrap().get_objectgraph(address) {
             Ok(data) => {
                 // println!("objectgraph = {:?}", data);
@@ -849,7 +849,7 @@ where B: StateBackend
     }
 
     fn set_objectgraph(&mut self, address: &Address, data: Bytes) {
-        println!("AVMExt save object graph: address = {:?}", address);
+        debug!(target: "vm", "AVMExt save object graph: address = {:?}", address);
         self.state
             .lock()
             .unwrap()

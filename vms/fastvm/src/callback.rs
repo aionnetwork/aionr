@@ -211,6 +211,7 @@ pub extern fn call(obj: *mut libc::c_void, info: *mut u8, msg: *const u8) -> *co
         4 => CallType::StaticCall,
         _ => panic!("Call type does not exist"),
     };
+    
     let static_flag = evm_msg.flags == 1 || evm_msg.kind == 4;
 
     // Address in different call types are handled in VM

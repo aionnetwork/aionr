@@ -193,8 +193,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     ) -> Vec<Result<Executed, ExecutionError>>
     {
         let mut vm_params = Vec::new();
-        // validate transactions
-        println!("start executing {:?} transactions", txs.len());
         for t in txs {
             let sender = t.sender();
             let nonce = t.nonce;
@@ -337,13 +335,13 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let mut signal = rx.recv().expect("Unable to receive from channel");
             while signal >= 0 {
                 match signal {
-                    0 => println!("commit state"),
+                    0 => debug!(target: "vm", "AVMExec: commit state"),
                     _ => println!("unknown signal"),
                 }
                 signal = rx.recv().expect("Unable to receive from channel");
             }
 
-            println!("received {:?}, kill channel", signal);
+            trace!(target: "vm", "received {:?}, kill channel", signal);
         });
 
         // Ordinary execution - keep VM in same thread
@@ -757,21 +755,27 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // nonzero nonce, or nonempty code, then the creation throws immediately, with exactly
         // the same behavior as would arise if the first byte in the init code were an invalid
         // opcode. This applies retroactively starting from genesis.
+        
         if self
             .state
             .exists_and_not_null(&params.address)
             .unwrap_or(true)
         {
-            return ExecutionResult {
-                gas_left: 0.into(),
-                status_code: ExecStatus::Failure,
-                return_data: ReturnData::empty(),
-                exception: String::from(
-                    "Contract creation address already exists, or checking contract existance \
-                     failed.",
-                ),
-                state_root: H256::default(),
-            };
+            // AKI-83: allow internal creation of contract which has balance and no code.
+            let code = self.state.code(&params.address).unwrap_or(None);
+            let aion040_fork = self.machine.params().monetary_policy_update.is_some();
+            if !aion040_fork || (self.depth >= 1 && code.is_some()) || self.depth == 0 {
+                return ExecutionResult {
+                    gas_left: 0.into(),
+                    status_code: ExecStatus::Failure,
+                    return_data: ReturnData::empty(),
+                    exception: String::from(
+                        "Contract creation address already exists, or checking contract existance \
+                        failed.",
+                    ),
+                    state_root: H256::default(),
+                };
+            } 
         }
 
         trace!(
@@ -987,6 +991,11 @@ Address};
 
     fn make_aion_machine() -> EthereumMachine {
         let machine = ::ethereum::new_aion_test_machine();
+        machine
+    }
+
+    fn make_avm_machine() -> EthereumMachine {
+        let machine = ::ethereum::new_aion_avm_machine();
         machine
     }
 
@@ -2430,7 +2439,7 @@ Address};
         params.gas_price = 1.into();
         let mut state = get_temp_state();
         state
-            .add_balance(&sender, &U256::from(10_000_000), CleanupMode::NoEmpty)
+            .add_balance(&sender, &U256::from(100_000_000), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
         let machine = make_aion_machine();
@@ -2455,10 +2464,12 @@ Address};
             println!("return data = {:?}", return_data);
         }
 
+        // Hello avm is deployed
+
         assert!(state.code(&params.address).unwrap().is_some());
 
+        // test key/value storage
         params.call_type = CallType::Call;
-        // let call_data = vec![0x21,0x00,0x08,0x73,0x61,0x79,0x48,0x65,0x6c,0x6c,0x6f];
         let call_data = AbiToken::STRING(String::from("storageTest")).encode();
         params.data = Some(call_data);
         params.nonce += 1;
@@ -2484,6 +2495,32 @@ Address};
         }
 
         assert_eq!(state.storage_at(&params.address, &vec![1u8,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10,1,2]).unwrap(), vec![0u8,2,3,5]);
+
+        // test recursive call
+        params.call_type = CallType::Call;
+        let call_data = AbiToken::STRING(String::from("callExt")).encode();
+        params.data = Some(call_data);
+        params.nonce += 1;
+        println!("call data = {:?}", params.data);
+        let substate = Substate::new();
+        let execution_results = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.call_avm(vec![params.clone()], &mut [substate.clone()])
+        };
+
+        for r in execution_results {
+            let ExecutionResult {
+                status_code,
+                gas_left: _,
+                return_data,
+                exception: _,
+                state_root,
+            } = r;
+
+            assert_eq!(status_code, ExecStatus::Success);
+            println!("result state root = {:?}, return_data = {:?}", state_root, return_data);
+            assert_eq!(return_data.to_vec(), vec![17u8, 0, 4, 0, 2, 3, 4]);
+        }
     }
 
     use std::io::Error;
@@ -2895,5 +2932,92 @@ Address};
             ex.call_avm(vec![params.clone()], &mut [substate.clone()])
         };
         assert_eq!(execution_results[0].status_code, ExecStatus::Failure);
+    }
+
+    #[test]
+    fn contract_create2() {
+        // test internal creation to address with balance
+        let code = "605060405234156100105760006000fd5b5b6000600061001d610043565b604051809103906000f08015821516156100375760006000fd5b915091505b5050610052565b60405160648061009a83390190565b603a806100606000396000f30060506040526008565b60006000fd00a165627a7a72305820fd53915fee1b05fe9bfd2e5c002fbc0a06e4b569cdf9cee967125a1bad38bbae0029605060405260006000600050909055341560195760006000fd5b601d565b603a80602a6000396000f30060506040526008565b60006000fd00a165627a7a7230582067ea917dd1ec8e15669ee107500f563855e03f1941e0a857e305c3f1754c16a40029".from_hex().unwrap();
+        let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
+        let address = contract_address(&sender, &U256::zero()).0;
+        let mut params = ActionParams::default();
+        params.address = address.clone();
+        params.code_address = address.clone();
+        params.sender = sender.clone();
+        params.origin = sender.clone();
+        params.gas = U256::from(1000_000);
+        params.code = Some(Arc::new(code.clone()));
+        params.value = ActionValue::Transfer(U256::from(0));
+        params.call_type = CallType::Call;
+        params.gas_price = U256::from(0);
+
+        let mut state = get_temp_state();
+        state
+            .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
+            .unwrap();
+        let inner_contract_address = "a007d071538ce40db67cc816def5ec8adc410858ee6cfda21e72300835b83754".from_hex().unwrap();
+        state
+            .add_balance(
+                &inner_contract_address[..].into(),
+                &100.into(),
+                CleanupMode::NoEmpty)
+            .unwrap();
+        let mut info = EnvInfo::default();
+        info.number = 1;
+        info.gas_limit = U256::from(1000000);
+        info.author = Address::from(1);
+
+        let machine = make_aion_machine();
+        let mut substate = Substate::new();
+
+        let ExecutionResult {
+            gas_left: _,
+            status_code,
+            return_data: _,
+            exception: _,
+            state_root: _,
+        } = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.create(params.clone(), &mut substate)
+        };
+
+        // machine before aion040_fork returns failure on creation at existed account
+        assert_eq!(status_code, ExecStatus::Revert);
+
+        let machine = make_avm_machine();
+        let mut substate = Substate::new();
+
+        let ExecutionResult {
+            gas_left: _,
+            status_code,
+            return_data: _,
+            exception: _,
+            state_root: _,
+        } = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.create(params.clone(), &mut substate)
+        };
+
+        // machine after aion040_fork returns success on creation at exsited account which has no code
+        assert_eq!(status_code, ExecStatus::Success);
+
+        println!("code = {:?}", state.code(&inner_contract_address[..].into()));
+        
+        let machine = make_avm_machine();
+        let mut substate = Substate::new();
+
+        let ExecutionResult {
+            gas_left: _,
+            status_code,
+            return_data: _,
+            exception: _,
+            state_root: _,
+        } = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.create(params, &mut substate)
+        };
+
+        // normal creation of contract on account which already exists
+        assert_eq!(status_code, ExecStatus::Failure);
     }
 }

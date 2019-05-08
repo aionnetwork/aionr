@@ -189,7 +189,6 @@ JNIEXPORT void JNICALL Java_org_aion_avm_jni_NativeKernelInterface_putStorage
     struct avm_bytes v = load_bytes(env, value);
 
     callbacks.put_storage((void *)handle, &a, &k, &v);
-    printf("callback put storage done\n");
 
     // release the buffer
     release_bytes(&k);
@@ -243,10 +242,6 @@ JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_getBala
 {
     struct avm_address a = load_address(env, address);
 
-    for (int i = 0; i < 32; i++) {
-      printf("%02x", a.bytes[i]);
-    }
-    printf("\n");
     struct avm_value v = callbacks.get_balance((void *)handle, &a);
 
     return to_jbyteArray(env, v.bytes, VALUE_LENGTH);
@@ -442,7 +437,6 @@ JNIEXPORT void JNICALL Java_org_aion_avm_jni_NativeKernelInterface_setObjectGrap
     struct avm_address a = load_address(env, address);
     struct avm_bytes c = load_bytes(env, data);
 
-    printf("JNI: setOjectGraph, func ptr = %p\n", callbacks.set_objectgraph);
     callbacks.set_objectgraph((void *)handle, &a, &c);
 
     // release the buffer

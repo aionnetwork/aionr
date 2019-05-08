@@ -362,7 +362,7 @@ impl Engine<EthereumMachine> for Arc<POWEquihashEngine> {
             let header = LiveBlock::header(&*block);
             result_block_reward = self.calculate_reward(&header);
             //result_block_reward = U256::from(3028549382716049382u64);
-            println!("verify number: {}, reward: {} ", header.number(),  result_block_reward);
+            debug!(target: "cons", "verify number: {}, reward: {} ", header.number(),  result_block_reward);
             author = *header.author();
         }
         block.header_mut().set_reward(result_block_reward.clone());
