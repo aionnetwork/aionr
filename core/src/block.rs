@@ -323,6 +323,7 @@ impl<'x> OpenBlock<'x> {
         let env_info = self.env_info();
         let mut idx = 0;
         let mut receipts_results = Vec::new();
+        // avm should deal with exceptions correctly
         for apply_result in self
             .block
             .state
@@ -371,7 +372,7 @@ impl<'x> OpenBlock<'x> {
         let env_info = self.env_info();
         debug!(target: "vm", "tx type = {:?}", t.tx_type());
         if let Some(_v) = self.engine.params().monetary_policy_update {
-            if t.tx_type() == AVM_TRANSACTION_TYPE {
+            if t.tx_type() == AVM_TRANSACTION_TYPE || is_normal_or_avm_call(self, &t) {
                 result.append(&mut self.block.state.apply_batch(&env_info, self.engine.machine(), &[t.clone()]));
             } else {
                 result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
@@ -689,22 +690,18 @@ fn is_normal_or_avm_call(
             ) {
             return false;
         } else {
+            // not builtin call
             if let Some(c) = code {
                 debug!(target: "vm", "pre bytes = {:?}", &c[0..2]);
-                return c[0..2] == [0x50u8, 0x4B];
+                // fastvm contract in database must have header 0x60,0x50
+                return c[0..2] != [0x60u8, 0x50];
             }
-            // TIPS: consider the corner case:
-            // user calls a fastvm empty contract (it will be deployed when code is None)
-            return true;
         }
     }
 
-    // fastvm create
-    if let Action::Create = tx.action {
-        return false;
-    }
+    // fastvm creation and call a contract with empty code
 
-    return true;
+    return false;
 }
 
 #[inline]
@@ -713,7 +710,7 @@ fn is_for_avm(
     tx: &SignedTransaction,
 ) -> bool
 {
-    // AVM creation = 0x0F; normal call = 0x01
+    // AVM creation = 0x02; normal call = 0x01
     return tx.tx_type() == AVM_TRANSACTION_TYPE || is_normal_or_avm_call(block, tx);
 }
 

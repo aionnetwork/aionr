@@ -196,7 +196,6 @@ impl BridgeController {
     }
 
     fn is_with_signature_bounds(&self, ext: &mut BuiltinExt, signature_length: i32) -> bool {
-        println!("sig length = {:?}", signature_length);
         signature_length >= self.connector.get_min_thresh(ext)
             && signature_length <= self.connector.get_member_count(ext)
     }
@@ -218,15 +217,12 @@ impl BridgeController {
         signatures: Vec<Bytes>,
     ) -> Result<Vec<ExecutionResult>, ErrCode>
     {
-        println!("1");
         if !self.is_ring_locked(ext) {
             return Err(ErrCode::RingNotLocked);
         }
-        println!("2");
         if !self.is_relayer(ext, caller) {
             return Err(ErrCode::NotRelayer);
         }
-        println!("3");
         if !self.is_with_signature_bounds(ext, signatures.len() as i32) {
             return Err(ErrCode::InvalidSignatureBounds);
         }

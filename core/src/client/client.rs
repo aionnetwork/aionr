@@ -49,7 +49,7 @@ use client::{
 use encoded;
 use engines::{EpochTransition, EthEngine};
 use error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
-use executive::{Executed, Executive};
+use executive::{Executed, Executive, contract_address};
 use factory::{Factories, VmFactory};
 use header::{BlockNumber, Header, Seal};
 use io::*;
@@ -2049,7 +2049,7 @@ fn transaction_receipt(
         gas_used: receipt.gas_used,
         contract_address: match tx.action {
             Action::Call(_) => None,
-            Action::Create => Some(receipt.output[0..32].into()),
+            Action::Create => Some(contract_address(&sender, &tx.nonce).0),
         },
         logs: receipt
             .logs()

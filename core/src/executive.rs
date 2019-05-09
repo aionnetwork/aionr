@@ -185,6 +185,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         self.transact_bulk(txs, check_nonce, true)
     }
 
+    // TIPS: carefully deal with errors in parallelism
     pub fn transact_bulk(
         &'a mut self,
         txs: &[SignedTransaction],
@@ -197,66 +198,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let sender = t.sender();
             let nonce = t.nonce;
 
-            // 1. Check transaction nonce
-            // if check_nonce && t.nonce != nonce {
-            //     return vec![Err(From::from(ExecutionError::InvalidNonce {
-            //         expected: nonce,
-            //         got: t.nonce,
-            //     }))];
-            // }
-
-            // 2. Check gas limit
-            // 2.1 Gas limit should not be less than the basic gas requirement
-            // let base_gas_required: U256 = t.gas_required();
-            // if t.gas < base_gas_required {
-            //     return vec![Err(From::from(ExecutionError::NotEnoughBaseGas {
-            //         required: base_gas_required,
-            //         got: t.gas,
-            //     }))];
-            // }
-            // debug!(target: "vm", "base_gas_required = {}", base_gas_required);
-            // println!("base_gas_required = {}", base_gas_required);
-
-            // 2.2 Gas limit should not exceed the maximum gas limit depending on
-            // the transaction's action type
-            // let max_gas_limit: U256 = match t.action {
-            //     Action::Create => GAS_CREATE_MAX,
-            //     Action::Call(_) => GAS_CALL_MAX,
-            // };
-
-            // Don't check max gas limit for local call.
-            // Local node has the right (and is free) to execute "big" calls with its own resources.
-            // if !is_local_call && t.gas > max_gas_limit {
-            //     return vec![Err(From::from(ExecutionError::ExceedMaxGasLimit {
-            //         max: max_gas_limit,
-            //         got: t.gas,
-            //     }))];
-            // }
-
-            // 2.3 Gas limit should not exceed the remaining gas limit of the current block
-            // if self.info.gas_used + t.gas > self.info.gas_limit {
-            //     return vec![Err(From::from(ExecutionError::BlockGasLimitReached {
-            //         gas_limit: self.info.gas_limit,
-            //         gas_used: self.info.gas_used,
-            //         gas: t.gas,
-            //     }))];
-            // }
-
-            // 3. Check balance, avoid unaffordable transactions
-            // TODO: we might need bigints here, or at least check overflows.
-            // let balance: U512 = U512::from(self.state.balance(&sender).unwrap());
-            // let gas_cost: U512 = t.gas.full_mul(t.gas_price);
-            // let total_cost: U512 = U512::from(t.value) + gas_cost;
-            // if balance < total_cost {
-            //     return vec![Err(From::from(ExecutionError::NotEnoughCash {
-            //         required: total_cost,
-            //         got: balance,
-            //     }))];
-            // }
-
-            //TODO: gas limit for AVM; validate passed, just run AION VM
-            // debug!(target: "vm", "tx gas = {:?}, base gas required = {:?}", t.gas, base_gas_required);
-            //let init_gas = t.gas - base_gas_required;
             let init_gas = t.gas;
 
             // Transactions are now handled in different ways depending on whether it's
@@ -764,7 +705,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             // AKI-83: allow internal creation of contract which has balance and no code.
             let code = self.state.code(&params.address).unwrap_or(None);
             let aion040_fork = self.machine.params().monetary_policy_update.is_some();
-            if !aion040_fork || (self.depth >= 1 && code.is_some()) || self.depth == 0 {
+            if !aion040_fork || code.is_some() {//(self.depth >= 1 && code.is_some()) || self.depth == 0 {
                 return ExecutionResult {
                     gas_left: 0.into(),
                     status_code: ExecStatus::Failure,
@@ -793,9 +734,9 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // Normally there won't be any address collision. Set new account's nonce and balance
         // to 0.
         // the nonce of a new contract account starts at 0 (according to java version implementation)
-        let nonce_offset = 0.into();
-        // let prev_bal = self.state.balance(&params.address)?;
-        let prev_bal = 0.into();
+        // AKI-83
+        let nonce_offset = self.state.nonce(&params.address).unwrap_or(0.into());
+        let prev_bal = self.state.balance(&params.address).unwrap_or(U256::zero());
         if let ActionValue::Transfer(val) = params.value {
             // Normally balance should have been checked before.
             // In case any error still occurs here, consider this transaction as a failure

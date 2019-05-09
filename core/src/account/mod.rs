@@ -69,7 +69,7 @@ impl AionVMAccount {
 
 impl From<BasicAccount> for AionVMAccount {
     fn from(basic: BasicAccount) -> Self {
-        Account {
+        AionVMAccount {
             balance: basic.balance,
             nonce: basic.nonce,
             storage_root: basic.storage_root,
@@ -284,508 +284,500 @@ impl AionVMAccount {
     pub fn set_empty_but_commit(&mut self) { self.empty_but_commit = true; }
 }
 
-macro_rules! impl_account {
-    ($T: ty) => {
-        impl VMAccount for AionVMAccount {
-            fn from_rlp(rlp: &[u8]) -> $T {
-                let basic: BasicAccount = ::rlp::decode(rlp);
-                basic.into()
-            }
+impl VMAccount for AionVMAccount {
+    fn from_rlp(rlp: &[u8]) -> AionVMAccount {
+        let basic: BasicAccount = ::rlp::decode(rlp);
+        basic.into()
+    }
 
-            fn init_code(&mut self, code: Bytes) {
-                self.code_hash = blake2b(&code);
-                self.code_cache = Arc::new(code);
-                self.code_size = Some(self.code_cache.len());
-                self.code_filth = Filth::Dirty;
-            }
+    fn init_code(&mut self, code: Bytes) {
+        self.code_hash = blake2b(&code);
+        self.code_cache = Arc::new(code);
+        self.code_size = Some(self.code_cache.len());
+        self.code_filth = Filth::Dirty;
+    }
 
-            // for AVM account, this must be called, so update account type to AVM
-            fn init_transformed_code(&mut self, code: Bytes) {
-                self.transformed_code_hash = blake2b(&code);
-                self.transformed_code_cache = Arc::new(code);
-                self.transformed_code_size = Some(self.transformed_code_cache.len());
-                self.code_filth = Filth::Dirty;
-                self.account_type = AccType::AVM;
-            }
+    // for AVM account, this must be called, so update account type to AVM
+    fn init_transformed_code(&mut self, code: Bytes) {
+        self.transformed_code_hash = blake2b(&code);
+        self.transformed_code_cache = Arc::new(code);
+        self.transformed_code_size = Some(self.transformed_code_cache.len());
+        self.code_filth = Filth::Dirty;
+        self.account_type = AccType::AVM;
+    }
 
-            fn init_objectgraph(&mut self, data: Bytes) {
-                self.account_type = AccType::AVM;
-                self.objectgraph_hash = blake2b(&data);
-                self.object_graph_cache = Arc::new(data);
-            }
+    fn init_objectgraph(&mut self, data: Bytes) {
+        self.account_type = AccType::AVM;
+        self.objectgraph_hash = blake2b(&data);
+        self.object_graph_cache = Arc::new(data);
+    }
 
-            fn objectgraph(&self) -> Option<Arc<Bytes>> {
-                if self.object_graph_cache.is_empty() {
-                    return None;
-                }
+    fn objectgraph(&self) -> Option<Arc<Bytes>> {
+        if self.object_graph_cache.is_empty() {
+            return None;
+        }
 
-                Some(self.object_graph_cache.clone())
-            }
+        Some(self.object_graph_cache.clone())
+    }
 
-            fn reset_code(&mut self, code: Bytes) {
-                self.init_code(code);
-            }
+    fn reset_code(&mut self, code: Bytes) {
+        self.init_code(code);
+    }
 
-            fn balance(&self) -> &U256 {&self.balance}
+    fn balance(&self) -> &U256 {&self.balance}
 
-            fn nonce(&self) -> &U256 {&self.nonce}
+    fn nonce(&self) -> &U256 {&self.nonce}
 
-            fn code_hash(&self) -> H256 {self.code_hash.clone()}
+    fn code_hash(&self) -> H256 {self.code_hash.clone()}
 
-            fn transformed_code_hash(&self) -> H256 {self.transformed_code_hash.clone()}
+    fn transformed_code_hash(&self) -> H256 {self.transformed_code_hash.clone()}
 
-            fn objectgraph_hash(&self) -> H256 {self.objectgraph_hash.clone()}
+    fn objectgraph_hash(&self) -> H256 {self.objectgraph_hash.clone()}
 
-            fn address_hash(&self, address: &Address) -> H256 {
-                let hash = self.address_hash.get();
-                hash.unwrap_or_else(|| {
-                    let hash = blake2b(address);
-                    self.address_hash.set(Some(hash.clone()));
-                    hash
-                })
-            }
+    fn address_hash(&self, address: &Address) -> H256 {
+        let hash = self.address_hash.get();
+        hash.unwrap_or_else(|| {
+            let hash = blake2b(address);
+            self.address_hash.set(Some(hash.clone()));
+            hash
+        })
+    }
 
-            fn code(&self) -> Option<Arc<Bytes>> {
-                if self.code_cache.is_empty() {
-                    return None;
-                }
+    fn code(&self) -> Option<Arc<Bytes>> {
+        if self.code_cache.is_empty() {
+            return None;
+        }
 
+        Some(self.code_cache.clone())
+    }
+
+    fn transformed_code(&self) -> Option<Arc<Bytes>> {
+        if self.transformed_code_cache.is_empty() {
+            return None;
+        }
+
+        Some(self.transformed_code_cache.clone())
+    }
+
+    fn code_size(&self) -> Option<usize>{self.code_size.clone()}
+
+    fn transformed_code_size(&self) -> Option<usize> {self.transformed_code_size.clone()}
+    
+    fn is_cached(&self) -> bool {
+        !self.code_cache.is_empty()
+            || (self.code_cache.is_empty() && self.code_hash == BLAKE2B_EMPTY)
+    }
+
+    fn is_transformed_cached(&self) -> bool {
+        !self.transformed_code_cache.is_empty()
+            // || (self.transformed_code_cache.is_empty() && self.transformed_code_hash == BLAKE2B_EMPTY)
+    }
+
+    fn is_objectgraph_cached(&self) -> bool {
+        !self.object_graph_cache.is_empty()
+            // || (self.object_graph_cache.is_empty() && self.objectgraph_hash == BLAKE2B_EMPTY)
+    }
+
+    fn cache_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>> {
+        // TODO: fill out self.code_cache;
+        trace!(
+            target: "account",
+            "Account::cache_code: ic={}; self.code_hash={:?}, self.code_cache={}",
+            self.is_cached(),
+            self.code_hash,
+            self.code_cache.pretty()
+        );
+
+        if self.is_cached() {
+            return Some(self.code_cache.clone());
+        }
+
+        match db.get(&self.code_hash) {
+            Some(x) => {
+                // println!("Account: code cache = {:?}", x);
+                self.code_size = Some(x.len());
+                self.code_cache = Arc::new(x.into_vec());
                 Some(self.code_cache.clone())
             }
-
-            fn transformed_code(&self) -> Option<Arc<Bytes>> {
-                if self.transformed_code_cache.is_empty() {
-                    return None;
-                }
-
-                Some(self.transformed_code_cache.clone())
-            }
-
-            fn code_size(&self) -> Option<usize>{self.code_size.clone()}
-
-            fn transformed_code_size(&self) -> Option<usize> {self.transformed_code_size.clone()}
-            
-            fn is_cached(&self) -> bool {
-                !self.code_cache.is_empty()
-                    || (self.code_cache.is_empty() && self.code_hash == BLAKE2B_EMPTY)
-            }
-
-            fn is_transformed_cached(&self) -> bool {
-                !self.transformed_code_cache.is_empty()
-                    // || (self.transformed_code_cache.is_empty() && self.transformed_code_hash == BLAKE2B_EMPTY)
-            }
-
-            fn is_objectgraph_cached(&self) -> bool {
-                !self.object_graph_cache.is_empty()
-                    // || (self.object_graph_cache.is_empty() && self.objectgraph_hash == BLAKE2B_EMPTY)
-            }
-
-            fn cache_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>> {
-                // TODO: fill out self.code_cache;
-                trace!(
-                    target: "account",
-                    "Account::cache_code: ic={}; self.code_hash={:?}, self.code_cache={}",
-                    self.is_cached(),
-                    self.code_hash,
-                    self.code_cache.pretty()
-                );
-
-                if self.is_cached() {
-                    return Some(self.code_cache.clone());
-                }
-
-                match db.get(&self.code_hash) {
-                    Some(x) => {
-                        // println!("Account: code cache = {:?}", x);
-                        self.code_size = Some(x.len());
-                        self.code_cache = Arc::new(x.into_vec());
-                        Some(self.code_cache.clone())
-                    }
-                    _ => {
-                        warn!(target: "account","Failed reverse get of {}", self.code_hash);
-                        None
-                    }
-                }
-            }
-
-            fn cache_transformed_code(&mut self, db:&HashStore) -> Option<Arc<Bytes>> {
-                 if self.is_transformed_cached() {
-                    return Some(self.transformed_code_cache.clone());
-                }
-
-                match db.get(&blake2b(self.address_hash.get().unwrap().clone())) {
-                    Some(x) => {
-                        self.account_type = AccType::AVM;
-                        self.transformed_code_size = Some(x.len());
-                        self.transformed_code_cache = Arc::new(x.into_vec());
-                        Some(self.transformed_code_cache.clone())
-                    }
-                    _ => {
-                        warn!(target: "account","Failed reverse get of {}", self.transformed_code_hash);
-                        None
-                    }
-                }
-            }
-
-            // objectgraph uses delta_root as key,
-            // it is cached during updating account cache
-            fn cache_objectgraph(&mut self, a: &Address, db: &HashStore) -> Option<Arc<Bytes>> {
-                if let Some(root) = db.get(a) {
-                    self.storage_root = root[..].into();
-                    // if storage_root has been stored, it should be avm created account
-                    self.account_type = AccType::AVM;
-                    // always cache object graph and key/value storage root
-                    println!("try to get object graph from: {:?}", self.delta_root);
-                    match db.get(&self.delta_root) {
-                        Some(data) => {
-                            self.object_graph_size = Some(data.len());
-                            self.objectgraph_hash = blake2b(&data);
-                            self.object_graph_cache = Arc::new(data[..].to_vec());
-                            Some(self.object_graph_cache.clone())
-                        },
-                        None => {
-                            self.object_graph_size = None;
-                            self.objectgraph_hash = BLAKE2B_EMPTY;
-                            None
-                        }
-                    }
-                } else {
-                    None
-                }
-            }
-
-            fn cache_given_code(&mut self, code: Arc<Bytes>) {
-                trace!(
-                    target: "account",
-                    "Account::cache_given_code: ic={}; self.code_hash={:?}, self.code_cache={}",
-                    self.is_cached(),
-                    self.code_hash,
-                    self.code_cache.pretty()
-                );
-
-                self.code_size = Some(code.len());
-                self.code_cache = code;
-            }
-
-            fn cache_given_transformed_code(&mut self, code: Arc<Bytes>) {
-                trace!(
-                    target: "account",
-                    "Account::cache_given_code: ic={}; self.code_hash={:?}, self.code_cache={}",
-                    self.is_transformed_cached(),
-                    self.transformed_code_hash,
-                    self.transformed_code_cache.pretty()
-                );
-
-                self.transformed_code_size = Some(code.len());
-                self.transformed_code_cache = code;
-            }
-
-            fn cache_given_objectgraph(&mut self, data: Arc<Bytes>) {
-                self.object_graph_size = Some(data.len());
-                self.object_graph_cache = data;
-            }
-
-            fn cache_code_size(&mut self, db: &HashStore) -> bool {
-                // TODO: fill out self.code_cache;
-                trace!(
-                    target: "account",
-                    "Account::cache_code_size: ic={}; self.code_hash={:?}, self.code_cache={}",
-                    self.is_cached(),
-                    self.code_hash,
-                    self.code_cache.pretty()
-                );
-                self.code_size.is_some() || if self.code_hash != BLAKE2B_EMPTY {
-                    match db.get(&self.code_hash) {
-                        Some(x) => {
-                            self.code_size = Some(x.len());
-                            true
-                        }
-                        _ => {
-                            warn!(target: "account","Failed reverse get of {}", self.code_hash);
-                            false
-                        }
-                    }
-                } else {
-                    false
-                }
-            }
-
-            fn cache_transformed_code_size(&mut self, db: &HashStore) -> bool {
-                self.transformed_code_size.is_some() || if self.transformed_code_hash != BLAKE2B_EMPTY {
-                    match db.get(&self.transformed_code_hash) {
-                        Some(x) => {
-                            self.transformed_code_size = Some(x.len());
-                            true
-                        }
-                        _ => {
-                            warn!(target: "account","Failed reverse get of {}", self.transformed_code_hash);
-                            false
-                        }
-                    }
-                } else {
-                    false
-                }
-            }
-
-            fn cache_objectgraph_size(&mut self, db: &HashStore) -> bool {
-                self.object_graph_size.is_some() || if self.objectgraph_hash != BLAKE2B_EMPTY {
-                    match db.get(&self.objectgraph_hash) {
-                        Some(x) => {
-                            self.object_graph_size = Some(x.len());
-                            true
-                        }
-                        _ => {
-                            warn!(target: "account","Failed reverse get of {}", self.objectgraph_hash);
-                            false
-                        }
-                    }
-                } else {
-                    false
-                }
-            }
-
-            fn is_empty(&self) -> bool {
-                assert!(
-                    self.storage_is_clean(),
-                    "Account::is_empty() may only legally be called when storage is clean."
-                );
-                self.is_null() && self.storage_root == BLAKE2B_NULL_RLP
-            }
-
-            fn is_null(&self) -> bool {
-                debug!(target: "vm", "check null: balance = {:?}, nonce = {:?}, code_hash = {:?}",
-                    self.balance.is_zero(), self.nonce.is_zero(), self.code_hash == BLAKE2B_EMPTY);
-                self.balance.is_zero() && self.nonce.is_zero() && self.code_hash == BLAKE2B_EMPTY
-            }
-
-            fn is_basic(&self) -> bool {
-                self.code_hash == BLAKE2B_EMPTY && self.transformed_code_hash == BLAKE2B_EMPTY
-            }
-
-            fn storage_root(&self) -> Option<&H256> {
-                if self.storage_is_clean() {
-                    Some(&self.storage_root)
-                } else {
-                    None
-                }
-            }
-
-            fn inc_nonce(&mut self) {self.nonce = self.nonce + U256::from(1u8);}
-
-            /// Increase account balance.
-            fn add_balance(&mut self, x: &U256) {self.balance = self.balance + *x;}
-
-            /// Decrease account balance.
-            /// Panics if balance is less than `x`
-            fn sub_balance(&mut self, x: &U256) {
-                assert!(self.balance >= *x);
-                self.balance = self.balance - *x;
-            }
-
-            /// Commit any unsaved code. `code_hash` will always return the hash of the `code_cache` after this.
-            fn commit_code(&mut self, db: &mut HashStore) {
-                trace!(
-                    target: "account",
-                    "Commiting code of {:?} - {:?}, {:?}",
-                    self,
-                    self.code_filth == Filth::Dirty,
-                    self.code_cache.is_empty()
-                );
-                match (self.code_filth == Filth::Dirty, self.code_cache.is_empty(), self.transformed_code_cache.is_empty()) {
-                    (true, true, true) => {
-                        self.code_size = Some(0);
-                        self.transformed_code_size = Some(0);
-                        self.code_filth = Filth::Clean;
-                    }
-                    (true, false, true) => {
-                        db.emplace(
-                            self.code_hash.clone(),
-                            DBValue::from_slice(&*self.code_cache),
-                        );
-                        self.code_size = Some(self.code_cache.len());
-                        self.transformed_code_size = Some(0);
-                        self.code_filth = Filth::Clean;
-                    }
-                    (true, true, false) => {
-                        self.code_size = Some(0);
-                        db.emplace(
-                            blake2b(self.address_hash.get().unwrap()),
-                            DBValue::from_slice(&*self.transformed_code_cache),
-                        );
-                        self.transformed_code_size = Some(self.transformed_code_cache.len());
-                        self.code_filth = Filth::Clean;
-                    }
-                    (true, false, false) => {
-                        self.code_size = Some(self.code_cache.len());
-                        db.emplace(
-                            self.code_hash.clone(),
-                            DBValue::from_slice(&*self.code_cache),
-                        );
-
-                        // use blake2b(address_hash) as key of transformed code
-                        db.emplace(
-                            blake2b(self.address_hash.get().unwrap()),
-                            DBValue::from_slice(&*self.transformed_code_cache)
-                            );
-                        self.transformed_code_size = Some(self.transformed_code_cache.len());
-                        self.code_filth = Filth::Clean;
-                    }
-                    (false, _, _) => {}
-                }
-            }
-
-            /// Export to RLP.
-            fn rlp(&self) -> Bytes {
-                let mut stream = RlpStream::new_list(4);
-                stream.append(&self.nonce);
-                stream.append(&self.balance);
-                //let vm_type: AccType = self.acc_type().into();
-                if self.acc_type() == AccType::AVM {
-                    println!("rlp encode using delta_root");
-                    stream.append(&self.delta_root);
-                } else {
-                    stream.append(&self.storage_root);
-                }
-                stream.append(&self.code_hash);
-                stream.out()
-            }
-
-            /// Clone account data and dirty storage keys
-            fn clone_dirty(&self) -> Self {
-                let mut account = self.clone_basic();
-                account.storage_changes = self.storage_changes.clone();
-                account.code_cache = self.code_cache.clone();
-                account.transformed_code_cache = self.transformed_code_cache.clone();
-                account
-            }
-
-            fn acc_type(&self) -> AccType {
-                self.account_type.clone()
-            }
-
-            /// avm should update object graph cache
-            /// at this moment, address_hash is always updated
-            /// cache code
-            fn update_account_cache<B: Backend>(
-                &mut self,
-                a: &Address,
-                require: RequireCache,
-                state_db: &B,
-                db: &HashStore,
-            )
-            {
-                if let Some(root) = db.get(a) {
-                    self.storage_root = root[..].into();
-                    // if storage_root has been stored, it should be avm created account
-                    self.account_type = AccType::AVM;
-                    // always cache object graph and key/value storage root
-                    println!("try to get object graph from: {:?}", self.delta_root);
-                    match db.get(&self.delta_root) {
-                        Some(data) => {
-                            println!("Account: got object graph");
-                            self.object_graph_size = Some(data.len());
-                            self.objectgraph_hash = blake2b(&data);
-                            self.object_graph_cache = Arc::new(data[..].to_vec());
-                        },
-                        None => {
-                            println!("Account: no object graph was found");
-                            self.object_graph_size = None;
-                            self.objectgraph_hash = BLAKE2B_EMPTY;
-                        }
-                    }
-                    debug!(target: "vm", "object graph = {:?}", self.object_graph_cache);
-                }
-
-                if let RequireCache::None = require {
-                    return;
-                }
-
-                if self.is_cached() && self.is_transformed_cached() {
-                    return;
-                }
-
-                // println!("Account: update code cache");
-                // if there's already code in the global cache, always cache it localy
-                let hash = self.code_hash();
-                match state_db.get_cached_code(&hash) {
-                    Some(code) => {
-                        self.cache_given_code(code);
-                    },
-                    None => {
-                        match require {
-                            RequireCache::None => {}
-                            RequireCache::Code => {
-                                if let Some(code) = self.cache_code(db) {
-                                    // propagate code loaded from the database to
-                                    // the global code cache.
-                                    state_db.cache_code(hash, code)
-                                }
-                            }
-                            RequireCache::CodeSize => {
-                                self.cache_code_size(db);
-                            }
-                        }
-                    }
-                }
-
-                if self.account_type == AccType::AVM {
-                    // update transformed code cache
-                    println!("Account: updating tranformed code cache");
-                    let hash = blake2b(self.address_hash.get().unwrap());
-                    match state_db.get_cached_code(&hash) {
-                        Some(code) => self.cache_given_transformed_code(code),
-                        None => {
-                            match require {
-                                RequireCache::None => {}
-                                RequireCache::Code => {
-                                    if let Some(code) = self.cache_transformed_code(db) {
-                                        // propagate code loaded from the database to
-                                        // the global code cache.
-                                        // println!("Account: transformed code = {:?}", code);
-                                        state_db.cache_code(hash, code)
-                                    }
-                                }
-                                RequireCache::CodeSize => {
-                                    self.cache_transformed_code_size(db);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            /// Prove a storage key's existence or nonexistence in the account's storage
-            /// trie.
-            /// `storage_key` is the hash of the desired storage key, meaning
-            /// this will only work correctly under a secure trie.
-            fn prove_storage(
-                &self,
-                db: &HashStore,
-                storage_key: H256,
-            ) -> Result<(Vec<Bytes>, H256), Box<TrieError>>
-            {
-                use trie::{Trie, TrieDB};
-                use trie::recorder::Recorder;
-
-                let mut recorder = Recorder::new();
-
-                let trie = TrieDB::new(db, &self.storage_root)?;
-                let item: U256 = {
-                    let query = (&mut recorder, ::rlp::decode);
-                    trie.get_with(&storage_key, query)?
-                        .unwrap_or_else(U256::zero)
-                };
-
-                Ok((
-                    recorder.drain().into_iter().map(|r| r.data).collect(),
-                    item.into(),
-                ))
+            _ => {
+                warn!(target: "account","Failed reverse get of {}", self.code_hash);
+                None
             }
         }
-    };
-}
+    }
 
-impl_account!(AionVMAccount);
+    fn cache_transformed_code(&mut self, db:&HashStore) -> Option<Arc<Bytes>> {
+            if self.is_transformed_cached() {
+            return Some(self.transformed_code_cache.clone());
+        }
+
+        match db.get(&blake2b(self.address_hash.get().unwrap().clone())) {
+            Some(x) => {
+                self.account_type = AccType::AVM;
+                self.transformed_code_size = Some(x.len());
+                self.transformed_code_cache = Arc::new(x.into_vec());
+                Some(self.transformed_code_cache.clone())
+            }
+            _ => {
+                warn!(target: "account","Failed reverse get of {}", self.transformed_code_hash);
+                None
+            }
+        }
+    }
+
+    // objectgraph uses delta_root as key,
+    // it is cached during updating account cache
+    fn cache_objectgraph(&mut self, a: &Address, db: &HashStore) -> Option<Arc<Bytes>> {
+        if let Some(root) = db.get(a) {
+            self.storage_root = root[..].into();
+            // if storage_root has been stored, it should be avm created account
+            self.account_type = AccType::AVM;
+            // always cache object graph and key/value storage root
+            println!("try to get object graph from: {:?}", self.delta_root);
+            match db.get(&self.delta_root) {
+                Some(data) => {
+                    self.object_graph_size = Some(data.len());
+                    self.objectgraph_hash = blake2b(&data);
+                    self.object_graph_cache = Arc::new(data[..].to_vec());
+                    Some(self.object_graph_cache.clone())
+                },
+                None => {
+                    self.object_graph_size = None;
+                    self.objectgraph_hash = BLAKE2B_EMPTY;
+                    None
+                }
+            }
+        } else {
+            None
+        }
+    }
+
+    fn cache_given_code(&mut self, code: Arc<Bytes>) {
+        trace!(
+            target: "account",
+            "Account::cache_given_code: ic={}; self.code_hash={:?}, self.code_cache={}",
+            self.is_cached(),
+            self.code_hash,
+            self.code_cache.pretty()
+        );
+
+        self.code_size = Some(code.len());
+        self.code_cache = code;
+    }
+
+    fn cache_given_transformed_code(&mut self, code: Arc<Bytes>) {
+        trace!(
+            target: "account",
+            "Account::cache_given_code: ic={}; self.code_hash={:?}, self.code_cache={}",
+            self.is_transformed_cached(),
+            self.transformed_code_hash,
+            self.transformed_code_cache.pretty()
+        );
+
+        self.transformed_code_size = Some(code.len());
+        self.transformed_code_cache = code;
+    }
+
+    fn cache_given_objectgraph(&mut self, data: Arc<Bytes>) {
+        self.object_graph_size = Some(data.len());
+        self.object_graph_cache = data;
+    }
+
+    fn cache_code_size(&mut self, db: &HashStore) -> bool {
+        // TODO: fill out self.code_cache;
+        trace!(
+            target: "account",
+            "Account::cache_code_size: ic={}; self.code_hash={:?}, self.code_cache={}",
+            self.is_cached(),
+            self.code_hash,
+            self.code_cache.pretty()
+        );
+        self.code_size.is_some() || if self.code_hash != BLAKE2B_EMPTY {
+            match db.get(&self.code_hash) {
+                Some(x) => {
+                    self.code_size = Some(x.len());
+                    true
+                }
+                _ => {
+                    warn!(target: "account","Failed reverse get of {}", self.code_hash);
+                    false
+                }
+            }
+        } else {
+            false
+        }
+    }
+
+    fn cache_transformed_code_size(&mut self, db: &HashStore) -> bool {
+        self.transformed_code_size.is_some() || if self.transformed_code_hash != BLAKE2B_EMPTY {
+            match db.get(&self.transformed_code_hash) {
+                Some(x) => {
+                    self.transformed_code_size = Some(x.len());
+                    true
+                }
+                _ => {
+                    warn!(target: "account","Failed reverse get of {}", self.transformed_code_hash);
+                    false
+                }
+            }
+        } else {
+            false
+        }
+    }
+
+    fn cache_objectgraph_size(&mut self, db: &HashStore) -> bool {
+        self.object_graph_size.is_some() || if self.objectgraph_hash != BLAKE2B_EMPTY {
+            match db.get(&self.objectgraph_hash) {
+                Some(x) => {
+                    self.object_graph_size = Some(x.len());
+                    true
+                }
+                _ => {
+                    warn!(target: "account","Failed reverse get of {}", self.objectgraph_hash);
+                    false
+                }
+            }
+        } else {
+            false
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        assert!(
+            self.storage_is_clean(),
+            "Account::is_empty() may only legally be called when storage is clean."
+        );
+        self.is_null() && self.storage_root == BLAKE2B_NULL_RLP
+    }
+
+    fn is_null(&self) -> bool {
+        debug!(target: "vm", "check null: balance = {:?}, nonce = {:?}, code_hash = {:?}",
+            self.balance.is_zero(), self.nonce.is_zero(), self.code_hash == BLAKE2B_EMPTY);
+        self.balance.is_zero() && self.nonce.is_zero() && self.code_hash == BLAKE2B_EMPTY
+    }
+
+    fn is_basic(&self) -> bool {
+        self.code_hash == BLAKE2B_EMPTY && self.transformed_code_hash == BLAKE2B_EMPTY
+    }
+
+    fn storage_root(&self) -> Option<&H256> {
+        if self.storage_is_clean() {
+            Some(&self.storage_root)
+        } else {
+            None
+        }
+    }
+
+    fn inc_nonce(&mut self) {self.nonce = self.nonce + U256::from(1u8);}
+
+    /// Increase account balance.
+    fn add_balance(&mut self, x: &U256) {self.balance = self.balance + *x;}
+
+    /// Decrease account balance.
+    /// Panics if balance is less than `x`
+    fn sub_balance(&mut self, x: &U256) {
+        assert!(self.balance >= *x);
+        self.balance = self.balance - *x;
+    }
+
+    /// Commit any unsaved code. `code_hash` will always return the hash of the `code_cache` after this.
+    fn commit_code(&mut self, db: &mut HashStore) {
+        trace!(
+            target: "account",
+            "Commiting code of {:?} - {:?}, {:?}",
+            self,
+            self.code_filth == Filth::Dirty,
+            self.code_cache.is_empty()
+        );
+        match (self.code_filth == Filth::Dirty, self.code_cache.is_empty(), self.transformed_code_cache.is_empty()) {
+            (true, true, true) => {
+                self.code_size = Some(0);
+                self.transformed_code_size = Some(0);
+                self.code_filth = Filth::Clean;
+            }
+            (true, false, true) => {
+                db.emplace(
+                    self.code_hash.clone(),
+                    DBValue::from_slice(&*self.code_cache),
+                );
+                self.code_size = Some(self.code_cache.len());
+                self.transformed_code_size = Some(0);
+                self.code_filth = Filth::Clean;
+            }
+            (true, true, false) => {
+                self.code_size = Some(0);
+                db.emplace(
+                    blake2b(self.address_hash.get().unwrap()),
+                    DBValue::from_slice(&*self.transformed_code_cache),
+                );
+                self.transformed_code_size = Some(self.transformed_code_cache.len());
+                self.code_filth = Filth::Clean;
+            }
+            (true, false, false) => {
+                self.code_size = Some(self.code_cache.len());
+                db.emplace(
+                    self.code_hash.clone(),
+                    DBValue::from_slice(&*self.code_cache),
+                );
+
+                // use blake2b(address_hash) as key of transformed code
+                db.emplace(
+                    blake2b(self.address_hash.get().unwrap()),
+                    DBValue::from_slice(&*self.transformed_code_cache)
+                    );
+                self.transformed_code_size = Some(self.transformed_code_cache.len());
+                self.code_filth = Filth::Clean;
+            }
+            (false, _, _) => {}
+        }
+    }
+
+    /// Export to RLP.
+    fn rlp(&self) -> Bytes {
+        let mut stream = RlpStream::new_list(4);
+        stream.append(&self.nonce);
+        stream.append(&self.balance);
+        //let vm_type: AccType = self.acc_type().into();
+        if self.acc_type() == AccType::AVM {
+            debug!(target: "vm", "rlp encode using delta_root");
+            stream.append(&self.delta_root);
+        } else {
+            stream.append(&self.storage_root);
+        }
+        stream.append(&self.code_hash);
+        stream.out()
+    }
+
+    /// Clone account data and dirty storage keys
+    fn clone_dirty(&self) -> Self {
+        let mut account = self.clone_basic();
+        account.storage_changes = self.storage_changes.clone();
+        account.code_cache = self.code_cache.clone();
+        account.transformed_code_cache = self.transformed_code_cache.clone();
+        account
+    }
+
+    fn acc_type(&self) -> AccType {
+        self.account_type.clone()
+    }
+
+    /// avm should update object graph cache
+    /// at this moment, address_hash is always updated
+    /// cache code
+    fn update_account_cache<B: Backend>(
+        &mut self,
+        a: &Address,
+        require: RequireCache,
+        state_db: &B,
+        db: &HashStore,
+    )
+    {
+        if let Some(root) = db.get(a) {
+            self.storage_root = root[..].into();
+            // if storage_root has been stored, it should be avm created account
+            self.account_type = AccType::AVM;
+            // always cache object graph and key/value storage root
+            debug!(target: "vm", "try to get object graph from: {:?}", self.delta_root);
+            match db.get(&self.delta_root) {
+                Some(data) => {
+                    self.object_graph_size = Some(data.len());
+                    self.objectgraph_hash = blake2b(&data);
+                    self.object_graph_cache = Arc::new(data[..].to_vec());
+                },
+                None => {
+                    self.object_graph_size = None;
+                    self.objectgraph_hash = BLAKE2B_EMPTY;
+                }
+            }
+            debug!(target: "vm", "object graph = {:?}", self.object_graph_cache);
+        }
+
+        if let RequireCache::None = require {
+            return;
+        }
+
+        if self.is_cached() && self.is_transformed_cached() {
+            return;
+        }
+
+        // println!("Account: update code cache");
+        // if there's already code in the global cache, always cache it localy
+        let hash = self.code_hash();
+        match state_db.get_cached_code(&hash) {
+            Some(code) => {
+                self.cache_given_code(code);
+            },
+            None => {
+                match require {
+                    RequireCache::None => {}
+                    RequireCache::Code => {
+                        if let Some(code) = self.cache_code(db) {
+                            // propagate code loaded from the database to
+                            // the global code cache.
+                            state_db.cache_code(hash, code)
+                        }
+                    }
+                    RequireCache::CodeSize => {
+                        self.cache_code_size(db);
+                    }
+                }
+            }
+        }
+
+        if self.account_type == AccType::AVM {
+            // update transformed code cache
+            println!("Account: updating tranformed code cache");
+            let hash = blake2b(self.address_hash.get().unwrap());
+            match state_db.get_cached_code(&hash) {
+                Some(code) => self.cache_given_transformed_code(code),
+                None => {
+                    match require {
+                        RequireCache::None => {}
+                        RequireCache::Code => {
+                            if let Some(code) = self.cache_transformed_code(db) {
+                                // propagate code loaded from the database to
+                                // the global code cache.
+                                // println!("Account: transformed code = {:?}", code);
+                                state_db.cache_code(hash, code)
+                            }
+                        }
+                        RequireCache::CodeSize => {
+                            self.cache_transformed_code_size(db);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// Prove a storage key's existence or nonexistence in the account's storage
+    /// trie.
+    /// `storage_key` is the hash of the desired storage key, meaning
+    /// this will only work correctly under a secure trie.
+    fn prove_storage(
+        &self,
+        db: &HashStore,
+        storage_key: H256,
+    ) -> Result<(Vec<Bytes>, H256), Box<TrieError>>
+    {
+        use trie::{Trie, TrieDB};
+        use trie::recorder::Recorder;
+
+        let mut recorder = Recorder::new();
+
+        let trie = TrieDB::new(db, &self.storage_root)?;
+        let item: U256 = {
+            let query = (&mut recorder, ::rlp::decode);
+            trie.get_with(&storage_key, query)?
+                .unwrap_or_else(U256::zero)
+        };
+
+        Ok((
+            recorder.drain().into_iter().map(|r| r.data).collect(),
+            item.into(),
+        ))
+    }
+}
 
 impl AionVMAccount {
     pub fn storage_at(&self, db: &HashStore, key: &Bytes) -> trie::Result<Bytes> {
