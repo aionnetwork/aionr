@@ -1051,7 +1051,6 @@ impl<B: Backend> State<B> {
                     .trie
                     .readonly(self.db.as_hashstore(), &self.root)?;
                 let mut maybe_acc = db.get_with(a, AionVMAccount::from_rlp)?;
-                println!("State: maybe_acc = {:?}", maybe_acc);
                 if let Some(ref mut account) = maybe_acc.as_mut() {
                     let accountdb = self
                         .factories
