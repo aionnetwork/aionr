@@ -210,6 +210,7 @@ mod tests {
             data: Some("d46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675".from_hex().unwrap().into()),
             nonce: None,
             condition: None,
+            tx_type: None,
         });
     }
 
@@ -229,6 +230,7 @@ mod tests {
                 data: None,
                 nonce: None,
                 condition: None,
+                tx_type: None,
             }
         );
     }
@@ -266,6 +268,7 @@ mod tests {
                 data: Some(vec![0x85, 0x95, 0xba, 0xb1].into()),
                 nonce: None,
                 condition: None,
+                tx_type: None,
             }
         );
     }
