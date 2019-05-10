@@ -26,7 +26,7 @@ all: release
 	@echo "Compiling $^"
 	@$(CPP) $(JNIFLAGS) -c $^ -o $@
 
-debug: $(JNIOBJECTS)
+debug: shared
 	#@echo "Generating $(TARGET)"
 	#@$(AR) cr $(TARGET) $(JNIOBJECTS)
 
@@ -34,11 +34,11 @@ shared: $(JNIOBJECTS)
 	@echo "Generating $(SHAREDTARGET)"
 	@$(CPP) $(JNIFLAGS) $^ -shared -o $(SHAREDTARGET)
 
-release: debug shared
-	@$(STRIP) -g $(TARGET)
+release: shared
+	@$(STRIP) $(SHAREDTARGET)
 
 clean:
 	@echo "Clean $(JNIOBJECTS)"
 	@rm -rf *.o
-	@echo "Clean $(TARGET)"
-	@rm -rf $(TARGET)
+	#@echo "Clean $(TARGET)"
+	#@rm -rf $(TARGET)

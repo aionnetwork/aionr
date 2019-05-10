@@ -371,7 +371,11 @@ impl<'x> OpenBlock<'x> {
         let mut result = Vec::new();
         let env_info = self.env_info();
         debug!(target: "vm", "tx type = {:?}", t.tx_type());
-        if let Some(_v) = self.engine.params().monetary_policy_update {
+
+        let aion040fork = self.engine.machine().params().monetary_policy_update.map_or(false, |v| {
+            self.block.header().number() >= v
+        });
+        if aion040fork {
             if t.tx_type() == AVM_TRANSACTION_TYPE || is_normal_or_avm_call(self, &t) {
                 result.append(&mut self.block.state.apply_batch(&env_info, self.engine.machine(), &[t.clone()]));
             } else {
@@ -720,8 +724,12 @@ fn push_transactions(
     block: &mut OpenBlock,
     transactions: &[SignedTransaction],
 ) -> Result<(), Error>
-{
-    if let Some(_v) = block.engine.machine().params().monetary_policy_update {
+{ 
+    let aion040fork = block.engine.machine().params().monetary_policy_update.map_or(false, |v| {
+        block.block.header().number() >= v
+    });
+
+    if aion040fork {
         let mut tx_batch = Vec::new();
         debug!(target: "vm", "transactions = {:?}, len = {:?}", transactions, transactions.len());
         for tx in transactions {

@@ -3,11 +3,13 @@ use std::process::Command;
 
 fn main() {
     let outdir: String = env::var("OUT_DIR").unwrap();
+    let profile = env::var("PROFILE").unwrap();
     // build avm library
     Command::new("make")
         .arg("-C")
         .arg("libs/avmjni")
         .arg(format!("{}={}", "OUTDIR", outdir))
+        .arg(profile.clone())
         .status()
         .expect("failed to build avm");
 
