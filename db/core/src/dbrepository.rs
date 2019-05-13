@@ -21,7 +21,7 @@
 
 use rockskvdb;
 use mockkvdb;
-use std::collections::{HashMap,BTreeMap};
+use std::collections::{HashMap, BTreeMap};
 use parking_lot::RwLock;
 
 use super::{Result, DBValue};

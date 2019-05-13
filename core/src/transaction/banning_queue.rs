@@ -30,7 +30,9 @@ use blake2b::blake2b;
 use transaction::{self, SignedTransaction, Action};
 use transient_hashmap::TransientHashMap;
 
-use transaction::transaction_queue::{TransactionQueue, TransactionDetailsProvider, TransactionOrigin, QueuingInstant};
+use transaction::transaction_queue::{
+    TransactionQueue, TransactionDetailsProvider, TransactionOrigin, QueuingInstant,
+};
 
 type Count = u16;
 
@@ -255,7 +257,7 @@ mod tests {
             action,
             U256::from(100),
             "3331600055".from_hex().unwrap(),
-            DEFAULT_TRANSACTION_TYPE,            
+            DEFAULT_TRANSACTION_TYPE,
         )
         .sign(keypair.secret(), None)
     }

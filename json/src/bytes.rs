@@ -110,7 +110,7 @@ mod test {
                 Bytes(vec![]),
                 Bytes(vec![0x12]),
                 Bytes(vec![0x12, 0x34]),
-                Bytes(vec![0, 1])
+                Bytes(vec![0, 1]),
             ]
         );
     }

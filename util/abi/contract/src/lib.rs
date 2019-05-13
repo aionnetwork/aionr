@@ -22,7 +22,7 @@
 
 #[macro_export]
 macro_rules! use_contract {
-    ($module: ident, $name: expr, $path: expr) => {
+    ($module:ident, $name:expr, $path:expr) => {
         #[allow(dead_code)]
         #[allow(missing_docs)]
         #[allow(unused_imports)]

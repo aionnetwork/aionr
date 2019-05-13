@@ -115,7 +115,9 @@ use io::IoChannel;
 use parking_lot::Mutex;
 use aion_types::{H256, U256, Address};
 use heapsize::HeapSizeOf;
-use transaction::local_transactions::{LocalTransactionsList, Status as LocalTransactionStatus, TxIoMessage};
+use transaction::local_transactions::{
+    LocalTransactionsList, Status as LocalTransactionStatus, TxIoMessage,
+};
 use table::Table;
 use transaction::{self, SignedTransaction, PendingTransaction};
 
@@ -3587,7 +3589,7 @@ pub mod test {
 
         // then
         assert_eq!(
-            txq.top_transactions_at(BlockNumber::max_value(), u64::max_value(),)
+            txq.top_transactions_at(BlockNumber::max_value(), u64::max_value())
                 .len(),
             7
         );

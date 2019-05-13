@@ -44,9 +44,7 @@ use self::handler::blocks_headers_handler::BlockHeadersHandler;
 use self::handler::broadcast_handler::BroadcastsHandler;
 use self::handler::import_handler::ImportHandler;
 use self::handler::status_handler::StatusHandler;
-use self::storage::{
-    ActivePeerInfo, PeerInfo, SyncState, SyncStatus, SyncStorage, TransactionStats,
-};
+use self::storage::{ActivePeerInfo, PeerInfo, SyncState, SyncStatus, SyncStorage, TransactionStats};
 use rustc_hex::ToHex;
 
 pub mod action;
@@ -152,11 +150,10 @@ impl SyncMgr {
                 info!(target: "sync", "{:-^127}","");
                 info!(target: "sync","      Total Diff    Blk No.    Blk Hash                 Address                 Revision      Conn  Seed  LstReq No.       Mode");
                 info!(target: "sync", "{:-^127}","");
-                active_nodes.sort_by(|a,b|{
-                    if a.target_total_difficulty != b.target_total_difficulty{
+                active_nodes.sort_by(|a, b| {
+                    if a.target_total_difficulty != b.target_total_difficulty {
                         b.target_total_difficulty.cmp(&a.target_total_difficulty)
-                    }
-                    else{
+                    } else {
                         b.best_block_num.cmp(&a.best_block_num)
                     }
                 });
@@ -197,7 +194,9 @@ impl SyncMgr {
                     SyncStorage::clear_downloaded_blocks();
                     SyncStorage::clear_requested_blocks();
                     SyncStorage::clear_headers_with_bodies_requested();
-                    SyncStorage::set_synced_block_number(SyncStorage::get_chain_info().best_block_number);
+                    SyncStorage::set_synced_block_number(
+                        SyncStorage::get_chain_info().best_block_number,
+                    );
                     let abnormal_mode_nodes_count =
                         P2pMgr::get_nodes_count_with_mode(Mode::BACKWARD)
                             + P2pMgr::get_nodes_count_with_mode(Mode::FORWARD);

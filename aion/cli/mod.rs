@@ -679,8 +679,8 @@ struct Log {
 #[cfg(test)]
 mod tests {
     use super::{
-		Args, ArgsError,
-		Config, Operating, Account, Network, Ws, Ipc, WalletApi, Mining, Database, Http
+        Args, ArgsError, Config, Operating, Account, Network, Ws, Ipc, WalletApi, Mining, Database,
+        Http,
 };
     use toml;
     use clap::{ErrorKind as ClapErrorKind};
@@ -857,7 +857,7 @@ mod tests {
                 arg_max_peers: 50u32,
                 arg_boot_nodes: vec![
                     "p2p://22345678-9abc-def0-1234-56789abcdef0@3.4.4.4:4444".into(),
-                    "p2p://32345678-9abc-def0-1234-56789abcdef0@4.5.5.5:5555".into()
+                    "p2p://32345678-9abc-def0-1234-56789abcdef0@4.5.5.5:5555".into(),
                 ],
                 arg_local_node: "p2p://12345678-9abc-def0-1234-56789abcdef0@2.3.3.3:3333".into(),
                 arg_net_id: 128u32,

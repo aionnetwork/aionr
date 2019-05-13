@@ -62,7 +62,6 @@ pub trait Backend: Send {
     fn get_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
     where F: FnOnce(Option<&mut AionVMAccount>) -> U;
 
-
     /// Get cached code based on hash.
     fn get_cached_code(&self, hash: &H256) -> Option<Arc<Vec<u8>>>;
 
@@ -110,7 +109,14 @@ impl HashStore for ProofCheck {
 impl Backend for ProofCheck {
     fn as_hashstore(&self) -> &HashStore { self }
     fn as_hashstore_mut(&mut self) -> &mut HashStore { self }
-    fn add_to_account_cache(&mut self, _addr: Address, _data: Option<AionVMAccount>, _modified: bool) {}
+    fn add_to_account_cache(
+        &mut self,
+        _addr: Address,
+        _data: Option<AionVMAccount>,
+        _modified: bool,
+    )
+    {
+    }
     fn cache_code(&self, _hash: H256, _code: Arc<Vec<u8>>) {}
     fn get_cached_account(&self, _addr: &Address) -> Option<Option<AionVMAccount>> { None }
     fn get_cached<F, U>(&self, _a: &Address, _f: F) -> Option<U>

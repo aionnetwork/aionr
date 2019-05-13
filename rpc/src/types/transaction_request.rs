@@ -22,9 +22,9 @@
 
 //! `TransactionRequest` type
 
-use types::{Bytes, H256, U256, TransactionCondition};
-use helpers;
 use ansi_term::Colour;
+use helpers;
+use types::{Bytes, H256, TransactionCondition, U256};
 
 use std::fmt;
 
@@ -57,7 +57,8 @@ pub struct TransactionRequest {
     /// Transaction's nonce
     pub nonce: Option<U256>,
     /// Transaction type
-    pub tx_type: Option<u8>,
+    #[serde(rename = "type")]
+    pub tx_type: Option<U256>,
     /// Delay until this block condition.
     pub condition: Option<TransactionCondition>,
 }
@@ -152,11 +153,11 @@ impl Into<helpers::TransactionRequest> for TransactionRequest {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use super::*;
     use rustc_hex::FromHex;
     use serde_json;
-    use types::{U256, H256, TransactionCondition};
-    use super::*;
+    use std::str::FromStr;
+    use types::{H256, TransactionCondition, U256};
 
     #[test]
     fn transaction_request_deserialize() {

@@ -26,8 +26,7 @@ use std::sync::Arc;
 use std::fmt;
 
 use acore::transaction::{
-    SignedTransaction, PendingTransaction, UnverifiedTransaction,
-    Condition as TransactionCondition
+    SignedTransaction, PendingTransaction, UnverifiedTransaction, Condition as TransactionCondition,
 };
 use acore::service::ClientIoMessage;
 use io::IoHandler;

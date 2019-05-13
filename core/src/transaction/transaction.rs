@@ -22,15 +22,20 @@
 
 //! Transaction data structure.
 
-use aion_types::{Address, Ed25519Public, H256, U256, to_u256};
-use ajson;
 use super::error;
-use key::{self, sign_ed25519, recover_ed25519, Ed25519Signature, public_to_address_ed25519, Ed25519Secret};
+use aion_types::{to_u256, Address, Ed25519Public, H256, U256};
+use ajson;
 use blake2b::blake2b;
 use heapsize::HeapSizeOf;
+use key::{
+    self, public_to_address_ed25519, recover_ed25519, sign_ed25519, Ed25519Secret, Ed25519Signature,
+};
 use rlp::{self, DecoderError, Encodable, RlpStream, UntrustedRlp};
 use std::ops::Deref;
-use vms::constants::{GAS_CALL_MIN, GAS_CALL_MAX, GAS_CREATE_MIN, GAS_CREATE_MAX, GAS_TX_DATA_NONZERO, GAS_TX_DATA_ZERO};
+use vms::constants::{
+    GAS_CALL_MAX, GAS_CALL_MIN, GAS_CREATE_MAX, GAS_CREATE_MIN, GAS_TX_DATA_NONZERO,
+    GAS_TX_DATA_ZERO,
+};
 
 use bytes::i64_to_bytes;
 use trace_time::to_epoch_micro;
@@ -47,8 +52,8 @@ pub const SYSTEM_ADDRESS: Address = H256([
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
 ]);
 
-pub const DEFAULT_TRANSACTION_TYPE: u8 = 0x01;
-pub const AVM_TRANSACTION_TYPE: u8 = 0x2;
+pub const DEFAULT_TRANSACTION_TYPE: U256 = U256([1, 0, 0, 0]);
+pub const AVM_TRANSACTION_TYPE: U256 = U256([2, 0, 0, 0]);
 
 struct TransactionEnergyRule;
 impl TransactionEnergyRule {
@@ -122,7 +127,7 @@ pub struct Transaction {
     /// Transaction data.
     pub data: Bytes,
     /// Transaction Type.
-    pub transaction_type: u8,
+    pub transaction_type: U256,
 }
 
 impl Transaction {
@@ -133,7 +138,7 @@ impl Transaction {
         action: Action,
         value: U256,
         data: Bytes,
-        tx_type: u8,
+        tx_type: U256,
     ) -> Transaction
     {
         Transaction {
@@ -374,9 +379,9 @@ impl rlp::Decodable for UnverifiedTransaction {
                 transaction_type: {
                     let transaction_type_vec = d.val_at::<Vec<u8>>(7)?;
                     if transaction_type_vec.len() == 0 {
-                        0u8
+                        0u8.into()
                     } else {
-                        transaction_type_vec[0]
+                        transaction_type_vec[0].into()
                     }
                 },
             },
@@ -594,7 +599,7 @@ impl SignedTransaction {
     }
 
     /// Returns transaction type.
-    pub fn tx_type(&self) -> u8 { self.transaction.unsigned.transaction_type }
+    pub fn tx_type(&self) -> U256 { self.transaction.unsigned.transaction_type }
 
     /// Returns transaction sender.
     pub fn sender(&self) -> Address { self.sender }

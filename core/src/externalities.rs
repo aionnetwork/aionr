@@ -30,14 +30,7 @@ use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use executive::*;
 use vms::{
-    ActionParams,
-    ActionValue,
-    Ext,
-    EnvInfo,
-    CallType,
-    ExecutionResult,
-    ExecStatus,
-    ReturnData,
+    ActionParams, ActionValue, Ext, EnvInfo, CallType, ExecutionResult, ExecStatus, ReturnData,
     ParamsType,
 };
 use kvdb::KeyValueDB;
@@ -152,12 +145,13 @@ impl<'a, B: 'a> Ext for Externalities<'a, B>
 where B: StateBackend
 {
     fn storage_at(&self, key: &H128) -> H128 {
-        let value = self.state
+        let value = self
+            .state
             .storage_at(&self.origin_info[0].address, &key[..].to_vec())
             .expect("Fatal error occurred when getting storage.");
         let mut ret: Vec<u8> = vec![0x00; 16];
         for idx in 0..value.len() {
-            ret[16-value.len()+idx] = value[idx];
+            ret[16 - value.len() + idx] = value[idx];
         }
         ret.as_slice().into()
     }
@@ -180,12 +174,13 @@ where B: StateBackend
     }
 
     fn storage_at_dword(&self, key: &H128) -> H256 {
-        let value =self.state
+        let value = self
+            .state
             .storage_at(&self.origin_info[0].address, &key[..].to_vec())
             .expect("Fatal error occurred when getting storage.");
         let mut ret: Vec<u8> = vec![0x00; 32];
         for idx in 0..value.len() {
-            ret[32-value.len()+idx] = value[idx];
+            ret[32 - value.len() + idx] = value[idx];
         }
         ret.as_slice().into()
     }
@@ -193,7 +188,11 @@ where B: StateBackend
     fn set_storage_dword(&mut self, key: H128, value: H256) {
         // value of this is always 32-byte long
         self.state
-            .set_storage(&self.origin_info[0].address, key[..].to_vec(), value[..].to_vec())
+            .set_storage(
+                &self.origin_info[0].address,
+                key[..].to_vec(),
+                value[..].to_vec(),
+            )
             .expect("Fatal error occurred when putting storage.")
     }
 
@@ -498,7 +497,7 @@ where B: StateBackend
             Ok(code) => {
                 //println!("code = {:?}", code);
                 code
-            },
+            }
             Err(_x) => None,
         }
     }
@@ -510,10 +509,7 @@ where B: StateBackend
             .expect("set empty_but_commit flags should not fail");
     }
 
-    fn create_account(&mut self, a: &Address) {
-        self.state
-            .new_contract(a, 0.into(), 0.into())
-    }
+    fn create_account(&mut self, a: &Address) { self.state.new_contract(a, 0.into(), 0.into()) }
 
     fn sstore(&mut self, a: &Address, key: Vec<u8>, value: Vec<u8>) {
         self.state
@@ -528,16 +524,12 @@ where B: StateBackend
         }
     }
 
-    fn kill_account(&mut self, a: &Address) {
-        self.state
-            .kill_account(a)
-    }
+    fn kill_account(&mut self, a: &Address) { self.state.kill_account(a) }
 
     fn inc_balance(&mut self, a: &Address, value: &U256) {
         self.state
             .add_balance(a, value, CleanupMode::NoEmpty)
             .expect("add balance failed");
-
     }
 
     fn dec_balance(&mut self, a: &Address, value: &U256) {
@@ -546,75 +538,45 @@ where B: StateBackend
             .expect("decrease balance failed")
     }
 
-    fn nonce(&self, a: &Address) -> u64 {
-        self.state
-            .nonce(a)
-            .expect("get nonce failed").low_u64()
-    }
+    fn nonce(&self, a: &Address) -> u64 { self.state.nonce(a).expect("get nonce failed").low_u64() }
 
     fn inc_nonce(&mut self, a: &Address) {
-        self.state
-            .inc_nonce(a)
-            .expect("increment nonce failed")
+        self.state.inc_nonce(a).expect("increment nonce failed")
     }
 
     /// avm specific methods
-    fn touch_account(&mut self, _a: &Address, _index: i32) {
-        unimplemented!()
-    }
+    fn touch_account(&mut self, _a: &Address, _index: i32) { unimplemented!() }
 
-    fn send_signal(&mut self, _signal: i32) {
-        unimplemented!()
-    }
+    fn send_signal(&mut self, _signal: i32) { unimplemented!() }
 
-    fn commit(&mut self) {
-        unimplemented!()
-    }
+    fn commit(&mut self) { unimplemented!() }
 
-    fn root(&self) -> H256{
-        unimplemented!()
-    }
+    fn root(&self) -> H256 { unimplemented!() }
 
     fn avm_log(&mut self, _address: &Address, _topics: Vec<H256>, _data: Vec<u8>, _index: i32) {
         unimplemented!()
     }
 
-    fn get_transformed_code(&self, _address: &Address) -> Option<Arc<Vec<u8>>> {
-        unimplemented!()
-    }
+    fn get_transformed_code(&self, _address: &Address) -> Option<Arc<Vec<u8>>> { unimplemented!() }
 
-    fn save_transformed_code(&mut self, _address: &Address, _code: Bytes) {
-        unimplemented!()
-    }
+    fn save_transformed_code(&mut self, _address: &Address, _code: Bytes) { unimplemented!() }
 
-    fn get_objectgraph(&self, _address: &Address) -> Option<Arc<Bytes>> {
-        unimplemented!()
-    }
+    fn get_objectgraph(&self, _address: &Address) -> Option<Arc<Bytes>> { unimplemented!() }
 
-    fn set_objectgraph(&mut self, _address: &Address, _data: Bytes) {
-        unimplemented!()
-    }
+    fn set_objectgraph(&mut self, _address: &Address, _data: Bytes) { unimplemented!() }
 }
 
 #[allow(unused)]
 impl<'a, B: 'a> Ext for AVMExternalities<'a, B>
 where B: StateBackend
 {
-    fn storage_at(&self, _key: &H128) -> H128 {
-       unimplemented!()
-    }
+    fn storage_at(&self, _key: &H128) -> H128 { unimplemented!() }
 
-    fn set_storage(&mut self, _key: H128, value: H128) {
-        unimplemented!()
-    }
+    fn set_storage(&mut self, _key: H128, value: H128) { unimplemented!() }
 
-    fn storage_at_dword(&self, _key: &H128) -> H256 {
-        unimplemented!()
-    }
+    fn storage_at_dword(&self, _key: &H128) -> H256 { unimplemented!() }
 
-    fn set_storage_dword(&mut self, _key: H128, _value: H256) {
-        unimplemented!()
-    }
+    fn set_storage_dword(&mut self, _key: H128, _value: H256) { unimplemented!() }
 
     fn exists(&self, address: &Address) -> bool {
         self.state
@@ -642,9 +604,7 @@ where B: StateBackend
             .expect("Fatal error occurred when getting balance.")
     }
 
-    fn blockhash(&mut self, number: &U256) -> H256 {
-        unimplemented!()
-    }
+    fn blockhash(&mut self, number: &U256) -> H256 { unimplemented!() }
 
     /// Create new contract account
     fn create(&mut self, gas: &U256, value: &U256, code: &[u8]) -> ExecutionResult {
@@ -685,25 +645,17 @@ where B: StateBackend
             .unwrap_or(0)
     }
 
-    fn log(&mut self, topics: Vec<H256>, data: &[u8]) {
-        unimplemented!()
-    }
+    fn log(&mut self, topics: Vec<H256>, data: &[u8]) { unimplemented!() }
 
-    fn suicide(&mut self, refund_address: &Address) {
-        unimplemented!()
-    }
+    fn suicide(&mut self, refund_address: &Address) { unimplemented!() }
 
     fn env_info(&self) -> &EnvInfo { self.env_info }
 
     fn depth(&self) -> usize { self.depth }
 
-    fn inc_sstore_clears(&mut self) {
-        unimplemented!()
-    }
+    fn inc_sstore_clears(&mut self) { unimplemented!() }
 
-    fn save_code(&mut self, code: Bytes) {
-        unimplemented!()
-    }
+    fn save_code(&mut self, code: Bytes) { unimplemented!() }
 
     fn save_code_at(&mut self, address: &Address, code: Bytes) {
         debug!(target: "vm", "AVM save code at: {:?}", address);
@@ -720,15 +672,13 @@ where B: StateBackend
             Ok(code) => {
                 //println!("code = {:?}", code);
                 code
-            },
+            }
             Err(_x) => None,
         }
     }
 
     // triggered when create a contract account with code = None
-    fn set_special_empty_flag(&mut self) {
-        unimplemented!()
-    }
+    fn set_special_empty_flag(&mut self) { unimplemented!() }
 
     fn create_account(&mut self, a: &Address) {
         self.state
@@ -752,12 +702,7 @@ where B: StateBackend
         }
     }
 
-    fn kill_account(&mut self, a: &Address) {
-        self.state
-            .lock()
-            .unwrap()
-            .kill_account(a)
-    }
+    fn kill_account(&mut self, a: &Address) { self.state.lock().unwrap().kill_account(a) }
 
     fn inc_balance(&mut self, a: &Address, value: &U256) {
         self.state
@@ -765,7 +710,6 @@ where B: StateBackend
             .unwrap()
             .add_balance(a, value, CleanupMode::NoEmpty)
             .expect("add balance failed");
-
     }
 
     fn dec_balance(&mut self, a: &Address, value: &U256) {
@@ -781,7 +725,8 @@ where B: StateBackend
             .lock()
             .unwrap()
             .nonce(a)
-            .expect("get nonce failed").low_u64()
+            .expect("get nonce failed")
+            .low_u64()
     }
 
     fn inc_nonce(&mut self, a: &Address) {
@@ -796,17 +741,17 @@ where B: StateBackend
         self.substates[index as usize].touched.insert(*a);
     }
 
-    fn send_signal(&mut self, signal: i32) {
-        self.tx.send(signal).expect("ext send failed");
-    }
+    fn send_signal(&mut self, signal: i32) { self.tx.send(signal).expect("ext send failed"); }
 
     fn commit(&mut self) {
-        self.state.lock().unwrap().commit().expect("commit state should not fail");
+        self.state
+            .lock()
+            .unwrap()
+            .commit()
+            .expect("commit state should not fail");
     }
 
-    fn root(&self) -> H256{
-        self.state.lock().unwrap().root().clone()
-    }
+    fn root(&self) -> H256 { self.state.lock().unwrap().root().clone() }
 
     fn avm_log(&mut self, address: &Address, topics: Vec<H256>, data: Vec<u8>, index: i32) {
         use log_entry::LogEntry;
@@ -823,7 +768,7 @@ where B: StateBackend
             Ok(code) => {
                 // println!("transformed code = {:?}", code);
                 code
-            },
+            }
             Err(_x) => None,
         }
     }
@@ -843,7 +788,7 @@ where B: StateBackend
             Ok(data) => {
                 // println!("objectgraph = {:?}", data);
                 data
-            },
+            }
             Err(_x) => None,
         }
     }

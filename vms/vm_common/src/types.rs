@@ -3,7 +3,6 @@ use aion_types::{U256, H256, Address};
 use rlp::{Encodable, Decodable, DecoderError, RlpStream, UntrustedRlp};
 use ajson;
 
-
 // return type definition
 /// Return data buffer. Holds memory from a previous call and a slice into that memory.
 #[derive(Debug, PartialEq, Clone)]
@@ -202,7 +201,6 @@ impl Into<[u8; 32]> for ActionValue {
     }
 }
 
-
 impl ActionValue {
     /// Returns action value as U256.
     pub fn value(&self) -> U256 {
@@ -286,7 +284,7 @@ impl Default for ActionParams {
             params_type: ParamsType::Embedded,
             transaction_hash: H256::default(),
             original_transaction_hash: H256::default(),
-            nonce: 0
+            nonce: 0,
         }
     }
 }

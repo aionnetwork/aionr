@@ -543,7 +543,11 @@ mod tests {
         // blocks  [ 3a(c) 2a(c) 2b 1b 1a(c) 0 ]
         // balance [ 5     5     4  3  2     2 ]
         let mut s = state_db.boxed_clone_canon(&root_parent);
-        s.add_to_account_cache(address, Some(AionVMAccount::new_basic(2.into(), 0.into())), false);
+        s.add_to_account_cache(
+            address,
+            Some(AionVMAccount::new_basic(2.into(), 0.into())),
+            false,
+        );
         s.journal_under(&mut batch, 0, &h0).unwrap();
         s.sync_cache(&[], &[], true);
 
@@ -552,17 +556,29 @@ mod tests {
         s.sync_cache(&[], &[], true);
 
         let mut s = state_db.boxed_clone_canon(&h0);
-        s.add_to_account_cache(address, Some(AionVMAccount::new_basic(3.into(), 0.into())), true);
+        s.add_to_account_cache(
+            address,
+            Some(AionVMAccount::new_basic(3.into(), 0.into())),
+            true,
+        );
         s.journal_under(&mut batch, 1, &h1b).unwrap();
         s.sync_cache(&[], &[], false);
 
         let mut s = state_db.boxed_clone_canon(&h1b);
-        s.add_to_account_cache(address, Some(AionVMAccount::new_basic(4.into(), 0.into())), true);
+        s.add_to_account_cache(
+            address,
+            Some(AionVMAccount::new_basic(4.into(), 0.into())),
+            true,
+        );
         s.journal_under(&mut batch, 2, &h2b).unwrap();
         s.sync_cache(&[], &[], false);
 
         let mut s = state_db.boxed_clone_canon(&h1a);
-        s.add_to_account_cache(address, Some(AionVMAccount::new_basic(5.into(), 0.into())), true);
+        s.add_to_account_cache(
+            address,
+            Some(AionVMAccount::new_basic(5.into(), 0.into())),
+            true,
+        );
         s.journal_under(&mut batch, 2, &h2a).unwrap();
         s.sync_cache(&[], &[], true);
 

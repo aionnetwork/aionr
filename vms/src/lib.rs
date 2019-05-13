@@ -44,24 +44,13 @@ mod tests;
 
 pub use factory::{Factory, FastVMFactory, AVMFactory};
 pub use vmtype::VMType;
-pub use fastvm::vm::{
-    self,
-    Error
-};
+pub use fastvm::vm::{self, Error};
 
 //pub use avm::{AVMActionParams};
 
 pub use fastvm::basetypes::constants;
 
 pub use vm_common::{
-    ReturnData,
-    ExecutionResult,
-    ExecStatus,
-    CallType,
-    EnvInfo,
-    LastHashes,
-    ParamsType,
-    ActionParams,
-    ActionValue,
-    Ext
+    ReturnData, ExecutionResult, ExecStatus, CallType, EnvInfo, LastHashes, ParamsType,
+    ActionParams, ActionValue, Ext,
 };

@@ -22,12 +22,7 @@
 
 use trie::TrieFactory;
 use account_db::Factory as AccountFactory;
-use vms::{
-    VMType,
-    Factory,
-    FastVMFactory,
-    AVMFactory,
-};
+use vms::{VMType, Factory, FastVMFactory, AVMFactory};
 
 /// Virtual machine factory
 #[derive(Clone)]

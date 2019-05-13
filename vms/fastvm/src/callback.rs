@@ -30,31 +30,31 @@ use vm_common::{CallType, Ext};
 #[derive(Debug)]
 #[repr(C)]
 pub struct EvmWord {
-    bytes: [u8; 16]
+    bytes: [u8; 16],
 }
 
 #[derive(Debug)]
 #[repr(C)]
 pub struct HashValue {
-    bytes: [u8; 32]
+    bytes: [u8; 32],
 }
 
 #[derive(Debug)]
 #[repr(C)]
 pub struct EvmAddress {
-    bytes: [u8; 32]
+    bytes: [u8; 32],
 }
 
 impl Deref for EvmWord {
     type Target = [u8; 16];
 
-    fn deref(&self) -> &Self::Target {&self.bytes}
+    fn deref(&self) -> &Self::Target { &self.bytes }
 }
 
 impl Deref for EvmAddress {
     type Target = [u8; 32];
 
-    fn deref(&self) -> &Self::Target {&self.bytes}
+    fn deref(&self) -> &Self::Target { &self.bytes }
 }
 
 // definitions of callbacks used by fastvm.so; obj : &Callback
@@ -66,7 +66,7 @@ pub extern fn get_blockhash(obj: *mut libc::c_void, number: u64) -> HashValue {
     debug!(target: "vm", "blockhash = {:?}, number = {:?}", ext.blockhash(&(number.into())), number);
     println!("blockhash = {:?}", ext.blockhash(&(number.into())));
     HashValue {
-        bytes: ext.blockhash(&(number.into())).into()
+        bytes: ext.blockhash(&(number.into())).into(),
     }
 }
 
@@ -102,7 +102,7 @@ pub extern fn get_balance(obj: *mut libc::c_void, address: EvmAddress) -> EvmWor
     let balance = ext.balance(&(address.bytes.into()));
     let evm_strg: [u8; 16] = U128::from(U256::from(balance)).into();
     EvmWord {
-        bytes: evm_strg
+        bytes: evm_strg,
     }
 }
 
@@ -119,12 +119,7 @@ pub extern fn exists(obj: *mut libc::c_void, address: EvmAddress) -> i32 {
 
 #[no_mangle]
 // 5 - get storage
-pub extern fn get_storage(
-    obj: *mut libc::c_void,
-    _address: EvmAddress,
-    key: EvmWord,
-) -> EvmWord
-{
+pub extern fn get_storage(obj: *mut libc::c_void, _address: EvmAddress, key: EvmWord) -> EvmWord {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
     debug!(target: "vm", "ext<get_storage>: key = {:?}, raw_env = {:?}", key, obj);
     let storage = ext.storage_at(&(key.bytes).into());
@@ -136,30 +131,21 @@ pub extern fn get_storage(
     let evm_strg: [u8; 16] = storage.into();
     debug!(target: "vm", "callback.rs get_storage() storage: {:?}", evm_strg);
     EvmWord {
-        bytes: evm_strg
+        bytes: evm_strg,
     }
 }
 
 #[no_mangle]
 // 6 - put storage
-pub extern fn put_storage(
-    obj: *mut libc::c_void,
-    _addr: EvmAddress,
-    key: EvmWord,
-    value: EvmWord,
-)
-{
+pub extern fn put_storage(obj: *mut libc::c_void, _addr: EvmAddress, key: EvmWord, value: EvmWord) {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
-    
+
     debug!(target: "vm",
         "callback.rs put_storage() key: {:?}",
         U256::from(U128::from(key.bytes.clone()))
     );
     debug!(target: "vm", "callback.rs put_storage() value: {:?}", value);
-    ext.set_storage(
-        U128::from(*key).into(),
-        U128::from(*value).into(),
-    );
+    ext.set_storage(U128::from(*key).into(), U128::from(*value).into());
 }
 
 #[no_mangle]
@@ -211,7 +197,7 @@ pub extern fn call(obj: *mut libc::c_void, info: *mut u8, msg: *const u8) -> *co
         4 => CallType::StaticCall,
         _ => panic!("Call type does not exist"),
     };
-    
+
     let static_flag = evm_msg.flags == 1 || evm_msg.kind == 4;
 
     // Address in different call types are handled in VM
@@ -299,12 +285,7 @@ extern {
         func: extern fn(obj: *mut libc::c_void, address: EvmAddress, key: EvmWord) -> EvmWord,
     );
     pub fn register_put_storage_fn(
-        func: extern fn(
-            obj: *mut libc::c_void,
-            address: EvmAddress,
-            key: EvmWord,
-            value: EvmWord,
-        ),
+        func: extern fn(obj: *mut libc::c_void, address: EvmAddress, key: EvmWord, value: EvmWord),
     );
     pub fn register_exists_fn(func: extern fn(obj: *mut libc::c_void, address: EvmAddress) -> i32);
     pub fn register_get_balance_fn(

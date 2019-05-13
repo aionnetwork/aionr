@@ -48,12 +48,12 @@ use self::header_validators::{
     HeaderValidator,
     POWValidator,
     EnergyConsumedValidator,
-    EquihashSolutionValidator
+    EquihashSolutionValidator,
 };
 use self::grant_parent_header_validators::{GrantParentHeaderValidator, DifficultyValidator};
 
-const ANNUAL_BLOCK_MOUNT : u64 = 3110400;
-const COMPOUND_YEAR_MAX : u64 = 128;
+const ANNUAL_BLOCK_MOUNT: u64 = 3110400;
+const COMPOUND_YEAR_MAX: u64 = 128;
 
 #[derive(Debug, PartialEq)]
 pub struct POWEquihashEngineParams {
@@ -183,14 +183,20 @@ pub struct RewardsCalculator {
 }
 
 impl RewardsCalculator {
-    fn new(params: &POWEquihashEngineParams, monetary_policy_update: Option<BlockNumber>, premine: U256) -> RewardsCalculator {
+    fn new(
+        params: &POWEquihashEngineParams,
+        monetary_policy_update: Option<BlockNumber>,
+        premine: U256,
+    ) -> RewardsCalculator
+    {
         // precalculate the desired increment.
         let delta = params.rampup_upper_bound - params.rampup_lower_bound;
         let m = (params.rampup_end_value - params.rampup_start_value) / delta;
 
-        let mut compound_lookup_table : Vec<U256> = Vec::new();
+        let mut compound_lookup_table: Vec<U256> = Vec::new();
         if let Some(number) = monetary_policy_update {
-            let total_supply = Self::calculate_total_supply_before_monetary_update(premine, number, params);
+            let total_supply =
+                Self::calculate_total_supply_before_monetary_update(premine, number, params);
 
             for i in 0..COMPOUND_YEAR_MAX {
                 compound_lookup_table.push(Self::calculate_compound(i, total_supply));
@@ -228,7 +234,12 @@ impl RewardsCalculator {
         }
     }
 
-    fn calculate_total_supply_before_monetary_update(initial_supply: U256, monetary_change_block_num: u64, params: &POWEquihashEngineParams) -> U256 {
+    fn calculate_total_supply_before_monetary_update(
+        initial_supply: U256,
+        monetary_change_block_num: u64,
+        params: &POWEquihashEngineParams,
+    ) -> U256
+    {
         if monetary_change_block_num < 1 {
             return initial_supply;
         } else {
@@ -261,17 +272,25 @@ impl RewardsCalculator {
         let mut current_reward = self.current_reward.lock().unwrap();
 
         if term != *current_term {
-            for _ in self.compound_lookup_table.iter() {
-            }
-            *current_reward = self.compound_lookup_table.get(term as usize).unwrap_or(&U256::from(0)).clone();
+            for _ in self.compound_lookup_table.iter() {}
+            *current_reward = self
+                .compound_lookup_table
+                .get(term as usize)
+                .unwrap_or(&U256::from(0))
+                .clone();
             *current_term = term;
         }
 
         return *current_reward;
     }
 
-    fn calculate_reward_before_monetary_update(number: u64, params: &POWEquihashEngineParams, m: U256) -> U256 {
-        let num : U256 = U256::from(number);
+    fn calculate_reward_before_monetary_update(
+        number: u64,
+        params: &POWEquihashEngineParams,
+        m: U256,
+    ) -> U256
+    {
+        let num: U256 = U256::from(number);
 
         if num <= params.rampup_lower_bound {
             return params.lower_block_reward;
@@ -293,7 +312,11 @@ pub struct POWEquihashEngine {
 impl POWEquihashEngine {
     /// Create a new instance of Equihash engine
     pub fn new(params: POWEquihashEngineParams, machine: EthereumMachine) -> Arc<Self> {
-        let rewards_calculator = RewardsCalculator::new(&params, machine.params().monetary_policy_update, machine.premine());
+        let rewards_calculator = RewardsCalculator::new(
+            &params,
+            machine.params().monetary_policy_update,
+            machine.premine(),
+        );
         let difficulty_calc = DifficultyCalc::new(&params);
         Arc::new(POWEquihashEngine {
             machine,

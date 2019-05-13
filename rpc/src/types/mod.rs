@@ -57,7 +57,7 @@ pub use self::stratum_header::{SimpleHeader, StratumHeader};
 pub use self::call_request::CallRequest;
 pub use self::confirmations::{
     ConfirmationPayload, ConfirmationRequest, ConfirmationResponse, ConfirmationResponseWithToken,
-    TransactionModification, SignRequest, DecryptRequest
+    TransactionModification, SignRequest, DecryptRequest,
 };
 pub use self::contract::{Contract, ContractInfo, Abi, AbiIO};
 pub use self::filter::{Filter, FilterChanges};
@@ -71,7 +71,8 @@ pub use self::receipt::{Receipt, SimpleReceipt, SimpleReceiptLog};
 pub use self::rpc_settings::RpcSettings;
 pub use self::secretstore::EncryptedDocumentKey;
 pub use self::sync::{
-    SyncStatus, SyncInfo, Peers, PeerInfo, PeerNetworkInfo, TransactionStats, ChainStatus, AcitvePeerInfo, PbSyncInfo
+    SyncStatus, SyncInfo, Peers, PeerInfo, PeerNetworkInfo, TransactionStats, ChainStatus,
+    AcitvePeerInfo, PbSyncInfo,
 };
 pub use self::transaction::{Transaction, RichRawTransaction};
 pub use self::transaction_request::TransactionRequest;

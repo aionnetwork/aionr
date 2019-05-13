@@ -149,6 +149,6 @@ mod test {
         batch.put("test", b"1", b"cat");
         batch.put("test", b"2", b"dog");
         assert_eq!(batch.get("test").unwrap(), dbop1);
-        assert_eq!(batch.get_vec("test").unwrap(), vec!(dbop1, dbop2));
+        assert_eq!(batch.get_vec("test").unwrap(), vec![dbop1, dbop2]);
     }
 }

@@ -108,7 +108,6 @@ impl fmt::Display for Error {
     }
 }
 
-
 // TODO: should be a trait, possible to avoid cloning everything from a Transaction(/View).
 /// Action (call/create) input params. Everything else should be specified in Externalities.
 // #[derive(Clone, Debug)]

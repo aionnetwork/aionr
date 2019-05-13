@@ -20,7 +20,7 @@
  *
  ******************************************************************************/
 
-use aion_types::{U256, Address};
+use aion_types::{Address, U256};
 use bytes::Bytes;
 
 use types::{Origin, TransactionCondition};
@@ -43,7 +43,7 @@ pub struct TransactionRequest {
     /// Transaction's nonce
     pub nonce: Option<U256>,
     /// Transaction type
-    pub tx_type: Option<u8>,
+    pub tx_type: Option<U256>,
     /// Delay until this condition is met.
     pub condition: Option<TransactionCondition>,
 }
@@ -87,7 +87,7 @@ pub struct FilledTransactionRequest {
     /// Transaction's nonce
     pub nonce: Option<U256>,
     /// Transaction type
-    pub tx_type: u8,
+    pub tx_type: U256,
     /// Delay until this condition is met.
     pub condition: Option<TransactionCondition>,
 }

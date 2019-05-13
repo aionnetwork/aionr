@@ -65,7 +65,7 @@ mod tests {
             deserialized,
             vec![
                 TransactionCondition::Number(51),
-                TransactionCondition::Timestamp(10)
+                TransactionCondition::Timestamp(10),
             ]
         )
     }

@@ -231,7 +231,7 @@ mod tests {
                 Token::Bool(true),
                 Token::Bool(true),
                 Token::Bool(false),
-                Token::Bool(false)
+                Token::Bool(false),
             ])
         );
     }
@@ -248,9 +248,9 @@ mod tests {
                 Token::Array(vec![
                     Token::Bool(true),
                     Token::Bool(true),
-                    Token::Bool(false)
+                    Token::Bool(false),
                 ]),
-                Token::Array(vec![Token::Bool(false)])
+                Token::Array(vec![Token::Bool(false)]),
             ])
         );
     }

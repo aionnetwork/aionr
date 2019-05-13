@@ -155,17 +155,11 @@ struct TestEnv<'a> {
 }
 
 impl<'a> Ext for TestEnv<'a> {
-    fn storage_at(&self, key: &H128) -> H128 {
-        *self.storage.get(key).unwrap_or(&H128::default())
-    }
+    fn storage_at(&self, key: &H128) -> H128 { *self.storage.get(key).unwrap_or(&H128::default()) }
 
-    fn set_storage(&mut self, key: H128, value: H128) {
-        self.storage.insert(key, value);
-    }
+    fn set_storage(&mut self, key: H128, value: H128) { self.storage.insert(key, value); }
     /// Returns a value for given key.
-    fn storage_at_dword(&self, key: &H128) -> H256 {
-        return *self.storage_dword.get(key).unwrap();
-    }
+    fn storage_at_dword(&self, key: &H128) -> H256 { return *self.storage_dword.get(key).unwrap(); }
 
     /// Stores a value for given key.
     fn set_storage_dword(&mut self, key: H128, value: H256) {
@@ -173,9 +167,7 @@ impl<'a> Ext for TestEnv<'a> {
     }
 
     /// Determine whether an account exists.
-    fn exists(&self, address: &Address) -> bool {
-        return *self.accounts.get(address).unwrap();
-    }
+    fn exists(&self, address: &Address) -> bool { return *self.accounts.get(address).unwrap(); }
 
     /// Determine whether an account exists and is not null (zero balance/nonce, no code).
     fn exists_and_not_null(&self, _address: &Address) -> bool { return true; }
@@ -273,9 +265,7 @@ impl<'a> Ext for TestEnv<'a> {
 
     fn set_special_empty_flag(&mut self) {}
 
-    fn code(&self, address: &Address) -> Option<Arc<Bytes>> {
-        None
-    }
+    fn code(&self, address: &Address) -> Option<Arc<Bytes>> { None }
 
     fn sstore(&mut self, address: &Address, key: Bytes, value: Bytes) {}
 
@@ -305,12 +295,12 @@ impl<'a> Ext for TestEnv<'a> {
 
     fn avm_log(&mut self, address: &Address, topics: Vec<H256>, data: Bytes, idx: i32) {}
 
-    fn get_transformed_code(&self, address: &Address) -> Option<Arc<Bytes>> {None}
+    fn get_transformed_code(&self, address: &Address) -> Option<Arc<Bytes>> { None }
 
     fn save_transformed_code(&mut self, address: &Address, code: Bytes) {}
 
-    fn get_objectgraph(&self, address: &Address) -> Option<Arc<Bytes>> {None}
-    
+    fn get_objectgraph(&self, address: &Address) -> Option<Arc<Bytes>> { None }
+
     fn set_objectgraph(&mut self, address: &Address, data: Bytes) {}
 }
 
@@ -385,7 +375,10 @@ fn evm_storage() {
     let code = vec![0x60, 0x01, 0x60, 0x02, 0x55];
     let res = instance.run(&code, &mut context.into());
     println!("TEST<fastvm_env>: res = {:?}", res);
-    assert_eq!(ext.storage_at(&[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x02u8].into()), [0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x01u8].into());
+    assert_eq!(
+        ext.storage_at(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x02u8].into()),
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01u8].into()
+    );
 }
 
 #[test]
@@ -405,10 +398,15 @@ fn evm_mstore() {
     instance.init(raw_env);
 
     // first mstore, then mload
-    let code = vec![0x60, 0x0f, 0x60, 0x02, 0x52, 0x60, 0x02, 0x51, 0x60, 0x10, 0x60, 0x02, 0xf3];
+    let code = vec![
+        0x60, 0x0f, 0x60, 0x02, 0x52, 0x60, 0x02, 0x51, 0x60, 0x10, 0x60, 0x02, 0xf3,
+    ];
     let res = instance.run(&code, &mut context.clone().into());
     println!("UT: evm_log, topics = {:?}", ext.log_topics);
-    assert_eq!(res.2, vec![0u8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x0f]);
+    assert_eq!(
+        res.2,
+        vec![0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0f]
+    );
 }
 
 #[test]
@@ -440,13 +438,19 @@ fn evm_log() {
     instance.init(raw_env);
     // LOG1
     // set M[0x02] = 0xaf
-    let code = vec![0x60, 0xaf, 0x60, 0x02, 0x52, 0x60, 0x03, 0x60, 0x00, 0x60, 0x1, 0x60, 0x11, 0xa1];
+    let code = vec![
+        0x60, 0xaf, 0x60, 0x02, 0x52, 0x60, 0x03, 0x60, 0x00, 0x60, 0x1, 0x60, 0x11, 0xa1,
+    ];
     // let code = vec![0x60, 0x01, 0x60, 0x02, 0xa0];
     let res = instance.run(&code, &mut context.clone().into());
 
     println!("topics = {:?}, data = {:?}", ext.log_topics, ext.log_data);
     assert_eq!(ext.log_topics.len(), 1);
-    let expected_topic: H256 = [0u8,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0x03].into();
+    let expected_topic: H256 = [
+        0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0x03,
+    ]
+        .into();
     assert_eq!(ext.log_topics[0].pop().unwrap(), expected_topic);
     assert_eq!(ext.log_data, [0xafu8]);
 }
@@ -468,9 +472,17 @@ fn blockhash() {
     instance.init(raw_env);
 
     // 0x40
-    let code = vec![0x60, 0x01, 0x40, 0x60, 0x02, 0x52, 0x60, 0x12, 0x52, 0x60, 0x20, 0x60, 0x02, 0xf3];
+    let code = vec![
+        0x60, 0x01, 0x40, 0x60, 0x02, 0x52, 0x60, 0x12, 0x52, 0x60, 0x20, 0x60, 0x02, 0xf3,
+    ];
     let res = instance.run(&code, &mut context.clone().into());
-    assert_eq!(res.2, vec![0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0xf]);    
+    assert_eq!(
+        res.2,
+        vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0xf,
+        ]
+    );
 }
 
 #[test]
@@ -490,7 +502,16 @@ fn sha3() {
     instance.init(raw_env);
 
     // 0x20: compute sha3(0xff)
-    let code = vec![0x60, 0xff, 0x60, 0x00, 0x52, 0x60, 0x10, 0x60, 0x00, 0x20, 0x60, 0x10, 0x52, 0x60, 0x20, 0x52, 0x60, 0x20, 0x60, 0x10, 0xf3];
+    let code = vec![
+        0x60, 0xff, 0x60, 0x00, 0x52, 0x60, 0x10, 0x60, 0x00, 0x20, 0x60, 0x10, 0x52, 0x60, 0x20,
+        0x52, 0x60, 0x20, 0x60, 0x10, 0xf3,
+    ];
     let res = instance.run(&code, &mut context.clone().into());
-    assert_eq!(res.2, vec![131, 193, 186, 50, 43, 185, 25, 210, 12, 46, 9, 202, 112, 253, 39, 188, 36, 86, 23, 169, 233, 171, 213, 49, 91, 138, 250, 235, 196, 19, 96, 68]);
+    assert_eq!(
+        res.2,
+        vec![
+            131, 193, 186, 50, 43, 185, 25, 210, 12, 46, 9, 202, 112, 253, 39, 188, 36, 86, 23,
+            169, 233, 171, 213, 49, 91, 138, 250, 235, 196, 19, 96, 68,
+        ]
+    );
 }

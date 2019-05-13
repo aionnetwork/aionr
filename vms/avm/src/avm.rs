@@ -17,7 +17,6 @@ use bytes::Bytes;
 use aion_types::{Address, U256, H256};
 use hash::{BLAKE2B_EMPTY};
 
-
 /// We keep a single JVM instance in the background, which will be shared
 /// among multiple threads. Before invoking any JNI methods, the executing
 /// thread needs to attach the thread to the JVM instance first and deattach
@@ -41,7 +40,7 @@ pub fn launch_jvm() {
                 } else {
                     libs = PathBuf::from(default_var.unwrap());
                 }
-                
+
                 libs.push("libs/aion_vm");
                 classpath = add_jars(
                     classpath,

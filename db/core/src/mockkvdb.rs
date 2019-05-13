@@ -21,7 +21,7 @@
 
 use traits::KeyValueDAO;
 use std::collections::BTreeMap;
-use super::{Key,DBValue};
+use super::{Key, DBValue};
 
 /// Rocksdb mock instance in memory
 pub struct Mockkvdb {

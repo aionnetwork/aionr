@@ -27,7 +27,7 @@ use super::blake2b_hash_contract::Blake2bHashContract;
 use super::tx_hash_contract::TxHashContract;
 use super::atb::token_bridge_contract::TokenBridgeContract;
 use std::fmt;
-use state::{State, Substate, Backend as StateBackend,CleanupMode};
+use state::{State, Substate, Backend as StateBackend, CleanupMode};
 use vms::ExecutionResult;
 use log_entry::LogEntry;
 // use state::{};
@@ -169,14 +169,15 @@ impl<'a, B: 'a> BuiltinExt for BuiltinExtImpl<'a, B>
 where B: StateBackend
 {
     fn storage_at(&self, key: &H128) -> H128 {
-        let value = self.state
+        let value = self
+            .state
             .storage_at(&self.context.address, &key[..].to_vec())
             .expect("Fatal error occurred when getting storage.");
         // should convert to H128
         let mut ret = vec![0u8; 16];
         if value.len() < 16 {
             for idx in 0..value.len() {
-                ret[16-value.len()+idx] = value[idx];
+                ret[16 - value.len() + idx] = value[idx];
             }
         }
         trace!(target: "vm", "BuiltIn: storage value = {:?}", ret);
@@ -201,13 +202,14 @@ where B: StateBackend
     }
 
     fn storage_at_dword(&self, key: &H128) -> H256 {
-        let value = self.state
+        let value = self
+            .state
             .storage_at(&self.context.address, &key[..].to_vec())
             .expect("Fatal error occurred when getting storage.");
         // should convert to H256 in case that value is not length of 32-bytes
         let mut ret: Vec<u8> = vec![0x00; 32];
         for idx in 0..value.len() {
-            ret[32-value.len()+idx] = value[idx];
+            ret[32 - value.len() + idx] = value[idx];
         }
         ret[..].into()
     }

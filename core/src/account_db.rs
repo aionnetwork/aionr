@@ -24,7 +24,7 @@
 use std::collections::HashMap;
 use blake2b::{BLAKE2B_NULL_RLP, blake2b};
 use aion_types::H256;
-use kvdb::{DBValue,HashStore};
+use kvdb::{DBValue, HashStore};
 use rlp::NULL_RLP;
 
 #[cfg(test)]

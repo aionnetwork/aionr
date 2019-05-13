@@ -31,15 +31,8 @@ use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use error::ExecutionError;
 use vms::{
-    self,
-    ActionParams,
-    ActionValue,
-    CallType,
-    EnvInfo,
-    ExecutionResult,
-    ExecStatus,
-    ReturnData,
-    VMType
+    self, ActionParams, ActionValue, CallType, EnvInfo, ExecutionResult, ExecStatus, ReturnData,
+    VMType,
 };
 use vms::constants::{MAX_CALL_DEPTH, GAS_CALL_MAX, GAS_CREATE_MAX};
 
@@ -220,7 +213,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         original_transaction_hash: t.hash(),
                         nonce: nonce.low_u64(),
                         static_flag: false,
-                        params_type: vms::ParamsType::Embedded
+                        params_type: vms::ParamsType::Embedded,
                     }
                 }
                 Action::Call(ref address) => {
@@ -290,19 +283,17 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         if self.depth != depth_threshold {
             let mut vm_factory = self.state.vm_factory();
             // consider put global callback in ext
-            let mut ext = self
-                .as_avm_externalities(unconfirmed_substate, tx.clone());
+            let mut ext = self.as_avm_externalities(unconfirmed_substate, tx.clone());
             //TODO: make create/exec compatible with fastvm
             let vm = vm_factory.create(VMType::AVM);
-            return vm.exec(params, &mut ext);   
+            return vm.exec(params, &mut ext);
         }
 
         //Start in new thread with stack size needed up to max depth
         crossbeam::scope(|scope| {
             let mut vm_factory = self.state.vm_factory();
 
-            let mut ext = self
-                .as_avm_externalities(unconfirmed_substate, tx.clone());
+            let mut ext = self.as_avm_externalities(unconfirmed_substate, tx.clone());
 
             scope
                 .builder()
@@ -471,8 +462,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         if self.depth != depth_threshold {
             let mut vm_factory = self.state.vm_factory();
             // consider put global callback in ext
-            let mut ext =
-                self.as_externalities(OriginInfo::from(&[&params as &ActionParams]), unconfirmed_substate);
+            let mut ext = self.as_externalities(
+                OriginInfo::from(&[&params as &ActionParams]),
+                unconfirmed_substate,
+            );
             //TODO: make create/exec compatible with fastvm
             let vm = vm_factory.create(VMType::FastVM);
             return vm.exec(vec![params], &mut ext).first().unwrap().clone();
@@ -482,8 +475,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         crossbeam::scope(|scope| {
             let mut vm_factory = self.state.vm_factory();
 
-            let mut ext =
-                self.as_externalities(OriginInfo::from(&[&params as &ActionParams]), unconfirmed_substate);
+            let mut ext = self.as_externalities(
+                OriginInfo::from(&[&params as &ActionParams]),
+                unconfirmed_substate,
+            );
 
             scope
                 .builder()
@@ -696,7 +691,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // nonzero nonce, or nonempty code, then the creation throws immediately, with exactly
         // the same behavior as would arise if the first byte in the init code were an invalid
         // opcode. This applies retroactively starting from genesis.
-        
+
         if self
             .state
             .exists_and_not_null(&params.address)
@@ -704,21 +699,24 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         {
             // AKI-83: allow internal creation of contract which has balance and no code.
             let code = self.state.code(&params.address).unwrap_or(None);
-            let aion040_fork = self.machine.params().monetary_policy_update.map_or(false, |v| {
-                self.info.number >= v
-            });
-            if !aion040_fork || code.is_some() {//(self.depth >= 1 && code.is_some()) || self.depth == 0 {
+            let aion040_fork = self
+                .machine
+                .params()
+                .monetary_policy_update
+                .map_or(false, |v| self.info.number >= v);
+            if !aion040_fork || code.is_some() {
+                //(self.depth >= 1 && code.is_some()) || self.depth == 0 {
                 return ExecutionResult {
                     gas_left: 0.into(),
                     status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from(
                         "Contract creation address already exists, or checking contract existance \
-                        failed.",
+                         failed.",
                     ),
                     state_root: H256::default(),
                 };
-            } 
+            }
         }
 
         trace!(
@@ -919,9 +917,7 @@ mod tests {
     use std::sync::Arc;
     use rustc_hex::FromHex;
     use super::*;
-    use aion_types::{
-        U256,
-Address};
+    use aion_types::{U256, Address};
     use vms::{ActionParams, ActionValue, CallType, EnvInfo};
     use machine::EthereumMachine;
     use state::{Substate, CleanupMode};
@@ -1680,7 +1676,10 @@ Address};
         };
         assert_eq!(status_code, ExecStatus::Success);
 
-        assert_eq!((*return_data).to_vec(), "00000000000000000000000000000004".from_hex().unwrap());
+        assert_eq!(
+            (*return_data).to_vec(),
+            "00000000000000000000000000000004".from_hex().unwrap()
+        );
         assert_eq!(state.nonce(&address).unwrap(), U256::from(1));
         assert_eq!(state.nonce(&new_address).unwrap(), U256::from(1));
     }
@@ -2433,11 +2432,25 @@ Address};
             } = r;
 
             assert_eq!(status_code, ExecStatus::Success);
-            println!("result state root = {:?}, return_data = {:?}", state_root, return_data);
+            println!(
+                "result state root = {:?}, return_data = {:?}",
+                state_root, return_data
+            );
             assert_eq!(return_data.to_vec(), vec![17u8, 0, 4, 0, 2, 3, 4]);
         }
 
-        assert_eq!(state.storage_at(&params.address, &vec![1u8,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10,1,2,3,4,5,6,7,8,9,10,1,2]).unwrap(), vec![0u8,2,3,5]);
+        assert_eq!(
+            state
+                .storage_at(
+                    &params.address,
+                    &vec![
+                        1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4,
+                        5, 6, 7, 8, 9, 10, 1, 2,
+                    ]
+                )
+                .unwrap(),
+            vec![0u8, 2, 3, 5]
+        );
 
         // test recursive call
         params.call_type = CallType::Call;
@@ -2461,7 +2474,10 @@ Address};
             } = r;
 
             assert_eq!(status_code, ExecStatus::Success);
-            println!("result state root = {:?}, return_data = {:?}", state_root, return_data);
+            println!(
+                "result state root = {:?}, return_data = {:?}",
+                state_root, return_data
+            );
             assert_eq!(return_data.to_vec(), vec![17u8, 0, 4, 0, 2, 3, 4]);
         }
     }
@@ -2488,10 +2504,20 @@ Address};
     fn avm_storage() {
         let mut state = get_temp_state();
         let address = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-        state.set_storage(&address, vec![0,0,0,1], vec![0,0,0,2]).expect("avm set storage failed");
-        let value = state.storage_at(&address, &vec![0,0,0,1]).expect("avm get storage failed");
-        assert_eq!(value, vec![0,0,0,2]);
-        state.set_storage(&address, vec![1,2,3,4,5,6,7,8,9,0], vec![1,2,3,4,5,0,0,0,2]).expect("avm set storage failed");
+        state
+            .set_storage(&address, vec![0, 0, 0, 1], vec![0, 0, 0, 2])
+            .expect("avm set storage failed");
+        let value = state
+            .storage_at(&address, &vec![0, 0, 0, 1])
+            .expect("avm get storage failed");
+        assert_eq!(value, vec![0, 0, 0, 2]);
+        state
+            .set_storage(
+                &address,
+                vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
+                vec![1, 2, 3, 4, 5, 0, 0, 0, 2],
+            )
+            .expect("avm set storage failed");
         println!("state = {:?}", state);
     }
 
@@ -2521,7 +2547,10 @@ Address};
         params2.nonce = params.nonce + 1;
         let results = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call_avm(vec![params.clone(), params2.clone()], &mut [substate.clone(), substate.clone()])
+            ex.call_avm(
+                vec![params.clone(), params2.clone()],
+                &mut [substate.clone(), substate.clone()],
+            )
         };
 
         assert_eq!(results.len(), 2);
@@ -2552,12 +2581,16 @@ Address};
         state
             .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
             .unwrap();
-        let inner_contract_address = "a007d071538ce40db67cc816def5ec8adc410858ee6cfda21e72300835b83754".from_hex().unwrap();
+        let inner_contract_address =
+            "a007d071538ce40db67cc816def5ec8adc410858ee6cfda21e72300835b83754"
+                .from_hex()
+                .unwrap();
         state
             .add_balance(
                 &inner_contract_address[..].into(),
                 &100.into(),
-                CleanupMode::NoEmpty)
+                CleanupMode::NoEmpty,
+            )
             .unwrap();
         let mut info = EnvInfo::default();
         info.number = 1;
@@ -2598,8 +2631,11 @@ Address};
         // machine after aion040_fork returns success on creation at exsited account which has no code
         assert_eq!(status_code, ExecStatus::Success);
 
-        println!("code = {:?}", state.code(&inner_contract_address[..].into()));
-        
+        println!(
+            "code = {:?}",
+            state.code(&inner_contract_address[..].into())
+        );
+
         let machine = make_avm_machine();
         let mut substate = Substate::new();
 

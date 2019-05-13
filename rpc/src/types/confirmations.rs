@@ -27,7 +27,10 @@ use serde::{Serialize, Serializer};
 use ansi_term::Colour;
 use bytes::ToPretty;
 
-use types::{U256, TransactionRequest, RichRawTransaction, H256, H520, H768, Bytes, TransactionCondition, Origin};
+use types::{
+    U256, TransactionRequest, RichRawTransaction, H256, H520, H768, Bytes, TransactionCondition,
+    Origin,
+};
 use helpers;
 
 /// Confirmation waiting in a queue

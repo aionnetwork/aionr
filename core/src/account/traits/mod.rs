@@ -49,7 +49,6 @@ impl From<AccType> for U256 {
 }
 
 pub trait VMAccount: Sync + Send {
-
     fn from_rlp(rlp: &[u8]) -> Self;
 
     /// Set this account's code to the given code.

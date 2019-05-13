@@ -60,22 +60,19 @@ impl PodAccount {
             storage: acc
                 .storage_changes()
                 .iter()
-                .filter(|(_, v)| {
-                    v.len() == 16
-                })
+                .filter(|(_, v)| v.len() == 16)
                 .fold(BTreeMap::new(), |mut m, (k, v)| {
                     m.insert(k.clone().as_slice().into(), v.clone().as_slice().into());
                     m
                 }),
-            storage_dword: acc.storage_changes().iter().filter(|(_, v)| {
-                v.len() == 32
-            }).fold(
-                BTreeMap::new(),
-                |mut m, (k, v)| {
+            storage_dword: acc
+                .storage_changes()
+                .iter()
+                .filter(|(_, v)| v.len() == 32)
+                .fold(BTreeMap::new(), |mut m, (k, v)| {
                     m.insert(k.clone().as_slice().into(), v.clone().as_slice().into());
                     m
-                },
-            ),
+                }),
             code: acc.code().map(|x| x.to_vec()),
         }
     }
@@ -425,19 +422,19 @@ mod test {
                 nonce: Diff::Same,
                 code: Diff::Same,
                 storage: map![
-                2.into() => Diff::new(2.into(), 3.into()),
-                3.into() => Diff::new(3.into(), 0.into()),
-                4.into() => Diff::new(4.into(), 0.into()),
-                7.into() => Diff::new(0.into(), 7.into()),
-                9.into() => Diff::new(0.into(), 9.into())
-            ],
+                    2.into() => Diff::new(2.into(), 3.into()),
+                    3.into() => Diff::new(3.into(), 0.into()),
+                    4.into() => Diff::new(4.into(), 0.into()),
+                    7.into() => Diff::new(0.into(), 7.into()),
+                    9.into() => Diff::new(0.into(), 9.into())
+                ],
                 storage_dword: map![
-                2.into() => Diff::new(2.into(), 3.into()),
-                3.into() => Diff::new(3.into(), 0.into()),
-                4.into() => Diff::new(4.into(), 0.into()),
-                7.into() => Diff::new(0.into(), 7.into()),
-                9.into() => Diff::new(0.into(), 9.into())
-            ],
+                    2.into() => Diff::new(2.into(), 3.into()),
+                    3.into() => Diff::new(3.into(), 0.into()),
+                    4.into() => Diff::new(4.into(), 0.into()),
+                    7.into() => Diff::new(0.into(), 7.into()),
+                    9.into() => Diff::new(0.into(), 9.into())
+                ],
             })
         );
     }

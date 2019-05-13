@@ -25,9 +25,7 @@ use fastvm::basetypes::{constants::GAS_CODE_DEPOSIT, DataWord};
 use fastvm::context::{execution_kind, ExecutionContext, TransactionResult};
 use vm_common::{ExecutionResult, ExecStatus, CallType, ReturnData, ActionParams, ActionValue, Ext};
 use std::sync::Arc;
-use avm::{
-    AVM
-};
+use avm::{AVM};
 use avm::types::{TransactionContext as AVMTxContext, AvmStatusCode};
 
 pub trait Factory {
@@ -220,7 +218,7 @@ impl Factory for AVMFactory {
 
             let caller = params.sender;
             debug!(target: "vm", "caller = {:?}", caller);
-            
+
             let origin = params.origin;
             let transfer_value: [u8; 32] = params.value.into();
             let call_value = transfer_value.to_vec();

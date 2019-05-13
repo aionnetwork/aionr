@@ -26,9 +26,8 @@ use std::collections::HashMap;
 use blake2b::Blake2b;
 use signature::long_signature;
 use {
-    Log, Hash, RawLog, LogParam, RawTopicFilter, TopicFilter,
-    Topic, ParamType, EventParam, encode, decode, Token,
-    Result, ErrorKind
+    Log, Hash, RawLog, LogParam, RawTopicFilter, TopicFilter, Topic, ParamType, EventParam, encode,
+    decode, Token, Result, ErrorKind,
 };
 
 /// Contract event.
@@ -270,29 +269,29 @@ mod tests {
                         "a".to_owned(),
                         Token::Int(
                             "0000000000000000000000000000000000000000000000000000000000000003"
-                                .into()
-                        )
+                                .into(),
+                        ),
                     ),
                     (
                         "b".to_owned(),
                         Token::Int(
                             "0000000000000000000000000000000000000000000000000000000000000002"
-                                .into()
-                        )
+                                .into(),
+                        ),
                     ),
                     (
                         "c".to_owned(),
                         Token::Address(
                             "2222222222222222222222222222222222222222222222222222222222222222"
-                                .into()
-                        )
+                                .into(),
+                        ),
                     ),
                     (
                         "d".to_owned(),
                         Token::Address(
                             "1111111111111111111111111111111111111111111111111111111111111111"
-                                .into()
-                        )
+                                .into(),
+                        ),
                     ),
                 ]
                 .into_iter()
@@ -302,7 +301,7 @@ mod tests {
                         value,
                     }
                 })
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>(),
             }
         );
     }

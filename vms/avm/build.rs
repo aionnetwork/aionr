@@ -25,7 +25,7 @@ fn main() {
     //         .args(["-O", &jni_jar_path].iter())
     //         .status()
     //         .expect("fetch jni jar error");
-    
+
     // // fetch avm libs
     // Command::new("wget")
     //         .arg("https://github.com/aionnetwork/AVM/archive/1.0.tar.gz")

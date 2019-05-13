@@ -100,8 +100,10 @@ pub fn compute_bundle_hash(source_block_hash: H256, bundles: &Vec<BridgeTransfer
 mod tests {
     use bytes::Bytes;
     use aion_types::H256;
-    use super::{to_signature, to_event_signature, get_signature, or_default_word,
-or_default_d_word, boolean_to_result_bytes, int_to_result_bytes, compute_bundle_hash};
+    use super::{
+        to_signature, to_event_signature, get_signature, or_default_word, or_default_d_word,
+        boolean_to_result_bytes, int_to_result_bytes, compute_bundle_hash,
+};
     use precompiled::precompiled_utilities::{WORD_LENGTH, HALF_WORD_LENGTH};
     use num_bigint::ToBigInt;
     use precompiled::atb::bridge_transfer::{BridgeTransfer, get_instance};

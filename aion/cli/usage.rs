@@ -62,28 +62,28 @@ macro_rules! if_vec {
 }
 
 macro_rules! if_option_vec {
-    (Option<Vec<String>>, THEN {$then:expr} ELSE {$otherwise:expr}) => {
+    (Option < Vec < String >> ,THEN { $then:expr }ELSE { $otherwise:expr }) => {
         $then
     };
-    (Option<$type:ty>, THEN {$then:expr} ELSE {$otherwise:expr}) => {
+    (Option < $type:ty > ,THEN { $then:expr }ELSE { $otherwise:expr }) => {
         $otherwise
     };
 }
 
 macro_rules! inner_option_type {
-    (Option<$type:ty>) => {
+    (Option < $type:ty >) => {
         $type
     };
 }
 
 macro_rules! inner_vec_type {
-    (Vec<$type:ty>) => {
+    (Vec < $type:ty >) => {
         $type
     };
 }
 
 macro_rules! inner_option_vec_type {
-    (Option<Vec<String>>) => {
+    (Option < Vec < String >>) => {
         String
     };
 }

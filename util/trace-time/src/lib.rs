@@ -30,7 +30,7 @@ use time::precise_time_ns;
 
 #[macro_export]
 macro_rules! trace_time {
-    ($name: expr) => {
+    ($name:expr) => {
         let _timer = $crate::PerfTimer::new($name);
     };
 }

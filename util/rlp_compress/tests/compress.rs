@@ -22,7 +22,9 @@
 
 extern crate rlp_compress;
 
-use rlp_compress::{compress, decompress, Swapper, snapshot_swapper, blocks_swapper, Compressor, Decompressor};
+use rlp_compress::{
+    compress, decompress, Swapper, snapshot_swapper, blocks_swapper, Compressor, Decompressor,
+};
 
 #[test]
 fn invalid_rlp_swapper() {

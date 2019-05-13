@@ -6,7 +6,7 @@ use aion_types::{H128, U256, H256, Address};
 use types::{*};
 
 /// Externalities interface for EVMs
-pub trait Ext: {
+pub trait Ext {
     /// Returns a value for given key.
     fn storage_at(&self, key: &H128) -> H128;
 
@@ -151,6 +151,6 @@ pub trait Ext: {
     fn save_transformed_code(&mut self, address: &Address, code: Bytes);
 
     fn get_objectgraph(&self, address: &Address) -> Option<Arc<Bytes>>;
-    
+
     fn set_objectgraph(&mut self, address: &Address, data: Bytes);
 }

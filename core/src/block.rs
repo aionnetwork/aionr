@@ -42,7 +42,10 @@ use header::{Header, Seal};
 use receipt::Receipt;
 use state::State;
 use state_db::StateDB;
-use transaction::{UnverifiedTransaction, SignedTransaction, Error as TransactionError, AVM_TRANSACTION_TYPE, Action};
+use transaction::{
+    UnverifiedTransaction, SignedTransaction, Error as TransactionError, AVM_TRANSACTION_TYPE,
+    Action,
+};
 use verification::PreverifiedBlock;
 use kvdb::KeyValueDB;
 
@@ -356,7 +359,7 @@ impl<'x> OpenBlock<'x> {
     /// If valid, it will be executed, and archived together with the receipt.
     /// This method is triggered both by sync and miner:
     /// sync module really call push_transactions, and we do bulk pushes during sync;
-    /// however miner do not use push_transactions due to some special logic: 
+    /// however miner do not use push_transactions due to some special logic:
     /// transaction penalisation .etc
     pub fn push_transaction(
         &mut self,
@@ -372,19 +375,26 @@ impl<'x> OpenBlock<'x> {
         let env_info = self.env_info();
         debug!(target: "vm", "tx type = {:?}", t.tx_type());
 
-        let aion040fork = self.engine.machine().params().monetary_policy_update.map_or(false, |v| {
-            self.block.header().number() >= v
-        });
+        let aion040fork = self
+            .engine
+            .machine()
+            .params()
+            .monetary_policy_update
+            .map_or(false, |v| self.block.header().number() >= v);
         if aion040fork {
             if t.tx_type() == AVM_TRANSACTION_TYPE || is_normal_or_avm_call(self, &t) {
-                result.append(&mut self.block.state.apply_batch(&env_info, self.engine.machine(), &[t.clone()]));
+                result.append(&mut self.block.state.apply_batch(
+                    &env_info,
+                    self.engine.machine(),
+                    &[t.clone()],
+                ));
             } else {
                 result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
             }
         } else {
             result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
         }
-        
+
         match result.pop().unwrap() {
             Ok(outcome) => {
                 self.block
@@ -674,11 +684,7 @@ pub fn enact(
 }
 
 #[inline]
-fn is_normal_or_avm_call(
-    block: &mut OpenBlock,
-    tx: &SignedTransaction,
-) -> bool
-{
+fn is_normal_or_avm_call(block: &mut OpenBlock, tx: &SignedTransaction) -> bool {
     if let Action::Call(a) = tx.action {
         // since fastvm is executed one transaction after another,
         // code() gets the real code of contract
@@ -686,12 +692,9 @@ fn is_normal_or_avm_call(
         // code() will return None. However avm solves the dependency,
         // call will be executed after creation, and code is retrieved by avm callback
         let code = block.block.state.code(&a).unwrap_or(None);
-        if a == H256::from(
-                "0000000000000000000000000000000000000000000000000000000000000100"
-            )
-            || a == H256::from(
-                "0000000000000000000000000000000000000000000000000000000000000200"
-            ) {
+        if a == H256::from("0000000000000000000000000000000000000000000000000000000000000100")
+            || a == H256::from("0000000000000000000000000000000000000000000000000000000000000200")
+        {
             return false;
         } else {
             // not builtin call
@@ -709,11 +712,7 @@ fn is_normal_or_avm_call(
 }
 
 #[inline]
-fn is_for_avm(
-    block: &mut OpenBlock,
-    tx: &SignedTransaction,
-) -> bool
-{
+fn is_for_avm(block: &mut OpenBlock, tx: &SignedTransaction) -> bool {
     // AVM creation = 0x02; normal call = 0x01
     return tx.tx_type() == AVM_TRANSACTION_TYPE || is_normal_or_avm_call(block, tx);
 }
@@ -724,10 +723,13 @@ fn push_transactions(
     block: &mut OpenBlock,
     transactions: &[SignedTransaction],
 ) -> Result<(), Error>
-{ 
-    let aion040fork = block.engine.machine().params().monetary_policy_update.map_or(false, |v| {
-        block.block.header().number() >= v
-    });
+{
+    let aion040fork = block
+        .engine
+        .machine()
+        .params()
+        .monetary_policy_update
+        .map_or(false, |v| block.block.header().number() >= v);
 
     if aion040fork {
         let mut tx_batch = Vec::new();
@@ -754,7 +756,7 @@ fn push_transactions(
             block.push_transaction(t.clone(), None)?;
         }
     }
-    
+
     trace!(target: "vm", "push transactions done");
 
     Ok(())

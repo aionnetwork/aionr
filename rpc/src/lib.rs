@@ -91,16 +91,16 @@ pub mod traits;
 pub mod impls;
 
 pub use jsonrpc_pubsub::Session as PubSubSession;
-pub use ipc::{Server as IpcServer, MetaExtractor as IpcMetaExtractor, RequestContext as IpcRequestContext};
-pub use http::{
-    Server as HttpServer,
-    hyper,
-    RequestMiddleware, RequestMiddlewareAction,
-    AccessControlAllowOrigin, Host, DomainsValidation
+pub use ipc::{
+    Server as IpcServer, MetaExtractor as IpcMetaExtractor, RequestContext as IpcRequestContext,
 };
-pub use ws::{Server as WsServer,Error as WsError, ErrorKind as WsErrorKind};
+pub use http::{
+    Server as HttpServer, hyper, RequestMiddleware, RequestMiddlewareAction,
+    AccessControlAllowOrigin, Host, DomainsValidation,
+};
+pub use ws::{Server as WsServer, Error as WsError, ErrorKind as WsErrorKind};
 
-pub use helpers::{block_import::is_major_importing,dispatch};
+pub use helpers::{block_import::is_major_importing, dispatch};
 pub use metadata::Metadata;
 pub use types::Origin;
 

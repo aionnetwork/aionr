@@ -62,18 +62,15 @@ pub mod backend;
 
 pub use account::{
     AionVMAccount,
-    // Account,
+// Account,
     VMAccount,
-    // AccType,
+// AccType,
     RequireCache,
 };
 pub use self::backend::Backend;
 pub use self::substate::Substate;
 
-use self::account_state::{
-    AccountEntry,
-    AccountState,
-};
+use self::account_state::{AccountEntry, AccountState};
 
 /// Used to return information about an `State::apply` operation.
 #[derive(Debug)]
@@ -318,9 +315,7 @@ impl<B: Backend> State<B> {
 
     /// Create a recoverable checkpoint of this state.
     /// AVM has no need of checkpoints
-    pub fn checkpoint(&mut self) {
-        self.checkpoints.get_mut().push(HashMap::new())
-    }
+    pub fn checkpoint(&mut self) { self.checkpoints.get_mut().push(HashMap::new()) }
 
     /// Merge last checkpoint with previous.
     pub fn discard_checkpoint(&mut self) {
@@ -413,7 +408,7 @@ impl<B: Backend> State<B> {
                 self.account_start_nonce + nonce_offset,
             ))),
         );
-        }
+    }
 
     /// Remove an existing account.
     pub fn kill_account(&mut self, account: &Address) {
@@ -562,7 +557,7 @@ impl<B: Backend> State<B> {
         })
     }
 
-     pub fn init_transformed_code(&mut self, a: &Address, code: Bytes) -> trie::Result<()> {
+    pub fn init_transformed_code(&mut self, a: &Address, code: Bytes) -> trie::Result<()> {
         self.require_or_from(
             a,
             true,
@@ -571,7 +566,7 @@ impl<B: Backend> State<B> {
         )?
         .init_transformed_code(code);
         Ok(())
-     }
+    }
 
     // object graph should ensure cached???
     pub fn get_objectgraph(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
@@ -634,7 +629,7 @@ impl<B: Backend> State<B> {
         let is_value_transfer = !incr.is_zero();
         if is_value_transfer || (cleanup_mode == CleanupMode::ForceCreate && !self.exists(a)?) {
             self.require(a, false)?.add_balance(incr);
-            //panic!("hi");
+        //panic!("hi");
         } else if let CleanupMode::TrackTouched(set) = cleanup_mode {
             if self.exists(a)? {
                 set.insert(*a);
@@ -760,7 +755,6 @@ impl<B: Backend> State<B> {
         txs: &[SignedTransaction],
     ) -> Vec<ApplyResult>
     {
-        
         let exec_results = self.execute_bulk(env_info, machine, txs, false, false);
 
         let mut receipts = Vec::new();
@@ -834,9 +828,7 @@ impl<B: Backend> State<B> {
         Ok(())
     }
 
-    pub fn commit_touched(&mut self, _accounts: HashSet<Address>) -> Result<(), Error> {
-        Ok(())
-    }
+    pub fn commit_touched(&mut self, _accounts: HashSet<Address>) -> Result<(), Error> { Ok(()) }
 
     /// Commits our cached account changes into the trie.
     pub fn commit(&mut self) -> Result<(), Error> {
@@ -863,11 +855,10 @@ impl<B: Backend> State<B> {
                         || address == &H256::from(
                             "0000000000000000000000000000000000000000000000000000000000000200",
                         ) {
-                            account
+                        account
                             .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
-                            account.update_root(address, account_db.as_hashstore_mut());
-                    } else if !account.storage_changes().is_empty()
-                    {
+                        account.update_root(address, account_db.as_hashstore_mut());
+                    } else if !account.storage_changes().is_empty() {
                         // TODO: check key/value storage in avm
                         // to see whether discard is needed
                         account.discard_storage_changes();
@@ -938,9 +929,10 @@ impl<B: Backend> State<B> {
     pub fn populate_from(&mut self, accounts: PodState) {
         assert!(self.checkpoints.borrow().is_empty());
         for (add, acc) in accounts.drain().into_iter() {
-            self.cache
-                .borrow_mut()
-                .insert(add, AccountEntry::new_dirty(Some(AionVMAccount::from_pod(acc))));
+            self.cache.borrow_mut().insert(
+                add,
+                AccountEntry::new_dirty(Some(AionVMAccount::from_pod(acc))),
+            );
         }
     }
 
@@ -1056,12 +1048,7 @@ impl<B: Backend> State<B> {
                         .factories
                         .accountdb
                         .readonly(self.db.as_hashstore(), account.address_hash(a));
-                    account.update_account_cache(
-                        a,
-                        require,
-                        &self.db,
-                        accountdb.as_hashstore(),
-                    );
+                    account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
                 }
                 let r = f(maybe_acc.as_ref());
                 self.insert_cache(a, AccountEntry::new_clean(maybe_acc));
@@ -1071,7 +1058,12 @@ impl<B: Backend> State<B> {
     }
 
     /// Pull account `a` in our cache from the trie DB. `require_code` requires that the code be cached, too.
-    fn require<'a>(&'a self, a: &Address, require_code: bool) -> trie::Result<RefMut<'a, AionVMAccount>> {
+    fn require<'a>(
+        &'a self,
+        a: &Address,
+        require_code: bool,
+    ) -> trie::Result<RefMut<'a, AionVMAccount>>
+    {
         self.require_or_from(
             a,
             require_code,
@@ -1207,7 +1199,15 @@ impl<B: Backend> State<B> {
 }
 
 impl<B: Backend> fmt::Debug for State<B> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "fvm accounts = {:?}, avm accounts = {:?}, state_root = {:?}", self.cache.borrow(), self.cache.borrow(), self.root()) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "fvm accounts = {:?}, avm accounts = {:?}, state_root = {:?}",
+            self.cache.borrow(),
+            self.cache.borrow(),
+            self.root()
+        )
+    }
 }
 
 // TODO: cloning for `State` shouldn't be possible in general; Remove this and use
@@ -1393,9 +1393,15 @@ mod tests {
                 )
                 .unwrap();
             state.init_transformed_code(&a, vec![1, 2, 3]).unwrap();
-            assert_eq!(state.transformed_code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
+            assert_eq!(
+                state.transformed_code(&a).unwrap(),
+                Some(Arc::new(vec![1u8, 2, 3]))
+            );
             state.commit().unwrap();
-            assert_eq!(state.transformed_code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
+            assert_eq!(
+                state.transformed_code(&a).unwrap(),
+                Some(Arc::new(vec![1u8, 2, 3]))
+            );
             state.drop()
         };
 
@@ -1407,7 +1413,10 @@ mod tests {
             Arc::new(MemoryDBRepository::new()),
         )
         .unwrap();
-        assert_eq!(state.transformed_code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
+        assert_eq!(
+            state.transformed_code(&a).unwrap(),
+            Some(Arc::new(vec![1u8, 2, 3]))
+        );
     }
 
     #[test]
@@ -1415,13 +1424,7 @@ mod tests {
         let a = Address::zero();
         let (root, db) = {
             let mut state = get_temp_state_with_nonce();
-            state
-                .set_storage(
-                    &a,
-                    vec![2],
-                    vec![69],
-                )
-                .unwrap();
+            state.set_storage(&a, vec![2], vec![69]).unwrap();
             state.commit().unwrap();
             state.drop()
         };
@@ -1434,10 +1437,7 @@ mod tests {
             Arc::new(MemoryDBRepository::new()),
         )
         .unwrap();
-        assert_eq!(
-            s.storage_at(&a, &vec![2]).unwrap(),
-            vec![69]
-        );
+        assert_eq!(s.storage_at(&a, &vec![2]).unwrap(), vec![69]);
     }
 
     #[test]
@@ -1708,7 +1708,7 @@ mod tests {
         state.set_storage(&a, vec![0x0b], vec![0x0c]).unwrap();
 
         let mut new_state = state.clone();
-        new_state.set_storage(&a, vec![0x0b],vec![0x0d]).unwrap();
+        new_state.set_storage(&a, vec![0x0b], vec![0x0d]).unwrap();
 
         new_state.diff_from(state).unwrap();
     }

@@ -23,9 +23,7 @@ mod tests;
 
 pub use avm::{
     AVM,
-    //AVMActionParams,
+//AVMActionParams,
 };
 
-pub use types::{
-    TransactionContext as AVMTxContext
-};
+pub use types::{TransactionContext as AVMTxContext};

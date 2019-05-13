@@ -59,9 +59,9 @@ impl State {
 
     /// Returns premine number.
     pub fn premine(&self) -> U256 {
-        self.0
-            .iter()
-            .fold(U256::from(0), |sum, (_add, ref acc)| sum + acc.balance.clone().unwrap_or(Uint(U256::from(0))).0)
+        self.0.iter().fold(U256::from(0), |sum, (_add, ref acc)| {
+            sum + acc.balance.clone().unwrap_or(Uint(U256::from(0))).0
+        })
     }
 }
 

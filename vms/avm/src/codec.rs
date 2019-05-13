@@ -121,9 +121,7 @@ impl NativeDecoder {
                 self.index = self.index + size;
                 Ok(ret)
             }
-            false => {
-                Err("Index out of bounds")
-            },
+            false => Err("Index out of bounds"),
         }
     }
 

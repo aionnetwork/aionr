@@ -33,9 +33,7 @@ pub struct avm_bytes {
 
 impl Into<Vec<u8>> for avm_bytes {
     fn into(self) -> Vec<u8> {
-        unsafe {
-            Vec::from_raw_parts(self.pointer, self.length as usize, self.length as usize)
-        }
+        unsafe { Vec::from_raw_parts(self.pointer, self.length as usize, self.length as usize) }
     }
 }
 
@@ -65,12 +63,16 @@ pub struct avm_callbacks {
     pub increment_nonce: extern fn(handle: *const c_void, address: *const avm_address),
     pub touch_account: extern fn(handle: *const c_void, address: *const avm_address, idx: i32),
     pub send_signal: extern fn(handle: *const c_void, sig_num: i32) -> avm_bytes,
-    pub contract_address: extern fn(sender: *const avm_address, nonce: *const avm_bytes) -> avm_bytes,
+    pub contract_address:
+        extern fn(sender: *const avm_address, nonce: *const avm_bytes) -> avm_bytes,
     pub add_log: extern fn(handle: *const c_void, logs: *const avm_bytes, idx: i32),
-    pub get_transformed_code: extern fn(handle: *const c_void, addr: *const avm_address) -> avm_bytes,
-    pub put_transformed_code: extern fn(handle: *const c_void, addr: *const avm_address, code: *const avm_bytes),
+    pub get_transformed_code:
+        extern fn(handle: *const c_void, addr: *const avm_address) -> avm_bytes,
+    pub put_transformed_code:
+        extern fn(handle: *const c_void, addr: *const avm_address, code: *const avm_bytes),
     pub get_objectgraph: extern fn(handle: *const c_void, addr: *const avm_address) -> avm_bytes,
-    pub set_objectgraph: extern fn(handle: *const c_void, addr: *const avm_address, data: *const avm_bytes),
+    pub set_objectgraph:
+        extern fn(handle: *const c_void, addr: *const avm_address, data: *const avm_bytes),
 }
 
 impl fmt::Display for avm_address {
@@ -123,7 +125,7 @@ pub extern fn avm_create_account(handle: *const c_void, address: *const avm_addr
 
 #[no_mangle]
 pub extern fn avm_has_account_state(handle: *const c_void, address: *const avm_address) -> u32 {
-    let ext: &mut Box<Ext> = unsafe {mem::transmute(handle)};
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
     ext.exists(addr) as u32
 }
@@ -152,12 +154,10 @@ pub extern fn avm_get_code(handle: *const c_void, address: *const avm_address) -
     debug!(target: "vm", "avm_get_code: 0x{:?}", addr);
 
     match ext.code(addr) {
-        None => {
-            unsafe {new_null_bytes()}
-        }
+        None => unsafe { new_null_bytes() },
         Some(code) => {
             if code.len() == 0 {
-                unsafe {new_null_bytes()}
+                unsafe { new_null_bytes() }
             } else {
                 unsafe {
                     let ret = new_fixed_bytes(code.len() as u32);
@@ -187,8 +187,8 @@ pub extern fn avm_put_storage(
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
 
-    let key: &[u8] = unsafe {slice::from_raw_parts((*key).pointer, (*key).length as usize)};
-    let value: &[u8] = unsafe {slice::from_raw_parts((*value).pointer, (*value).length as usize)};
+    let key: &[u8] = unsafe { slice::from_raw_parts((*key).pointer, (*key).length as usize) };
+    let value: &[u8] = unsafe { slice::from_raw_parts((*value).pointer, (*value).length as usize) };
 
     debug!(target: "vm", "avm_put_storage: addr = 0x{:?}, key = {:?}, value = {:?}", addr, key, value);
 
@@ -203,35 +203,35 @@ pub extern fn avm_get_storage(
 ) -> avm_bytes
 {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
-    let addr = unsafe {&(*address).bytes.into()};
-    let key: &[u8] = unsafe {slice::from_raw_parts((*key).pointer, (*key).length as usize)};
+    let addr = unsafe { &(*address).bytes.into() };
+    let key: &[u8] = unsafe { slice::from_raw_parts((*key).pointer, (*key).length as usize) };
 
     debug!(target: "vm", "avm_get_storage: addr = 0x{:?}, key = {:?}", addr, key);
 
     match ext.sload(addr, &key.into()) {
         Some(v) => {
-           if v.len() > 0 {
-               debug!("storage value = {:?}", v);
-               unsafe {
-                   let mut ret = new_fixed_bytes(v.len() as u32);
-                   ptr::copy(&v.as_slice()[0], ret.pointer, v.len());
-                   ret
+            if v.len() > 0 {
+                debug!("storage value = {:?}", v);
+                unsafe {
+                    let mut ret = new_fixed_bytes(v.len() as u32);
+                    ptr::copy(&v.as_slice()[0], ret.pointer, v.len());
+                    ret
                 }
-           } else {
-               unsafe {new_null_bytes()}
-           }
-        },
+            } else {
+                unsafe { new_null_bytes() }
+            }
+        }
         None => {
             debug!(target: "vm", "value is None");
-            unsafe {new_null_bytes()}
+            unsafe { new_null_bytes() }
         }
     }
 }
 
 #[no_mangle]
 pub extern fn avm_delete_account(handle: *const c_void, address: *const avm_address) {
-    let ext: &mut Box<Ext> = unsafe {mem::transmute(handle)};
-    let addr: &Address = unsafe {mem::transmute(address)};
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
+    let addr: &Address = unsafe { mem::transmute(address) };
 
     debug!(target: "vm", "avm_selfdestruct: {:?}", addr);
 
@@ -241,15 +241,15 @@ pub extern fn avm_delete_account(handle: *const c_void, address: *const avm_addr
 #[no_mangle]
 pub extern fn avm_get_balance(handle: *const c_void, address: *const avm_address) -> avm_value {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
-    let addr: &Address = unsafe {mem::transmute(address)};
+    let addr: &Address = unsafe { mem::transmute(address) };
 
     let balance = avm_value {
         bytes: ext.balance(addr).into(),
     };
 
-     debug!(target: "vm", "avm_get_balance: 0x{:?} = {:?}", addr, balance);
+    debug!(target: "vm", "avm_get_balance: 0x{:?} = {:?}", addr, balance);
 
-     balance
+    balance
 }
 
 #[no_mangle]
@@ -260,8 +260,12 @@ pub extern fn avm_increase_balance(
 )
 {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
-    let addr: &Address = unsafe {mem::transmute(address)};
-    let value: &avm_value = unsafe {{mem::transmute(value)}};
+    let addr: &Address = unsafe { mem::transmute(address) };
+    let value: &avm_value = unsafe {
+        {
+            mem::transmute(value)
+        }
+    };
 
     debug!(target: "vm", "avm_inc_balance: 0x{:?} += {:?}", addr, value);
 
@@ -276,8 +280,12 @@ pub extern fn avm_decrease_balance(
 )
 {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
-    let addr: &Address = unsafe {mem::transmute(address)};
-    let value: &avm_value = unsafe {{mem::transmute(value)}};
+    let addr: &Address = unsafe { mem::transmute(address) };
+    let value: &avm_value = unsafe {
+        {
+            mem::transmute(value)
+        }
+    };
 
     debug!(target: "vm", "avm_inc_balance: 0x{:?} -= {:?}", addr, value);
 
@@ -286,8 +294,8 @@ pub extern fn avm_decrease_balance(
 
 #[no_mangle]
 pub extern fn avm_get_nonce(handle: *const c_void, address: *const avm_address) -> u64 {
-    let ext: &mut Box<Ext> = unsafe {mem::transmute(handle)};
-    let addr: &Address = unsafe {mem::transmute(address)};
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
+    let addr: &Address = unsafe { mem::transmute(address) };
     let nonce = ext.nonce(addr);
 
     debug!(target: "vm", "avm_get_nonce: 0x{:?} = {:?}", addr, nonce);
@@ -296,8 +304,8 @@ pub extern fn avm_get_nonce(handle: *const c_void, address: *const avm_address) 
 
 #[no_mangle]
 pub extern fn avm_increment_nonce(handle: *const c_void, address: *const avm_address) {
-    let ext: &mut Box<Ext> = unsafe {mem::transmute(handle)};
-    let addr: &Address = unsafe {mem::transmute(address)};
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
+    let addr: &Address = unsafe { mem::transmute(address) };
 
     debug!(target: "vm", "avm_inc_nonce: 0x{:?}", addr);
 
@@ -306,17 +314,17 @@ pub extern fn avm_increment_nonce(handle: *const c_void, address: *const avm_add
 
 #[no_mangle]
 pub extern fn avm_touch_account(handle: *const c_void, address: *const avm_address, index: i32) {
-    let ext: &mut Box<Ext> = unsafe {mem::transmute(handle)};
-    let addr: &Address  = unsafe {mem::transmute(address)};
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
+    let addr: &Address = unsafe { mem::transmute(address) };
 
     debug!(target: "vm", "touch account: {:?} - {:?}", addr, index);
-    
+
     ext.touch_account(addr, index);
 }
 
 #[no_mangle]
 pub extern fn avm_send_signal(handle: *const c_void, sig_num: i32) -> avm_bytes {
-    let ext: &mut Box<Ext> = unsafe {mem::transmute(handle)};
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     ext.send_signal(sig_num);
     match sig_num {
         0 => {
@@ -328,15 +336,12 @@ pub extern fn avm_send_signal(handle: *const c_void, sig_num: i32) -> avm_bytes 
                 ptr::copy(&root[0], ret.pointer, 32);
                 ret
             }
-        },
-        _ => {
-            unsafe {
-                let ret = new_fixed_bytes(32);
-                ret
-            }
         }
+        _ => unsafe {
+            let ret = new_fixed_bytes(32);
+            ret
+        },
     }
-    
 }
 
 fn contract_address(sender: &Address, nonce: &U256) -> (Address, Option<H256>) {
@@ -351,9 +356,13 @@ fn contract_address(sender: &Address, nonce: &U256) -> (Address, Option<H256>) {
 }
 
 #[no_mangle]
-pub extern fn avm_contract_address(sender: *const avm_address, nonce: *const avm_bytes) -> avm_bytes {
-    let addr: &Address = unsafe {mem::transmute(sender)};
-    let n = unsafe {slice::from_raw_parts((*nonce).pointer, (*nonce).length as usize)};
+pub extern fn avm_contract_address(
+    sender: *const avm_address,
+    nonce: *const avm_bytes,
+) -> avm_bytes
+{
+    let addr: &Address = unsafe { mem::transmute(sender) };
+    let n = unsafe { slice::from_raw_parts((*nonce).pointer, (*nonce).length as usize) };
 
     debug!(target: "vm", "avm new contract: sender = {:?}, nonce = {:?}", addr, n);
 
@@ -368,8 +377,8 @@ pub extern fn avm_contract_address(sender: *const avm_address, nonce: *const avm
 
 #[no_mangle]
 pub extern fn avm_add_log(handle: *const c_void, avm_log: *const avm_bytes, index: i32) {
-    let ext: &mut Box<Ext> = unsafe {mem::transmute(handle)};
-    let log_data = unsafe {slice::from_raw_parts((*avm_log).pointer, (*avm_log).length as usize)};
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
+    let log_data = unsafe { slice::from_raw_parts((*avm_log).pointer, (*avm_log).length as usize) };
     let mut decoder = NativeDecoder::new(&log_data.to_vec());
     let address: Address = decoder.decode_bytes().unwrap()[..].into();
     let topic_num = decoder.decode_int().unwrap();
@@ -384,19 +393,21 @@ pub extern fn avm_add_log(handle: *const c_void, avm_log: *const avm_bytes, inde
 }
 
 #[no_mangle]
-pub extern fn avm_get_transformed_code(handle: *const c_void, address: *const avm_address) -> avm_bytes {
+pub extern fn avm_get_transformed_code(
+    handle: *const c_void,
+    address: *const avm_address,
+) -> avm_bytes
+{
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
 
     debug!(target: "vm", "avm_get_transformed_code: 0x{:?}", addr);
 
     match ext.get_transformed_code(addr) {
-        None => {
-            unsafe {new_null_bytes()}
-        }
+        None => unsafe { new_null_bytes() },
         Some(code) => {
             if code.len() == 0 {
-                unsafe {new_null_bytes()}
+                unsafe { new_null_bytes() }
             } else {
                 unsafe {
                     let ret = new_fixed_bytes(code.len() as u32);
@@ -409,7 +420,12 @@ pub extern fn avm_get_transformed_code(handle: *const c_void, address: *const av
 }
 
 #[no_mangle]
-pub extern fn avm_put_transformed_code(handle: *const c_void, address: *const avm_address, code: *const avm_bytes) {
+pub extern fn avm_put_transformed_code(
+    handle: *const c_void,
+    address: *const avm_address,
+    code: *const avm_bytes,
+)
+{
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
     let code: &avm_bytes = unsafe { mem::transmute(code) };
@@ -428,12 +444,10 @@ pub extern fn avm_get_objectgraph(handle: *const c_void, address: *const avm_add
     debug!(target: "vm", "avm_get_transformed_code: 0x{:?}", addr);
 
     match ext.get_objectgraph(addr) {
-        None => {
-            unsafe {new_null_bytes()}
-        }
+        None => unsafe { new_null_bytes() },
         Some(graph) => {
             if graph.len() == 0 {
-                unsafe {new_null_bytes()}
+                unsafe { new_null_bytes() }
             } else {
                 unsafe {
                     let ret = new_fixed_bytes(graph.len() as u32);
@@ -446,7 +460,12 @@ pub extern fn avm_get_objectgraph(handle: *const c_void, address: *const avm_add
 }
 
 #[no_mangle]
-pub extern fn avm_set_objectgraph(handle: *const c_void, address: *const avm_address, data: *const avm_bytes) {
+pub extern fn avm_set_objectgraph(
+    handle: *const c_void,
+    address: *const avm_address,
+    data: *const avm_bytes,
+)
+{
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
     let graph: &avm_bytes = unsafe { mem::transmute(data) };
@@ -492,12 +511,13 @@ mod tests {
     #[test]
     fn set_storage() {
         //debug key/value
-        let mut key: Vec<u8> = (1..10).map(|_| {
-            rand::random()
-        }).collect();
-        let mut value = vec![5,6,7,8];
+        let mut key: Vec<u8> = (1..10).map(|_| rand::random()).collect();
+        let mut value = vec![5, 6, 7, 8];
 
-        println!("address = {:?}, key = {:?}, value = {:?}", BLAKE2B_EMPTY, key, value);
+        println!(
+            "address = {:?}, key = {:?}, value = {:?}",
+            BLAKE2B_EMPTY, key, value
+        );
 
         let handle: *mut libc::c_void = ptr::null_mut();
         let address = avm_address {

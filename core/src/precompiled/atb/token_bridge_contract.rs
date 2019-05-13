@@ -24,10 +24,14 @@ use vms::{ExecStatus, ReturnData};
 use vms::ExecutionResult;
 use precompiled::builtin::{BuiltinContract, BuiltinExt, BuiltinParams};
 use super::bridge_controller::BridgeController;
-use super::bridge_deserializer::{parse_address_from_call, parse_address_list, parse_bundle_request, parse_double_word_from_call};
+use super::bridge_deserializer::{
+    parse_address_from_call, parse_address_list, parse_bundle_request, parse_double_word_from_call,
+};
 use super::bridge_func_sig::BridgeFuncSig;
 use super::bridge_strg_conn::BridgeStorageConnector;
-use super::bridge_utilities::{boolean_to_result_bytes, get_signature, int_to_result_bytes, or_default_d_word};
+use super::bridge_utilities::{
+    boolean_to_result_bytes, get_signature, int_to_result_bytes, or_default_d_word,
+};
 
 pub struct TokenBridgeContract {
     activate_at: u64,
@@ -346,9 +350,11 @@ mod test {
     use num_bigint::{BigInt, Sign, ToBigInt};
     use precompiled::atb::{bridge_event_sig, bridge_func_sig, bridge_transfer, bridge_utilities};
     use precompiled::atb::bridge_event_sig::BridgeEventSig;
-    use precompiled::atb::bridge_transfer::{get_instance,BridgeTransfer};
+    use precompiled::atb::bridge_transfer::{get_instance, BridgeTransfer};
     use precompiled::atb::bridge_utilities::compute_bundle_hash;
-    use precompiled::builtin::{BuiltinContext, BuiltinContract, BuiltinExt, BuiltinExtImpl, BuiltinParams};
+    use precompiled::builtin::{
+        BuiltinContext, BuiltinContract, BuiltinExt, BuiltinExtImpl, BuiltinParams,
+};
     use rustc_hex::FromHex;
     use state::{State, Substate};
     use super::{*};
@@ -497,10 +503,7 @@ mod test {
 
         assert!(!contract.connector.get_initialized(&mut ext));
         let result = contract.execute(&mut ext, &input);
-        assert_eq!(
-            Address::from(&*result.return_data),
-            *OWNER_ADDRESS
-        );
+        assert_eq!(Address::from(&*result.return_data), *OWNER_ADDRESS);
         assert!(contract.connector.get_initialized(&mut ext));
     }
 
@@ -525,10 +528,7 @@ mod test {
 
         let query_result = contract.execute(&mut ext, &BridgeFuncSig::NewOwner.hash());
         assert!(query_result.status_code == ExecStatus::Success);
-        assert_eq!(
-            new_owner,
-            H256::from(&*query_result.return_data)
-        );
+        assert_eq!(new_owner, H256::from(&*query_result.return_data));
     }
 
     #[test]
@@ -1967,13 +1967,19 @@ mod test {
             .unwrap();
         let transfer_result = contract.execute(&mut ext, &call_payload);
         assert!(transfer_result.status_code == ExecStatus::Success);
-        assert_eq!((*transfer_result.return_data).to_vec(), DataWord::one().data);
+        assert_eq!(
+            (*transfer_result.return_data).to_vec(),
+            DataWord::one().data
+        );
 
         contract.connector.set_ring_locked(&mut ext, false);
 
         let transfer_result = contract.execute(&mut ext, &call_payload);
         assert!(transfer_result.status_code == ExecStatus::Success);
-        assert_eq!((*transfer_result.return_data).to_vec(), DataWord::zero().data);
+        assert_eq!(
+            (*transfer_result.return_data).to_vec(),
+            DataWord::zero().data
+        );
     }
 
     #[test]

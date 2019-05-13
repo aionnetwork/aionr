@@ -58,13 +58,9 @@ pub enum RequireCache {
 }
 
 impl AionVMAccount {
-    fn empty_storage_cache() -> VMCache {
-        RefCell::new(LruCache::new(STORAGE_CACHE_ITEMS))
-    }
+    fn empty_storage_cache() -> VMCache { RefCell::new(LruCache::new(STORAGE_CACHE_ITEMS)) }
 
-    fn empty_storage_change() -> VMStorageChange {
-        HashMap::new()
-    }
+    fn empty_storage_change() -> VMStorageChange { HashMap::new() }
 }
 
 impl From<BasicAccount> for AionVMAccount {
@@ -176,9 +172,7 @@ impl AionVMAccount {
         }
     }
 
-    fn storage_is_clean(&self) -> bool {
-        self.storage_changes.is_empty()
-    }
+    fn storage_is_clean(&self) -> bool { self.storage_changes.is_empty() }
 
     /// Commit the `storage_changes` to the backing DB and update `storage_root`.
     pub fn commit_storage(
@@ -199,7 +193,7 @@ impl AionVMAccount {
                 }
             }
             debug!(target: "vm", "CommitStorage: key = {:?}, value = {:?}, is_zero = {:?}", k, v, is_zero);
-            // account just commit storage key/value pairs, 
+            // account just commit storage key/value pairs,
             // the real length of value should be dealed by caller
             match is_zero {
                 true => t.remove(&k)?,
@@ -212,14 +206,10 @@ impl AionVMAccount {
         Ok(())
     }
 
-    pub fn discard_storage_changes(&mut self) {
-        self.storage_changes.clear();
-    }
+    pub fn discard_storage_changes(&mut self) { self.storage_changes.clear(); }
 
     /// Return the storage overlay.
-    pub fn storage_changes(&self) -> &VMStorageChange {
-        &self.storage_changes
-    }
+    pub fn storage_changes(&self) -> &VMStorageChange { &self.storage_changes }
 
     pub fn get_empty_but_commit(&mut self) -> bool { return self.empty_but_commit; }
 
@@ -320,19 +310,17 @@ impl VMAccount for AionVMAccount {
         Some(self.object_graph_cache.clone())
     }
 
-    fn reset_code(&mut self, code: Bytes) {
-        self.init_code(code);
-    }
+    fn reset_code(&mut self, code: Bytes) { self.init_code(code); }
 
-    fn balance(&self) -> &U256 {&self.balance}
+    fn balance(&self) -> &U256 { &self.balance }
 
-    fn nonce(&self) -> &U256 {&self.nonce}
+    fn nonce(&self) -> &U256 { &self.nonce }
 
-    fn code_hash(&self) -> H256 {self.code_hash.clone()}
+    fn code_hash(&self) -> H256 { self.code_hash.clone() }
 
-    fn transformed_code_hash(&self) -> H256 {self.transformed_code_hash.clone()}
+    fn transformed_code_hash(&self) -> H256 { self.transformed_code_hash.clone() }
 
-    fn objectgraph_hash(&self) -> H256 {self.objectgraph_hash.clone()}
+    fn objectgraph_hash(&self) -> H256 { self.objectgraph_hash.clone() }
 
     fn address_hash(&self, address: &Address) -> H256 {
         let hash = self.address_hash.get();
@@ -359,10 +347,10 @@ impl VMAccount for AionVMAccount {
         Some(self.transformed_code_cache.clone())
     }
 
-    fn code_size(&self) -> Option<usize>{self.code_size.clone()}
+    fn code_size(&self) -> Option<usize> { self.code_size.clone() }
 
-    fn transformed_code_size(&self) -> Option<usize> {self.transformed_code_size.clone()}
-    
+    fn transformed_code_size(&self) -> Option<usize> { self.transformed_code_size.clone() }
+
     fn is_cached(&self) -> bool {
         !self.code_cache.is_empty()
             || (self.code_cache.is_empty() && self.code_hash == BLAKE2B_EMPTY)
@@ -370,12 +358,12 @@ impl VMAccount for AionVMAccount {
 
     fn is_transformed_cached(&self) -> bool {
         !self.transformed_code_cache.is_empty()
-            // || (self.transformed_code_cache.is_empty() && self.transformed_code_hash == BLAKE2B_EMPTY)
+        // || (self.transformed_code_cache.is_empty() && self.transformed_code_hash == BLAKE2B_EMPTY)
     }
 
     fn is_objectgraph_cached(&self) -> bool {
         !self.object_graph_cache.is_empty()
-            // || (self.object_graph_cache.is_empty() && self.objectgraph_hash == BLAKE2B_EMPTY)
+        // || (self.object_graph_cache.is_empty() && self.objectgraph_hash == BLAKE2B_EMPTY)
     }
 
     fn cache_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>> {
@@ -406,8 +394,8 @@ impl VMAccount for AionVMAccount {
         }
     }
 
-    fn cache_transformed_code(&mut self, db:&HashStore) -> Option<Arc<Bytes>> {
-            if self.is_transformed_cached() {
+    fn cache_transformed_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>> {
+        if self.is_transformed_cached() {
             return Some(self.transformed_code_cache.clone());
         }
 
@@ -440,7 +428,7 @@ impl VMAccount for AionVMAccount {
                     self.objectgraph_hash = blake2b(&data);
                     self.object_graph_cache = Arc::new(data[..].to_vec());
                     Some(self.object_graph_cache.clone())
-                },
+                }
                 None => {
                     self.object_graph_size = None;
                     self.objectgraph_hash = BLAKE2B_EMPTY;
@@ -568,10 +556,10 @@ impl VMAccount for AionVMAccount {
         }
     }
 
-    fn inc_nonce(&mut self) {self.nonce = self.nonce + U256::from(1u8);}
+    fn inc_nonce(&mut self) { self.nonce = self.nonce + U256::from(1u8); }
 
     /// Increase account balance.
-    fn add_balance(&mut self, x: &U256) {self.balance = self.balance + *x;}
+    fn add_balance(&mut self, x: &U256) { self.balance = self.balance + *x; }
 
     /// Decrease account balance.
     /// Panics if balance is less than `x`
@@ -589,7 +577,11 @@ impl VMAccount for AionVMAccount {
             self.code_filth == Filth::Dirty,
             self.code_cache.is_empty()
         );
-        match (self.code_filth == Filth::Dirty, self.code_cache.is_empty(), self.transformed_code_cache.is_empty()) {
+        match (
+            self.code_filth == Filth::Dirty,
+            self.code_cache.is_empty(),
+            self.transformed_code_cache.is_empty(),
+        ) {
             (true, true, true) => {
                 self.code_size = Some(0);
                 self.transformed_code_size = Some(0);
@@ -623,8 +615,8 @@ impl VMAccount for AionVMAccount {
                 // use blake2b(address_hash) as key of transformed code
                 db.emplace(
                     blake2b(self.address_hash.get().unwrap()),
-                    DBValue::from_slice(&*self.transformed_code_cache)
-                    );
+                    DBValue::from_slice(&*self.transformed_code_cache),
+                );
                 self.transformed_code_size = Some(self.transformed_code_cache.len());
                 self.code_filth = Filth::Clean;
             }
@@ -657,9 +649,7 @@ impl VMAccount for AionVMAccount {
         account
     }
 
-    fn acc_type(&self) -> AccType {
-        self.account_type.clone()
-    }
+    fn acc_type(&self) -> AccType { self.account_type.clone() }
 
     /// avm should update object graph cache
     /// at this moment, address_hash is always updated
@@ -683,7 +673,7 @@ impl VMAccount for AionVMAccount {
                     self.object_graph_size = Some(data.len());
                     self.objectgraph_hash = blake2b(&data);
                     self.object_graph_cache = Arc::new(data[..].to_vec());
-                },
+                }
                 None => {
                     self.object_graph_size = None;
                     self.objectgraph_hash = BLAKE2B_EMPTY;
@@ -706,7 +696,7 @@ impl VMAccount for AionVMAccount {
         match state_db.get_cached_code(&hash) {
             Some(code) => {
                 self.cache_given_code(code);
-            },
+            }
             None => {
                 match require {
                     RequireCache::None => {}
@@ -826,10 +816,8 @@ impl AionVMAccount {
                 DBValue::from_slice(self.object_graph_cache.as_slice()),
             );
             // save key/valud storage root
-            db.emplace(
-                address.clone(), 
-                DBValue::from_slice(&self.storage_root[..]));
-            }
+            db.emplace(address.clone(), DBValue::from_slice(&self.storage_root[..]));
+        }
     }
 
     pub fn save_object_graph(&mut self, address: &Address, db: &mut HashStore) {
@@ -840,9 +828,7 @@ impl AionVMAccount {
             DBValue::from_slice(self.object_graph_cache.as_slice()),
         );
         // save key/valud storage root
-        db.emplace(
-            address.clone(), 
-            DBValue::from_slice(&self.storage_root[..]));
+        db.emplace(address.clone(), DBValue::from_slice(&self.storage_root[..]));
     }
 
     pub fn update_object_graph(&mut self, db: &HashStore) {
@@ -850,7 +836,7 @@ impl AionVMAccount {
             Some(x) => {
                 self.object_graph_size = Some(x.len());
                 self.object_graph_cache = Arc::new(x[..].to_vec());
-            },
+            }
             None => {
                 self.object_graph_size = None;
             }
@@ -869,7 +855,6 @@ impl AionVMAccount {
             Err(h)
         }
     }
-
 }
 
 impl fmt::Debug for AionVMAccount {
@@ -916,15 +901,9 @@ mod tests {
             "d2e59a50e7414e56da75917275d1542a13fd345bf88a657a4222a0d50ad58868".into()
         );
         let value = a.storage_at(&db.immutable(), &vec![0x00; 16]).unwrap();
-        assert_eq!(
-            value,
-            vec![0x12, 0x34]
-        );
+        assert_eq!(value, vec![0x12, 0x34]);
         let value = a.storage_at(&db.immutable(), &vec![0x01]).unwrap();
-        assert_eq!(
-            value,
-            Vec::<u8>::new()
-        );
+        assert_eq!(value, Vec::<u8>::new());
     }
 
     #[test]
@@ -979,7 +958,10 @@ mod tests {
         a.address_hash(&address);
         assert_eq!(a.cache_code(&db.immutable()), Some(Arc::new(vec![])));
         assert_eq!(a.account_type, AccType::FVM);
-        assert_eq!(a.cache_transformed_code(&db.immutable()), Some(Arc::new(vec![0x55, 0x44, 0xffu8])));
+        assert_eq!(
+            a.cache_transformed_code(&db.immutable()),
+            Some(Arc::new(vec![0x55, 0x44, 0xffu8]))
+        );
         assert_eq!(a.account_type, AccType::AVM);
     }
 
@@ -999,7 +981,10 @@ mod tests {
         };
 
         let mut a = AionVMAccount::from_rlp(&rlp);
-        assert_eq!(a.cache_objectgraph(&address, &db.immutable()), Some(Arc::new(vec![0x55, 0x44, 0xffu8])));
+        assert_eq!(
+            a.cache_objectgraph(&address, &db.immutable()),
+            Some(Arc::new(vec![0x55, 0x44, 0xffu8]))
+        );
     }
 
     #[test]

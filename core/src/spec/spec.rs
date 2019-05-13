@@ -27,27 +27,27 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 
-use bytes::Bytes;
-use types::BlockNumber;
-use aion_types::{H256, U256, Address};
-use ethbloom::Bloom;
+use aion_types::{Address, H256, U256};
 use ajson;
-use blake2b::{BLAKE2B_NULL_RLP, blake2b};
+use blake2b::{blake2b, BLAKE2B_NULL_RLP};
+use bytes::Bytes;
+use ethbloom::Bloom;
 use kvdb::{MemoryDB, MemoryDBRepository};
 use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
-use vms::{CallType, ActionValue, ParamsType, EnvInfo, ActionParams};
+use types::BlockNumber;
+use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
 
-use precompiled::builtin::{BuiltinContract, builtin_contract};
-use engines::{POWEquihashEngine, EthEngine, NullEngine, InstantSeal};
+use engines::{EthEngine, InstantSeal, NullEngine, POWEquihashEngine};
 use error::Error;
-use executive::{Executive};
+use executive::Executive;
 use factory::Factories;
 use header::Header;
 use machine::EthereumMachine;
 use pod_state::PodState;
-use spec::Genesis;
+use precompiled::builtin::{builtin_contract, BuiltinContract};
 use spec::seal::Generic as GenericSeal;
+use spec::Genesis;
 use state::backend::Basic as BasicBackend;
 use state::{Backend, State, Substate};
 use transaction::DEFAULT_TRANSACTION_TYPE;
@@ -205,7 +205,13 @@ fn load_from(spec_params: SpecParams, s: ajson::spec::Spec) -> Result<Spec, Erro
 
     let mut s = Spec {
         name: s.name.clone().into(),
-        engine: Spec::engine(spec_params, s.engine, params, builtins, s.accounts.premine()),
+        engine: Spec::engine(
+            spec_params,
+            s.engine,
+            params,
+            builtins,
+            s.accounts.premine(),
+        ),
         data_dir: s.data_dir.unwrap_or(s.name).into(),
         parent_hash: g.parent_hash,
         transactions_root: g.transactions_root,
@@ -261,7 +267,7 @@ impl Spec {
         _engine_spec: &ajson::spec::Engine,
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
-        premine: U256
+        premine: U256,
     ) -> EthereumMachine
     {
         EthereumMachine::regular(params, builtins, premine)
@@ -494,9 +500,9 @@ impl Spec {
     /// initialize genesis epoch data, using in-memory database for
     /// constructor.
     pub fn genesis_epoch_data(&self) -> Result<Vec<u8>, String> {
-        use transaction::{Action, Transaction};
         use journaldb;
-        use kvdb::{MockDbRepository};
+        use kvdb::MockDbRepository;
+        use transaction::{Action, Transaction};
 
         let genesis = self.genesis_header();
         let db_configs = vec!["epoch".into()];

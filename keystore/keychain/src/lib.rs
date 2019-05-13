@@ -66,8 +66,7 @@ pub use self::ethstore::{EthStore, EthMultiStore};
 pub use self::import::{import_account, import_accounts};
 pub use self::json::OpaqueKeyFile as KeyFile;
 pub use self::secret_store::{
-    StoreAccountRef, SimpleSecretStore, SecretStore,
-    Derivation, IndexDerivation,
+    StoreAccountRef, SimpleSecretStore, SecretStore, Derivation, IndexDerivation,
 };
 pub use self::random::random_string;
 

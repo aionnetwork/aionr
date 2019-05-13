@@ -34,10 +34,8 @@ use helpers::accounts::unwrap_provider;
 use traits::{EthSigning};
 use types::{
     H256 as RpcH256, H768 as RpcH768, Bytes as RpcBytes,
-    RichRawTransaction as RpcRichRawTransaction,
-    TransactionRequest as RpcTransactionRequest,
-    ConfirmationPayload as RpcConfirmationPayload,
-    ConfirmationResponse as RpcConfirmationResponse,
+    RichRawTransaction as RpcRichRawTransaction, TransactionRequest as RpcTransactionRequest,
+    ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse as RpcConfirmationResponse,
 };
 
 /// Implementation of functions that require signing when no trusted signer is used.

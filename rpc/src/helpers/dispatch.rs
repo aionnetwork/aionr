@@ -26,29 +26,25 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use blake2b::blake2b;
-use aion_types::{H256, H768, Address, U256};
-use bytes::Bytes;
-use parking_lot::Mutex;
-use key::Ed25519Signature;
-use acore::miner::MinerService;
-use acore::client::MiningBlockChainClient;
 use acore::account_provider::AccountProvider;
-use acore::transaction::{Action, SignedTransaction, PendingTransaction, Transaction};
+use acore::client::MiningBlockChainClient;
+use acore::miner::MinerService;
+use acore::transaction::{Action, PendingTransaction, SignedTransaction, Transaction};
+use aion_types::{Address, H256, H768, U256};
+use blake2b::blake2b;
+use bytes::Bytes;
+use key::Ed25519Signature;
+use parking_lot::Mutex;
 
-use jsonrpc_core::{BoxFuture, Result, Error};
-use jsonrpc_core::futures::{future, Future, Poll, Async};
-use helpers::{errors, nonce, TransactionRequest, FilledTransactionRequest, ConfirmationPayload};
+use helpers::{errors, nonce, ConfirmationPayload, FilledTransactionRequest, TransactionRequest};
+use jsonrpc_core::futures::{future, Async, Future, Poll};
+use jsonrpc_core::{BoxFuture, Error, Result};
 use types::{
-    H256 as RpcH256,
-    H768 as RpcH768,
-    RichRawTransaction as RpcRichRawTransaction,
-    ConfirmationPayload as RpcConfirmationPayload,
-    ConfirmationResponse,
-    SignRequest as RpcSignRequest,
+    ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse, H256 as RpcH256,
+    H768 as RpcH768, RichRawTransaction as RpcRichRawTransaction, SignRequest as RpcSignRequest,
 };
 
-pub use self::nonce::{Reservations, Ready as NonceReady};
+pub use self::nonce::{Ready as NonceReady, Reservations};
 
 use bytes::i64_to_bytes;
 use trace_time::to_epoch_micro;

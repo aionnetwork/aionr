@@ -118,7 +118,7 @@ impl Decodable for u8 {
 }
 
 macro_rules! impl_encodable_for_u {
-    ($name: ident, $func: ident, $size: expr) => {
+    ($name:ident, $func:ident, $size:expr) => {
         impl Encodable for $name {
             fn rlp_append(&self, s: &mut RlpStream) {
                 let leading_empty_bytes = self.leading_zeros() as usize / 8;
@@ -131,7 +131,7 @@ macro_rules! impl_encodable_for_u {
 }
 
 macro_rules! impl_decodable_for_u {
-    ($name: ident) => {
+    ($name:ident) => {
         impl Decodable for $name {
             fn decode(rlp: &UntrustedRlp) -> Result<Self, DecoderError> {
                 rlp.decoder().decode_value(|bytes| {
@@ -175,7 +175,7 @@ impl Decodable for usize {
 }
 
 macro_rules! impl_encodable_for_hash {
-    ($name: ident) => {
+    ($name:ident) => {
         impl Encodable for $name {
             fn rlp_append(&self, s: &mut RlpStream) { s.encoder().encode_value(self); }
         }
@@ -183,7 +183,7 @@ macro_rules! impl_encodable_for_hash {
 }
 
 macro_rules! impl_decodable_for_hash {
-    ($name: ident, $size: expr) => {
+    ($name:ident, $size:expr) => {
         impl Decodable for $name {
             fn decode(rlp: &UntrustedRlp) -> Result<Self, DecoderError> {
                 rlp.decoder().decode_value(|bytes| {
@@ -221,7 +221,7 @@ impl_encodable_for_hash!(H768);
 impl_decodable_for_hash!(H768, 96);
 
 macro_rules! impl_encodable_for_uint {
-    ($name: ident, $size: expr) => {
+    ($name:ident, $size:expr) => {
         impl Encodable for $name {
             fn rlp_append(&self, s: &mut RlpStream) {
                 let leading_empty_bytes = $size - (self.bits() + 7) / 8;
@@ -234,7 +234,7 @@ macro_rules! impl_encodable_for_uint {
 }
 
 macro_rules! impl_decodable_for_uint {
-    ($name: ident, $size: expr) => {
+    ($name:ident, $size:expr) => {
         impl Decodable for $name {
             fn decode(rlp: &UntrustedRlp) -> Result<Self, DecoderError> {
                 rlp.decoder().decode_value(|bytes| {
