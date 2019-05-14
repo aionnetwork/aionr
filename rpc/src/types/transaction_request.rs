@@ -184,7 +184,7 @@ mod tests {
                 value: Some(U256::from(3)),
                 data: Some(vec![0x12, 0x34, 0x56].into()),
                 nonce: Some(U256::from(4)),
-                tx_type: Some(0x01),
+                tx_type: Some(U256::from(0x01)),
                 condition: Some(TransactionCondition::Number(0x13)),
             }
         );

@@ -12,7 +12,6 @@ boot_nodes = [
 	"p2p://c37d6b45-20d8-49d9-97d6-284f88da5c51@104.40.182.54:30303", 
 	"p2p://c36d4208-fe4b-41fa-989b-c7eeafdffe72@35.208.215.219:30303" 
 ]
-
 ip_black_list = []
 
 [http]

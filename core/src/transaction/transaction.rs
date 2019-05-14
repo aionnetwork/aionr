@@ -757,7 +757,7 @@ mod tests {
             value: U256::from(0),
             value_bytes: Vec::new(),
             data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
-            transaction_type: 1,
+            transaction_type: U256::from(1),
         };
 
         let ut = UnverifiedTransaction {
@@ -789,7 +789,7 @@ mod tests {
             value: U256::from(0),
             value_bytes: Vec::new(),
             data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
-            transaction_type: 1,
+            transaction_type: U256::from(1),
         };
 
         let ut = UnverifiedTransaction {
@@ -1074,7 +1074,7 @@ mod tests {
             value: U256::from(0),
             value_bytes: Vec::new(),
             data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
-            transaction_type: 1,
+            transaction_type: U256::from(1),
         };
         println!("data: {:?}", t.data);
         assert_eq!(t.gas_required().low_u64(), 21256);
@@ -1096,7 +1096,7 @@ mod tests {
             value: U256::from(1),
             value_bytes: Vec::new(),
             data: b"Hello!".to_vec(),
-            transaction_type: 1,
+            transaction_type: U256::from(1),
         }
         .sign(&key.secret(), None);
         let mut slice = blake2b(key.public());
@@ -1120,7 +1120,7 @@ mod tests {
             value: U256::from(1),
             value_bytes: Vec::new(),
             data: b"Hello!".to_vec(),
-            transaction_type: 1,
+            transaction_type: U256::from(1),
         }
         .fake_sign(Address::from(0x69));
         assert_eq!(Address::from(0x69), t.sender());

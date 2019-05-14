@@ -21,6 +21,7 @@
 
 use acore::block::Block;
 use acore::client::BlockId;
+use acore::header::Seal;
 use aion_types::H256;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
@@ -57,9 +58,13 @@ impl BlockBodiesHandler {
             let mut req = req.clone();
             req.body.clear();
 
+            let mut header_requested = Vec::new();
             for header in hw.headers.iter() {
-                if !SyncStorage::is_imported_block_hash(&header.hash()) {
+                if !SyncStorage::is_downloaded_block_hashes(&header.hash())
+                    && !SyncStorage::is_imported_block_hash(&header.hash())
+                {
                     req.body.put_slice(&header.hash());
+                    header_requested.push(header.clone());
                 }
             }
 
@@ -76,6 +81,8 @@ impl BlockBodiesHandler {
                         trace!(target: "sync", "Sync blocks bodies req sent...");
                         let mut hw = hw.clone();
                         hw.timestamp = SystemTime::now();
+                        hw.headers.clear();
+                        hw.headers.extend(header_requested);
                         headers_with_bodies_requested.insert(hw.node_hash, hw);
                     }
                 }
@@ -162,7 +169,17 @@ impl BlockBodiesHandler {
                                     header: headers[i].clone(),
                                     transactions: bodies[i].clone(),
                                 };
-                                blocks.push(block);
+                                if let Ok(mut downloaded_block_hashes) =
+                                    SyncStorage::get_downloaded_block_hashes().lock()
+                                {
+                                    let hash = block.header.hash();
+                                    if !downloaded_block_hashes.contains_key(&hash) {
+                                        blocks.push(block);
+                                        downloaded_block_hashes.insert(hash, 0);
+                                    } else {
+                                        trace!(target: "sync", "downloaded_block_hashes: {}.", hash);
+                                    }
+                                }
                             }
                         } else {
                             debug!(
@@ -176,18 +193,71 @@ impl BlockBodiesHandler {
                         }
 
                         if !blocks.is_empty() {
-                            let mut bw = BlocksWrapper::new();
-                            bw.node_id_hash = node.node_hash;
-                            bw.blocks.extend(blocks);
-                            SyncStorage::insert_downloaded_blocks(bw);
+                            if node.mode == Mode::LIGHTNING {
+                                if let Some(block) = blocks.get(0) {
+                                    let block_number = block.header.number();
+                                    let max_staged_block_number =
+                                        SyncStorage::get_max_staged_block_number();
+                                    if block_number <= max_staged_block_number {
+                                        debug!(target: "sync", "Block #{} is out of staging scope: [#{} - Lastest)", block_number, max_staged_block_number);
+                                        return;
+                                    } else {
+                                        let mut block_hashes_to_stage = Vec::new();
+                                        let mut blocks_to_stage = Vec::new();
+
+                                        let parent_hash = block.header.parent_hash();
+                                        let parent_number = block_number - 1;
+                                        if let Ok(mut staged_blocks) =
+                                            SyncStorage::get_staged_blocks().lock()
+                                        {
+                                            if staged_blocks.len() < 32
+                                                && !staged_blocks.contains_key(&parent_hash)
+                                            {
+                                                for blk in blocks.iter() {
+                                                    let hash = blk.header.hash();
+                                                    block_hashes_to_stage.push(hash);
+                                                    blocks_to_stage.push(blk.rlp_bytes(Seal::With));
+                                                }
+
+                                                let max_staged_block_number =
+                                                    parent_number + blocks_to_stage.len() as u64;
+
+                                                info!(target: "sync", "Staged blocks from {} to {} with parent: {}", parent_number + 1, max_staged_block_number, parent_hash);
+                                                debug!(target: "sync", "cache size: {}", staged_blocks.len());
+
+                                                SyncStorage::insert_staged_block_hashes(
+                                                    block_hashes_to_stage,
+                                                );
+
+                                                staged_blocks.insert(*parent_hash, blocks_to_stage);
+
+                                                if max_staged_block_number
+                                                    > SyncStorage::get_max_staged_block_number()
+                                                {
+                                                    SyncStorage::set_max_staged_block_number(
+                                                        max_staged_block_number,
+                                                    );
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else {
+                                let mut bw = BlocksWrapper::new();
+                                bw.node_id_hash = node.node_hash;
+                                bw.blocks.extend(blocks);
+                                SyncStorage::insert_downloaded_blocks(bw);
+                            }
+
+                            if node.mode == Mode::NORMAL || node.mode == Mode::THUNDER {
+                                BlockHeadersHandler::get_headers_from_node(node);
+                            }
                         }
                     }
                 }
                 None => {}
             }
         }
-
-        BlockHeadersHandler::get_headers_from_node(node);
 
         SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesRes);
         P2pMgr::update_node(node_hash, node);

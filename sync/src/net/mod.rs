@@ -194,7 +194,7 @@ impl NetManager {
                                 ActiveNodesHandler::handle_active_nodes_res(node, req);
                             }
                             _ => {
-                                error!(target: "net", "Invalid received.");
+                                error!(target: "net", "Invalid action {} received.", req.head.action);
                             }
                         };
                     }

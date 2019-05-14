@@ -35,7 +35,7 @@ sed -i '2i chain = \"mainnet/mainnet.json\"' $MAINT
 echo -e 'export AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mainnet/mainnet.toml $*'>package/$1/mainnet.sh
 chmod +x package/$1/mainnet.sh
 
-cp aion/cli/config_testnet_mastery.toml $MASTT
+cp aion/cli/config_mastery.toml $MASTT
 cp core/res/aion/testnet_mastery.json $MASTJ
 sed -i '/\<chain = /c chain = \"mastery/mastery.json\"' $MASTT
 echo -e 'export AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mastery/mastery.toml $*'>package/$1/mastery.sh

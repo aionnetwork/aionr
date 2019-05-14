@@ -272,7 +272,7 @@ mod test {
     fn avm_hello_world() {
         let avm = AVM::new();
         let transactions = prepare_transactions();
-        let results = avm.execute(0, &transactions).unwrap();
+        let results = avm.execute(0, &transactions, false).unwrap();
         println!("{:?}", results);
     }
 
