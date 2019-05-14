@@ -337,6 +337,16 @@ pub extern fn avm_send_signal(handle: *const c_void, sig_num: i32) -> avm_bytes 
                 ret
             }
         }
+
+        1 => {
+            // just get current root
+            let root = ext.root();
+            unsafe {
+                let ret = new_fixed_bytes(32);
+                ptr::copy(&root[0], ret.pointer, 32);
+                ret
+            }
+        }
         _ => unsafe {
             let ret = new_fixed_bytes(32);
             ret

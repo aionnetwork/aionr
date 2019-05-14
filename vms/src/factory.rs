@@ -29,7 +29,12 @@ use avm::{AVM};
 use avm::types::{TransactionContext as AVMTxContext, AvmStatusCode};
 
 pub trait Factory {
-    fn exec(&mut self, params: Vec<ActionParams>, ext: &mut Ext) -> Vec<ExecutionResult>;
+    fn exec(
+        &mut self,
+        params: Vec<ActionParams>,
+        ext: &mut Ext,
+        is_local: bool,
+    ) -> Vec<ExecutionResult>;
 }
 
 #[derive(Clone)]
@@ -48,7 +53,13 @@ impl FastVMFactory {
 }
 
 impl Factory for FastVMFactory {
-    fn exec(&mut self, params: Vec<ActionParams>, ext: &mut Ext) -> Vec<ExecutionResult> {
+    fn exec(
+        &mut self,
+        params: Vec<ActionParams>,
+        ext: &mut Ext,
+        _is_local: bool,
+    ) -> Vec<ExecutionResult>
+    {
         assert!(params.len() == 1);
         let params = params[0].clone();
         assert!(
@@ -191,7 +202,13 @@ impl AVMFactory {
 }
 
 impl Factory for AVMFactory {
-    fn exec(&mut self, params: Vec<ActionParams>, ext: &mut Ext) -> Vec<ExecutionResult> {
+    fn exec(
+        &mut self,
+        params: Vec<ActionParams>,
+        ext: &mut Ext,
+        is_local: bool,
+    ) -> Vec<ExecutionResult>
+    {
         let mut avm_tx_contexts = Vec::new();
 
         for params in params {
@@ -234,7 +251,7 @@ impl Factory for AVMFactory {
             let block_number = ext.env_info().number;
             // don't really know why jit timestamp is int..
             let block_timestamp = ext.env_info().timestamp as i64;
-            let tx_hash = vec![0; 32];
+            let tx_hash = params.transaction_hash[..].to_vec();
             let depth = ext.depth() as i32;
             let kind = match params.call_type {
                 CallType::None => AVM_CREATE,
@@ -269,7 +286,7 @@ impl Factory for AVMFactory {
 
         let inst = &mut self.instance;
         let ext_ptr: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(ext)) };
-        let mut res = inst.execute(ext_ptr as i64, &avm_tx_contexts);
+        let mut res = inst.execute(ext_ptr as i64, &avm_tx_contexts, is_local);
 
         let mut exec_results = Vec::new();
 

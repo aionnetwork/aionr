@@ -716,7 +716,6 @@ impl VMAccount for AionVMAccount {
 
         if self.account_type == AccType::AVM {
             // update transformed code cache
-            println!("Account: updating tranformed code cache");
             let hash = blake2b(self.address_hash.get().unwrap());
             match state_db.get_cached_code(&hash) {
                 Some(code) => self.cache_given_transformed_code(code),

@@ -183,6 +183,7 @@ impl AVM {
         &self,
         ext_hdl: i64,
         transactions: &Vec<TransactionContext>,
+        is_local: bool,
     ) -> Result<Vec<TransactionResult>, &'static str>
     {
         trace!(target: "vm", "start rust jvm executor");
@@ -208,6 +209,7 @@ impl AVM {
                     .new_byte_array_with_data(&Self::encode_transaction_contexts(&transactions))
                     .expect("Failed to create new byte array in JVM"),
             ),
+            Value::Boolean(is_local),
         ];
 
         trace!(target: "vm", "rust jvm call_static");
@@ -252,80 +254,6 @@ impl AVM {
         }
 
         Ok(results)
-    }
-}
-
-// pub trait AVMExt {
-//     fn create_account(&mut self, address: &Address);
-//     fn account_exists(&self, address: &Address) -> bool;
-//     fn save_code(&mut self, address: &Address, code: Vec<u8>);
-//     fn get_code(&self, address: &Address) -> Option<Arc<Vec<u8>>>;
-//     fn sstore(&mut self, address: &Address, key: Vec<u8>, value: Vec<u8>);
-//     fn sload(&self, address: &Address, key: &Vec<u8>) -> Option<Vec<u8>>;
-//     fn remove_account(&mut self, address: &Address);
-//     fn avm_balance(&self, address: &Address) -> U256;
-//     fn inc_balance(&mut self, address: &Address, inc: &U256);
-//     fn dec_balance(&mut self, address: &Address, dec: &U256);
-//     fn get_nonce(&self, address: &Address) -> u64;
-//     fn inc_nonce(&mut self, address: &Address);
-//     fn env_info(&self) -> &EnvInfo;
-//     fn depth(&self) -> usize;
-// }
-
-// TODO: should be a trait, possible to avoid cloning everything from a Transaction(/View).
-/// Action (call/create) input params. Everything else should be specified in Externalities.
-#[derive(Clone, Debug)]
-pub struct AVMActionParams {
-    /// Address of currently executed code.
-    pub code_address: Address,
-    /// Hash of currently executed code.
-    pub code_hash: Option<H256>,
-    /// Receive address. Usually equal to code_address,
-    /// except when called using CALLCODE.
-    pub address: Address,
-    /// Sender of current part of the transaction.
-    pub sender: Address,
-    /// Transaction initiator.
-    pub origin: Address,
-    /// Gas paid up front for transaction execution
-    pub gas: U256,
-    /// Gas price.
-    pub gas_price: U256,
-    /// Transaction value.
-    pub value: U256,
-    /// Code being executed.
-    pub code: Option<Arc<Bytes>>,
-    /// Input data.
-    pub data: Option<Bytes>,
-    /// Type of call
-    pub call_type: CallType,
-    /// transaction hash
-    pub transaction_hash: H256,
-    /// original transaction hash
-    pub original_transaction_hash: H256,
-    /// Nonce
-    pub nonce: u64,
-}
-
-impl Default for AVMActionParams {
-    /// Returns default ActionParams initialized with zeros
-    fn default() -> AVMActionParams {
-        AVMActionParams {
-            code_address: Address::new(),
-            code_hash: Some(BLAKE2B_EMPTY),
-            address: Address::new(),
-            sender: Address::new(),
-            origin: Address::new(),
-            gas: U256::zero(),
-            gas_price: U256::zero(),
-            value: U256::zero(),
-            code: None,
-            data: None,
-            call_type: CallType::None,
-            transaction_hash: H256::default(),
-            original_transaction_hash: H256::default(),
-            nonce: 0,
-        }
     }
 }
 

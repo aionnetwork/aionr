@@ -183,7 +183,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         &'a mut self,
         txs: &[SignedTransaction],
         _check_nonce: bool,
-        _is_local_call: bool,
+        is_local_call: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
         let mut vm_params = Vec::new();
@@ -192,6 +192,20 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let nonce = t.nonce;
 
             let init_gas = t.gas;
+
+            if is_local_call {
+                let sender = t.sender();
+                let balance = self.state.balance(&sender).unwrap_or(0.into());
+                let needed_balance = t.value.saturating_add(t.gas.saturating_mul(t.gas_price));
+                if balance < needed_balance {
+                    // give the sender a sufficient balance
+                    let _ = self.state.add_balance(
+                        &sender,
+                        &(needed_balance - balance),
+                        CleanupMode::NoEmpty,
+                    );
+                }
+            }
 
             // Transactions are now handled in different ways depending on whether it's
             // action type is Create or Call.
@@ -246,7 +260,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         }
 
         let mut substates = vec![Substate::new(); vm_params.len()];
-        let results = self.exec_avm(vm_params, &mut substates.as_mut_slice());
+        let results = self.exec_avm(vm_params, &mut substates.as_mut_slice(), is_local_call);
 
         // enact results and update state separately
 
@@ -257,6 +271,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         &mut self,
         params: Vec<ActionParams>,
         unconfirmed_substate: &mut [Substate],
+        is_local_call: bool,
     ) -> Vec<ExecutionResult>
     {
         let local_stack_size = ::io::LOCAL_STACK_SIZE.with(|sz| sz.get());
@@ -270,6 +285,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             while signal >= 0 {
                 match signal {
                     0 => debug!(target: "vm", "AVMExec: commit state"),
+                    1 => debug!(target: "vm", "AVMExec: get state"),
                     _ => println!("unknown signal"),
                 }
                 signal = rx.recv().expect("Unable to receive from channel");
@@ -286,7 +302,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let mut ext = self.as_avm_externalities(unconfirmed_substate, tx.clone());
             //TODO: make create/exec compatible with fastvm
             let vm = vm_factory.create(VMType::AVM);
-            return vm.exec(params, &mut ext);
+            return vm.exec(params, &mut ext, is_local_call);
         }
 
         //Start in new thread with stack size needed up to max depth
@@ -304,7 +320,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 ))
                 .spawn(move || {
                     let vm = vm_factory.create(VMType::AVM);
-                    vm.exec(params, &mut ext)
+                    vm.exec(params, &mut ext, is_local_call)
                 })
                 .expect("Sub-thread creation cannot fail; the host might run out of resources; qed")
         })
@@ -468,7 +484,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             );
             //TODO: make create/exec compatible with fastvm
             let vm = vm_factory.create(VMType::FastVM);
-            return vm.exec(vec![params], &mut ext).first().unwrap().clone();
+            // fastvm local call flag is unused
+            return vm
+                .exec(vec![params], &mut ext, false)
+                .first()
+                .unwrap()
+                .clone();
         }
 
         //Start in new thread with stack size needed up to max depth
@@ -489,7 +510,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 ))
                 .spawn(move || {
                     let vm = vm_factory.create(VMType::FastVM);
-                    vm.exec(vec![params], &mut ext).first().unwrap().clone()
+                    vm.exec(vec![params], &mut ext, false)
+                        .first()
+                        .unwrap()
+                        .clone()
                 })
                 .expect("Sub-thread creation cannot fail; the host might run out of resources; qed")
         })
@@ -662,7 +686,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         let mut unconfirmed_substates = vec![Substate::new(); params.len()];
 
-        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice());
+        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice(), false);
 
         res
     }
@@ -677,7 +701,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         let mut unconfirmed_substates = vec![Substate::new(); params.len()];
 
-        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice());
+        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice(), false);
 
         res
     }

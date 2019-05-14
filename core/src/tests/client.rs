@@ -329,7 +329,7 @@ fn does_not_propagate_delayed_transactions() {
             gas_price_bytes: Vec::new(),
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
-            transaction_type: 0x01,
+            transaction_type: 0x01.into(),
         }
         .sign(&secret, None),
         Some(Condition::Number(2)),
