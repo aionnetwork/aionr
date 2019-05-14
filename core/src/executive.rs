@@ -201,10 +201,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     // give the sender a sufficient balance
                     let _ = self.state.add_balance(
                         &sender,
-                        &(needed_balance - balance),
+                        &(needed_balance + needed_balance - balance),
                         CleanupMode::NoEmpty,
                     );
                 }
+                debug!(target: "vm", "sender: {:?}, balance: {:?}", sender, self.state.balance(&sender).unwrap_or(0.into()));
             }
 
             // Transactions are now handled in different ways depending on whether it's

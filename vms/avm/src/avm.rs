@@ -9,13 +9,13 @@ use std::{env, path::Path, path::PathBuf};
 use std::ptr;
 use std::sync::atomic::AtomicPtr;
 use std::sync::atomic::Ordering;
-use std::sync::Arc;
+// use std::sync::Arc;
 use std::thread;
 use types::{TransactionContext, TransactionResult};
-use vm_common::{CallType};
-use bytes::Bytes;
-use aion_types::{Address, U256, H256};
-use hash::{BLAKE2B_EMPTY};
+// use vm_common::{CallType};
+// use bytes::Bytes;
+// use aion_types::{Address, U256, H256};
+// use hash::{BLAKE2B_EMPTY};
 
 /// We keep a single JVM instance in the background, which will be shared
 /// among multiple threads. Before invoking any JNI methods, the executing
