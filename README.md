@@ -11,8 +11,6 @@ This repository contains the rust kernel implementation and releases for the Aio
 
 Mainstream adoption of blockchains is limited because of scalability, privacy, and interoperability challenges. Aion is a multi-tier blockchain network designed to address these challenges.
 
-Many blockchains will are being created to solve business challenges in different industries. The Aion network is designed to support custom blockchains a provide a way for seperate blockchains to communicate.
-
 The [Aion White Papers](https://aion.network/developers/#whitepapers) provides more details on our design and project roadmap.
 
 ## Install the Kernel
@@ -76,9 +74,18 @@ Follow this guide to install the Aion Rust kernel on your system.
     ```bash
     sudo apt-get install libzmq3-dev -y
     ```
+6. Install JAVA JDK: :new:
+    * [JDK 11](https://download.java.net/java/GA/jdk11/13/GPL/openjdk-11.0.1_linux-x64_bin.tar.gz) or higher.
 
-6. **This step is optional**. If you plan on modifying the _Protobuf_ message, you need to install [Google Protobuf](https://github.com/stepancheg/rust-protobuf). You will also need to make sure that `protoc` is added to your `PATH` once _Profobuf_ is installed.
+7. **This step is optional**. If you plan on modifying the _Protobuf_ message, you need to install [Google Protobuf](https://github.com/stepancheg/rust-protobuf). You will also need to make sure that `protoc` is added to your `PATH` once _Profobuf_ is installed.
 
+8. Set Environment Variables: :new:
+    ```bash
+    export JAVA_HOME=<jdk_directory_location>
+    export LIBRARY_PATH=$JAVA_HOME/lib/server
+    export PATH=$PATH:$JAVA_HOME/bin
+    export LD_LIBRARY_PATH=$LIBRARY_PATH:/usr/local/lib
+    ```
 ### Build the Kernel
 
 Once you have installed the prerequisites, follow these steps to build the kernel.
@@ -178,3 +185,4 @@ For more information about Aion Community please refer to [Aion Community](https
 ## License
 
 Aion is released under the [GPL-V3 license](LICENSE)
+
