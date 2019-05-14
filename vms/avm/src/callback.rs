@@ -512,35 +512,36 @@ pub fn register_callbacks() {
 
 #[cfg(test)]
 mod tests {
-    use rand;
-    use std::ptr;
-    use hash::BLAKE2B_EMPTY;
+    // use rand;
+    // use std::ptr;
+    // use hash::BLAKE2B_EMPTY;
 
-    use super::*;
+    // use super::*;
 
     #[test]
     fn set_storage() {
+        //NOTE: moved to executive
         //debug key/value
-        let mut key: Vec<u8> = (1..10).map(|_| rand::random()).collect();
-        let mut value = vec![5, 6, 7, 8];
+        //     let mut key: Vec<u8> = (1..10).map(|_| rand::random()).collect();
+        //     let mut value = vec![5, 6, 7, 8];
 
-        println!(
-            "address = {:?}, key = {:?}, value = {:?}",
-            BLAKE2B_EMPTY, key, value
-        );
+        //     println!(
+        //         "address = {:?}, key = {:?}, value = {:?}",
+        //         BLAKE2B_EMPTY, key, value
+        //     );
 
-        let handle: *mut libc::c_void = ptr::null_mut();
-        let address = avm_address {
-            bytes: BLAKE2B_EMPTY.into(),
-        };
-        let key = avm_bytes {
-            length: key.len() as u32,
-            pointer: &mut key.as_mut_slice()[0],
-        };
-        let value = avm_bytes {
-            length: value.len() as u32,
-            pointer: &mut value.as_mut_slice()[0],
-        };
-        avm_put_storage(handle, &address, &key, &value);
+        //     let handle: *mut libc::c_void = ptr::null_mut();
+        //     let address = avm_address {
+        //         bytes: BLAKE2B_EMPTY.into(),
+        //     };
+        //     let key = avm_bytes {
+        //         length: key.len() as u32,
+        //         pointer: &mut key.as_mut_slice()[0],
+        //     };
+        //     let value = avm_bytes {
+        //         length: value.len() as u32,
+        //         pointer: &mut value.as_mut_slice()[0],
+        //     };
+        //     avm_put_storage(handle, &address, &key, &value);
     }
 }

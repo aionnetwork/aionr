@@ -25,31 +25,6 @@
 //! Then when you create the JVM in Rust, you need to add `/path/to/project`
 //! (ie.  the directory containing the root of your Java code) to the classpath,
 //! and specify the correct JVM version:
-//!
-//! ```rust
-//! use rjni::{Jvm, Version, Classpath, Options};
-//!
-//! fn main() {
-//! 	// Create a custom classpath, pointing to the directory containing the
-//! 	// root of your Java code
-//! 	let mut classpath = Classpath::new();
-//! 	classpath.add(&Path::new("/path/to/project"));
-//!
-//! 	// Create a series of configuration options for the JVM, specifying the
-//! 	// version of the JVM we want to use (1.6), and our custom classpath
-//! 	let mut options = Options::new();
-//! 	options.version(Version::V16);
-//! 	options.classpath(classpath);
-//!
-//! 	// Create the JVM with these options
-//! 	let jvm = Jvm::new(options).unwrap();
-//!
-//! 	// Get the `com.me.Test` class using the JVM
-//! 	let class = jvm.class("com/me/Test").unwrap();
-//!
-//! 	// ...
-//! }
-//! ```
 
 #![allow(dead_code)]
 

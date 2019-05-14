@@ -169,7 +169,7 @@ mod tests {
             "value":"0x3",
             "data":"0x123456",
             "nonce":"0x4",
-            "tx_type":"0x01",
+            "type":"0x01",
             "condition": { "block": 19 }
         }"#;
         let deserialized: TransactionRequest = serde_json::from_str(s).unwrap();

@@ -259,121 +259,121 @@ impl AVM {
 
 #[cfg(test)]
 mod test {
-    use avm::AVM;
-    use codec::NativeEncoder;
-    use std::fs::File;
-    use std::io::Error;
-    use std::io::Read;
-    use std::path::PathBuf;
-    use types::TransactionContext;
-    use avm_abi::{AbiToken, AVMEncoder};
+    // use avm::AVM;
+    // use codec::NativeEncoder;
+    // use std::fs::File;
+    // use std::io::Error;
+    // use std::io::Read;
+    // use std::path::PathBuf;
+    // use types::TransactionContext;
+    // use avm_abi::{AbiToken, AVMEncoder};
 
     #[test]
     fn avm_hello_world() {
-        let avm = AVM::new();
-        let transactions = prepare_transactions();
-        let results = avm.execute(0, &transactions, false).unwrap();
-        println!("{:?}", results);
+        // let avm = AVM::new();
+        // let transactions = prepare_transactions();
+        // let results = avm.execute(0, &transactions, false).unwrap();
+        // println!("{:?}", results);
     }
 
-    fn prepare_transactions() -> Vec<TransactionContext> {
-        let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        file.push("examples/com.example.helloworld.jar");
-        let file_str = file.to_str().expect("Failed to locate the helloworld.jar");
+    // fn prepare_transactions() -> Vec<TransactionContext> {
+    //     let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    //     file.push("examples/com.example.helloworld.jar");
+    //     let file_str = file.to_str().expect("Failed to locate the helloworld.jar");
 
-        let tx1 = TransactionContext {
-            transaction_type: 2,
-            address: [1u8; 32].to_vec(),
-            caller: [2u8; 32].to_vec(),
-            origin: [3u8; 32].to_vec(),
-            nonce: 0,
-            value: vec![99],
-            data: code_and_arguments(
-                &read_file(file_str).expect("Failed to read the helloworld.jar"),
-                Option::None,
-            ),
-            energy_limit: 1000_00,
-            energy_price: 1,
-            transaction_hash: [4u8; 32].to_vec(),
-            basic_cost: 200_000,
-            transaction_timestamp: 2,
-            block_timestamp: 3,
-            block_number: 4,
-            block_energy_limit: 5_000_000,
-            block_coinbase: [4u8; 32].to_vec(),
-            block_previous_hash: [5u8; 32].to_vec(),
-            block_difficulty: [0u8; 16].to_vec(),
-            internal_call_depth: 0,
-        };
+    //     let tx1 = TransactionContext {
+    //         transaction_type: 2,
+    //         address: [1u8; 32].to_vec(),
+    //         caller: [2u8; 32].to_vec(),
+    //         origin: [3u8; 32].to_vec(),
+    //         nonce: 0,
+    //         value: vec![99],
+    //         data: code_and_arguments(
+    //             &read_file(file_str).expect("Failed to read the helloworld.jar"),
+    //             Option::None,
+    //         ),
+    //         energy_limit: 1000_00,
+    //         energy_price: 1,
+    //         transaction_hash: [4u8; 32].to_vec(),
+    //         basic_cost: 200_000,
+    //         transaction_timestamp: 2,
+    //         block_timestamp: 3,
+    //         block_number: 4,
+    //         block_energy_limit: 5_000_000,
+    //         block_coinbase: [4u8; 32].to_vec(),
+    //         block_previous_hash: [5u8; 32].to_vec(),
+    //         block_difficulty: [0u8; 16].to_vec(),
+    //         internal_call_depth: 0,
+    //     };
 
-        let tx2 = TransactionContext {
-            transaction_type: 2,
-            address: [1u8; 32].to_vec(),
-            caller: [5u8; 32].to_vec(),
-            origin: [6u8; 32].to_vec(),
-            nonce: 0,
-            value: vec![10],
-            data: code_and_arguments(
-                &read_file(file_str).expect("Failed to read the helloworld.jar"),
-                Option::None,
-            ),
-            energy_limit: 1_000_000,
-            energy_price: 1,
-            transaction_hash: [4u8; 32].to_vec(),
-            basic_cost: 200_000,
-            transaction_timestamp: 2,
-            block_timestamp: 3,
-            block_number: 4,
-            block_energy_limit: 5_000_000,
-            block_coinbase: [4u8; 32].to_vec(),
-            block_previous_hash: [5u8; 32].to_vec(),
-            block_difficulty: [0u8; 16].to_vec(),
-            internal_call_depth: 0,
-        };
+    //     let tx2 = TransactionContext {
+    //         transaction_type: 2,
+    //         address: [1u8; 32].to_vec(),
+    //         caller: [5u8; 32].to_vec(),
+    //         origin: [6u8; 32].to_vec(),
+    //         nonce: 0,
+    //         value: vec![10],
+    //         data: code_and_arguments(
+    //             &read_file(file_str).expect("Failed to read the helloworld.jar"),
+    //             Option::None,
+    //         ),
+    //         energy_limit: 1_000_000,
+    //         energy_price: 1,
+    //         transaction_hash: [4u8; 32].to_vec(),
+    //         basic_cost: 200_000,
+    //         transaction_timestamp: 2,
+    //         block_timestamp: 3,
+    //         block_number: 4,
+    //         block_energy_limit: 5_000_000,
+    //         block_coinbase: [4u8; 32].to_vec(),
+    //         block_previous_hash: [5u8; 32].to_vec(),
+    //         block_difficulty: [0u8; 16].to_vec(),
+    //         internal_call_depth: 0,
+    //     };
 
-        let tx3 = TransactionContext {
-            transaction_type: 3,
-            address: [1u8; 32].to_vec(),
-            caller: [5u8; 32].to_vec(),
-            origin: [6u8; 32].to_vec(),
-            nonce: 1,
-            value: vec![10],
-            data: AbiToken::STRING("sayHello".to_string()).encode(),
-            energy_limit: 1_000_000,
-            energy_price: 1,
-            transaction_hash: [4u8; 32].to_vec(),
-            basic_cost: 200_000,
-            transaction_timestamp: 2,
-            block_timestamp: 3,
-            block_number: 4,
-            block_energy_limit: 5_000_000,
-            block_coinbase: [4u8; 32].to_vec(),
-            block_previous_hash: [5u8; 32].to_vec(),
-            block_difficulty: [0u8; 16].to_vec(),
-            internal_call_depth: 0,
-        };
+    //     let tx3 = TransactionContext {
+    //         transaction_type: 3,
+    //         address: [1u8; 32].to_vec(),
+    //         caller: [5u8; 32].to_vec(),
+    //         origin: [6u8; 32].to_vec(),
+    //         nonce: 1,
+    //         value: vec![10],
+    //         data: AbiToken::STRING("sayHello".to_string()).encode(),
+    //         energy_limit: 1_000_000,
+    //         energy_price: 1,
+    //         transaction_hash: [4u8; 32].to_vec(),
+    //         basic_cost: 200_000,
+    //         transaction_timestamp: 2,
+    //         block_timestamp: 3,
+    //         block_number: 4,
+    //         block_energy_limit: 5_000_000,
+    //         block_coinbase: [4u8; 32].to_vec(),
+    //         block_previous_hash: [5u8; 32].to_vec(),
+    //         block_difficulty: [0u8; 16].to_vec(),
+    //         internal_call_depth: 0,
+    //     };
 
-        let mut tx_contexts = Vec::<TransactionContext>::new();
-        tx_contexts.push(tx1);
-        tx_contexts.push(tx2);
-        tx_contexts.push(tx3);
-        tx_contexts
-    }
+    //     let mut tx_contexts = Vec::<TransactionContext>::new();
+    //     tx_contexts.push(tx1);
+    //     tx_contexts.push(tx2);
+    //     tx_contexts.push(tx3);
+    //     tx_contexts
+    // }
 
-    fn code_and_arguments(code: &Vec<u8>, arguments: Option<&Vec<u8>>) -> Vec<u8> {
-        let mut encoder = NativeEncoder::new();
-        encoder.encode_bytes(code);
-        match arguments {
-            Some(arg) => encoder.encode_bytes(arg),
-            None => {}
-        }
-        encoder.to_bytes()
-    }
+    // fn code_and_arguments(code: &Vec<u8>, arguments: Option<&Vec<u8>>) -> Vec<u8> {
+    //     let mut encoder = NativeEncoder::new();
+    //     encoder.encode_bytes(code);
+    //     match arguments {
+    //         Some(arg) => encoder.encode_bytes(arg),
+    //         None => {}
+    //     }
+    //     encoder.to_bytes()
+    // }
 
-    fn read_file(path: &str) -> Result<Vec<u8>, Error> {
-        let mut file = File::open(path)?;
-        let mut buf = Vec::<u8>::new();
-        file.read_to_end(&mut buf)?;
-        Ok(buf)
-    }
+    // fn read_file(path: &str) -> Result<Vec<u8>, Error> {
+    //     let mut file = File::open(path)?;
+    //     let mut buf = Vec::<u8>::new();
+    //     file.read_to_end(&mut buf)?;
+    //     Ok(buf)
+    // }
 }

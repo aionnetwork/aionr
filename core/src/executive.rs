@@ -951,7 +951,7 @@ mod tests {
     use bytes::Bytes;
     use error::ExecutionError;
     use avm_abi::{ToBytes};
-    use blake2b::BLAKE2B_EMPTY;
+    // use blake2b::BLAKE2B_EMPTY;
 
     fn make_aion_machine() -> EthereumMachine {
         let machine = ::ethereum::new_aion_test_machine();
@@ -2042,7 +2042,7 @@ mod tests {
             ex.create(params, &mut substate)
         };
         assert_eq!(status_code, ExecStatus::Failure);
-        assert_eq!(gas_left, U256::from(100_000));
+        assert_eq!(gas_left, U256::from(0));
     }
 
     #[test]
@@ -2384,9 +2384,10 @@ mod tests {
     }
 
     #[test]
+    /// HelloWorld with extra storage test
     fn hello_avm() {
-        // Create contract on already existing address
         let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        // NOTE: tested with avm v1.3
         file.push("src/tests/AVMDapps/demo-0.1.0.jar");
         let file_str = file.to_str().expect("Failed to locate the demo.jar");
         let mut code = read_file(file_str).expect("unable to open avm dapp");
@@ -2406,7 +2407,7 @@ mod tests {
         params.gas_price = 1.into();
         let mut state = get_temp_state();
         state
-            .add_balance(&sender, &U256::from(100_000_000), CleanupMode::NoEmpty)
+            .add_balance(&sender, &U256::from(200_000_000), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
         let machine = make_aion_machine();
@@ -2461,7 +2462,7 @@ mod tests {
                 "result state root = {:?}, return_data = {:?}",
                 state_root, return_data
             );
-            assert_eq!(return_data.to_vec(), vec![17u8, 0, 4, 0, 2, 3, 4]);
+            assert_eq!(return_data.to_vec(), vec![0u8, 2, 3, 4]);
         }
 
         assert_eq!(
@@ -2474,37 +2475,8 @@ mod tests {
                     ]
                 )
                 .unwrap(),
-            vec![0u8, 2, 3, 5]
+            vec![0u8, 2, 3, 4]
         );
-
-        // test recursive call
-        params.call_type = CallType::Call;
-        let call_data = AbiToken::STRING(String::from("callExt")).encode();
-        params.data = Some(call_data);
-        params.nonce += 1;
-        println!("call data = {:?}", params.data);
-        let substate = Substate::new();
-        let execution_results = {
-            let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.call_avm(vec![params.clone()], &mut [substate.clone()])
-        };
-
-        for r in execution_results {
-            let ExecutionResult {
-                status_code,
-                gas_left: _,
-                return_data,
-                exception: _,
-                state_root,
-            } = r;
-
-            assert_eq!(status_code, ExecStatus::Success);
-            println!(
-                "result state root = {:?}, return_data = {:?}",
-                state_root, return_data
-            );
-            assert_eq!(return_data.to_vec(), vec![17u8, 0, 4, 0, 2, 3, 4]);
-        }
     }
 
     use std::io::Error;
@@ -2518,10 +2490,7 @@ mod tests {
         println!("path = {:?}", path);
         let mut file = File::open(path)?;
         let mut buf = Vec::<u8>::new();
-        // let mut buf = String::new();
         file.read_to_end(&mut buf)?;
-        // file.sync_all()?;
-        //Ok(buf.as_bytes().to_vec())
         Ok(buf)
     }
 
