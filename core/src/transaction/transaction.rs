@@ -22,15 +22,20 @@
 
 //! Transaction data structure.
 
-use aion_types::{Address, Ed25519Public, H256, U256, to_u256};
-use ajson;
 use super::error;
-use key::{self, sign_ed25519, recover_ed25519, Ed25519Signature, public_to_address_ed25519, Ed25519Secret};
+use aion_types::{to_u256, Address, Ed25519Public, H256, U256};
+use ajson;
 use blake2b::blake2b;
 use heapsize::HeapSizeOf;
+use key::{
+    self, public_to_address_ed25519, recover_ed25519, sign_ed25519, Ed25519Secret, Ed25519Signature,
+};
 use rlp::{self, DecoderError, Encodable, RlpStream, UntrustedRlp};
 use std::ops::Deref;
-use vms::constants::{GAS_CALL_MIN, GAS_CALL_MAX, GAS_CREATE_MIN, GAS_CREATE_MAX, GAS_TX_DATA_NONZERO, GAS_TX_DATA_ZERO};
+use vms::constants::{
+    GAS_CALL_MAX, GAS_CALL_MIN, GAS_CREATE_MAX, GAS_CREATE_MIN, GAS_TX_DATA_NONZERO,
+    GAS_TX_DATA_ZERO,
+};
 
 use bytes::i64_to_bytes;
 use trace_time::to_epoch_micro;
@@ -47,7 +52,8 @@ pub const SYSTEM_ADDRESS: Address = H256([
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe,
 ]);
 
-pub const DEFAULT_TRANSACTION_TYPE: u8 = 0x01;
+pub const DEFAULT_TRANSACTION_TYPE: U256 = U256([1, 0, 0, 0]);
+pub const AVM_TRANSACTION_TYPE: U256 = U256([2, 0, 0, 0]);
 
 struct TransactionEnergyRule;
 impl TransactionEnergyRule {
@@ -121,7 +127,7 @@ pub struct Transaction {
     /// Transaction data.
     pub data: Bytes,
     /// Transaction Type.
-    pub transaction_type: u8,
+    pub transaction_type: U256,
 }
 
 impl Transaction {
@@ -132,6 +138,7 @@ impl Transaction {
         action: Action,
         value: U256,
         data: Bytes,
+        tx_type: U256,
     ) -> Transaction
     {
         Transaction {
@@ -145,7 +152,7 @@ impl Transaction {
             value,
             value_bytes: Bytes::new(),
             data,
-            transaction_type: DEFAULT_TRANSACTION_TYPE,
+            transaction_type: tx_type,
         }
     }
 
@@ -372,9 +379,9 @@ impl rlp::Decodable for UnverifiedTransaction {
                 transaction_type: {
                     let transaction_type_vec = d.val_at::<Vec<u8>>(7)?;
                     if transaction_type_vec.len() == 0 {
-                        0u8
+                        0u8.into()
                     } else {
-                        transaction_type_vec[0]
+                        transaction_type_vec[0].into()
                     }
                 },
             },
@@ -591,6 +598,9 @@ impl SignedTransaction {
         }
     }
 
+    /// Returns transaction type.
+    pub fn tx_type(&self) -> U256 { self.transaction.unsigned.transaction_type }
+
     /// Returns transaction sender.
     pub fn sender(&self) -> Address { self.sender }
 
@@ -747,7 +757,7 @@ mod tests {
             value: U256::from(0),
             value_bytes: Vec::new(),
             data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
-            transaction_type: 1,
+            transaction_type: U256::from(1),
         };
 
         let ut = UnverifiedTransaction {
@@ -779,7 +789,7 @@ mod tests {
             value: U256::from(0),
             value_bytes: Vec::new(),
             data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
-            transaction_type: 1,
+            transaction_type: U256::from(1),
         };
 
         let ut = UnverifiedTransaction {
@@ -1064,7 +1074,7 @@ mod tests {
             value: U256::from(0),
             value_bytes: Vec::new(),
             data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
-            transaction_type: 1,
+            transaction_type: U256::from(1),
         };
         println!("data: {:?}", t.data);
         assert_eq!(t.gas_required().low_u64(), 21256);
@@ -1086,7 +1096,7 @@ mod tests {
             value: U256::from(1),
             value_bytes: Vec::new(),
             data: b"Hello!".to_vec(),
-            transaction_type: 1,
+            transaction_type: U256::from(1),
         }
         .sign(&key.secret(), None);
         let mut slice = blake2b(key.public());
@@ -1110,7 +1120,7 @@ mod tests {
             value: U256::from(1),
             value_bytes: Vec::new(),
             data: b"Hello!".to_vec(),
-            transaction_type: 1,
+            transaction_type: U256::from(1),
         }
         .fake_sign(Address::from(0x69));
         assert_eq!(Address::from(0x69), t.sender());

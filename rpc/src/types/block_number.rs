@@ -142,7 +142,7 @@ mod tests {
                 BlockNumber::Num(10),
                 BlockNumber::Latest,
                 BlockNumber::Earliest,
-                BlockNumber::Pending
+                BlockNumber::Pending,
             ]
         )
     }

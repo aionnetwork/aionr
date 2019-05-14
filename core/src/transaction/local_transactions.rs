@@ -225,6 +225,7 @@ mod tests {
     use super::*;
     use key::generate_keypair;
     use io::IoService;
+    use transaction::DEFAULT_TRANSACTION_TYPE;
 
     #[test]
     fn should_add_transaction_as_pending() {
@@ -278,6 +279,7 @@ mod tests {
             transaction::Action::Create,
             U256::from(100),
             Default::default(),
+            DEFAULT_TRANSACTION_TYPE,
         )
         .sign(keypair.secret(), None)
     }

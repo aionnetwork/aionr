@@ -31,11 +31,14 @@ extern crate threadpool;
 extern crate serde_derive;
 
 use std::num::ParseIntError;
-use std::{env, fmt, process, io};
+use std::{env, fmt, io, process};
 
 use docopt::Docopt;
-use key::{Ed25519KeyPair, generate_keypair, Error as KeyError, sign_ed25519, verify_signature_ed25519, recover_ed25519, public_to_address_ed25519, Address};
-use rustc_hex::{ToHex, FromHexError};
+use key::{
+    generate_keypair, public_to_address_ed25519, recover_ed25519, sign_ed25519,
+    verify_signature_ed25519, Address, Ed25519KeyPair, Error as KeyError,
+};
+use rustc_hex::{FromHexError, ToHex};
 
 pub const USAGE: &'static str = r#"
 keys generator.

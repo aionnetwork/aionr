@@ -120,28 +120,28 @@ mod test {
             super::diff_pod(&a, &PodState::new()),
             StateDiff {
                 raw: map![
-            1.into() => AccountDiff{
-                balance: Diff::Died(69.into()),
-                nonce: Diff::Died(0.into()),
-                code: Diff::Died(vec![]),
-                storage: map![],
-                storage_dword: map![],
-            }
-        ]
+                    1.into() => AccountDiff{
+                        balance: Diff::Died(69.into()),
+                        nonce: Diff::Died(0.into()),
+                        code: Diff::Died(vec![]),
+                        storage: map![],
+                        storage_dword: map![],
+                    }
+                ],
             }
         );
         assert_eq!(
             super::diff_pod(&PodState::new(), &a),
             StateDiff {
                 raw: map![
-            1.into() => AccountDiff{
-                balance: Diff::Born(69.into()),
-                nonce: Diff::Born(0.into()),
-                code: Diff::Born(vec![]),
-                storage: map![],
-                storage_dword: map![],
-            }
-        ]
+                    1.into() => AccountDiff{
+                        balance: Diff::Born(69.into()),
+                        nonce: Diff::Born(0.into()),
+                        code: Diff::Born(vec![]),
+                        storage: map![],
+                        storage_dword: map![],
+                    }
+                ],
             }
         );
     }
@@ -177,28 +177,28 @@ mod test {
             super::diff_pod(&a, &b),
             StateDiff {
                 raw: map![
-            2.into() => AccountDiff{
-                balance: Diff::Born(69.into()),
-                nonce: Diff::Born(0.into()),
-                code: Diff::Born(vec![]),
-                storage: map![],
-                storage_dword: map![],
-            }
-        ]
+                    2.into() => AccountDiff{
+                        balance: Diff::Born(69.into()),
+                        nonce: Diff::Born(0.into()),
+                        code: Diff::Born(vec![]),
+                        storage: map![],
+                        storage_dword: map![],
+                    }
+                ],
             }
         );
         assert_eq!(
             super::diff_pod(&b, &a),
             StateDiff {
                 raw: map![
-            2.into() => AccountDiff{
-                balance: Diff::Died(69.into()),
-                nonce: Diff::Died(0.into()),
-                code: Diff::Died(vec![]),
-                storage: map![],
-                storage_dword: map![],
-            }
-        ]
+                    2.into() => AccountDiff{
+                        balance: Diff::Died(69.into()),
+                        nonce: Diff::Died(0.into()),
+                        code: Diff::Died(vec![]),
+                        storage: map![],
+                        storage_dword: map![],
+                    }
+                ],
             }
         );
     }
@@ -241,14 +241,14 @@ mod test {
             super::diff_pod(&a, &b),
             StateDiff {
                 raw: map![
-            1.into() => AccountDiff{
-                balance: Diff::Same,
-                nonce: Diff::Changed(0.into(), 1.into()),
-                code: Diff::Same,
-                storage: map![],
-                storage_dword: map![],
-            }
-        ]
+                    1.into() => AccountDiff{
+                        balance: Diff::Same,
+                        nonce: Diff::Changed(0.into(), 1.into()),
+                        code: Diff::Same,
+                        storage: map![],
+                        storage_dword: map![],
+                    }
+                ],
             }
         );
     }

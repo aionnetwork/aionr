@@ -158,7 +158,7 @@ mod test {
                 Uint(U256::from(10)),
                 Uint(U256::from(0)),
                 Uint(U256::from(0)),
-                Uint(U256::from(0))
+                Uint(U256::from(0)),
             ]
         );
     }

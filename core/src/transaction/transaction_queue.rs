@@ -115,7 +115,9 @@ use io::IoChannel;
 use parking_lot::Mutex;
 use aion_types::{H256, U256, Address};
 use heapsize::HeapSizeOf;
-use transaction::local_transactions::{LocalTransactionsList, Status as LocalTransactionStatus, TxIoMessage};
+use transaction::local_transactions::{
+    LocalTransactionsList, Status as LocalTransactionStatus, TxIoMessage,
+};
 use table::Table;
 use transaction::{self, SignedTransaction, PendingTransaction};
 
@@ -1492,7 +1494,7 @@ pub mod test {
     use super::*;
     use key::{generate_keypair};
     use rustc_hex::FromHex;
-    use transaction::Transaction;
+    use transaction::{Transaction, DEFAULT_TRANSACTION_TYPE};
     use io::IoService;
 
     pub struct DummyTransactionDetailsProvider {
@@ -1546,6 +1548,7 @@ pub mod test {
             transaction::Action::Create,
             U256::from(100),
             "3331600055".from_hex().unwrap(),
+            DEFAULT_TRANSACTION_TYPE,
         )
     }
 
@@ -3586,7 +3589,7 @@ pub mod test {
 
         // then
         assert_eq!(
-            txq.top_transactions_at(BlockNumber::max_value(), u64::max_value(),)
+            txq.top_transactions_at(BlockNumber::max_value(), u64::max_value())
                 .len(),
             7
         );

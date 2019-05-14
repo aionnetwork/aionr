@@ -27,7 +27,7 @@ use super::lookup::Lookup;
 use super::node::Node as RlpNode;
 use super::node::NodeKey;
 
-use db::{HashStore,DBValue};
+use db::{HashStore, DBValue};
 use bytes::ToPretty;
 use nibbleslice::NibbleSlice;
 use rlp::{Rlp, RlpStream};
@@ -1152,7 +1152,7 @@ mod tests {
             *t.root(),
             trie_root(vec![
                 (vec![0x01u8, 0x23], vec![0x01u8, 0x23]),
-                (vec![0x11u8, 0x23], vec![0x11u8, 0x23])
+                (vec![0x11u8, 0x23], vec![0x11u8, 0x23]),
             ])
         );
     }
@@ -1239,7 +1239,7 @@ mod tests {
             *t.root(),
             trie_root(vec![
                 (vec![0x01u8, 0x23], big_value0.to_vec()),
-                (vec![0x11u8, 0x23], big_value1.to_vec())
+                (vec![0x11u8, 0x23], big_value1.to_vec()),
             ])
         );
     }
@@ -1257,7 +1257,7 @@ mod tests {
             *t.root(),
             trie_root(vec![
                 (vec![0x01u8, 0x23], big_value.to_vec()),
-                (vec![0x11u8, 0x23], big_value.to_vec())
+                (vec![0x11u8, 0x23], big_value.to_vec()),
             ])
         );
     }

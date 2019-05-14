@@ -122,12 +122,14 @@ impl BridgeStorageConnector {
         let mut data = Vec::new();
         data.extend(&[0u8; 12]);
         data.extend(&bytes);
+        debug!(target: "vm", "ATB conn:set member count = {:?}", data);
         ext.set_storage(self.member_count.into(), data.as_slice().into());
     }
 
     pub fn get_member_count(&self, ext: &mut BuiltinExt) -> i32 {
         let count_word = ext.storage_at(&self.member_count.into());
         let bytes: [u8; 16] = count_word.into();
+        debug!(target: "vm", "ATB conn:member count = {:?}, bytes = {:?}", count_word, bytes);
         from_signed_bytes_be(&bytes[12..16])
     }
 
@@ -141,6 +143,7 @@ impl BridgeStorageConnector {
 
     pub fn get_min_thresh(&self, ext: &mut BuiltinExt) -> i32 {
         let thresh_word = ext.storage_at(&self.min_thresh.into());
+        debug!(target: "vm", "ATB conn:thresh word = {:?}", thresh_word);
         let bytes: [u8; 16] = thresh_word.into();
         from_signed_bytes_be(&bytes[12..16])
     }

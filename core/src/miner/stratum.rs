@@ -30,12 +30,11 @@ use block::IsBlock;
 use client::Client;
 use aion_types::{H256, clean_0x};
 use acore_stratum::{
-    JobDispatcher, PushWorkHandler,
-    Stratum as StratumService, Error as StratumServiceError,
+    JobDispatcher, PushWorkHandler, Stratum as StratumService, Error as StratumServiceError,
 };
 use miner::{self, Miner, MinerService};
 use dir::helpers::replace_home_and_local;
-use dir::{default_data_path,default_local_path,CHAINS_PATH};
+use dir::{default_data_path, default_local_path, CHAINS_PATH};
 
 use bytes::Bytes;
 use rustc_hex::FromHex;
@@ -85,6 +84,7 @@ struct SubmitPayload {
 
 impl SubmitPayload {
     fn from_args(payload: Vec<String>) -> Result<Self, PayloadError> {
+        trace!(target: "stratum", "payload = {:?}", payload);
         if payload.len() != 3 {
             return Err(PayloadError::ArgumentsAmountUnexpected(payload.len()));
         }

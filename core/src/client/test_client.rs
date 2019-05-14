@@ -39,12 +39,14 @@ use bytes::Bytes;
 use rlp::*;
 use key::{generate_keypair, public_to_address_ed25519};
 use tempdir::TempDir;
-use transaction::{self, Transaction, LocalizedTransaction, PendingTransaction, SignedTransaction, Action, DEFAULT_TRANSACTION_TYPE};
+use transaction::{
+    self, Transaction, LocalizedTransaction, PendingTransaction, SignedTransaction, Action,
+    DEFAULT_TRANSACTION_TYPE,
+};
 use blockchain::{TreeRoute, BlockReceipts};
 use client::{
-    BlockChainClient, MiningBlockChainClient, BlockChainInfo, BlockStatus, BlockId,
-    TransactionId, LastHashes, CallAnalytics, BlockImportError,
-    ProvingBlockChainClient,
+    BlockChainClient, MiningBlockChainClient, BlockChainInfo, BlockStatus, BlockId, TransactionId,
+    LastHashes, CallAnalytics, BlockImportError, ProvingBlockChainClient,
 };
 use db::{COL_STATE, DB_NAMES};
 use header::{Header as BlockHeader, BlockNumber};
@@ -329,7 +331,7 @@ impl TestBlockChainClient {
             gas_price_bytes: Vec::new(),
             nonce: U256::zero(),
             nonce_bytes: Vec::new(),
-            transaction_type: DEFAULT_TRANSACTION_TYPE,
+            transaction_type: DEFAULT_TRANSACTION_TYPE.into(),
         };
         let signed_tx = tx.sign(&keypair.secret().0, None);
         self.set_balance(signed_tx.sender(), 10_000_000_000_000_000_000u64.into());

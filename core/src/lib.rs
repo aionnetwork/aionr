@@ -104,6 +104,8 @@ extern crate bytebuffer;
 
 extern crate tokio;
 
+extern crate avm_abi;
+
 pub mod account_provider;
 pub mod block;
 pub mod client;
@@ -124,6 +126,7 @@ pub mod state;
 pub mod state_db;
 pub mod verification;
 pub mod views;
+pub mod account;
 
 mod cache_manager;
 mod blooms;
@@ -140,6 +143,7 @@ mod tx_filter;
 pub mod tests;
 #[cfg(test)]
 extern crate fastvm;
+extern crate core;
 
 pub use types::*;
 pub use executive::contract_address;

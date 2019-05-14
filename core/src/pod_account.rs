@@ -29,7 +29,7 @@ use kvdb::HashStore;
 use triehash::sec_trie_root;
 use bytes::Bytes;
 use trie::TrieFactory;
-use state::Account;
+use state::{VMAccount, AionVMAccount};
 use ajson;
 use types::account_diff::*;
 use rlp::{self, RlpStream};
@@ -53,24 +53,26 @@ pub struct PodAccount {
 impl PodAccount {
     /// Convert Account to a PodAccount.
     /// NOTE: This will silently fail unless the account is fully cached.
-    pub fn from_account(acc: &Account) -> PodAccount {
+    pub fn from_account(acc: &AionVMAccount) -> PodAccount {
         PodAccount {
             balance: *acc.balance(),
             nonce: *acc.nonce(),
             storage: acc
                 .storage_changes()
                 .iter()
+                .filter(|(_, v)| v.len() == 16)
                 .fold(BTreeMap::new(), |mut m, (k, v)| {
-                    m.insert(k.clone(), v.clone());
+                    m.insert(k.clone().as_slice().into(), v.clone().as_slice().into());
                     m
                 }),
-            storage_dword: acc.storage_changes_dword().iter().fold(
-                BTreeMap::new(),
-                |mut m, (k, v)| {
-                    m.insert(k.clone(), v.clone());
+            storage_dword: acc
+                .storage_changes()
+                .iter()
+                .filter(|(_, v)| v.len() == 32)
+                .fold(BTreeMap::new(), |mut m, (k, v)| {
+                    m.insert(k.clone().as_slice().into(), v.clone().as_slice().into());
                     m
-                },
-            ),
+                }),
             code: acc.code().map(|x| x.to_vec()),
         }
     }
@@ -420,19 +422,19 @@ mod test {
                 nonce: Diff::Same,
                 code: Diff::Same,
                 storage: map![
-                2.into() => Diff::new(2.into(), 3.into()),
-                3.into() => Diff::new(3.into(), 0.into()),
-                4.into() => Diff::new(4.into(), 0.into()),
-                7.into() => Diff::new(0.into(), 7.into()),
-                9.into() => Diff::new(0.into(), 9.into())
-            ],
+                    2.into() => Diff::new(2.into(), 3.into()),
+                    3.into() => Diff::new(3.into(), 0.into()),
+                    4.into() => Diff::new(4.into(), 0.into()),
+                    7.into() => Diff::new(0.into(), 7.into()),
+                    9.into() => Diff::new(0.into(), 9.into())
+                ],
                 storage_dword: map![
-                2.into() => Diff::new(2.into(), 3.into()),
-                3.into() => Diff::new(3.into(), 0.into()),
-                4.into() => Diff::new(4.into(), 0.into()),
-                7.into() => Diff::new(0.into(), 7.into()),
-                9.into() => Diff::new(0.into(), 9.into())
-            ],
+                    2.into() => Diff::new(2.into(), 3.into()),
+                    3.into() => Diff::new(3.into(), 0.into()),
+                    4.into() => Diff::new(4.into(), 0.into()),
+                    7.into() => Diff::new(0.into(), 7.into()),
+                    9.into() => Diff::new(0.into(), 9.into())
+                ],
             })
         );
     }

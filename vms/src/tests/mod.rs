@@ -18,24 +18,3 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
-#[cfg(test)]
-mod bytes {
-    /*
-    fn merge(list: Vec<[u8]>) -> &[u8] {
-        let size: i32 = 0;
-        let count = list.len();
-    }
-
-    #[test]
-    fn test_compilation() {
-
-    }
-    */
-}
-
-#[cfg(test)]
-mod contract_test {
-    extern crate fastvm;
-    use fastvm::vm::{Result, GasLeft, Ext, ActionParams, ActionValue};
-}

@@ -24,9 +24,12 @@ pipeline {
         pollSCM('H/5 * * * *')
     }
 	environment{
-		JAVA_ARGS="-Dorg.apache.commons.jelly.tags.fmt.timeZone=Asia/Shanghai"
-		JENKINS_JAVA_OPTIONS="-Dorg.apache.commons.jelly.tags.fmt.timeZone=Asia/Shanghai"
+		JAVA_HOME="/run/jdk-11"
+		PATH="${JAVA_HOME}/bin:${PATH}"
+		LIBRARY_PATH="${JAVA_HOME}/lib/server"
+		LD_LIBRARY_PATH="${LIBRARY_PATH}:/usr/local/lib:/run/libs"
 	}
+
 
     options {
         timeout(time: 120, unit: 'MINUTES') 

@@ -73,7 +73,7 @@ mod tests {
                 ParamType::Uint(256),
                 ParamType::Array(Box::new(ParamType::Address)),
                 ParamType::FixedArray(Box::new(ParamType::Uint(256)), 3),
-                ParamType::FixedArray(Box::new(ParamType::Array(Box::new(ParamType::Bool))), 5)
+                ParamType::FixedArray(Box::new(ParamType::Array(Box::new(ParamType::Bool))), 5),
             ]
         );
     }

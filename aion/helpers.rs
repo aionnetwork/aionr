@@ -282,7 +282,10 @@ mod tests {
     use aion_types::U256;
     use acore::client::BlockId;
     use acore::miner::PendingSet;
-    use super::{to_block_id, to_u256, to_pending_set, to_address, to_addresses, password_from_file,parse_log_target};
+    use super::{
+        to_block_id, to_u256, to_pending_set, to_address, to_addresses, password_from_file,
+        parse_log_target,
+};
 
     #[test]
     fn test_parse_log_target() {

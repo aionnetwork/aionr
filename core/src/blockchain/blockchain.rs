@@ -42,7 +42,9 @@ use receipt::Receipt;
 use blooms::{BloomGroup, GroupPosition};
 use blockchain::best_block::{BestBlock, BestAncientBlock};
 use blockchain::block_info::{BlockInfo, BlockLocation, BranchBecomingCanonChainData};
-use blockchain::extras::{BlockReceipts, BlockDetails, TransactionAddress, EPOCH_KEY_PREFIX, EpochTransitions};
+use blockchain::extras::{
+    BlockReceipts, BlockDetails, TransactionAddress, EPOCH_KEY_PREFIX, EpochTransitions,
+};
 use types::blockchain_info::BlockChainInfo;
 use types::tree_route::TreeRoute;
 use blockchain::update::ExtrasUpdate;
@@ -2369,7 +2371,7 @@ mod tests {
                     entry: LogEntry {
                         address: Default::default(),
                         topics: vec![],
-                        data: vec![1]
+                        data: vec![1],
                     },
                     block_hash: b1_hash,
                     block_number: b1_number,
@@ -2382,7 +2384,7 @@ mod tests {
                     entry: LogEntry {
                         address: Default::default(),
                         topics: vec![],
-                        data: vec![2]
+                        data: vec![2],
                     },
                     block_hash: b1_hash,
                     block_number: b1_number,
@@ -2395,7 +2397,7 @@ mod tests {
                     entry: LogEntry {
                         address: Default::default(),
                         topics: vec![],
-                        data: vec![3]
+                        data: vec![3],
                     },
                     block_hash: b1_hash,
                     block_number: b1_number,
@@ -2408,7 +2410,7 @@ mod tests {
                     entry: LogEntry {
                         address: Default::default(),
                         topics: vec![],
-                        data: vec![4]
+                        data: vec![4],
                     },
                     block_hash: b2_hash,
                     block_number: b2_number,
@@ -2416,7 +2418,7 @@ mod tests {
                     transaction_index: 0,
                     transaction_log_index: 0,
                     log_index: 0,
-                }
+                },
             ]
         );
         assert_eq!(
@@ -2425,7 +2427,7 @@ mod tests {
                 entry: LogEntry {
                     address: Default::default(),
                     topics: vec![],
-                    data: vec![4]
+                    data: vec![4],
                 },
                 block_hash: b2_hash,
                 block_number: b2_number,
@@ -2584,7 +2586,7 @@ mod tests {
 
     #[test]
     fn epoch_transitions_iter() {
-        use ::engines::EpochTransition;
+        use engines::EpochTransition;
 
         let genesis = BlockBuilder::genesis();
         let next_5 = genesis.add_blocks(5);
@@ -2646,7 +2648,7 @@ mod tests {
 
     #[test]
     fn epoch_transition_for() {
-        use ::engines::EpochTransition;
+        use engines::EpochTransition;
 
         let genesis = BlockBuilder::genesis();
         let fork_7 = genesis.add_blocks_with(7, || {

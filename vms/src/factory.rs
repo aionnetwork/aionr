@@ -19,22 +19,22 @@
  *
  ******************************************************************************/
 
-//! Evm factory.
-//!
-use aion_types::U256;
-
-use fastvm::{FastVM, EvmStatusCode};
-use fastvm::basetypes::DataWord;
+use aion_types::{U128, U256, H256};
+use fastvm::{EvmStatusCode, FastVM};
+use fastvm::basetypes::{constants::GAS_CODE_DEPOSIT, DataWord};
 use fastvm::context::{execution_kind, ExecutionContext, TransactionResult};
-
-use fastvm::vm::{ExecutionResult, Ext, ActionParams, ActionValue, ReturnData, CallType};
-use fastvm::basetypes::constants::GAS_CODE_DEPOSIT;
+use vm_common::{ExecutionResult, ExecStatus, CallType, ReturnData, ActionParams, ActionValue, Ext};
 use std::sync::Arc;
-
-use aion_types::{U128};
+use avm::{AVM};
+use avm::types::{TransactionContext as AVMTxContext, AvmStatusCode};
 
 pub trait Factory {
-    fn exec(&mut self, params: ActionParams, ext: &mut Ext) -> ExecutionResult;
+    fn exec(
+        &mut self,
+        params: Vec<ActionParams>,
+        ext: &mut Ext,
+        is_local: bool,
+    ) -> Vec<ExecutionResult>;
 }
 
 #[derive(Clone)]
@@ -53,7 +53,15 @@ impl FastVMFactory {
 }
 
 impl Factory for FastVMFactory {
-    fn exec(&mut self, params: ActionParams, ext: &mut Ext) -> ExecutionResult {
+    fn exec(
+        &mut self,
+        params: Vec<ActionParams>,
+        ext: &mut Ext,
+        _is_local: bool,
+    ) -> Vec<ExecutionResult>
+    {
+        assert!(params.len() == 1);
+        let params = params[0].clone();
         assert!(
             params.gas <= U256::from(i64::max_value() as u64),
             "evmjit max gas is 2 ^ 63"
@@ -63,19 +71,20 @@ impl Factory for FastVMFactory {
             "evmjit max gas is 2 ^ 63"
         );
 
-        let raw_code = Arc::into_raw(params.code.unwrap());
+        let raw_code = Arc::into_raw(params.code.unwrap_or_else(|| Arc::new(Vec::new())));
         let code: &Vec<u8> = unsafe { ::std::mem::transmute(raw_code) };
 
         let call_data = params.data.unwrap_or_else(Vec::new);
 
         if code.is_empty() {
             ext.set_special_empty_flag();
-            return ExecutionResult {
+            return vec![ExecutionResult {
                 gas_left: params.gas,
-                status_code: EvmStatusCode::Success,
+                status_code: ExecStatus::Success,
                 return_data: ReturnData::empty(),
                 exception: String::default(),
-            };
+                state_root: H256::default(),
+            }];
         }
 
         let gas = params.gas.low_u64();
@@ -109,7 +118,7 @@ impl Factory for FastVMFactory {
             CallType::Call => execution_kind::CALL,
             CallType::CallCode => execution_kind::CALLCODE,
             CallType::DelegateCall => execution_kind::DELEGATECALL,
-            CallType::StaticCall => execution_kind::CALL,
+            _ => execution_kind::CALL,
         };
         let flags: i32 = params.static_flag.into();
 
@@ -161,30 +170,166 @@ impl Factory for FastVMFactory {
             }
         }
 
-        ExecutionResult {
+        vec![ExecutionResult {
             gas_left: gas_left,
-            status_code: status_code.clone(),
+            status_code: status_code.into(),
             return_data: ReturnData::new(return_data, 0, return_data_length),
             exception: match status_code {
                 EvmStatusCode::Success => String::default(),
                 code => code.to_string(),
             },
+            state_root: H256::default(),
+        }]
+    }
+}
+
+const AVM_CREATE: i32 = 3;
+const AVM_CALL: i32 = 0;
+const AVM_BALANCE_TRANSFER: i32 = 4;
+// const AVM_GARBAGE_COLLECTION: i32 = 5;
+
+#[derive(Clone)]
+pub struct AVMFactory {
+    instance: AVM,
+}
+
+impl AVMFactory {
+    pub fn new() -> Self {
+        AVMFactory {
+            instance: AVM::new(),
         }
     }
 }
 
-#[derive(Clone)]
-pub struct AVMFactory {}
-
-impl AVMFactory {
-    pub fn new() -> Self { AVMFactory {} }
-}
-
 impl Factory for AVMFactory {
-    fn exec(&mut self, _params: ActionParams, _ext: &mut Ext) -> ExecutionResult {
-        unimplemented!()
+    fn exec(
+        &mut self,
+        params: Vec<ActionParams>,
+        ext: &mut Ext,
+        is_local: bool,
+    ) -> Vec<ExecutionResult>
+    {
+        let mut avm_tx_contexts = Vec::new();
+
+        for params in params {
+            assert!(
+                params.gas <= U256::from(i64::max_value() as u64),
+                "evmjit max gas is 2 ^ 63"
+            );
+            assert!(
+                params.gas_price <= U256::from(i64::max_value() as u64),
+                "evmjit max gas is 2 ^ 63"
+            );
+
+            let mut code: &Vec<u8> = &Vec::new();
+            if params.code.is_some() {
+                let raw_code = Arc::into_raw(params.code.unwrap());
+                code = unsafe { ::std::mem::transmute(raw_code) };
+            }
+
+            let mut call_data = params.data.unwrap_or_else(Vec::new);
+
+            let gas_limit = params.gas.low_u64();
+            let gas_price = params.gas_price.low_u64();
+            let address = params.address;
+
+            let caller = params.sender;
+            debug!(target: "vm", "caller = {:?}", caller);
+
+            let origin = params.origin;
+            let transfer_value: [u8; 32] = params.value.into();
+            let call_value = transfer_value.to_vec();
+
+            debug!(target: "vm", "call_value = {:?}", call_value);
+            debug!(target: "vm", "call_data = {:?}", call_data);
+            debug!(target: "vm", "gas limit = {:?}", gas_limit);
+
+            let block_coinbase = ext.env_info().author.clone();
+            let difficulty = <[u8; 16]>::from(U128::from(ext.env_info().difficulty));
+            let block_difficulty = difficulty.to_vec();
+            let block_gas_limit = ext.env_info().gas_limit.low_u64();
+            let block_number = ext.env_info().number;
+            // don't really know why jit timestamp is int..
+            let block_timestamp = ext.env_info().timestamp as i64;
+            let tx_hash = params.transaction_hash[..].to_vec();
+            let depth = ext.depth() as i32;
+            let kind = match params.call_type {
+                CallType::None => AVM_CREATE,
+                CallType::BulkBalance => AVM_BALANCE_TRANSFER,
+                _ => AVM_CALL,
+            };
+
+            if kind == AVM_CREATE {
+                call_data = code.clone();
+            }
+            let nonce = params.nonce;
+
+            avm_tx_contexts.push(AVMTxContext::new(
+                tx_hash,
+                address,
+                origin,
+                caller,
+                gas_price,
+                gas_limit,
+                call_value,
+                call_data,
+                depth,
+                kind,
+                block_coinbase,
+                block_number,
+                block_timestamp,
+                block_gas_limit,
+                block_difficulty,
+                nonce,
+            ))
+        }
+
+        let inst = &mut self.instance;
+        let ext_ptr: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(ext)) };
+        let mut res = inst.execute(ext_ptr as i64, &avm_tx_contexts, is_local);
+
+        let mut exec_results = Vec::new();
+
+        if let Ok(ref mut tx_res) = res {
+            assert!(
+                tx_res.len() >= 1,
+                "avm must return valid transaction result"
+            );
+
+            for index in 0..tx_res.len() {
+                let result = tx_res[index].clone();
+                let mut status_code: AvmStatusCode = (result.code as i32).into();
+                let mut gas_left =
+                    U256::from(avm_tx_contexts[index].energy_limit - result.energy_used);
+                let return_data = result.return_data;
+                debug!(target: "vm", "avm status code = {:?}, gas left = {:?}", status_code, gas_left);
+                exec_results.push(ExecutionResult {
+                    gas_left: gas_left.into(),
+                    status_code: status_code.clone().into(),
+                    return_data: ReturnData::new(return_data.clone(), 0, return_data.len()),
+                    exception: match status_code.into() {
+                        AvmStatusCode::Success => String::default(),
+                        code => code.to_string(),
+                    },
+                    state_root: result.state_root.clone(),
+                });
+            }
+        } else {
+            panic!("avm unexpected error");
+        }
+
+        return exec_results;
     }
 }
 
-#[test]
-fn test_create_fastvm() { let _vm = FastVMFactory::new(); }
+#[cfg(test)]
+mod tests {
+    use super::AVMFactory;
+    use super::FastVMFactory;
+
+    #[test]
+    fn test_create_fastvm() { let _vm = FastVMFactory::new(); }
+
+    #[test]
+    fn test_create_avm() { let _vm = AVMFactory::new(); }
+}

@@ -40,6 +40,9 @@ pub struct Params {
     pub gas_limit_bound_divisor: Uint,
     /// See `CommonParams` docs.
     pub registrar: Option<Address>,
+    /// monetary policy update block number.
+    #[serde(rename = "monetaryPolicyUpdate")]
+    pub monetary_policy_update: Option<Uint>,
     /// Transaction permission contract address.
     #[serde(rename = "transactionPermissionContract")]
     pub transaction_permission_contract: Option<Address>,

@@ -19,7 +19,7 @@
  *
  ******************************************************************************/
 
-#[allow(unused)]
+#![allow(unused)]
 
 extern crate time;
 extern crate rand;
@@ -28,8 +28,10 @@ extern crate libc;
 use core::FastVM;
 use ffi::EvmJit;
 use context::ExecutionContext;
-use vm::{ExecutionResult, CallType};
-use env_info::EnvInfo;
+use vm_common::{ExecutionResult, CallType, EnvInfo};
+
+use std::sync::Arc;
+use std::collections::HashMap;
 
 type Bytes = Vec<u8>;
 
@@ -133,7 +135,7 @@ impl Into<ExecutionContext> for FastVMTest {
 }
 
 use aion_types::{H128, U256, H256};
-use vm::Ext;
+use vm_common::Ext;
 
 trait DummyCallbacks {
     fn storage_at(&self, key: &H128) -> H128;
@@ -144,24 +146,28 @@ trait DummyCallbacks {
 
 struct TestEnv<'a> {
     env_info: &'a EnvInfo,
+    storage: HashMap<H128, H128>,
+    storage_dword: HashMap<H128, H256>,
+    accounts: HashMap<H256, bool>,
+    balance: HashMap<Address, H128>,
+    log_topics: Vec<Vec<H256>>,
+    log_data: Vec<u8>,
 }
 
 impl<'a> Ext for TestEnv<'a> {
-    fn storage_at(&self, key: &H128) -> H128 {
-        debug!(target: "vm", "TEST<get_storage>: key = {}", key);
-        return H128::new();
-    }
-    fn set_storage(&mut self, key: H128, value: H128) {
-        debug!(target: "vm", "TEST<set_storage>: key = {}, value = {}", key, value);
-    }
+    fn storage_at(&self, key: &H128) -> H128 { *self.storage.get(key).unwrap_or(&H128::default()) }
+
+    fn set_storage(&mut self, key: H128, value: H128) { self.storage.insert(key, value); }
     /// Returns a value for given key.
-    fn storage_at_dword(&self, _key: &H128) -> H256 { 0.into() }
+    fn storage_at_dword(&self, key: &H128) -> H256 { return *self.storage_dword.get(key).unwrap(); }
 
     /// Stores a value for given key.
-    fn set_storage_dword(&mut self, _key: H128, _value: H256) {}
+    fn set_storage_dword(&mut self, key: H128, value: H256) {
+        self.storage_dword.insert(key, value);
+    }
 
     /// Determine whether an account exists.
-    fn exists(&self, _address: &Address) -> bool { return true; }
+    fn exists(&self, address: &Address) -> bool { return *self.accounts.get(address).unwrap(); }
 
     /// Determine whether an account exists and is not null (zero balance/nonce, no code).
     fn exists_and_not_null(&self, _address: &Address) -> bool { return true; }
@@ -173,7 +179,10 @@ impl<'a> Ext for TestEnv<'a> {
     fn balance(&self, _address: &Address) -> U256 { 0.into() }
 
     /// Returns the hash of one of the 256 most recent complete blocks.
-    fn blockhash(&mut self, _number: &U256) -> H256 { 0.into() }
+    fn blockhash(&mut self, _number: &U256) -> H256 {
+        println!("Ext: get blockhash of {:?}", _number);
+        0xf.into()
+    }
 
     /// Creates new contract.
     ///
@@ -211,7 +220,10 @@ impl<'a> Ext for TestEnv<'a> {
     fn extcodesize(&self, _address: &Address) -> usize { return 0; }
 
     /// Creates log entry with given topics and data
-    fn log(&mut self, _topics: Vec<H256>, _data: &[u8]) {}
+    fn log(&mut self, topics: Vec<H256>, data: &[u8]) {
+        self.log_topics.push(topics);
+        self.log_data.extend_from_slice(data);
+    }
 
     /// Should be called when contract commits suicide.
     /// Address to which funds should be refunded.
@@ -252,6 +264,44 @@ impl<'a> Ext for TestEnv<'a> {
     fn save_code(&mut self, _code: Bytes) {}
 
     fn set_special_empty_flag(&mut self) {}
+
+    fn code(&self, address: &Address) -> Option<Arc<Bytes>> { None }
+
+    fn sstore(&mut self, address: &Address, key: Bytes, value: Bytes) {}
+
+    fn sload(&self, address: &Address, key: &Bytes) -> Option<Bytes> { None }
+
+    fn create_account(&mut self, address: &Address) {}
+
+    fn kill_account(&mut self, address: &Address) {}
+
+    fn inc_balance(&mut self, address: &Address, inc: &U256) {}
+
+    fn dec_balance(&mut self, address: &Address, dec: &U256) {}
+
+    fn nonce(&self, address: &Address) -> u64 { 0 }
+
+    fn inc_nonce(&mut self, address: &Address) {}
+
+    fn save_code_at(&mut self, address: &Address, code: Bytes) {}
+
+    fn touch_account(&mut self, address: &Address, index: i32) {}
+
+    fn send_signal(&mut self, signal: i32) {}
+
+    fn commit(&mut self) {}
+
+    fn root(&self) -> H256 { H256::default() }
+
+    fn avm_log(&mut self, address: &Address, topics: Vec<H256>, data: Bytes, idx: i32) {}
+
+    fn get_transformed_code(&self, address: &Address) -> Option<Arc<Bytes>> { None }
+
+    fn save_transformed_code(&mut self, address: &Address, code: Bytes) {}
+
+    fn get_objectgraph(&self, address: &Address) -> Option<Arc<Bytes>> { None }
+
+    fn set_objectgraph(&mut self, address: &Address, data: Bytes) {}
 }
 
 impl<'a> EvmJit<::libc::c_void> for TestEnv<'a> {
@@ -267,6 +317,12 @@ fn fastvm_env() {
     let mut instance = FastVM::new();
     let ext = TestEnv {
         env_info: &EnvInfo::default(),
+        accounts: HashMap::new(),
+        balance: HashMap::new(),
+        storage: HashMap::new(),
+        storage_dword: HashMap::new(),
+        log_topics: Vec::new(),
+        log_data: Vec::new(),
     };
     let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext)) };
     instance.init(raw_env);
@@ -283,6 +339,12 @@ fn operation_underflow() {
     let mut instance = FastVM::new();
     let ext = TestEnv {
         env_info: &EnvInfo::default(),
+        accounts: HashMap::new(),
+        balance: HashMap::new(),
+        storage: HashMap::new(),
+        storage_dword: HashMap::new(),
+        log_topics: Vec::new(),
+        log_data: Vec::new(),
     };
     let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext)) };
     instance.init(raw_env);
@@ -291,4 +353,165 @@ fn operation_underflow() {
     let code = vec![0x06, 0x05, 0x06];
     let res = instance.run(&code, &mut context.into());
     println!("TEST<fastvm_env>: res = {:?}", res);
+}
+
+#[test]
+fn evm_storage() {
+    let context = FastVMTest::new();
+    let mut instance = FastVM::new();
+    let ext = TestEnv {
+        env_info: &EnvInfo::default(),
+        accounts: HashMap::new(),
+        balance: HashMap::new(),
+        storage: HashMap::new(),
+        storage_dword: HashMap::new(),
+        log_topics: Vec::new(),
+        log_data: Vec::new(),
+    };
+    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &Ext)) };
+    instance.init(raw_env);
+    println!("raw_ext = {:?}", raw_env);
+
+    let code = vec![0x60, 0x01, 0x60, 0x02, 0x55];
+    let res = instance.run(&code, &mut context.into());
+    println!("TEST<fastvm_env>: res = {:?}", res);
+    assert_eq!(
+        ext.storage_at(&[0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x02u8].into()),
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x01u8].into()
+    );
+}
+
+#[test]
+fn evm_mstore() {
+    let context = FastVMTest::new();
+    let mut instance = FastVM::new();
+    let ext = TestEnv {
+        env_info: &EnvInfo::default(),
+        accounts: HashMap::new(),
+        balance: HashMap::new(),
+        storage: HashMap::new(),
+        storage_dword: HashMap::new(),
+        log_topics: Vec::new(),
+        log_data: Vec::new(),
+    };
+    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &Ext)) };
+    instance.init(raw_env);
+
+    // first mstore, then mload
+    let code = vec![
+        0x60, 0x0f, 0x60, 0x02, 0x52, 0x60, 0x02, 0x51, 0x60, 0x10, 0x60, 0x02, 0xf3,
+    ];
+    let res = instance.run(&code, &mut context.clone().into());
+    println!("UT: evm_log, topics = {:?}", ext.log_topics);
+    assert_eq!(
+        res.2,
+        vec![0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x0f]
+    );
+}
+
+#[test]
+fn evm_log() {
+    let context = FastVMTest::new();
+    let mut instance = FastVM::new();
+    let mut ext = TestEnv {
+        env_info: &EnvInfo::default(),
+        accounts: HashMap::new(),
+        balance: HashMap::new(),
+        storage: HashMap::new(),
+        storage_dword: HashMap::new(),
+        log_topics: Vec::new(),
+        log_data: Vec::new(),
+    };
+    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &Ext)) };
+    instance.init(raw_env);
+
+    // LOG0
+    let code = vec![0x60, 0x01, 0x60, 0x02, 0xa0];
+    let res = instance.run(&code, &mut context.clone().into());
+    println!("UT: evm_log, topics = {:?}", ext.log_topics);
+    assert_eq!(ext.log_topics.len(), 1);
+    assert!(ext.log_topics[0].is_empty());
+
+    ext.log_topics.clear();
+    ext.log_data.clear();
+
+    instance.init(raw_env);
+    // LOG1
+    // set M[0x02] = 0xaf
+    let code = vec![
+        0x60, 0xaf, 0x60, 0x02, 0x52, 0x60, 0x03, 0x60, 0x00, 0x60, 0x1, 0x60, 0x11, 0xa1,
+    ];
+    // let code = vec![0x60, 0x01, 0x60, 0x02, 0xa0];
+    let res = instance.run(&code, &mut context.clone().into());
+
+    println!("topics = {:?}, data = {:?}", ext.log_topics, ext.log_data);
+    assert_eq!(ext.log_topics.len(), 1);
+    let expected_topic: H256 = [
+        0u8, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0, 0x03,
+    ]
+        .into();
+    assert_eq!(ext.log_topics[0].pop().unwrap(), expected_topic);
+    assert_eq!(ext.log_data, [0xafu8]);
+}
+
+#[test]
+fn blockhash() {
+    let context = FastVMTest::new();
+    let mut instance = FastVM::new();
+    let mut ext = TestEnv {
+        env_info: &EnvInfo::default(),
+        accounts: HashMap::new(),
+        balance: HashMap::new(),
+        storage: HashMap::new(),
+        storage_dword: HashMap::new(),
+        log_topics: Vec::new(),
+        log_data: Vec::new(),
+    };
+    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &Ext)) };
+    instance.init(raw_env);
+
+    // 0x40
+    let code = vec![
+        0x60, 0x01, 0x40, 0x60, 0x02, 0x52, 0x60, 0x12, 0x52, 0x60, 0x20, 0x60, 0x02, 0xf3,
+    ];
+    let res = instance.run(&code, &mut context.clone().into());
+    assert_eq!(
+        res.2,
+        vec![
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0xf,
+        ]
+    );
+}
+
+#[test]
+fn sha3() {
+    let context = FastVMTest::new();
+    let mut instance = FastVM::new();
+    let mut ext = TestEnv {
+        env_info: &EnvInfo::default(),
+        accounts: HashMap::new(),
+        balance: HashMap::new(),
+        storage: HashMap::new(),
+        storage_dword: HashMap::new(),
+        log_topics: Vec::new(),
+        log_data: Vec::new(),
+    };
+    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &Ext)) };
+    instance.init(raw_env);
+
+    // 0x20: compute sha3(0xff)
+    let code = vec![
+        0x60, 0xff, 0x60, 0x00, 0x52, 0x60, 0x10, 0x60, 0x00, 0x20, 0x60, 0x10, 0x52, 0x60, 0x20,
+        0x52, 0x60, 0x20, 0x60, 0x10, 0xf3,
+    ];
+    let res = instance.run(&code, &mut context.clone().into());
+    assert_eq!(
+        res.2,
+        vec![
+            131, 193, 186, 50, 43, 185, 25, 210, 12, 46, 9, 202, 112, 253, 39, 188, 36, 86, 23,
+            169, 233, 171, 213, 49, 91, 138, 250, 235, 196, 19, 96, 68,
+        ]
+    );
 }

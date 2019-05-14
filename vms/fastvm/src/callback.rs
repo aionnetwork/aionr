@@ -20,28 +20,61 @@
  ******************************************************************************/
 
 use std::{mem, slice};
+use std::ops::Deref;
 use libc;
 use basetypes::{EvmMessage, constants};
 use ffi::{EvmResult, EvmStatusCode};
 use aion_types::{U128, H256, U256, Address};
-use vm::{Ext, CallType};
+use vm_common::{CallType, Ext};
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct EvmWord {
+    bytes: [u8; 16],
+}
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct HashValue {
+    bytes: [u8; 32],
+}
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct EvmAddress {
+    bytes: [u8; 32],
+}
+
+impl Deref for EvmWord {
+    type Target = [u8; 16];
+
+    fn deref(&self) -> &Self::Target { &self.bytes }
+}
+
+impl Deref for EvmAddress {
+    type Target = [u8; 32];
+
+    fn deref(&self) -> &Self::Target { &self.bytes }
+}
 
 // definitions of callbacks used by fastvm.so; obj : &Callback
 #[no_mangle]
 // 1 - get block hash
-pub extern fn get_blockhash(_obj: *mut libc::c_void, _number: u64) -> *const u8 {
+pub extern fn get_blockhash(obj: *mut libc::c_void, number: u64) -> HashValue {
     debug!(target: "vm", "get_blockhash");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(_obj) };
-    debug!(target: "vm", "blockhash = {:?}, number = {:?}", ext.blockhash(&(_number.into())), _number);
-    ext.blockhash(&(_number.into())).as_ptr()
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    debug!(target: "vm", "blockhash = {:?}, number = {:?}", ext.blockhash(&(number.into())), number);
+    println!("blockhash = {:?}", ext.blockhash(&(number.into())));
+    HashValue {
+        bytes: ext.blockhash(&(number.into())).into(),
+    }
 }
 
 #[no_mangle]
 // 2 - get contract code
-pub extern fn get_code(_obj: *mut libc::c_void, _code_info: *mut u8, _address: *const u8) {
+pub extern fn get_code(obj: *mut libc::c_void, code_info: *mut u8, address: EvmAddress) {
     debug!(target: "vm", "get_code");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(_obj) };
-    let address: &[u8; 32] = unsafe { mem::transmute(_address) };
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
 
     #[repr(C)]
     struct code_info {
@@ -49,8 +82,8 @@ pub extern fn get_code(_obj: *mut libc::c_void, _code_info: *mut u8, _address: *
         code_ptr: *mut u8,
     }
 
-    let info: &mut code_info = unsafe { mem::transmute(_code_info) };
-    let code = ext.extcode(&(address.clone().into()));
+    let info: &mut code_info = unsafe { mem::transmute(code_info) };
+    let code = ext.extcode(&((*address).into()));
     info.code_size = code.len().clone() as u32;
     info.code_ptr = {
         if info.code_size <= 0 {
@@ -63,22 +96,22 @@ pub extern fn get_code(_obj: *mut libc::c_void, _code_info: *mut u8, _address: *
 
 #[no_mangle]
 // 3 - get account balance
-pub extern fn get_balance(_obj: *mut libc::c_void, _address: *const u8) -> *const u8 {
+pub extern fn get_balance(obj: *mut libc::c_void, address: EvmAddress) -> EvmWord {
     debug!(target: "vm", "get_balance");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(_obj) };
-    let address: &[u8; 32] = unsafe { mem::transmute(_address) };
-    let balance = ext.balance(&(address.clone().into()));
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    let balance = ext.balance(&(address.bytes.into()));
     let evm_strg: [u8; 16] = U128::from(U256::from(balance)).into();
-    unsafe { ::std::mem::transmute(&evm_strg) }
+    EvmWord {
+        bytes: evm_strg,
+    }
 }
 
 #[no_mangle]
 // 4 - check account exists
-pub extern fn exists(_obj: *mut libc::c_void, _address: *const u8) -> i32 {
+pub extern fn exists(obj: *mut libc::c_void, address: EvmAddress) -> i32 {
     debug!(target: "vm", "check exists");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(_obj) };
-    let address: &[u8; 32] = unsafe { mem::transmute(_address) };
-    match ext.exists(&(address.clone().into())) {
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    match ext.exists(&((*address).into())) {
         true => 1,
         false => 0,
     }
@@ -86,62 +119,48 @@ pub extern fn exists(_obj: *mut libc::c_void, _address: *const u8) -> i32 {
 
 #[no_mangle]
 // 5 - get storage
-pub extern fn get_storage(
-    _obj: *mut libc::c_void,
-    _address: *const u8,
-    _key: *const u8,
-) -> *const u8
-{
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(_obj) };
-    let key: &[u8; 16] = unsafe { mem::transmute(_key) };
-    debug!(target: "vm", "ext<get_storage>: key = {:?}, raw_env = {:?}", key, _obj);
-    let storage = ext.storage_at(&(U128::from(key.clone()).into()));
+pub extern fn get_storage(obj: *mut libc::c_void, _address: EvmAddress, key: EvmWord) -> EvmWord {
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    debug!(target: "vm", "ext<get_storage>: key = {:?}, raw_env = {:?}", key, obj);
+    let storage = ext.storage_at(&(key.bytes).into());
     debug!(target: "vm",
-        "callback.rs get_storage() key: {:?}",
-        U128::from(key.clone())
+        "FastVM CB: get_storage() key = {:?}, value = {:?}",
+        key,
+        storage
     );
-    let evm_strg: [u8; 16] = U128::from(storage).into();
+    let evm_strg: [u8; 16] = storage.into();
     debug!(target: "vm", "callback.rs get_storage() storage: {:?}", evm_strg);
-    unsafe { ::std::mem::transmute(&evm_strg) }
+    EvmWord {
+        bytes: evm_strg,
+    }
 }
 
 #[no_mangle]
 // 6 - put storage
-pub extern fn put_storage(
-    _obj: *mut libc::c_void,
-    _addr: *const u8,
-    _key: *const u8,
-    _value: *const u8,
-)
-{
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(_obj) };
-    let key: &[u8; 16] = unsafe { mem::transmute(_key) };
-    let value: &[u8; 16] = unsafe { mem::transmute(_value) };
+pub extern fn put_storage(obj: *mut libc::c_void, _addr: EvmAddress, key: EvmWord, value: EvmWord) {
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+
     debug!(target: "vm",
         "callback.rs put_storage() key: {:?}",
-        U256::from(U128::from(key.clone()))
+        U256::from(U128::from(key.bytes.clone()))
     );
     debug!(target: "vm", "callback.rs put_storage() value: {:?}", value);
-    ext.set_storage(
-        U128::from(key.clone()).into(),
-        U128::from(value.clone()).into(),
-    );
+    ext.set_storage(U128::from(*key).into(), U128::from(*value).into());
 }
 
 #[no_mangle]
 // 7 - self destroy
-pub extern fn selfdestruct(_obj: *mut libc::c_void, _owner: *const u8, _beneficiary: *const u8) {
+pub extern fn selfdestruct(obj: *mut libc::c_void, _owner: EvmAddress, beneficiary: EvmAddress) {
     debug!(target: "vm", "selfdestruct");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(_obj) };
-    let beneficiary: &[u8; 32] = unsafe { mem::transmute(_beneficiary) };
-    ext.suicide(&(beneficiary.clone().into()));
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    ext.suicide(&((*beneficiary).into()));
 }
 
 #[no_mangle]
 // 8 - log
 pub extern fn vm_log(
     obj: *mut libc::c_void,
-    _addr: *const u8,
+    _addr: EvmAddress,
     data: *const u8,
     data_size: usize,
     topics: *const u8,
@@ -152,20 +171,22 @@ pub extern fn vm_log(
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
     let data: &[u8] = unsafe { slice::from_raw_parts(data, data_size) };
     let mut new_topics: Vec<H256> = Vec::new();
+    // topics count is calculated by 16 bytes in evm
     for idx in 0..topics_cnt / 2 {
         let topic: &[u8; 32] = unsafe { mem::transmute(topics as usize + idx * 32) };
-        new_topics.push(topic.clone().into());
+        new_topics.push((*topic).into());
     }
+    debug!(target: "vm", "vm topics = {:?}, data = {:?}", new_topics, data);
     ext.log(new_topics, data);
 }
 
 #[no_mangle]
 // 9 - call
-pub extern fn call(_obj: *mut libc::c_void, _info: *mut u8, _msg: *const u8) -> *const u8 {
+pub extern fn call(obj: *mut libc::c_void, info: *mut u8, msg: *const u8) -> *const u8 {
     debug!(target: "vm", "enter vm call");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(_obj) };
-    let result_info: &mut EvmResult = unsafe { mem::transmute(_info) };
-    let evm_msg: &EvmMessage = unsafe { mem::transmute(_msg) };
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    let result_info: &mut EvmResult = unsafe { mem::transmute(info) };
+    let evm_msg: &EvmMessage = unsafe { mem::transmute(msg) };
     let call_data_size = evm_msg.input_size.clone();
     let data: &[u8] = unsafe { slice::from_raw_parts(evm_msg.input as *const u8, call_data_size) };
     let call_type: CallType = match evm_msg.kind {
@@ -176,6 +197,7 @@ pub extern fn call(_obj: *mut libc::c_void, _info: *mut u8, _msg: *const u8) -> 
         4 => CallType::StaticCall,
         _ => panic!("Call type does not exist"),
     };
+
     let static_flag = evm_msg.flags == 1 || evm_msg.kind == 4;
 
     // Address in different call types are handled in VM
@@ -217,11 +239,11 @@ pub extern fn call(_obj: *mut libc::c_void, _info: *mut u8, _msg: *const u8) -> 
     };
 
     result_info.gas_left = result.gas_left.low_u64() as i64;
-    result_info.status_code = result.status_code;
-    result_info.output_size = result.return_data.size;
+    result_info.status_code = result.status_code.into();
+    result_info.output_size = result.return_data.len();
     debug!(target: "vm", "output_data: {:?}", result.return_data);
     if result_info.output_size > 0 {
-        result_info.output_data = unsafe { ::std::mem::transmute(&result.return_data.mem[0]) };
+        result_info.output_data = unsafe { ::std::mem::transmute(&result.return_data[0]) };
     }
     result_info.output_data
 }
@@ -249,7 +271,7 @@ extern {
     pub fn register_log_fn(
         func: extern fn(
             obj: *mut libc::c_void,
-            address: *const u8,
+            address: EvmAddress,
             data: *const u8,
             data_size: usize,
             topics: *const u8,
@@ -257,29 +279,24 @@ extern {
         ),
     );
     pub fn register_get_code_fn(
-        func: extern fn(obj: *mut libc::c_void, code_info: *mut u8, address: *const u8),
+        func: extern fn(obj: *mut libc::c_void, code_info: *mut u8, address: EvmAddress),
     );
     pub fn register_get_storage_fn(
-        func: extern fn(obj: *mut libc::c_void, address: *const u8, key: *const u8) -> *const u8,
+        func: extern fn(obj: *mut libc::c_void, address: EvmAddress, key: EvmWord) -> EvmWord,
     );
     pub fn register_put_storage_fn(
-        func: extern fn(
-            obj: *mut libc::c_void,
-            address: *const u8,
-            key: *const u8,
-            value: *const u8,
-        ),
+        func: extern fn(obj: *mut libc::c_void, address: EvmAddress, key: EvmWord, value: EvmWord),
     );
-    pub fn register_exists_fn(func: extern fn(obj: *mut libc::c_void, address: *const u8) -> i32);
+    pub fn register_exists_fn(func: extern fn(obj: *mut libc::c_void, address: EvmAddress) -> i32);
     pub fn register_get_balance_fn(
-        func: extern fn(obj: *mut libc::c_void, address: *const u8) -> *const u8,
+        func: extern fn(obj: *mut libc::c_void, address: EvmAddress) -> EvmWord,
     );
     pub fn register_selfdestruct_fn(
-        func: extern fn(obj: *mut libc::c_void, address: *const u8, beneficiary: *const u8),
+        func: extern fn(obj: *mut libc::c_void, address: EvmAddress, beneficiary: EvmAddress),
     );
     pub fn register_get_tx_context_fn(func: extern fn(obj: *mut libc::c_void, result: *mut u8));
     pub fn register_get_blockhash_fn(
-        func: extern fn(obj: *mut libc::c_void, number: u64) -> *const u8,
+        func: extern fn(obj: *mut libc::c_void, number: u64) -> HashValue,
     );
 }
 
