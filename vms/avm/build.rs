@@ -28,13 +28,21 @@ fn main() {
     // build avm library
     Command::new("make")
         .arg("-C")
-        .arg("libs/avmjni")
+        .arg("libs/avmjni/native")
         .arg(format!("{}={}", "OUTDIR", outdir))
         .arg(profile.clone())
         .status()
-        .expect("failed to build avm");
+        .expect("failed to build jni library");
 
     println!("cargo:rustc-link-search=native={}", outdir);
+
+    // NOTE: build jni jar package
+    Command::new("ant")
+        .arg("-f")
+        .arg("libs/avmjni/build.xml")
+        .status()
+        .expect("failed to build jni jar");
+
     //println!("cargo:rustc-link-lib=avmjni");
 
     // fetch jni jar
