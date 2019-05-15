@@ -2441,6 +2441,7 @@ mod tests {
         let call_data = AbiToken::STRING(String::from("storageTest")).encode();
         params.data = Some(call_data);
         params.nonce += 1;
+        params.gas = U256::from(2_000_000);
         println!("call data = {:?}", params.data);
         let substate = Substate::new();
         let execution_results = {
