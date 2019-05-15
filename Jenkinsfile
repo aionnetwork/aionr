@@ -25,7 +25,8 @@ pipeline {
     }
 	environment{
 		JAVA_HOME="/run/jdk-11"
-		PATH="${JAVA_HOME}/bin:${PATH}"
+		ANT_HOME="/run/apache-ant-1.10.5"
+		PATH="${JAVA_HOME}/bin:${ANT_HOME}/bin:${PATH}"
 		LIBRARY_PATH="${JAVA_HOME}/lib/server"
 		LD_LIBRARY_PATH="${LIBRARY_PATH}:/usr/local/lib:/run/libs"
 	}
