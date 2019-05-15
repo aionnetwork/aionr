@@ -1,21 +1,33 @@
+/*******************************************************************************
+ * Copyright (c) 2018-2019 Aion foundation.
+ *
+ *     This file is part of the aion network project.
+ *
+ *     The aion network project is free software: you can redistribute it
+ *     and/or modify it under the terms of the GNU General Public License
+ *     as published by the Free Software Foundation, either version 3 of
+ *     the License, or any later version.
+ *
+ *     The aion network project is distributed in the hope that it will
+ *     be useful, but WITHOUT ANY WARRANTY; without even the implied
+ *     warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *     See the GNU General Public License for more details.
+ *
+ *     You should have received a copy of the GNU General Public License
+ *     along with the aion network project source files.
+ *     If not, see <https://www.gnu.org/licenses/>.
+ *
+ ******************************************************************************/
+
 use callback::register_callbacks;
 use codec::NativeDecoder;
 use codec::NativeEncoder;
 use rjni::{Classpath, JavaVM, Options, Type, Value, Version};
 use rjni::ffi;
-use std::fs;
 use std::io::Error;
-use std::{env, path::Path, path::PathBuf};
-use std::ptr;
-use std::sync::atomic::AtomicPtr;
-use std::sync::atomic::Ordering;
-// use std::sync::Arc;
-use std::thread;
+use std::{fs, ptr, thread, env, path::Path, path::PathBuf};
+use std::sync::atomic::{AtomicPtr, Ordering};
 use types::{TransactionContext, TransactionResult};
-// use vm_common::{CallType};
-// use bytes::Bytes;
-// use aion_types::{Address, U256, H256};
-// use hash::{BLAKE2B_EMPTY};
 
 /// We keep a single JVM instance in the background, which will be shared
 /// among multiple threads. Before invoking any JNI methods, the executing

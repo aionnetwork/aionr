@@ -199,11 +199,9 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 let needed_balance = t.value.saturating_add(t.gas.saturating_mul(t.gas_price));
                 if balance < needed_balance {
                     // give the sender a sufficient balance
-                    let _ = self.state.add_balance(
-                        &sender,
-                        &(needed_balance + needed_balance - balance),
-                        CleanupMode::NoEmpty,
-                    );
+                    let _ =
+                        self.state
+                            .add_balance(&sender, &(needed_balance), CleanupMode::NoEmpty);
                 }
                 debug!(target: "vm", "sender: {:?}, balance: {:?}", sender, self.state.balance(&sender).unwrap_or(0.into()));
             }

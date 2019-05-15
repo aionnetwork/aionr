@@ -1098,8 +1098,6 @@ impl Client {
                 .params()
                 .monetary_policy_update
                 .map_or(false, |v| env_info.number >= v);
-            let is_avm = for_local_avm(state, transaction);
-            println!("{:?} == {:?}", aion040fork, is_avm);
             if aion040fork && for_local_avm(state, transaction) {
                 let avm_result = Executive::new(state, env_info, machine)
                     .transact_virtual_bulk(&[transaction.clone()], false);
@@ -1112,7 +1110,7 @@ impl Client {
                     .transact_virtual(transaction, false)?;
             }
 
-            println!("result = {:?}", ret);
+            debug!(target: "vm", "local call result = {:?}", ret);
 
             if let Some(original) = original_state {
                 ret.state_diff = Some(state.diff_from(original).map_err(ExecutionError::from)?);
@@ -1260,6 +1258,8 @@ impl BlockChainClient for Client {
         // that's just a copy of the state.
         let mut state = self.state_at(block).ok_or(CallError::StatePruned)?;
         let machine = self.engine.machine();
+
+        debug!(target: "vm", "fake transaction = {:?}", transaction);
 
         Self::do_virtual_call(machine, &env_info, &mut state, transaction, analytics)
     }

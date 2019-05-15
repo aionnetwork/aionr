@@ -7,6 +7,14 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+#undef org_aion_avm_jni_NativeKernelInterface_CONTRACT_CREATE_TX_NRG_MIN
+#define org_aion_avm_jni_NativeKernelInterface_CONTRACT_CREATE_TX_NRG_MIN 200000LL
+#undef org_aion_avm_jni_NativeKernelInterface_CONTRACT_CREATE_TX_NRG_MAX
+#define org_aion_avm_jni_NativeKernelInterface_CONTRACT_CREATE_TX_NRG_MAX 5000000LL
+#undef org_aion_avm_jni_NativeKernelInterface_TX_NRG_MIN
+#define org_aion_avm_jni_NativeKernelInterface_TX_NRG_MIN 21000LL
+#undef org_aion_avm_jni_NativeKernelInterface_TX_NRG_MAX
+#define org_aion_avm_jni_NativeKernelInterface_TX_NRG_MAX 2000000LL
 /*
  * Class:     org_aion_avm_jni_NativeKernelInterface
  * Method:    createAccount
