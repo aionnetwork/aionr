@@ -143,7 +143,7 @@ public class NativeKernelInterface implements KernelInterface {
 
     @Override
     public byte[] getBlockHashByNumber(long blockNumber) {
-        throw new AssertionError("No equivalent concept in the Avm.");
+        return getBlockHashByNumber(handle, blockNumber);
     }
 
     @Override
@@ -279,4 +279,6 @@ public class NativeKernelInterface implements KernelInterface {
     public static native byte[] sendSignal(long handle, int sig);
 
     public static native byte[] contract_address(byte[] sender, byte[] nonce);
+
+    public static native byte[] getBlockHashByNumber(long handle, long blockNumber);
 }

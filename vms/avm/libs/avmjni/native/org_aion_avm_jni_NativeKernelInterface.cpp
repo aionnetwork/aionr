@@ -442,3 +442,15 @@ JNIEXPORT void JNICALL Java_org_aion_avm_jni_NativeKernelInterface_setObjectGrap
     // release the buffer
     release_bytes(&c);
 }
+
+JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_getBlockHashByNumber
+  (JNIEnv *env, jclass clazz, jlong handle, jlong block_number)
+{
+  struct avm_bytes ret = callbacks.get_blockhash((void *)handle, block_number);
+
+  jbyteArray block_hash = is_null(&ret) ? NULL : to_jbyteArray(env, ret.pointer, ret.length);
+
+  release_bytes(&ret);
+
+  return block_hash;
+}

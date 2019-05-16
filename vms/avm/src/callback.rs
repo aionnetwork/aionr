@@ -73,6 +73,7 @@ pub struct avm_callbacks {
     pub get_objectgraph: extern fn(handle: *const c_void, addr: *const avm_address) -> avm_bytes,
     pub set_objectgraph:
         extern fn(handle: *const c_void, addr: *const avm_address, data: *const avm_bytes),
+    pub get_blockhash: extern fn(handle: *const c_void, block_number: i64) -> avm_bytes,
 }
 
 impl fmt::Display for avm_address {
@@ -485,6 +486,20 @@ pub extern fn avm_set_objectgraph(
     ext.set_objectgraph(addr, ext_graph.to_vec());
 }
 
+#[no_mangle]
+pub extern fn avm_get_blockhash(
+    handle: *const c_void,
+    block_number: i64,
+) -> avm_bytes {
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
+    let blockhash = ext.blockhash(&block_number.into());
+    unsafe {
+        let ret = new_fixed_bytes(32);
+        ptr::copy(&blockhash[..][0], ret.pointer, 32);
+        ret
+    }
+}
+
 pub fn register_callbacks() {
     unsafe {
         callbacks.create_account = avm_create_account;
@@ -507,6 +522,7 @@ pub fn register_callbacks() {
         callbacks.put_transformed_code = avm_put_transformed_code;
         callbacks.get_objectgraph = avm_get_objectgraph;
         callbacks.set_objectgraph = avm_set_objectgraph;
+        callbacks.get_blockhash = avm_get_blockhash;
     }
 }
 

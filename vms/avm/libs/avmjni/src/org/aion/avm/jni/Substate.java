@@ -28,6 +28,23 @@ public class Substate implements KernelInterface {
     private EnvInfo info;
     private boolean isLocalCall;
 
+    private static final String ADDR_OWNER =
+            "0000000000000000000000000000000000000000000000000000000000000000";
+    private static final String ADDR_TOTAL_CURRENCY =
+            "0000000000000000000000000000000000000000000000000000000000000100";
+
+    private static final String ADDR_TOKEN_BRIDGE =
+            "0000000000000000000000000000000000000000000000000000000000000200";
+    private static final String ADDR_TOKEN_BRIDGE_INITIAL_OWNER =
+            "a008d7b29e8d1f4bfab428adce89dc219c4714b2c6bf3fd1131b688f9ad804aa";
+
+    private static final String ADDR_ED_VERIFY =
+            "0000000000000000000000000000000000000000000000000000000000000010";
+    private static final String ADDR_BLAKE2B_HASH =
+            "0000000000000000000000000000000000000000000000000000000000000011";
+    private static final String ADDR_TX_HASH =
+            "0000000000000000000000000000000000000000000000000000000000000012";
+
     private class EnvInfo {
         private Address coinbase;
         private long blockTimestamp;
@@ -56,6 +73,19 @@ public class Substate implements KernelInterface {
         this.info.blockGasLimit = msg.blockEnergyLimit;
         this.info.blockNumber = msg.blockNumber;
         this.info.coinbase = new Address(msg.blockCoinbase);
+    }
+
+    private boolean isPrecompiledContract(Address address) {
+        switch (address.toString()) {
+            case ADDR_TOKEN_BRIDGE:
+            case ADDR_ED_VERIFY:
+            case ADDR_BLAKE2B_HASH:
+            case ADDR_TX_HASH:
+                return true;
+            case ADDR_TOTAL_CURRENCY:
+            default:
+                return false;
+        }
     }
 
     @Override
@@ -238,12 +268,15 @@ public class Substate implements KernelInterface {
 
     @Override
     public boolean destinationAddressIsSafeForThisVM(Address address) {
+        if (isPrecompiledContract(address)) {
+            return false;
+        }
         return this.parent.destinationAddressIsSafeForThisVM(address);
     }
 
     @Override
     public byte[] getBlockHashByNumber(long blockNumber) {
-        throw new AssertionError("No equivalent concept in the Avm.");
+        return this.parent.getBlockHashByNumber(blockNumber);
     }
 
     @Override
