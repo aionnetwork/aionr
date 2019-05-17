@@ -6,7 +6,7 @@ nohup /run/aionminer -l 127.0.0.1:8008 -u 0xa07e185919beef1e0a79fea78fcfabc24927
 
 
 WS="${PWD}"
-PACKAGE="aionr-$(git describe --tags)-$(date +%Y%m%d)"
+PACKAGE="aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"
 
 # remove db
 echo "clean previous testdb"
