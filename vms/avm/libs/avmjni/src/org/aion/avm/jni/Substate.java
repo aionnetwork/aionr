@@ -281,25 +281,22 @@ public class Substate implements KernelInterface {
 
     @Override
     public void payMiningFee(Address address, BigInteger fee) {
-        // This method may have special logic in the kernel. Here it is just adjustBalance.
         adjustBalance(address, fee);
     }
 
     @Override
     public void refundAccount(Address address, BigInteger amount) {
-        // This method may have special logic in the kernel. Here it is just adjustBalance.
         adjustBalance(address, amount);
     }
 
     @Override
     public void deductEnergyCost(Address address, BigInteger cost) {
-        // This method may have special logic in the kernel. Here it is just adjustBalance.
         adjustBalance(address, cost);
     }
 
     @Override
     public void removeStorage(Address address, byte[] key) {
-        throw new AssertionError("This class does not implement this method.");
+        putStorage(address, key, new byte[]{0});
     }
 
     @Override
@@ -335,11 +332,6 @@ public class Substate implements KernelInterface {
 
     }
 
-    // @Override
-    // public Set<byte[]> getTouchedAccounts() {
-    //     throw new AssertionError("This class does not implement this method.");
-    // }
-
     @Override
     public void commitTo(KernelInterface target) { }
 
@@ -350,7 +342,6 @@ public class Substate implements KernelInterface {
         }
     }
 
-    // Camus: this should not be in kernel interface
     @Override
     public Address getMinerAddress() {
         if (Constants.DEBUG) {
@@ -360,25 +351,21 @@ public class Substate implements KernelInterface {
         return this.info.coinbase;
     }
 
-    // Camus: this should not be in kernel interface
     @Override
     public long getBlockDifficulty() {
         return this.info.blockDifficulty;
     }
 
-    // Camus: this should not be in kernel interface
     @Override
     public long getBlockEnergyLimit() {
         return this.info.blockGasLimit;
     }
 
-    // Camus: this should not be in kernel interface
     @Override
     public long getBlockTimestamp() {
         return this.info.blockTimestamp;
     }
 
-    // Camus: this should not be in kernel interface
     @Override
     public long getBlockNumber() {
         return this.info.blockNumber;

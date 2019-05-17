@@ -487,10 +487,7 @@ pub extern fn avm_set_objectgraph(
 }
 
 #[no_mangle]
-pub extern fn avm_get_blockhash(
-    handle: *const c_void,
-    block_number: i64,
-) -> avm_bytes {
+pub extern fn avm_get_blockhash(handle: *const c_void, block_number: i64) -> avm_bytes {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let blockhash = ext.blockhash(&block_number.into());
     unsafe {
