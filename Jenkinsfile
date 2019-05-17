@@ -54,7 +54,7 @@ pipeline {
             	echo 'clean compiled version.rs'
             	sh 'rm -r target/release/build/aion-version* target/release/build/avm-* || echo "no aion-version folders exist"'
             	echo "building..."
-                sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-$(git describe --tags)-$(date +%Y%m%d)"'
+                sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"'
             }
         }
 		stage('Unit Test'){

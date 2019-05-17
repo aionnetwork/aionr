@@ -79,11 +79,15 @@ Follow this guide to install the Aion Rust kernel on your system.
 
 7. **This step is optional**. If you plan on modifying the _Protobuf_ message, you need to install [Google Protobuf](https://github.com/stepancheg/rust-protobuf). You will also need to make sure that `protoc` is added to your `PATH` once _Profobuf_ is installed.
 
-8. Set Environment Variables: :new:
+8. Install Apache Ant 10: :new:
+    * [Apache Ant 10](http://ftp.tsukuba.wide.ad.jp/software/apache//ant/binaries/apache-ant-1.10.5-bin.tar.gz)
+
+9. Set Environment Variables: :new:
     ```bash
     export JAVA_HOME=<jdk_directory_location>
+    export ANT_HOME=<apache_ant_directory>	
     export LIBRARY_PATH=$JAVA_HOME/lib/server
-    export PATH=$PATH:$JAVA_HOME/bin
+    export PATH=$PATH:$JAVA_HOME/bin:$ANT_HOME/bin
     export LD_LIBRARY_PATH=$LIBRARY_PATH:/usr/local/lib
     ```
 ### Build the Kernel
