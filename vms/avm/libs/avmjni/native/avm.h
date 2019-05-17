@@ -156,6 +156,8 @@ typedef void (*avm_set_transformed_code_fn)(
     const struct avm_address *address,
     const struct avm_bytes *data);
 
+typedef struct avm_bytes (*avm_get_blockhash_fn)(const void *handle, const i64 block_number);
+
 /**
  * A data structure holds all the callback function pointers.
  */
@@ -180,6 +182,7 @@ struct avm_callbacks {
     avm_set_transformed_code_fn put_transformed_code;
     avm_get_objectgraph_fn      get_objectgraph;
     avm_set_objectgraph_fn      set_objectgraph;
+    avm_get_blockhash_fn        get_blockhash;
 };
 
 typedef struct avm_bytes (*create_contract_fn)(const struct avm_address *address, const uint64_t nonce);

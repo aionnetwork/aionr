@@ -604,7 +604,45 @@ where B: StateBackend
             .expect("Fatal error occurred when getting balance.")
     }
 
-    fn blockhash(&mut self, number: &U256) -> H256 { unimplemented!() }
+    fn blockhash(&mut self, number: &U256) -> H256 {
+        match *number < U256::from(self.env_info.number)
+            && number.low_u64() >= cmp::max(256, self.env_info.number) - 256
+        {
+            true => {
+                let index = self.env_info.number - number.low_u64() - 1;
+                assert!(
+                    index < self.env_info.last_hashes.len() as u64,
+                    format!(
+                        "Inconsistent env_info, should contain at least {:?} last hashes",
+                        index + 1
+                    )
+                );
+                let r = self.env_info.last_hashes[index as usize].clone();
+                trace!(
+                    target: "ext",
+                    "ext: blockhash({}) -> {} self.env_info.number={}\n",
+                    number,
+                    r,
+                    self.env_info.number
+                );
+                r
+            }
+            false => {
+                trace!(
+                    target: "ext",
+                    "ext: blockhash({}) -> null self.env_info.number={}\n",
+                    number,
+                    self.env_info.number
+                );
+                // for Aion, always returns the real blockhash
+                let db = self.state.lock().unwrap().export_kvdb();
+                match db.read(db::COL_EXTRA, &number.low_u64()) {
+                    Some(value) => value,
+                    _ => H256::zero(),
+                }
+            }
+        }
+    }
 
     /// Create new contract account
     fn create(&mut self, gas: &U256, value: &U256, code: &[u8]) -> ExecutionResult {

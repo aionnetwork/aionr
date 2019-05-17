@@ -175,6 +175,14 @@ JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_sendSig
 JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_contract_1address
   (JNIEnv *, jclass, jbyteArray, jbyteArray);
 
+/*
+ * Class:     org_aion_avm_jni_NativeKernelInterface
+ * Method:    getBlockHashByNumber
+ * Signature: (JJ)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_getBlockHashByNumber
+  (JNIEnv *, jclass, jlong, jlong);
+
 #ifdef __cplusplus
 }
 #endif
