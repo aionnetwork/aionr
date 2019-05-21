@@ -238,10 +238,7 @@ impl rlp::Encodable for Crypto {
 mod tests {
     use rustc_hex::ToHex;
     use key::generate_keypair;
-    use super::{
-        Crypto,
-        Error
-};
+    use super::{Crypto, Error};
 
     #[test]
     fn crypto_with_secret_create() {

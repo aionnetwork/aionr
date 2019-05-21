@@ -30,17 +30,21 @@ use acore::miner::{MinerOptions, Banning, StratumOptions};
 use acore::verification::queue::VerifierSettings;
 
 use pb::WalletApiConfiguration;
-use rpc::{IpcConfiguration, HttpConfiguration, WsConfiguration,};
+use rpc::{IpcConfiguration, HttpConfiguration, WsConfiguration};
 use aion_rpc::dispatch::DynamicGasPrice;
 use cache::CacheConfig;
-use helpers::{to_block_id, to_u256, to_pending_set, aion_ipc_path,parse_log_target,
-to_addresses, to_address, to_queue_strategy,validate_log_level};
+use helpers::{
+    to_block_id, to_u256, to_pending_set, aion_ipc_path, parse_log_target, to_addresses,
+    to_address, to_queue_strategy, validate_log_level,
+};
 use dir::helpers::{replace_home, replace_home_and_local, absolute};
 use params::{ResealPolicy, AccountsConfig, MinerExtras, SpecType};
 use logger::{LogConfig};
 use dir::{self, Directories, default_local_path, default_data_path};
 use run::RunCmd;
-use blockchain::{BlockchainCmd, ImportBlockchain, ExportBlockchain, KillBlockchain, RevertBlockchain, DataFormat};
+use blockchain::{
+    BlockchainCmd, ImportBlockchain, ExportBlockchain, KillBlockchain, RevertBlockchain, DataFormat,
+};
 use account::{AccountCmd, NewAccount, ListAccounts, ImportAccounts, ImportAccount, ExportAccount};
 
 #[derive(Debug, PartialEq)]
@@ -398,11 +402,12 @@ impl Configuration {
         if !self.args.flag_dynamic_gas_price {
             return Ok(None);
         }
-        let dynamic = DynamicGasPrice {
-            blk_price_window: self.args.arg_blk_price_window,
-            max_blk_traverse: self.args.arg_max_blk_traverse,
-            gas_price_percentile: self.args.arg_gas_price_percentile,
-        };
+        let mut dynamic = DynamicGasPrice::default();
+
+        dynamic.blk_price_window = self.args.arg_blk_price_window;
+        dynamic.max_blk_traverse = self.args.arg_max_blk_traverse;
+        dynamic.gas_price_percentile = self.args.arg_gas_price_percentile;
+
         Ok(Some(dynamic))
     }
 

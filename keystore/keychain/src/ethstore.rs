@@ -588,16 +588,9 @@ impl SimpleSecretStore for EthMultiStore {
 #[cfg(test)]
 mod tests {
     extern crate tempdir;
-    use accounts_dir::{
-        KeyDirectory,
-        MemoryDirectory,
-        RootDiskDirectory
-};
+    use accounts_dir::{KeyDirectory, MemoryDirectory, RootDiskDirectory};
     use key::{generate_keypair, Ed25519KeyPair};
-    use secret_store::{
-        SimpleSecretStore,
-        SecretStore,
-};
+    use secret_store::{SimpleSecretStore, SecretStore};
     use super::EthStore;
     use self::tempdir::TempDir;
 

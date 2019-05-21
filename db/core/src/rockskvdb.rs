@@ -22,7 +22,8 @@
 use std::cmp;
 use traits::KeyValueDAO;
 use parity_rocksdb::{
-    DB, Options, BlockBasedOptions, Cache, ReadOptions, IteratorMode, Direction, WriteOptions, WriteBatch, DBIterator, Writable, DBCompactionStyle
+    DB, Options, BlockBasedOptions, Cache, ReadOptions, IteratorMode, Direction, WriteOptions,
+    WriteBatch, DBIterator, Writable, DBCompactionStyle,
 };
 use super::{Key, DBValue};
 use std::collections::HashMap;

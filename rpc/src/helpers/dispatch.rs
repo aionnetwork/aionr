@@ -26,29 +26,25 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use blake2b::blake2b;
-use aion_types::{H256, H768, Address, U256};
-use bytes::Bytes;
-use parking_lot::Mutex;
-use key::Ed25519Signature;
-use acore::miner::MinerService;
-use acore::client::MiningBlockChainClient;
 use acore::account_provider::AccountProvider;
-use acore::transaction::{Action, SignedTransaction, PendingTransaction, Transaction};
+use acore::client::MiningBlockChainClient;
+use acore::miner::MinerService;
+use acore::transaction::{Action, PendingTransaction, SignedTransaction, Transaction};
+use aion_types::{Address, H256, H768, U256};
+use blake2b::blake2b;
+use bytes::Bytes;
+use key::Ed25519Signature;
+use parking_lot::Mutex;
 
-use jsonrpc_core::{BoxFuture, Result, Error};
-use jsonrpc_core::futures::{future, Future, Poll, Async};
-use helpers::{errors, nonce, TransactionRequest, FilledTransactionRequest, ConfirmationPayload};
+use helpers::{errors, nonce, ConfirmationPayload, FilledTransactionRequest, TransactionRequest};
+use jsonrpc_core::futures::{future, Async, Future, Poll};
+use jsonrpc_core::{BoxFuture, Error, Result};
 use types::{
-    H256 as RpcH256,
-    H768 as RpcH768,
-    RichRawTransaction as RpcRichRawTransaction,
-    ConfirmationPayload as RpcConfirmationPayload,
-    ConfirmationResponse,
-    SignRequest as RpcSignRequest,
+    ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse, H256 as RpcH256,
+    H768 as RpcH768, RichRawTransaction as RpcRichRawTransaction, SignRequest as RpcSignRequest,
 };
 
-pub use self::nonce::{Reservations, Ready as NonceReady};
+pub use self::nonce::{Ready as NonceReady, Reservations};
 
 use bytes::i64_to_bytes;
 use trace_time::to_epoch_micro;
@@ -173,6 +169,7 @@ impl<C: MiningBlockChainClient, M: MinerService> Dispatcher for FullDispatcher<C
                 .unwrap_or_else(|| self.miner.default_gas_limit()),
             value: request.value.unwrap_or_else(|| 0.into()),
             data: request.data.unwrap_or_else(Vec::new),
+            tx_type: request.tx_type.unwrap_or_else(|| 0x01.into()),
             condition: request.condition,
         }))
     }
@@ -231,6 +228,7 @@ fn sign_transaction(
         filled.to.map_or(Action::Create, Action::Call),
         filled.value,
         filled.data,
+        filled.tx_type,
     );
 
     let timestamp = i64_to_bytes(to_epoch_micro());
@@ -455,6 +453,8 @@ pub struct DynamicGasPrice {
     pub blk_price_window: usize,
     pub max_blk_traverse: usize,
     pub gas_price_percentile: usize,
+    pub last_processed: i64,
+    pub recommendation: U256,
 }
 
 impl Default for DynamicGasPrice {
@@ -463,6 +463,8 @@ impl Default for DynamicGasPrice {
             blk_price_window: 20,
             max_blk_traverse: 64,
             gas_price_percentile: 60,
+            last_processed: -1,
+            recommendation: U256::from(10000000000u64),
         }
     }
 }
@@ -568,17 +570,22 @@ where
         None => {
             return miner.minimal_gas_price();
         }
-        Some(dynamic_gas_price) => {
-            client
-                .gas_price_corpus(
-                    dynamic_gas_price.blk_price_window,
-                    dynamic_gas_price.max_blk_traverse,
-                )
-                .percentile(dynamic_gas_price.gas_price_percentile)
-                .cloned()
-                .map_or(miner.minimal_gas_price(), |gas_price| {
-                    ::std::cmp::min(gas_price, miner.local_maximal_gas_price())
-                })
+        Some(mut dynamic_gas_price) => {
+            let blk_now = client.chain_info().best_block_number as i64;
+            if blk_now - dynamic_gas_price.last_processed >= 2 {
+                dynamic_gas_price.recommendation = client
+                    .gas_price_corpus(
+                        dynamic_gas_price.blk_price_window,
+                        dynamic_gas_price.max_blk_traverse,
+                    )
+                    .percentile(dynamic_gas_price.gas_price_percentile)
+                    .cloned()
+                    .map_or(miner.minimal_gas_price(), |gas_price| {
+                        ::std::cmp::min(gas_price, miner.local_maximal_gas_price())
+                    });
+                dynamic_gas_price.last_processed = blk_now;
+            }
+            return dynamic_gas_price.recommendation;
         }
     }
 }

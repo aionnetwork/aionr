@@ -36,7 +36,9 @@ mod ed25519;
 mod blake2b;
 
 pub use self::error::Error;
-pub use self::ed25519::signature_ed25519::{recover_ed25519, sign_ed25519, verify_signature_ed25519, Ed25519Signature};
+pub use self::ed25519::signature_ed25519::{
+    recover_ed25519, sign_ed25519, verify_signature_ed25519, Ed25519Signature,
+};
 pub use self::ed25519::secret_ed25519::Ed25519Secret;
 pub use self::ed25519::keypair_ed25519::{generate_keypair, Ed25519KeyPair, public_to_address_ed25519};
 pub use aion_types::{Address, H256, Ed25519Public};

@@ -27,28 +27,30 @@ use std::io::Read;
 use std::path::Path;
 use std::sync::Arc;
 
-use bytes::Bytes;
-use aion_types::{H256, U256, Address};
-use ethbloom::Bloom;
+use aion_types::{Address, H256, U256};
 use ajson;
-use blake2b::{BLAKE2B_NULL_RLP, blake2b};
+use blake2b::{blake2b, BLAKE2B_NULL_RLP};
+use bytes::Bytes;
+use ethbloom::Bloom;
 use kvdb::{MemoryDB, MemoryDBRepository};
 use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
-use vms::{CallType, ActionValue, ActionParams, ParamsType, EnvInfo};
+use types::BlockNumber;
+use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
 
-use precompiled::builtin::{BuiltinContract, builtin_contract};
-use engines::{POWEquihashEngine, EthEngine, NullEngine, InstantSeal};
+use engines::{EthEngine, InstantSeal, NullEngine, POWEquihashEngine};
 use error::Error;
 use executive::Executive;
 use factory::Factories;
 use header::Header;
 use machine::EthereumMachine;
 use pod_state::PodState;
-use spec::Genesis;
+use precompiled::builtin::{builtin_contract, BuiltinContract};
 use spec::seal::Generic as GenericSeal;
+use spec::Genesis;
 use state::backend::Basic as BasicBackend;
 use state::{Backend, State, Substate};
+use transaction::DEFAULT_TRANSACTION_TYPE;
 
 // helper for formatting errors.
 fn fmt_err<F: ::std::fmt::Display>(f: F) -> String { format!("Spec json is invalid: {}", f) }
@@ -65,6 +67,8 @@ pub struct CommonParams {
     pub gas_limit_bound_divisor: U256,
     /// Registrar contract address.
     pub registrar: Address,
+    /// monetary policy update block number.
+    pub monetary_policy_update: Option<BlockNumber>,
     /// Transaction permission managing contract address.
     pub transaction_permission_contract: Option<Address>,
 }
@@ -77,6 +81,7 @@ impl From<ajson::spec::Params> for CommonParams {
             min_gas_limit: p.min_gas_limit.into(),
             gas_limit_bound_divisor: p.gas_limit_bound_divisor.into(),
             registrar: p.registrar.map_or_else(Address::new, Into::into),
+            monetary_policy_update: p.monetary_policy_update.map(Into::into),
             transaction_permission_contract: p.transaction_permission_contract.map(Into::into),
         }
     }
@@ -183,7 +188,7 @@ fn load_machine_from(s: ajson::spec::Spec) -> EthereumMachine {
         .collect();
     let params = CommonParams::from(s.params);
 
-    Spec::machine(&s.engine, params, builtins)
+    Spec::machine(&s.engine, params, builtins, s.accounts.premine())
 }
 
 /// Load from JSON object.
@@ -200,7 +205,13 @@ fn load_from(spec_params: SpecParams, s: ajson::spec::Spec) -> Result<Spec, Erro
 
     let mut s = Spec {
         name: s.name.clone().into(),
-        engine: Spec::engine(spec_params, s.engine, params, builtins),
+        engine: Spec::engine(
+            spec_params,
+            s.engine,
+            params,
+            builtins,
+            s.accounts.premine(),
+        ),
         data_dir: s.data_dir.unwrap_or(s.name).into(),
         parent_hash: g.parent_hash,
         transactions_root: g.transactions_root,
@@ -256,9 +267,10 @@ impl Spec {
         _engine_spec: &ajson::spec::Engine,
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
+        premine: U256,
     ) -> EthereumMachine
     {
-        EthereumMachine::regular(params, builtins)
+        EthereumMachine::regular(params, builtins, premine)
     }
 
     /// Convert engine spec into a arc'd Engine of the right underlying type.
@@ -268,9 +280,10 @@ impl Spec {
         engine_spec: ajson::spec::Engine,
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
+        premine: U256,
     ) -> Arc<EthEngine>
     {
-        let machine = Self::machine(&engine_spec, params, builtins);
+        let machine = Self::machine(&engine_spec, params, builtins, premine);
 
         match engine_spec {
             ajson::spec::Engine::POWEquihashEngine(pow_equihash_engine) => {
@@ -358,6 +371,7 @@ impl Spec {
                     params_type: ParamsType::Embedded,
                     transaction_hash: H256::default(),
                     original_transaction_hash: H256::default(),
+                    nonce: 0,
                 };
 
                 let mut substate = Substate::new();
@@ -486,9 +500,9 @@ impl Spec {
     /// initialize genesis epoch data, using in-memory database for
     /// constructor.
     pub fn genesis_epoch_data(&self) -> Result<Vec<u8>, String> {
-        use transaction::{Action, Transaction};
         use journaldb;
-        use kvdb::{MockDbRepository};
+        use kvdb::MockDbRepository;
+        use transaction::{Action, Transaction};
 
         let genesis = self.genesis_header();
         let db_configs = vec!["epoch".into()];
@@ -522,6 +536,7 @@ impl Spec {
                 Action::Call(a),
                 U256::default(),
                 d,
+                DEFAULT_TRANSACTION_TYPE,
             )
             .fake_sign(from);
 

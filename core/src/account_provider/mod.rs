@@ -25,8 +25,9 @@ use std::collections::{HashMap};
 use std::time::{Instant, Duration};
 use parking_lot::RwLock;
 use keychain::{
-    SimpleSecretStore, SecretStore, Error as SSError, EthStore, EthMultiStore,
-random_string, StoreAccountRef, OpaqueSecretEd25519};
+    SimpleSecretStore, SecretStore, Error as SSError, EthStore, EthMultiStore, random_string,
+    StoreAccountRef, OpaqueSecretEd25519,
+};
 use keychain::accounts_dir::MemoryDirectory;
 use keychain::ethkey::{Address, Ed25519Secret, generate_keypair, Message, Ed25519Signature};
 use ajson::misc::AccountMeta;

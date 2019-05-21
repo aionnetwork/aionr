@@ -24,16 +24,16 @@ use std::collections::{BTreeMap, HashSet};
 use std::str::FromStr;
 use std::sync::Arc;
 
-use sync::sync::{SyncProvider};
 use acore::account_provider::AccountProvider;
 use acore::client::Client;
-use acore::miner::Miner;
-use jsonrpc_core::{self as core, MetaIoHandler};
 use acore::miner::external::ExternalMiner;
-use aion_rpc::dispatch::{FullDispatcher,DynamicGasPrice};
+use acore::miner::Miner;
+use aion_rpc::dispatch::{DynamicGasPrice, FullDispatcher};
 use aion_rpc::informant::{ActivityNotifier, ClientNotifier};
-use aion_rpc::{Metadata};
+use aion_rpc::Metadata;
+use jsonrpc_core::{self as core, MetaIoHandler};
 use parking_lot::Mutex;
+use sync::sync::SyncProvider;
 use tokio::runtime::TaskExecutor;
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
@@ -173,8 +173,8 @@ impl FullDependencies {
     ) where
         S: core::Middleware<Metadata>,
     {
-        use aion_rpc::impls::*;
         use aion_rpc::dispatch;
+        use aion_rpc::impls::*;
         use aion_rpc::traits::*;
         macro_rules! add_signing_methods {
             ($namespace:ident, $handler:expr, $deps:expr, $nonces:expr) => {{
@@ -383,7 +383,7 @@ mod test {
                     Api::Rpc,
                     Api::Personal,
                     Api::EthPubSub,
-                    Api::Ping
+                    Api::Ping,
                 ]
                 .into_iter()
                 .collect()
@@ -403,7 +403,7 @@ mod test {
                     Api::Stratum,
                     Api::Rpc,
                     Api::EthPubSub,
-                    Api::Ping
+                    Api::Ping,
                 ]
                 .into_iter()
                 .collect()

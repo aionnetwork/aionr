@@ -22,7 +22,8 @@
 
 //! Transaction Execution environment.
 use std::sync::{Arc, Mutex};
-use blake2b::blake2b;
+use std::collections::HashSet;
+use blake2b::{blake2b};
 use aion_types::{H256, U256, U512, Address};
 #[cfg(test)]
 use aion_types::U128;
@@ -30,23 +31,19 @@ use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use error::ExecutionError;
 use vms::{
-    self,
-    ActionParams,
-    ActionValue,
-    CallType,
-    EnvInfo,
-    ReturnData,
-    EvmStatusCode,
+    self, ActionParams, ActionValue, CallType, EnvInfo, ExecutionResult, ExecStatus, ReturnData,
+    VMType,
 };
-use vms::vm::ExecutionResult;
-use vms::constants::{MAX_CALL_DEPTH, GAS_CALL_MAX, GAS_CREATE_MAX,};
-use vms::VMType;
+use vms::constants::{MAX_CALL_DEPTH, GAS_CALL_MAX, GAS_CREATE_MAX};
 
 use externalities::*;
 use transaction::{Action, SignedTransaction};
 use crossbeam;
 pub use executed::Executed;
 use precompiled::builtin::{BuiltinExtImpl, BuiltinContext};
+
+use std::thread;
+use std::sync::mpsc::{channel, Sender};
 
 #[cfg(debug_assertions)]
 /// Roughly estimate what stack size each level of evm depth will use. (Debug build)
@@ -119,7 +116,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     /// Creates `Externalities` from `Executive`.
     pub fn as_externalities<'any>(
         &'any mut self,
-        origin_info: OriginInfo,
+        origin_info: Vec<OriginInfo>,
         substate: &'any mut Substate,
     ) -> Externalities<'any, B>
     {
@@ -132,6 +129,22 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             origin_info,
             substate,
             kvdb,
+        )
+    }
+
+    pub fn as_avm_externalities<'any>(
+        &'any mut self,
+        substates: &'any mut [Substate],
+        tx_chnnl: Sender<i32>,
+    ) -> AVMExternalities<'any, B>
+    {
+        AVMExternalities::new(
+            self.state,
+            self.info,
+            self.machine,
+            self.depth,
+            substates,
+            tx_chnnl,
         )
     }
 
@@ -154,6 +167,163 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         }
 
         self.transact(t, check_nonce, true)
+    }
+
+    pub fn transact_virtual_bulk(
+        &'a mut self,
+        txs: &[SignedTransaction],
+        check_nonce: bool,
+    ) -> Vec<Result<Executed, ExecutionError>>
+    {
+        self.transact_bulk(txs, check_nonce, true)
+    }
+
+    // TIPS: carefully deal with errors in parallelism
+    pub fn transact_bulk(
+        &'a mut self,
+        txs: &[SignedTransaction],
+        _check_nonce: bool,
+        is_local_call: bool,
+    ) -> Vec<Result<Executed, ExecutionError>>
+    {
+        let mut vm_params = Vec::new();
+        for t in txs {
+            let sender = t.sender();
+            let nonce = t.nonce;
+
+            let init_gas = t.gas;
+
+            if is_local_call {
+                let sender = t.sender();
+                let balance = self.state.balance(&sender).unwrap_or(0.into());
+                let needed_balance = t.value.saturating_add(t.gas.saturating_mul(t.gas_price));
+                if balance < needed_balance {
+                    // give the sender a sufficient balance
+                    let _ =
+                        self.state
+                            .add_balance(&sender, &(needed_balance), CleanupMode::NoEmpty);
+                }
+                debug!(target: "vm", "sender: {:?}, balance: {:?}", sender, self.state.balance(&sender).unwrap_or(0.into()));
+            }
+
+            // Transactions are now handled in different ways depending on whether it's
+            // action type is Create or Call.
+            let params = match t.action {
+                Action::Create => {
+                    ActionParams {
+                        code_address: Address::default(),
+                        code_hash: None,
+                        address: Address::default(),
+                        sender: sender.clone(),
+                        origin: sender.clone(),
+                        gas: init_gas,
+                        gas_price: t.gas_price,
+                        value: ActionValue::Transfer(t.value),
+                        code: Some(Arc::new(t.data.clone())),
+                        data: None,
+                        call_type: CallType::None,
+                        transaction_hash: t.hash(),
+                        original_transaction_hash: t.hash(),
+                        nonce: nonce.low_u64(),
+                        static_flag: false,
+                        params_type: vms::ParamsType::Embedded,
+                    }
+                }
+                Action::Call(ref address) => {
+                    let call_type = match self.state.code(&address).unwrap().is_some() {
+                        true => CallType::Call,
+                        false => CallType::BulkBalance,
+                    };
+
+                    ActionParams {
+                        code_address: address.clone(),
+                        address: address.clone(),
+                        sender: sender.clone(),
+                        origin: sender.clone(),
+                        gas: init_gas,
+                        gas_price: t.gas_price,
+                        value: ActionValue::Transfer(t.value),
+                        code: self.state.code(address).unwrap(),
+                        code_hash: Some(self.state.code_hash(address).unwrap()),
+                        data: Some(t.data.clone()),
+                        call_type: call_type,
+                        transaction_hash: t.hash(),
+                        original_transaction_hash: t.hash(),
+                        nonce: nonce.low_u64(),
+                        params_type: vms::ParamsType::Embedded,
+                        static_flag: false,
+                    }
+                }
+            };
+            vm_params.push(params);
+        }
+
+        let mut substates = vec![Substate::new(); vm_params.len()];
+        let results = self.exec_avm(vm_params, &mut substates.as_mut_slice(), is_local_call);
+
+        // enact results and update state separately
+
+        self.avm_finalize(txs, substates.as_slice(), results)
+    }
+
+    fn exec_avm(
+        &mut self,
+        params: Vec<ActionParams>,
+        unconfirmed_substate: &mut [Substate],
+        is_local_call: bool,
+    ) -> Vec<ExecutionResult>
+    {
+        let local_stack_size = ::io::LOCAL_STACK_SIZE.with(|sz| sz.get());
+        let depth_threshold =
+            local_stack_size.saturating_sub(STACK_SIZE_ENTRY_OVERHEAD) / STACK_SIZE_PER_DEPTH;
+
+        // start a new thread to listen avm signal
+        let (tx, rx) = channel();
+        thread::spawn(move || {
+            let mut signal = rx.recv().expect("Unable to receive from channel");
+            while signal >= 0 {
+                match signal {
+                    0 => debug!(target: "vm", "AVMExec: commit state"),
+                    1 => debug!(target: "vm", "AVMExec: get state"),
+                    _ => println!("unknown signal"),
+                }
+                signal = rx.recv().expect("Unable to receive from channel");
+            }
+
+            trace!(target: "vm", "received {:?}, kill channel", signal);
+        });
+
+        // Ordinary execution - keep VM in same thread
+        debug!(target: "vm", "depth threshold = {:?}", depth_threshold);
+        if self.depth != depth_threshold {
+            let mut vm_factory = self.state.vm_factory();
+            // consider put global callback in ext
+            let mut ext = self.as_avm_externalities(unconfirmed_substate, tx.clone());
+            //TODO: make create/exec compatible with fastvm
+            let vm = vm_factory.create(VMType::AVM);
+            return vm.exec(params, &mut ext, is_local_call);
+        }
+
+        //Start in new thread with stack size needed up to max depth
+        crossbeam::scope(|scope| {
+            let mut vm_factory = self.state.vm_factory();
+
+            let mut ext = self.as_avm_externalities(unconfirmed_substate, tx.clone());
+
+            scope
+                .builder()
+                .stack_size(::std::cmp::max(
+                    (MAX_CALL_DEPTH as usize).saturating_sub(depth_threshold)
+                        * STACK_SIZE_PER_DEPTH,
+                    local_stack_size,
+                ))
+                .spawn(move || {
+                    let vm = vm_factory.create(VMType::AVM);
+                    vm.exec(params, &mut ext, is_local_call)
+                })
+                .expect("Sub-thread creation cannot fail; the host might run out of resources; qed")
+        })
+        .join()
     }
 
     /// This function should be used to execute transaction.
@@ -261,6 +431,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     params_type: vms::ParamsType::Embedded,
                     transaction_hash: t.hash(),
                     original_transaction_hash: t.hash(),
+                    nonce: t.nonce.low_u64(),
                 };
                 self.create(params, &mut substate)
             }
@@ -281,6 +452,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     params_type: vms::ParamsType::Separate,
                     transaction_hash: t.hash(),
                     original_transaction_hash: t.hash(),
+                    nonce: t.nonce.low_u64(),
                 };
                 self.call(params, &mut substate)
             }
@@ -305,17 +477,28 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         if self.depth != depth_threshold {
             let mut vm_factory = self.state.vm_factory();
             // consider put global callback in ext
-            let mut ext = self.as_externalities(OriginInfo::from(&params), unconfirmed_substate);
+            let mut ext = self.as_externalities(
+                OriginInfo::from(&[&params as &ActionParams]),
+                unconfirmed_substate,
+            );
             //TODO: make create/exec compatible with fastvm
             let vm = vm_factory.create(VMType::FastVM);
-            return vm.exec(params, &mut ext);
+            // fastvm local call flag is unused
+            return vm
+                .exec(vec![params], &mut ext, false)
+                .first()
+                .unwrap()
+                .clone();
         }
 
         //Start in new thread with stack size needed up to max depth
         crossbeam::scope(|scope| {
             let mut vm_factory = self.state.vm_factory();
 
-            let mut ext = self.as_externalities(OriginInfo::from(&params), unconfirmed_substate);
+            let mut ext = self.as_externalities(
+                OriginInfo::from(&[&params as &ActionParams]),
+                unconfirmed_substate,
+            );
 
             scope
                 .builder()
@@ -326,7 +509,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 ))
                 .spawn(move || {
                     let vm = vm_factory.create(VMType::FastVM);
-                    vm.exec(params, &mut ext)
+                    vm.exec(vec![params], &mut ext, false)
+                        .first()
+                        .unwrap()
+                        .clone()
                 })
                 .expect("Sub-thread creation cannot fail; the host might run out of resources; qed")
         })
@@ -361,9 +547,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 ) {
                     return ExecutionResult {
                         gas_left: 0.into(),
-                        status_code: EvmStatusCode::Failure,
+                        status_code: ExecStatus::Failure,
                         return_data: ReturnData::empty(),
                         exception: String::from("Error in balance transfer"),
+                        state_root: H256::default(),
                     };
                 }
             }
@@ -399,6 +586,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             };
 
             let cost = builtin.cost(data);
+            debug!(target: "vm", "builtin gas cost = {:?}", cost);
             if cost <= params.gas {
                 let mut unconfirmed_substate = Substate::new();
                 let mut result = {
@@ -413,7 +601,9 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     builtin.execute(&mut ext, data)
                 };
 
-                if result.status_code == EvmStatusCode::Success {
+                debug!(target: "vm", "builtin result = {:?}", result);
+
+                if result.status_code == ExecStatus::Success {
                     result.gas_left = params.gas - cost;
                     // Handle state and substates
                     self.enact_result(&result, substate, unconfirmed_substate);
@@ -426,9 +616,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 self.state.revert_to_checkpoint();
                 res = ExecutionResult {
                     gas_left: 0.into(),
-                    status_code: EvmStatusCode::Failure,
+                    status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from("Not enough gas to execute precompiled contract."),
+                    state_root: H256::default(),
                 };
             }
         } else {
@@ -450,15 +641,16 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
                 res = ExecutionResult {
                     gas_left: params.gas,
-                    status_code: EvmStatusCode::Success,
+                    status_code: ExecStatus::Success,
                     return_data: ReturnData::empty(),
                     exception: String::default(),
+                    state_root: H256::default(),
                 };
             }
         }
 
         debug!(target: "executive", "final transact result = {:?}", res);
-        if (self.depth == 0) && (res.status_code == EvmStatusCode::Success) {
+        if (self.depth == 0) && (res.status_code == ExecStatus::Success) {
             // at first, transfer value to destination
             if let ActionValue::Transfer(val) = params.value {
                 // Normally balance should have been checked before.
@@ -471,15 +663,46 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 ) {
                     return ExecutionResult {
                         gas_left: 0.into(),
-                        status_code: EvmStatusCode::Failure,
+                        status_code: ExecStatus::Failure,
                         return_data: ReturnData::empty(),
                         exception: String::from("Error in balance transfer"),
+                        state_root: H256::default(),
                     };
                 }
             }
         }
 
         return res;
+    }
+
+    pub fn create_avm(
+        &mut self,
+        params: Vec<ActionParams>,
+        _substates: &mut [Substate],
+    ) -> Vec<ExecutionResult>
+    {
+        self.state.checkpoint();
+
+        let mut unconfirmed_substates = vec![Substate::new(); params.len()];
+
+        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice(), false);
+
+        res
+    }
+
+    pub fn call_avm(
+        &mut self,
+        params: Vec<ActionParams>,
+        _substates: &mut [Substate],
+    ) -> Vec<ExecutionResult>
+    {
+        self.state.checkpoint();
+
+        let mut unconfirmed_substates = vec![Substate::new(); params.len()];
+
+        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice(), false);
+
+        res
     }
 
     /// Creates contract with given contract params.
@@ -491,20 +714,32 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // nonzero nonce, or nonempty code, then the creation throws immediately, with exactly
         // the same behavior as would arise if the first byte in the init code were an invalid
         // opcode. This applies retroactively starting from genesis.
+
         if self
             .state
             .exists_and_not_null(&params.address)
             .unwrap_or(true)
         {
-            return ExecutionResult {
-                gas_left: 0.into(),
-                status_code: EvmStatusCode::Failure,
-                return_data: ReturnData::empty(),
-                exception: String::from(
-                    "Contract creation address already exists, or checking contract existance \
-                     failed.",
-                ),
-            };
+            // AKI-83: allow internal creation of contract which has balance and no code.
+            let code = self.state.code(&params.address).unwrap_or(None);
+            let aion040_fork = self
+                .machine
+                .params()
+                .monetary_policy_update
+                .map_or(false, |v| self.info.number >= v);
+            if !aion040_fork || code.is_some() {
+                //(self.depth >= 1 && code.is_some()) || self.depth == 0 {
+                return ExecutionResult {
+                    gas_left: 0.into(),
+                    status_code: ExecStatus::Failure,
+                    return_data: ReturnData::empty(),
+                    exception: String::from(
+                        "Contract creation address already exists, or checking contract existance \
+                         failed.",
+                    ),
+                    state_root: H256::default(),
+                };
+            }
         }
 
         trace!(
@@ -522,9 +757,9 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // Normally there won't be any address collision. Set new account's nonce and balance
         // to 0.
         // the nonce of a new contract account starts at 0 (according to java version implementation)
-        let nonce_offset = 0.into();
-        // let prev_bal = self.state.balance(&params.address)?;
-        let prev_bal = 0.into();
+        // AKI-83
+        let nonce_offset = self.state.nonce(&params.address).unwrap_or(0.into());
+        let prev_bal = self.state.balance(&params.address).unwrap_or(U256::zero());
         if let ActionValue::Transfer(val) = params.value {
             // Normally balance should have been checked before.
             // In case any error still occurs here, consider this transaction as a failure
@@ -534,9 +769,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             {
                 return ExecutionResult {
                     gas_left: 0.into(),
-                    status_code: EvmStatusCode::Failure,
+                    status_code: ExecStatus::Failure,
                     return_data: ReturnData::empty(),
                     exception: String::from("Error in balance transfer"),
+                    state_root: H256::default(),
                 };
             }
             self.state
@@ -553,6 +789,58 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         res
     }
 
+    fn avm_finalize(
+        &mut self,
+        txs: &[SignedTransaction],
+        substates: &[Substate],
+        results: Vec<ExecutionResult>,
+    ) -> Vec<Result<Executed, ExecutionError>>
+    {
+        assert_eq!(txs.len(), results.len());
+
+        let mut final_results = Vec::new();
+
+        for idx in 0..txs.len() {
+            let result = results.get(idx).unwrap().clone();
+            let t = txs[idx].clone();
+            let substate = substates[idx].clone();
+            // perform suicides
+            for address in &substate.suicides {
+                self.state.kill_account(address);
+            }
+            let gas_left = match result.status_code {
+                ExecStatus::Success | ExecStatus::Revert => result.gas_left,
+                _ => 0.into(),
+            };
+            let gas_used = t.gas - gas_left;
+            //TODO: check whether avm has already refunded
+            //let refund_value = gas_left * t.gas_price;
+            let fees_value = gas_used * t.gas_price;
+
+            let mut touched = HashSet::new();
+            for account in substate.touched {
+                touched.insert(account);
+            }
+
+            final_results.push(Ok(Executed {
+                exception: result.exception,
+                gas: t.gas,
+                gas_used: gas_used,
+                refunded: gas_left,
+                cumulative_gas_used: self.info.gas_used + gas_used,
+                logs: substate.logs,
+                contracts_created: substate.contracts_created,
+                output: result.return_data.to_vec(),
+                state_diff: None,
+                transaction_fee: fees_value,
+                touched: touched,
+                state_root: result.state_root,
+            }))
+        }
+
+        return final_results;
+    }
+
     /// Finalizes the transaction (does refunds and suicides).
     fn finalize(
         &mut self,
@@ -565,7 +853,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // If return status code is not Success or Revert, the total amount of
         // gas limit will be charged.
         let gas_left = match result.status_code {
-            EvmStatusCode::Success | EvmStatusCode::Revert => result.gas_left,
+            ExecStatus::Success | ExecStatus::Revert => result.gas_left,
             _ => 0.into(),
         };
         let gas_used = t.gas - gas_left;
@@ -614,9 +902,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             cumulative_gas_used: self.info.gas_used + gas_used,
             logs: substate.logs,
             contracts_created: substate.contracts_created,
-            output: result.return_data.mem,
+            output: result.return_data.to_vec(),
             state_diff: None,
             transaction_fee: fees_value,
+            touched: HashSet::new(),
+            state_root: H256::default(),
         })
     }
 
@@ -632,7 +922,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         match result.status_code {
             // Commit state changes by discarding checkpoint only when
             // return status code is Success
-            EvmStatusCode::Success => {
+            ExecStatus::Success => {
                 self.state.discard_checkpoint();
                 substate.accrue(un_substate);
             }
@@ -650,19 +940,24 @@ mod tests {
     use std::sync::Arc;
     use rustc_hex::FromHex;
     use super::*;
-    use aion_types::{
-        U256,
-Address};
+    use aion_types::{U256, Address};
     use vms::{ActionParams, ActionValue, CallType, EnvInfo};
     use machine::EthereumMachine;
     use state::{Substate, CleanupMode};
     use tests::helpers::*;
-    use transaction::{Action, Transaction, SignedTransaction};
+    use transaction::{Action, Transaction, SignedTransaction, DEFAULT_TRANSACTION_TYPE};
     use bytes::Bytes;
     use error::ExecutionError;
+    use avm_abi::{ToBytes};
+    // use blake2b::BLAKE2B_EMPTY;
 
-    fn make_frontier_machine() -> EthereumMachine {
+    fn make_aion_machine() -> EthereumMachine {
         let machine = ::ethereum::new_aion_test_machine();
+        machine
+    }
+
+    fn make_avm_machine() -> EthereumMachine {
+        let machine = ::ethereum::new_aion_avm_machine();
         machine
     }
 
@@ -709,7 +1004,7 @@ Address};
         info.number = 1;
         info.gas_limit = U256::from(1000000);
         info.author = Address::from(1);
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
         let mut substate = Substate::new();
 
         let ExecutionResult {
@@ -717,12 +1012,13 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
 
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(gas_left, U256::from(441091));
 
         let mut params = ActionParams::default();
@@ -742,12 +1038,13 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
 
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
         let expected_data = "000000000000000000000000000000100000000000000000000000000000040061000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000062".from_hex().unwrap();
         let expected_result = vms::ReturnData::new(expected_data.clone(), 0, expected_data.len());
         assert_eq!(return_data, expected_result);
@@ -787,7 +1084,7 @@ Address};
             .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
         let mut substate = Substate::new();
 
         let ExecutionResult {
@@ -795,12 +1092,13 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
 
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
     }
 
     #[test]
@@ -831,7 +1129,7 @@ Address};
         info.number = 1;
         info.gas_limit = U256::from(1000000);
         info.author = Address::from(1);
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
         let mut substate = Substate::new();
 
         let ExecutionResult {
@@ -839,12 +1137,14 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
+            println!("call executor");
             ex.call(params, &mut substate)
         };
 
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -865,12 +1165,13 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
 
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -891,12 +1192,13 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
 
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -917,12 +1219,13 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
 
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -943,12 +1246,13 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
 
-        assert_eq!(status_code, EvmStatusCode::Revert);
+        assert_eq!(status_code, ExecStatus::Revert);
     }
 
     #[test]
@@ -971,7 +1275,7 @@ Address};
             .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
         let mut substate = Substate::new();
 
         let ExecutionResult {
@@ -979,21 +1283,16 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
 
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
+        assert_eq!((*return_data).to_vec(), "60506040526000356c01000000000000000000000000900463ffffffff1680632d7df21a146100335761002d565b60006000fd5b341561003f5760006000fd5b6100666004808080601001359035909160200190919290803590601001909190505061007c565b6040518082815260100191505060405180910390f35b6000600060007f66fa32225b641331dff20698cd66d310b3149e86d875926af7ea2f2a9079e80b856040518082815260100191505060405180910390a18585915091506001841115156100d55783925061016456610163565b60018282632d7df21a898960018a036000604051601001526040518463ffffffff166c010000000000000000000000000281526004018084848252816010015260200182815260100193505050506010604051808303816000888881813b151561013f5760006000fd5b5af1151561014d5760006000fd5b5050505060405180519060100150019250610164565b5b505093925050505600a165627a7a72305820c4755a8b960e01280a2c8d85fae255d08e1be318b2c2685a948e7b42660c2f5c0029".from_hex().unwrap());
+        assert_eq!(status_code, ExecStatus::Success);
 
-        assert_eq!(mem, "60506040526000356c01000000000000000000000000900463ffffffff1680632d7df21a146100335761002d565b60006000fd5b341561003f5760006000fd5b6100666004808080601001359035909160200190919290803590601001909190505061007c565b6040518082815260100191505060405180910390f35b6000600060007f66fa32225b641331dff20698cd66d310b3149e86d875926af7ea2f2a9079e80b856040518082815260100191505060405180910390a18585915091506001841115156100d55783925061016456610163565b60018282632d7df21a898960018a036000604051601001526040518463ffffffff166c010000000000000000000000000281526004018084848252816010015260200182815260100193505050506010604051808303816000888881813b151561013f5760006000fd5b5af1151561014d5760006000fd5b5050505060405180519060100150019250610164565b5b505093925050505600a165627a7a72305820c4755a8b960e01280a2c8d85fae255d08e1be318b2c2685a948e7b42660c2f5c0029".from_hex().unwrap());
-        assert_eq!(status_code, EvmStatusCode::Success);
-
-        let code = mem.clone();
+        let code = &(*return_data);
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -1001,7 +1300,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1020,12 +1319,13 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
 
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
 
         let code = "60506040526000356c01000000000000000000000000900463ffffffff1680632d7df21a146100335761002d565b60006000fd5b341561003f5760006000fd5b6100666004808080601001359035909160200190919290803590601001909190505061007c565b6040518082815260100191505060405180910390f35b6000600060007f66fa32225b641331dff20698cd66d310b3149e86d875926af7ea2f2a9079e80b856040518082815260100191505060405180910390a18585915091506001841115156100d55783925061016456610163565b60018282632d7df21a898960018a036000604051601001526040518463ffffffff166c010000000000000000000000000281526004018084848252816010015260200182815260100193505050506010604051808303816000888881813b151561013f5760006000fd5b5af1151561014d5760006000fd5b5050505060405180519060100150019250610164565b5b505093925050505600a165627a7a72305820c4755a8b960e01280a2c8d85fae255d08e1be318b2c2685a948e7b42660c2f5c0029".from_hex().unwrap();
 
@@ -1054,11 +1354,12 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::Revert);
+        assert_eq!(status_code, ExecStatus::Revert);
     }
 
     #[test]
@@ -1080,7 +1381,7 @@ Address};
             .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
         let mut substate = Substate::new();
 
         let ExecutionResult {
@@ -1088,21 +1389,16 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
 
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-
         //assert_eq!(mem, "6080604052600436106049576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063b802926914604e578063f43fa80514606a575b600080fd5b60546092565b6040518082815260200191505060405180910390f35b348015607557600080fd5b50607c60b1565b6040518082815260200191505060405180910390f35b60003073ffffffffffffffffffffffffffffffffffffffff1631905090565b600080549050905600a165627a7a72305820b64352477fa36031aab85a988e2c96456bb81f07e01036304f21fc60137cc4610029".from_hex().unwrap());
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
 
-        let code = mem.clone();
+        let code = &*return_data;
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -1110,7 +1406,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(10));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1126,15 +1422,16 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
 
         println!("return data = {:?}", return_data);
-        assert_eq!(status_code, EvmStatusCode::Revert);
+        assert_eq!(status_code, ExecStatus::Revert);
 
-        let code = mem.clone();
+        let code = &*return_data;
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -1142,7 +1439,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(89));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1159,6 +1456,7 @@ Address};
             status_code: _,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
@@ -1184,7 +1482,7 @@ Address};
             .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
         let mut substate = Substate::new();
 
         let ExecutionResult {
@@ -1192,21 +1490,16 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
 
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-
         //assert_eq!(mem, "6080604052600436106049576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063b802926914604e578063f43fa80514606a575b600080fd5b60546092565b6040518082815260200191505060405180910390f35b348015607557600080fd5b50607c60b1565b6040518082815260200191505060405180910390f35b60003073ffffffffffffffffffffffffffffffffffffffff1631905090565b600080549050905600a165627a7a72305820b64352477fa36031aab85a988e2c96456bb81f07e01036304f21fc60137cc4610029".from_hex().unwrap());
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
 
-        let code = mem.clone();
+        let code = &*return_data;
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -1214,7 +1507,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1235,13 +1528,14 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
 
         println!("return data = {:?}", return_data);
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
     }
 
     #[test]
@@ -1258,7 +1552,7 @@ Address};
         info.number = 1;
         info.gas_limit = U256::from(1000000);
         info.author = Address::from(1);
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
         let mut substate = Substate::new();
         let address = contract_address(&sender, &U256::zero()).0;
         // Create contract InternalTransaction
@@ -1274,23 +1568,20 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-        assert_eq!(status_code, EvmStatusCode::Success);
-        assert_eq!(mem, "60506040523615610054576000356c01000000000000000000000000900463ffffffff1680631e4198e01461008f5780636d73ac71146100af578063cc8066c8146100f8578063efc81a8c1461012d57610054565b5b7f656718b7d7f0803b58a7a46a3a5ca0a26696492f223276e7a227baba40fb95b7346040518082815260100191505060405180910390a15b005b6100ad6004808080601001359035909160200190919290505061015e565b005b34156100bb5760006000fd5b6100e2600480808060100135903590916020019091929080359060100190919050506101c8565b6040518082815260100191505060405180910390f35b34156101045760006000fd5b61012b60048080806010013590359091602001909192908035906010019091905050610295565b005b34156101395760006000fd5b610141610300565b604051808383825281601001526020019250505060405180910390f35b81816108fc34908115029060405160006040518083038185898989f1945050505050151561018c5760006000fd5b7f281a259dfd2e4aaf4447339f7e35909b8a423be045a738057d6c3c01e8d1f5a2346040518082815260100191505060405180910390a15b5050565b60006000600060008686925092506002838363f65a554b886000604051601001526040518263ffffffff166c01000000000000000000000000028152600401808281526010019150506010604051808303816000888881813b151561022d5760006000fd5b5af1151561023b5760006000fd5b50505050604051805190601001500190507ff56ebbc311e11d9790970c4f650e868d7c17a8c35e5c268477d6933ae010d1f4826040518082815260100191505060405180910390a180935061028b565b5050509392505050565b82826108fc83908115029060405160006040518083038185898989f194505050505015156102c35760006000fd5b7f3f418b40de968f04f1770399699cdfb8221fb37431187bf6ba88c8ef1cde63de826040518082815260100191505060405180910390a15b505050565b600060006000600061031061037e565b604051809103906000f080158215161561032a5760006000fd5b915091507f6092db4a9f98e713a99420bc27f1f1cdfcfd435af45397aeb05ffbee8d567d8e8383604051808383825281601001526020019250505060405180910390a1818193509350610378565b50509091565b60405161013e8061038f833901905600605060405234156100105760006000fd5b610015565b61011a806100246000396000f300605060405236156030576000356c01000000000000000000000000900463ffffffff168063f65a554b14606b576030565b3415603b5760006000fd5b5b7f6684c6fb8e464ba954e17ed3f5aed6e2d49231ce285b7770f422d1f52cef503b60405160405180910390a15b005b341560765760006000fd5b608a600480803590601001909190505060a0565b6040518082815260100191505060405180910390f35b600060006001830190507f3bc83dc4da931c34301105d9c2aff52e35bb96133cd1cf0a835faa9bb607422c826040518082815260100191505060405180910390a180915060e8565b509190505600a165627a7a72305820ec84292d19105cb4d6f311689eed4db3cb4e4251249a9cf06f071e1746e74de60029a165627a7a723058209d38411c6f215aa8daa7dd8150890ea7576a1b0e117cedffc3c002a95810948e0029".from_hex().unwrap());
+
+        assert_eq!(status_code, ExecStatus::Success);
+        assert_eq!((*return_data).to_vec(), "60506040523615610054576000356c01000000000000000000000000900463ffffffff1680631e4198e01461008f5780636d73ac71146100af578063cc8066c8146100f8578063efc81a8c1461012d57610054565b5b7f656718b7d7f0803b58a7a46a3a5ca0a26696492f223276e7a227baba40fb95b7346040518082815260100191505060405180910390a15b005b6100ad6004808080601001359035909160200190919290505061015e565b005b34156100bb5760006000fd5b6100e2600480808060100135903590916020019091929080359060100190919050506101c8565b6040518082815260100191505060405180910390f35b34156101045760006000fd5b61012b60048080806010013590359091602001909192908035906010019091905050610295565b005b34156101395760006000fd5b610141610300565b604051808383825281601001526020019250505060405180910390f35b81816108fc34908115029060405160006040518083038185898989f1945050505050151561018c5760006000fd5b7f281a259dfd2e4aaf4447339f7e35909b8a423be045a738057d6c3c01e8d1f5a2346040518082815260100191505060405180910390a15b5050565b60006000600060008686925092506002838363f65a554b886000604051601001526040518263ffffffff166c01000000000000000000000000028152600401808281526010019150506010604051808303816000888881813b151561022d5760006000fd5b5af1151561023b5760006000fd5b50505050604051805190601001500190507ff56ebbc311e11d9790970c4f650e868d7c17a8c35e5c268477d6933ae010d1f4826040518082815260100191505060405180910390a180935061028b565b5050509392505050565b82826108fc83908115029060405160006040518083038185898989f194505050505015156102c35760006000fd5b7f3f418b40de968f04f1770399699cdfb8221fb37431187bf6ba88c8ef1cde63de826040518082815260100191505060405180910390a15b505050565b600060006000600061031061037e565b604051809103906000f080158215161561032a5760006000fd5b915091507f6092db4a9f98e713a99420bc27f1f1cdfcfd435af45397aeb05ffbee8d567d8e8383604051808383825281601001526020019250505060405180910390a1818193509350610378565b50509091565b60405161013e8061038f833901905600605060405234156100105760006000fd5b610015565b61011a806100246000396000f300605060405236156030576000356c01000000000000000000000000900463ffffffff168063f65a554b14606b576030565b3415603b5760006000fd5b5b7f6684c6fb8e464ba954e17ed3f5aed6e2d49231ce285b7770f422d1f52cef503b60405160405180910390a15b005b341560765760006000fd5b608a600480803590601001909190505060a0565b6040518082815260100191505060405180910390f35b600060006001830190507f3bc83dc4da931c34301105d9c2aff52e35bb96133cd1cf0a835faa9bb607422c826040518082815260100191505060405180910390a180915060e8565b509190505600a165627a7a72305820ec84292d19105cb4d6f311689eed4db3cb4e4251249a9cf06f071e1746e74de60029a165627a7a723058209d38411c6f215aa8daa7dd8150890ea7576a1b0e117cedffc3c002a95810948e0029".from_hex().unwrap());
         assert_eq!(state.balance(&sender).unwrap(), U256::from(90));
         assert_eq!(state.balance(&address).unwrap(), U256::from(10));
         assert_eq!(state.nonce(&address).unwrap(), U256::from(0));
 
         // Transfer value through contract
-        let code = mem.clone();
+        let code = &*return_data;
         let receiver = Address::from_slice(b"ef1722f3947def4cf144679da39c4c32bdc35681");
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -1298,7 +1589,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(10));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1310,11 +1601,12 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&sender).unwrap(), U256::from(80));
         assert_eq!(state.balance(&address).unwrap(), U256::from(10));
         assert_eq!(state.balance(&receiver).unwrap(), U256::from(10));
@@ -1327,7 +1619,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1340,11 +1632,12 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&sender).unwrap(), U256::from(80));
         assert_eq!(state.balance(&address).unwrap(), U256::from(5));
         assert_eq!(state.balance(&receiver).unwrap(), U256::from(15));
@@ -1357,7 +1650,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(210_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1368,17 +1661,14 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::Success);
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-        let new_address = Address::from(mem.clone().as_slice());
+        assert_eq!(status_code, ExecStatus::Success);
+
+        let new_address = Address::from(&*return_data);
         assert_eq!(state.nonce(&address).unwrap(), U256::from(1));
         assert_eq!(state.nonce(&new_address).unwrap(), U256::from(1));
 
@@ -1389,7 +1679,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1402,17 +1692,17 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::Success);
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-        assert_eq!(mem, "00000000000000000000000000000004".from_hex().unwrap());
+        assert_eq!(status_code, ExecStatus::Success);
+
+        assert_eq!(
+            (*return_data).to_vec(),
+            "00000000000000000000000000000004".from_hex().unwrap()
+        );
         assert_eq!(state.nonce(&address).unwrap(), U256::from(1));
         assert_eq!(state.nonce(&new_address).unwrap(), U256::from(1));
     }
@@ -1420,7 +1710,7 @@ Address};
     #[test]
     fn error_cases_rejected() {
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
         let mut info = EnvInfo::default();
         info.gas_limit = U256::from(3_000_000);
         let mut state = get_temp_state();
@@ -1437,6 +1727,7 @@ Address};
             Action::Create,
             0.into(),
             Bytes::new(),
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1461,6 +1752,7 @@ Address};
             Action::Create,
             0.into(),
             Bytes::new(),
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1483,6 +1775,7 @@ Address};
             Action::Call(0.into()),
             0.into(),
             Bytes::new(),
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1506,6 +1799,7 @@ Address};
             Action::Create,
             0.into(),
             data,
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1529,6 +1823,7 @@ Address};
             Action::Call(0.into()),
             0.into(),
             data,
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1551,6 +1846,7 @@ Address};
             Action::Call(0.into()),
             1000.into(),
             Bytes::new(),
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1573,6 +1869,7 @@ Address};
             Action::Call(0.into()),
             0.into(),
             Bytes::new(),
+            DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
         let error = {
@@ -1608,18 +1905,19 @@ Address};
             .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
         let mut substate = Substate::new();
         let ExecutionResult {
             gas_left: _,
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::Revert);
+        assert_eq!(status_code, ExecStatus::Revert);
 
         let mut params = ActionParams::default();
         params.address = address.clone();
@@ -1633,19 +1931,15 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
 
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
         //assert_eq!(mem, "6080604052600436106049576000357c0100000000000000000000000000000000000000000000000000000000900463ffffffff168063b802926914604e578063f43fa80514606a575b600080fd5b60546092565b6040518082815260200191505060405180910390f35b348015607557600080fd5b50607c60b1565b6040518082815260200191505060405180910390f35b60003073ffffffffffffffffffffffffffffffffffffffff1631905090565b600080549050905600a165627a7a72305820b64352477fa36031aab85a988e2c96456bb81f07e01036304f21fc60137cc4610029".from_hex().unwrap());
-        assert_eq!(status_code, EvmStatusCode::Success);
-        let code = mem.clone();
+        assert_eq!(status_code, ExecStatus::Success);
+        let code = &*return_data;
 
         // Call non payable function with value transfer
         let mut params = ActionParams::default();
@@ -1654,7 +1948,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(1));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1673,12 +1967,13 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
         println!("return data = {:?}", return_data);
-        assert_eq!(status_code, EvmStatusCode::Revert);
+        assert_eq!(status_code, ExecStatus::Revert);
 
         // Call contract reverts when called contract gets error or runs out of gas
         let mut params = ActionParams::default();
@@ -1687,7 +1982,7 @@ Address};
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(1_000_000);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1706,12 +2001,13 @@ Address};
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
         println!("return data = {:?}", return_data);
-        assert_eq!(status_code, EvmStatusCode::Revert);
+        assert_eq!(status_code, ExecStatus::Revert);
     }
 
     #[test]
@@ -1731,18 +2027,20 @@ Address};
             .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
         let mut substate = Substate::new();
         let ExecutionResult {
-            gas_left: _,
+            gas_left,
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::Failure);
+        assert_eq!(status_code, ExecStatus::Failure);
+        assert_eq!(gas_left, U256::from(0));
     }
 
     #[test]
@@ -1758,7 +2056,7 @@ Address};
         info.number = 1;
         info.gas_limit = U256::from(1000000);
         info.author = Address::from(1);
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
 
         // 1. Deploy bad code
         let code = "ff".from_hex().unwrap();
@@ -1774,11 +2072,12 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::OutOfGas);
+        assert_eq!(status_code, ExecStatus::OutOfGas);
 
         // 2. Run out of gas
         let code = "605060405234156100105760006000fd5b610015565b610199806100246000396000f30060506040526000356c01000000000000000000000000900463ffffffff1680632d7df21a146100335761002d565b60006000fd5b341561003f5760006000fd5b6100666004808080601001359035909160200190919290803590601001909190505061007c565b6040518082815260100191505060405180910390f35b6000600060007f66fa32225b641331dff20698cd66d310b3149e86d875926af7ea2f2a9079e80b856040518082815260100191505060405180910390a18585915091506001841115156100d55783925061016456610163565b60018282632d7df21a898960018a036000604051601001526040518463ffffffff166c010000000000000000000000000281526004018084848252816010015260200182815260100193505050506010604051808303816000888881813b151561013f5760006000fd5b5af1151561014d5760006000fd5b5050505060405180519060100150019250610164565b5b505093925050505600a165627a7a72305820c4755a8b960e01280a2c8d85fae255d08e1be318b2c2685a948e7b42660c2f5c0029".from_hex().unwrap();
@@ -1789,31 +2088,28 @@ Address};
         params.gas = U256::from(100_000);
         params.code = Some(Arc::new(code.clone()));
         params.value = ActionValue::Transfer(0.into());
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
 
         let ExecutionResult {
             gas_left: _,
             status_code,
             return_data,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-        assert_eq!(status_code, EvmStatusCode::Success);
-        let code = mem.clone();
+
+        assert_eq!(status_code, ExecStatus::Success);
+        let code = &*return_data;
         let mut params = ActionParams::default();
         params.address = address.clone();
         params.code_address = address.clone();
         params.sender = sender.clone();
         params.origin = sender.clone();
         params.gas = U256::from(100);
-        params.code = Some(Arc::new(code.clone()));
+        params.code = Some(Arc::new(code.clone().to_vec()));
         params.value = ActionValue::Transfer(U256::from(0));
         params.call_type = CallType::Call;
         params.gas_price = U256::from(0);
@@ -1827,11 +2123,12 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params, &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::OutOfGas);
+        assert_eq!(status_code, ExecStatus::OutOfGas);
     }
 
     #[test]
@@ -1852,26 +2149,22 @@ Address};
             .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
             .unwrap();
         let info = EnvInfo::default();
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
         let mut substate = Substate::new();
         let ExecutionResult {
             gas_left: _,
             status_code,
             return_data,
             exception,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.create(params, &mut substate)
         };
         println!("exception: {:?}", exception);
-        assert_eq!(status_code, EvmStatusCode::Success);
-        let ReturnData {
-            mem,
-            offset: _,
-            size: _,
-        } = return_data;
-        let vec_empty: Vec<u8> = Vec::new();
-        assert_eq!(mem, vec_empty);
+        assert_eq!(status_code, ExecStatus::Success);
+
+        assert_eq!((*return_data).is_empty(), true);
         assert_eq!(state.commit().is_ok(), true);
         assert_eq!(
             state.root().to_vec(),
@@ -1894,7 +2187,7 @@ Address};
         info.number = 1;
         info.gas_limit = U256::from(1000000);
         info.author = Address::from(1);
-        let machine = make_frontier_machine();
+        let machine = make_aion_machine();
 
         // Call ofter StaticCall with zero value
         let code = "6f000000000000000000000000000000006f000000000000000000000000000000006f000000000000000000000000000000006f0000000000000000000000000000000034305af1".from_hex().unwrap();
@@ -1912,11 +2205,12 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(0));
 
         // Call after StaticCall with non-zero value
@@ -1935,11 +2229,12 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::OutOfGas);
+        assert_eq!(status_code, ExecStatus::OutOfGas);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(0));
 
         // CallCode after StaticCall with non-zero value
@@ -1958,11 +2253,12 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(10));
 
         // DelegateCall after StaticCall with non-zero value
@@ -1981,11 +2277,12 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(20));
 
         // DelegateCall after Call with non-zero value
@@ -2003,11 +2300,12 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::Success);
+        assert_eq!(status_code, ExecStatus::Success);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(30));
 
         // StaticCall with sstore
@@ -2026,11 +2324,12 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::OutOfGas);
+        assert_eq!(status_code, ExecStatus::OutOfGas);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(30));
 
         // StaticCall with log
@@ -2049,11 +2348,12 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::OutOfGas);
+        assert_eq!(status_code, ExecStatus::OutOfGas);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(30));
 
         // StaticCall with selfdestruct
@@ -2072,11 +2372,278 @@ Address};
             status_code,
             return_data: _,
             exception: _,
+            state_root: _,
         } = {
             let mut ex = Executive::new(&mut state, &info, &machine);
             ex.call(params.clone(), &mut substate)
         };
-        assert_eq!(status_code, EvmStatusCode::OutOfGas);
+        assert_eq!(status_code, ExecStatus::OutOfGas);
         assert_eq!(state.balance(&params.address).unwrap(), U256::from(30));
+    }
+
+    #[test]
+    /// HelloWorld with extra storage test
+    fn hello_avm() {
+        let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        // NOTE: tested with avm v1.3
+        file.push("src/tests/AVMDapps/demo-0.1.0.jar");
+        let file_str = file.to_str().expect("Failed to locate the demo.jar");
+        let mut code = read_file(file_str).expect("unable to open avm dapp");
+        let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
+        let address = contract_address(&sender, &U256::zero()).0;
+        let mut params = ActionParams::default();
+        params.address = address.clone();
+        params.sender = sender.clone();
+        params.origin = sender.clone();
+        params.gas = U256::from(5_000_000);
+        let mut avm_code: Vec<u8> = (code.len() as u32).to_vm_bytes();
+        println!("code of hello_avm = {:?}", code.len());
+        avm_code.append(&mut code);
+        params.code = Some(Arc::new(avm_code.clone()));
+        params.value = ActionValue::Transfer(0.into());
+        params.call_type = CallType::None;
+        params.gas_price = 1.into();
+        let mut state = get_temp_state();
+        state
+            .add_balance(&sender, &U256::from(200_000_000), CleanupMode::NoEmpty)
+            .unwrap();
+        let info = EnvInfo::default();
+        let machine = make_aion_machine();
+        let substate = Substate::new();
+        let execution_results = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.call_avm(vec![params.clone()], &mut [substate])
+        };
+
+        for r in execution_results {
+            let ExecutionResult {
+                status_code,
+                gas_left: _,
+                return_data,
+                exception: _,
+                state_root: _,
+            } = r;
+
+            assert_eq!(status_code, ExecStatus::Success);
+
+            params.address = (*return_data).into();
+            println!("return data = {:?}", return_data);
+        }
+
+        // Hello avm is deployed
+
+        assert!(state.code(&params.address).unwrap().is_some());
+
+        // test key/value storage
+        params.call_type = CallType::Call;
+        let call_data = AbiToken::STRING(String::from("storageTest")).encode();
+        params.data = Some(call_data);
+        params.nonce += 1;
+        params.gas = U256::from(2_000_000);
+        println!("call data = {:?}", params.data);
+        let substate = Substate::new();
+        let execution_results = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.call_avm(vec![params.clone()], &mut [substate.clone()])
+        };
+
+        for r in execution_results {
+            let ExecutionResult {
+                status_code,
+                gas_left: _,
+                return_data,
+                exception: _,
+                state_root,
+            } = r;
+
+            assert_eq!(status_code, ExecStatus::Success);
+            println!(
+                "result state root = {:?}, return_data = {:?}",
+                state_root, return_data
+            );
+            assert_eq!(return_data.to_vec(), vec![0u8, 2, 3, 4]);
+        }
+
+        assert_eq!(
+            state
+                .storage_at(
+                    &params.address,
+                    &vec![
+                        1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4,
+                        5, 6, 7, 8, 9, 10, 1, 2,
+                    ]
+                )
+                .unwrap(),
+            vec![0u8, 2, 3, 4]
+        );
+    }
+
+    use std::io::Error;
+    use std::fs::File;
+    use std::io::Read;
+    use std::path::PathBuf;
+    use std::path::Path;
+
+    fn read_file(path: &str) -> Result<Vec<u8>, Error> {
+        let path = Path::new(path);
+        println!("path = {:?}", path);
+        let mut file = File::open(path)?;
+        let mut buf = Vec::<u8>::new();
+        file.read_to_end(&mut buf)?;
+        Ok(buf)
+    }
+
+    #[test]
+    fn avm_storage() {
+        let mut state = get_temp_state();
+        let address = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
+        state
+            .set_storage(&address, vec![0, 0, 0, 1], vec![0, 0, 0, 2])
+            .expect("avm set storage failed");
+        let value = state
+            .storage_at(&address, &vec![0, 0, 0, 1])
+            .expect("avm get storage failed");
+        assert_eq!(value, vec![0, 0, 0, 2]);
+        state
+            .set_storage(
+                &address,
+                vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
+                vec![1, 2, 3, 4, 5, 0, 0, 0, 2],
+            )
+            .expect("avm set storage failed");
+        println!("state = {:?}", state);
+    }
+
+    #[test]
+    fn avm_balance_transfer() {
+        let mut state = get_temp_state();
+        let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
+        let mut params = ActionParams::default();
+        let address = contract_address(&sender, &U256::zero()).0;
+        params.address = address.clone();
+        params.sender = sender.clone();
+        params.origin = sender.clone();
+        params.gas = U256::from(1_000_000);
+        params.code = Some(Arc::new(vec![]));
+        params.value = ActionValue::Transfer(100.into());
+        params.call_type = CallType::BulkBalance;
+        params.gas_price = 1.into();
+        state
+            .add_balance(&sender, &U256::from(50_000_000), CleanupMode::NoEmpty)
+            .unwrap();
+        let info = EnvInfo::default();
+        let machine = make_aion_machine();
+        let substate = Substate::new();
+        let mut params2 = params.clone();
+        params2.address = contract_address(&sender, &U256::one()).0;
+        params2.value = ActionValue::Transfer(99.into());
+        params2.nonce = params.nonce + 1;
+        let results = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.call_avm(
+                vec![params.clone(), params2.clone()],
+                &mut [substate.clone(), substate.clone()],
+            )
+        };
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(state.balance(&address), Ok(100.into()));
+        assert_eq!(state.balance(&params2.address), Ok(99.into()));
+    }
+
+    use avm_abi::{AVMEncoder, AbiToken};
+
+    #[test]
+    fn contract_create2() {
+        // test internal creation to address with balance
+        let code = "605060405234156100105760006000fd5b5b6000600061001d610043565b604051809103906000f08015821516156100375760006000fd5b915091505b5050610052565b60405160648061009a83390190565b603a806100606000396000f30060506040526008565b60006000fd00a165627a7a72305820fd53915fee1b05fe9bfd2e5c002fbc0a06e4b569cdf9cee967125a1bad38bbae0029605060405260006000600050909055341560195760006000fd5b601d565b603a80602a6000396000f30060506040526008565b60006000fd00a165627a7a7230582067ea917dd1ec8e15669ee107500f563855e03f1941e0a857e305c3f1754c16a40029".from_hex().unwrap();
+        let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
+        let address = contract_address(&sender, &U256::zero()).0;
+        let mut params = ActionParams::default();
+        params.address = address.clone();
+        params.code_address = address.clone();
+        params.sender = sender.clone();
+        params.origin = sender.clone();
+        params.gas = U256::from(1000_000);
+        params.code = Some(Arc::new(code.clone()));
+        params.value = ActionValue::Transfer(U256::from(0));
+        params.call_type = CallType::Call;
+        params.gas_price = U256::from(0);
+
+        let mut state = get_temp_state();
+        state
+            .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
+            .unwrap();
+        let inner_contract_address =
+            "a007d071538ce40db67cc816def5ec8adc410858ee6cfda21e72300835b83754"
+                .from_hex()
+                .unwrap();
+        state
+            .add_balance(
+                &inner_contract_address[..].into(),
+                &100.into(),
+                CleanupMode::NoEmpty,
+            )
+            .unwrap();
+        let mut info = EnvInfo::default();
+        info.number = 1;
+        info.gas_limit = U256::from(1000000);
+        info.author = Address::from(1);
+
+        let machine = make_aion_machine();
+        let mut substate = Substate::new();
+
+        let ExecutionResult {
+            gas_left: _,
+            status_code,
+            return_data: _,
+            exception: _,
+            state_root: _,
+        } = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.create(params.clone(), &mut substate)
+        };
+
+        // machine before aion040_fork returns failure on creation at existed account
+        assert_eq!(status_code, ExecStatus::Revert);
+
+        let machine = make_avm_machine();
+        let mut substate = Substate::new();
+
+        let ExecutionResult {
+            gas_left: _,
+            status_code,
+            return_data: _,
+            exception: _,
+            state_root: _,
+        } = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.create(params.clone(), &mut substate)
+        };
+
+        // machine after aion040_fork returns success on creation at exsited account which has no code
+        assert_eq!(status_code, ExecStatus::Success);
+
+        println!(
+            "code = {:?}",
+            state.code(&inner_contract_address[..].into())
+        );
+
+        let machine = make_avm_machine();
+        let mut substate = Substate::new();
+
+        let ExecutionResult {
+            gas_left: _,
+            status_code,
+            return_data: _,
+            exception: _,
+            state_root: _,
+        } = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.create(params.clone(), &mut substate)
+        };
+
+        // normal creation of contract on account which already exists
+        assert_eq!(status_code, ExecStatus::Success);
     }
 }

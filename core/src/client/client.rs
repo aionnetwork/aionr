@@ -65,6 +65,7 @@ use state::{self, State};
 use state_db::StateDB;
 use transaction::{
     Action, LocalizedTransaction, PendingTransaction, SignedTransaction, Transaction,
+    DEFAULT_TRANSACTION_TYPE, AVM_TRANSACTION_TYPE
 };
 use types::filter::Filter;
 use verification;
@@ -1052,6 +1053,7 @@ impl Client {
             Action::Call(address),
             U256::default(),
             data,
+            DEFAULT_TRANSACTION_TYPE,
         )
         .fake_sign(from)
     }
@@ -1064,6 +1066,19 @@ impl Client {
         analytics: CallAnalytics,
     ) -> Result<Executed, CallError>
     {
+        fn for_local_avm(state: &mut State<StateDB>, transaction: &SignedTransaction) -> bool {
+            if transaction.tx_type() == AVM_TRANSACTION_TYPE {
+                return true;
+            } else if let Action::Call(a) = transaction.action {
+                let code = state.code(&a).unwrap_or(None);
+                if let Some(c) = code {
+                    return c[0..2] != [0x60u8, 0x50];
+                }
+            }
+
+            return false;
+        }
+
         fn call(
             state: &mut State<StateDB>,
             env_info: &EnvInfo,
@@ -1078,8 +1093,24 @@ impl Client {
                 None
             };
 
-            let mut ret =
-                Executive::new(state, env_info, machine).transact_virtual(transaction, false)?;
+            let mut ret;
+            let aion040fork = machine
+                .params()
+                .monetary_policy_update
+                .map_or(false, |v| env_info.number >= v);
+            if aion040fork && for_local_avm(state, transaction) {
+                let avm_result = Executive::new(state, env_info, machine)
+                    .transact_virtual_bulk(&[transaction.clone()], false);
+                match avm_result[0].clone() {
+                    Err(x) => return Err(x.into()),
+                    Ok(_) => ret = avm_result[0].clone().unwrap(),
+                }
+            } else {
+                ret = Executive::new(state, env_info, machine)
+                    .transact_virtual(transaction, false)?;
+            }
+
+            debug!(target: "vm", "local call result = {:?}", ret);
 
             if let Some(original) = original_state {
                 ret.state_diff = Some(state.diff_from(original).map_err(ExecutionError::from)?);
@@ -1227,6 +1258,8 @@ impl BlockChainClient for Client {
         // that's just a copy of the state.
         let mut state = self.state_at(block).ok_or(CallError::StatePruned)?;
         let machine = self.engine.machine();
+
+        debug!(target: "vm", "fake transaction = {:?}", transaction);
 
         Self::do_virtual_call(machine, &env_info, &mut state, transaction, analytics)
     }
@@ -1455,6 +1488,7 @@ impl BlockChainClient for Client {
         self.state_at(id).and_then(|s| s.nonce(address).ok())
     }
 
+    //TODO: update account type
     fn storage_root(&self, address: &Address, id: BlockId) -> Option<H256> {
         self.state_at(id)
             .and_then(|s| s.storage_root(address).ok())
@@ -1481,8 +1515,14 @@ impl BlockChainClient for Client {
     }
 
     fn storage_at(&self, address: &Address, position: &H128, id: BlockId) -> Option<H128> {
-        self.state_at(id)
-            .and_then(|s| s.storage_at(address, position).ok())
+        let value = self
+            .state_at(id)
+            .and_then(|s| s.storage_at(address, &position[..].to_vec()).ok());
+        if let Some(v) = value {
+            Some(v[..].into())
+        } else {
+            None
+        }
     }
 
     fn list_accounts(

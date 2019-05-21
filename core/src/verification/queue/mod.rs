@@ -125,7 +125,7 @@ pub enum Status {
 
 impl Into<::block_status::BlockStatus> for Status {
     fn into(self) -> ::block_status::BlockStatus {
-        use ::block_status::BlockStatus;
+        use block_status::BlockStatus;
         match self {
             Status::Queued => BlockStatus::Queued,
             Status::Bad => BlockStatus::Bad,

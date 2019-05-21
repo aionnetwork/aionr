@@ -56,9 +56,6 @@ fn new_db() -> Arc<KeyValueDB> {
 pub fn get_network_config() -> NetworkConfig {
     let mut net_config = NetworkConfig::default();
     net_config.boot_nodes.push(String::from(
-        "p2p://c33d1066-8c7e-496c-9c4e-c89318280274@13.92.155.115:30303",
-    ));
-    net_config.boot_nodes.push(String::from(
         "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:30303",
     ));
     net_config.boot_nodes.push(String::from(
@@ -68,14 +65,20 @@ pub fn get_network_config() -> NetworkConfig {
         "p2p://c33d4c07-6a29-4ca6-8b06-b2781ba7f9bf@191.232.164.119:30303",
     ));
     net_config.boot_nodes.push(String::from(
-        "p2p://c33d5a94-20d8-49d9-97d6-284f88da5c21@13.89.244.125:30303",
+        "p2p://741b979e-6a06-493a-a1f2-693cafd37083@66.207.217.190:30303",
     ));
     net_config.boot_nodes.push(String::from(
-        "p2p://741b979e-6a06-493a-a1f2-693cafd37083@66.207.217.190:30303",
+        "p2p://c39d0a10-20d8-49d9-97d6-284f88da5c25@13.92.157.19:30303",
+    ));
+    net_config.boot_nodes.push(String::from(
+        "p2p://c38d2a32-20d8-49d9-97d6-284f88da5c83@40.78.84.78:30303",
+    ));
+    net_config.boot_nodes.push(String::from(
+        "p2p://c37d6b45-20d8-49d9-97d6-284f88da5c51@104.40.182.54:30303",
     ));
 
     net_config.local_node =
-        String::from("p2p://00000000-6666-0000-0000-000000000000@0.0.0.0:30303");
+        String::from("p2p://00000000-6666-0000-0000-000000000000@0.0.0.0:30309");
     net_config.net_id = 256;
     net_config.sync_from_boot_nodes_only = false;
     net_config

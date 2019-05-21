@@ -30,7 +30,7 @@ use block::{ExecutedBlock, IsBlock};
 use precompiled::builtin::BuiltinContract;
 use client::BlockChainClient;
 use error::Error;
-use executive::Executive;
+use executive::{Executive};
 use header::{BlockNumber, Header};
 use spec::CommonParams;
 use state::{CleanupMode, Substate};
@@ -45,6 +45,7 @@ pub struct EthereumMachine {
     params: CommonParams,
     builtins: Arc<BTreeMap<Address, Box<BuiltinContract>>>,
     tx_filter: Option<Arc<TransactionFilter>>,
+    premine: U256,
 }
 
 impl EthereumMachine {
@@ -52,6 +53,7 @@ impl EthereumMachine {
     pub fn regular(
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
+        premine: U256,
     ) -> EthereumMachine
     {
         let tx_filter = TransactionFilter::from_params(&params).map(Arc::new);
@@ -59,6 +61,7 @@ impl EthereumMachine {
             params: params,
             builtins: Arc::new(builtins),
             tx_filter: tx_filter,
+            premine: premine,
         }
     }
 }
@@ -96,13 +99,14 @@ impl EthereumMachine {
             params_type: ParamsType::Separate,
             transaction_hash: H256::default(),
             original_transaction_hash: H256::default(),
+            nonce: 0,
         };
         let mut ex = Executive::new(&mut state, &env_info, self);
         let mut substate = Substate::new();
         let result = ex.call(params, &mut substate);
         match result.exception.as_str() {
             "" => {
-                return Ok(result.return_data.mem);
+                return Ok(result.return_data.to_vec());
             }
             error => {
                 warn!(target:"executive","Encountered error on making system call: {}", error);
@@ -160,6 +164,8 @@ impl EthereumMachine {
 
     /// Builtin-contracts for the chain..
     pub fn builtins(&self) -> &BTreeMap<Address, Box<BuiltinContract>> { &*self.builtins }
+
+    pub fn premine(&self) -> U256 { self.premine }
 
     /// Attempt to get a handle to a built-in contract.
     /// Only returns references to activated built-ins.

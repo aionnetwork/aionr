@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-def message, lastCommit
+def message, lastCommit,tag
 
 @NonCPS
 def getCommit(){
@@ -24,9 +24,13 @@ pipeline {
         pollSCM('H/5 * * * *')
     }
 	environment{
-		JAVA_ARGS="-Dorg.apache.commons.jelly.tags.fmt.timeZone=Asia/Shanghai"
-		JENKINS_JAVA_OPTIONS="-Dorg.apache.commons.jelly.tags.fmt.timeZone=Asia/Shanghai"
+		JAVA_HOME="/run/jdk-11"
+		ANT_HOME="/run/apache-ant-1.10.5"
+		PATH="${JAVA_HOME}/bin:${ANT_HOME}/bin:${PATH}"
+		LIBRARY_PATH="${JAVA_HOME}/lib/server"
+		LD_LIBRARY_PATH="${LIBRARY_PATH}:/usr/local/lib:/run/libs"
 	}
+
 
     options {
         timeout(time: 120, unit: 'MINUTES') 
@@ -44,9 +48,13 @@ pipeline {
         stage('Build'){
             steps{
             	sh 'set -e'
-                echo "building..."
-                sh 'RUSTFLAGS="-D warnings" cargo build --release' 
-
+                echo "clean old package"
+            	sh 'rm aionr*.tar.gz || echo "no previous build packages"'
+            	sh 'rm -r package || echo "no previous build package folder"'
+            	echo 'clean compiled version.rs'
+            	sh 'rm -r target/release/build/aion-version* target/release/build/avm-* || echo "no aion-version folders exist"'
+            	echo "building..."
+                sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"'
             }
         }
 		stage('Unit Test'){
@@ -69,7 +77,7 @@ pipeline {
 							throw e
 						}
 					}
-					sh 'rm -rf $HOME/.aion/chains'	
+					
 			}
 		}
 		stage('RPC Test'){
@@ -78,7 +86,6 @@ pipeline {
 				script{
 					try{
 						sh './scripts/run_RPCtest.sh'
-						sh 'echo $?'
 					}
 					catch(Exception e){
 						echo "${e}"
@@ -100,7 +107,7 @@ pipeline {
         }
 
         success{
-			archiveArtifacts artifacts: 'target/release/aion,test_results/*.*',fingerprint:true
+			archiveArtifacts artifacts: '*.tar.gz,test_results/*.*,target/release/aion',fingerprint:true
             slackSend channel: '#ci',
                       color: 'good',
                       message: "${currentBuild.fullDisplayName} completed successfully. Grab the generated builds at ${env.BUILD_URL}\nArtifacts: ${env.BUILD_URL}artifact/\n Check BenchTest result: ${env.BUILD_URL}artifact/test_results/report.html \nCommit: ${GIT_COMMIT}\nChanges:${message}"

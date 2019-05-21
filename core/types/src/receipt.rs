@@ -230,7 +230,7 @@ pub struct LocalizedReceipt {
 
 #[cfg(test)]
 mod tests {
-    use super::{Receipt,H256,U256,Bytes};
+    use super::{Receipt, H256, U256, Bytes};
     use log_entry::LogEntry;
 
     #[test]

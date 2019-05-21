@@ -20,9 +20,8 @@
  ******************************************************************************/
 
 use super::builtin::{BuiltinParams, BuiltinContract, BuiltinExt};
-use aion_types::U256;
-use vms::vm::ExecutionResult;
-use vms::{ReturnData, EvmStatusCode};
+use aion_types::{U256, H256};
+use vms::{ExecutionResult, ExecStatus, ReturnData};
 
 pub struct TxHashContract {
     /// contract name
@@ -51,9 +50,10 @@ impl BuiltinContract for TxHashContract {
         let tx_hash = ext.context().origin_tx_hash.clone();
         ExecutionResult {
             gas_left: U256::zero(),
-            status_code: EvmStatusCode::Success,
+            status_code: ExecStatus::Success,
             return_data: ReturnData::new(tx_hash.to_vec(), 0, tx_hash.len()),
             exception: String::default(),
+            state_root: H256::default(),
         }
     }
 }
@@ -64,7 +64,7 @@ mod tests {
     use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
     use tests::helpers::get_temp_state;
     use state::Substate;
-    use vms::EvmStatusCode;
+    use vms::ExecStatus;
     use aion_types::{H256, Address};
     use rustc_hex::ToHex;
     use bytes::to_hex;
@@ -92,8 +92,8 @@ mod tests {
             substate,
         );
         let result = contract.execute(&mut ext, &vec![]);
-        assert_eq!(result.status_code, EvmStatusCode::Success);
+        assert_eq!(result.status_code, ExecStatus::Success);
         let ret_data = result.return_data;
-        assert_eq!(to_hex(&ret_data.mem), random_txhash.as_ref().to_hex());
+        assert_eq!(to_hex(&*ret_data), random_txhash.as_ref().to_hex());
     }
 }

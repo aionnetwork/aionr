@@ -408,7 +408,7 @@ mod tests {
         assert_eq!(
             trie_root(vec![(
                 b"A",
-                b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as &[u8]
+                b"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" as &[u8],
             )]),
             //            "d23786fb4a010da3ce639d66d5e904a11dbc02746d1ce25029e53290cabf28ab".into()
             // keccak->blake2b, update expected hash as well.

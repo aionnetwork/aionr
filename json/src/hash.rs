@@ -31,7 +31,7 @@ use aion_types::{H64 as Hash64, H256 as Hash256, H520 as Hash520};
 use ethbloom::Bloom as Hash2048;
 
 macro_rules! impl_hash {
-    ($name: ident, $inner: ident) => {
+    ($name:ident, $inner:ident) => {
         /// Lenient hash json deserialization for test json files.
         #[derive(Default, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, Clone)]
         pub struct $name(pub $inner);
@@ -124,10 +124,10 @@ mod test {
                 H256(aion_types::H256::from(0)),
                 H256(
                     aion_types::H256::from_str(
-                        "5a39ed1020c04d4d84539975b893a4e7c53eab6c2965db8bc3468093a31bc5ae"
+                        "5a39ed1020c04d4d84539975b893a4e7c53eab6c2965db8bc3468093a31bc5ae",
                     )
-                    .unwrap()
-                )
+                    .unwrap(),
+                ),
             ]
         );
     }

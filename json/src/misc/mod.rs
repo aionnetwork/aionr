@@ -23,7 +23,7 @@
 //! Misc deserialization.
 
 macro_rules! impl_serialization {
-    ($key: ty => $name: ty) => {
+    ($key:ty => $name:ty) => {
         impl $name {
             /// Read a hash map of DappId -> $name
             pub fn read<R, S, D>(

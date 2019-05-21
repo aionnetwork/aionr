@@ -75,7 +75,7 @@ impl<'db> Trie for SecTrieDB<'db> {
 
 #[test]
 fn trie_to_sectrie() {
-    use db::{MemoryDB,DBValue};
+    use db::{MemoryDB, DBValue};
     use super::triedbmut::TrieDBMut;
     use super::TrieMut;
 

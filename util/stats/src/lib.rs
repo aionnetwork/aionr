@@ -176,7 +176,7 @@ mod tests {
         assert_eq!(
             Histogram {
                 bucket_bounds: correct_bounds,
-                counts: vec![4, 2, 4, 6, 4]
+                counts: vec![4, 2, 4, 6, 4],
             },
             hist
         );
@@ -188,7 +188,7 @@ mod tests {
             Histogram::create(&[1, 2, 2], 3),
             Some(Histogram {
                 bucket_bounds: vec![1, 2, 3, 4],
-                counts: vec![1, 2, 0]
+                counts: vec![1, 2, 0],
             })
         );
     }
@@ -199,7 +199,7 @@ mod tests {
             Histogram::create(&[1, 2, 5], 2),
             Some(Histogram {
                 bucket_bounds: vec![1, 4, 7],
-                counts: vec![2, 1]
+                counts: vec![2, 1],
             })
         );
     }
@@ -210,7 +210,7 @@ mod tests {
             Histogram::create(&[1, 2, 6], 2),
             Some(Histogram {
                 bucket_bounds: vec![1, 4, 7],
-                counts: vec![2, 1]
+                counts: vec![2, 1],
             })
         );
     }

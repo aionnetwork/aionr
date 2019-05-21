@@ -329,7 +329,7 @@ fn does_not_propagate_delayed_transactions() {
             gas_price_bytes: Vec::new(),
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
-            transaction_type: 0x01,
+            transaction_type: 0x01.into(),
         }
         .sign(&secret, None),
         Some(Condition::Number(2)),
@@ -346,7 +346,7 @@ fn does_not_propagate_delayed_transactions() {
             gas_price_bytes: Vec::new(),
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
-            transaction_type: 0x01,
+            transaction_type: U256::from(0x01),
         }
         .sign(&secret, None),
         None,
@@ -403,7 +403,7 @@ fn transaction_proof() {
         gas_price_bytes: Vec::new(),
         gas_bytes: Vec::new(),
         value_bytes: Vec::new(),
-        transaction_type: 0x01,
+        transaction_type: U256::from(0x01),
     }
     .fake_sign(address);
 

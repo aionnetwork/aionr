@@ -26,7 +26,7 @@
 //! or rolled back.
 
 use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP};
-use std::cell::{RefCell, RefMut};
+use std::cell::{RefMut, RefCell};
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
@@ -47,24 +47,33 @@ use types::basic_account::BasicAccount;
 use types::state_diff::StateDiff;
 use vms::EnvInfo;
 
-use aion_types::{Address, H128, H256, U256};
+use aion_types::{Address, H256, U256};
 use bytes::Bytes;
-use kvdb::{KeyValueDB, AsHashStore, DBValue, HashStore, MemoryDBRepository};
+use kvdb::{KeyValueDB, AsHashStore, DBValue, MemoryDBRepository};
 
 use trie;
 use trie::recorder::Recorder;
 use trie::{Trie, TrieDB, TrieError};
 
-mod account;
+mod account_state;
 mod substate;
 
 pub mod backend;
 
-pub use self::account::Account;
+pub use account::{
+    AionVMAccount,
+// Account,
+    VMAccount,
+// AccType,
+    RequireCache,
+};
 pub use self::backend::Backend;
 pub use self::substate::Substate;
 
+use self::account_state::{AccountEntry, AccountState};
+
 /// Used to return information about an `State::apply` operation.
+#[derive(Debug)]
 pub struct ApplyOutcome {
     /// The receipt for the applied transaction.
     pub receipt: Receipt,
@@ -82,102 +91,6 @@ pub enum ProvedExecution {
     Failed(ExecutionError),
     /// The transaction successfully completd with the given proof.
     Complete(Executed),
-}
-
-#[derive(Eq, PartialEq, Clone, Copy, Debug)]
-/// Account modification state. Used to check if the account was
-/// Modified in between commits and overall.
-enum AccountState {
-    /// Account was loaded from disk and never modified in this state object.
-    CleanFresh,
-    /// Account was loaded from the global cache and never modified.
-    CleanCached,
-    /// Account has been modified and is not committed to the trie yet.
-    /// This is set if any of the account data is changed, including
-    /// storage and code.
-    Dirty,
-    /// Account was modified and committed to the trie.
-    Committed,
-}
-
-#[derive(Debug)]
-/// In-memory copy of the account data. Holds the optional account
-/// and the modification status.
-/// Account entry can contain existing (`Some`) or non-existing
-/// account (`None`)
-struct AccountEntry {
-    /// Account entry. `None` if account known to be non-existant.
-    account: Option<Account>,
-    /// Unmodified account balance.
-    old_balance: Option<U256>,
-    /// Entry state.
-    state: AccountState,
-}
-
-// Account cache item. Contains account data and
-// modification state
-impl AccountEntry {
-    fn is_dirty(&self) -> bool { self.state == AccountState::Dirty }
-
-    /// Clone dirty data into new `AccountEntry`. This includes
-    /// basic account data and modified storage keys.
-    /// Returns None if clean.
-    fn clone_if_dirty(&self) -> Option<AccountEntry> {
-        match self.is_dirty() {
-            true => Some(self.clone_dirty()),
-            false => None,
-        }
-    }
-
-    /// Clone dirty data into new `AccountEntry`. This includes
-    /// basic account data and modified storage keys.
-    fn clone_dirty(&self) -> AccountEntry {
-        AccountEntry {
-            old_balance: self.old_balance,
-            account: self.account.as_ref().map(Account::clone_dirty),
-            state: self.state,
-        }
-    }
-
-    // Create a new account entry and mark it as dirty.
-    fn new_dirty(account: Option<Account>) -> AccountEntry {
-        AccountEntry {
-            old_balance: account.as_ref().map(|a| a.balance().clone()),
-            account: account,
-            state: AccountState::Dirty,
-        }
-    }
-
-    // Create a new account entry and mark it as clean.
-    fn new_clean(account: Option<Account>) -> AccountEntry {
-        AccountEntry {
-            old_balance: account.as_ref().map(|a| a.balance().clone()),
-            account: account,
-            state: AccountState::CleanFresh,
-        }
-    }
-
-    // Create a new account entry and mark it as clean and cached.
-    fn new_clean_cached(account: Option<Account>) -> AccountEntry {
-        AccountEntry {
-            old_balance: account.as_ref().map(|a| a.balance().clone()),
-            account: account,
-            state: AccountState::CleanCached,
-        }
-    }
-
-    // Replace data with another entry but preserve storage cache.
-    fn overwrite_with(&mut self, other: AccountEntry) {
-        self.state = other.state;
-        match other.account {
-            Some(acc) => {
-                if let Some(ref mut ours) = self.account {
-                    ours.overwrite_with(acc);
-                }
-            }
-            None => self.account = None,
-        }
-    }
 }
 
 /// Check the given proof of execution.
@@ -303,19 +216,14 @@ pub fn prove_transaction<H: AsHashStore + Send + Sync>(
 pub struct State<B: Backend> {
     db: B,
     root: H256,
-    cache: RefCell<HashMap<Address, AccountEntry>>,
+
+    cache: RefCell<HashMap<Address, AccountEntry<AionVMAccount>>>,
     // The original account is preserved in
-    checkpoints: RefCell<Vec<HashMap<Address, Option<AccountEntry>>>>,
+    checkpoints: RefCell<Vec<HashMap<Address, Option<AccountEntry<AionVMAccount>>>>>,
     account_start_nonce: U256,
+
     factories: Factories,
     kvdb: Arc<KeyValueDB>,
-}
-
-#[derive(Copy, Clone)]
-enum RequireCache {
-    None,
-    CodeSize,
-    Code,
 }
 
 /// Mode of dealing with null accounts.
@@ -352,11 +260,11 @@ impl<B: Backend> State<B> {
         State {
             db: db,
             root: root,
+            factories: factories,
+            kvdb: kvdb,
             cache: RefCell::new(HashMap::new()),
             checkpoints: RefCell::new(Vec::new()),
             account_start_nonce: account_start_nonce,
-            factories: factories,
-            kvdb: kvdb,
         }
     }
 
@@ -376,11 +284,11 @@ impl<B: Backend> State<B> {
         let state = State {
             db: db,
             root: root,
+            factories: factories,
+            kvdb: kvdb,
             cache: RefCell::new(HashMap::new()),
             checkpoints: RefCell::new(Vec::new()),
             account_start_nonce: account_start_nonce,
-            factories: factories,
-            kvdb: kvdb,
         };
 
         Ok(state)
@@ -397,16 +305,17 @@ impl<B: Backend> State<B> {
         State {
             db: backend,
             root: self.root,
+            factories: self.factories,
+            kvdb: self.kvdb,
             cache: self.cache,
             checkpoints: self.checkpoints,
             account_start_nonce: self.account_start_nonce,
-            factories: self.factories,
-            kvdb: self.kvdb,
         }
     }
 
     /// Create a recoverable checkpoint of this state.
-    pub fn checkpoint(&mut self) { self.checkpoints.get_mut().push(HashMap::new()); }
+    /// AVM has no need of checkpoints
+    pub fn checkpoint(&mut self) { self.checkpoints.get_mut().push(HashMap::new()) }
 
     /// Merge last checkpoint with previous.
     pub fn discard_checkpoint(&mut self) {
@@ -454,7 +363,7 @@ impl<B: Backend> State<B> {
         }
     }
 
-    fn insert_cache(&self, address: &Address, account: AccountEntry) {
+    fn insert_cache(&self, address: &Address, account: AccountEntry<AionVMAccount>) {
         // Dirty account which is not in the cache means this is a new account.
         // It goes directly into the checkpoint as there's nothing to rever to.
         //
@@ -494,7 +403,7 @@ impl<B: Backend> State<B> {
     pub fn new_contract(&mut self, contract: &Address, balance: U256, nonce_offset: U256) {
         self.insert_cache(
             contract,
-            AccountEntry::new_dirty(Some(Account::new_contract(
+            AccountEntry::new_dirty(Some(AionVMAccount::new_contract(
                 balance,
                 self.account_start_nonce + nonce_offset,
             ))),
@@ -503,18 +412,22 @@ impl<B: Backend> State<B> {
 
     /// Remove an existing account.
     pub fn kill_account(&mut self, account: &Address) {
-        self.insert_cache(account, AccountEntry::new_dirty(None));
+        trace!(target: "vm", "kill account: {:?}", account);
+        self.insert_cache(account, AccountEntry::<AionVMAccount>::new_dirty(None));
     }
 
     /// Determine whether an account exists.
     pub fn exists(&self, a: &Address) -> trie::Result<bool> {
+        debug!(target: "vm", "check account of: {:?}", a);
         // Bloom filter does not contain empty accounts, so it is important here to
         // check if account exists in the database directly before EIP-161 is in effect.
+        // self.ensure_fvm_cached(a, RequireCache::None, false, |a| a.is_some())
         self.ensure_cached(a, RequireCache::None, false, |a| a.is_some())
     }
 
     /// Determine whether an account exists and if not empty.
     pub fn exists_and_not_null(&self, a: &Address) -> trie::Result<bool> {
+        debug!(target: "vm", "exist and not null");
         self.ensure_cached(a, RequireCache::None, false, |a| {
             a.map_or(false, |a| !a.is_null())
         })
@@ -522,6 +435,7 @@ impl<B: Backend> State<B> {
 
     /// Determine whether an account exists and has code or non-zero nonce.
     pub fn exists_and_has_code_or_nonce(&self, a: &Address) -> trie::Result<bool> {
+        debug!(target: "vm", "exist and has code or nonce");
         self.ensure_cached(a, RequireCache::CodeSize, false, |a| {
             a.map_or(false, |a| {
                 a.code_hash() != BLAKE2B_EMPTY || *a.nonce() != self.account_start_nonce
@@ -531,6 +445,7 @@ impl<B: Backend> State<B> {
 
     /// Get the balance of account `a`.
     pub fn balance(&self, a: &Address) -> trie::Result<U256> {
+        debug!(target: "vm", "get balance of: {:?}", a);
         self.ensure_cached(a, RequireCache::None, true, |a| {
             a.as_ref()
                 .map_or(U256::zero(), |account| *account.balance())
@@ -539,6 +454,7 @@ impl<B: Backend> State<B> {
 
     /// Get the nonce of account `a`.
     pub fn nonce(&self, a: &Address) -> trie::Result<U256> {
+        debug!(target: "vm", "get nonce of {:?}", a);
         self.ensure_cached(a, RequireCache::None, true, |a| {
             a.as_ref()
                 .map_or(self.account_start_nonce, |account| *account.nonce())
@@ -547,6 +463,7 @@ impl<B: Backend> State<B> {
 
     /// Get the storage root of account `a`.
     pub fn storage_root(&self, a: &Address) -> trie::Result<Option<H256>> {
+        debug!(target: "vm", "get storage root of: {:?}", a);
         self.ensure_cached(a, RequireCache::None, true, |a| {
             a.as_ref()
                 .and_then(|account| account.storage_root().cloned())
@@ -554,7 +471,7 @@ impl<B: Backend> State<B> {
     }
 
     /// Mutate storage of account `address` so that it is `value` for `key`.
-    pub fn storage_at(&self, address: &Address, key: &H128) -> trie::Result<H128> {
+    pub fn storage_at(&self, address: &Address, key: &Bytes) -> trie::Result<Bytes> {
         // Storage key search and update works like this:
         // 1. If there's an entry for the account in the local cache check for the key and return it if found.
         // 2. If there's an entry for the account in the global cache check for the key or load it into that account.
@@ -563,8 +480,9 @@ impl<B: Backend> State<B> {
         // check local cache first without updating
         {
             let local_cache = self.cache.borrow_mut();
+            let account = local_cache.get(address);
             let mut local_account = None;
-            if let Some(maybe_acc) = local_cache.get(address) {
+            if let Some(maybe_acc) = account {
                 match maybe_acc.account {
                     Some(ref account) => {
                         if let Some(value) = account.cached_storage_at(key) {
@@ -573,13 +491,13 @@ impl<B: Backend> State<B> {
                             local_account = Some(maybe_acc);
                         }
                     }
-                    _ => return Ok(H128::new()),
+                    _ => return Ok(vec![]),
                 }
             }
             // check the global cache and and cache storage key there if found,
             let trie_res = self.db.get_cached(address, |acc| {
                 match acc {
-                    None => Ok(H128::new()),
+                    None => Ok(vec![]),
                     Some(a) => {
                         let account_db = self
                             .factories
@@ -603,14 +521,14 @@ impl<B: Backend> State<B> {
                         .readonly(self.db.as_hashstore(), account.address_hash(address));
                     return account.storage_at(account_db.as_hashstore(), key);
                 } else {
-                    return Ok(H128::new());
+                    return Ok(vec![]);
                 }
             }
         }
 
         // check if the account could exist before any requests to trie
         if self.db.is_known_null(address) {
-            return Ok(H128::zero());
+            return Ok(vec![]);
         }
 
         // account is not found in the global cache, get from the DB and insert into local
@@ -619,8 +537,8 @@ impl<B: Backend> State<B> {
             .trie
             .readonly(self.db.as_hashstore(), &self.root)
             .expect(SEC_TRIE_DB_UNWRAP_STR);
-        let maybe_acc = db.get_with(address, Account::from_rlp)?;
-        let r = maybe_acc.as_ref().map_or(Ok(H128::new()), |a| {
+        let maybe_acc = db.get_with(address, AionVMAccount::from_rlp)?;
+        let r = maybe_acc.as_ref().map_or(Ok(vec![]), |a| {
             let account_db = self
                 .factories
                 .accountdb
@@ -631,86 +549,71 @@ impl<B: Backend> State<B> {
         r
     }
 
-    pub fn storage_at_dword(&self, address: &Address, key: &H128) -> trie::Result<H256> {
-        {
-            let local_cache = self.cache.borrow_mut();
-            let mut local_account = None;
-            if let Some(maybe_acc) = local_cache.get(address) {
-                match maybe_acc.account {
-                    Some(ref account) => {
-                        if let Some(value) = account.cached_storage_at_dword(key) {
-                            return Ok(value);
-                        } else {
-                            local_account = Some(maybe_acc);
-                        }
-                    }
-                    _ => return Ok(H256::new()),
-                }
-            }
-            // check the global cache and and cache storage key there if found,
-            let trie_res = self.db.get_cached(address, |acc| {
-                match acc {
-                    None => Ok(H256::new()),
-                    Some(a) => {
-                        let account_db = self
-                            .factories
-                            .accountdb
-                            .readonly(self.db.as_hashstore(), a.address_hash(address));
-                        a.storage_at_dword(account_db.as_hashstore(), key)
-                    }
-                }
-            });
-
-            if let Some(res) = trie_res {
-                return res;
-            }
-
-            // otherwise cache the account localy and cache storage key there.
-            if let Some(ref mut acc) = local_account {
-                if let Some(ref account) = acc.account {
-                    let account_db = self
-                        .factories
-                        .accountdb
-                        .readonly(self.db.as_hashstore(), account.address_hash(address));
-                    return account.storage_at_dword(account_db.as_hashstore(), key);
-                } else {
-                    return Ok(H256::new());
-                }
-            }
-        }
-
-        // check if the account could exist before any requests to trie
-        if self.db.is_known_null(address) {
-            return Ok(H256::zero());
-        }
-
-        // account is not found in the global cache, get from the DB and insert into local
-        let db = self
-            .factories
-            .trie
-            .readonly(self.db.as_hashstore(), &self.root)
-            .expect(SEC_TRIE_DB_UNWRAP_STR);
-        let maybe_acc = db.get_with(address, Account::from_rlp)?;
-        let r = maybe_acc.as_ref().map_or(Ok(H256::new()), |a| {
-            let account_db = self
-                .factories
-                .accountdb
-                .readonly(self.db.as_hashstore(), a.address_hash(address));
-            a.storage_at_dword(account_db.as_hashstore(), key)
-        });
-        self.insert_cache(address, AccountEntry::new_clean(maybe_acc));
-        r
-    }
-
     /// Get accounts' code.
     pub fn code(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
+        debug!(target: "vm", "get code of: {:?}", a);
         self.ensure_cached(a, RequireCache::Code, true, |a| {
             a.as_ref().map_or(None, |a| a.code().clone())
         })
     }
 
+    pub fn init_transformed_code(&mut self, a: &Address, code: Bytes) -> trie::Result<()> {
+        self.require_or_from(
+            a,
+            true,
+            || AionVMAccount::new_contract(0.into(), self.account_start_nonce),
+            |_| {},
+        )?
+        .init_transformed_code(code);
+        Ok(())
+    }
+
+    // object graph should ensure cached???
+    pub fn get_objectgraph(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
+        let ret = self.ensure_cached(a, RequireCache::Code, true, |a| {
+            a.as_ref().map_or(None, |a| a.objectgraph().clone())
+        });
+
+        debug!(target: "vm", "get object graph of: {:?} = {:?}", a, ret);
+
+        return ret;
+    }
+
+    pub fn set_objectgraph(&mut self, a: &Address, data: Bytes) -> trie::Result<()> {
+        //WORKAROUND: avm will set object graph after selfdestruct, avoid creating new account
+        {
+            let cache = self.cache.borrow();
+            if let Some(maybe_acc) = cache.get(a) {
+                if maybe_acc.is_dirty() && !maybe_acc.account.is_some() {
+                    return Ok(());
+                }
+            }
+        }
+
+        self.require_or_from(
+            a,
+            true,
+            || AionVMAccount::new_contract(0.into(), self.account_start_nonce),
+            |_| {},
+        )?
+        .init_objectgraph(data);
+        Ok(())
+    }
+
+    /// Get accounts' code. avm specific code (dedundant code saving)
+    pub fn transformed_code(&self, a: &Address) -> trie::Result<Option<Arc<Bytes>>> {
+        let ret = self.ensure_cached(a, RequireCache::Code, true, |a| {
+            a.as_ref().map_or(None, |a| a.transformed_code().clone())
+        });
+
+        debug!(target: "vm", "get transformed code of: {:?} = {:?}", a, ret);
+
+        return ret;
+    }
+
     /// Get an account's code hash.
     pub fn code_hash(&self, a: &Address) -> trie::Result<H256> {
+        debug!(target: "vm", "get code hash of: {:?}", a);
         self.ensure_cached(a, RequireCache::None, true, |a| {
             a.as_ref().map_or(BLAKE2B_EMPTY, |a| a.code_hash())
         })
@@ -718,6 +621,7 @@ impl<B: Backend> State<B> {
 
     /// Get accounts' code size.
     pub fn code_size(&self, a: &Address) -> trie::Result<Option<usize>> {
+        debug!(target: "vm", "get code size");
         self.ensure_cached(a, RequireCache::CodeSize, true, |a| {
             a.as_ref().and_then(|a| a.code_size())
         })
@@ -735,6 +639,7 @@ impl<B: Backend> State<B> {
         let is_value_transfer = !incr.is_zero();
         if is_value_transfer || (cleanup_mode == CleanupMode::ForceCreate && !self.exists(a)?) {
             self.require(a, false)?.add_balance(incr);
+        //panic!("hi");
         } else if let CleanupMode::TrackTouched(set) = cleanup_mode {
             if self.exists(a)? {
                 set.insert(*a);
@@ -782,16 +687,9 @@ impl<B: Backend> State<B> {
     }
 
     /// Mutate storage of account `a` so that it is `value` for `key`.
-    pub fn set_storage(&mut self, a: &Address, key: H128, value: H128) -> trie::Result<()> {
-        trace!(target: "state", "set_storage({}:{:x} to {:x})", a, key, value);
+    pub fn set_storage(&mut self, a: &Address, key: Bytes, value: Bytes) -> trie::Result<()> {
+        trace!(target: "state", "set_storage({}:{:?} to {:?})", a, key, value);
         self.require(a, false)?.set_storage(key, value);
-        Ok(())
-    }
-
-    /// Mutate storage of account `a` so that it is `value` for `key`.
-    pub fn set_storage_dword(&mut self, a: &Address, key: H128, value: H256) -> trie::Result<()> {
-        trace!(target: "state", "set_storage({}:{:x} to {:x})", a, key, value);
-        self.require(a, false)?.set_storage_dword(key, value);
         Ok(())
     }
 
@@ -801,7 +699,7 @@ impl<B: Backend> State<B> {
         self.require_or_from(
             a,
             true,
-            || Account::new_contract(0.into(), self.account_start_nonce),
+            || AionVMAccount::new_contract(0.into(), self.account_start_nonce),
             |_| {},
         )?
         .init_code(code);
@@ -812,7 +710,7 @@ impl<B: Backend> State<B> {
         self.require_or_from(
             a,
             true,
-            || Account::new_contract(0.into(), self.account_start_nonce),
+            || AionVMAccount::new_contract(0.into(), self.account_start_nonce),
             |_| {},
         )?
         .set_empty_but_commit();
@@ -824,7 +722,7 @@ impl<B: Backend> State<B> {
         self.require_or_from(
             a,
             true,
-            || Account::new_contract(0.into(), self.account_start_nonce),
+            || AionVMAccount::new_contract(0.into(), self.account_start_nonce),
             |_| {},
         )?
         .reset_code(code);
@@ -860,6 +758,60 @@ impl<B: Backend> State<B> {
         })
     }
 
+    pub fn apply_batch(
+        &mut self,
+        env_info: &EnvInfo,
+        machine: &Machine,
+        txs: &[SignedTransaction],
+    ) -> Vec<ApplyResult>
+    {
+        let exec_results = self.execute_bulk(env_info, machine, txs, false, false);
+
+        let mut receipts = Vec::new();
+        for result in exec_results {
+            //self.commit_touched(result.clone().unwrap().touched);
+            let outcome = match result {
+                Ok(e) => {
+                    let state_root = e.state_root.clone();
+                    let receipt = Receipt::new(
+                        state_root,
+                        e.gas_used,
+                        e.transaction_fee,
+                        e.logs,
+                        e.output,
+                        e.exception,
+                    );
+                    Ok(ApplyOutcome {
+                        receipt,
+                    })
+                }
+                Err(x) => Err(From::from(x)),
+            };
+            receipts.push(outcome);
+        }
+
+        trace!(target: "state", "Transaction receipt: {:?}", receipts);
+
+        return receipts;
+    }
+
+    fn execute_bulk(
+        &mut self,
+        env_info: &EnvInfo,
+        machine: &Machine,
+        txs: &[SignedTransaction],
+        check_nonce: bool,
+        virt: bool,
+    ) -> Vec<Result<Executed, ExecutionError>>
+    {
+        let mut e = Executive::new(self, env_info, machine);
+
+        match virt {
+            true => e.transact_virtual_bulk(txs, check_nonce),
+            false => e.transact_bulk(txs, check_nonce, false),
+        }
+    }
+
     // Execute a given transaction without committing changes.
     //
     // `virt` signals that we are executing outside of a block set and restrictions like
@@ -886,12 +838,15 @@ impl<B: Backend> State<B> {
         Ok(())
     }
 
+    pub fn commit_touched(&mut self, _accounts: HashSet<Address>) -> Result<(), Error> { Ok(()) }
+
     /// Commits our cached account changes into the trie.
     pub fn commit(&mut self) -> Result<(), Error> {
         // first, commit the sub trees.
         let mut accounts = self.cache.borrow_mut();
-        debug!(target: "cons", "commit accounts = {:?}", accounts);
+        // debug!(target: "cons", "commit accounts = {:?}", accounts);
         for (address, ref mut a) in accounts.iter_mut().filter(|&(_, ref a)| a.is_dirty()) {
+            debug!(target: "cons", "commit account: [{:?} - {:?}]", address, a);
             if let Some(ref mut account) = a.account {
                 let addr_hash = account.address_hash(address);
                 {
@@ -902,6 +857,7 @@ impl<B: Backend> State<B> {
                     account.commit_code(account_db.as_hashstore_mut());
                     // Tmp workaround to ignore storage changes on null accounts
                     // until java kernel fixed the problem
+                    debug!(target: "vm", "check null of {:?}", address);
                     if !account.is_null()
                         || address == &H256::from(
                             "0000000000000000000000000000000000000000000000000000000000000100",
@@ -911,13 +867,10 @@ impl<B: Backend> State<B> {
                         ) {
                         account
                             .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
-                        account.commit_storage_dword(
-                            &self.factories.trie,
-                            account_db.as_hashstore_mut(),
-                        )?;
-                    } else if !account.storage_changes().is_empty()
-                        || !account.storage_changes_dword().is_empty()
-                    {
+                        account.update_root(address, account_db.as_hashstore_mut());
+                    } else if !account.storage_changes().is_empty() {
+                        // TODO: check key/value storage in avm
+                        // to see whether discard is needed
                         account.discard_storage_changes();
                         a.state = AccountState::CleanFresh;
                     } else {
@@ -940,6 +893,7 @@ impl<B: Backend> State<B> {
         }
 
         {
+            // commit fvm accounts
             let mut trie = self
                 .factories
                 .trie
@@ -956,7 +910,8 @@ impl<B: Backend> State<B> {
                 };
             }
         }
-        debug!(target: "cons", "after commit accounts = {:?}", accounts);
+        //println!("new state = {:?}", self);
+        debug!(target: "cons", "after commit: accounts = {:?}, state root = {:?}", accounts, self.root);
 
         Ok(())
     }
@@ -974,16 +929,20 @@ impl<B: Backend> State<B> {
     }
 
     /// Clear state cache
-    pub fn clear(&mut self) { self.cache.borrow_mut().clear(); }
+    pub fn clear(&mut self) {
+        self.cache.borrow_mut().clear();
+        self.cache.borrow_mut().clear();
+    }
 
     /// Populate the state from `accounts`.
     /// Used for tests.
     pub fn populate_from(&mut self, accounts: PodState) {
         assert!(self.checkpoints.borrow().is_empty());
         for (add, acc) in accounts.drain().into_iter() {
-            self.cache
-                .borrow_mut()
-                .insert(add, AccountEntry::new_dirty(Some(Account::from_pod(acc))));
+            self.cache.borrow_mut().insert(
+                add,
+                AccountEntry::new_dirty(Some(AionVMAccount::from_pod(acc))),
+            );
         }
     }
 
@@ -1023,11 +982,7 @@ impl<B: Backend> State<B> {
                 // needs to be split into two parts for the refcell code here
                 // to work.
                 for key in pod_account.storage.keys() {
-                    self.storage_at(address, key)?;
-                }
-
-                for key in pod_account.storage_dword.keys() {
-                    self.storage_at_dword(address, key)?;
+                    self.storage_at(address, &key[..].to_vec())?;
                 }
             }
         }
@@ -1045,44 +1000,6 @@ impl<B: Backend> State<B> {
         Ok(pod_state::diff_pod(&state_pre.to_pod(), &pod_state_post))
     }
 
-    // load required account data from the databases.
-    fn update_account_cache(
-        require: RequireCache,
-        account: &mut Account,
-        state_db: &B,
-        db: &HashStore,
-    )
-    {
-        if let RequireCache::None = require {
-            return;
-        }
-
-        if account.is_cached() {
-            return;
-        }
-
-        // if there's already code in the global cache, always cache it localy
-        let hash = account.code_hash();
-        match state_db.get_cached_code(&hash) {
-            Some(code) => account.cache_given_code(code),
-            None => {
-                match require {
-                    RequireCache::None => {}
-                    RequireCache::Code => {
-                        if let Some(code) = account.cache_code(db) {
-                            // propagate code loaded from the database to
-                            // the global code cache.
-                            state_db.cache_code(hash, code)
-                        }
-                    }
-                    RequireCache::CodeSize => {
-                        account.cache_code_size(db);
-                    }
-                }
-            }
-        }
-    }
-
     /// Check caches for required data
     /// First searches for account in the local, then the shared cache.
     /// Populates local cache if nothing found.
@@ -1094,28 +1011,30 @@ impl<B: Backend> State<B> {
         f: F,
     ) -> trie::Result<U>
     where
-        F: Fn(Option<&Account>) -> U,
+        F: Fn(Option<&AionVMAccount>) -> U,
     {
         // check local cache first
+        debug!(target: "vm", "search local cache");
         if let Some(ref mut maybe_acc) = self.cache.borrow_mut().get_mut(a) {
             if let Some(ref mut account) = maybe_acc.account {
                 let accountdb = self
                     .factories
                     .accountdb
                     .readonly(self.db.as_hashstore(), account.address_hash(a));
-                Self::update_account_cache(require, account, &self.db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
                 return Ok(f(Some(account)));
             }
             return Ok(f(None));
         }
         // check global cache
+        debug!(target: "vm", "search global cache");
         let result = self.db.get_cached(a, |mut acc| {
             if let Some(ref mut account) = acc {
                 let accountdb = self
                     .factories
                     .accountdb
                     .readonly(self.db.as_hashstore(), account.address_hash(a));
-                Self::update_account_cache(require, account, &self.db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
             }
             f(acc.map(|a| &*a))
         });
@@ -1127,23 +1046,19 @@ impl<B: Backend> State<B> {
                     return Ok(f(None));
                 }
 
+                trace!(target: "vm", "search local database");
                 // not found in the global cache, get from the DB and insert into local
                 let db = self
                     .factories
                     .trie
                     .readonly(self.db.as_hashstore(), &self.root)?;
-                let mut maybe_acc = db.get_with(a, Account::from_rlp)?;
+                let mut maybe_acc = db.get_with(a, AionVMAccount::from_rlp)?;
                 if let Some(ref mut account) = maybe_acc.as_mut() {
                     let accountdb = self
                         .factories
                         .accountdb
                         .readonly(self.db.as_hashstore(), account.address_hash(a));
-                    Self::update_account_cache(
-                        require,
-                        account,
-                        &self.db,
-                        accountdb.as_hashstore(),
-                    );
+                    account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
                 }
                 let r = f(maybe_acc.as_ref());
                 self.insert_cache(a, AccountEntry::new_clean(maybe_acc));
@@ -1153,11 +1068,16 @@ impl<B: Backend> State<B> {
     }
 
     /// Pull account `a` in our cache from the trie DB. `require_code` requires that the code be cached, too.
-    fn require<'a>(&'a self, a: &Address, require_code: bool) -> trie::Result<RefMut<'a, Account>> {
+    fn require<'a>(
+        &'a self,
+        a: &Address,
+        require_code: bool,
+    ) -> trie::Result<RefMut<'a, AionVMAccount>>
+    {
         self.require_or_from(
             a,
             require_code,
-            || Account::new_basic(0u8.into(), self.account_start_nonce),
+            || AionVMAccount::new_basic(0u8.into(), self.account_start_nonce),
             |_| {},
         )
     }
@@ -1170,10 +1090,10 @@ impl<B: Backend> State<B> {
         require_code: bool,
         default: F,
         not_default: G,
-    ) -> trie::Result<RefMut<'a, Account>>
+    ) -> trie::Result<RefMut<'a, AionVMAccount>>
     where
-        F: FnOnce() -> Account,
-        G: FnOnce(&mut Account),
+        F: FnOnce() -> AionVMAccount,
+        G: FnOnce(&mut AionVMAccount),
     {
         let contains_key = self.cache.borrow().contains_key(a);
         if !contains_key {
@@ -1185,7 +1105,7 @@ impl<B: Backend> State<B> {
                             .factories
                             .trie
                             .readonly(self.db.as_hashstore(), &self.root)?;
-                        AccountEntry::new_clean(db.get_with(a, Account::from_rlp)?)
+                        AccountEntry::new_clean(db.get_with(a, AionVMAccount::from_rlp)?)
                     } else {
                         AccountEntry::new_clean(None)
                     };
@@ -1216,9 +1136,9 @@ impl<B: Backend> State<B> {
                             .factories
                             .accountdb
                             .readonly(self.db.as_hashstore(), addr_hash);
-                        Self::update_account_cache(
+                        account.update_account_cache(
+                            a,
                             RequireCache::Code,
-                            account,
                             &self.db,
                             accountdb.as_hashstore(),
                         );
@@ -1274,7 +1194,8 @@ impl<B: Backend> State<B> {
         // TODO: probably could look into cache somehow but it's keyed by
         // address, not blake2b(address).
         let trie = TrieDB::new(self.db.as_hashstore(), &self.root)?;
-        let acc = match trie.get_with(&account_key, Account::from_rlp)? {
+        //TODO: update account type
+        let acc = match trie.get_with(&account_key, AionVMAccount::from_rlp)? {
             Some(acc) => acc,
             None => return Ok((Vec::new(), H256::new())),
         };
@@ -1288,7 +1209,15 @@ impl<B: Backend> State<B> {
 }
 
 impl<B: Backend> fmt::Debug for State<B> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result { write!(f, "{:?}", self.cache.borrow()) }
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "fvm accounts = {:?}, avm accounts = {:?}, state_root = {:?}",
+            self.cache.borrow(),
+            self.cache.borrow(),
+            self.root()
+        )
+    }
 }
 
 // TODO: cloning for `State` shouldn't be possible in general; Remove this and use
@@ -1296,7 +1225,7 @@ impl<B: Backend> fmt::Debug for State<B> {
 impl Clone for State<StateDB> {
     fn clone(&self) -> State<StateDB> {
         let cache = {
-            let mut cache: HashMap<Address, AccountEntry> = HashMap::new();
+            let mut cache: HashMap<Address, AccountEntry<AionVMAccount>> = HashMap::new();
             for (key, val) in self.cache.borrow().iter() {
                 if let Some(entry) = val.clone_if_dirty() {
                     cache.insert(key.clone(), entry);
@@ -1308,11 +1237,11 @@ impl Clone for State<StateDB> {
         State {
             db: self.db.boxed_clone(),
             root: self.root.clone(),
+            factories: self.factories.clone(),
+            kvdb: self.kvdb.clone(),
             cache: RefCell::new(cache),
             checkpoints: RefCell::new(Vec::new()),
             account_start_nonce: self.account_start_nonce.clone(),
-            factories: self.factories.clone(),
-            kvdb: self.kvdb.clone(),
         }
     }
 }
@@ -1320,7 +1249,7 @@ impl Clone for State<StateDB> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use aion_types::{Address, H256, U128, U256};
+    use aion_types::{Address, H256, U256};
     use key::Ed25519Secret;
     use logger::init_log;
     use receipt::SimpleReceipt;
@@ -1357,7 +1286,7 @@ mod tests {
             action: Action::Create,
             value: 100.into(),
             value_bytes: Vec::new(),
-            transaction_type: 1,
+            transaction_type: 1.into(),
             data: FromHex::from_hex("601080600c6000396000f3006000355415600957005b60203560003555")
                 .unwrap(),
         }
@@ -1401,6 +1330,35 @@ mod tests {
     }
 
     #[test]
+    fn balance_from_database() {
+        let a = Address::zero();
+        let (root, db) = {
+            let mut state = get_temp_state();
+            state
+                .require_or_from(
+                    &a,
+                    false,
+                    || AionVMAccount::new_contract(42.into(), 0.into()),
+                    |_| {},
+                )
+                .unwrap();
+            state.commit().unwrap();
+            assert_eq!(state.balance(&a).unwrap(), 42.into());
+            state.drop()
+        };
+
+        let state = State::from_existing(
+            db,
+            root,
+            U256::from(0u8),
+            Default::default(),
+            Arc::new(MemoryDBRepository::new()),
+        )
+        .unwrap();
+        assert_eq!(state.balance(&a).unwrap(), 42.into());
+    }
+
+    #[test]
     fn code_from_database() {
         let a = Address::zero();
         let (root, db) = {
@@ -1409,7 +1367,7 @@ mod tests {
                 .require_or_from(
                     &a,
                     false,
-                    || Account::new_contract(42.into(), 0.into()),
+                    || AionVMAccount::new_contract(42.into(), 0.into()),
                     |_| {},
                 )
                 .unwrap();
@@ -1432,17 +1390,51 @@ mod tests {
     }
 
     #[test]
+    fn transformed_code_from_database() {
+        let a = Address::zero();
+        let (root, db) = {
+            let mut state = get_temp_state();
+            state
+                .require_or_from(
+                    &a,
+                    false,
+                    || AionVMAccount::new_contract(42.into(), 0.into()),
+                    |_| {},
+                )
+                .unwrap();
+            state.init_transformed_code(&a, vec![1, 2, 3]).unwrap();
+            assert_eq!(
+                state.transformed_code(&a).unwrap(),
+                Some(Arc::new(vec![1u8, 2, 3]))
+            );
+            state.commit().unwrap();
+            assert_eq!(
+                state.transformed_code(&a).unwrap(),
+                Some(Arc::new(vec![1u8, 2, 3]))
+            );
+            state.drop()
+        };
+
+        let state = State::from_existing(
+            db,
+            root,
+            U256::from(0u8),
+            Default::default(),
+            Arc::new(MemoryDBRepository::new()),
+        )
+        .unwrap();
+        assert_eq!(
+            state.transformed_code(&a).unwrap(),
+            Some(Arc::new(vec![1u8, 2, 3]))
+        );
+    }
+
+    #[test]
     fn storage_at_from_database() {
         let a = Address::zero();
         let (root, db) = {
             let mut state = get_temp_state_with_nonce();
-            state
-                .set_storage(
-                    &a,
-                    H128::from(U128::from(2u64)),
-                    H128::from(U128::from(69u64)),
-                )
-                .unwrap();
+            state.set_storage(&a, vec![2], vec![69]).unwrap();
             state.commit().unwrap();
             state.drop()
         };
@@ -1455,10 +1447,7 @@ mod tests {
             Arc::new(MemoryDBRepository::new()),
         )
         .unwrap();
-        assert_eq!(
-            s.storage_at(&a, &H128::from(U128::from(2u64))).unwrap(),
-            H128::from(U128::from(69u64))
-        );
+        assert_eq!(s.storage_at(&a, &vec![2]).unwrap(), vec![69]);
     }
 
     #[test]
@@ -1726,10 +1715,10 @@ mod tests {
         state
             .add_balance(&a, &256.into(), CleanupMode::NoEmpty)
             .unwrap();
-        state.set_storage(&a, 0xb.into(), 0xc.into()).unwrap();
+        state.set_storage(&a, vec![0x0b], vec![0x0c]).unwrap();
 
         let mut new_state = state.clone();
-        new_state.set_storage(&a, 0xb.into(), 0xd.into()).unwrap();
+        new_state.set_storage(&a, vec![0x0b], vec![0x0d]).unwrap();
 
         new_state.diff_from(state).unwrap();
     }

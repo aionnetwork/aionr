@@ -22,13 +22,14 @@
 
 //! Transaction execution format module.
 
-use aion_types::{U256, U512, Address};
+use aion_types::{H256, U256, U512, Address};
 use bytes::Bytes;
 use trie;
 use log_entry::LogEntry;
 use state_diff::StateDiff;
 
 use std::fmt;
+use std::collections::HashSet;
 
 /// Transaction execution receipt.
 #[derive(Debug, PartialEq, Clone)]
@@ -69,6 +70,10 @@ pub struct Executed {
     pub state_diff: Option<StateDiff>,
     /// Transaction fee
     pub transaction_fee: U256,
+    /// accounts touched by avm
+    pub touched: HashSet<Address>,
+    /// state root after each execution
+    pub state_root: H256,
 }
 
 /// Result of executing the transaction.

@@ -38,12 +38,7 @@ use std::{env, process, fs, fmt};
 use docopt::Docopt;
 use keychain::accounts_dir::{KeyDirectory, RootDiskDirectory};
 use keychain::ethkey::Address;
-use keychain::{
-    EthStore,
-    SimpleSecretStore,
-    import_accounts,
-    StoreAccountRef
-};
+use keychain::{EthStore, SimpleSecretStore, import_accounts, StoreAccountRef};
 
 pub const USAGE: &'static str = r#"
 key management.

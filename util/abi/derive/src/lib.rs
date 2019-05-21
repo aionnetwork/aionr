@@ -280,10 +280,12 @@ fn template_param_type(input: &ParamType, index: usize) -> quote::Tokens {
 
 fn from_template_param(input: &ParamType, name: &quote::Tokens) -> quote::Tokens {
     match *input {
-		ParamType::Array(_) => quote! { #name.into_iter().map(Into::into).collect::<Vec<_>>() },
-		ParamType::FixedArray(_, _) => quote! { (Box::new(#name.into()) as Box<[_]>).into_vec().into_iter().map(Into::into).collect::<Vec<_>>() },
-		_ => quote! {#name.into() },
-	}
+        ParamType::Array(_) => quote! { #name.into_iter().map(Into::into).collect::<Vec<_>>() },
+        ParamType::FixedArray(_, _) => {
+            quote! { (Box::new(#name.into()) as Box<[_]>).into_vec().into_iter().map(Into::into).collect::<Vec<_>>() }
+        }
+        _ => quote! {#name.into() },
+    }
 }
 
 fn to_token(name: &quote::Tokens, kind: &ParamType) -> quote::Tokens {

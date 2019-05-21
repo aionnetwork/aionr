@@ -72,7 +72,7 @@ fn test_load_boot_nodes() {
     for _ in 0..10 {
         node.inc_repeated();
     }
-    assert_eq!(node.ip_addr.port, 30303);
+    assert_eq!(node.ip_addr.port, 30309);
     assert_eq!(node.is_over_repeated_threshold(), true);
 
     node.node_hash = node_hash;
@@ -89,7 +89,7 @@ fn test_load_boot_nodes() {
     node.reset_repeated();
     P2pMgr::update_node(node_hash, &mut node);
     peer_node = P2pMgr::get_node(node_hash).unwrap();
-    assert_eq!(peer_node.ip_addr.port, 30303);
+    assert_eq!(peer_node.ip_addr.port, 30309);
     assert_eq!(peer_node.is_over_repeated_threshold(), false);
 }
 

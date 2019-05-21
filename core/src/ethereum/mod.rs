@@ -65,3 +65,8 @@ pub fn new_frontier_test_machine() -> EthereumMachine {
 pub fn new_aion_test_machine() -> EthereumMachine {
     load_machine(include_bytes!("../../res/testnet.json"))
 }
+
+#[cfg(test)]
+pub fn new_aion_avm_machine() -> EthereumMachine {
+    load_machine(include_bytes!("../../res/aion/avm.json"))
+}
