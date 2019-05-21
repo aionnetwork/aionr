@@ -580,6 +580,16 @@ impl<B: Backend> State<B> {
     }
 
     pub fn set_objectgraph(&mut self, a: &Address, data: Bytes) -> trie::Result<()> {
+        //WORKAROUND: avm will set object graph after selfdestruct, avoid creating new account
+        {
+            let cache = self.cache.borrow();
+            if let Some(maybe_acc) = cache.get(a) {
+                if maybe_acc.is_dirty() && !maybe_acc.account.is_some() {
+                    return Ok(());
+                }
+            }
+        }
+
         self.require_or_from(
             a,
             true,
