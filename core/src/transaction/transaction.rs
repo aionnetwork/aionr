@@ -58,7 +58,7 @@ pub const AVM_TRANSACTION_TYPE: U256 = U256([2, 0, 0, 0]);
 struct TransactionEnergyRule;
 impl TransactionEnergyRule {
     pub fn is_valid_gas_create(gas: U256) -> bool {
-        (gas >= GAS_CALL_MIN) && (gas <= GAS_CREATE_MAX)
+        (gas >= GAS_CREATE_MIN) && (gas <= GAS_CREATE_MAX)
     }
 
     pub fn is_valid_gas_call(gas: U256) -> bool { gas >= GAS_CALL_MIN && gas <= GAS_CALL_MAX }
