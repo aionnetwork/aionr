@@ -517,7 +517,7 @@ impl UnverifiedTransaction {
             Action::Create => {
                 if !TransactionEnergyRule::is_valid_gas_create(self.gas) {
                     return Err(error::Error::InvalidContractCreateGas {
-                        minimal: GAS_CREATE_MIN + GAS_CALL_MIN,
+                        minimal: GAS_CREATE_MIN,
                         maximal: GAS_CREATE_MAX,
                         got: self.gas,
                     });
@@ -911,7 +911,7 @@ mod tests {
         assert_eq!(
             e,
             error::Error::InvalidContractCreateGas {
-                minimal: GAS_CREATE_MIN + GAS_CALL_MIN,
+                minimal: GAS_CREATE_MIN,
                 maximal: GAS_CREATE_MAX,
                 got: t.gas,
             }
@@ -950,7 +950,7 @@ mod tests {
         assert_eq!(
             e,
             error::Error::InvalidContractCreateGas {
-                minimal: GAS_CREATE_MIN + GAS_CALL_MIN,
+                minimal: GAS_CREATE_MIN,
                 maximal: GAS_CREATE_MAX,
                 got: t.gas,
             }
