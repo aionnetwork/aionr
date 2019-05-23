@@ -348,12 +348,14 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         // 2. Check gas limit
         // 2.1 Gas limit should not be less than the basic gas requirement
-        let base_gas_required: U256 = t.gas_required();
+        let mut base_gas_required: U256 = t.gas_required();
         if t.gas < base_gas_required {
-            return Err(From::from(ExecutionError::NotEnoughBaseGas {
-                required: base_gas_required,
-                got: t.gas,
-            }));
+            // return Err(From::from(ExecutionError::NotEnoughBaseGas {
+            //     required: base_gas_required,
+            //     got: t.gas,
+            // }));
+            // WORKAROUND: let this tx get into vm with gas = 0, aionj specific
+            base_gas_required = t.gas;
         }
         debug!(target: "vm", "base_gas_required = {}", base_gas_required);
 
@@ -701,6 +703,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         let mut unconfirmed_substates = vec![Substate::new(); params.len()];
 
         let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice(), false);
+
+        println!("{:?}", unconfirmed_substates);
 
         res
     }
@@ -1802,22 +1806,23 @@ mod tests {
             DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
-        let error = {
+        let result = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.transact(&signed_transaction, true, false).unwrap_err()
+            ex.transact(&signed_transaction, true, false)
         };
-        assert_eq!(
-            error,
-            ExecutionError::NotEnoughBaseGas {
-                required: U256::from(246_240),
-                got: U256::from(1_000),
-            }
-        );
+        // assert_eq!(
+        //     error,
+        //     ExecutionError::NotEnoughBaseGas {
+        //         required: U256::from(246_240),
+        //         got: U256::from(1_000),
+        //     }
+        // );
+        assert!(result.is_ok());
 
         // 1.5 Transaction does not have enough base gas (call)
         let data = "2d7df21a".from_hex().unwrap();
         let transaction: Transaction = Transaction::new(
-            U256::zero(),
+            U256::one(),
             U256::zero(),
             U256::from(1_000),
             Action::Call(0.into()),
@@ -1826,21 +1831,22 @@ mod tests {
             DEFAULT_TRANSACTION_TYPE,
         );
         let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
-        let error = {
+        let result = {
             let mut ex = Executive::new(&mut state, &info, &machine);
-            ex.transact(&signed_transaction, true, false).unwrap_err()
+            ex.transact(&signed_transaction, true, false)
         };
-        assert_eq!(
-            error,
-            ExecutionError::NotEnoughBaseGas {
-                required: U256::from(21_256),
-                got: U256::from(1_000),
-            }
-        );
+        // assert_eq!(
+        //     error,
+        //     ExecutionError::NotEnoughBaseGas {
+        //         required: U256::from(21_256),
+        //         got: U256::from(1_000),
+        //     }
+        // );
+        assert!(result.is_ok());
 
         // 2. Insufficient balance
         let transaction: Transaction = Transaction::new(
-            U256::zero(),
+            U256::from(2),
             U256::from(1),
             U256::from(50_000),
             Action::Call(0.into()),
@@ -1863,7 +1869,7 @@ mod tests {
 
         // 3. Invalid nonce
         let transaction: Transaction = Transaction::new(
-            U256::from(1),
+            U256::from(4),
             U256::from(0),
             U256::from(50_000),
             Action::Call(0.into()),
@@ -1879,8 +1885,8 @@ mod tests {
         assert_eq!(
             error,
             ExecutionError::InvalidNonce {
-                expected: U256::zero(),
-                got: U256::from(1),
+                expected: U256::from(2),
+                got: U256::from(4),
             }
         );
     }
@@ -2382,11 +2388,10 @@ mod tests {
     }
 
     #[test]
-    /// HelloWorld with extra storage test
-    fn hello_avm() {
+    fn avm_recursive() {
         let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         // NOTE: tested with avm v1.3
-        file.push("src/tests/AVMDapps/demo-0.1.0.jar");
+        file.push("src/tests/AVMDapps/demo-0.3.0.jar");
         let file_str = file.to_str().expect("Failed to locate the demo.jar");
         let mut code = read_file(file_str).expect("unable to open avm dapp");
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
@@ -2418,7 +2423,7 @@ mod tests {
         for r in execution_results {
             let ExecutionResult {
                 status_code,
-                gas_left: _,
+                gas_left,
                 return_data,
                 exception: _,
                 state_root: _,
@@ -2434,9 +2439,16 @@ mod tests {
 
         assert!(state.code(&params.address).unwrap().is_some());
 
-        // test key/value storage
         params.call_type = CallType::Call;
-        let call_data = AbiToken::STRING(String::from("storageTest")).encode();
+        // let call_data = AbiToken::STRING(String::from("callExt")).encode();
+        let mut call_data = AbiToken::STRING(String::from("recursive")).encode();
+        // for QA recursive
+        let mut target = [0u8; 32];
+        target.copy_from_slice(&params.address[..]);
+        call_data.append(&mut AbiToken::ADDRESS(target).encode());
+        call_data.append(&mut AbiToken::INT32(10).encode());
+        // call_data.append(&mut AbiToken::INT32(1).encode());
+        // temp QA ends
         params.data = Some(call_data);
         params.nonce += 1;
         params.gas = U256::from(2_000_000);
@@ -2450,32 +2462,164 @@ mod tests {
         for r in execution_results {
             let ExecutionResult {
                 status_code,
-                gas_left: _,
+                gas_left,
                 return_data,
                 exception: _,
                 state_root,
             } = r;
 
+            println!("gas left = {:?}", gas_left);
             assert_eq!(status_code, ExecStatus::Success);
-            println!(
-                "result state root = {:?}, return_data = {:?}",
-                state_root, return_data
-            );
-            assert_eq!(return_data.to_vec(), vec![0u8, 2, 3, 4]);
+        }
+    }
+
+    #[test]
+    /// HelloWorld with extra storage test
+    fn hello_avm() {
+        let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        // NOTE: tested with avm v1.3
+        file.push("src/tests/AVMDapps/demo-0.2.0.jar");
+        let file_str = file.to_str().expect("Failed to locate the demo.jar");
+        let mut code = read_file(file_str).expect("unable to open avm dapp");
+        let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
+        let address = contract_address(&sender, &U256::zero()).0;
+        let mut params = ActionParams::default();
+        params.address = address.clone();
+        params.sender = sender.clone();
+        params.origin = sender.clone();
+        params.gas = U256::from(5_000_000);
+        let mut avm_code: Vec<u8> = (code.len() as u32).to_vm_bytes();
+        println!("code of hello_avm = {:?}", code.len());
+        avm_code.append(&mut code);
+        params.code = Some(Arc::new(avm_code.clone()));
+        params.value = ActionValue::Transfer(0.into());
+        params.call_type = CallType::None;
+        params.gas_price = 1.into();
+        let mut state = get_temp_state();
+        state
+            .add_balance(&sender, &U256::from(200_000_000), CleanupMode::NoEmpty)
+            .unwrap();
+        let info = EnvInfo::default();
+        let machine = make_aion_machine();
+        let substate = Substate::new();
+        let execution_results = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.call_avm(vec![params.clone()], &mut [substate])
+        };
+
+        for r in execution_results {
+            let ExecutionResult {
+                status_code,
+                gas_left,
+                return_data,
+                exception: _,
+                state_root: _,
+            } = r;
+
+            assert_eq!(status_code, ExecStatus::Success);
+
+            params.address = (*return_data).into();
+            println!("return data = {:?}", return_data);
         }
 
-        assert_eq!(
-            state
-                .storage_at(
-                    &params.address,
-                    &vec![
-                        1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4,
-                        5, 6, 7, 8, 9, 10, 1, 2,
-                    ]
-                )
-                .unwrap(),
-            vec![0u8, 2, 3, 4]
-        );
+        // Hello avm is deployed
+
+        assert!(state.code(&params.address).unwrap().is_some());
+
+        params.call_type = CallType::Call;
+        let call_data = AbiToken::STRING(String::from("callExt")).encode();
+        params.data = Some(call_data);
+        params.nonce += 1;
+        params.gas = U256::from(2_000_000);
+        println!("call data = {:?}", params.data);
+        let substate = Substate::new();
+        let execution_results = {
+            let mut ex = Executive::new(&mut state, &info, &machine);
+            ex.call_avm(vec![params.clone()], &mut [substate.clone()])
+        };
+
+        for r in execution_results {
+            let ExecutionResult {
+                status_code,
+                gas_left,
+                return_data,
+                exception: _,
+                state_root,
+            } = r;
+
+            println!("gas left = {:?}", gas_left);
+            assert_eq!(status_code, ExecStatus::Success);
+        }
+
+        // params.call_type = CallType::Call;
+        // let mut call_data = AbiToken::STRING(String::from("recursive")).encode();
+        // call_data.append(&mut AbiToken::ADDRESS(params.address.into()).encode());
+        // call_data.append(&mut AbiToken::INT32(10).encode());
+
+        // params.data = Some(call_data);
+        // params.nonce += 1;
+        // params.gas = U256::from(2_000_000);
+        // println!("call data = {:?}", params.data);
+        // let substate = Substate::new();
+        // let execution_results = {
+        //     let mut ex = Executive::new(&mut state, &info, &machine);
+        //     ex.call_avm(vec![params.clone()], &mut [substate.clone()])
+        // };
+
+        // for r in execution_results {
+        //     let ExecutionResult {
+        //         status_code,
+        //         gas_left: _,
+        //         return_data,
+        //         exception: _,
+        //         state_root,
+        //     } = r;
+
+        //     assert_eq!(status_code, ExecStatus::Success);
+        // }
+
+        // test key/value storage
+        // params.call_type = CallType::Call;
+        // let call_data = AbiToken::STRING(String::from("storageTest")).encode();
+        // params.data = Some(call_data);
+        // params.nonce += 1;
+        // params.gas = U256::from(2_000_000);
+        // println!("call data = {:?}", params.data);
+        // let substate = Substate::new();
+        // let execution_results = {
+        //     let mut ex = Executive::new(&mut state, &info, &machine);
+        //     ex.call_avm(vec![params.clone()], &mut [substate.clone()])
+        // };
+
+        // for r in execution_results {
+        //     let ExecutionResult {
+        //         status_code,
+        //         gas_left: _,
+        //         return_data,
+        //         exception: _,
+        //         state_root,
+        //     } = r;
+
+        //     assert_eq!(status_code, ExecStatus::Success);
+        //     println!(
+        //         "result state root = {:?}, return_data = {:?}",
+        //         state_root, return_data
+        //     );
+        //     assert_eq!(return_data.to_vec(), vec![0u8, 2, 3, 4]);
+        // }
+
+        // assert_eq!(
+        //     state
+        //         .storage_at(
+        //             &params.address,
+        //             &vec![
+        //                 1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4,
+        //                 5, 6, 7, 8, 9, 10, 1, 2,
+        //             ]
+        //         )
+        //         .unwrap(),
+        //     vec![0u8, 2, 3, 4]
+        // );
     }
 
     use std::io::Error;
