@@ -1519,7 +1519,11 @@ impl BlockChainClient for Client {
             .state_at(id)
             .and_then(|s| s.storage_at(address, &position[..].to_vec()).ok());
         if let Some(v) = value {
-            Some(v[..].into())
+            let mut ret = vec![0u8; 16];
+            for idx in 0..v.len() {
+                ret[16 - v.len() + idx] = v[idx];
+            }
+            Some(ret[..].into())
         } else {
             None
         }
