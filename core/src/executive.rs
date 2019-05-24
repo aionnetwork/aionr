@@ -2423,7 +2423,7 @@ mod tests {
         for r in execution_results {
             let ExecutionResult {
                 status_code,
-                gas_left,
+                gas_left: _,
                 return_data,
                 exception: _,
                 state_root: _,
@@ -2463,9 +2463,9 @@ mod tests {
             let ExecutionResult {
                 status_code,
                 gas_left,
-                return_data,
+                return_data: _,
                 exception: _,
-                state_root,
+                state_root: _,
             } = r;
 
             println!("gas left = {:?}", gas_left);
@@ -2510,7 +2510,7 @@ mod tests {
         for r in execution_results {
             let ExecutionResult {
                 status_code,
-                gas_left,
+                gas_left: _,
                 return_data,
                 exception: _,
                 state_root: _,
@@ -2542,9 +2542,9 @@ mod tests {
             let ExecutionResult {
                 status_code,
                 gas_left,
-                return_data,
+                return_data: _,
                 exception: _,
-                state_root,
+                state_root: _,
             } = r;
 
             println!("gas left = {:?}", gas_left);
