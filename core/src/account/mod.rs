@@ -25,7 +25,7 @@ mod traits;
 
 use lru_cache::LruCache;
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{HashMap, BTreeMap, HashSet};
 use std::sync::Arc;
 use std::fmt;
 
@@ -85,6 +85,7 @@ impl From<BasicAccount> for AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
+            storage_removable: HashSet::new(),
         }
     }
 }
@@ -111,6 +112,7 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
+            storage_removable: HashSet::new()
         }
     }
 
@@ -135,6 +137,7 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
+            storage_removable: HashSet::new()
         }
     }
 
@@ -169,6 +172,7 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
+            storage_removable: HashSet::new()
         }
     }
 
@@ -181,6 +185,7 @@ impl AionVMAccount {
         db: &mut HashStore,
     ) -> trie::Result<()>
     {
+        let account_type = self.acc_type().clone();
         let mut t = trie_factory.from_existing(db, &mut self.storage_root)?;
         for (k, v) in self.storage_changes.drain() {
             // cast key and value to trait type,
@@ -190,6 +195,14 @@ impl AionVMAccount {
                 if item != 0x00 {
                     is_zero = false;
                     break;
+                }
+            }
+            if account_type == AccType::AVM {
+                // avm always commits storage in storage_changes
+                // and removes storage in storage_removable
+                is_zero = false;
+                for k in self.storage_removable.drain() {
+                    t.remove(&k)?;
                 }
             }
             debug!(target: "vm", "CommitStorage: key = {:?}, value = {:?}, is_zero = {:?}", k, v, is_zero);
@@ -235,6 +248,7 @@ impl AionVMAccount {
             address_hash: self.address_hash.clone(),
             empty_but_commit: self.empty_but_commit.clone(),
             account_type: self.account_type.clone(),
+            storage_removable: HashSet::new()
         }
     }
 
@@ -262,6 +276,7 @@ impl AionVMAccount {
             cache.insert(k.clone(), v.clone()); //TODO: cloning should not be required here
         }
         self.storage_changes = other.storage_changes;
+        self.storage_removable = other.storage_removable;
     }
 
     /// Clone account data, dirty storage keys and cached storage keys.
@@ -769,17 +784,22 @@ impl VMAccount for AionVMAccount {
 }
 
 impl AionVMAccount {
-    pub fn storage_at(&self, db: &HashStore, key: &Bytes) -> trie::Result<Bytes> {
+    pub fn storage_at(&self, db: &HashStore, key: &Bytes) -> trie::Result<Option<Bytes>> {
         if let Some(value) = self.cached_storage_at(key) {
-            return Ok(value);
+            return Ok(Some(value));
         }
         let db = SecTrieDB::new(db, &self.storage_root)?;
+
+        if self.acc_type() == AccType::AVM
+            && !db.contains(key)? {
+                return Ok(None);
+            }
 
         let item: Bytes = db.get_with(key, ::rlp::decode)?.unwrap_or_else(|| vec![]);
         self.storage_cache
             .borrow_mut()
             .insert(key.clone(), item.clone());
-        Ok(item)
+        Ok(Some(item))
     }
 
     pub fn cached_storage_at(&self, key: &Bytes) -> Option<Bytes> {
@@ -795,7 +815,22 @@ impl AionVMAccount {
     }
 
     pub fn set_storage(&mut self, key: Bytes, value: Bytes) {
+        // update removable set
+        if self.storage_removable.contains(&key) {
+            self.storage_removable.remove(&key);
+        }
+
         self.storage_changes.insert(key, value);
+    }
+
+    pub fn remove_storage(&mut self, key: Bytes) {
+        // update storage changes
+        if self.storage_changes.contains_key(&key) {
+            let old = self.storage_changes.remove(&key);
+            debug!(target: "vm", "removed avm value {:?}", old);
+        }
+        
+        self.storage_removable.insert(key);
     }
 
     pub fn update_root(&mut self, address: &Address, db: &mut HashStore) {

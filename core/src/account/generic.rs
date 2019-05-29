@@ -1,5 +1,6 @@
 use std::cell::{Cell};
 use std::sync::Arc;
+use std::collections::HashSet;
 
 use aion_types::{H256, U256};
 use bytes::{Bytes};
@@ -39,6 +40,9 @@ pub struct Account<T, U> {
     // Modified storage. Accumulates changes to storage made in `set_storage`
     // Takes precedence over `storage_cache`.
     pub storage_changes: U,
+
+    // ass hole: Aion Java kernel specific
+    pub storage_removable: HashSet<Bytes>,
 
     // Code hash of the account.
     pub code_hash: H256,

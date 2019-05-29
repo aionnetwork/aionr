@@ -175,9 +175,11 @@ where B: StateBackend
             .expect("Fatal error occurred when getting storage.");
         // should convert to H128
         let mut ret = vec![0u8; 16];
-        if value.len() < 16 {
-            for idx in 0..value.len() {
-                ret[16 - value.len() + idx] = value[idx];
+        if let Some(v) = value {
+            if v.len() < 16 {
+                for idx in 0..v.len() {
+                    ret[16 - v.len() + idx] = v[idx];
+                }
             }
         }
         trace!(target: "vm", "BuiltIn: storage value = {:?}", ret);
@@ -208,8 +210,10 @@ where B: StateBackend
             .expect("Fatal error occurred when getting storage.");
         // should convert to H256 in case that value is not length of 32-bytes
         let mut ret: Vec<u8> = vec![0x00; 32];
-        for idx in 0..value.len() {
-            ret[32 - value.len() + idx] = value[idx];
+        if let Some(v) = value {
+            for idx in 0..v.len() {
+                ret[32 - v.len() + idx] = v[idx];
+            }
         }
         ret[..].into()
     }

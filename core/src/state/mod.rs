@@ -471,12 +471,16 @@ impl<B: Backend> State<B> {
     }
 
     /// Mutate storage of account `address` so that it is `value` for `key`.
-    pub fn storage_at(&self, address: &Address, key: &Bytes) -> trie::Result<Bytes> {
+    pub fn storage_at(&self, address: &Address, key: &Bytes) -> trie::Result<Option<Bytes>> {
         // Storage key search and update works like this:
         // 1. If there's an entry for the account in the local cache check for the key and return it if found.
         // 2. If there's an entry for the account in the global cache check for the key or load it into that account.
         // 3. If account is missing in the global cache load it into the local cache and cache the key there.
 
+        // Ok(None) for avm null
+        // Ok(vec![]) for fastvm empty
+        // Err() is error
+        // Ok(Some) for some
         // check local cache first without updating
         {
             let local_cache = self.cache.borrow_mut();
@@ -486,18 +490,21 @@ impl<B: Backend> State<B> {
                 match maybe_acc.account {
                     Some(ref account) => {
                         if let Some(value) = account.cached_storage_at(key) {
-                            return Ok(value);
+                            return Ok(Some(value));
                         } else {
+                            // storage not cached, will try local search later
                             local_account = Some(maybe_acc);
                         }
                     }
-                    _ => return Ok(vec![]),
+                    // NOTE: No account found, is it possible in both fastvm and avm, maybe not 
+                    _ => return Ok(Some(vec![])),
                 }
             }
             // check the global cache and and cache storage key there if found,
             let trie_res = self.db.get_cached(address, |acc| {
                 match acc {
-                    None => Ok(vec![]),
+                    // NOTE: the same question as above
+                    None => Ok(Some(vec![])),
                     Some(a) => {
                         let account_db = self
                             .factories
@@ -521,14 +528,14 @@ impl<B: Backend> State<B> {
                         .readonly(self.db.as_hashstore(), account.address_hash(address));
                     return account.storage_at(account_db.as_hashstore(), key);
                 } else {
-                    return Ok(vec![]);
+                    return Ok(Some(vec![]));
                 }
             }
         }
 
         // check if the account could exist before any requests to trie
         if self.db.is_known_null(address) {
-            return Ok(vec![]);
+            return Ok(Some(vec![]));
         }
 
         // account is not found in the global cache, get from the DB and insert into local
@@ -538,7 +545,7 @@ impl<B: Backend> State<B> {
             .readonly(self.db.as_hashstore(), &self.root)
             .expect(SEC_TRIE_DB_UNWRAP_STR);
         let maybe_acc = db.get_with(address, AionVMAccount::from_rlp)?;
-        let r = maybe_acc.as_ref().map_or(Ok(vec![]), |a| {
+        let r = maybe_acc.as_ref().map_or(Ok(Some(vec![])), |a| {
             let account_db = self
                 .factories
                 .accountdb
@@ -690,6 +697,11 @@ impl<B: Backend> State<B> {
     pub fn set_storage(&mut self, a: &Address, key: Bytes, value: Bytes) -> trie::Result<()> {
         trace!(target: "state", "set_storage({}:{:?} to {:?})", a, key, value);
         self.require(a, false)?.set_storage(key, value);
+        Ok(())
+    }
+
+    pub fn remove_storage(&mut self, a: &Address, key: Bytes) -> trie::Result<()> {
+        self.require(a, false)?.remove_storage(key);
         Ok(())
     }
 

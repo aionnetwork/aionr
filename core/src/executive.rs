@@ -64,6 +64,7 @@ const STACK_SIZE_ENTRY_OVERHEAD: usize = 20 * 1024;
 /// VM lock
 lazy_static! {
     static ref VM_LOCK: Mutex<bool> = Mutex::new(false);
+    static ref AVM_LOCK: Mutex<bool> = Mutex::new(false);
 }
 
 /// Returns new address created from address, nonce
@@ -186,6 +187,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         is_local_call: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
+        let _vm_lock = AVM_LOCK.lock().unwrap();
         let mut vm_params = Vec::new();
         for t in txs {
             let sender = t.sender();

@@ -454,3 +454,85 @@ JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_getBloc
 
   return block_hash;
 }
+
+/*
+ * Class:     org_aion_avm_jni_NativeKernelInterface
+ * Method:    sha256
+ * Signature: ([B)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_sha256
+  (JNIEnv *env, jclass clazz, jbyteArray data)
+{
+  struct avm_bytes input = load_bytes(env, data);
+  struct avm_bytes ret = callbacks.sha256(&input);
+
+  jbyteArray hash_data = is_null(&ret)? NULL: to_jbyteArray(env, ret.pointer, ret.length);
+
+  release_bytes(&ret);
+
+  return hash_data;
+}
+
+/*
+ * Class:     org_aion_avm_jni_NativeKernelInterface
+ * Method:    blake2b
+ * Signature: ([B)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_blake2b
+  (JNIEnv *env, jclass clazz, jbyteArray data)
+{
+  struct avm_bytes input = load_bytes(env, data);
+  struct avm_bytes ret = callbacks.blake2b(&input);
+
+  jbyteArray hash_data = is_null(&ret)? NULL: to_jbyteArray(env, ret.pointer, ret.length);
+
+  release_bytes(&ret);
+
+  return hash_data;
+}
+
+/*
+ * Class:     org_aion_avm_jni_NativeKernelInterface
+ * Method:    keccak256
+ * Signature: ([B)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_keccak256
+  (JNIEnv *env, jclass clazz, jbyteArray data)
+{
+  struct avm_bytes input = load_bytes(env, data);
+  struct avm_bytes ret = callbacks.keccak256(&input);
+
+  jbyteArray hash_data = is_null(&ret)? NULL: to_jbyteArray(env, ret.pointer, ret.length);
+
+  release_bytes(&ret);
+
+  return hash_data;
+}
+
+/*
+ * Class:     org_aion_avm_jni_NativeKernelInterface
+ * Method:    edverify
+ * Signature: ([B[B[B)Z
+ */
+JNIEXPORT jboolean JNICALL Java_org_aion_avm_jni_NativeKernelInterface_edverify
+  (JNIEnv *env, jclass clazz, jbyteArray data, jbyteArray data1, jbyteArray data2)
+{
+  struct avm_bytes input = load_bytes(env, data);
+  struct avm_bytes input1 = load_bytes(env, data1);
+  struct avm_bytes input2 = load_bytes(env, data2);
+
+  return callbacks.verify_ed25519(&input, &input1, &input2);
+}
+
+/*
+ * Class:     org_aion_avm_jni_NativeKernelInterface
+ * Method:    removeStorage
+ * Signature: (J[B[B)V
+ */
+JNIEXPORT void JNICALL Java_org_aion_avm_jni_NativeKernelInterface_removeStorage
+  (JNIEnv *env, jclass clazz, jlong handle, jbyteArray address, jbyteArray data)
+{
+  struct avm_address a = load_address(env, address);
+  struct avm_bytes input = load_bytes(env, data);
+  callbacks.remove_storage((void *)handle, &a, &input);
+}
