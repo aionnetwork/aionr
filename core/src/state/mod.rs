@@ -496,8 +496,10 @@ impl<B: Backend> State<B> {
                             local_account = Some(maybe_acc);
                         }
                     }
-                    // NOTE: No account found, is it possible in both fastvm and avm, maybe not 
-                    _ => return Ok(Some(vec![])),
+                    // NOTE: No account found, is it possible in both fastvm and avm, maybe not
+                    _ => {
+                        return Ok(None);
+                    }
                 }
             }
             // check the global cache and and cache storage key there if found,

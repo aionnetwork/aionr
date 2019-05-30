@@ -82,7 +82,8 @@ pub struct avm_callbacks {
     pub verify_ed25519:
         extern fn(input: *const avm_bytes, input1: *const avm_bytes, input2: *const avm_bytes)
             -> bool,
-    pub remove_storage: extern fn(handle: *const c_void, addr: *const avm_address, data: *const avm_bytes),
+    pub remove_storage:
+        extern fn(handle: *const c_void, addr: *const avm_address, data: *const avm_bytes),
 }
 
 impl fmt::Display for avm_address {
@@ -230,6 +231,7 @@ pub extern fn avm_get_storage(
             } else {
                 // is there a way to get zero-length array's header pointer
                 unsafe { new_fixed_bytes(0) }
+                // unsafe {new_null_bytes()}
             }
         }
         None => {
@@ -559,11 +561,12 @@ pub extern fn avm_vediryEdDSA(
 pub extern fn avm_remove_storage(
     handle: *const c_void,
     address: *const avm_address,
-    data: *const avm_bytes
-) {
+    data: *const avm_bytes,
+)
+{
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
-    let key: Vec<u8> = unsafe {(*data).into()};
+    let key: Vec<u8> = unsafe { (*data).into() };
     debug!(target: "vm", "avm remove storage at: {:?}", key);
     ext.remove_storage(addr, key);
 }

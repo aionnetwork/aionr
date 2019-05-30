@@ -187,7 +187,7 @@ where B: StateBackend
                 ret[32 - v.len() + idx] = v[idx];
             }
         }
-        
+
         ret.as_slice().into()
     }
 
@@ -570,7 +570,7 @@ where B: StateBackend
 
     fn set_objectgraph(&mut self, _address: &Address, _data: Bytes) { unimplemented!() }
 
-    fn remove_storage(&mut self, _address: &Address, _data: Bytes) {unimplemented!()}
+    fn remove_storage(&mut self, _address: &Address, _data: Bytes) { unimplemented!() }
 }
 
 #[allow(unused)]

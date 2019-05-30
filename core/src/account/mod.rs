@@ -112,7 +112,7 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
-            storage_removable: HashSet::new()
+            storage_removable: HashSet::new(),
         }
     }
 
@@ -137,7 +137,7 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
-            storage_removable: HashSet::new()
+            storage_removable: HashSet::new(),
         }
     }
 
@@ -186,6 +186,7 @@ impl AionVMAccount {
     ) -> trie::Result<()>
     {
         let account_type = self.acc_type().clone();
+        // println!("StorageROOT before commit = {:?}", self.storage_root);
         let mut t = trie_factory.from_existing(db, &mut self.storage_root)?;
         for (k, v) in self.storage_changes.drain() {
             // cast key and value to trait type,
@@ -201,9 +202,6 @@ impl AionVMAccount {
                 // avm always commits storage in storage_changes
                 // and removes storage in storage_removable
                 is_zero = false;
-                for k in self.storage_removable.drain() {
-                    t.remove(&k)?;
-                }
             }
             debug!(target: "vm", "CommitStorage: key = {:?}, value = {:?}, is_zero = {:?}", k, v, is_zero);
             // account just commit storage key/value pairs,
@@ -212,6 +210,12 @@ impl AionVMAccount {
                 true => t.remove(&k)?,
                 false => t.insert(&k, &encode(&v))?,
             };
+
+            if account_type == AccType::AVM {
+                for k in self.storage_removable.drain() {
+                    t.remove(&k)?;
+                }
+            }
 
             self.storage_cache.borrow_mut().insert(k, v);
         }
@@ -248,7 +252,7 @@ impl AionVMAccount {
             address_hash: self.address_hash.clone(),
             empty_but_commit: self.empty_but_commit.clone(),
             account_type: self.account_type.clone(),
-            storage_removable: HashSet::new()
+            storage_removable: HashSet::new(),
         }
     }
 
@@ -677,7 +681,12 @@ impl VMAccount for AionVMAccount {
         db: &HashStore,
     )
     {
-        if let Some(root) = db.get(a) {
+        // avm definition
+        let mut raw_key = Vec::new();
+        raw_key.extend_from_slice(&a[..]);
+        raw_key.push(AccType::AVM.into());
+        if let Some(root) = db.get(&blake2b(raw_key)) {
+            debug!(target: "vm", "{:?}: update root from {:?} to {:?}", a, self.storage_root, root);
             self.storage_root = root[..].into();
             // if storage_root has been stored, it should be avm created account
             self.account_type = AccType::AVM;
@@ -790,10 +799,9 @@ impl AionVMAccount {
         }
         let db = SecTrieDB::new(db, &self.storage_root)?;
 
-        if self.acc_type() == AccType::AVM
-            && !db.contains(key)? {
-                return Ok(None);
-            }
+        if self.acc_type() == AccType::AVM && !db.contains(key)? {
+            return Ok(None);
+        }
 
         let item: Bytes = db.get_with(key, ::rlp::decode)?.unwrap_or_else(|| vec![]);
         self.storage_cache
@@ -829,7 +837,7 @@ impl AionVMAccount {
             let old = self.storage_changes.remove(&key);
             debug!(target: "vm", "removed avm value {:?}", old);
         }
-        
+
         self.storage_removable.insert(key);
     }
 
@@ -850,7 +858,13 @@ impl AionVMAccount {
                 DBValue::from_slice(self.object_graph_cache.as_slice()),
             );
             // save key/valud storage root
-            db.emplace(address.clone(), DBValue::from_slice(&self.storage_root[..]));
+            let mut raw_key = Vec::new();
+            raw_key.extend_from_slice(&address[..]);
+            raw_key.push(AccType::AVM.into());
+            db.emplace(
+                blake2b(raw_key),
+                DBValue::from_slice(&self.storage_root[..]),
+            );
         }
     }
 
