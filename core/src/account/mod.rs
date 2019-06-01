@@ -38,7 +38,8 @@ use pod_account::*;
 use trie;
 use trie::{Trie, SecTrieDB, TrieFactory, TrieError};
 
-use kvdb::{DBValue, HashStore};
+// use db::Writable;
+use kvdb::{KeyValueDB, DBTransaction, DBValue, HashStore};
 
 pub use self::generic::Account;
 pub use self::traits::{VMAccount, AccType};
@@ -211,13 +212,15 @@ impl AionVMAccount {
                 false => t.insert(&k, &encode(&v))?,
             };
 
-            if account_type == AccType::AVM {
-                for k in self.storage_removable.drain() {
-                    t.remove(&k)?;
-                }
-            }
-
             self.storage_cache.borrow_mut().insert(k, v);
+        }
+
+        if account_type == AccType::AVM {
+            for k in self.storage_removable.drain() {
+                println!("remove avm key: {:?}", k);
+                t.remove(&k)?;
+                self.storage_cache.borrow_mut().remove(&k);
+            }
         }
 
         Ok(())
@@ -679,23 +682,32 @@ impl VMAccount for AionVMAccount {
         require: RequireCache,
         state_db: &B,
         db: &HashStore,
+        graph_db: Arc<KeyValueDB>
     )
     {
         // avm definition
-        let mut raw_key = Vec::new();
-        raw_key.extend_from_slice(&a[..]);
-        raw_key.push(AccType::AVM.into());
-        if let Some(root) = db.get(&blake2b(raw_key)) {
+        // let mut raw_key = Vec::new();
+        // raw_key.extend_from_slice(&a[..]);
+        // raw_key.push(AccType::AVM.into());
+        if let Some(root) = graph_db.get(::db::COL_AVM_GRAPH, &self.delta_root).unwrap_or(None) {
+            // println!("delta root = {:?}", self.delta_root);
             debug!(target: "vm", "{:?}: update root from {:?} to {:?}", a, self.storage_root, root);
-            self.storage_root = root[..].into();
+            // self.storage_root = root[..].into();
+            // try decode RLP to get the external storage root
+            let concatenated: Vec<H256> = ::rlp::decode_list(root[..].into());
+            assert!(concatenated.len() == 2, "unexpected value from graph db");
+            // println!("avm root: {:?} -- {:?}", concatenated.get(0), concatenated.get(1));
+            self.storage_root = concatenated.get(0).unwrap().clone();
             // if storage_root has been stored, it should be avm created account
             self.account_type = AccType::AVM;
             // always cache object graph and key/value storage root
             debug!(target: "vm", "try to get object graph from: {:?}", self.delta_root);
-            match db.get(&self.delta_root) {
+            // update object graph using graph hash
+            let graph_hash = concatenated.get(1).unwrap();
+            match graph_db.get(::db::COL_AVM_GRAPH, &graph_hash).unwrap() {
                 Some(data) => {
                     self.object_graph_size = Some(data.len());
-                    self.objectgraph_hash = blake2b(&data);
+                    self.objectgraph_hash = concatenated.get(1).unwrap().clone(); //blake2b(&data);
                     self.object_graph_cache = Arc::new(data[..].to_vec());
                 }
                 None => {
@@ -703,6 +715,7 @@ impl VMAccount for AionVMAccount {
                     self.objectgraph_hash = BLAKE2B_EMPTY;
                 }
             }
+            
             debug!(target: "vm", "object graph = {:?}", self.object_graph_cache);
         }
 
@@ -797,6 +810,7 @@ impl AionVMAccount {
         if let Some(value) = self.cached_storage_at(key) {
             return Ok(Some(value));
         }
+
         let db = SecTrieDB::new(db, &self.storage_root)?;
 
         if self.acc_type() == AccType::AVM && !db.contains(key)? {
@@ -841,8 +855,9 @@ impl AionVMAccount {
         self.storage_removable.insert(key);
     }
 
-    pub fn update_root(&mut self, address: &Address, db: &mut HashStore) {
+    pub fn update_root(&mut self, _address: &Address, graph_db: Arc<KeyValueDB>) {
         debug!(target: "vm", "account type: {:?}", self.acc_type());
+        println!("account type: {:?}", self.acc_type());
         if self.account_type == AccType::AVM {
             let mut concatenated_root = Vec::new();
             concatenated_root.extend_from_slice(&self.storage_root[..]);
@@ -853,31 +868,51 @@ impl AionVMAccount {
                 self.storage_root, self.delta_root, self.code_hash);
             // save object graph
             debug!(target: "vm", "hash for object graph = {:?}", self.delta_root);
-            db.emplace(
-                self.delta_root.clone(),
-                DBValue::from_slice(self.object_graph_cache.as_slice()),
-            );
+
+            let mut stream = RlpStream::new_list(2);
+            stream.append(&self.storage_root);
+            stream.append(&self.objectgraph_hash);
+            let content = stream.out();
+
+            println!("object graph hash = {:?}", self.objectgraph_hash);
+
+            // db.emplace(
+            //     self.delta_root.clone(),
+            //     DBValue::from_slice(self.object_graph_cache.as_slice()),
+            // );
+            // db.emplace(
+            //     self.delta_root.clone(),
+            //     DBValue::from_slice(content.as_slice()),
+            // );
+            // db.emplace(
+            //     self.objectgraph_hash,
+            //     DBValue::from_slice(self.object_graph_cache.as_slice())
+            // );
+            let mut batch = DBTransaction::new();
+            batch.put(::db::COL_AVM_GRAPH, &self.delta_root[..], content.as_slice());
+            batch.put(::db::COL_AVM_GRAPH, &self.objectgraph_hash[..], self.object_graph_cache.as_slice());
+            graph_db.write(batch).expect("GRAPH DB write failed");
             // save key/valud storage root
-            let mut raw_key = Vec::new();
-            raw_key.extend_from_slice(&address[..]);
-            raw_key.push(AccType::AVM.into());
-            db.emplace(
-                blake2b(raw_key),
-                DBValue::from_slice(&self.storage_root[..]),
-            );
+            // let mut raw_key = Vec::new();
+            // raw_key.extend_from_slice(&address[..]);
+            // raw_key.push(AccType::AVM.into());
+            // db.emplace(
+            //     blake2b(raw_key),
+            //     DBValue::from_slice(&self.storage_root[..]),
+            // );
         }
     }
 
-    pub fn save_object_graph(&mut self, address: &Address, db: &mut HashStore) {
-        // save object graph
-        println!("hash for object graph = {:?}", self.delta_root);
-        db.emplace(
-            self.delta_root.clone(),
-            DBValue::from_slice(self.object_graph_cache.as_slice()),
-        );
-        // save key/valud storage root
-        db.emplace(address.clone(), DBValue::from_slice(&self.storage_root[..]));
-    }
+    // pub fn save_object_graph(&mut self, address: &Address, db: &mut HashStore) {
+    //     // save object graph
+    //     println!("hash for object graph = {:?}", self.delta_root);
+    //     db.emplace(
+    //         self.delta_root.clone(),
+    //         DBValue::from_slice(self.object_graph_cache.as_slice()),
+    //     );
+    //     // save key/valud storage root
+    //     db.emplace(address.clone(), DBValue::from_slice(&self.storage_root[..]));
+    // }
 
     pub fn update_object_graph(&mut self, db: &HashStore) {
         match db.get(&self.storage_root) {

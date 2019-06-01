@@ -490,6 +490,7 @@ impl<B: Backend> State<B> {
                 match maybe_acc.account {
                     Some(ref account) => {
                         if let Some(value) = account.cached_storage_at(key) {
+                            // println!("TT: 1");
                             return Ok(Some(value));
                         } else {
                             // storage not cached, will try local search later
@@ -498,6 +499,7 @@ impl<B: Backend> State<B> {
                     }
                     // NOTE: No account found, is it possible in both fastvm and avm, maybe not
                     _ => {
+                        // println!("TT: 2");
                         return Ok(None);
                     }
                 }
@@ -506,18 +508,23 @@ impl<B: Backend> State<B> {
             let trie_res = self.db.get_cached(address, |acc| {
                 match acc {
                     // NOTE: the same question as above
-                    None => Ok(Some(vec![])),
+                    None => {
+                        // println!("TT: 3");
+                        Ok(Some(vec![]))
+                    },
                     Some(a) => {
                         let account_db = self
                             .factories
                             .accountdb
                             .readonly(self.db.as_hashstore(), a.address_hash(address));
+                            // println!("TT: 7");
                         a.storage_at(account_db.as_hashstore(), key)
                     }
                 }
             });
 
             if let Some(res) = trie_res {
+                // println!("TT: 4");
                 return res;
             }
 
@@ -528,8 +535,10 @@ impl<B: Backend> State<B> {
                         .factories
                         .accountdb
                         .readonly(self.db.as_hashstore(), account.address_hash(address));
+                    // println!("TT: 9");
                     return account.storage_at(account_db.as_hashstore(), key);
                 } else {
+                    // println!("TT: 5");
                     return Ok(Some(vec![]));
                 }
             }
@@ -537,6 +546,7 @@ impl<B: Backend> State<B> {
 
         // check if the account could exist before any requests to trie
         if self.db.is_known_null(address) {
+            // println!("TT: 6");
             return Ok(Some(vec![]));
         }
 
@@ -552,6 +562,7 @@ impl<B: Backend> State<B> {
                 .factories
                 .accountdb
                 .readonly(self.db.as_hashstore(), a.address_hash(address));
+                // println!("TT: 8");
             a.storage_at(account_db.as_hashstore(), key)
         });
         self.insert_cache(address, AccountEntry::new_clean(maybe_acc));
@@ -881,7 +892,7 @@ impl<B: Backend> State<B> {
                         ) {
                         account
                             .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
-                        account.update_root(address, account_db.as_hashstore_mut());
+                        account.update_root(address, self.kvdb.clone());
                     } else if !account.storage_changes().is_empty() {
                         // TODO: check key/value storage in avm
                         // to see whether discard is needed
@@ -1035,7 +1046,7 @@ impl<B: Backend> State<B> {
                     .factories
                     .accountdb
                     .readonly(self.db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore(), self.kvdb.clone());
                 return Ok(f(Some(account)));
             }
             return Ok(f(None));
@@ -1048,7 +1059,7 @@ impl<B: Backend> State<B> {
                     .factories
                     .accountdb
                     .readonly(self.db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
+                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore(), self.kvdb.clone());
             }
             f(acc.map(|a| &*a))
         });
@@ -1072,7 +1083,7 @@ impl<B: Backend> State<B> {
                         .factories
                         .accountdb
                         .readonly(self.db.as_hashstore(), account.address_hash(a));
-                    account.update_account_cache(a, require, &self.db, accountdb.as_hashstore());
+                    account.update_account_cache(a, require, &self.db, accountdb.as_hashstore(), self.kvdb.clone());
                 }
                 let r = f(maybe_acc.as_ref());
                 self.insert_cache(a, AccountEntry::new_clean(maybe_acc));
@@ -1155,6 +1166,7 @@ impl<B: Backend> State<B> {
                             RequireCache::Code,
                             &self.db,
                             accountdb.as_hashstore(),
+                            self.kvdb.clone()
                         );
                     }
                     account
