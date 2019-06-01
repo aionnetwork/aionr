@@ -365,7 +365,6 @@ extern "C" {
     recv_idx += 1;
     memcpy(&recv_addr_repo[recv_idx], &curr_recv_addr.addr, sizeof(evm_address));
 
-    debug("call with gas limit = %d, revision = %d\n", msg.gas, rev);
     do_keccak((const uint8_t*) code, len, msg.code_hash.bytes);
     struct evm_result evm_result = inst->execute(inst, &vm_context, (enum evm_revision)rev, &msg,
                                                  (uint8_t *)code, len);

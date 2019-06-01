@@ -25,7 +25,7 @@ mod traits;
 
 use lru_cache::LruCache;
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{HashMap, BTreeMap, HashSet};
 use std::sync::Arc;
 use std::fmt;
 
@@ -38,7 +38,8 @@ use pod_account::*;
 use trie;
 use trie::{Trie, SecTrieDB, TrieFactory, TrieError};
 
-use kvdb::{DBValue, HashStore};
+// use db::Writable;
+use kvdb::{KeyValueDB, DBTransaction, DBValue, HashStore};
 
 pub use self::generic::Account;
 pub use self::traits::{VMAccount, AccType};
@@ -85,6 +86,7 @@ impl From<BasicAccount> for AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
+            storage_removable: HashSet::new(),
         }
     }
 }
@@ -111,6 +113,7 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
+            storage_removable: HashSet::new(),
         }
     }
 
@@ -135,6 +138,7 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
+            storage_removable: HashSet::new(),
         }
     }
 
@@ -169,6 +173,7 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
+            storage_removable: HashSet::new()
         }
     }
 
@@ -181,6 +186,8 @@ impl AionVMAccount {
         db: &mut HashStore,
     ) -> trie::Result<()>
     {
+        let account_type = self.acc_type().clone();
+        // println!("StorageROOT before commit = {:?}", self.storage_root);
         let mut t = trie_factory.from_existing(db, &mut self.storage_root)?;
         for (k, v) in self.storage_changes.drain() {
             // cast key and value to trait type,
@@ -192,6 +199,12 @@ impl AionVMAccount {
                     break;
                 }
             }
+            if account_type == AccType::AVM {
+                // avm always commits storage in storage_changes
+                // and removes storage in storage_removable
+                debug!(target: "vm", "insert avm key: {:?}", k);
+                is_zero = false;
+            }
             debug!(target: "vm", "CommitStorage: key = {:?}, value = {:?}, is_zero = {:?}", k, v, is_zero);
             // account just commit storage key/value pairs,
             // the real length of value should be dealed by caller
@@ -201,6 +214,14 @@ impl AionVMAccount {
             };
 
             self.storage_cache.borrow_mut().insert(k, v);
+        }
+
+        if account_type == AccType::AVM {
+            for k in self.storage_removable.drain() {
+                debug!(target: "vm", "remove avm key: {:?}", k);
+                t.remove(&k)?;
+                self.storage_cache.borrow_mut().remove(&k);
+            }
         }
 
         Ok(())
@@ -235,6 +256,7 @@ impl AionVMAccount {
             address_hash: self.address_hash.clone(),
             empty_but_commit: self.empty_but_commit.clone(),
             account_type: self.account_type.clone(),
+            storage_removable: HashSet::new(),
         }
     }
 
@@ -262,6 +284,7 @@ impl AionVMAccount {
             cache.insert(k.clone(), v.clone()); //TODO: cloning should not be required here
         }
         self.storage_changes = other.storage_changes;
+        self.storage_removable = other.storage_removable;
     }
 
     /// Clone account data, dirty storage keys and cached storage keys.
@@ -660,18 +683,35 @@ impl VMAccount for AionVMAccount {
         require: RequireCache,
         state_db: &B,
         db: &HashStore,
+        graph_db: Arc<KeyValueDB>,
     )
     {
-        if let Some(root) = db.get(a) {
-            self.storage_root = root[..].into();
+        // avm definition
+        // let mut raw_key = Vec::new();
+        // raw_key.extend_from_slice(&a[..]);
+        // raw_key.push(AccType::AVM.into());
+        if let Some(root) = graph_db
+            .get(::db::COL_AVM_GRAPH, &self.delta_root)
+            .unwrap_or(None)
+        {
+            // println!("delta root = {:?}", self.delta_root);
+            debug!(target: "vm", "{:?}: update root from {:?} to {:?}", a, self.storage_root, root);
+            // self.storage_root = root[..].into();
+            // try decode RLP to get the external storage root
+            let concatenated: Vec<H256> = ::rlp::decode_list(root[..].into());
+            assert!(concatenated.len() == 2, "unexpected value from graph db");
+            // println!("avm root: {:?} -- {:?}", concatenated.get(0), concatenated.get(1));
+            self.storage_root = concatenated.get(0).unwrap().clone();
             // if storage_root has been stored, it should be avm created account
             self.account_type = AccType::AVM;
             // always cache object graph and key/value storage root
             debug!(target: "vm", "try to get object graph from: {:?}", self.delta_root);
-            match db.get(&self.delta_root) {
+            // update object graph using graph hash
+            let graph_hash = concatenated.get(1).unwrap();
+            match graph_db.get(::db::COL_AVM_GRAPH, &graph_hash).unwrap() {
                 Some(data) => {
                     self.object_graph_size = Some(data.len());
-                    self.objectgraph_hash = blake2b(&data);
+                    self.objectgraph_hash = concatenated.get(1).unwrap().clone(); //blake2b(&data);
                     self.object_graph_cache = Arc::new(data[..].to_vec());
                 }
                 None => {
@@ -679,6 +719,7 @@ impl VMAccount for AionVMAccount {
                     self.objectgraph_hash = BLAKE2B_EMPTY;
                 }
             }
+
             debug!(target: "vm", "object graph = {:?}", self.object_graph_cache);
         }
 
@@ -714,29 +755,29 @@ impl VMAccount for AionVMAccount {
             }
         }
 
-        if self.account_type == AccType::AVM {
-            // update transformed code cache
-            let hash = blake2b(self.address_hash.get().unwrap());
-            match state_db.get_cached_code(&hash) {
-                Some(code) => self.cache_given_transformed_code(code),
-                None => {
-                    match require {
-                        RequireCache::None => {}
-                        RequireCache::Code => {
-                            if let Some(code) = self.cache_transformed_code(db) {
-                                // propagate code loaded from the database to
-                                // the global code cache.
-                                // println!("Account: transformed code = {:?}", code);
-                                state_db.cache_code(hash, code)
-                            }
+        // if self.account_type == AccType::AVM {
+        // update transformed code cache
+        let hash = blake2b(self.address_hash.get().unwrap());
+        match state_db.get_cached_code(&hash) {
+            Some(code) => self.cache_given_transformed_code(code),
+            None => {
+                match require {
+                    RequireCache::None => {}
+                    RequireCache::Code => {
+                        if let Some(code) = self.cache_transformed_code(db) {
+                            // propagate code loaded from the database to
+                            // the global code cache.
+                            // println!("Account: transformed code = {:?}", code);
+                            state_db.cache_code(hash, code)
                         }
-                        RequireCache::CodeSize => {
-                            self.cache_transformed_code_size(db);
-                        }
+                    }
+                    RequireCache::CodeSize => {
+                        self.cache_transformed_code_size(db);
                     }
                 }
             }
         }
+        // }
     }
 
     /// Prove a storage key's existence or nonexistence in the account's storage
@@ -769,17 +810,22 @@ impl VMAccount for AionVMAccount {
 }
 
 impl AionVMAccount {
-    pub fn storage_at(&self, db: &HashStore, key: &Bytes) -> trie::Result<Bytes> {
+    pub fn storage_at(&self, db: &HashStore, key: &Bytes) -> trie::Result<Option<Bytes>> {
         if let Some(value) = self.cached_storage_at(key) {
-            return Ok(value);
+            return Ok(Some(value));
         }
+
         let db = SecTrieDB::new(db, &self.storage_root)?;
+
+        if self.acc_type() == AccType::AVM && !db.contains(key)? {
+            return Ok(None);
+        }
 
         let item: Bytes = db.get_with(key, ::rlp::decode)?.unwrap_or_else(|| vec![]);
         self.storage_cache
             .borrow_mut()
             .insert(key.clone(), item.clone());
-        Ok(item)
+        Ok(Some(item))
     }
 
     pub fn cached_storage_at(&self, key: &Bytes) -> Option<Bytes> {
@@ -795,10 +841,25 @@ impl AionVMAccount {
     }
 
     pub fn set_storage(&mut self, key: Bytes, value: Bytes) {
+        // update removable set
+        if self.storage_removable.contains(&key) {
+            self.storage_removable.remove(&key);
+        }
+
         self.storage_changes.insert(key, value);
     }
 
-    pub fn update_root(&mut self, address: &Address, db: &mut HashStore) {
+    pub fn remove_storage(&mut self, key: Bytes) {
+        // update storage changes
+        if self.storage_changes.contains_key(&key) {
+            let old = self.storage_changes.remove(&key);
+            debug!(target: "vm", "removed avm value {:?}", old);
+        }
+
+        self.storage_removable.insert(key);
+    }
+
+    pub fn update_root(&mut self, _address: &Address, graph_db: Arc<KeyValueDB>) {
         debug!(target: "vm", "account type: {:?}", self.acc_type());
         if self.account_type == AccType::AVM {
             let mut concatenated_root = Vec::new();
@@ -809,38 +870,70 @@ impl AionVMAccount {
             debug!(target: "vm", "updated storage root = {:?}, delta_root = {:?}, code hash = {:?}", 
                 self.storage_root, self.delta_root, self.code_hash);
             // save object graph
-            debug!(target: "vm", "hash for object graph = {:?}", self.delta_root);
-            db.emplace(
-                self.delta_root.clone(),
-                DBValue::from_slice(self.object_graph_cache.as_slice()),
+            debug!(target: "vm", "hash for object graph = {:?}", self.objectgraph_hash);
+
+            let mut stream = RlpStream::new_list(2);
+            stream.append(&self.storage_root);
+            stream.append(&self.objectgraph_hash);
+            let content = stream.out();
+
+            // db.emplace(
+            //     self.delta_root.clone(),
+            //     DBValue::from_slice(self.object_graph_cache.as_slice()),
+            // );
+            // db.emplace(
+            //     self.delta_root.clone(),
+            //     DBValue::from_slice(content.as_slice()),
+            // );
+            // db.emplace(
+            //     self.objectgraph_hash,
+            //     DBValue::from_slice(self.object_graph_cache.as_slice())
+            // );
+            let mut batch = DBTransaction::new();
+            batch.put(
+                ::db::COL_AVM_GRAPH,
+                &self.delta_root[..],
+                content.as_slice(),
             );
+            batch.put(
+                ::db::COL_AVM_GRAPH,
+                &self.objectgraph_hash[..],
+                self.object_graph_cache.as_slice(),
+            );
+            graph_db.write(batch).expect("GRAPH DB write failed");
             // save key/valud storage root
-            db.emplace(address.clone(), DBValue::from_slice(&self.storage_root[..]));
+            // let mut raw_key = Vec::new();
+            // raw_key.extend_from_slice(&address[..]);
+            // raw_key.push(AccType::AVM.into());
+            // db.emplace(
+            //     blake2b(raw_key),
+            //     DBValue::from_slice(&self.storage_root[..]),
+            // );
         }
     }
 
-    pub fn save_object_graph(&mut self, address: &Address, db: &mut HashStore) {
-        // save object graph
-        println!("hash for object graph = {:?}", self.delta_root);
-        db.emplace(
-            self.delta_root.clone(),
-            DBValue::from_slice(self.object_graph_cache.as_slice()),
-        );
-        // save key/valud storage root
-        db.emplace(address.clone(), DBValue::from_slice(&self.storage_root[..]));
-    }
+    // pub fn save_object_graph(&mut self, address: &Address, db: &mut HashStore) {
+    //     // save object graph
+    //     println!("hash for object graph = {:?}", self.delta_root);
+    //     db.emplace(
+    //         self.delta_root.clone(),
+    //         DBValue::from_slice(self.object_graph_cache.as_slice()),
+    //     );
+    //     // save key/valud storage root
+    //     db.emplace(address.clone(), DBValue::from_slice(&self.storage_root[..]));
+    // }
 
-    pub fn update_object_graph(&mut self, db: &HashStore) {
-        match db.get(&self.storage_root) {
-            Some(x) => {
-                self.object_graph_size = Some(x.len());
-                self.object_graph_cache = Arc::new(x[..].to_vec());
-            }
-            None => {
-                self.object_graph_size = None;
-            }
-        }
-    }
+    // pub fn update_object_graph(&mut self, db: &HashStore) {
+    //     match db.get(&self.storage_root) {
+    //         Some(x) => {
+    //             self.object_graph_size = Some(x.len());
+    //             self.object_graph_cache = Arc::new(x[..].to_vec());
+    //         }
+    //         None => {
+    //             self.object_graph_size = None;
+    //         }
+    //     }
+    // }
 
     #[cfg(test)]
     /// Provide a byte array which hashes to the `code_hash`. returns the hash as a result.
@@ -900,9 +993,9 @@ mod tests {
             "d2e59a50e7414e56da75917275d1542a13fd345bf88a657a4222a0d50ad58868".into()
         );
         let value = a.storage_at(&db.immutable(), &vec![0x00; 16]).unwrap();
-        assert_eq!(value, vec![0x12, 0x34]);
+        assert_eq!(value, Some(vec![0x12, 0x34]));
         let value = a.storage_at(&db.immutable(), &vec![0x01]).unwrap();
-        assert_eq!(value, Vec::<u8>::new());
+        assert_eq!(value, Some(Vec::<u8>::new()));
     }
 
     #[test]
@@ -964,27 +1057,27 @@ mod tests {
         assert_eq!(a.account_type, AccType::AVM);
     }
 
-    #[test]
-    fn cache_objectgraph() {
-        let address = Address::new();
-        let mut db = MemoryDB::new();
-        let mut db = AccountDBMut::new(&mut db, &address);
-        let mut a = AionVMAccount::new_contract(69.into(), 0.into());
+    // #[test]
+    // fn cache_objectgraph() {
+    //     let address = Address::new();
+    //     let mut db = MemoryDB::new();
+    //     let mut db = AccountDBMut::new(&mut db, &address);
+    //     let mut a = AionVMAccount::new_contract(69.into(), 0.into());
 
-        let rlp = {
-            a.init_objectgraph(vec![0x55, 0x44, 0xffu8]);
-            a.commit_storage(&Default::default(), &mut db).unwrap();
-            // calculate delta_root and save it in accountDB
-            a.update_root(&address, &mut db);
-            a.rlp()
-        };
+    //     let rlp = {
+    //         a.init_objectgraph(vec![0x55, 0x44, 0xffu8]);
+    //         a.commit_storage(&Default::default(), &mut db).unwrap();
+    //         // calculate delta_root and save it in accountDB
+    //         a.update_root(&address, &mut db);
+    //         a.rlp()
+    //     };
 
-        let mut a = AionVMAccount::from_rlp(&rlp);
-        assert_eq!(
-            a.cache_objectgraph(&address, &db.immutable()),
-            Some(Arc::new(vec![0x55, 0x44, 0xffu8]))
-        );
-    }
+    //     let mut a = AionVMAccount::from_rlp(&rlp);
+    //     assert_eq!(
+    //         a.cache_objectgraph(&address, &db.immutable()),
+    //         Some(Arc::new(vec![0x55, 0x44, 0xffu8]))
+    //     );
+    // }
 
     #[test]
     fn cached_storage_at() {

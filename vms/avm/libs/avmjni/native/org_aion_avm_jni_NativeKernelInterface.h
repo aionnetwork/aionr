@@ -183,6 +183,46 @@ JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_contrac
 JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_getBlockHashByNumber
   (JNIEnv *, jclass, jlong, jlong);
 
+/*
+ * Class:     org_aion_avm_jni_NativeKernelInterface
+ * Method:    sha256
+ * Signature: ([B)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_sha256
+  (JNIEnv *, jclass, jbyteArray);
+
+/*
+ * Class:     org_aion_avm_jni_NativeKernelInterface
+ * Method:    blake2b
+ * Signature: ([B)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_blake2b
+  (JNIEnv *, jclass, jbyteArray);
+
+/*
+ * Class:     org_aion_avm_jni_NativeKernelInterface
+ * Method:    keccak256
+ * Signature: ([B)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_keccak256
+  (JNIEnv *, jclass, jbyteArray);
+
+/*
+ * Class:     org_aion_avm_jni_NativeKernelInterface
+ * Method:    edverify
+ * Signature: ([B[B[B)Z
+ */
+JNIEXPORT jboolean JNICALL Java_org_aion_avm_jni_NativeKernelInterface_edverify
+  (JNIEnv *, jclass, jbyteArray, jbyteArray, jbyteArray);
+
+/*
+ * Class:     org_aion_avm_jni_NativeKernelInterface
+ * Method:    removeStorage
+ * Signature: (J[B[B)V
+ */
+JNIEXPORT void JNICALL Java_org_aion_avm_jni_NativeKernelInterface_removeStorage
+  (JNIEnv *, jclass, jlong, jbyteArray, jbyteArray);
+
 #ifdef __cplusplus
 }
 #endif

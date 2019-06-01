@@ -11,6 +11,8 @@ use vm_common::Ext;
 use aion_types::{Address, U256, H256};
 use hash::blake2b;
 use codec::NativeDecoder;
+use crypto::{sha2::Sha256, digest::Digest, ed25519};
+use tiny_keccak::keccak256;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -33,7 +35,7 @@ pub struct avm_bytes {
 
 impl Into<Vec<u8>> for avm_bytes {
     fn into(self) -> Vec<u8> {
-        unsafe { Vec::from_raw_parts(self.pointer, self.length as usize, self.length as usize) }
+        unsafe { slice::from_raw_parts(self.pointer, self.length as usize).into() }
     }
 }
 
@@ -74,6 +76,14 @@ pub struct avm_callbacks {
     pub set_objectgraph:
         extern fn(handle: *const c_void, addr: *const avm_address, data: *const avm_bytes),
     pub get_blockhash: extern fn(handle: *const c_void, block_number: i64) -> avm_bytes,
+    pub sha256: extern fn(input: *const avm_bytes) -> avm_bytes,
+    pub blake2b: extern fn(input: *const avm_bytes) -> avm_bytes,
+    pub keccak256: extern fn(input: *const avm_bytes) -> avm_bytes,
+    pub verify_ed25519:
+        extern fn(input: *const avm_bytes, input1: *const avm_bytes, input2: *const avm_bytes)
+            -> bool,
+    pub remove_storage:
+        extern fn(handle: *const c_void, addr: *const avm_address, data: *const avm_bytes),
 }
 
 impl fmt::Display for avm_address {
@@ -219,7 +229,9 @@ pub extern fn avm_get_storage(
                     ret
                 }
             } else {
-                unsafe { new_null_bytes() }
+                // is there a way to get zero-length array's header pointer
+                unsafe { new_fixed_bytes(0) }
+                // unsafe {new_null_bytes()}
             }
         }
         None => {
@@ -497,6 +509,68 @@ pub extern fn avm_get_blockhash(handle: *const c_void, block_number: i64) -> avm
     }
 }
 
+#[no_mangle]
+pub extern fn avm_sha256(input: *const avm_bytes) -> avm_bytes {
+    let data = unsafe { slice::from_raw_parts((*input).pointer, (*input).length as usize) };
+    let mut sh = Sha256::new();
+    sh.input(data);
+    let mut ans = vec![0u8; 32];
+    sh.result(&mut ans);
+    unsafe {
+        let ret = new_fixed_bytes(32);
+        ptr::copy(&ans.as_slice()[0], ret.pointer, ans.len());
+        ret
+    }
+}
+
+#[no_mangle]
+pub extern fn avm_blake2b(input: *const avm_bytes) -> avm_bytes {
+    let data: Vec<u8> = unsafe { (*input).into() };
+    let ans = blake2b(data);
+    unsafe {
+        let ret = new_fixed_bytes(32);
+        ptr::copy(&ans[0], ret.pointer, ans.len());
+        ret
+    }
+}
+#[no_mangle]
+pub extern fn avm_keccak256(input: *const avm_bytes) -> avm_bytes {
+    let data: Vec<u8> = unsafe { (*input).into() };
+    let ans = keccak256(&data);
+    unsafe {
+        let ret = new_fixed_bytes(32);
+        ptr::copy(&ans[0], ret.pointer, ans.len());
+        ret
+    }
+}
+
+#[no_mangle]
+pub extern fn avm_vediryEdDSA(
+    input: *const avm_bytes,
+    input1: *const avm_bytes,
+    input2: *const avm_bytes,
+) -> bool
+{
+    let data: Vec<u8> = unsafe { (*input).into() };
+    let data1: Vec<u8> = unsafe { (*input1).into() };
+    let data2: Vec<u8> = unsafe { (*input2).into() };
+    return ed25519::verify(&data, &data1, &data2);
+}
+
+#[no_mangle]
+pub extern fn avm_remove_storage(
+    handle: *const c_void,
+    address: *const avm_address,
+    data: *const avm_bytes,
+)
+{
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
+    let addr: &Address = unsafe { mem::transmute(address) };
+    let key: Vec<u8> = unsafe { (*data).into() };
+    debug!(target: "vm", "avm remove storage at: {:?}", key);
+    ext.remove_storage(addr, key);
+}
+
 pub fn register_callbacks() {
     unsafe {
         callbacks.create_account = avm_create_account;
@@ -520,6 +594,11 @@ pub fn register_callbacks() {
         callbacks.get_objectgraph = avm_get_objectgraph;
         callbacks.set_objectgraph = avm_set_objectgraph;
         callbacks.get_blockhash = avm_get_blockhash;
+        callbacks.sha256 = avm_sha256;
+        callbacks.blake2b = avm_blake2b;
+        callbacks.keccak256 = avm_keccak256;
+        callbacks.verify_ed25519 = avm_vediryEdDSA;
+        callbacks.remove_storage = avm_remove_storage;
     }
 }
 
@@ -529,7 +608,7 @@ mod tests {
     // use std::ptr;
     // use hash::BLAKE2B_EMPTY;
 
-    // use super::*;
+    use super::*;
 
     #[test]
     fn set_storage() {
@@ -556,5 +635,67 @@ mod tests {
         //         pointer: &mut value.as_mut_slice()[0],
         //     };
         //     avm_put_storage(handle, &address, &key, &value);
+    }
+
+    use std::mem;
+
+    #[test]
+    fn test_sha256() {
+        let data = [1u8; 10];
+        let input: *mut u8 = unsafe { mem::transmute(&data[0]) };
+        let avm_data: *const avm_bytes = unsafe {
+            mem::transmute(&avm_bytes {
+                length: data.len() as u32,
+                pointer: input,
+            })
+        };
+        let output: Vec<u8> = avm_sha256(avm_data).into();
+        assert_eq!(
+            output,
+            vec![
+                255, 173, 248, 216, 157, 55, 179, 181, 95, 225, 132, 123, 81, 60, 249, 46, 59, 232,
+                126, 76, 22, 135, 8, 199, 133, 24, 69, 223, 150, 251, 54, 190
+            ]
+        );
+    }
+
+    #[test]
+    fn test_blake2b() {
+        let data = [1u8; 10];
+        let input: *mut u8 = unsafe { mem::transmute(&data[0]) };
+        let avm_data: *const avm_bytes = unsafe {
+            mem::transmute(&avm_bytes {
+                length: data.len() as u32,
+                pointer: input,
+            })
+        };
+        let output: Vec<u8> = avm_blake2b(avm_data).into();
+        assert_eq!(
+            output,
+            vec![
+                197, 207, 121, 92, 239, 143, 82, 117, 31, 217, 228, 129, 246, 136, 196, 67, 212,
+                134, 89, 233, 238, 217, 168, 82, 23, 144, 41, 19, 132, 88, 201, 90
+            ]
+        );
+    }
+
+    #[test]
+    fn test_keccak256() {
+        let data = [1u8; 10];
+        let input: *mut u8 = unsafe { mem::transmute(&data[0]) };
+        let avm_data: *const avm_bytes = unsafe {
+            mem::transmute(&avm_bytes {
+                length: data.len() as u32,
+                pointer: input,
+            })
+        };
+        let output: Vec<u8> = avm_keccak256(avm_data).into();
+        assert_eq!(
+            output,
+            vec![
+                227, 244, 47, 121, 192, 107, 198, 141, 238, 101, 169, 101, 242, 107, 156, 26, 29,
+                64, 211, 25, 95, 36, 52, 17, 39, 21, 15, 114, 66, 151, 151, 9
+            ]
+        );
     }
 }

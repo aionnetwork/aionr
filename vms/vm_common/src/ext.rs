@@ -136,6 +136,9 @@ pub trait Ext {
     /// avm get storage
     fn sload(&self, address: &Address, key: &Bytes) -> Option<Bytes>;
 
+    // avm remove storage
+    fn remove_storage(&mut self, a: &Address, key: Vec<u8>);
+
     /// avm create account
     fn create_account(&mut self, address: &Address);
 

@@ -26,13 +26,17 @@ fn main() {
     let outdir: String = env::var("OUT_DIR").unwrap();
     let profile = env::var("PROFILE").unwrap();
     // build avm library
-    Command::new("make")
+    let status = Command::new("make")
         .arg("-C")
         .arg("libs/avmjni/native")
         .arg(format!("{}={}", "OUTDIR", outdir))
         .arg(profile.clone())
         .status()
         .expect("failed to build jni library");
+
+    if !status.success() {
+        panic!("build native jni library failed");
+    }
 
     println!("cargo:rustc-link-search=native={}", outdir);
 

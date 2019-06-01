@@ -158,6 +158,16 @@ typedef void (*avm_set_transformed_code_fn)(
 
 typedef struct avm_bytes (*avm_get_blockhash_fn)(const void *handle, const i64 block_number);
 
+typedef struct avm_bytes (*avm_sha256_fn)(const struct avm_bytes *data);
+
+typedef struct avm_bytes (*avm_blake2b_fn)(const struct avm_bytes *data);
+
+typedef struct avm_bytes (*avm_keccak256_fn)(const struct avm_bytes *data);
+
+typedef bool (*avm_edveryfy_fn)(const struct avm_bytes *data, const struct avm_bytes *data1, const struct avm_bytes *data2);
+
+typedef void (*avm_remove_storage_fn)(const void *handle, const struct avm_address *address, const struct avm_bytes *data);
+
 /**
  * A data structure holds all the callback function pointers.
  */
@@ -183,6 +193,11 @@ struct avm_callbacks {
     avm_get_objectgraph_fn      get_objectgraph;
     avm_set_objectgraph_fn      set_objectgraph;
     avm_get_blockhash_fn        get_blockhash;
+    avm_sha256_fn               sha256;
+    avm_blake2b_fn              blake2b;
+    avm_keccak256_fn            keccak256;
+    avm_edveryfy_fn             verify_ed25519;
+    avm_remove_storage_fn       remove_storage;
 };
 
 typedef struct avm_bytes (*create_contract_fn)(const struct avm_address *address, const uint64_t nonce);

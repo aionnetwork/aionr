@@ -64,6 +64,7 @@ const STACK_SIZE_ENTRY_OVERHEAD: usize = 20 * 1024;
 /// VM lock
 lazy_static! {
     static ref VM_LOCK: Mutex<bool> = Mutex::new(false);
+    static ref AVM_LOCK: Mutex<bool> = Mutex::new(false);
 }
 
 /// Returns new address created from address, nonce
@@ -186,6 +187,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         is_local_call: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
+        let _vm_lock = AVM_LOCK.lock().unwrap();
         let mut vm_params = Vec::new();
         for t in txs {
             let sender = t.sender();
@@ -2423,7 +2425,7 @@ mod tests {
         for r in execution_results {
             let ExecutionResult {
                 status_code,
-                gas_left,
+                gas_left: _,
                 return_data,
                 exception: _,
                 state_root: _,
@@ -2463,9 +2465,9 @@ mod tests {
             let ExecutionResult {
                 status_code,
                 gas_left,
-                return_data,
+                return_data: _,
                 exception: _,
-                state_root,
+                state_root: _,
             } = r;
 
             println!("gas left = {:?}", gas_left);
@@ -2510,7 +2512,7 @@ mod tests {
         for r in execution_results {
             let ExecutionResult {
                 status_code,
-                gas_left,
+                gas_left: _,
                 return_data,
                 exception: _,
                 state_root: _,
@@ -2542,9 +2544,9 @@ mod tests {
             let ExecutionResult {
                 status_code,
                 gas_left,
-                return_data,
+                return_data: _,
                 exception: _,
-                state_root,
+                state_root: _,
             } = r;
 
             println!("gas left = {:?}", gas_left);
@@ -2647,7 +2649,7 @@ mod tests {
         let value = state
             .storage_at(&address, &vec![0, 0, 0, 1])
             .expect("avm get storage failed");
-        assert_eq!(value, vec![0, 0, 0, 2]);
+        assert_eq!(value, Some(vec![0, 0, 0, 2]));
         state
             .set_storage(
                 &address,

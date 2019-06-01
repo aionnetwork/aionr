@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use aion_types::{Address, H256, U256};
 use bytes::Bytes;
-use kvdb::{HashStore};
+use kvdb::{KeyValueDB, HashStore};
 use state::{Backend, RequireCache};
 use trie::TrieError;
 
@@ -166,6 +166,7 @@ pub trait VMAccount: Sync + Send {
         require: RequireCache,
         state_db: &B,
         db: &HashStore,
+        gragh_db: Arc<KeyValueDB>,
     );
 
     fn prove_storage(

@@ -8,23 +8,23 @@ import org.aion.vm.api.interfaces.TransactionInterface;
 public class AionCapabilities implements IExternalCapabilities {
 
     @Override
-    public byte[] sha256(byte[] bytes) {
-        throw new RuntimeException("sha256 not supported");
+    public byte[] sha256(byte[] data) {
+        return NativeKernelInterface.sha256(data);
     }
 
     @Override
-    public byte[] blake2b(byte[] bytes) {
-        throw new RuntimeException("blake2b not supported");
+    public byte[] blake2b(byte[] data) {
+        return NativeKernelInterface.blake2b(data);
     }
 
     @Override
-    public byte[] keccak256(byte[] bytes) {
-        throw new RuntimeException("keccak256 not supported");
+    public byte[] keccak256(byte[] data) {
+        return NativeKernelInterface.keccak256(data);
     }
 
     @Override
-    public boolean verifyEdDSA(byte[] bytes, byte[] bytes1, byte[] bytes2) {
-        throw new RuntimeException("verifyEsDSA not supported");
+    public boolean verifyEdDSA(byte[] data, byte[] data1, byte[] data2) {
+        return NativeKernelInterface.edverify(data, data1, data2);
     }
 
     @Override

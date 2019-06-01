@@ -6,6 +6,7 @@ import org.aion.types.Address;
 import java.util.List;
 import java.util.Set;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.function.Consumer;
 import java.math.BigInteger;
 import java.util.HashMap;
@@ -67,7 +68,8 @@ public class Substate implements KernelInterface {
 
     // block info is regarded as EnvInfo for transactions
     public void updateEnvInfo(Message msg) {
-        NativeDecoder decoder = new NativeDecoder(msg.blockDifficulty);
+        byte[] difficulty = Arrays.copyOfRange(msg.blockDifficulty, 8, 16);
+        NativeDecoder decoder = new NativeDecoder(difficulty);
         this.info.blockDifficulty = decoder.decodeLong();
         this.info.blockTimestamp = msg.blockTimestamp;
         this.info.blockGasLimit = msg.blockEnergyLimit;
@@ -296,7 +298,11 @@ public class Substate implements KernelInterface {
 
     @Override
     public void removeStorage(Address address, byte[] key) {
-        putStorage(address, key, new byte[]{0});
+        putStorage(address, key, null);
+        Consumer<KernelInterface> write = (kernel) -> {
+            kernel.removeStorage(address, key);
+        };
+        writeLog.add(write);
     }
 
     @Override
@@ -353,6 +359,11 @@ public class Substate implements KernelInterface {
 
     @Override
     public long getBlockDifficulty() {
+        if (Constants.DEBUG) {
+            System.out.print("Block Difficulty: ");
+            System.out.println(this.info.blockDifficulty);
+        }
+        
         return this.info.blockDifficulty;
     }
 
