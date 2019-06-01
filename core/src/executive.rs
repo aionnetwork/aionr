@@ -2649,7 +2649,7 @@ mod tests {
         let value = state
             .storage_at(&address, &vec![0, 0, 0, 1])
             .expect("avm get storage failed");
-        assert_eq!(value, vec![0, 0, 0, 2]);
+        assert_eq!(value, Some(vec![0, 0, 0, 2]));
         state
             .set_storage(
                 &address,

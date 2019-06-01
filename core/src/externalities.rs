@@ -712,7 +712,7 @@ where B: StateBackend
     }
 
     fn code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
-        println!("AVM get code from: {:?}", address);
+        debug!(target: "vm", "AVM get code from: {:?}", address);
         match self.state.lock().unwrap().code(address) {
             Ok(code) => {
                 //println!("code = {:?}", code);

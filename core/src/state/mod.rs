@@ -64,7 +64,7 @@ pub use account::{
     AionVMAccount,
 // Account,
     VMAccount,
-// AccType,
+    AccType,
     RequireCache,
 };
 pub use self::backend::Backend;
@@ -499,7 +499,6 @@ impl<B: Backend> State<B> {
                     }
                     // NOTE: No account found, is it possible in both fastvm and avm, maybe not
                     _ => {
-                        // println!("TT: 2");
                         return Ok(None);
                     }
                 }
@@ -508,23 +507,18 @@ impl<B: Backend> State<B> {
             let trie_res = self.db.get_cached(address, |acc| {
                 match acc {
                     // NOTE: the same question as above
-                    None => {
-                        // println!("TT: 3");
-                        Ok(Some(vec![]))
-                    },
+                    None => Ok(None),
                     Some(a) => {
                         let account_db = self
                             .factories
                             .accountdb
                             .readonly(self.db.as_hashstore(), a.address_hash(address));
-                            // println!("TT: 7");
                         a.storage_at(account_db.as_hashstore(), key)
                     }
                 }
             });
 
             if let Some(res) = trie_res {
-                // println!("TT: 4");
                 return res;
             }
 
@@ -535,11 +529,9 @@ impl<B: Backend> State<B> {
                         .factories
                         .accountdb
                         .readonly(self.db.as_hashstore(), account.address_hash(address));
-                    // println!("TT: 9");
                     return account.storage_at(account_db.as_hashstore(), key);
                 } else {
-                    // println!("TT: 5");
-                    return Ok(Some(vec![]));
+                    return Ok(None);
                 }
             }
         }
@@ -547,7 +539,7 @@ impl<B: Backend> State<B> {
         // check if the account could exist before any requests to trie
         if self.db.is_known_null(address) {
             // println!("TT: 6");
-            return Ok(Some(vec![]));
+            return Ok(None);
         }
 
         // account is not found in the global cache, get from the DB and insert into local
@@ -562,7 +554,6 @@ impl<B: Backend> State<B> {
                 .factories
                 .accountdb
                 .readonly(self.db.as_hashstore(), a.address_hash(address));
-                // println!("TT: 8");
             a.storage_at(account_db.as_hashstore(), key)
         });
         self.insert_cache(address, AccountEntry::new_clean(maybe_acc));
@@ -1046,7 +1037,13 @@ impl<B: Backend> State<B> {
                     .factories
                     .accountdb
                     .readonly(self.db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore(), self.kvdb.clone());
+                account.update_account_cache(
+                    a,
+                    require,
+                    &self.db,
+                    accountdb.as_hashstore(),
+                    self.kvdb.clone(),
+                );
                 return Ok(f(Some(account)));
             }
             return Ok(f(None));
@@ -1059,7 +1056,13 @@ impl<B: Backend> State<B> {
                     .factories
                     .accountdb
                     .readonly(self.db.as_hashstore(), account.address_hash(a));
-                account.update_account_cache(a, require, &self.db, accountdb.as_hashstore(), self.kvdb.clone());
+                account.update_account_cache(
+                    a,
+                    require,
+                    &self.db,
+                    accountdb.as_hashstore(),
+                    self.kvdb.clone(),
+                );
             }
             f(acc.map(|a| &*a))
         });
@@ -1083,7 +1086,13 @@ impl<B: Backend> State<B> {
                         .factories
                         .accountdb
                         .readonly(self.db.as_hashstore(), account.address_hash(a));
-                    account.update_account_cache(a, require, &self.db, accountdb.as_hashstore(), self.kvdb.clone());
+                    account.update_account_cache(
+                        a,
+                        require,
+                        &self.db,
+                        accountdb.as_hashstore(),
+                        self.kvdb.clone(),
+                    );
                 }
                 let r = f(maybe_acc.as_ref());
                 self.insert_cache(a, AccountEntry::new_clean(maybe_acc));
@@ -1166,7 +1175,7 @@ impl<B: Backend> State<B> {
                             RequireCache::Code,
                             &self.db,
                             accountdb.as_hashstore(),
-                            self.kvdb.clone()
+                            self.kvdb.clone(),
                         );
                     }
                     account
@@ -1385,8 +1394,41 @@ mod tests {
     }
 
     #[test]
+    fn avm_empty_bytes_or_null() {
+        let a = Address::zero();
+        let mut state = get_temp_state();
+        state
+            .require_or_from(
+                &a,
+                false,
+                || {
+                    let mut acc = AionVMAccount::new_contract(42.into(), 0.into());
+                    acc.account_type = AccType::AVM;
+                    acc
+                },
+                |_| {},
+            )
+            .unwrap();
+        let key = vec![0x01];
+        let value = vec![];
+        state.set_storage(&a, key.clone(), value).unwrap();
+        assert_eq!(state.storage_at(&a, &key).unwrap(), Some(vec![]));
+        state.commit().unwrap();
+        state.remove_storage(&a, key.clone()).unwrap();
+        // remove unexisting key
+        state.remove_storage(&a, vec![0x02]).unwrap();
+        state.commit().unwrap();
+        state.set_storage(&a, vec![0x02], vec![0x03]).unwrap();
+        // clean local cache
+        state.commit().unwrap();
+        assert_eq!(state.storage_at(&a, &key).unwrap(), None);
+        assert_eq!(state.storage_at(&a, &vec![0x02]).unwrap(), Some(vec![0x03]));
+    }
+
+    #[test]
     fn code_from_database() {
         let a = Address::zero();
+
         let (root, db) = {
             let mut state = get_temp_state();
             state
@@ -1473,7 +1515,7 @@ mod tests {
             Arc::new(MemoryDBRepository::new()),
         )
         .unwrap();
-        assert_eq!(s.storage_at(&a, &vec![2]).unwrap(), vec![69]);
+        assert_eq!(s.storage_at(&a, &vec![2]).unwrap_or(None), Some(vec![69]));
     }
 
     #[test]
