@@ -26,7 +26,6 @@ pub struct BasicAccount {
 /// The changes are applied in `commit_storage` and `commit_code`
 #[derive(Clone)]
 pub struct Account<T, U> {
-
     pub balance: U256,
 
     pub nonce: U256,

@@ -520,20 +520,21 @@ impl VMAccount for AionVMAccount {
     }
 
     fn cache_transformed_code_size(&mut self, db: &HashStore) -> bool {
-        self.transformed_code_size.is_some() || if self.transformed_code_hash != BLAKE2B_EMPTY {
-            match db.get(&self.transformed_code_hash) {
-                Some(x) => {
-                    self.transformed_code_size = Some(x.len());
-                    true
+        self.transformed_code_size.is_some()
+            || if self.transformed_code_hash != BLAKE2B_EMPTY {
+                match db.get(&self.transformed_code_hash) {
+                    Some(x) => {
+                        self.transformed_code_size = Some(x.len());
+                        true
+                    }
+                    _ => {
+                        debug!(target: "account","Failed reverse get of {}", self.transformed_code_hash);
+                        false
+                    }
                 }
-                _ => {
-                    debug!(target: "account","Failed reverse get of {}", self.transformed_code_hash);
-                    false
-                }
+            } else {
+                false
             }
-        } else {
-            false
-        }
     }
 
     fn cache_objectgraph_size(&mut self, db: &HashStore) -> bool {
