@@ -79,7 +79,7 @@ impl From<BasicAccount> for AionVMAccount {
             transformed_code_hash: BLAKE2B_EMPTY,
             transformed_code_size: None,
             transformed_code_cache: Arc::new(vec![]),
-            objectgraph_hash: BLAKE2B_EMPTY,
+            object_graph_hash: BLAKE2B_EMPTY,
             object_graph_size: None,
             object_graph_cache: Arc::new(vec![]),
             code_filth: Filth::Clean,
@@ -94,8 +94,8 @@ impl From<BasicAccount> for AionVMAccount {
 impl AionVMAccount {
     pub fn new_contract(balance: U256, nonce: U256) -> Self {
         Self {
-            balance: balance,
-            nonce: nonce,
+            balance,
+            nonce,
             storage_root: BLAKE2B_NULL_RLP,
             delta_root: BLAKE2B_NULL_RLP,
             storage_cache: Self::empty_storage_cache(),
@@ -105,7 +105,7 @@ impl AionVMAccount {
             transformed_code_hash: BLAKE2B_EMPTY,
             transformed_code_size: None,
             transformed_code_cache: Arc::new(vec![]),
-            objectgraph_hash: BLAKE2B_EMPTY,
+            object_graph_hash: BLAKE2B_EMPTY,
             object_graph_size: None,
             object_graph_cache: Arc::new(vec![]),
             code_size: None,
@@ -119,8 +119,8 @@ impl AionVMAccount {
 
     pub fn new_basic(balance: U256, nonce: U256) -> Self {
         Self {
-            balance: balance,
-            nonce: nonce,
+            balance,
+            nonce,
             storage_root: BLAKE2B_NULL_RLP,
             delta_root: BLAKE2B_NULL_RLP,
             storage_cache: Self::empty_storage_cache(),
@@ -130,7 +130,7 @@ impl AionVMAccount {
             transformed_code_hash: BLAKE2B_EMPTY,
             transformed_code_size: None,
             transformed_code_cache: Arc::new(vec![]),
-            objectgraph_hash: BLAKE2B_EMPTY,
+            object_graph_hash: BLAKE2B_EMPTY,
             object_graph_size: None,
             object_graph_cache: Arc::new(vec![]),
             code_size: Some(0),
@@ -153,7 +153,7 @@ impl AionVMAccount {
             storage_root: BLAKE2B_NULL_RLP,
             delta_root: BLAKE2B_NULL_RLP,
             storage_cache: Self::empty_storage_cache(),
-            storage_changes: storage_changes,
+            storage_changes,
             code_hash: pod.code.as_ref().map_or(BLAKE2B_EMPTY, |c| blake2b(c)),
             code_filth: Filth::Dirty,
             code_size: Some(pod.code.as_ref().map_or(0, |c| c.len())),
@@ -167,7 +167,7 @@ impl AionVMAccount {
             transformed_code_hash: BLAKE2B_EMPTY,
             transformed_code_size: None,
             transformed_code_cache: Arc::new(vec![]),
-            objectgraph_hash: BLAKE2B_EMPTY,
+            object_graph_hash: BLAKE2B_EMPTY,
             object_graph_size: None,
             object_graph_cache: Arc::new(vec![]),
             address_hash: Cell::new(None),
@@ -249,7 +249,7 @@ impl AionVMAccount {
             transformed_code_hash: self.transformed_code_hash.clone(),
             transformed_code_size: self.transformed_code_size.clone(),
             transformed_code_cache: self.transformed_code_cache.clone(),
-            objectgraph_hash: self.objectgraph_hash.clone(),
+            object_graph_hash: self.object_graph_hash.clone(),
             object_graph_size: self.object_graph_size.clone(),
             object_graph_cache: self.object_graph_cache.clone(),
             code_filth: self.code_filth.clone(),
@@ -274,7 +274,7 @@ impl AionVMAccount {
         self.transformed_code_size = other.transformed_code_size;
         self.transformed_code_cache = other.transformed_code_cache;
         self.object_graph_size = other.object_graph_size;
-        self.objectgraph_hash = other.objectgraph_hash;
+        self.object_graph_hash = other.object_graph_hash;
         self.object_graph_cache = other.object_graph_cache;
         self.empty_but_commit = other.empty_but_commit;
         self.account_type = other.account_type;
@@ -321,7 +321,7 @@ impl VMAccount for AionVMAccount {
 
     fn init_objectgraph(&mut self, data: Bytes) {
         self.account_type = AccType::AVM;
-        self.objectgraph_hash = blake2b(&data);
+        self.object_graph_hash = blake2b(&data);
         self.object_graph_cache = Arc::new(data);
     }
 
@@ -343,7 +343,7 @@ impl VMAccount for AionVMAccount {
 
     fn transformed_code_hash(&self) -> H256 { self.transformed_code_hash.clone() }
 
-    fn objectgraph_hash(&self) -> H256 { self.objectgraph_hash.clone() }
+    fn object_graph_hash(&self) -> H256 { self.object_graph_hash.clone() }
 
     fn address_hash(&self, address: &Address) -> H256 {
         let hash = self.address_hash.get();
@@ -386,7 +386,7 @@ impl VMAccount for AionVMAccount {
 
     fn is_objectgraph_cached(&self) -> bool {
         !self.object_graph_cache.is_empty()
-        // || (self.object_graph_cache.is_empty() && self.objectgraph_hash == BLAKE2B_EMPTY)
+        // || (self.object_graph_cache.is_empty() && self.object_graph_hash == BLAKE2B_EMPTY)
     }
 
     fn cache_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>> {
@@ -411,7 +411,7 @@ impl VMAccount for AionVMAccount {
                 Some(self.code_cache.clone())
             }
             _ => {
-                warn!(target: "account","Failed reverse get of {}", self.code_hash);
+                debug!(target: "account","Failed reverse get of {}", self.code_hash);
                 None
             }
         }
@@ -430,7 +430,7 @@ impl VMAccount for AionVMAccount {
                 Some(self.transformed_code_cache.clone())
             }
             _ => {
-                warn!(target: "account","Failed reverse get of {}", self.transformed_code_hash);
+                debug!(target: "account","Failed reverse get of {}", self.transformed_code_hash);
                 None
             }
         }
@@ -448,13 +448,13 @@ impl VMAccount for AionVMAccount {
             match db.get(&self.delta_root) {
                 Some(data) => {
                     self.object_graph_size = Some(data.len());
-                    self.objectgraph_hash = blake2b(&data);
+                    self.object_graph_hash = blake2b(&data);
                     self.object_graph_cache = Arc::new(data[..].to_vec());
                     Some(self.object_graph_cache.clone())
                 }
                 None => {
                     self.object_graph_size = None;
-                    self.objectgraph_hash = BLAKE2B_EMPTY;
+                    self.object_graph_hash = BLAKE2B_EMPTY;
                     None
                 }
             }
@@ -510,7 +510,7 @@ impl VMAccount for AionVMAccount {
                     true
                 }
                 _ => {
-                    warn!(target: "account","Failed reverse get of {}", self.code_hash);
+                    debug!(target: "account","Failed reverse get of {}", self.code_hash);
                     false
                 }
             }
@@ -527,7 +527,7 @@ impl VMAccount for AionVMAccount {
                     true
                 }
                 _ => {
-                    warn!(target: "account","Failed reverse get of {}", self.transformed_code_hash);
+                    debug!(target: "account","Failed reverse get of {}", self.transformed_code_hash);
                     false
                 }
             }
@@ -537,14 +537,14 @@ impl VMAccount for AionVMAccount {
     }
 
     fn cache_objectgraph_size(&mut self, db: &HashStore) -> bool {
-        self.object_graph_size.is_some() || if self.objectgraph_hash != BLAKE2B_EMPTY {
-            match db.get(&self.objectgraph_hash) {
+        self.object_graph_size.is_some() || if self.object_graph_hash != BLAKE2B_EMPTY {
+            match db.get(&self.object_graph_hash) {
                 Some(x) => {
                     self.object_graph_size = Some(x.len());
                     true
                 }
                 _ => {
-                    warn!(target: "account","Failed reverse get of {}", self.objectgraph_hash);
+                    debug!(target: "account","Failed reverse get of {}", self.object_graph_hash);
                     false
                 }
             }
@@ -711,12 +711,12 @@ impl VMAccount for AionVMAccount {
             match graph_db.get(::db::COL_AVM_GRAPH, &graph_hash).unwrap() {
                 Some(data) => {
                     self.object_graph_size = Some(data.len());
-                    self.objectgraph_hash = concatenated.get(1).unwrap().clone(); //blake2b(&data);
+                    self.object_graph_hash = concatenated.get(1).unwrap().clone(); //blake2b(&data);
                     self.object_graph_cache = Arc::new(data[..].to_vec());
                 }
                 None => {
                     self.object_graph_size = None;
-                    self.objectgraph_hash = BLAKE2B_EMPTY;
+                    self.object_graph_hash = BLAKE2B_EMPTY;
                 }
             }
 
@@ -864,17 +864,17 @@ impl AionVMAccount {
         if self.account_type == AccType::AVM {
             let mut concatenated_root = Vec::new();
             concatenated_root.extend_from_slice(&self.storage_root[..]);
-            concatenated_root.extend_from_slice(&self.objectgraph_hash[..]);
+            concatenated_root.extend_from_slice(&self.object_graph_hash[..]);
             debug!(target: "vm", "concatenated root = {:?}", concatenated_root);
             self.delta_root = blake2b(&concatenated_root);
             debug!(target: "vm", "updated storage root = {:?}, delta_root = {:?}, code hash = {:?}", 
                 self.storage_root, self.delta_root, self.code_hash);
             // save object graph
-            debug!(target: "vm", "hash for object graph = {:?}", self.objectgraph_hash);
+            debug!(target: "vm", "hash for object graph = {:?}", self.object_graph_hash);
 
             let mut stream = RlpStream::new_list(2);
             stream.append(&self.storage_root);
-            stream.append(&self.objectgraph_hash);
+            stream.append(&self.object_graph_hash);
             let content = stream.out();
 
             // db.emplace(
@@ -886,7 +886,7 @@ impl AionVMAccount {
             //     DBValue::from_slice(content.as_slice()),
             // );
             // db.emplace(
-            //     self.objectgraph_hash,
+            //     self.object_graph_hash,
             //     DBValue::from_slice(self.object_graph_cache.as_slice())
             // );
             let mut batch = DBTransaction::new();
@@ -897,7 +897,7 @@ impl AionVMAccount {
             );
             batch.put(
                 ::db::COL_AVM_GRAPH,
-                &self.objectgraph_hash[..],
+                &self.object_graph_hash[..],
                 self.object_graph_cache.as_slice(),
             );
             graph_db.write(batch).expect("GRAPH DB write failed");

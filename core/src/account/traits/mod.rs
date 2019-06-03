@@ -70,7 +70,7 @@ pub trait VMAccount: Sync + Send {
 
     fn transformed_code_hash(&self) -> H256;
 
-    fn objectgraph_hash(&self) -> H256;
+    fn object_graph_hash(&self) -> H256;
 
     fn address_hash(&self, address: &Address) -> H256;
 
