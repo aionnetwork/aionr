@@ -244,22 +244,22 @@ fn load_from(spec_params: SpecParams, s: ajson::spec::Spec) -> Result<Spec, Erro
     Ok(s)
 }
 
-macro_rules! load_bundled {
-    ($e:expr) => {
-        Spec::load(
-            &::std::env::temp_dir(),
-            include_bytes!(concat!("../../res/", $e, ".json")) as &[u8],
-        )
-        .expect(concat!("Chain spec ", $e, " is invalid."))
-    };
-}
+//macro_rules! load_bundled {
+//    ($e:expr) => {
+//        Spec::load(
+//            &::std::env::temp_dir(),
+//            include_bytes!(concat!("../../../../resources/", $e, ".json")) as &[u8],
+//        )
+//        .expect(concat!("Chain spec ", $e, " is invalid."))
+//    };
+//}
 
-macro_rules! load_machine_bundled {
-    ($e:expr) => {
-        Spec::load_machine(include_bytes!(concat!("../../res/", $e, ".json")) as &[u8])
-            .expect(concat!("Chain spec ", $e, " is invalid."))
-    };
-}
+//macro_rules! load_machine_bundled {
+//    ($e:expr) => {
+//        Spec::load_machine(include_bytes!(concat!("../../../../resources/", $e, ".json")) as &[u8])
+//            .expect(concat!("Chain spec ", $e, " is invalid."))
+//    };
+//}
 
 impl Spec {
     // create an instance of an Ethereum state machine, minus consensus logic.
@@ -557,21 +557,6 @@ impl Spec {
 
         self.engine.genesis_epoch_data(&genesis, &call)
     }
-
-    /// Create a new Spec which conforms to the Frontier-era Morden chain except that it's a
-    /// NullEngine consensus.
-    pub fn new_test() -> Spec { load_bundled!("null_morden") }
-
-    /// Create the EthereumMachine corresponding to Spec::new_test.
-    pub fn new_test_machine() -> EthereumMachine { load_machine_bundled!("null_morden") }
-
-    /// Create a new Spec which is a NullEngine consensus with a premine of address whose
-    /// secret is blake2b('').
-    pub fn new_null() -> Spec { load_bundled!("null") }
-
-    /// Create a new Spec with InstantSeal consensus which does internal sealing (not requiring
-    /// work).
-    pub fn new_instant() -> Spec { load_bundled!("instant_seal") }
 }
 
 #[cfg(test)]

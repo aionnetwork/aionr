@@ -1,5 +1,5 @@
 [aion]
-chain = "core/res/aion/testnet_mastery.json"
+chain = "mastery/mastery.json"
 
 [network]
 max_peers = 32

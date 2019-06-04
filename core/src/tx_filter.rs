@@ -32,7 +32,7 @@ use spec::CommonParams;
 use transaction::{Action, SignedTransaction};
 use blake2b::BLAKE2B_EMPTY;
 
-use_contract!(transact_acl, "TransactAcl", "res/contracts/tx_acl.json");
+use_contract!(transact_acl, "TransactAcl", "../resources/tx_acl.json");
 
 const MAX_CACHE_SIZE: usize = 4096;
 

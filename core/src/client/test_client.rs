@@ -131,19 +131,7 @@ pub enum EachBlockWith {
     UncleAndTransaction,
 }
 
-impl Default for TestBlockChainClient {
-    fn default() -> Self { TestBlockChainClient::new() }
-}
-
 impl TestBlockChainClient {
-    /// Creates new test client.
-    pub fn new() -> Self { Self::new_with_extra_data(Bytes::new()) }
-
-    /// Creates new test client with specified extra data for each block
-    pub fn new_with_extra_data(extra_data: Bytes) -> Self {
-        let spec = Spec::new_test();
-        TestBlockChainClient::new_with_spec_and_extra(spec, extra_data)
-    }
 
     /// Create test client with custom spec.
     pub fn new_with_spec(spec: Spec) -> Self {

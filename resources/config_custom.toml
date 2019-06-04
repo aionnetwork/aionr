@@ -1,8 +1,5 @@
 [aion]
-chain = "core/res/aion/custom.json"
-#keys_path = None
-#base_path = None
-#db_path = None
+chain = "custom/custom.json"
 
 [account]
 fast_unlock = false

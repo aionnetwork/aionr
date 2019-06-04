@@ -1,2 +1,0 @@
-Aion.
-	Copyright (c) 2017-2018 Aion foundation.
