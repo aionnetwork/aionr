@@ -38,7 +38,7 @@ use rlp::{Rlp, RlpStream};
 use types::BlockNumber;
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
 
-use engines::{EthEngine, InstantSeal, NullEngine, POWEquihashEngine};
+use engines::{EthEngine, POWEquihashEngine};
 use error::Error;
 use executive::Executive;
 use factory::Factories;
@@ -222,7 +222,7 @@ fn load_from(spec_params: SpecParams, s: ajson::spec::Spec) -> Result<Spec, Erro
         gas_used: g.gas_used,
         timestamp: g.timestamp,
         extra_data: g.extra_data,
-        seal_rlp: seal_rlp,
+        seal_rlp,
         constructors: s
             .accounts
             .constructors()
@@ -243,23 +243,6 @@ fn load_from(spec_params: SpecParams, s: ajson::spec::Spec) -> Result<Spec, Erro
 
     Ok(s)
 }
-
-//macro_rules! load_bundled {
-//    ($e:expr) => {
-//        Spec::load(
-//            &::std::env::temp_dir(),
-//            include_bytes!(concat!("../../../../resources/", $e, ".json")) as &[u8],
-//        )
-//        .expect(concat!("Chain spec ", $e, " is invalid."))
-//    };
-//}
-
-//macro_rules! load_machine_bundled {
-//    ($e:expr) => {
-//        Spec::load_machine(include_bytes!(concat!("../../../../resources/", $e, ".json")) as &[u8])
-//            .expect(concat!("Chain spec ", $e, " is invalid."))
-//    };
-//}
 
 impl Spec {
     // create an instance of an Ethereum state machine, minus consensus logic.
@@ -292,10 +275,6 @@ impl Spec {
                     machine,
                 ))
             }
-            ajson::spec::Engine::Null(null) => {
-                Arc::new(NullEngine::new(null.params.into(), machine))
-            }
-            ajson::spec::Engine::InstantSeal => Arc::new(InstantSeal::new(machine)),
         }
     }
 
@@ -307,13 +286,6 @@ impl Spec {
         // basic accounts in spec.
         {
             let mut t = factories.trie.create(db.as_hashstore_mut(), &mut root);
-
-            //            let network_address = FromHex::from_hex(
-            //                "0000000000000000000000000000000000000000000000000000000000000100",
-            //            ).unwrap();
-            //            let network_account_rlp = FromHex::from_hex("f8448080a005fd02342b56544ead95ab1e477b0baaa70f75b109b23098a84b67bf52c25deba00e5751c026e543b2e8ab2eb06099daa1d1e5df47778f7787faab45cdf12fe3a8").unwrap();
-            //            t.insert(&network_address, &network_account_rlp)?;
-
             for (address, account) in self.genesis_state.get().iter() {
                 t.insert(&**address, &account.rlp())?;
             }

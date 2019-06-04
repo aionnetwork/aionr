@@ -21,16 +21,11 @@
  ******************************************************************************/
 
 //! Consensus engine specification and basic implementations.
-
-mod instant_seal;
-mod null_engine;
 pub mod pow_equihash_engine;
 
 pub mod epoch;
 
 pub use self::epoch::{EpochVerifier, Transition as EpochTransition};
-pub use self::instant_seal::InstantSeal;
-pub use self::null_engine::NullEngine;
 pub use self::pow_equihash_engine::POWEquihashEngine;
 
 use std::sync::{Weak, Arc};
