@@ -18,7 +18,7 @@ acore-bytes = { path = "../../util/bytes" }
 ajson = { path = "../../json" }
 rlp = { path = "../../util/rlp" }
 patricia-trie = { path = "../../util/patricia_trie" }
-common-types = { path = "../../core/types" }
+common-types = { path = "../../types" }
 blake2b = { path = "../../util/blake2b" }
 log = "0.3"
 rustc-hex = "1.0"

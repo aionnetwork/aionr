@@ -21,7 +21,6 @@
  ******************************************************************************/
 
 //! Types used in the public API
-
 extern crate aion_types;
 extern crate ethbloom;
 extern crate acore_bytes as bytes;
@@ -31,9 +30,6 @@ extern crate rlp;
 extern crate rlp_derive;
 extern crate blake2b;
 extern crate heapsize;
-
-#[cfg(test)]
-extern crate rustc_hex;
 
 pub mod account_diff;
 pub mod basic_account;
