@@ -43,7 +43,6 @@ aion-types = { path = "util/aion-types" }
 key = { path = "keystore/key" }
 keychain = {path = "keystore/keychain" }
 rlp = { path = "util/rlp" }
-aion-local-store = { path = "local-store" }
 aion-rpc = { path = "rpc" }
 aion-version = { path = "util/version" }
 path = { path = "util/path" }

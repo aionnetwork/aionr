@@ -34,9 +34,6 @@ pub use aion_types::H256;
 pub use blake2b_impl::Blake2b;
 
 mod blake2b_impl;
-//mod blake2s;
-#[cfg(test)]
-mod kat;
 
 use std::io;
 /// Get the BLAKE2B (i.e. BLAKE2B) hash of the empty bytes string.

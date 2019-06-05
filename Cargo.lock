@@ -52,7 +52,7 @@ dependencies = [
  "crypto 0.1.0",
  "db 0.0.1",
  "dir 0.1.0",
- "equihash 0.0.0",
+ "equihash 0.1.0",
  "ethbloom 0.5.1",
  "fastvm 0.2.0",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -152,7 +152,6 @@ dependencies = [
  "acore-bytes 0.1.0",
  "acore-io 0.1.0",
  "acore-stratum 0.1.0",
- "aion-local-store 0.1.0",
  "aion-pb-apiserver 0.1.0",
  "aion-rpc 0.1.0",
  "aion-types 0.1.0",
@@ -165,7 +164,7 @@ dependencies = [
  "db 0.0.1",
  "dir 0.1.0",
  "docopt 0.8.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "equihash 0.0.0",
+ "equihash 0.1.0",
  "fdlimit 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "futures 0.1.25 (registry+https://github.com/rust-lang/crates.io-index)",
  "ipnetwork 0.12.8 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -200,21 +199,6 @@ dependencies = [
  "toml 0.4.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "winapi 0.2.8 (registry+https://github.com/rust-lang/crates.io-index)",
  "ws2_32-sys 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "aion-local-store"
-version = "0.1.0"
-dependencies = [
- "acore 0.1.0",
- "acore-io 0.1.0",
- "db 0.0.1",
- "key 0.3.0",
- "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
- "rlp 0.2.1",
- "serde 1.0.80 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_derive 1.0.80 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde_json 1.0.32 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -450,7 +434,6 @@ name = "blake2b"
 version = "0.1.0"
 dependencies = [
  "aion-types 0.1.0",
- "tiny-keccak 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -857,7 +840,7 @@ dependencies = [
 
 [[package]]
 name = "equihash"
-version = "0.0.0"
+version = "0.1.0"
 dependencies = [
  "acore-bytes 0.1.0",
  "blake2b 0.1.0",

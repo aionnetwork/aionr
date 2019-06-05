@@ -6,6 +6,3 @@ authors = ["Michael Gehring <mg@ebfe.org>"]
 
 [dependencies]
 aion-types = { path = "../../util/aion-types"}
-
-[dev-dependencies]
-tiny-keccak = "1.4.2"
