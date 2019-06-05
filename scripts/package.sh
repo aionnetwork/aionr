@@ -5,6 +5,8 @@ if [ ! -n "$1" ] ; then
     exit 1
 fi
 
+rm -rf target/release/build/aion-version* target/release/build/avm-* || echo "cannot find previous avm and version build"
+
 MAINT="package/$1/mainnet/mainnet.toml"
 MAINJ="package/$1/mainnet/mainnet.json"
 MASTT="package/$1/mastery/mastery.toml"

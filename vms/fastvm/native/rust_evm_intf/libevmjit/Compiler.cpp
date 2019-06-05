@@ -191,7 +191,7 @@ std::unique_ptr<llvm::Module> Compiler::compile(code_iterator _begin, code_itera
 
 	// Init runtime structures.
 	RuntimeManager runtimeManager(m_builder, _begin, _end);
-	GasMeter gasMeter(m_builder, runtimeManager, m_rev);    // insert point restored by guard
+	GasMeter gasMeter(m_builder, runtimeManager, m_rev);
 	Memory memory(runtimeManager, gasMeter, m_rev);
 	Ext ext(runtimeManager, memory);
 	Arith128 arith(m_builder);
@@ -213,10 +213,6 @@ std::unique_ptr<llvm::Module> Compiler::compile(code_iterator _begin, code_itera
 
 	for (auto& block: blocks)
 		compileBasicBlock(block, runtimeManager, arith, memory, ext, gasMeter);
-
-	// std::cout << "module info after compilation" << std::endl;
-  	// module->dump();
-  	// std::cout << "module info dump ends" << std::endl;
 
 	// Code for special blocks:
 	m_builder.SetInsertPoint(stopBB);
@@ -567,16 +563,36 @@ void Compiler::compileBasicBlock(BasicBlock& _basicBlock, RuntimeManager& _runti
 			break;
 		}
 
-		case Instruction::ANY_DUP:
+		case Instruction::BASE_DUP:
 		{
 			auto index = static_cast<size_t>(inst) - static_cast<size_t>(Instruction::DUP1);
 			stack.dup(index);
 			break;
 		}
 
-		case Instruction::ANY_SWAP:
+		case Instruction::EXT_DUP:
+		{
+			if (m_rev < EVM_AION_V1) {
+				goto invalidInstruction;
+			}
+			auto index = static_cast<size_t>(inst) - static_cast<size_t>(Instruction::DUP17) + 16;
+			stack.dup(index);
+			break;
+		}
+
+		case Instruction::BASE_SWAP:
 		{
 			auto index = static_cast<size_t>(inst) - static_cast<size_t>(Instruction::SWAP1) + 1;
+			stack.swap(index);
+			break;
+		}
+
+		case Instruction::EXT_SWAP:
+		{
+			if (m_rev < EVM_AION_V1) {
+				goto invalidInstruction;
+			}
+			auto index = static_cast<size_t>(inst) - static_cast<size_t>(Instruction::SWAP17) + 17;
 			stack.swap(index);
 			break;
 		}

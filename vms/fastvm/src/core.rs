@@ -29,6 +29,7 @@ use bincode::{serialize};
 use ffi::*;
 
 const REVISION_AION: i32 = 5;
+const REVISION_AION_V1: i32 = 7;
 
 impl EvmJit<u8> for EvmResult {
     fn to_evm_jit(&mut self) -> *mut u8 { unsafe { mem::transmute(self) } }
@@ -77,7 +78,7 @@ pub struct FastVM {
 impl FastVM {
     pub fn new() -> FastVM {
         FastVM {
-            revision: REVISION_AION,
+            revision: REVISION_AION_V1,
             flag_static: 1,
             vm_instance: 0,
         }

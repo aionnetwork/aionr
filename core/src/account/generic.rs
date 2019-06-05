@@ -1,5 +1,6 @@
 use std::cell::{Cell};
 use std::sync::Arc;
+use std::collections::HashSet;
 
 use aion_types::{H256, U256};
 use bytes::{Bytes};
@@ -25,44 +26,58 @@ pub struct BasicAccount {
 /// The changes are applied in `commit_storage` and `commit_code`
 #[derive(Clone)]
 pub struct Account<T, U> {
-    // Balance of the account.
     pub balance: U256,
-    // Nonce of the account.
+
     pub nonce: U256,
-    // Trie-backed storage.
+
+    // trie-backed storage.
     pub storage_root: H256,
+
     // avm storage root
     pub delta_root: H256,
-    // LRU Cache of the trie-backed storage.
-    // This is limited to `STORAGE_CACHE_ITEMS` recent queries
+
+    // LRU cache of the trie-backed storage.
+    // limited to `STORAGE_CACHE_ITEMS` recent queries
     pub storage_cache: T,
-    // Modified storage. Accumulates changes to storage made in `set_storage`
-    // Takes precedence over `storage_cache`.
+
+    // modified storage. Accumulates changes to storage made in `set_storage`
+    // takes precedence over `storage_cache`.
     pub storage_changes: U,
 
-    // Code hash of the account.
+    // aion: java kernel specific
+    pub storage_removable: HashSet<Bytes>,
+
+    // code hash of the account.
     pub code_hash: H256,
-    // Size of the accoun code.
+
+    // size of the account code.
     pub code_size: Option<usize>,
-    // Code cache of the account.
+
+    // code cache of the account.
     pub code_cache: Arc<Bytes>,
-    // AVM: Code hash of the account.
+
+    // avm code hash of the account.
     pub transformed_code_hash: H256,
-    // AVM: Size of the transformed code.
+    // avm size of the transformed code.
     pub transformed_code_size: Option<usize>,
     // avm specific code cache
     pub transformed_code_cache: Arc<Bytes>,
+
     // avm object graph
     pub object_graph_cache: Arc<Bytes>,
-    pub objectgraph_hash: H256,
+    pub object_graph_hash: H256,
     pub object_graph_size: Option<usize>,
-    // Account code new or has been modified.
+
+    // account code new or has been modified.
     pub code_filth: Filth,
-    // Cached address hash.
+
+    // cached address hash.
     pub address_hash: Cell<Option<H256>>,
+
     // empty_flag: for Aion Java Kernel Only
     pub empty_but_commit: bool,
-    // account type: 0x01 = EVM; 0x0f = AVM
+
+    // account type: 0x01 = EVM; 0x02 = AVM
     pub account_type: AccType,
 }
 

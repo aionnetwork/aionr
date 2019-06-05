@@ -168,7 +168,8 @@ public class NativeKernelInterface implements KernelInterface {
     @Override
     public void removeStorage(Address address, byte[] key) {
         // System.out.println("Native: remove storage");
-        putStorage(address, key, new byte[0]);
+        //putStorage(address, key, new byte[0]);
+        removeStorage(handle, address.toBytes(), key);
     }
 
     @Override
@@ -281,4 +282,14 @@ public class NativeKernelInterface implements KernelInterface {
     public static native byte[] contract_address(byte[] sender, byte[] nonce);
 
     public static native byte[] getBlockHashByNumber(long handle, long blockNumber);
+
+    public static native byte[] sha256(byte[] data);
+
+    public static native byte[] blake2b(byte[] data);
+
+    public static native byte[] keccak256(byte[] data);
+
+    public static native boolean edverify(byte[] data, byte[] data1, byte[] data2);
+
+    public static native void removeStorage(long handle, byte[] address, byte[] key);
 }

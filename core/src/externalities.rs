@@ -150,9 +150,12 @@ where B: StateBackend
             .storage_at(&self.origin_info[0].address, &key[..].to_vec())
             .expect("Fatal error occurred when getting storage.");
         let mut ret: Vec<u8> = vec![0x00; 16];
-        for idx in 0..value.len() {
-            ret[16 - value.len() + idx] = value[idx];
+        if let Some(v) = value {
+            for idx in 0..v.len() {
+                ret[16 - v.len() + idx] = v[idx];
+            }
         }
+
         ret.as_slice().into()
     }
 
@@ -179,9 +182,12 @@ where B: StateBackend
             .storage_at(&self.origin_info[0].address, &key[..].to_vec())
             .expect("Fatal error occurred when getting storage.");
         let mut ret: Vec<u8> = vec![0x00; 32];
-        for idx in 0..value.len() {
-            ret[32 - value.len() + idx] = value[idx];
+        if let Some(v) = value {
+            for idx in 0..v.len() {
+                ret[32 - v.len() + idx] = v[idx];
+            }
         }
+
         ret.as_slice().into()
     }
 
@@ -492,7 +498,6 @@ where B: StateBackend
     }
 
     fn code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
-        println!("AVM get code from: {:?}", address);
         match self.state.code(address) {
             Ok(code) => {
                 //println!("code = {:?}", code);
@@ -519,7 +524,7 @@ where B: StateBackend
 
     fn sload(&self, a: &Address, key: &Vec<u8>) -> Option<Vec<u8>> {
         match self.state.storage_at(a, key) {
-            Ok(value) => Some(value),
+            Ok(value) => value,
             Err(_) => None,
         }
     }
@@ -564,6 +569,8 @@ where B: StateBackend
     fn get_objectgraph(&self, _address: &Address) -> Option<Arc<Bytes>> { unimplemented!() }
 
     fn set_objectgraph(&mut self, _address: &Address, _data: Bytes) { unimplemented!() }
+
+    fn remove_storage(&mut self, _address: &Address, _data: Bytes) { unimplemented!() }
 }
 
 #[allow(unused)]
@@ -705,7 +712,7 @@ where B: StateBackend
     }
 
     fn code(&self, address: &Address) -> Option<Arc<Vec<u8>>> {
-        println!("AVM get code from: {:?}", address);
+        debug!(target: "vm", "AVM get code from: {:?}", address);
         match self.state.lock().unwrap().code(address) {
             Ok(code) => {
                 //println!("code = {:?}", code);
@@ -735,9 +742,17 @@ where B: StateBackend
 
     fn sload(&self, a: &Address, key: &Vec<u8>) -> Option<Vec<u8>> {
         match self.state.lock().unwrap().storage_at(a, key) {
-            Ok(value) => Some(value),
+            Ok(value) => value,
             Err(_) => None,
         }
+    }
+
+    fn remove_storage(&mut self, a: &Address, key: Vec<u8>) {
+        self.state
+            .lock()
+            .unwrap()
+            .remove_storage(a, key)
+            .expect("Fatal error during removing storage");
     }
 
     fn kill_account(&mut self, a: &Address) { self.state.lock().unwrap().kill_account(a) }

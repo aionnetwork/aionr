@@ -65,9 +65,6 @@ pub fn get_network_config() -> NetworkConfig {
         "p2p://c33d4c07-6a29-4ca6-8b06-b2781ba7f9bf@191.232.164.119:30303",
     ));
     net_config.boot_nodes.push(String::from(
-        "p2p://741b979e-6a06-493a-a1f2-693cafd37083@66.207.217.190:30303",
-    ));
-    net_config.boot_nodes.push(String::from(
         "p2p://c39d0a10-20d8-49d9-97d6-284f88da5c25@13.92.157.19:30303",
     ));
     net_config.boot_nodes.push(String::from(
@@ -75,6 +72,9 @@ pub fn get_network_config() -> NetworkConfig {
     ));
     net_config.boot_nodes.push(String::from(
         "p2p://c37d6b45-20d8-49d9-97d6-284f88da5c51@104.40.182.54:30303",
+    ));
+    net_config.boot_nodes.push(String::from(
+        "p2p://c36d4208-fe4b-41fa-989b-c7eeafdffe72@35.208.215.219:30303",
     ));
 
     net_config.local_node =

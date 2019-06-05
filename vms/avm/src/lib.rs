@@ -33,6 +33,8 @@ extern crate rand;
 #[macro_use]
 extern crate log;
 extern crate rlp;
+extern crate crypto;
+extern crate tiny_keccak;
 
 pub mod avm;
 pub mod callback;

@@ -18,3 +18,5 @@ blake2b = { path = "../../util/blake2b" }
 rand = "*"
 log = "0.3"
 rlp = {path = "../../util/rlp"}
+crypto = {path = "../../util/crypto"}
+tiny-keccak = "1.4.2"

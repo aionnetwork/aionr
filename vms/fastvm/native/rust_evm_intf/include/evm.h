@@ -436,6 +436,7 @@ typedef int (*evm_set_option_fn)(struct evm_instance* evm,
                                  char const* name,
                                  char const* value);
 
+
 /// EVM revision.
 ///
 /// The revision of the EVM specification based on the Ethereum
@@ -448,6 +449,7 @@ enum evm_revision {
     EVM_BYZANTIUM = 4,
     EVM_AION = 5,
     EVM_CONSTANTINOPLE = 6,
+    EVM_AION_V1 = 7,
 };
 
 
@@ -506,7 +508,6 @@ struct evm_instance {
 /// @return  EVM instance or NULL indicating instance creation failure.
 ///
 /// struct evm_instance* examplevm_create(void);
-
 
 
 #if __cplusplus

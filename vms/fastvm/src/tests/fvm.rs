@@ -166,6 +166,8 @@ impl<'a> Ext for TestEnv<'a> {
         self.storage_dword.insert(key, value);
     }
 
+    fn remove_storage(&mut self, a: &Address, key: Vec<u8>) {}
+
     /// Determine whether an account exists.
     fn exists(&self, address: &Address) -> bool { return *self.accounts.get(address).unwrap(); }
 
@@ -514,4 +516,31 @@ fn sha3() {
             169, 233, 171, 213, 49, 91, 138, 250, 235, 196, 19, 96, 68,
         ]
     );
+}
+
+use rustc_hex::FromHex;
+
+#[test]
+fn invalid_gas() {
+    let mut context = FastVMTest::new();
+    context.nrg_limit = 0; //9223372036854775808;
+    let mut instance = FastVM::new();
+    let mut ext = TestEnv {
+        env_info: &EnvInfo::default(),
+        accounts: HashMap::new(),
+        balance: HashMap::new(),
+        storage: HashMap::new(),
+        storage_dword: HashMap::new(),
+        log_topics: Vec::new(),
+        log_data: Vec::new(),
+    };
+    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &Ext)) };
+    instance.init(raw_env);
+    //let code = "d0d1188a00000000000000000000000000000032".from_hex().unwrap();
+    // let code = vec![0x60, 0x50];
+    println!("{:?}-{:?}", i64::max_value(), i64::min_value());
+    let code = "60506040523415600f5760006000fd5b5b5b600115601b576011565b5b6020565b603a80602d6000396000f30060506040526008565b60006000fd00a165627a7a72305820c39f9e61953f77cbe7316aee3ed72ba5914ee08019d883f16b87cff04a1c829d0029".from_hex().unwrap();
+    println!("code = {:?}", code);
+    let res = instance.run(&code, &mut context.clone().into());
+    println!("{:?}", res);
 }
