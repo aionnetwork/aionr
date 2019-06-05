@@ -138,8 +138,6 @@ pub mod blockchain;
 mod factory;
 
 #[cfg(test)]
-pub mod tests;
-#[cfg(test)]
 extern crate fastvm;
 extern crate core;
 
