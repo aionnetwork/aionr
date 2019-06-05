@@ -408,7 +408,7 @@ fn print_running_environment(
         info!(target: "run", "Start without config.");
     }
     match spec {
-        SpecType::Foundation => {
+        SpecType::Default => {
             info!(target: "run", "Load built-in Mainnet Genesis Spec.");
         }
         SpecType::Custom(ref filename) => {
