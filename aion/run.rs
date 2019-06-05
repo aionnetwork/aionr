@@ -301,16 +301,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     user_defaults.fat_db = fat_db;
     user_defaults.save(&user_defaults_path)?;
 
-    // start miner module
-    // let runtime_miner = tokio::runtime::Builder::new()
-    //     .core_threads(1)
-    //     .name_prefix("seal-block-loop #")
-    //     .build()
-    //     .expect("seal block runtime loop init failed");
-    // let executor_miner = runtime_miner.executor();
-    // let close = run_miner(executor_miner.clone(), client.clone());
-
-    // enable Sync module
+    // enable sync module
     network_manager.start_network();
 
     if let Some(config_path) = cmd.dirs.config {

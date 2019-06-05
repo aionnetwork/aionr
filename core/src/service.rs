@@ -22,17 +22,11 @@
 
 //! Creates and registers client and network services.
 
-use std::time::Instant;
 use std::path::Path;
 use std::sync::Arc;
-
-use futures::sync::oneshot;
-use tokio::runtime::TaskExecutor;
-use tokio::timer::Interval;
-use tokio::prelude::{Future, Stream};
 use ansi_term::Colour;
 use bytes::Bytes;
-use client::{ChainNotify, Client, ClientConfig, MiningBlockChainClient};
+use client::{ChainNotify, Client, ClientConfig};
 use db;
 use error::*;
 use io::*;
@@ -55,23 +49,6 @@ pub enum ClientIoMessage {
     NewTransactions(Vec<Bytes>, usize),
     /// New consensus message received.
     NewMessage(Bytes),
-}
-
-/// Run the miner
-pub fn run_miner(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
-    let (close, shutdown_signal) = oneshot::channel();
-    let seal_block_task = Interval::new(Instant::now(), client.prepare_block_interval())
-        .for_each(move |_| {
-            let client: Arc<Client> = client.clone();
-            client.miner().try_prepare_block(&*client);
-            Ok(())
-        })
-        .map_err(|e| panic!("interval err: {:?}", e))
-        .select(shutdown_signal.map_err(|_| {}))
-        .map(|_| ())
-        .map_err(|_| ());
-    executor.spawn(seal_block_task);
-    close
 }
 
 /// Client service setup. Creates and registers client and network services with the IO subsystem.
