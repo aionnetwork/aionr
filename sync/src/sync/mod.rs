@@ -57,13 +57,12 @@ const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
 const BLOCKS_IMPORT_INTERVAL: u64 = 50;
 const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
-const SYNC_STATIC_CAPACITY: usize = 25;
 
 #[derive(Clone)]
 struct SyncMgr;
 
 impl SyncMgr {
-    fn enable(executor: &TaskExecutor) {
+    fn enable(executor: &TaskExecutor, max_peers: u32) {
         let status_req_task =
             Interval::new(Instant::now(), Duration::from_secs(STATUS_REQ_INTERVAL))
                 .for_each(move |_| {
@@ -157,7 +156,7 @@ impl SyncMgr {
                         b.best_block_num.cmp(&a.best_block_num)
                     }
                 });
-                let mut count = 0;
+                let mut count: u32 = 0;
                 for node in active_nodes.iter() {
                     if let Ok(_) = node.last_request_timestamp.elapsed() {
                         info!(target: "sync",
@@ -179,7 +178,7 @@ impl SyncMgr {
                             format!("{}",node.mode)
                         );
                         count += 1;
-                        if count == SYNC_STATIC_CAPACITY {
+                        if count ==  max_peers {
                             break;
                         }
                     }
@@ -342,7 +341,7 @@ impl Sync {
         };
         Arc::new(Sync {
             network: service,
-            starting_block_number: starting_block_number,
+            starting_block_number,
         })
     }
 }
@@ -445,7 +444,8 @@ impl NetworkManager for Sync {
         NetManager::enable(&executor, sync_handler);
         debug!(target: "sync", "###### network enabled... ######");
 
-        SyncMgr::enable(&executor);
+
+        SyncMgr::enable(&executor, self.network.config.max_peers);
         debug!(target: "sync", "###### SYNC enabled... ######");
     }
 
