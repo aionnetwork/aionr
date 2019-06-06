@@ -7,6 +7,6 @@ authors = ["Camus Qiu <camus@aion.network>"]
 aion-types = { path = "../../util/aion-types"}
 rlp = { path = "../../util/rlp" }
 blake2b = { path = "../../util/blake2b" }
-common-types = { path = "../../core/types" }
+common-types = { path = "../../types" }
 ajson = { path = "../../json" }
 acore-bytes = { path = "../../util/bytes" }

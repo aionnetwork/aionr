@@ -28,14 +28,12 @@ use std::sync::Arc;
 
 use block::{ExecutedBlock, IsBlock};
 use precompiled::builtin::BuiltinContract;
-use client::BlockChainClient;
 use error::Error;
 use executive::{Executive};
 use header::{BlockNumber, Header};
 use spec::CommonParams;
 use state::{CleanupMode, Substate};
-use transaction::{self, SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
-use tx_filter::TransactionFilter;
+use transaction::{SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
 
 use aion_types::{U256, H256, Address};
 use vms::{ActionParams, ActionValue, CallType, ParamsType};
@@ -44,7 +42,6 @@ use vms::{ActionParams, ActionValue, CallType, ParamsType};
 pub struct EthereumMachine {
     params: CommonParams,
     builtins: Arc<BTreeMap<Address, Box<BuiltinContract>>>,
-    tx_filter: Option<Arc<TransactionFilter>>,
     premine: U256,
 }
 
@@ -56,12 +53,10 @@ impl EthereumMachine {
         premine: U256,
     ) -> EthereumMachine
     {
-        let tx_filter = TransactionFilter::from_params(&params).map(Arc::new);
         EthereumMachine {
-            params: params,
+            params,
             builtins: Arc::new(builtins),
-            tx_filter: tx_filter,
-            premine: premine,
+            premine,
         }
     }
 }
@@ -88,12 +83,12 @@ impl EthereumMachine {
             address: contract_address.clone(),
             sender: SYSTEM_ADDRESS.clone(),
             origin: SYSTEM_ADDRESS.clone(),
-            gas: gas,
+            gas,
             gas_price: 0.into(),
             value: ActionValue::Transfer(0.into()),
             code: state.code(&contract_address)?,
             code_hash: Some(state.code_hash(&contract_address)?),
-            data: data,
+            data,
             call_type: CallType::Call,
             static_flag: false,
             params_type: ParamsType::Separate,
@@ -203,25 +198,6 @@ impl EthereumMachine {
     /// Does basic verification of the transaction.
     pub fn verify_transaction_basic(&self, t: &UnverifiedTransaction) -> Result<(), Error> {
         t.verify_basic(None)?;
-
-        Ok(())
-    }
-
-    /// Does verification of the transaction against the parent state.
-    // TODO: refine the bound here to be a "state provider" or similar as opposed
-    // to full client functionality.
-    pub fn verify_transaction(
-        &self,
-        t: &SignedTransaction,
-        header: &Header,
-        client: &BlockChainClient,
-    ) -> Result<(), Error>
-    {
-        if let Some(ref filter) = self.tx_filter.as_ref() {
-            if !filter.transaction_allowed(header.parent_hash(), t, client) {
-                return Err(transaction::Error::NotAllowed.into());
-            }
-        }
 
         Ok(())
     }

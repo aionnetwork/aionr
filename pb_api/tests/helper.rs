@@ -41,13 +41,6 @@ fn load<'a>(params: &'a String, b: &[u8]) -> Spec {
     .expect("chain spec is invalid")
 }
 
-fn new_spec() -> Spec {
-    load(
-        &"$HOME/.aion/cache_".into(),
-        include_bytes!("../../../core/res/testnet.json"),
-    )
-}
-
 fn new_db() -> Arc<KeyValueDB> {
     let mut db_configs = Vec::new();
     for db_name in db::DB_NAMES.to_vec() {

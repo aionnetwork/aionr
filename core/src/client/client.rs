@@ -80,7 +80,8 @@ pub use types::block_status::BlockStatus;
 pub use types::blockchain_info::BlockChainInfo;
 pub use verification::queue::QueueInfo as BlockQueueInfo;
 
-use_contract!(registry, "Registry", "res/contracts/registrar.json");
+//use_contract!(registry, "Registry", "res/contracts/registrar.json");
+use_contract!(registry, "Registry", "../resources/registrar.json");
 
 const MIN_HISTORY_SIZE: u64 = 8;
 

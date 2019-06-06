@@ -21,7 +21,6 @@
  ******************************************************************************/
 
 // uncomment below line to test precompile contract blake2b hash
-//#![feature(box_syntax)]
 #![cfg_attr(feature = "benches", feature(test))]
 extern crate bloomchain;
 extern crate bn;
@@ -137,10 +136,7 @@ mod executive;
 mod externalities;
 pub mod blockchain;
 mod factory;
-mod tx_filter;
 
-#[cfg(test)]
-pub mod tests;
 #[cfg(test)]
 extern crate fastvm;
 extern crate core;

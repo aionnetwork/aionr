@@ -45,7 +45,7 @@ fn load<'a, T: Into<Option<SpecParams<'a>>>>(params: T, b: &[u8]) -> Spec {
 
 /// Create a new Foundation Mainnet chain spec.
 pub fn new_foundation<'a, T: Into<SpecParams<'a>>>(params: T) -> Spec {
-    load(params.into(), include_bytes!("../../res/aion/mainnet.json"))
+    load(params.into(), include_bytes!("../../../resources/mainnet.json"))
 }
 
 #[cfg(test)]
@@ -53,20 +53,8 @@ fn load_machine(b: &[u8]) -> EthereumMachine {
     Spec::load_machine(b).expect("chain spec is invalid")
 }
 
-// For tests
-
 /// Create a new Foundation Frontier-era chain spec as though it never changes to Homestead.
 #[cfg(test)]
-pub fn new_frontier_test_machine() -> EthereumMachine {
-    load_machine(include_bytes!("../../res/testnet.json"))
-}
-
-#[cfg(test)]
-pub fn new_aion_test_machine() -> EthereumMachine {
-    load_machine(include_bytes!("../../res/testnet.json"))
-}
-
-#[cfg(test)]
 pub fn new_aion_avm_machine() -> EthereumMachine {
-    load_machine(include_bytes!("../../res/aion/avm.json"))
+    load_machine(include_bytes!("../../../resources/avm.json"))
 }

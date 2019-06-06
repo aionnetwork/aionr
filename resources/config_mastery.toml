@@ -1,0 +1,32 @@
+[aion]
+chain = "mastery/mastery.json"
+
+[network]
+max_peers = 32
+net_id = 32
+local_node = "p2p://99f66e43-6672-4919-aa4f-4f224c31baf4@0.0.0.0:30303"
+boot_nodes = [
+"p2p://a30d1000-8c7e-496c-9c4e-c89318280274@168.62.170.146:30303",
+"p2p://a30d2000-729a-4584-86f1-e19ab97cf9ce@23.96.22.19:30303",
+"p2p://a30d4000-729a-4584-86f1-e19ab97cf9cq@13.90.81.122:30303",
+"p2p://a30d5000-8c7e-496c-9c4e-c89318280275@104.42.186.213:30303"
+]
+
+ip_black_list = []
+
+[websockets]
+disable = false
+
+[http]
+disable = false
+port = 8545
+
+[ipc]
+disable = false
+
+[stratum]
+port = 8008
+interface = "0.0.0.0"
+
+[mining]
+author = "0xa08fc457b39b03c30dc71bdb89a4d0409dd4fa42f6539a5c3ee4054af9b71f23"

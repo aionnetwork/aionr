@@ -20,44 +20,35 @@
  *
  ******************************************************************************/
 
-//! Null engine params deserialization.
+//! Types used in the public API
+extern crate aion_types;
+extern crate ethbloom;
+extern crate acore_bytes as bytes;
+extern crate ajson;
+extern crate rlp;
+#[macro_use]
+extern crate rlp_derive;
+extern crate blake2b;
+extern crate heapsize;
 
-use uint::Uint;
+pub mod account_diff;
+pub mod basic_account;
+pub mod block_status;
+pub mod blockchain_info;
+pub mod call_analytics;
+pub mod filter;
+pub mod ids;
+pub mod log_entry;
+pub mod pruning_info;
+pub mod receipt;
+pub mod restoration_status;
+pub mod security_level;
+pub mod state_diff;
+pub mod trace_filter;
+pub mod tree_route;
+pub mod verification_queue_info;
 
-/// Authority params deserialization.
-#[derive(Debug, PartialEq, Deserialize)]
-pub struct NullEngineParams {
-    /// Block reward.
-    #[serde(rename = "blockReward")]
-    pub block_reward: Option<Uint>,
-}
-
-/// Null engine descriptor
-#[derive(Debug, PartialEq, Deserialize)]
-pub struct NullEngine {
-    /// Null engine params.
-    pub params: NullEngineParams,
-}
-
-#[cfg(test)]
-mod tests {
-    use serde_json;
-    use uint::Uint;
-    use aion_types::U256;
-    use super::*;
-
-    #[test]
-    fn null_engine_deserialization() {
-        let s = r#"{
-            "params": {
-                "blockReward": "0x0d"
-            }
-        }"#;
-
-        let deserialized: NullEngine = serde_json::from_str(s).unwrap();
-        assert_eq!(
-            deserialized.params.block_reward,
-            Some(Uint(U256::from(0x0d)))
-        );
-    }
-}
+/// Type for block number.
+pub type BlockNumber = u64;
+/// Type for header version.
+pub type HeaderVersion = u8;

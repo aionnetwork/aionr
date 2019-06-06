@@ -12,42 +12,6 @@ pub enum AccType {
     AVM,
 }
 
-impl From<U256> for AccType {
-    fn from(t: U256) -> AccType {
-        match t.low_u32() {
-            0x01 => AccType::FVM,
-            _ => AccType::AVM,
-        }
-    }
-}
-
-impl From<u8> for AccType {
-    fn from(t: u8) -> AccType {
-        match t {
-            0x01 => AccType::FVM,
-            _ => AccType::AVM,
-        }
-    }
-}
-
-impl From<AccType> for u8 {
-    fn from(t: AccType) -> u8 {
-        match t {
-            AccType::AVM => 0x0f,
-            AccType::FVM => 0x01,
-        }
-    }
-}
-
-impl From<AccType> for U256 {
-    fn from(t: AccType) -> U256 {
-        match t {
-            AccType::AVM => 0x0f.into(),
-            AccType::FVM => 0x01.into(),
-        }
-    }
-}
-
 pub trait VMAccount: Sync + Send {
     fn from_rlp(rlp: &[u8]) -> Self;
 
@@ -134,29 +98,14 @@ pub trait VMAccount: Sync + Send {
     /// Panics if balance is less than `x`
     fn sub_balance(&mut self, x: &U256);
 
-    // /// Commit the `storage_changes` to the backing DB and update `storage_root`.
-    // fn commit_storage(
-    //     &mut self,
-    //     trie_factory: &TrieFactory,
-    //     db: &mut HashStore,
-    // ) -> trie::Result<()>;
-
-    // fn discard_storage_changes(&mut self);
-
     /// Commit any unsaved code. `code_hash` will always return the hash of the `code_cache` after this.
     fn commit_code(&mut self, db: &mut HashStore);
 
     /// Export to RLP.
     fn rlp(&self) -> Bytes;
 
-    // /// Clone basic account data
-    // fn clone_basic(&self) -> Self;
-
     /// Clone account data and dirty storage keys
     fn clone_dirty(&self) -> Self;
-
-    // /// Clone account data, dirty storage keys and cached storage keys.
-    // fn clone_all(&self) -> Self;
 
     fn acc_type(&self) -> AccType;
 
@@ -166,7 +115,7 @@ pub trait VMAccount: Sync + Send {
         require: RequireCache,
         state_db: &B,
         db: &HashStore,
-        gragh_db: Arc<KeyValueDB>,
+        graph_db: Arc<KeyValueDB>,
     );
 
     fn prove_storage(

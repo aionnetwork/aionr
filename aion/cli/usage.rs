@@ -383,7 +383,7 @@ macro_rules! usage {
             }
 
             pub fn print_version() -> String {
-                format!(include_str!("./version.txt"), version())
+                format!(include_str!("../../resources/version.txt"), version())
             }
 
             #[allow(unused_mut)] // subc_subc_exist may be assigned true by the macro
@@ -400,7 +400,7 @@ macro_rules! usage {
                     }
                 };
 
-                let mut help : String = include_str!("./usage_header.txt").to_owned();
+                let mut help : String = include_str!("../../resources/usage_header.txt").to_owned();
 
                 help.push_str("\n");
 

@@ -57,7 +57,6 @@ extern crate aion_types;
 extern crate key;
 extern crate keychain;
 extern crate panic_hook;
-extern crate aion_local_store as local_store;
 extern crate aion_rpc;
 extern crate aion_version;
 extern crate path;

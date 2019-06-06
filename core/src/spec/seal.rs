@@ -23,15 +23,12 @@
 //! Spec seal.
 
 use rlp::RlpStream;
-use aion_types::{H64, H256};
+use aion_types::H256;
 use ajson;
 use bytes::Bytes;
 
-/// Pow equihash seal.
 pub struct POWEquihash {
-    ///Seal nonce.
     pub nonce: H256,
-    /// Seal mix hash.
     pub solution: Bytes,
 }
 
@@ -43,31 +40,10 @@ impl Into<Generic> for POWEquihash {
     }
 }
 
-/// Classic ethereum seal.
-pub struct Ethereum {
-    /// Seal nonce.
-    pub nonce: H64,
-    /// Seal mix hash.
-    pub mix_hash: H256,
-}
-
-impl Into<Generic> for Ethereum {
-    fn into(self) -> Generic {
-        let mut s = RlpStream::new_list(2);
-        s.append(&self.mix_hash).append(&self.nonce);
-        Generic(s.out())
-    }
-}
-
 pub struct Generic(pub Vec<u8>);
 
-/// Genesis seal type.
 pub enum Seal {
-    POWEquihash(POWEquihash),
-    /// Classic ethereum seal.
-    Ethereum(Ethereum),
-    /// Generic RLP seal.
-    Generic(Generic),
+    POWEquihash(POWEquihash)
 }
 
 impl From<ajson::spec::Seal> for Seal {
@@ -79,13 +55,6 @@ impl From<ajson::spec::Seal> for Seal {
                     solution: pow_equihash.solution.into(),
                 })
             }
-            ajson::spec::Seal::Ethereum(eth) => {
-                Seal::Ethereum(Ethereum {
-                    nonce: eth.nonce.into(),
-                    mix_hash: eth.mix_hash.into(),
-                })
-            }
-            ajson::spec::Seal::Generic(g) => Seal::Generic(Generic(g.into())),
         }
     }
 }
@@ -94,8 +63,6 @@ impl Into<Generic> for Seal {
     fn into(self) -> Generic {
         match self {
             Seal::POWEquihash(pow_equihash) => pow_equihash.into(),
-            Seal::Generic(generic) => generic,
-            Seal::Ethereum(eth) => eth.into(),
         }
     }
 }

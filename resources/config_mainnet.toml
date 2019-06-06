@@ -1,3 +1,6 @@
+[aion]
+chain = "mainnet/mainnet.json"
+
 [network]
 sync_from_boot_nodes_only = false
 max_peers = 64

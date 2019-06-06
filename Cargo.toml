@@ -43,7 +43,6 @@ aion-types = { path = "util/aion-types" }
 key = { path = "keystore/key" }
 keychain = {path = "keystore/keychain" }
 rlp = { path = "util/rlp" }
-aion-local-store = { path = "local-store" }
 aion-rpc = { path = "rpc" }
 aion-version = { path = "util/version" }
 path = { path = "util/path" }
@@ -89,7 +88,8 @@ panic = "abort"
 
 [workspace]
 members = [
-	"core/types",
+	#"core/types",
+	"types",
 	"keystore/key/cli",
 	"keystore/keychain/cli",
 	"sync",
