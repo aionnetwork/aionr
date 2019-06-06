@@ -43,7 +43,7 @@ impl Into<Generic> for POWEquihash {
 pub struct Generic(pub Vec<u8>);
 
 pub enum Seal {
-    POWEquihash(POWEquihash)
+    POWEquihash(POWEquihash),
 }
 
 impl From<ajson::spec::Seal> for Seal {

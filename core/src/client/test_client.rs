@@ -132,7 +132,6 @@ pub enum EachBlockWith {
 }
 
 impl TestBlockChainClient {
-
     /// Create test client with custom spec.
     pub fn new_with_spec(spec: Spec) -> Self {
         TestBlockChainClient::new_with_spec_and_extra(spec, Bytes::new())

@@ -444,7 +444,6 @@ impl NetworkManager for Sync {
         NetManager::enable(&executor, sync_handler);
         debug!(target: "sync", "###### network enabled... ######");
 
-
         SyncMgr::enable(&executor, self.network.config.max_peers);
         debug!(target: "sync", "###### SYNC enabled... ######");
     }

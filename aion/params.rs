@@ -66,7 +66,7 @@ impl SpecType {
                 file = fs::File::open(filename).map_err(|e| {
                     format!("Could not load specification file at {}: {}", filename, e)
                 })?;
-            },
+            }
             SpecType::Custom(ref filename) => {
                 file = fs::File::open(filename).map_err(|e| {
                     format!("Could not load specification file at {}: {}", filename, e)
