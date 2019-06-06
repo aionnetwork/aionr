@@ -19,7 +19,6 @@
  *
  ******************************************************************************/
 
-// calculate difficulty.
 use std::collections::HashSet;
 use bytes::bytes_to_i32s;
 use bytes::i32_to_bytes;
@@ -30,9 +29,7 @@ use std::ptr;
 pub struct EquihashValidator {
     n: i32,
     k: i32,
-    //    indices_per_hash_output: i32,
     indices_hash_length: usize,
-    //    hash_output: i32,
     collision_bit_length: i32,
     solution_width: i32,
 }

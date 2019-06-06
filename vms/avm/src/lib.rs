@@ -41,12 +41,8 @@ pub mod callback;
 pub mod codec;
 pub mod types;
 
-#[cfg(test)]
-mod tests;
-
 pub use avm::{
     AVM,
-//AVMActionParams,
 };
 
 pub use types::{TransactionContext as AVMTxContext};
