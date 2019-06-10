@@ -232,10 +232,6 @@ pub trait Engine<M: Machine>: Sync + Send {
         Ok(())
     }
 
-    /// Phase 4 verification. Verify block header against potentially external data.
-    /// Should only be called when `register_client` has been called previously.
-    fn verify_block_external(&self, _header: &M::Header) -> Result<(), Error> { Ok(()) }
-
     /// Genesis epoch data.
     fn genesis_epoch_data<'a>(
         &self,

@@ -103,7 +103,6 @@ pub struct ImportBlockchain {
     pub wal: bool,
     pub fat_db: Switch,
     pub vm_type: VMType,
-    pub check_seal: bool,
     pub with_color: bool,
     pub verifier_settings: VerifierSettings,
 }
@@ -190,7 +189,6 @@ fn execute_import(cmd: ImportBlockchain) -> Result<(), String> {
         algorithm,
         cmd.pruning_history,
         cmd.pruning_memory,
-        cmd.check_seal,
     );
 
     client_config.queue.verifier_settings = cmd.verifier_settings;
@@ -376,7 +374,6 @@ fn start_client(
         algorithm,
         pruning_history,
         pruning_memory,
-        true,
     );
 
     let service = ClientService::start(

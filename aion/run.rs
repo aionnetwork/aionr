@@ -83,7 +83,6 @@ pub struct RunCmd {
     pub wal: bool,
     pub vm_type: VMType,
     pub stratum: StratumOptions,
-    pub check_seal: bool,
     pub verifier_settings: VerifierSettings,
     pub no_persistent_txqueue: bool,
 }
@@ -168,7 +167,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         algorithm,
         cmd.pruning_history,
         cmd.pruning_memory,
-        cmd.check_seal,
     );
 
     client_config.queue.verifier_settings = cmd.verifier_settings;

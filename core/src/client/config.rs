@@ -23,13 +23,12 @@
 use std::str::FromStr;
 use std::path::Path;
 
-use verification::{VerifierType, QueueConfig};
+use verification::queue::Config as QueueConfig;
 use journaldb;
 use kvdb::CompactionProfile;
 
 pub use std::time::Duration;
 pub use blockchain::Config as BlockChainConfig;
-//pub use evm::VMType;
 pub use vms::VMType;
 
 /// Client state db compaction profile
@@ -92,8 +91,6 @@ pub struct ClientConfig {
     pub db_wal: bool,
     /// The chain spec name
     pub spec_name: String,
-    /// Type of block verifier used by client.
-    pub verifier_type: VerifierType,
     /// State db cache-size.
     pub state_cache_size: usize,
     /// EVM jump-tables cache size.
@@ -102,8 +99,6 @@ pub struct ClientConfig {
     pub history: u64,
     /// Ideal memory usage for state pruning history.
     pub history_mem: usize,
-    /// Check seal valididity on block import
-    pub check_seal: bool,
 }
 
 #[cfg(test)]

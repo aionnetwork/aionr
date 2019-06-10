@@ -46,8 +46,6 @@ pub use executive::{Executed, Executive};
 pub use vms::{EnvInfo, LastHashes};
 
 pub use error::{BlockImportError, TransactionImportError};
-pub use verification::VerifierType;
 
 mod traits;
-
 mod chain_notify;

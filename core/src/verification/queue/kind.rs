@@ -70,7 +70,6 @@ pub trait Kind: 'static + Sized + Send + Sync {
     fn verify(
         unverified: Self::Unverified,
         engine: &EthEngine,
-        check_seal: bool,
     ) -> Result<Self::Verified, Error>;
 }
 
@@ -112,11 +111,15 @@ pub mod blocks {
         fn verify(
             un: Self::Unverified,
             engine: &EthEngine,
-            check_seal: bool,
         ) -> Result<Self::Verified, Error>
         {
             let hash = un.hash();
-            match verify_block_unordered(un.header, un.bytes, engine, check_seal) {
+            match verify_block_unordered(
+                un.header,
+                un.bytes,
+                engine,
+                //check_seal
+            ) {
                 Ok(verified) => Ok(verified),
                 Err(e) => {
                     warn!(target: "client", "Stage 2 block verification failed for {}: {:?}", hash, e);
@@ -139,8 +142,8 @@ pub mod blocks {
 
             let header = BlockView::new(&bytes).header();
             Unverified {
-                header: header,
-                bytes: bytes,
+                header,
+                bytes,
             }
         }
     }
@@ -200,17 +203,11 @@ pub mod headers {
         fn verify(
             unverified: Self::Unverified,
             engine: &EthEngine,
-            check_seal: bool,
-        ) -> Result<Self::Verified, Error>
-        {
-            match check_seal {
-                true => {
-                    engine
-                        .verify_block_unordered(&unverified)
-                        .map(|_| unverified)
-                }
-                false => Ok(unverified),
-            }
+            //check_seal: bool,
+        ) -> Result<Self::Verified, Error> {
+            engine
+                .verify_block_unordered(&unverified)
+                .map(|_| unverified)
         }
     }
 }
