@@ -27,9 +27,6 @@ extern crate test;
 
 extern crate aion_types;
 
-#[cfg(test)]
-extern crate tiny_keccak;
-
 pub use aion_types::H256;
 pub use blake2b_impl::Blake2b;
 
