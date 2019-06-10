@@ -383,8 +383,7 @@ impl<K: Kind> VerificationQueue<K> {
 
             // chris
             let is_ready = match K::verify(
-                item,
-                &*engine,
+                item, &*engine,
                 //verification.check_seal
             ) {
                 Ok(verified) => {
@@ -824,11 +823,7 @@ mod tests {
 
         let mut config = Config::default();
         config.verifier_settings.scale_verifiers = auto_scale;
-        BlockQueue::new(
-            config,
-            engine,
-            IoChannel::disconnected()
-        )
+        BlockQueue::new(config, engine, IoChannel::disconnected())
     }
 
     #[test]
@@ -836,11 +831,7 @@ mod tests {
         // TODO better test
         let spec = Spec::new_test();
         let engine = spec.engine;
-        let _ = BlockQueue::new(
-            Config::default(),
-            engine,
-            IoChannel::disconnected()
-        );
+        let _ = BlockQueue::new(Config::default(), engine, IoChannel::disconnected());
     }
 
     #[test]
@@ -928,11 +919,7 @@ mod tests {
         let engine = spec.engine;
         let mut config = Config::default();
         config.max_mem_use = super::MIN_MEM_LIMIT; // empty queue uses about 15000
-        let queue = BlockQueue::new(
-            config,
-            engine,
-            IoChannel::disconnected()
-        );
+        let queue = BlockQueue::new(config, engine, IoChannel::disconnected());
         assert!(!queue.queue_info().is_full());
         let mut blocks = get_good_dummy_block_seq(50);
         for b in blocks.drain(..) {

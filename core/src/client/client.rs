@@ -159,7 +159,8 @@ impl Client {
         db: Arc<KeyValueDB>,
         miner: Arc<Miner>,
         message_channel: IoChannel<ClientIoMessage>,
-    ) -> Result<Arc<Client>, ::error::Error> {
+    ) -> Result<Arc<Client>, ::error::Error>
+    {
         let trie_spec = match config.fat_db {
             true => TrieSpec::Fat,
             false => TrieSpec::Secure,
@@ -398,7 +399,7 @@ impl Client {
 
         // Verify Block Family
         let verify_family_result = verify_block_family(
-        //let verify_family_result = self.verifier.verify_block_family(
+            //let verify_family_result = self.verifier.verify_block_family(
             header,
             &parent,
             grant_parent_header,

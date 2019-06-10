@@ -26,7 +26,6 @@ use blake2b::BLAKE2B_NULL_RLP;
 use spec::seal::Seal;
 
 pub struct Genesis {
-
     pub seal: Seal,
     pub difficulty: U256,
     pub author: Address,
@@ -44,7 +43,6 @@ pub struct Genesis {
 impl From<ajson::spec::Genesis> for Genesis {
     fn from(g: ajson::spec::Genesis) -> Self {
         Genesis {
-
             seal: From::from(g.seal),
             difficulty: g.difficulty.into(),
             author: g.author.map_or_else(Address::zero, Into::into),

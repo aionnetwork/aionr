@@ -73,9 +73,9 @@ pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &EthEngine) -> 
         .at(1)?
         .iter()
         .map(|rlp| rlp.as_val::<UnverifiedTransaction>())
-        {
-            engine.verify_transaction_basic(&t?)?;
-        }
+    {
+        engine.verify_transaction_basic(&t?)?;
+    }
     Ok(())
 }
 
@@ -87,7 +87,8 @@ pub fn verify_block_unordered(
     bytes: Bytes,
     engine: &EthEngine,
     //check_seal: bool,
-) -> Result<PreverifiedBlock, Error> {
+) -> Result<PreverifiedBlock, Error>
+{
     // chris
     //if check_seal {
     engine.verify_block_unordered(&header)?;
@@ -123,7 +124,8 @@ pub fn verify_block_family(
     grant_parent: Option<&Header>,
     engine: &EthEngine,
     do_full: Option<FullFamilyParams>,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+{
     verify_parent(&header, &parent, engine.params().gas_limit_bound_divisor)?;
     engine.verify_block_family(&header, &parent, grant_parent)?;
 
@@ -169,7 +171,8 @@ pub fn verify_header_params(
     header: &Header,
     engine: &EthEngine,
     is_full: bool,
-) -> Result<(), Error> {
+) -> Result<(), Error>
+{
     let expected_seal_fields = engine.seal_fields(header);
     if header.seal().len() != expected_seal_fields {
         return Err(From::from(BlockError::InvalidSealArity(Mismatch {
@@ -263,7 +266,7 @@ fn verify_parent(header: &Header, parent: &Header, gas_limit_divisor: U256) -> R
             max: None,
             found: header.number(),
         })
-            .into());
+        .into());
     }
 
     let parent_gas_limit = *parent.gas_limit();
@@ -436,9 +439,9 @@ mod tests {
             _matches: F,
             _limit: Option<usize>,
         ) -> Vec<LocalizedLogEntry>
-            where
-                F: Fn(&LogEntry) -> bool,
-                Self: Sized,
+        where
+            F: Fn(&LogEntry) -> bool,
+            Self: Sized,
         {
             unimplemented!()
         }
@@ -450,7 +453,7 @@ mod tests {
     }
 
     fn family_test<BC>(bytes: &[u8], engine: &EthEngine, bc: &BC) -> Result<(), Error>
-        where BC: BlockProvider {
+    where BC: BlockProvider {
         let view = BlockView::new(bytes);
         let header = view.header();
         let transactions: Vec<_> = view
@@ -526,7 +529,7 @@ mod tests {
             value_bytes: Vec::new(),
             transaction_type: U256::from(1),
         }
-            .sign(keypair.secret().into(), None);
+        .sign(keypair.secret().into(), None);
 
         let tr2 = Transaction {
             action: Action::Create,
@@ -541,7 +544,7 @@ mod tests {
             value_bytes: Vec::new(),
             transaction_type: U256::from(1),
         }
-            .sign(keypair.secret().into(), None);
+        .sign(keypair.secret().into(), None);
 
         let good_transactions = [tr1.clone(), tr2.clone()];
 

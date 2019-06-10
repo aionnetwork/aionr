@@ -39,14 +39,14 @@ pub trait ChainNotify: Send + Sync {
     );
 
     /// fires when chain achieves active mode
-    fn start(&self){}
+    fn start(&self) {}
 
     /// fires when chain achieves passive mode
-    fn stop(&self){}
+    fn stop(&self) {}
 
     /// fires when chain broadcasts a message
-    fn broadcast(&self, _data: Vec<u8>){}
+    fn broadcast(&self, _data: Vec<u8>) {}
 
     /// fires when new transactions are received from a peer
-    fn transactions_received(&self, _transactions: &[Bytes]){}
+    fn transactions_received(&self, _transactions: &[Bytes]) {}
 }

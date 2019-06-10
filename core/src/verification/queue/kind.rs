@@ -67,10 +67,7 @@ pub trait Kind: 'static + Sized + Send + Sync {
     fn create(input: Self::Input, engine: &EthEngine) -> Result<Self::Unverified, Error>;
 
     /// Attempt to verify the `Unverified` item using the given engine.
-    fn verify(
-        unverified: Self::Unverified,
-        engine: &EthEngine,
-    ) -> Result<Self::Verified, Error>;
+    fn verify(unverified: Self::Unverified, engine: &EthEngine) -> Result<Self::Verified, Error>;
 }
 
 /// The blocks verification module.
@@ -108,16 +105,10 @@ pub mod blocks {
             }
         }
 
-        fn verify(
-            un: Self::Unverified,
-            engine: &EthEngine,
-        ) -> Result<Self::Verified, Error>
-        {
+        fn verify(un: Self::Unverified, engine: &EthEngine) -> Result<Self::Verified, Error> {
             let hash = un.hash();
             match verify_block_unordered(
-                un.header,
-                un.bytes,
-                engine,
+                un.header, un.bytes, engine,
                 //check_seal
             ) {
                 Ok(verified) => Ok(verified),
@@ -204,7 +195,8 @@ pub mod headers {
             unverified: Self::Unverified,
             engine: &EthEngine,
             //check_seal: bool,
-        ) -> Result<Self::Verified, Error> {
+        ) -> Result<Self::Verified, Error>
+        {
             engine
                 .verify_block_unordered(&unverified)
                 .map(|_| unverified)
