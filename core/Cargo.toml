@@ -61,7 +61,7 @@ unexpected = { path = "../util/unexpected" }
 journaldb = { path = "../db/journaldb" }
 tempdir = "0.3"
 db = { path = "../db/core" }
-equihash = { path = "../equihash" }
+equihash = { path = "../util/equihash" }
 blake2b = { path = "../util/blake2b" }
 dir = { path = "../util/dir" }
 tiny-keccak = "1.4.2"
