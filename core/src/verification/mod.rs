@@ -86,14 +86,9 @@ pub fn verify_block_unordered(
     header: Header,
     bytes: Bytes,
     engine: &EthEngine,
-    //check_seal: bool,
 ) -> Result<PreverifiedBlock, Error>
 {
-    // chris
-    //if check_seal {
     engine.verify_block_unordered(&header)?;
-    //}
-    // Verify transactions.
     let mut transactions = Vec::new();
     {
         let v = BlockView::new(&bytes);
