@@ -181,12 +181,6 @@ impl ::aion_machine::LiveBlock for ExecutedBlock {
     fn header(&self) -> &Header { &self.header }
 }
 
-impl ::aion_machine::Transactions for ExecutedBlock {
-    type Transaction = SignedTransaction;
-
-    fn transactions(&self) -> &[SignedTransaction] { &self.transactions }
-}
-
 /// Block that is ready for transactions to be added.
 ///
 /// It's a bit like a Vec<Transaction>, except that whenever a transaction is pushed, we execute it and

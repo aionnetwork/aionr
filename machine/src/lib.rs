@@ -46,15 +46,6 @@ pub trait Header {
     fn number(&self) -> u64;
 }
 
-/// a header with an associated score (difficulty in PoW terms)
-pub trait ScoredHeader: Header {
-    /// Get the score of this header.
-    fn score(&self) -> &U256;
-
-    /// Set the score of this header.
-    fn set_score(&mut self, score: U256);
-}
-
 /// A "live" block is one which is in the process of the transition.
 /// The state of this block can be mutated by arbitrary rules of the
 /// state transition function.
@@ -64,15 +55,6 @@ pub trait LiveBlock: 'static {
 
     /// Get a reference to the header.
     fn header(&self) -> &Self::Header;
-}
-
-/// Trait for blocks which have a transaction type.
-pub trait Transactions: LiveBlock {
-    /// The transaction type.
-    type Transaction;
-
-    /// Get a reference to the transactions in this block.
-    fn transactions(&self) -> &[Self::Transaction];
 }
 
 /// Generalization of types surrounding blockchain-suitable state machines.
@@ -85,7 +67,6 @@ pub trait Machine: for<'a> LocalizedMachine<'a> {
     type EngineClient: ?Sized;
     /// A description of needed auxiliary data.
     type AuxiliaryRequest;
-
     /// Errors which can occur when querying or interacting with the machine.
     type Error;
 }
