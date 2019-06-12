@@ -20,8 +20,7 @@
  *
  ******************************************************************************/
 
-//! Stratum protocol implementation for Aion rust clients
-
+#![warn(unused_extern_crates)]
 extern crate jsonrpc_tcp_server;
 extern crate jsonrpc_core;
 extern crate jsonrpc_macros;

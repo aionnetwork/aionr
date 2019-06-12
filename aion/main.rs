@@ -19,33 +19,23 @@
  *
  ******************************************************************************/
 
-//! Ethcore client application.
-
-#![warn(missing_docs)]
-
+#![warn(unused_extern_crates)]
 extern crate ansi_term;
 extern crate ctrlc;
-extern crate docopt;
 #[macro_use]
 extern crate clap;
 extern crate dir;
 extern crate fdlimit;
-extern crate futures;
-extern crate isatty;
 extern crate jsonrpc_core;
 extern crate num_cpus;
-extern crate number_prefix;
 extern crate parking_lot;
-extern crate regex;
 extern crate rlp;
 extern crate rpassword;
 extern crate rustc_hex;
-extern crate semver;
 extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
-extern crate time;
 extern crate toml;
 
 extern crate sync;
@@ -59,7 +49,6 @@ extern crate keychain;
 extern crate panic_hook;
 extern crate aion_rpc;
 extern crate aion_version;
-extern crate path;
 extern crate blake2b;
 extern crate journaldb;
 extern crate aion_pb_apiserver as pb;

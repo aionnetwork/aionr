@@ -6,4 +6,3 @@ version = "0.1.0"
 blake2b = { path = "../blake2b" }
 acore-bytes = { path = "../bytes" }
 log = "0.3"
-rustc-hex = "1.0"

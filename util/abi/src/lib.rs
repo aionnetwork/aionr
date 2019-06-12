@@ -20,10 +20,7 @@
  *
  ******************************************************************************/
 
-//! Ethereum ABI encoding decoding library.
-
-#![warn(missing_docs)]
-
+#![warn(unused_extern_crates)]
 extern crate rustc_hex as hex;
 extern crate serde;
 extern crate serde_json;

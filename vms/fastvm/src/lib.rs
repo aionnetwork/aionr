@@ -19,20 +19,15 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
+
 //! methods for FastVM implemented by Rust
 extern crate bincode;
 extern crate libc;
 extern crate num_bigint;
 extern crate aion_types;
-extern crate acore_bytes as bytes;
-extern crate ajson;
-extern crate blake2b as hash;
-extern crate common_types as types;
 #[macro_use]
 extern crate log;
-extern crate rustc_hex;
-extern crate db as kvdb;
-extern crate rlp;
 extern crate patricia_trie as trie;
 extern crate vm_common;
 

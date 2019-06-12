@@ -20,6 +20,7 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 //! General IO module.
 //!
 //! Example usage for creating a network service and adding an IO handler:

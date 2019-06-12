@@ -20,14 +20,13 @@
  *
  ******************************************************************************/
 
-//! Trie interface and implementation.
-extern crate rand;
+#![warn(unused_extern_crates)]
+
 extern crate aion_types;
 extern crate blake2b;
 extern crate rlp;
 extern crate acore_bytes as bytes;
 extern crate elastic_array;
-extern crate logger;
 extern crate db;
 
 #[cfg(test)]

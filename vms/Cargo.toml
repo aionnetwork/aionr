@@ -5,18 +5,10 @@ authors = ["aion-camus <camus@aion.network>"]
 
 [dependencies]
 byteorder = "1.0"
-acore-bytes = { path = "../util/bytes" }
+log = "0.3"
+libc = "0.2.0"
 aion-types = { path = "../util/aion-types"}
 patricia-trie = { path = "../util/patricia_trie" }
-ajson = { path = "../json" }
-rlp = { path = "../util/rlp" }
-bit-set = "0.4"
-heapsize = "0.4"
-log = "0.3"
-blake2b = { path = "../util/blake2b" }
-parking_lot = "0.5"
-memory-cache = { path = "../util/memory_cache" }
 fastvm = { path = "fastvm" }
 avm = { path = "avm" }
-libc = "0.2.0"
 vm_common = { path = "vm_common" }

@@ -20,9 +20,7 @@
  *
  ******************************************************************************/
 
-//! Generalization of a state machine for a consensus engine.
-//! This will define traits for the header, block, and state of a blockchain.
-
+#![warn(unused_extern_crates)]
 extern crate aion_types;
 
 use aion_types::{H256, U256, Address};

@@ -20,6 +20,7 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 //! Custom panic hook with bug report link
 
 extern crate backtrace;

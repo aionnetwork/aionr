@@ -19,7 +19,7 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
+#![warn(unused_extern_crates)]
 extern crate rustc_hex;
 extern crate serde;
 extern crate serde_json;

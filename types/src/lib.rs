@@ -20,7 +20,7 @@
  *
  ******************************************************************************/
 
-//! Types used in the public API
+#![warn(unused_extern_crates)]
 extern crate aion_types;
 extern crate ethbloom;
 extern crate acore_bytes as bytes;
@@ -28,7 +28,6 @@ extern crate ajson;
 extern crate rlp;
 #[macro_use]
 extern crate rlp_derive;
-extern crate blake2b;
 extern crate heapsize;
 
 pub mod account_diff;

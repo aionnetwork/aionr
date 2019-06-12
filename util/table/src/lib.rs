@@ -20,6 +20,7 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 //! A collection associating pair of keys (row and column) with a single value.
 
 use std::hash::Hash;

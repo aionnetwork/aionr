@@ -20,32 +20,27 @@
  *
  ******************************************************************************/
 
-// uncomment below line to test precompile contract blake2b hash
+#![warn(unused_extern_crates)]
 #![cfg_attr(feature = "benches", feature(test))]
 extern crate bloomchain;
-extern crate bn;
 extern crate byteorder;
 extern crate crossbeam;
 extern crate common_types as types;
 extern crate acore_bloom_journal as bloom_journal;
 extern crate acore_io as io;
 extern crate acore_bytes as bytes;
-extern crate logger;
 extern crate acore_stratum;
 extern crate aion_types;
 extern crate ethbloom;
 extern crate ajson;
 extern crate key;
 extern crate crypto as rcrypto;
-extern crate futures_cpupool;
-extern crate futures;
 extern crate itertools;
 extern crate lru_cache;
 extern crate num_cpus;
 extern crate num;
 extern crate aion_machine;
 extern crate parking_lot;
-extern crate rand;
 extern crate rayon;
 extern crate rlp;
 extern crate rlp_compress;
@@ -59,9 +54,6 @@ extern crate util_error;
 extern crate db as kvdb;
 extern crate dir;
 extern crate transient_hashmap;
-extern crate linked_hash_map;
-extern crate abi;
-extern crate abi_contract;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
@@ -74,22 +66,17 @@ extern crate using_queue;
 extern crate table;
 extern crate memory_cache;
 extern crate journaldb;
-extern crate macros;
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate trace_time;
-extern crate tempdir;
 pub extern crate keychain;
 extern crate equihash;
 extern crate vms;
 // for aion token bridge
 extern crate tiny_keccak;
 extern crate num_bigint;
-extern crate bincode;
 extern crate bytebuffer;
-extern crate tokio;
-extern crate avm_abi;
 
 pub mod account_provider;
 pub mod block;
@@ -121,10 +108,6 @@ mod executive;
 mod externalities;
 pub mod blockchain;
 mod factory;
-
-#[cfg(test)]
-extern crate fastvm;
-extern crate core;
 
 pub use types::*;
 pub use executive::contract_address;

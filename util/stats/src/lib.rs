@@ -20,6 +20,7 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 //! Statistical functions and helpers.
 
 use std::iter::FromIterator;

@@ -19,6 +19,8 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
+
 extern crate aion_types;
 extern crate rlp;
 extern crate blake2b as hash;

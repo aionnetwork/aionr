@@ -10,6 +10,5 @@ rlp_derive  = { path = "../util/rlp_derive" }
 acore-bytes = { path = "../util/bytes" }
 aion-types  = { path = "../util/aion-types"}
 ethbloom    = { path = "../util/ethbloom"}
-blake2b     = { path = "../util/blake2b" }
 ajson       = { path = "../json" }
 heapsize    = "0.4"

@@ -20,11 +20,8 @@
  *
  ******************************************************************************/
 
-//! Ethereum key-management.
+#![warn(unused_extern_crates)]
 
-#![warn(missing_docs)]
-
-extern crate byteorder;
 extern crate blake2b;
 extern crate crypto;
 extern crate dir;
@@ -38,7 +35,6 @@ extern crate serde_json;
 extern crate smallvec;
 extern crate subtle;
 extern crate time;
-extern crate tempdir;
 extern crate aion_types;
 extern crate key;
 extern crate rlp;

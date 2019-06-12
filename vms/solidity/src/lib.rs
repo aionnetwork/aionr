@@ -19,8 +19,9 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
+
 extern crate libc;
-extern crate serde_json;
 
 use std::ffi::CStr;
 

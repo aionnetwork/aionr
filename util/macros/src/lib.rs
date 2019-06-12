@@ -21,6 +21,7 @@
  ******************************************************************************/
 
 //! Utils common types and macros global reexport.
+#![warn(unused_extern_crates)]
 
 use std::io;
 

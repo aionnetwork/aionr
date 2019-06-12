@@ -12,10 +12,7 @@ num-bigint = "0.2"
 aion-types = { path = "../../util/aion-types" }
 lazy_static = "1.0"
 vm_common = { path = "../vm_common" }
-avm_abi = { path = "../../util/avm_abi" }
-acore-bytes = { path = "../../util/bytes" }
 blake2b = { path = "../../util/blake2b" }
-rand = "*"
 log = "0.3"
 rlp = {path = "../../util/rlp"}
 crypto = {path = "../../util/crypto"}

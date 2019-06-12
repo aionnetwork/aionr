@@ -1,7 +1,3 @@
-extern crate rustc_hex;
-extern crate libc;
-extern crate num_bigint;
-
 use core::fmt;
 use core::slice;
 use libc::c_void;

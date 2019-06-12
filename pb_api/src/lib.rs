@@ -19,9 +19,7 @@
  *
  ******************************************************************************/
 
-// this mod requires zmq to be installed.
-// $ apt install libzmq3-dev
-
+#![warn(unused_extern_crates)]
 extern crate zmq;
 extern crate protobuf;
 extern crate aion_rpc;

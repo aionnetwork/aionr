@@ -20,6 +20,7 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 //! Path utilities
 use std::path::Path;
 use std::path::PathBuf;

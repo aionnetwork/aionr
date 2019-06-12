@@ -20,6 +20,7 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 //! Generetes trie root.
 //!
 //! This module should be used to generate trie root hash.
