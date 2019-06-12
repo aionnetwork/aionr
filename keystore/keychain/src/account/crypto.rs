@@ -149,10 +149,10 @@ impl Crypto {
             }
         };
 
-//        let mac  = blake2b(crypto::derive_mac(&derived_right_bits, &self.ciphertext));
-//        if subtle::slices_equal(&mac, &self.mac) == 0 {
-//            return Err(Error::InvalidPassword);
-//        }
+        //        let mac  = blake2b(crypto::derive_mac(&derived_right_bits, &self.ciphertext));
+        //        if subtle::slices_equal(&mac, &self.mac) == 0 {
+        //            return Err(Error::InvalidPassword);
+        //        }
 
         let mut plain: SmallVec<[u8; 32]> = SmallVec::from_vec(vec![0; expected_len]);
 
