@@ -54,7 +54,7 @@ pipeline {
             	echo 'clean compiled version.rs'
             	sh 'rm -r target/release/build/aion-version* target/release/build/avm-* || echo "no aion-version folders exist"'
             	echo "building..."
-                sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"'
+                sh 'RUSTFLAGS="-D warnings" ./resources/package.sh "aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"'
             }
         }
 		stage('Unit Test'){
@@ -70,7 +70,7 @@ pipeline {
 							sh 'echo $?'
 							lastCommit = sh(returnStdout: true, script: 'git rev-parse HEAD | cut -c 1-8')
 							echo "${lastCommit}"
-							sh "python scripts/bench.py -l test_results/ut_result.txt -r test_results/report.html -c ${lastCommit}"
+							sh "python resources/bench.py -l test_results/ut_result.txt -r test_results/report.html -c ${lastCommit}"
 						}
 						catch(Exception e){
 							echo "${e}"
@@ -85,7 +85,7 @@ pipeline {
 				sh 'set -e'
 				script{
 					try{
-						sh './scripts/run_RPCtest.sh'
+						sh './resources/run_RPCtest.sh'
 					}
 					catch(Exception e){
 						echo "${e}"
