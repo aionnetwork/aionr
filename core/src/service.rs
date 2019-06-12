@@ -243,9 +243,6 @@ impl IoHandler<ClientIoMessage> for ClientIoHandler {
             ClientIoMessage::BlockVerified => {
                 self.client.import_verified_blocks();
             }
-            ClientIoMessage::NewMessage(ref message) => {
-                // trace!(target: "io", "Invalid message received: {}", e);
-            }
             _ => {}
         }
     }

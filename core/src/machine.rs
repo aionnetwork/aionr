@@ -22,7 +22,7 @@
 
 //! Ethereum-like state machine definition.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::cmp;
 use std::sync::Arc;
 
@@ -119,7 +119,6 @@ impl EthereumMachine {
     /// Logic to perform on a new block: updating last hashes.
     pub fn on_new_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
         self.push_last_hash(block)?;
-
         Ok(())
     }
 

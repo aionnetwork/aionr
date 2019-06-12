@@ -25,14 +25,12 @@ mod grant_parent_header_validators;
 
 use ajson;
 use machine::EthereumMachine;
-use engines::Engine;
 use aion_types::{U256, U512};
 use header::Header;
 use block::ExecutedBlock;
 use error::Error;
 use std::cmp;
 use std::sync::Mutex;
-use std::sync::Arc;
 use types::BlockNumber;
 use aion_machine::{LiveBlock, WithBalances};
 use equihash::EquihashValidator;
@@ -51,9 +49,6 @@ use self::header_validators::{
     EquihashSolutionValidator,
 };
 use self::grant_parent_header_validators::{GrantParentHeaderValidator, DifficultyValidator};
-use std::collections::BTreeMap;
-use engines::ConstructedVerifier;
-use engines::EngineError;
 
 const ANNUAL_BLOCK_MOUNT: u64 = 3110400;
 const COMPOUND_YEAR_MAX: u64 = 128;
@@ -291,7 +286,8 @@ impl RewardsCalculator {
         number: u64,
         params: &POWEquihashEngineParams,
         m: U256,
-    ) -> U256 {
+    ) -> U256
+    {
         let num: U256 = U256::from(number);
 
         if num <= params.rampup_lower_bound {
@@ -387,18 +383,15 @@ impl POWEquihashEngine {
 
     pub fn machine(&self) -> &EthereumMachine { &self.machine }
 
-    pub fn seal_fields(&self, _header: &Header) -> usize {
-        // we don't add nonce and solution in header, continue to encapsulate them in seal field.
-        // nonce and solution.
-        2
-    }
+    pub fn seal_fields(&self, _header: &Header) -> usize { 2 }
 
     pub fn verify_block_family(
         &self,
         header: &Header,
         parent: &Header,
         grant_parent: Option<&Header>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    {
         // verify parent
         let mut parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(3);
         parent_validators.push(Box::new(NumberValidator {}));
@@ -424,7 +417,8 @@ impl POWEquihashEngine {
         header: &mut Header,
         parent: &Header,
         grant_parent: Option<&Header>,
-    ) {
+    )
+    {
         let difficulty = self.calculate_difficulty(header, parent, grant_parent);
         header.set_difficulty(difficulty);
     }
@@ -435,7 +429,6 @@ impl POWEquihashEngine {
         {
             let header = LiveBlock::header(&*block);
             result_block_reward = self.calculate_reward(&header);
-            //result_block_reward = U256::from(3028549382716049382u64);
             debug!(target: "cons", "verify number: {}, reward: {} ", header.number(),  result_block_reward);
             author = *header.author();
         }
@@ -447,110 +440,11 @@ impl POWEquihashEngine {
     }
 
     pub fn seals_internally(&self) -> Option<bool> { None }
-
 }
-
-// chris
-//impl Engine<EthereumMachine> for Arc<POWEquihashEngine> {
-//    fn name(&self) -> &str { "POWEquihashEngine" }
-//
-//    fn machine(&self) -> &EthereumMachine { &self.machine }
-//
-//    fn seal_fields(&self, _header: &Header) -> usize {
-//        // we don't add nonce and solution in header, continue to encapsulate them in seal field.
-//        // nonce and solution.
-//        2
-//    }
-//
-//    fn populate_from_parent(
-//        &self,
-//        header: &mut Header,
-//        parent: &Header,
-//        grant_parent: Option<&Header>,
-//    )
-//    {
-//        let difficulty = self.calculate_difficulty(header, parent, grant_parent);
-//        header.set_difficulty(difficulty);
-//    }
-//
-//    fn on_close_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
-//        use aion_machine::{LiveBlock, WithBalances};
-//
-//        let result_block_reward;
-//        let author;
-//        {
-//            let header = LiveBlock::header(&*block);
-//            result_block_reward = self.calculate_reward(&header);
-//            //result_block_reward = U256::from(3028549382716049382u64);
-//            debug!(target: "cons", "verify number: {}, reward: {} ", header.number(),  result_block_reward);
-//            author = *header.author();
-//        }
-//        block.header_mut().set_reward(result_block_reward.clone());
-//        self.machine
-//            .add_balance(block, &author, &result_block_reward)?;
-//        self.machine
-//            .note_rewards(block, &[(author, result_block_reward)])
-//    }
-//
-//    fn verify_local_seal(&self, header: &Header) -> Result<(), Error> {
-//        self.verify_block_basic(header)
-//            .and_then(|_| self.verify_block_unordered(header))
-//    }
-//
-//    fn verify_block_basic(&self, header: &Header) -> Result<(), Error> {
-//        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(4);
-//        cheap_validators.push(Box::new(VersionValidator {}));
-//        cheap_validators.push(Box::new(EnergyConsumedValidator {}));
-//        cheap_validators.push(Box::new(POWValidator {}));
-//
-//        for v in cheap_validators.iter() {
-//            v.validate(header)?;
-//        }
-//
-//        Ok(())
-//    }
-//
-//    fn verify_block_unordered(&self, header: &Header) -> Result<(), Error> {
-//        let mut costly_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(1);
-//        costly_validators.push(Box::new(EquihashSolutionValidator {
-//            solution_validator: EquihashValidator::new(210, 9),
-//        }));
-//        for v in costly_validators.iter() {
-//            v.validate(header)?;
-//        }
-//        Ok(())
-//    }
-//
-//    fn verify_block_family(
-//        &self,
-//        header: &Header,
-//        parent: &Header,
-//        grant_parent: Option<&Header>,
-//    ) -> Result<(), Error>
-//    {
-//        // verify parent
-//        let mut parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(3);
-//        parent_validators.push(Box::new(NumberValidator {}));
-//        parent_validators.push(Box::new(TimestampValidator {}));
-//        for v in parent_validators.iter() {
-//            v.validate(header, parent)?;
-//        }
-//
-//        // verify grant parent
-//        let mut grant_validators: Vec<Box<GrantParentHeaderValidator>> = Vec::with_capacity(1);
-//        grant_validators.push(Box::new(DifficultyValidator {
-//            difficulty_calc: &self.difficulty_calc,
-//        }));
-//        for v in grant_validators.iter() {
-//            v.validate(header, parent, grant_parent)?;
-//        }
-//
-//        Ok(())
-//    }
-//}
 
 #[cfg(test)]
 mod tests {
+
     use super::Header;
     use super::U256;
     use super::RewardsCalculator;
@@ -677,6 +571,7 @@ mod tests {
             calculator.calculate_difficulty(&header, &parent_header, Some(&grant_parent_header));
         assert_eq!(difficulty, U256::from(16));
     }
+
     #[test]
     fn test_calculate_difficulty2() {
         let params = POWEquihashEngineParams {
@@ -705,6 +600,7 @@ mod tests {
             calculator.calculate_difficulty(&header, &parent_header, Some(&grant_parent_header));
         assert_eq!(difficulty, U256::from(2001));
     }
+
     #[test]
     fn test_calculate_difficulty3() {
         let params = POWEquihashEngineParams {
@@ -733,6 +629,7 @@ mod tests {
             calculator.calculate_difficulty(&header, &parent_header, Some(&grant_parent_header));
         assert_eq!(difficulty, U256::from(3000));
     }
+
     #[test]
     fn test_calculate_difficulty4() {
         let params = POWEquihashEngineParams {

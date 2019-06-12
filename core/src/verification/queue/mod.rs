@@ -206,9 +206,7 @@ impl QueueSignal {
     fn reset(&self) { self.signalled.store(false, AtomicOrdering::Relaxed); }
 }
 
-// chris
 struct Verification<K: Kind> {
-    // All locks must be captured in the order declared here.
     unverified: Mutex<VecDeque<K::Unverified>>,
     verifying: Mutex<VecDeque<Verifying<K>>>,
     verified: Mutex<VecDeque<K::Verified>>,
@@ -216,7 +214,6 @@ struct Verification<K: Kind> {
     more_to_verify: SMutex<()>,
     empty: SMutex<()>,
     sizes: Sizes,
-    // check_seal: bool,
 }
 
 impl<K: Kind> VerificationQueue<K> {
@@ -225,7 +222,6 @@ impl<K: Kind> VerificationQueue<K> {
         config: Config,
         engine: Arc<POWEquihashEngine>,
         message_channel: IoChannel<ClientIoMessage>,
-        //check_seal: bool,
     ) -> Self
     {
         let verification = Arc::new(Verification {
@@ -240,7 +236,6 @@ impl<K: Kind> VerificationQueue<K> {
                 verifying: AtomicUsize::new(0),
                 verified: AtomicUsize::new(0),
             },
-            //check_seal: check_seal,
         });
         let more_to_verify = Arc::new(SCondvar::new());
         let deleting = Arc::new(AtomicBool::new(false));
@@ -380,12 +375,7 @@ impl<K: Kind> VerificationQueue<K> {
             };
 
             let hash = item.hash();
-
-            // chris
-            let is_ready = match K::verify(
-                item, &*engine,
-                //verification.check_seal
-            ) {
+            let is_ready = match K::verify(item, &*engine) {
                 Ok(verified) => {
                     let mut verifying = verification.verifying.lock();
                     let mut idx = None;

@@ -20,7 +20,6 @@
  *
  ******************************************************************************/
 
-use std::collections::BTreeMap;
 use std::time::Duration;
 
 use block::{OpenBlock, SealedBlock, ClosedBlock};
@@ -282,10 +281,6 @@ pub trait BlockChainClient: Sync + Send {
     /// Disable the client from importing blocks. This cannot be undone in this session and indicates
     /// that a subsystem has reason to believe this executable incapable of syncing the chain.
     fn disable(&self);
-
-    // chris
-    //// Returns engine-related extra info for `BlockId`.
-    // fn block_extra_info(&self, id: BlockId) -> Option<BTreeMap<String, String>>;
 
     /// Returns information about pruning/data availability.
     fn pruning_info(&self) -> PruningInfo;

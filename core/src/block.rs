@@ -227,7 +227,6 @@ impl<'x> OpenBlock<'x> {
         author: Address,
         gas_range_target: (U256, U256),
         extra_data: Bytes,
-        is_epoch_begin: bool,
         kvdb: Arc<KeyValueDB>,
     ) -> Result<Self, Error>
     {
@@ -252,7 +251,8 @@ impl<'x> OpenBlock<'x> {
         r.set_extra_data(extra_data);
         r.block.header.note_dirty();
 
-        let gas_floor_target = cmp::max(gas_range_target.0, engine.machine().params().min_gas_limit);
+        let gas_floor_target =
+            cmp::max(gas_range_target.0, engine.machine().params().min_gas_limit);
         let gas_ceil_target = cmp::max(gas_range_target.1, gas_floor_target);
 
         engine.machine().populate_from_parent(
@@ -563,7 +563,12 @@ impl LockedBlock {
     /// Provide a valid seal in order to turn this into a `SealedBlock`.
     ///
     /// NOTE: This does not check the validity of `seal` with the engine.
-    pub fn seal(self, engine: &POWEquihashEngine, seal: Vec<Bytes>) -> Result<SealedBlock, BlockError> {
+    pub fn seal(
+        self,
+        engine: &POWEquihashEngine,
+        seal: Vec<Bytes>,
+    ) -> Result<SealedBlock, BlockError>
+    {
         let expected_seal_fields = engine.seal_fields(self.header());
         let mut s = self;
         if seal.len() != expected_seal_fields {
@@ -636,7 +641,6 @@ pub fn enact(
     grant_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
-    is_epoch_begin: bool,
     kvdb: Arc<KeyValueDB>,
 ) -> Result<LockedBlock, Error>
 {
@@ -664,7 +668,6 @@ pub fn enact(
         Address::new(),
         (3141562.into(), 31415620.into()),
         vec![],
-        is_epoch_begin,
         kvdb,
     )?;
 
@@ -793,7 +796,6 @@ pub fn enact_verified(
     grant_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
-    is_epoch_begin: bool,
     kvdb: Arc<KeyValueDB>,
 ) -> Result<LockedBlock, Error>
 {
@@ -806,7 +808,6 @@ pub fn enact_verified(
         grant_parent,
         last_hashes,
         factories,
-        is_epoch_begin,
         kvdb,
     )
 }
@@ -815,7 +816,7 @@ pub fn enact_verified(
 mod tests {
     use tests::helpers::*;
     use super::*;
-    use engines::EthEngine;
+    use engines::POWEquihashEngine;
     use vms::LastHashes;
     use error::Error;
     use header::Header;
@@ -830,7 +831,7 @@ mod tests {
     /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
     fn enact_bytes(
         block_bytes: &[u8],
-        engine: &EthEngine,
+        engine: &POWEquihashEngine,
         db: StateDB,
         parent: &Header,
         _grant_parent: Option<&Header>,
@@ -986,8 +987,8 @@ mod tests {
                 .keys()
                 .iter()
                 .filter(|k| orig_db.journal_db().get(k.0) != db.journal_db().get(k.0))
-                .next()
-                , None
+                .next(),
+            None
         );
     }
 }

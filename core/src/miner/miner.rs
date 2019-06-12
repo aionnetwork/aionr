@@ -29,7 +29,7 @@ use account_provider::AccountProvider;
 use aion_types::{Address, H256, U256};
 use ansi_term::Colour;
 use bytes::Bytes;
-use engines::{POWEquihashEngine, Seal};
+use engines::POWEquihashEngine;
 use error::*;
 use miner::{MinerService, MinerStatus, NotifyWork};
 use parking_lot::{Mutex, RwLock};
@@ -161,7 +161,6 @@ pub struct Miner {
     transaction_listener: RwLock<Vec<Box<Fn(&[H256]) + Send + Sync>>>,
     sealing_work: Mutex<SealingWork>,
     next_allowed_reseal: Mutex<Instant>,
-    next_mandatory_reseal: RwLock<Instant>,
     sealing_block_last_request: Mutex<u64>,
     // for sealing...
     options: MinerOptions,
@@ -226,7 +225,6 @@ impl Miner {
             transaction_queue: Arc::new(RwLock::new(txq)),
             transaction_listener: RwLock::new(vec![]),
             next_allowed_reseal: Mutex::new(Instant::now()),
-            next_mandatory_reseal: RwLock::new(Instant::now() + options.reseal_max_period),
             sealing_block_last_request: Mutex::new(0),
             sealing_work: Mutex::new(SealingWork {
                 queue: UsingQueue::new(options.work_queue_size),
@@ -630,7 +628,7 @@ impl Miner {
         let cost: U256 = transaction.value + transaction.gas_price * transaction.gas;
         if client.latest_balance(&transaction.sender()) < cost {
             return Err(Error::Transaction(TransactionError::InsufficientBalance {
-                cost: cost,
+                cost,
                 balance: client.latest_balance(&transaction.sender()),
             }));
         }
@@ -659,7 +657,8 @@ impl Miner {
             .machine()
             .verify_transaction_basic(&transaction)
             .and_then(|_| {
-                self.engine.machine()
+                self.engine
+                    .machine()
                     .verify_transaction_signature(transaction, &best_block_header)
             })
             .and_then(|transaction| self.verify_transaction_miner(client, transaction))
@@ -741,22 +740,6 @@ impl Miner {
 
         Ok(result)
     }
-
-    // fn add_transactions_to_queue(
-    //     &self,
-    //     client: &MiningBlockChainClient,
-    //     transactions: Vec<SignedTransaction>,
-    //     default_origin: TransactionOrigin,
-    //     condition: Option<TransactionCondition>,
-    // ) -> Vec<Result<TransactionImportResult, Error>>
-    // {
-    //     transactions
-    //         .into_iter()
-    //         .map(|transaction| {
-    //             self.add_transaction_to_queue(client, transaction, default_origin, condition.clone())
-    //         })
-    //         .collect()
-    // }
 
     /// Are we allowed to do a non-mandatory reseal?
     fn tx_reseal_allowed(&self) -> bool { Instant::now() > *self.next_allowed_reseal.lock() }
@@ -1258,24 +1241,6 @@ impl MinerService for Miner {
                 .remove_old(&fetch_account, time);
         }
 
-        // re-boradcast
-        // let chain_info = client.chain_info();
-        // let transactions = {
-        //     self.transaction_queue.read().top_transactions_at(
-        //         chain_info.best_block_number,
-        //         chain_info.best_block_timestamp,
-        //     )
-        // };
-
-        // let mut transaction_count = 0;
-        // for transaction in transactions.iter() {
-        //     client.broadcast_transaction(::rlp::encode(transaction).into_vec());
-        //     transaction_count += 1;
-        //     if transaction_count > 200 {
-        //         break;
-        //     }
-        // }
-
         if enacted.len() > 0 || (imported.len() > 0 && false) {
             // --------------------------------------------------------------------------
             // | NOTE Code below requires transaction_queue and sealing_work locks.     |
@@ -1293,7 +1258,7 @@ struct TransactionDetailsProvider<'a> {
 impl<'a> TransactionDetailsProvider<'a> {
     pub fn new(client: &'a MiningBlockChainClient) -> Self {
         TransactionDetailsProvider {
-            client: client,
+            client,
         }
     }
 }

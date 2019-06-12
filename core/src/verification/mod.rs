@@ -64,7 +64,12 @@ impl HeapSizeOf for PreverifiedBlock {
 }
 
 /// Phase 1 quick block verification. Only does checks that are cheap. Operates on a single block
-pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &POWEquihashEngine) -> Result<(), Error> {
+pub fn verify_block_basic(
+    header: &Header,
+    bytes: &[u8],
+    engine: &POWEquihashEngine,
+) -> Result<(), Error>
+{
     verify_header_params(&header, engine, true)?;
     verify_block_integrity(bytes, &header.transactions_root())?;
     engine.verify_block_basic(&header)?;
@@ -121,7 +126,11 @@ pub fn verify_block_family(
     do_full: Option<FullFamilyParams>,
 ) -> Result<(), Error>
 {
-    verify_parent(&header, &parent, engine.machine().params().gas_limit_bound_divisor)?;
+    verify_parent(
+        &header,
+        &parent,
+        engine.machine().params().gas_limit_bound_divisor,
+    )?;
     engine.verify_block_family(&header, &parent, grant_parent)?;
 
     let (_bytes, _txs, _bc, _client) = match do_full {

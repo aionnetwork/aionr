@@ -21,8 +21,6 @@
  ******************************************************************************/
 
 //! Blockchain database client.
-
-mod ancient_import;
 mod config;
 mod error;
 mod client;

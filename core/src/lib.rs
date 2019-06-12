@@ -60,15 +60,10 @@ extern crate db as kvdb;
 extern crate dir;
 extern crate transient_hashmap;
 extern crate linked_hash_map;
-
 extern crate abi;
-#[macro_use]
-extern crate abi_derive;
-#[macro_use]
 extern crate abi_contract;
 #[macro_use]
 extern crate lazy_static;
-
 #[macro_use]
 extern crate rlp_derive;
 extern crate rustc_hex;
@@ -79,8 +74,6 @@ extern crate using_queue;
 extern crate table;
 extern crate memory_cache;
 extern crate journaldb;
-
-#[macro_use]
 extern crate macros;
 #[macro_use]
 extern crate log;
