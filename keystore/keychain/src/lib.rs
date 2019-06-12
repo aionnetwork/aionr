@@ -24,7 +24,6 @@
 
 extern crate blake2b;
 extern crate crypto;
-extern crate dir;
 extern crate itertools;
 extern crate libc;
 extern crate parking_lot;
@@ -33,7 +32,7 @@ extern crate rustc_hex;
 extern crate serde;
 extern crate serde_json;
 extern crate smallvec;
-extern crate subtle;
+//extern crate subtle;
 extern crate time;
 extern crate aion_types;
 extern crate key;

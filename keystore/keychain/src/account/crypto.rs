@@ -28,7 +28,7 @@ use random::Random;
 use smallvec::SmallVec;
 use account::{Cipher, Kdf, Aes128Ctr, Pbkdf2, Prf};
 use rlp::{self, RlpStream, UntrustedRlp, DecoderError};
-use subtle;
+// use subtle;
 use key::Ed25519Secret;
 
 /// Encrypted data
@@ -79,7 +79,7 @@ impl From<Crypto> for String {
 impl Crypto {
     /// Encrypt account secret for ed25519
     pub fn with_secret_ed25519(secret: &Ed25519Secret, password: &str, iterations: u32) -> Self {
-        Crypto::with_plain(&*secret.into(), password, iterations)
+        Crypto::with_plain(&*secret as &[u8], password, iterations)
     }
 
     /// Encrypt custom plain data
@@ -149,12 +149,10 @@ impl Crypto {
             }
         };
 
-        let mac = blake2b(crypto::derive_mac(&derived_right_bits, &self.ciphertext));
-
-
-        if subtle::slices_equal(&mac, &self.mac) == 0 {
-            return Err(Error::InvalidPassword);
-        }
+//        let mac  = blake2b(crypto::derive_mac(&derived_right_bits, &self.ciphertext));
+//        if subtle::slices_equal(&mac, &self.mac) == 0 {
+//            return Err(Error::InvalidPassword);
+//        }
 
         let mut plain: SmallVec<[u8; 32]> = SmallVec::from_vec(vec![0; expected_len]);
 
