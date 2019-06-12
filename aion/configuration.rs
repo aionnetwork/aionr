@@ -665,9 +665,6 @@ mod tests {
     use helpers::{default_network_config};
     use params::SpecType;
     use run::RunCmd;
-
-    extern crate ipnetwork;
-
     use super::*;
 
     #[derive(Debug, PartialEq)]

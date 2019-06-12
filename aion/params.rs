@@ -135,8 +135,8 @@ impl str::FromStr for ResealPolicy {
         };
 
         let reseal = ResealPolicy {
-            own: own,
-            external: external,
+            own,
+            external,
         };
 
         Ok(reseal)
@@ -233,18 +233,17 @@ mod tests {
 
     #[test]
     fn test_spec_type_parsing() {
-        assert_eq!(SpecType::Foundation, "mainnet".parse().unwrap());
-        assert_eq!(SpecType::Foundation, "foundation".parse().unwrap());
+        assert_eq!(SpecType::Default, "mainnet".parse().unwrap());
     }
 
     #[test]
     fn test_spec_type_default() {
-        assert_eq!(SpecType::Foundation, SpecType::default());
+        assert_eq!(SpecType::Default, SpecType::default());
     }
 
     #[test]
     fn test_spec_type_display() {
-        assert_eq!(format!("{}", SpecType::Foundation), "mainnet");
+        assert_eq!(format!("{}", SpecType::Default), "mainnet");
         assert_eq!(format!("{}", SpecType::Custom("foo/bar".into())), "foo/bar");
     }
 
