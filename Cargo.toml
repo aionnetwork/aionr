@@ -36,7 +36,7 @@ acore = { path = "core" }
 acore-bytes = { path = "util/bytes" }
 acore-io = { path = "util/io" }
 blake2b = { path = "util/blake2b" }
-equihash = { path = "equihash" }
+equihash = { path = "util/equihash" }
 logger = { path = "util/logger" }
 acore-stratum = { path = "stratum" }
 aion-types = { path = "util/aion-types" }

@@ -28,34 +28,25 @@ pub trait ChainNotify: Send + Sync {
     /// fires when chain has new blocks.
     fn new_blocks(
         &self,
-        _imported: Vec<H256>,
-        _invalid: Vec<H256>,
-        _enacted: Vec<H256>,
-        _retracted: Vec<H256>,
-        _sealed: Vec<H256>,
+        imported: Vec<H256>,
+        invalid: Vec<H256>,
+        enacted: Vec<H256>,
+        retracted: Vec<H256>,
+        sealed: Vec<H256>,
         // Block bytes.
-        _proposed: Vec<Bytes>,
-        _duration: u64,
-    )
-    {
-        // does nothing by default
-    }
+        proposed: Vec<Bytes>,
+        duration: u64,
+    );
 
     /// fires when chain achieves active mode
-    fn start(&self) {
-        // does nothing by default
-    }
+    fn start(&self) {}
 
     /// fires when chain achieves passive mode
-    fn stop(&self) {
-        // does nothing by default
-    }
+    fn stop(&self) {}
 
     /// fires when chain broadcasts a message
     fn broadcast(&self, _data: Vec<u8>) {}
 
     /// fires when new transactions are received from a peer
-    fn transactions_received(&self, _transactions: &[Bytes]) {
-        // does nothing by default
-    }
+    fn transactions_received(&self, _transactions: &[Bytes]) {}
 }

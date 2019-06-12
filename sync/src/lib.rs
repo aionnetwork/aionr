@@ -52,6 +52,3 @@ pub mod p2p;
 pub mod sync;
 
 extern crate db as kvdb;
-
-#[cfg(test)]
-mod tests;

@@ -68,9 +68,12 @@ use transaction::{
     DEFAULT_TRANSACTION_TYPE, AVM_TRANSACTION_TYPE
 };
 use types::filter::Filter;
-use verification;
 use verification::queue::BlockQueue;
-use verification::{PreverifiedBlock, Verifier};
+use verification::{
+    PreverifiedBlock,
+    verify_block_family,
+    verify_block_final
+};
 use views::BlockView;
 use vms::{EnvInfo, LastHashes};
 
@@ -135,7 +138,7 @@ pub struct Client {
     block_queue: BlockQueue,
     report: RwLock<ClientReport>,
     import_lock: Mutex<()>,
-    verifier: Box<Verifier>,
+    //verifier: Box<Verifier>,
     miner: Arc<Miner>,
     io_channel: Mutex<IoChannel<ClientIoMessage>>,
     notify: RwLock<Vec<Weak<ChainNotify>>>,
@@ -217,7 +220,6 @@ impl Client {
             config.queue.clone(),
             engine.clone(),
             message_channel.clone(),
-            config.verifier_type.verifying_seal(),
         );
 
         let registrar_address = engine
@@ -231,20 +233,20 @@ impl Client {
         let client = Arc::new(Client {
             enabled: AtomicBool::new(true),
             chain: RwLock::new(chain),
-            engine: engine,
-            verifier: verification::new(config.verifier_type.clone()),
-            config: config,
+            engine,
+            //verifier: verification::new(),
+            config,
             db: RwLock::new(db),
             state_db: RwLock::new(state_db),
-            block_queue: block_queue,
+            block_queue,
             report: RwLock::new(Default::default()),
             import_lock: Mutex::new(()),
-            miner: miner,
+            miner,
             io_channel: Mutex::new(message_channel),
             notify: RwLock::new(Vec::new()),
             last_hashes: RwLock::new(VecDeque::new()),
-            factories: factories,
-            history: history,
+            factories,
+            history,
             ancient_verifier: Mutex::new(None),
             registrar: registry::Registry::default(),
             registrar_address,
@@ -284,7 +286,7 @@ impl Client {
                     EpochTransition {
                         block_hash: gh.hash(),
                         block_number: 0,
-                        proof: proof,
+                        proof,
                     },
                 );
 
@@ -396,7 +398,8 @@ impl Client {
         let grant_parent_header = grant_parent.as_ref();
 
         // Verify Block Family
-        let verify_family_result = self.verifier.verify_block_family(
+        let verify_family_result = verify_block_family(
+            //let verify_family_result = self.verifier.verify_block_family(
             header,
             &parent,
             grant_parent_header,
@@ -406,12 +409,6 @@ impl Client {
 
         if let Err(e) = verify_family_result {
             warn!(target: "client", "Stage 3 block verification failed for #{} ({})\nError: {:?}", header.number(), header.hash(), e);
-            return Err(());
-        };
-
-        let verify_external_result = self.verifier.verify_block_external(header, engine);
-        if let Err(e) = verify_external_result {
-            warn!(target: "client", "Stage 4 block verification failed for #{} ({})\nError: {:?}", header.number(), header.hash(), e);
             return Err(());
         };
 
@@ -438,10 +435,7 @@ impl Client {
         })?;
 
         // Final Verification
-        if let Err(e) = self
-            .verifier
-            .verify_block_final(header, locked_block.block().header())
-        {
+        if let Err(e) = verify_block_final(header, locked_block.block().header()) {
             warn!(target: "client", "Stage 5 block verification failed for #{} ({})\nError: {:?}", header.number(), header.hash(), e);
             return Err(());
         }
@@ -794,7 +788,7 @@ impl Client {
                 debug!(target: "client", "Block {} signals epoch end.", hash);
 
                 let pending = PendingTransition {
-                    proof: proof,
+                    proof,
                 };
                 chain.insert_pending_transition(batch, hash, pending);
             }
@@ -824,7 +818,7 @@ impl Client {
                 EpochTransition {
                     block_hash: header.hash(),
                     block_number: header.number(),
-                    proof: proof,
+                    proof,
                 },
             );
 
@@ -1021,7 +1015,7 @@ impl Client {
                 Self::block_hash(&self.chain.read(), &self.miner, id).map(|hash| {
                     TransactionAddress {
                         block_hash: hash,
-                        index: index,
+                        index,
                     }
                 })
             }

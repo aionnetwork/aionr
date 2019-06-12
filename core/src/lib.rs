@@ -86,23 +86,16 @@ extern crate macros;
 extern crate log;
 #[macro_use]
 extern crate trace_time;
-
 extern crate tempdir;
-
 pub extern crate keychain;
-
 extern crate equihash;
-
-// for Aion FastVM
 extern crate vms;
 // for aion token bridge
 extern crate tiny_keccak;
 extern crate num_bigint;
 extern crate bincode;
 extern crate bytebuffer;
-
 extern crate tokio;
-
 extern crate avm_abi;
 
 pub mod account_provider;
@@ -113,7 +106,6 @@ pub mod db;
 pub mod encoded;
 pub mod engines;
 pub mod error;
-pub mod ethereum;
 pub mod executed;
 pub mod header;
 pub mod machine;

@@ -206,6 +206,7 @@ impl QueueSignal {
     fn reset(&self) { self.signalled.store(false, AtomicOrdering::Relaxed); }
 }
 
+// chris
 struct Verification<K: Kind> {
     // All locks must be captured in the order declared here.
     unverified: Mutex<VecDeque<K::Unverified>>,
@@ -215,7 +216,7 @@ struct Verification<K: Kind> {
     more_to_verify: SMutex<()>,
     empty: SMutex<()>,
     sizes: Sizes,
-    check_seal: bool,
+    // check_seal: bool,
 }
 
 impl<K: Kind> VerificationQueue<K> {
@@ -224,7 +225,7 @@ impl<K: Kind> VerificationQueue<K> {
         config: Config,
         engine: Arc<EthEngine>,
         message_channel: IoChannel<ClientIoMessage>,
-        check_seal: bool,
+        //check_seal: bool,
     ) -> Self
     {
         let verification = Arc::new(Verification {
@@ -239,7 +240,7 @@ impl<K: Kind> VerificationQueue<K> {
                 verifying: AtomicUsize::new(0),
                 verified: AtomicUsize::new(0),
             },
-            check_seal: check_seal,
+            //check_seal: check_seal,
         });
         let more_to_verify = Arc::new(SCondvar::new());
         let deleting = Arc::new(AtomicBool::new(false));
@@ -283,19 +284,19 @@ impl<K: Kind> VerificationQueue<K> {
         }
 
         VerificationQueue {
-            engine: engine,
-            ready_signal: ready_signal,
-            more_to_verify: more_to_verify,
-            verification: verification,
-            deleting: deleting,
+            engine,
+            ready_signal,
+            more_to_verify,
+            verification,
+            deleting,
             processing: RwLock::new(HashMap::new()),
-            empty: empty,
+            empty,
             ticks_since_adjustment: AtomicUsize::new(0),
             max_queue_size: cmp::max(config.max_queue_size, MIN_QUEUE_LIMIT),
             max_mem_use: cmp::max(config.max_mem_use, MIN_MEM_LIMIT),
-            scale_verifiers: scale_verifiers,
-            verifier_handles: verifier_handles,
-            state: state,
+            scale_verifiers,
+            verifier_handles,
+            state,
             total_difficulty: RwLock::new(0.into()),
         }
     }
@@ -379,7 +380,12 @@ impl<K: Kind> VerificationQueue<K> {
             };
 
             let hash = item.hash();
-            let is_ready = match K::verify(item, &*engine, verification.check_seal) {
+
+            // chris
+            let is_ready = match K::verify(
+                item, &*engine,
+                //verification.check_seal
+            ) {
                 Ok(verified) => {
                     let mut verifying = verification.verifying.lock();
                     let mut idx = None;
@@ -817,7 +823,7 @@ mod tests {
 
         let mut config = Config::default();
         config.verifier_settings.scale_verifiers = auto_scale;
-        BlockQueue::new(config, engine, IoChannel::disconnected(), true)
+        BlockQueue::new(config, engine, IoChannel::disconnected())
     }
 
     #[test]
@@ -825,7 +831,7 @@ mod tests {
         // TODO better test
         let spec = Spec::new_test();
         let engine = spec.engine;
-        let _ = BlockQueue::new(Config::default(), engine, IoChannel::disconnected(), true);
+        let _ = BlockQueue::new(Config::default(), engine, IoChannel::disconnected());
     }
 
     #[test]
@@ -913,7 +919,7 @@ mod tests {
         let engine = spec.engine;
         let mut config = Config::default();
         config.max_mem_use = super::MIN_MEM_LIMIT; // empty queue uses about 15000
-        let queue = BlockQueue::new(config, engine, IoChannel::disconnected(), true);
+        let queue = BlockQueue::new(config, engine, IoChannel::disconnected());
         assert!(!queue.queue_info().is_full());
         let mut blocks = get_good_dummy_block_seq(50);
         for b in blocks.drain(..) {
@@ -933,7 +939,7 @@ mod tests {
 
         queue.scale_verifiers(0);
 
-        assert!(queue.num_verifiers() == 1);
+        assert_eq!(queue.num_verifiers(), 1);
     }
 
     #[test]

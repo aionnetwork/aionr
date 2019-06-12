@@ -62,7 +62,6 @@ pub mod backend;
 
 pub use account::{
     AionVMAccount,
-// Account,
     VMAccount,
     AccType,
     RequireCache,

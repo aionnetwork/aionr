@@ -83,7 +83,6 @@ pub struct RunCmd {
     pub wal: bool,
     pub vm_type: VMType,
     pub stratum: StratumOptions,
-    pub check_seal: bool,
     pub verifier_settings: VerifierSettings,
     pub no_persistent_txqueue: bool,
 }
@@ -168,7 +167,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         algorithm,
         cmd.pruning_history,
         cmd.pruning_memory,
-        cmd.check_seal,
     );
 
     client_config.queue.verifier_settings = cmd.verifier_settings;
@@ -301,16 +299,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     user_defaults.fat_db = fat_db;
     user_defaults.save(&user_defaults_path)?;
 
-    // start miner module
-    // let runtime_miner = tokio::runtime::Builder::new()
-    //     .core_threads(1)
-    //     .name_prefix("seal-block-loop #")
-    //     .build()
-    //     .expect("seal block runtime loop init failed");
-    // let executor_miner = runtime_miner.executor();
-    // let close = run_miner(executor_miner.clone(), client.clone());
-
-    // enable Sync module
+    // enable sync module
     network_manager.start_network();
 
     if let Some(config_path) = cmd.dirs.config {
@@ -408,7 +397,7 @@ fn print_running_environment(
         info!(target: "run", "Start without config.");
     }
     match spec {
-        SpecType::Foundation => {
+        SpecType::Default => {
             info!(target: "run", "Load built-in Mainnet Genesis Spec.");
         }
         SpecType::Custom(ref filename) => {

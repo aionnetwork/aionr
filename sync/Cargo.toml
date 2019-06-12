@@ -4,8 +4,6 @@ name = "sync"
 version = "0.2.0"
 authors = ["Well Shang <jia@aion.network>"]
 
-[lib]
-
 [dependencies]
 blake2b = { path = "../util/blake2b" }
 acore-bytes = { path = "../util/bytes" }

@@ -59,8 +59,4 @@ pub use dbconfigs::{DatabaseConfig, CompactionProfile, RepositoryConfig};
 pub type Key = ElasticArray32<u8>;
 pub type DBValue = ElasticArray128<u8>;
 pub type Result<T> = ::std::result::Result<T, Error>;
-
-#[cfg(test)]
-mod tests;
-/// Required length of prefixes.
 pub const PREFIX_LEN: usize = 12;

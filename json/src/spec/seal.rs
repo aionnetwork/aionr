@@ -27,7 +27,6 @@ use bytes::Bytes;
 
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct POWEquihash {
-
     pub nonce: H256,
 
     pub solution: Bytes,
@@ -36,7 +35,6 @@ pub struct POWEquihash {
 /// Seal variants.
 #[derive(Debug, PartialEq, Deserialize)]
 pub enum Seal {
-
     #[serde(rename = "POWEquihash")]
     POWEquihash(POWEquihash),
 }

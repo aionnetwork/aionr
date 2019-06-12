@@ -32,8 +32,6 @@ extern crate common_types as types;
 extern crate log;
 extern crate rustc_hex;
 extern crate db as kvdb;
-#[cfg(test)]
-mod tests;
 extern crate rlp;
 extern crate patricia_trie as trie;
 extern crate vm_common;

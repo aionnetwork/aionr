@@ -50,8 +50,6 @@ mod protobuf_engine;
 mod pb_api_util;
 mod api_process;
 mod tx_pending_status;
-#[cfg(test)]
-mod tests;
 
 pub use protobuf_engine::PBEngine;
 pub use protobuf_engine::WalletApiConfiguration;
