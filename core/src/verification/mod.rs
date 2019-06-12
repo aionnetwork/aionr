@@ -39,7 +39,7 @@ use unexpected::{Mismatch, OutOfBounds};
 
 use blockchain::*;
 use client::BlockChainClient;
-use engines::EthEngine;
+use engines::POWEquihashEngine;
 use error::{BlockError, Error};
 use header::{BlockNumber, Header};
 use transaction::{SignedTransaction, UnverifiedTransaction};
@@ -64,7 +64,7 @@ impl HeapSizeOf for PreverifiedBlock {
 }
 
 /// Phase 1 quick block verification. Only does checks that are cheap. Operates on a single block
-pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &EthEngine) -> Result<(), Error> {
+pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &POWEquihashEngine) -> Result<(), Error> {
     verify_header_params(&header, engine, true)?;
     verify_block_integrity(bytes, &header.transactions_root())?;
     engine.verify_block_basic(&header)?;
@@ -74,7 +74,7 @@ pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &EthEngine) -> 
         .iter()
         .map(|rlp| rlp.as_val::<UnverifiedTransaction>())
     {
-        engine.verify_transaction_basic(&t?)?;
+        engine.machine().verify_transaction_basic(&t?)?;
     }
     Ok(())
 }
@@ -85,7 +85,7 @@ pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &EthEngine) -> 
 pub fn verify_block_unordered(
     header: Header,
     bytes: Bytes,
-    engine: &EthEngine,
+    engine: &POWEquihashEngine,
 ) -> Result<PreverifiedBlock, Error>
 {
     engine.verify_block_unordered(&header)?;
@@ -93,7 +93,7 @@ pub fn verify_block_unordered(
     {
         let v = BlockView::new(&bytes);
         for t in v.transactions() {
-            let t = engine.verify_transaction_signature(t, &header)?;
+            let t = engine.machine().verify_transaction_signature(t, &header)?;
             transactions.push(t);
         }
     }
@@ -117,11 +117,11 @@ pub fn verify_block_family(
     header: &Header,
     parent: &Header,
     grant_parent: Option<&Header>,
-    engine: &EthEngine,
+    engine: &POWEquihashEngine,
     do_full: Option<FullFamilyParams>,
 ) -> Result<(), Error>
 {
-    verify_parent(&header, &parent, engine.params().gas_limit_bound_divisor)?;
+    verify_parent(&header, &parent, engine.machine().params().gas_limit_bound_divisor)?;
     engine.verify_block_family(&header, &parent, grant_parent)?;
 
     let (_bytes, _txs, _bc, _client) = match do_full {
@@ -164,7 +164,7 @@ pub fn verify_block_final(expected: &Header, got: &Header) -> Result<(), Error> 
 /// Check basic header parameters.
 pub fn verify_header_params(
     header: &Header,
-    engine: &EthEngine,
+    engine: &POWEquihashEngine,
     is_full: bool,
 ) -> Result<(), Error>
 {
@@ -190,7 +190,7 @@ pub fn verify_header_params(
             found: header.gas_used().clone(),
         })));
     }
-    let min_gas_limit = engine.params().min_gas_limit;
+    let min_gas_limit = engine.machine().params().min_gas_limit;
     if header.gas_limit() < &min_gas_limit {
         return Err(From::from(BlockError::InvalidGasLimit(OutOfBounds {
             min: Some(min_gas_limit),
@@ -198,7 +198,7 @@ pub fn verify_header_params(
             found: header.gas_limit().clone(),
         })));
     }
-    let maximum_extra_data_size = engine.maximum_extra_data_size();
+    let maximum_extra_data_size = engine.machine().maximum_extra_data_size();
     if header.number() != 0 && header.extra_data().len() > maximum_extra_data_size {
         return Err(From::from(BlockError::ExtraDataOutOfBounds(OutOfBounds {
             min: None,
@@ -442,12 +442,12 @@ mod tests {
         }
     }
 
-    fn basic_test(bytes: &[u8], engine: &EthEngine) -> Result<(), Error> {
+    fn basic_test(bytes: &[u8], engine: &POWEquihashEngine) -> Result<(), Error> {
         let header = BlockView::new(bytes).header();
         verify_block_basic(&header, bytes, engine)
     }
 
-    fn family_test<BC>(bytes: &[u8], engine: &EthEngine, bc: &BC) -> Result<(), Error>
+    fn family_test<BC>(bytes: &[u8], engine: &POWEquihashEngine, bc: &BC) -> Result<(), Error>
     where BC: BlockProvider {
         let view = BlockView::new(bytes);
         let header = view.header();

@@ -360,9 +360,6 @@ pub trait EthEngine: Engine<::machine::EthereumMachine> {
     fn verify_transaction_basic(&self, t: &UnverifiedTransaction) -> Result<(), Error> {
         self.machine().verify_transaction_basic(t)
     }
-
-    /// Additional information.
-    fn additional_params(&self) -> HashMap<String, String> { self.machine().additional_params() }
 }
 
 // convenience wrappers for existing functions.

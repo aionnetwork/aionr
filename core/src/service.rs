@@ -105,13 +105,11 @@ impl ClientService {
         });
         io_service.register_handler(client_io)?;
 
-        spec.engine.register_client(Arc::downgrade(&client) as _);
-
         let stop_guard = StopGuard::new();
 
         Ok(ClientService {
             io_service: Arc::new(io_service),
-            client: client,
+            client,
             database: dbs,
             _stop_guard: stop_guard,
         })
@@ -246,11 +244,9 @@ impl IoHandler<ClientIoMessage> for ClientIoHandler {
                 self.client.import_verified_blocks();
             }
             ClientIoMessage::NewMessage(ref message) => {
-                if let Err(e) = self.client.engine().handle_message(message) {
-                    trace!(target: "io", "Invalid message received: {}", e);
-                }
+                // trace!(target: "io", "Invalid message received: {}", e);
             }
-            _ => {} // ignore other messages
+            _ => {}
         }
     }
 }

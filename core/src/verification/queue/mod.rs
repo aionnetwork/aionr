@@ -33,7 +33,7 @@ use aion_types::{H256, U256};
 use parking_lot::{Condvar, Mutex, RwLock};
 use io::*;
 use error::*;
-use engines::EthEngine;
+use engines::POWEquihashEngine;
 use service::*;
 
 use self::kind::{BlockLike, Kind};
@@ -144,7 +144,7 @@ struct Sizes {
 /// A queue of items to be verified. Sits between network or other I/O and the `BlockChain`.
 /// Keeps them in the same order as inserted, minus invalid items.
 pub struct VerificationQueue<K: Kind> {
-    engine: Arc<EthEngine>,
+    engine: Arc<POWEquihashEngine>,
     more_to_verify: Arc<SCondvar>,
     verification: Arc<Verification<K>>,
     deleting: Arc<AtomicBool>,
@@ -223,7 +223,7 @@ impl<K: Kind> VerificationQueue<K> {
     /// Creates a new queue instance.
     pub fn new(
         config: Config,
-        engine: Arc<EthEngine>,
+        engine: Arc<POWEquihashEngine>,
         message_channel: IoChannel<ClientIoMessage>,
         //check_seal: bool,
     ) -> Self
@@ -303,7 +303,7 @@ impl<K: Kind> VerificationQueue<K> {
 
     fn verify(
         verification: Arc<Verification<K>>,
-        engine: Arc<EthEngine>,
+        engine: Arc<POWEquihashEngine>,
         wait: Arc<SCondvar>,
         ready: Arc<QueueSignal>,
         empty: Arc<SCondvar>,

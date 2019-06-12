@@ -25,13 +25,11 @@
 mod ancient_import;
 mod config;
 mod error;
-mod test_client;
 mod client;
 
 pub use self::client::*;
 pub use self::config::{ClientConfig, DatabaseCompactionProfile, BlockChainConfig, VMType};
 pub use self::error::Error;
-pub use self::test_client::{TestBlockChainClient, EachBlockWith};
 pub use self::chain_notify::ChainNotify;
 pub use self::traits::{BlockChainClient, MiningBlockChainClient, EngineClient};
 

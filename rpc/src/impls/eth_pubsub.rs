@@ -185,22 +185,23 @@ impl<C: BlockChainClient> ChainNotify for ChainNotificationHandler<C> {
         const EXTRA_INFO_PROOF: &'static str = "Object exists in in blockchain (fetched earlier), \
                                                 extra_info is always available if object exists; \
                                                 qed";
-        let headers = enacted
-            .iter()
-            .filter_map(|hash| self.client.block_header(BlockId::Hash(*hash)))
-            .map(|header| {
-                let hash = header.hash();
-                (
-                    header,
-                    self.client
-                        .block_extra_info(BlockId::Hash(hash))
-                        .expect(EXTRA_INFO_PROOF),
-                )
-            })
-            .collect::<Vec<_>>();
-
-        // Headers
-        self.notify_heads(&headers);
+        // chris
+//        let headers = enacted
+//            .iter()
+//            .filter_map(|hash| self.client.block_header(BlockId::Hash(*hash)))
+//            .map(|header| {
+//                let hash = header.hash();
+//                (
+//                    header,
+//                    self.client
+//                        .block_extra_info(BlockId::Hash(hash))
+//                        .expect(EXTRA_INFO_PROOF),
+//                )
+//            })
+//            .collect::<Vec<_>>();
+//
+//        // Headers
+//        self.notify_heads(&headers);
 
         // Enacted logs
         self.notify_logs(&enacted, |filter| {

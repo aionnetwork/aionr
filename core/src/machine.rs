@@ -201,13 +201,6 @@ impl EthereumMachine {
 
         Ok(())
     }
-
-    /// Additional params.
-    pub fn additional_params(&self) -> HashMap<String, String> {
-        hash_map![
-            "registrar".to_owned() => format!("{:x}", self.params.registrar)
-        ]
-    }
 }
 
 /// Auxiliary data fetcher for an Ethereum machine. In Ethereum-like machines

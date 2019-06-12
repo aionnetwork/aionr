@@ -35,7 +35,7 @@ use bytes::Bytes;
 use unexpected::Mismatch;
 
 use vms::{EnvInfo, LastHashes};
-use engines::EthEngine;
+use engines::POWEquihashEngine;
 use error::{Error, BlockError};
 use factory::Factories;
 use header::{Header, Seal};
@@ -105,8 +105,8 @@ impl ExecutedBlock {
             transactions: Default::default(),
             receipts: Default::default(),
             transactions_set: Default::default(),
-            state: state,
-            last_hashes: last_hashes,
+            state,
+            last_hashes,
         }
     }
 
@@ -187,7 +187,7 @@ impl ::aion_machine::LiveBlock for ExecutedBlock {
 /// maintain the system `state()`. We also archive execution receipts in preparation for later block creation.
 pub struct OpenBlock<'x> {
     block: ExecutedBlock,
-    engine: &'x EthEngine,
+    engine: &'x POWEquihashEngine,
 }
 
 /// Just like `OpenBlock`, except that we've applied `Engine::on_close_block`, finished up the non-seal header fields,
@@ -218,7 +218,7 @@ pub struct SealedBlock {
 impl<'x> OpenBlock<'x> {
     /// Create a new `OpenBlock` ready for transaction pushing.
     pub fn new(
-        engine: &'x EthEngine,
+        engine: &'x POWEquihashEngine,
         factories: Factories,
         db: StateDB,
         parent: &Header,
@@ -236,7 +236,7 @@ impl<'x> OpenBlock<'x> {
         let state = State::from_existing(
             db,
             parent.state_root().clone(),
-            engine.account_start_nonce(number),
+            engine.machine().account_start_nonce(number),
             factories,
             kvdb.clone(),
         )?;
@@ -252,7 +252,7 @@ impl<'x> OpenBlock<'x> {
         r.set_extra_data(extra_data);
         r.block.header.note_dirty();
 
-        let gas_floor_target = cmp::max(gas_range_target.0, engine.params().min_gas_limit);
+        let gas_floor_target = cmp::max(gas_range_target.0, engine.machine().params().min_gas_limit);
         let gas_ceil_target = cmp::max(gas_range_target.1, gas_floor_target);
 
         engine.machine().populate_from_parent(
@@ -264,7 +264,6 @@ impl<'x> OpenBlock<'x> {
         engine.populate_from_parent(&mut r.block.header, parent, grant_parent);
 
         engine.machine().on_new_block(&mut r.block)?;
-        engine.on_new_block(&mut r.block, is_epoch_begin)?;
 
         Ok(r)
     }
@@ -292,7 +291,7 @@ impl<'x> OpenBlock<'x> {
 
     /// Alter the extra_data for the block.
     pub fn set_extra_data(&mut self, extra_data: Bytes) {
-        let len = self.engine.maximum_extra_data_size();
+        let len = self.engine.machine().maximum_extra_data_size();
         let mut data = extra_data;
         data.resize(len, 0u8);
         self.block.header.set_extra_data(data);
@@ -462,7 +461,7 @@ impl<'x> OpenBlock<'x> {
 
         ClosedBlock {
             block: s.block,
-            unclosed_state: unclosed_state,
+            unclosed_state,
         }
     }
 
@@ -546,13 +545,13 @@ impl ClosedBlock {
     }
 
     /// Given an engine reference, reopen the `ClosedBlock` into an `OpenBlock`.
-    pub fn reopen(self, engine: &EthEngine) -> OpenBlock {
+    pub fn reopen(self, engine: &POWEquihashEngine) -> OpenBlock {
         // revert rewards (i.e. set state back at last transaction's state).
         let mut block = self.block;
         block.state = self.unclosed_state;
         OpenBlock {
-            block: block,
-            engine: engine,
+            block,
+            engine,
         }
     }
 }
@@ -564,7 +563,7 @@ impl LockedBlock {
     /// Provide a valid seal in order to turn this into a `SealedBlock`.
     ///
     /// NOTE: This does not check the validity of `seal` with the engine.
-    pub fn seal(self, engine: &EthEngine, seal: Vec<Bytes>) -> Result<SealedBlock, BlockError> {
+    pub fn seal(self, engine: &POWEquihashEngine, seal: Vec<Bytes>) -> Result<SealedBlock, BlockError> {
         let expected_seal_fields = engine.seal_fields(self.header());
         let mut s = self;
         if seal.len() != expected_seal_fields {
@@ -584,7 +583,7 @@ impl LockedBlock {
     /// Returns the `ClosedBlock` back again if the seal is no good.
     pub fn try_seal(
         self,
-        engine: &EthEngine,
+        engine: &POWEquihashEngine,
         seal: Vec<Bytes>,
     ) -> Result<SealedBlock, (Error, LockedBlock)>
     {
@@ -631,7 +630,7 @@ impl IsBlock for SealedBlock {
 pub fn enact(
     header: &Header,
     transactions: &[SignedTransaction],
-    engine: &EthEngine,
+    engine: &POWEquihashEngine,
     db: StateDB,
     parent: &Header,
     grant_parent: Option<&Header>,
@@ -646,7 +645,7 @@ pub fn enact(
             let s = State::from_existing(
                 db.boxed_clone(),
                 parent.state_root().clone(),
-                engine.account_start_nonce(parent.number() + 1),
+                engine.machine().account_start_nonce(parent.number() + 1),
                 factories.clone(),
                 kvdb.clone(),
             )?;
@@ -654,9 +653,6 @@ pub fn enact(
                 header.number(), s.root(), header.author(), s.balance(&header.author())?);
         }
     }
-    // let s = State::from_existing(db.boxed_clone(), parent.state_root().clone(), engine.account_start_nonce(parent.number() + 1), factories.clone())?;
-    // error!(target: "enact", "num={}, root={}, author={}, author_balance={}\n",
-    //     header.number(), s.root(), header.author(), s.balance(&header.author())?);
 
     let mut b = OpenBlock::new(
         engine,
@@ -791,7 +787,7 @@ fn push_transactions(
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 pub fn enact_verified(
     block: &PreverifiedBlock,
-    engine: &EthEngine,
+    engine: &POWEquihashEngine,
     db: StateDB,
     parent: &Header,
     grant_parent: Option<&Header>,
@@ -984,14 +980,14 @@ mod tests {
 
         let db = e.drain();
         assert_eq!(orig_db.journal_db().keys(), db.journal_db().keys());
-        assert!(
+        assert_eq!(
             orig_db
                 .journal_db()
                 .keys()
                 .iter()
                 .filter(|k| orig_db.journal_db().get(k.0) != db.journal_db().get(k.0))
                 .next()
-                == None
+                , None
         );
     }
 }

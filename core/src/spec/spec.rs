@@ -38,7 +38,7 @@ use rlp::{Rlp, RlpStream};
 use types::BlockNumber;
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
 
-use engines::{EthEngine, POWEquihashEngine};
+use engines::POWEquihashEngine;
 use error::Error;
 use executive::Executive;
 use factory::Factories;
@@ -65,8 +65,6 @@ pub struct CommonParams {
     pub min_gas_limit: U256,
     /// Gas limit bound divisor (how much gas limit can change per block)
     pub gas_limit_bound_divisor: U256,
-    /// Registrar contract address.
-    pub registrar: Address,
     /// monetary policy update block number.
     pub monetary_policy_update: Option<BlockNumber>,
     /// Transaction permission managing contract address.
@@ -80,7 +78,6 @@ impl From<ajson::spec::Params> for CommonParams {
             maximum_extra_data_size: if data_size > 0 { data_size } else { 32usize },
             min_gas_limit: p.min_gas_limit.into(),
             gas_limit_bound_divisor: p.gas_limit_bound_divisor.into(),
-            registrar: p.registrar.map_or_else(Address::new, Into::into),
             monetary_policy_update: p.monetary_policy_update.map(Into::into),
             transaction_permission_contract: p.transaction_permission_contract.map(Into::into),
         }
@@ -121,7 +118,7 @@ pub struct Spec {
     /// User friendly spec name
     pub name: String,
     /// What engine are we using for this?
-    pub engine: Arc<EthEngine>,
+    pub engine: Arc<POWEquihashEngine>,
     /// Name of the subdir inside the main data dir to use for chain data and settings.
     pub data_dir: String,
     /// The genesis block's parent hash field.
@@ -264,7 +261,7 @@ impl Spec {
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
         premine: U256,
-    ) -> Arc<EthEngine>
+    ) -> Arc<POWEquihashEngine>
     {
         let machine = Self::machine(&engine_spec, params, builtins, premine);
 
@@ -301,13 +298,11 @@ impl Spec {
             );
         }
 
-        let start_nonce = self.engine.account_start_nonce(0);
-
         let (root, db) = {
             let mut state = State::from_existing(
                 db,
                 root,
-                start_nonce,
+                U256::zero(),
                 factories.clone(),
                 Arc::new(MemoryDBRepository::new()),
             )?;
@@ -373,9 +368,6 @@ impl Spec {
 
     /// Return the state root for the genesis state, memoising accordingly.
     pub fn state_root(&self) -> H256 { self.state_root_memo.read().clone() }
-
-    /// Get common blockchain parameters.
-    pub fn params(&self) -> &CommonParams { &self.engine.params() }
 
     /// Get the header of the genesis block.
     pub fn genesis_header(&self) -> Header {
@@ -467,67 +459,6 @@ impl Spec {
         ajson::spec::Spec::load(reader)
             .map_err(fmt_err)
             .and_then(|x| load_from(params.into(), x).map_err(fmt_err))
-    }
-
-    /// initialize genesis epoch data, using in-memory database for
-    /// constructor.
-    pub fn genesis_epoch_data(&self) -> Result<Vec<u8>, String> {
-        use journaldb;
-        use kvdb::MockDbRepository;
-        use transaction::{Action, Transaction};
-
-        let genesis = self.genesis_header();
-        let db_configs = vec!["epoch".into()];
-        let factories = Default::default();
-        let mut db = journaldb::new(
-            Arc::new(MockDbRepository::init(db_configs)),
-            journaldb::Algorithm::Archive,
-            "epoch",
-        );
-
-        self.ensure_db_good(BasicBackend(db.as_hashstore_mut()), &factories)
-            .map_err(|e| format!("Unable to initialize genesis state: {}", e))?;
-
-        let call = |a, d| {
-            let mut db = db.boxed_clone();
-            let env_info = ::vms::EnvInfo {
-                number: 0,
-                author: *genesis.author(),
-                timestamp: genesis.timestamp(),
-                difficulty: *genesis.difficulty(),
-                gas_limit: *genesis.gas_limit(),
-                last_hashes: Arc::new(Vec::new()),
-                gas_used: 0.into(),
-            };
-
-            let from = Address::default();
-            let tx = Transaction::new(
-                self.engine.account_start_nonce(0),
-                U256::default(),
-                U256::from(50_000_000), // TODO: share with client.
-                Action::Call(a),
-                U256::default(),
-                d,
-                DEFAULT_TRANSACTION_TYPE,
-            )
-            .fake_sign(from);
-
-            let res = ::state::prove_transaction(
-                db.as_hashstore_mut(),
-                *genesis.state_root(),
-                &tx,
-                self.engine.machine(),
-                &env_info,
-                factories.clone(),
-                true,
-                Arc::new(MemoryDBRepository::new()),
-            );
-
-            res.map(|(out, proof)| (out, proof.into_iter().map(|x| x.into_vec()).collect()))
-                .ok_or_else(|| "Failed to prove call: insufficient state".into())
-        };
-
-        self.engine.genesis_epoch_data(&genesis, &call)
     }
 }
 

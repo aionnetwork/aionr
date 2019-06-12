@@ -170,13 +170,6 @@ pub trait BlockChainClient: Sync + Send {
     /// Import a block into the blockchain.
     fn import_block(&self, bytes: Bytes) -> Result<H256, BlockImportError>;
 
-    /// Import a block with transaction receipts. Does no sealing and transaction validation.
-    fn import_block_with_receipts(
-        &self,
-        block_bytes: Bytes,
-        receipts_bytes: Bytes,
-    ) -> Result<H256, BlockImportError>;
-
     /// Get block queue information.
     fn queue_info(&self) -> BlockQueueInfo;
 
@@ -188,9 +181,6 @@ pub trait BlockChainClient: Sync + Send {
 
     /// Get blockchain information.
     fn chain_info(&self) -> BlockChainInfo;
-
-    /// Get the registrar address, if it exists.
-    fn additional_params(&self) -> BTreeMap<String, String>;
 
     /// Get the best block header.
     fn best_block_header(&self) -> encoded::Header;
@@ -293,20 +283,15 @@ pub trait BlockChainClient: Sync + Send {
     /// that a subsystem has reason to believe this executable incapable of syncing the chain.
     fn disable(&self);
 
-    /// Returns engine-related extra info for `BlockId`.
-    fn block_extra_info(&self, id: BlockId) -> Option<BTreeMap<String, String>>;
+    // chris
+    //// Returns engine-related extra info for `BlockId`.
+    // fn block_extra_info(&self, id: BlockId) -> Option<BTreeMap<String, String>>;
 
     /// Returns information about pruning/data availability.
     fn pruning_info(&self) -> PruningInfo;
 
     /// Like `call`, but with various defaults. Designed to be used for calling contracts.
     fn call_contract(&self, id: BlockId, address: Address, data: Bytes) -> Result<Bytes, String>;
-
-    /// Get the address of the registry itself.
-    fn registrar_address(&self) -> Option<Address>;
-
-    /// Get the address of a particular blockchain service, if available.
-    fn registry_address(&self, name: String, block: BlockId) -> Option<Address>;
 }
 
 /// Extended client interface used for mining
