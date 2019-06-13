@@ -355,11 +355,14 @@ mod tests {
 
 #[cfg(test)]
 mod bench {
+
+    extern crate tiny_keccak;
+
     use std::iter::repeat;
 
     use super::{Blake2b, OUT_BYTES};
     use std::time::Instant;
-    use tiny_keccak::keccak256;
+    use self::tiny_keccak::keccak256;
 
     fn bench_chunk_size(n: usize, count: u64) {
         let mut h = Blake2b::new(OUT_BYTES);

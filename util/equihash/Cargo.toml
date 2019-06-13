@@ -6,3 +6,6 @@ version = "0.1.0"
 blake2b = { path = "../blake2b" }
 acore-bytes = { path = "../bytes" }
 log = "0.3"
+
+[dev-dependencies]
+rustc-hex = "2.0.1"
