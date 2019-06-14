@@ -26,3 +26,4 @@ uuid = { version = "0.6.5", features = ["v4"] }
 
 [dev-dependencies]
 matches = "0.1"
+tempdir = "0.3.7"

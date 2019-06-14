@@ -45,6 +45,7 @@ extern crate serde_derive;
 
 pub mod accounts_dir;
 pub mod ethkey;
+pub mod secret_store;
 
 mod account;
 mod json;
@@ -53,7 +54,6 @@ mod error;
 mod ethstore;
 mod import;
 mod random;
-mod secret_store;
 
 pub use self::account::{SafeAccount, Crypto};
 pub use self::error::Error;
