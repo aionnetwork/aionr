@@ -22,21 +22,14 @@
 
 #![warn(unused_extern_crates)]
 
+extern crate trie_standardmap;
+extern crate acore_bytes;
 extern crate aion_types;
 extern crate blake2b;
 extern crate rlp;
 extern crate acore_bytes as bytes;
 extern crate elastic_array;
 extern crate db;
-
-#[cfg(test)]
-extern crate trie_standardmap as standardmap;
-
-#[cfg(test)]
-extern crate acore_bytes;
-
-#[cfg(test)]
-extern crate trie_standardmap;
 
 #[macro_use]
 extern crate log;

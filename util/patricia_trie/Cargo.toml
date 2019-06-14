@@ -14,6 +14,7 @@ blake2b = { path = "../blake2b" }
 rlp = { version = "0.2.1", path = "../rlp" }
 triehash = { version = "0.1.0", path = "../triehash" }
 db = {path = "../../db/core" }
+trie-standardmap = { path = "../trie-standardmap" }
 
 [dev-dependencies]
 trie-standardmap = { path = "../trie-standardmap" }
