@@ -31,7 +31,6 @@ extern crate log;
 extern crate lru_cache;
 extern crate rand;
 extern crate rustc_hex;
-extern crate serde;
 #[macro_use]
 extern crate serde_derive;
 extern crate state;

@@ -42,6 +42,7 @@ pub struct DbRepository {
     /// db flush priority, cause Btreemap would sorted key by Dictionary order.
     db_priority: Vec<DbName>,
     /// dbs config, useful in reopening db.
+    #[cfg(test)]
     configs: Vec<RepositoryConfig>,
 }
 /// db repository mock instance, useful in tests
@@ -49,19 +50,18 @@ pub struct MockDbRepository {
     ///mockdb in repository
     dbs: HashMap<DbName, RwLock<MockDb>>,
     /// dbs config
+    #[cfg(test)]
     configs: Vec<String>,
 }
 
 pub struct MemoryDBRepository {
-    dbs: HashMap<DbName, RwLock<MemoryDB>>,
-    configs: Vec<String>,
+    dbs: HashMap<DbName, RwLock<MemoryDB>>
 }
 
 impl MemoryDBRepository {
     pub fn new() -> Self {
         MemoryDBRepository {
-            dbs: HashMap::new(),
-            configs: Vec::new(),
+            dbs: HashMap::new()
         }
     }
     fn flush(&self) -> Result<()> { Ok(()) }
@@ -78,6 +78,7 @@ impl DbRepository {
     pub fn insert_db(&mut self, _configs: Vec<RepositoryConfig>) -> Result<()> { unimplemented!() }
     /// init repository
     pub fn init(configs: Vec<RepositoryConfig>) -> Result<DbRepository> {
+        #[cfg(test)]
         let dbconfigs = configs.clone();
         let mut dbs = BTreeMap::new();
         let mut db_names = vec![];
@@ -96,8 +97,9 @@ impl DbRepository {
             };
         }
         let dbrep = DbRepository {
-            dbs: dbs,
+            dbs,
             db_priority: db_names,
+            #[cfg(test)]
             configs: dbconfigs,
         };
         Ok(dbrep)
@@ -121,11 +123,13 @@ impl DbRepository {
         Ok(())
     }
     /// close all dbs
+    #[cfg(test)]
     fn close_all(&mut self) {
         self.db_priority.clear();
         self.dbs.clear();
     }
     /// reopen all dbs
+    #[cfg(test)]
     fn open_all(&mut self) {
         self.close_all();
         let configs = self.configs.clone();
@@ -149,6 +153,7 @@ impl Drop for DbRepository {
 impl MockDbRepository {
     /// init db repository
     pub fn init(configs: Vec<String>) -> Self {
+        #[cfg(test)]
         let dbconfigs = configs.clone();
         let mut dbs = HashMap::new();
         for db_name in configs {
@@ -156,15 +161,18 @@ impl MockDbRepository {
             dbs.insert(db_name, RwLock::new(db));
         }
         MockDbRepository {
-            dbs: dbs,
+            dbs,
+            #[cfg(test)]
             configs: dbconfigs,
         }
     }
     /// flush all db
     fn flush(&self) -> Result<()> { Ok(()) }
     /// close all dbs
+    #[cfg(test)]
     fn close_all(&mut self) { self.dbs.clear(); }
     /// reopen all dbs
+    #[cfg(test)]
     fn open_all(&mut self) {
         self.close_all();
         let configs = self.configs.clone();

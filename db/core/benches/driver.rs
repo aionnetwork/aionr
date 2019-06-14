@@ -100,16 +100,16 @@ impl BenchmarkTest {
     ) -> Self
     {
         BenchmarkTest {
-            db: db,
-            generater: generater,
+            db,
+            generater,
             opCount: 0,
             byteCount: 0,
             startTime: Instant::now(),
-            dbpath: dbpath,
+            dbpath,
             keySizeBytes: 16,
-            valueSizeBytes: valueSizeBytes,
+            valueSizeBytes,
             compressionRatio: COMPRESS_RATIO,
-            keyCount: keyCount,
+            keyCount,
         }
     }
     // ---------------------------------------------------------------
