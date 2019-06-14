@@ -19,19 +19,27 @@
  *
  ******************************************************************************/
 
-#![allow(unused)]
+#![warn(unused_extern_crates)]
 
 extern crate time;
 extern crate rand;
 extern crate libc;
-
-use core::FastVM;
-use ffi::EvmJit;
-use context::ExecutionContext;
-use vm_common::{ExecutionResult, CallType, EnvInfo};
+extern crate fastvm;
+extern crate vm_common;
+extern crate aion_types;
+extern crate rustc_hex;
+#[macro_use]
+extern crate log;
 
 use std::sync::Arc;
 use std::collections::HashMap;
+
+use aion_types::Address;
+use fastvm::core::FastVM;
+use fastvm::basetypes::{DataWord};
+use fastvm::context::{execution_kind, TransactionResult, ExecutionContext};
+use fastvm::ffi::EvmJit;
+use vm_common::{ExecutionResult, CallType, EnvInfo};
 
 type Bytes = Vec<u8>;
 
@@ -45,11 +53,6 @@ pub fn random_from_bytes(len: usize) -> Vec<u8> {
     debug!(target: "vm", "new list = {:?}", random_vec);
     random_vec
 }
-
-extern crate aion_types;
-use context::{execution_kind, TransactionResult};
-use basetypes::{DataWord};
-use aion_types::Address;
 
 #[derive(Clone)]
 pub struct FastVMTest {

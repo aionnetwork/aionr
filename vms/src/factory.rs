@@ -20,7 +20,8 @@
  ******************************************************************************/
 
 use aion_types::{U128, U256, H256};
-use fastvm::{EvmStatusCode, FastVM};
+use fastvm::ffi::EvmStatusCode;
+use fastvm::core::FastVM;
 use fastvm::basetypes::{constants::GAS_CODE_DEPOSIT, DataWord};
 use fastvm::context::{execution_kind, ExecutionContext, TransactionResult};
 use vm_common::{ExecutionResult, ExecStatus, CallType, ReturnData, ActionParams, ActionValue, Ext};

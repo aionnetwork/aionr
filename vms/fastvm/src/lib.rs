@@ -36,8 +36,5 @@ pub mod basetypes;
 pub mod callback;
 
 pub mod vm;
-mod ffi;
-mod core;
-
-pub use core::FastVM;
-pub use ffi::EvmStatusCode;
+pub mod core;
+pub mod ffi;

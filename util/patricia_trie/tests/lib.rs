@@ -22,16 +22,19 @@
 
 #![warn(unused_extern_crates)]
 
+extern crate patricia_trie;
 extern crate acore_bytes;
 extern crate aion_types;
 extern crate trie_standardmap;
+extern crate blake2b;
+extern crate db;
 
 use std::time::Instant;
 use acore_bytes::Bytes;
 use aion_types::H256;
 use blake2b::blake2b;
 use db::MemoryDB;
-use super::{TrieDBMut, TrieDB, TrieMut, Trie};
+use patricia_trie::{TrieDBMut, TrieDB, TrieMut, Trie};
 use trie_standardmap::{Alphabet, ValueMode, StandardMap};
 
 fn random_word(

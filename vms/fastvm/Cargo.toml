@@ -16,3 +16,8 @@ aion-types = { path = "../../util/aion-types"}
 patricia-trie = { path = "../../util/patricia_trie" }
 log = "0.3"
 vm_common = { path = "../vm_common" }
+
+[dev-dependencies]
+rand = "0.4.3"
+rustc-hex = "2.0.1"
+rlp = { path = "../../util/rlp" }
