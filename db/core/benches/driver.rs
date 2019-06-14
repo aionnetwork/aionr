@@ -19,8 +19,11 @@
  *
  ******************************************************************************/
 
-#![allow(dead_code)]
-use super::super::{DBTransaction, DbRepository, KeyValueDB, RepositoryConfig, DatabaseConfig};
+#![warn(unused_extern_crates)]
+
+extern crate db;
+
+use db::{DBTransaction, DbRepository, KeyValueDB, RepositoryConfig, DatabaseConfig};
 use rand;
 use std::fs;
 use std::path::Path;
