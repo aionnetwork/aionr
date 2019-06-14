@@ -12,3 +12,6 @@ aion-types  = { path = "../util/aion-types"}
 ethbloom    = { path = "../util/ethbloom"}
 ajson       = { path = "../json" }
 heapsize    = "0.4"
+
+[dev-dependencies]
+rustc-hex = "2.0.1"

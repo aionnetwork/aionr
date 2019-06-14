@@ -21,6 +21,7 @@
  ******************************************************************************/
 
 #![warn(unused_extern_crates)]
+
 extern crate aion_types;
 extern crate ethbloom;
 extern crate acore_bytes as bytes;
