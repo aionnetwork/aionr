@@ -456,12 +456,3 @@ pub fn get_bad_state_dummy_block() -> Bytes {
 
     create_test_block(&block_header)
 }
-
-#[derive(Default)]
-pub struct TestNotify {
-    pub messages: RwLock<Vec<Bytes>>,
-}
-
-impl ChainNotify for TestNotify {
-    fn broadcast(&self, data: Vec<u8>) { self.messages.write().push(data); }
-}
