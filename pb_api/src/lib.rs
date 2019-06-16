@@ -43,10 +43,10 @@ extern crate lazy_static;
 #[cfg(test)]
 extern crate rand;
 
-mod message;
+pub mod message;
 mod protobuf_engine;
-mod pb_api_util;
-mod api_process;
+pub mod pb_api_util;
+pub mod api_process;
 mod tx_pending_status;
 
 pub use protobuf_engine::PBEngine;

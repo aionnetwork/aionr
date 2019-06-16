@@ -9,25 +9,27 @@ build = "build.rs"
 protoc-rust = "2.1.1"
 
 [dependencies]
-protobuf = { version = "2.1.1"}
+aion-rpc =    { path = "../rpc" }
+aion-types =  { path = "../util/aion-types"}
+acore-bytes = { path ="../util/bytes" }
+acore-io =    { path = "../util/io" }
+acore =       { path = "../core" }
+dir =         { path = "../util/dir" }
+protobuf = "2.1.1"
 log = "0.3"
 env_logger = "0.4"
-aion-rpc = { path = "../rpc" }
-aion-types = { path = "../util/aion-types"}
 rustc-hex = "*"
-acore-bytes = { path ="../util/bytes" }
 parking_lot = "*"
-acore-io = { path = "../util/io" }
-acore = { path = "../core" }
 crossbeam = "0.4.1"
-dir = { path = "../util/dir" }
 
 [dependencies.zmq]
 version = "0.8.2"
 features = ["zmq_has"]
 
 [dev-dependencies]
-db = { path = "../db/core" }
-sync = { path = "../sync" }
-lazy_static = "*"
+sync =     { path = "../sync" }
+acore-io = { path = "../util/io" }
+db =       { path = "../db/core" }
+lazy_static = "1.3.0"
 rand = "*"
+protobuf = "2.1.1"
