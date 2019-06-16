@@ -4,7 +4,7 @@ chain = "mastery/mastery.json"
 [network]
 max_peers = 32
 net_id = 32
-local_node = "p2p://ca59f860-ad27-42f3-891a-aa2ff304b918@0.0.0.0:30303"
+local_node = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"
 boot_nodes = [
 "p2p://a30d1000-8c7e-496c-9c4e-c89318280274@168.62.170.146:30303",
 "p2p://a30d2000-729a-4584-86f1-e19ab97cf9ce@23.96.22.19:30303",
