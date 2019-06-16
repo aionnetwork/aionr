@@ -26,7 +26,6 @@ use std::ptr;
 use bincode::{serialize};
 use ffi::*;
 
-const REVISION_AION: i32 = 5;
 const REVISION_AION_V1: i32 = 7;
 
 impl EvmJit<u8> for EvmResult {
@@ -52,14 +51,6 @@ impl EvmResult {
             unsafe { ::libc::free(out_ptr) };
         }
     }
-}
-
-/// The kind of call-like instruction.
-enum EvmCallKind {
-    EvmCall = 0,         //< Request Call.
-    EvmDelegateCall = 1, //< Request DELEGATECALL. The value param ignored.
-    EvmCallCode = 2,     //< Request CALLCODE.
-    EvmCreate = 3,       //< Request CREATE. Semantic of some params changes.
 }
 
 /*

@@ -20,11 +20,10 @@
  *
  ******************************************************************************/
 
-#![feature(test)]
-extern crate aion_types as bigint;
+extern crate aion_types;
 extern crate rlp;
 
-use bigint::U256;
+use aion_types::U256;
 use rlp::{RlpStream, Rlp};
 use std::time::Instant;
 

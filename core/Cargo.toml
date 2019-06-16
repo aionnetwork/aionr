@@ -54,7 +54,6 @@ db = { path = "../db/core" }
 equihash = { path = "../util/equihash" }
 blake2b = { path = "../util/blake2b" }
 dir = { path = "../util/dir" }
-tempdir = "*"
 tiny-keccak = "1.4.2"
 num-bigint = "0.2"
 bytebuffer = "0.2.1"
@@ -62,9 +61,13 @@ transient-hashmap = "0.4"
 macros = { path = "../util/macros" }
 
 [dev-dependencies]
+tempdir = "*"
 trie-standardmap = { path = "../util/trie-standardmap" }
-fastvm = {path = "../vms/fastvm"}
-logger = { path = "../util/logger" }
+fastvm =           { path = "../vms/fastvm" }
+vms =              { path = "../vms" }
+logger =           { path = "../util/logger" }
+aion-types =       { path = "../util/aion-types" }
+db =               { path = "../db/core" }
 
 [features]
 evm-debug = ["slow-blocks"]

@@ -73,20 +73,18 @@ extern crate trace_time;
 pub extern crate keychain;
 extern crate equihash;
 extern crate vms;
-extern crate tempdir;
 // for aion token bridge
 extern crate tiny_keccak;
 extern crate num_bigint;
 extern crate bytebuffer;
-
 #[cfg(test)]
 extern crate fastvm;
-
 #[cfg(test)]
 extern crate logger;
-
 #[macro_use]
 extern crate macros;
+#[cfg(test)]
+extern crate tempdir;
 
 pub mod account_provider;
 pub mod block;
@@ -108,6 +106,10 @@ pub mod state_db;
 pub mod verification;
 pub mod views;
 pub mod account;
+pub mod blockchain;
+pub mod factory;
+#[cfg(test)]
+pub mod tests;
 
 mod cache_manager;
 mod blooms;
@@ -116,11 +118,6 @@ mod account_db;
 mod precompiled;
 mod executive;
 mod externalities;
-pub mod blockchain;
-mod factory;
 
 pub use types::*;
 pub use executive::contract_address;
-
-#[cfg(test)]
-mod tests;

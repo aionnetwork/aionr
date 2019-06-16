@@ -5,10 +5,10 @@ version = "0.2.0"
 authors = ["Well Shang <jia@aion.network>"]
 
 [dependencies]
-acore-bytes = { path = "../util/bytes" }
-acore = { path = "../core" }
-aion-types = { path = "../util/aion-types"}
-rlp = { path = "../util/rlp" }
+acore-bytes =  { path = "../util/bytes" }
+acore =        { path = "../core" }
+aion-types =   { path = "../util/aion-types"}
+rlp =          { path = "../util/rlp" }
 aion-version = { path = "../util/version" }
 bincode = "1.0.1"
 byteorder = "1.2.7"
@@ -36,3 +36,10 @@ tokio-reactor = "0.1.6"
 tokio-tcp = "0.1.2"
 tokio-threadpool = "0.1.8"
 uuid = { version = "0.6.5", features = ["v4"] }
+
+[dev-dependencies]
+tokio = "0.1.11"
+acore =      { path = "../core" }
+acore-io =   { path = "../util/io" }
+db =         { path = "../db/core" }
+aion-types = { path = "../util/aion-types"}

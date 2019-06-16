@@ -40,7 +40,7 @@ use tokio_threadpool::{Builder, ThreadPool};
 
 mod error;
 mod event;
-mod msg;
+pub mod msg;
 mod node;
 
 pub use self::error::*;

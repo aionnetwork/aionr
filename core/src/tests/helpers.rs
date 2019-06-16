@@ -195,7 +195,6 @@ where
             author.clone(),
             (3141562.into(), 31415620.into()),
             vec![],
-            false,
             Arc::new(MemoryDBRepository::new()),
         )
         .unwrap();

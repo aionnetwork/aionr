@@ -32,8 +32,6 @@ extern crate fixed_hash;
 extern crate ethereum_types_serialize;
 #[cfg(feature = "serialize")]
 extern crate serde;
-#[cfg(test)]
-extern crate rand;
 #[macro_use]
 extern crate crunchy;
 #[cfg(feature = "serialize")]

@@ -21,6 +21,7 @@ acore-io = { path = "../util/io" }
 acore = { path = "../core" }
 crossbeam = "0.4.1"
 dir = { path = "../util/dir" }
+
 [dependencies.zmq]
 version = "0.8.2"
 features = ["zmq_has"]
