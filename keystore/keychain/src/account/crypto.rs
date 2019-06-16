@@ -28,7 +28,8 @@ use random::Random;
 use smallvec::SmallVec;
 use account::{Cipher, Kdf, Aes128Ctr, Pbkdf2, Prf};
 use rlp::{self, RlpStream, UntrustedRlp, DecoderError};
-// use subtle;
+use subtle::ConstantTimeEq;
+use aion_types::H256;
 use key::Ed25519Secret;
 
 /// Encrypted data
@@ -149,10 +150,10 @@ impl Crypto {
             }
         };
 
-        //        let mac  = blake2b(crypto::derive_mac(&derived_right_bits, &self.ciphertext));
-        //        if subtle::slices_equal(&mac, &self.mac) == 0 {
-        //            return Err(Error::InvalidPassword);
-        //        }
+        let mac: H256 = blake2b(crypto::derive_mac(&derived_right_bits, &self.ciphertext));
+        if mac.ct_eq(&self.mac).unwrap_u8() == 0 {
+            return Err(Error::InvalidPassword);
+        }
 
         let mut plain: SmallVec<[u8; 32]> = SmallVec::from_vec(vec![0; expected_len]);
 
