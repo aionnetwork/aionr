@@ -62,6 +62,7 @@ macros = { path = "../util/macros" }
 
 [dev-dependencies]
 tempdir = "*"
+log = "0.3"
 trie-standardmap = { path = "../util/trie-standardmap" }
 fastvm =           { path = "../vms/fastvm" }
 vms =              { path = "../vms" }
