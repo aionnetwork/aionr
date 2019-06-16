@@ -93,10 +93,10 @@ fn benchtest_forwards_with_crunchy() {
     for _ in 0..count {
         let other_data = random_data();
         unroll! {
-                for i in 0..255 {
-                    data[i] |= other_data[i];
-                }
+            for i in 0..255 {
+                data[i] |= other_data[i];
             }
+        }
     }
 
     let took = time.elapsed();
@@ -115,10 +115,10 @@ fn benchtest_backwards_with_crunchy() {
     for _ in 0..count {
         let other_data = random_data();
         unroll! {
-                for i in 0..255 {
-                    data[255-i] |= other_data[255-i];
-                }
+            for i in 0..255 {
+                data[255-i] |= other_data[255-i];
             }
+        }
     }
 
     let took = time.elapsed();

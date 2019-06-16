@@ -98,7 +98,8 @@ impl RootDiskDirectory {
 }
 
 impl<T> DiskDirectory<T>
-where T: KeyFileManager {
+where T: KeyFileManager
+{
     /// Create new disk directory instance
     pub fn new<P>(path: P, key_manager: T) -> Self
     where P: AsRef<Path> {

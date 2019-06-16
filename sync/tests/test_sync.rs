@@ -97,12 +97,12 @@ pub fn init_sync_storage() {
     SyncStorage::init(client.clone() as Arc<BlockChainClient>);
 }
 
-
 fn load<'a>(params: &'a String, b: &[u8]) -> Spec {
     match params.into() {
         Some(params) => Spec::load(params, b),
         None => Spec::load(&::std::env::temp_dir(), b),
-    }.expect("chain spec is invalid")
+    }
+    .expect("chain spec is invalid")
 }
 
 pub fn get_client(spec: &Spec) -> Arc<Client> {
@@ -114,12 +114,11 @@ pub fn get_client(spec: &Spec) -> Arc<Client> {
         Arc::new(Miner::with_spec(&spec)),
         channel.clone(),
     )
-        .unwrap()
+    .unwrap()
 }
 
 #[test]
 fn benchtest_sync_mainnet() {
-
     let target = 99;
 
     let test_spec = new_spec();
@@ -201,11 +200,11 @@ fn benchtest_sync_mainnet() {
 
     let chain_info = client.chain_info();
     assert!(chain_info.best_block_number >= target);
-//    let block_99 = client.block(BlockId::Number(target)).unwrap();
-//    assert!(
-//        block_99.hash()
-//            == H256::from("0x765baf520b24fb81f95d2f7f9fa28069a203b372f66401f947c5e5a62735bb22")
-//    );
+    //    let block_99 = client.block(BlockId::Number(target)).unwrap();
+    //    assert!(
+    //        block_99.hash()
+    //            == H256::from("0x765baf520b24fb81f95d2f7f9fa28069a203b372f66401f947c5e5a62735bb22")
+    //    );
 }
 
 #[test]

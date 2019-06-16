@@ -19,7 +19,8 @@ fn populate_trie<'db>(
     db: &'db mut HashStore,
     root: &'db mut H256,
     v: &[(Vec<u8>, Vec<u8>)],
-) -> TrieDBMut<'db> {
+) -> TrieDBMut<'db>
+{
     let mut t = TrieDBMut::new(db, root);
     for i in 0..v.len() {
         let key: &[u8] = &v[i].0;
@@ -50,7 +51,7 @@ fn playpen() {
             value_mode: ValueMode::Index,
             count: 100,
         }
-            .make_with(&mut seed);
+        .make_with(&mut seed);
 
         let real = trie_root(x.clone());
         let mut memdb = MemoryDB::new();
@@ -326,7 +327,7 @@ fn stress() {
             value_mode: ValueMode::Index,
             count: 4,
         }
-            .make_with(&mut seed);
+        .make_with(&mut seed);
 
         let real = trie_root(x.clone());
         let mut memdb = MemoryDB::new();
@@ -378,7 +379,7 @@ fn insert_empty() {
         value_mode: ValueMode::Index,
         count: 4,
     }
-        .make_with(&mut seed);
+    .make_with(&mut seed);
 
     let mut db = MemoryDB::new();
     let mut root = H256::new();
@@ -407,7 +408,7 @@ fn return_old_values() {
         value_mode: ValueMode::Index,
         count: 4,
     }
-        .make_with(&mut seed);
+    .make_with(&mut seed);
 
     let mut db = MemoryDB::new();
     let mut root = H256::new();

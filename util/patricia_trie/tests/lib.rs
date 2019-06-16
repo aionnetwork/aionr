@@ -37,13 +37,7 @@ use db::MemoryDB;
 use patricia_trie::{TrieDBMut, TrieDB, TrieMut, Trie};
 use trie_standardmap::{Alphabet, ValueMode, StandardMap};
 
-fn random_word(
-    alphabet: &[u8],
-    min_count: usize,
-    diff_count: usize,
-    seed: &mut H256,
-) -> Vec<u8>
-{
+fn random_word(alphabet: &[u8], min_count: usize, diff_count: usize, seed: &mut H256) -> Vec<u8> {
     assert!(min_count + diff_count <= 32);
     *seed = blake2b(&seed);
     let r = min_count + (seed[31] as usize % (diff_count + 1));

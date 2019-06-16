@@ -51,7 +51,7 @@ fn transaction() -> SignedTransaction {
         gas_bytes: Vec::new(),
         value_bytes: Vec::new(),
     }
-        .sign(keypair.secret(), None)
+    .sign(keypair.secret(), None)
 }
 
 fn default_gas_price() -> U256 { 0u64.into() }

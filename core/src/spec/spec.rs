@@ -470,19 +470,19 @@ mod tests {
         assert!(Spec::load(&::std::env::temp_dir(), &[] as &[u8]).is_err());
     }
 
-//    #[test]
-//    fn test_chain() {
-//        let test_spec = Spec::new_test();
-//
-//        assert_eq!(
-//            test_spec.state_root(),
-//            "b3fd94094ccb910e058c00d6763b61472e7bf1b8a9cb2549a83a4d5a397e194e".into()
-//        );
-//        let genesis = test_spec.genesis_block();
-//        assert_eq!(
-//            BlockView::new(&genesis).header_view().hash(),
-//            "0b10f11ef884982ebeba4e34eb4ee15126ff7f513f6d3dc55528e92c6cb86ab4".into()
-//        );
-//    }
+    //    #[test]
+    //    fn test_chain() {
+    //        let test_spec = Spec::new_test();
+    //
+    //        assert_eq!(
+    //            test_spec.state_root(),
+    //            "b3fd94094ccb910e058c00d6763b61472e7bf1b8a9cb2549a83a4d5a397e194e".into()
+    //        );
+    //        let genesis = test_spec.genesis_block();
+    //        assert_eq!(
+    //            BlockView::new(&genesis).header_view().hash(),
+    //            "0b10f11ef884982ebeba4e34eb4ee15126ff7f513f6d3dc55528e92c6cb86ab4".into()
+    //        );
+    //    }
 
 }

@@ -55,13 +55,13 @@ pub struct MockDbRepository {
 }
 
 pub struct MemoryDBRepository {
-    dbs: HashMap<DbName, RwLock<MemoryDB>>
+    dbs: HashMap<DbName, RwLock<MemoryDB>>,
 }
 
 impl MemoryDBRepository {
     pub fn new() -> Self {
         MemoryDBRepository {
-            dbs: HashMap::new()
+            dbs: HashMap::new(),
         }
     }
     fn flush(&self) -> Result<()> { Ok(()) }
