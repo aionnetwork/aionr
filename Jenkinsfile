@@ -54,19 +54,21 @@ pipeline {
             	echo 'clean compiled version.rs'
             	sh 'rm -r target/release/build/aion-version* target/release/build/avm-* || echo "no aion-version folders exist"'
             	echo "building..."
-                sh 'RUSTFLAGS="-D warnings" ./resources/package.sh "aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"'
+                #sh 'RUSTFLAGS="-D warnings" ./resources/package.sh "aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"'
+                sh './resources/package.sh "aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"'
             }
         }
 		stage('Unit Test'){
 			steps{
 					sh 'ls test_results || mkdir test_results'
-
+					#sh 'RUSTFLAGS="-D warnings" cargo +nightly test --all --no-run --release --exclude fastvm --exclude solidity'
 
 					script{
 						try{
 							sh '''#!/bin/bash
 							set -o pipefail
-							cargo test  --all --release -- --nocapture --test-threads=1 2>&1 | tee test_results/ut_result.txt'''
+							#RUSTFLAGS="-D warnings" cargo +nightly test  --all --release -- --nocapture --test-threads 1 2>&1 | tee test_results/ut_result.txt'''
+							cargo +nightly test  --all --release --exclude avm -- --nocapture --test-threads=1 2>&1 | tee test_results/ut_result.txt'''
 							sh 'echo $?'
 							lastCommit = sh(returnStdout: true, script: 'git rev-parse HEAD | cut -c 1-8')
 							echo "${lastCommit}"
