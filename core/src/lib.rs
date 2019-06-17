@@ -21,6 +21,7 @@
  ******************************************************************************/
 
 #![warn(unused_extern_crates)]
+
 #![cfg_attr(feature = "benches", feature(test))]
 extern crate bloomchain;
 extern crate byteorder;

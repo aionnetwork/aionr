@@ -54,6 +54,7 @@ use sync::sync::SyncConfig;
 use tokio;
 use tokio::prelude::*;
 use user_defaults::UserDefaults;
+
 // Pops along with error messages when a password is missing or invalid.
 const VERIFY_PASSWORD_HINT: &'static str = "Make sure valid password is present in files passed \
                                             using `--password` or in the configuration file.";
@@ -116,11 +117,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // create dirs used by aion
     cmd.dirs.create_dirs()?;
-
-    // run in daemon mode
-    if let Some(pid_file) = cmd.daemon {
-        daemonize(pid_file)?;
-    }
 
     //print out running aion environment
     print_running_environment(&cmd.spec, &spec.data_dir, &cmd.dirs, &db_dirs);
@@ -359,23 +355,6 @@ pub fn execute(cmd: RunCmd) -> Result<(), String> {
         })
     }
     wait(execute_impl(cmd))
-}
-
-#[cfg(not(windows))]
-fn daemonize(pid_file: String) -> Result<(), String> {
-    extern crate daemonize;
-
-    daemonize::Daemonize::new()
-        .pid_file(pid_file)
-        .chown_pid_file(true)
-        .start()
-        .map(|_| ())
-        .map_err(|e| format!("Couldn't daemonize; {}", e))
-}
-
-#[cfg(windows)]
-fn daemonize(_pid_file: String) -> Result<(), String> {
-    Err("daemon is no supported on windows".into())
 }
 
 fn print_running_environment(
