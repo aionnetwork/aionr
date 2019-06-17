@@ -15,4 +15,3 @@ threadpool = "1.7"
 [[bin]]
 name = "keygen"
 path = "src/main.rs"
-doc = false

@@ -1,10 +1,10 @@
 [package]
-description = "Aion Blockchain client"
-name = "aion"
+description = "aion network rust implementation"
+name = "aionr"
 # NOTE Make sure to update util/version/Cargo.toml as well
 version = "0.2.4"
 license = "GPL-3.0"
-authors = ["Aion Foundation <admin@aion.network>"]
+authors = ["aion foundation <admin@aion.network>"]
 
 [dependencies]
 log = "0.3"
@@ -21,16 +21,17 @@ serde = "1.0"
 serde_json = "1.0"
 serde_derive = "1.0"
 fdlimit = "0.1"
-ctrlc =         { git = "https://github.com/paritytech/rust-ctrlc.git" }
-jsonrpc-core =  { git = "https://github.com/paritytech/jsonrpc.git", branch = "parity-2.2" }
-sync =          { path = "sync" }
-acore =         { path = "core" }
-acore-bytes =   { path = "util/bytes" }
-acore-io =      { path = "util/io" }
-blake2b =       { path = "util/blake2b" }
-equihash =      { path = "util/equihash" }
-logger =        { path = "util/logger" }
-acore-stratum = { path = "stratum" }
+tokio = "0.1.13"
+ctrlc =             { git = "https://github.com/paritytech/rust-ctrlc.git" }
+jsonrpc-core =      { git = "https://github.com/paritytech/jsonrpc.git", branch = "parity-2.2" }
+sync =              { path = "sync" }
+acore =             { path = "core" }
+acore-bytes =       { path = "util/bytes" }
+acore-io =          { path = "util/io" }
+blake2b =           { path = "util/blake2b" }
+equihash =          { path = "util/equihash" }
+logger =            { path = "util/logger" }
+acore-stratum =     { path = "stratum" }
 aion-types =        { path = "util/aion-types" }
 key =               { path = "keystore/key" }
 keychain =          { path = "keystore/keychain" }
@@ -42,7 +43,6 @@ panic_hook =        { path = "util/panic_hook" }
 journaldb =         { path = "db/journaldb" }
 db =                { path = "db/core" }
 aion-pb-apiserver = { path = "pb_api"}
-tokio = "0.1.13"
 
 [dev-dependencies]
 pretty_assertions = "0.1"

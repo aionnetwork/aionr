@@ -7,6 +7,5 @@ authors = ["Aion Foundation <admin@aion.network>"]
 blake2b = { path = "../../util/blake2b"}
 crypto = { path = "../../util/crypto" }
 aion-types = { path = "../../util/aion-types"}
-log = "0.3"
 rand = "0.4"
 rustc-hex = "1.0"
