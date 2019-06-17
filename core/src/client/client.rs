@@ -64,6 +64,7 @@ use transaction::{
     DEFAULT_TRANSACTION_TYPE, AVM_TRANSACTION_TYPE
 };
 use types::filter::Filter;
+use types::vms::{EnvInfo, LastHashes};
 use verification::queue::BlockQueue;
 use verification::{
     PreverifiedBlock,
@@ -71,7 +72,6 @@ use verification::{
     verify_block_final
 };
 use views::BlockView;
-use vms::{EnvInfo, LastHashes};
 
 // re-export
 pub use blockchain::CacheSize as BlockChainCacheSize;

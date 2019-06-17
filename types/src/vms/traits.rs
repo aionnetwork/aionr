@@ -20,11 +20,9 @@
  ******************************************************************************/
 
 use std::sync::Arc;
-
 use bytes::Bytes;
-use aion_types::{H128, U256, H256, Address};
-//use rlp::{Encodable, Decodable, DecoderError, RlpStream, UntrustedRlp};
-use types::{*};
+use aion_types::{ H128, U256, H256, Address };
+use super::{ EnvInfo, ExecutionResult, CallType };
 
 /// Externalities interface for EVMs
 pub trait Ext {

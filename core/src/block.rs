@@ -29,12 +29,11 @@ use blake2b::BLAKE2B_NULL_RLP;
 use triehash::ordered_trie_root;
 
 use rlp::{UntrustedRlp, RlpStream, Encodable, Decodable, DecoderError};
+use types::vms::{EnvInfo, LastHashes};
 use aion_types::{H256, U256, Address};
 use ethbloom::Bloom;
 use bytes::Bytes;
 use unexpected::Mismatch;
-
-use vms::{EnvInfo, LastHashes};
 use engines::POWEquihashEngine;
 use error::{Error, BlockError};
 use factory::Factories;

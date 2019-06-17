@@ -7,8 +7,8 @@ authors = ["aion-camus <camus@aion.network>"]
 byteorder = "1.0"
 log = "0.3"
 libc = "0.2.0"
+types = { path = "../types" }
 aion-types = { path = "../util/aion-types"}
 patricia-trie = { path = "../util/patricia_trie" }
 fastvm = { path = "fastvm" }
 avm = { path = "avm" }
-vm_common = { path = "vm_common" }

@@ -25,14 +25,12 @@ use std::cmp;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
 use aion_types::{H256, U256, H128, Address};
+use types::vms::{ActionParams, ActionValue, EnvInfo, CallType, ExecutionResult, ExecStatus, ReturnData, ParamsType};
+use types::vms::traits::Ext;
 use bytes::Bytes;
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use executive::*;
-use vms::{
-    ActionParams, ActionValue, Ext, EnvInfo, CallType, ExecutionResult, ExecStatus, ReturnData,
-    ParamsType,
-};
 use kvdb::KeyValueDB;
 use db::{self, Readable};
 

@@ -21,7 +21,7 @@
 
 use super::builtin::{BuiltinExt, BuiltinContract, BuiltinParams};
 use aion_types::{U256, H128, U128, H256, Address};
-use vms::{ExecutionResult, ExecStatus, ReturnData};
+use types::vms::{ExecutionResult, ExecStatus, ReturnData};
 use key::{Ed25519Signature, public_to_address_ed25519, verify_signature_ed25519};
 
 /// A pre-compiled contract for retrieving and updating the total amount of currency.
@@ -208,7 +208,7 @@ impl BuiltinContract for TotalCurrencyContract {
 mod tests {
     use std::collections::BTreeMap;
     use aion_types::{H128, U128, H256, U256, Address};
-    use vms::ExecStatus;
+    use types::vms::ExecStatus;
     use super::TotalCurrencyContract;
     use precompiled::builtin::{BuiltinParams, BuiltinContract, BuiltinExt, BuiltinContext};
     use key::{sign_ed25519, Ed25519Secret, Ed25519KeyPair};

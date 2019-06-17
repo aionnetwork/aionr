@@ -36,8 +36,7 @@ use kvdb::{MemoryDB, MemoryDBRepository};
 use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
 use types::BlockNumber;
-use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
-
+use types::vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
 use engines::POWEquihashEngine;
 use error::Error;
 use executive::Executive;

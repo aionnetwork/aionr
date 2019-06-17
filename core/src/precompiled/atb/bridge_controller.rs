@@ -22,6 +22,7 @@
 use std::cmp;
 use bytes::Bytes;
 use aion_types::{H256, U256};
+use types::vms::{ReturnData, ExecStatus, ExecutionResult};
 use num_bigint::BigInt;
 use num_bigint::ToBigInt;
 
@@ -33,7 +34,6 @@ use precompiled::atb::bridge_event_sig::BridgeEventSig;
 use precompiled::atb::bridge_strg_conn::BridgeStorageConnector;
 use precompiled::atb::bridge_transfer::BridgeTransfer;
 use precompiled::atb::bridge_utilities::compute_bundle_hash;
-use vms::{ExecutionResult, ReturnData, ExecStatus};
 
 pub struct BridgeController {
     connector: BridgeStorageConnector,

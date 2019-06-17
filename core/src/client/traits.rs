@@ -26,7 +26,6 @@ use block::{OpenBlock, SealedBlock, ClosedBlock};
 use blockchain::TreeRoute;
 use encoded;
 use error::{ImportResult, CallError, BlockImportError};
-use vms::LastHashes;
 use factory::VmFactory;
 use executive::Executed;
 use filter::Filter;
@@ -35,8 +34,8 @@ use log_entry::LocalizedLogEntry;
 use receipt::LocalizedReceipt;
 use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction};
 use verification::queue::QueueInfo as BlockQueueInfo;
-
 use aion_types::{H256, H128, U256, Address};
+use types::vms::LastHashes;
 use bytes::Bytes;
 use kvdb::DBValue;
 

@@ -48,7 +48,7 @@ pub mod state_diff;
 pub mod trace_filter;
 pub mod tree_route;
 pub mod verification_queue_info;
-pub mod vm;
+pub mod vms;
 
 /// Type for block number.
 pub type BlockNumber = u64;

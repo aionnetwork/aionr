@@ -25,21 +25,22 @@ extern crate time;
 extern crate rand;
 extern crate libc;
 extern crate fastvm;
-extern crate vm_common;
 extern crate aion_types;
+extern crate types;
 extern crate rustc_hex;
 #[macro_use]
 extern crate log;
 
 use std::sync::Arc;
 use std::collections::HashMap;
-
-use aion_types::Address;
+use std::convert::Into;
 use fastvm::core::FastVM;
 use fastvm::basetypes::{DataWord};
 use fastvm::context::{execution_kind, TransactionResult, ExecutionContext};
 use fastvm::ffi::EvmJit;
-use vm_common::{ExecutionResult, CallType, EnvInfo};
+use aion_types::{Address, H128, U256, H256};
+use types::vms::traits::Ext;
+use types::vms::{ExecutionResult, CallType, EnvInfo};
 
 type Bytes = Vec<u8>;
 
@@ -136,9 +137,6 @@ impl Into<ExecutionContext> for FastVMTest {
         }
     }
 }
-
-use aion_types::{H128, U256, H256};
-use vm_common::Ext;
 
 trait DummyCallbacks {
     fn storage_at(&self, key: &H128) -> H128;

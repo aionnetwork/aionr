@@ -29,9 +29,7 @@ use std::panic::{self, PanicInfo};
 use std::thread;
 use backtrace::Backtrace;
 
-pub fn set() {
-    panic::set_hook(Box::new(panic_hook));
-}
+pub fn set() { panic::set_hook(Box::new(panic_hook)); }
 
 static ABOUT_PANIC: &str = "
 This is a bug. Help us report here:

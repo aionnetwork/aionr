@@ -20,6 +20,7 @@
  ******************************************************************************/
 
 use aion_types::{U256, Address, H128, H256};
+use types::vms::ExecutionResult;
 use ajson;
 use super::total_currency_contract::TotalCurrencyContract;
 use super::edverify_contract::EDVerifyContract;
@@ -28,9 +29,7 @@ use super::tx_hash_contract::TxHashContract;
 use super::atb::token_bridge_contract::TokenBridgeContract;
 use std::fmt;
 use state::{State, Substate, Backend as StateBackend, CleanupMode};
-use vms::ExecutionResult;
 use log_entry::LogEntry;
-// use state::{};
 
 pub trait BuiltinContract: Send + Sync {
     /// gas cost.

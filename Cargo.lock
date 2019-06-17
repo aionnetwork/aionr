@@ -709,7 +709,7 @@ dependencies = [
  "serde_derive 1.0.92 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde_json 1.0.32 (registry+https://github.com/rust-lang/crates.io-index)",
  "time 0.1.40 (registry+https://github.com/rust-lang/crates.io-index)",
- "vm_common 0.1.0",
+ "types 0.1.0",
 ]
 
 [[package]]
@@ -2552,18 +2552,6 @@ version = "0.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
-name = "vm_common"
-version = "0.1.0"
-dependencies = [
- "acore-bytes 0.1.0",
- "aion-types 0.1.0",
- "ajson 0.1.0",
- "blake2b 0.1.0",
- "rlp 0.2.1",
- "types 0.1.0",
-]
-
-[[package]]
 name = "vms"
 version = "0.1.0"
 dependencies = [
@@ -2574,7 +2562,7 @@ dependencies = [
  "libc 0.2.43 (registry+https://github.com/rust-lang/crates.io-index)",
  "log 0.3.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "patricia-trie 0.1.0",
- "vm_common 0.1.0",
+ "types 0.1.0",
 ]
 
 [[package]]

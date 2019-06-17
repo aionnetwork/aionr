@@ -22,14 +22,15 @@
 #![warn(unused_extern_crates)]
 
 extern crate fastvm;
-extern crate vm_common;
 extern crate aion_types;
+extern crate types;
 extern crate rlp;
 
+use std::convert::Into;
 use aion_types::U256;
+use types::vms::CallType;
 use fastvm::vm::CostType;
 use rlp::RlpStream;
-use vm_common::CallType;
 
 #[test]
 fn encode_calltype() {

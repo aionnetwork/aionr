@@ -19,12 +19,20 @@
  *
  ******************************************************************************/
 
-use bytes::Bytes;
-use aion_types::{U256, H256, Address};
-use rlp::{Encodable, Decodable, DecoderError, RlpStream, UntrustedRlp};
-use ajson;
+pub mod traits;
+pub mod avm;
 
-// return type definition
+use std::convert::Into;
+use std::sync::Arc;
+use std::cmp;
+use std::ops::Deref;
+use bytes::Bytes;
+use aion_types::{ U256, H256, Address };
+use ajson::vm::Env;
+use rlp::{ Encodable, Decodable, RlpStream, UntrustedRlp, DecoderError };
+use blake2b::blake2b;
+use super::BlockNumber;
+
 /// Return data buffer. Holds memory from a previous call and a slice into that memory.
 #[derive(Debug, PartialEq, Clone)]
 pub struct ReturnData {
@@ -33,7 +41,7 @@ pub struct ReturnData {
     size: usize,
 }
 
-impl ::std::ops::Deref for ReturnData {
+impl Deref for ReturnData {
     type Target = [u8];
     fn deref(&self) -> &[u8] { &self.mem[self.offset..self.offset + self.size] }
 }
@@ -50,9 +58,9 @@ impl ReturnData {
     /// Create `ReturnData` from give buffer and slice.
     pub fn new(mem: Vec<u8>, offset: usize, size: usize) -> Self {
         ReturnData {
-            mem: mem,
-            offset: offset,
-            size: size,
+            mem,
+            offset,
+            size,
         }
     }
 }
@@ -143,11 +151,6 @@ impl Decodable for CallType {
     }
 }
 
-use std::cmp;
-use std::sync::Arc;
-use hash::blake2b;
-use common_types::BlockNumber;
-
 /// Simple vector of hashes, should be at most 256 items large, can be smaller if being used
 /// for a block whose number is less than 257.
 pub type LastHashes = Vec<H256>;
@@ -185,11 +188,11 @@ impl Default for EnvInfo {
     }
 }
 
-impl From<ajson::vm::Env> for EnvInfo {
-    fn from(e: ajson::vm::Env) -> Self {
+impl From<Env> for EnvInfo {
+    fn from(e: Env) -> Self {
         let number = e.number.into();
         EnvInfo {
-            number: number,
+            number,
             author: e.author.into(),
             difficulty: e.difficulty.into(),
             gas_limit: e.gas_limit.into(),
@@ -307,17 +310,5 @@ impl Default for ActionParams {
             original_transaction_hash: H256::default(),
             nonce: 0,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn it_can_be_created_as_default() {
-        let default_env_info = EnvInfo::default();
-
-        assert_eq!(default_env_info.difficulty, 0.into());
     }
 }

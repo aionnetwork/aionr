@@ -21,7 +21,7 @@
 
 use super::builtin::{BuiltinParams, BuiltinContract, BuiltinExt};
 use aion_types::{U256, H256};
-use vms::{ExecutionResult, ExecStatus, ReturnData};
+use types::vms::{ExecutionResult, ExecStatus, ReturnData};
 use blake2b::Blake2b;
 
 const WORD_LENGTH: u64 = 4;

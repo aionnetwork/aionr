@@ -45,7 +45,7 @@ use state_db::StateDB;
 use transaction::SignedTransaction;
 use types::basic_account::BasicAccount;
 use types::state_diff::StateDiff;
-use vms::EnvInfo;
+use types::vms::EnvInfo;
 
 use aion_types::{Address, H256, U256};
 use bytes::Bytes;

@@ -21,7 +21,7 @@
 
 use super::builtin::{BuiltinParams, BuiltinContract, BuiltinExt};
 use aion_types::{U256, H256};
-use vms::{ExecutionResult, ExecStatus, ReturnData};
+use types::vms::{ExecutionResult, ExecStatus, ReturnData};
 
 pub struct TxHashContract {
     /// contract name
@@ -64,8 +64,8 @@ mod tests {
     use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
     use tests::helpers::get_temp_state;
     use state::Substate;
-    use vms::ExecStatus;
     use aion_types::{H256, Address};
+    use types::vms::ExecStatus;
     use rustc_hex::ToHex;
     use bytes::to_hex;
 

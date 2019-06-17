@@ -1,4 +1,5 @@
 /*******************************************************************************
+ * Copyright (c) 2015-2018 Parity Technologies (UK) Ltd.
  * Copyright (c) 2018-2019 Aion foundation.
  *
  *     This file is part of the aion network project.
@@ -21,15 +22,13 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate aion_types;
-extern crate rlp;
-extern crate blake2b as hash;
-extern crate common_types;
-extern crate ajson;
-extern crate acore_bytes as bytes;
+extern crate types;
 
-pub mod types;
-pub mod ext;
+use types::vm::EnvInfo;
+use std::convert::Into;
 
-pub use types::*;
-pub use ext::Ext;
+#[test]
+fn it_can_be_created_as_default() {
+    let default_env_info = EnvInfo::default();
+    assert_eq!(default_env_info.difficulty, 0.into());
+}

@@ -22,7 +22,7 @@
 use aion_types::{U256, U128, U512};
 use ffi::EvmStatusCode;
 use std::{fmt, ops, cmp};
-use vm_common::{ReturnData};
+use types::vms::ReturnData;
 
 // result definition
 /// VM errors. from vm/src/errors.rs

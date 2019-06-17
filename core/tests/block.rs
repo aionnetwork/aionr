@@ -24,13 +24,13 @@
 
 extern crate acore;
 extern crate aion_types;
+extern crate types;
 extern crate vms;
 extern crate db;
 #[macro_use]
 extern crate log;
 
 use std::sync::Arc;
-//use acore::tests::helpers::*;
 use acore::block::{OpenBlock, LockedBlock};
 use acore::engines::POWEquihashEngine;
 use acore::error::Error;
@@ -40,9 +40,9 @@ use acore::state_db::StateDB;
 use acore::state::State;
 use acore::views::BlockView;
 use acore::transaction::SignedTransaction;
-use vms::LastHashes;
 use db::MemoryDBRepository;
 use aion_types::Address;
+use types::vms::LastHashes;
 
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 fn enact_bytes(

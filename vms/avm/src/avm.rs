@@ -19,15 +19,15 @@
  *
  ******************************************************************************/
 
-use callback::register_callbacks;
-use codec::NativeDecoder;
-use codec::NativeEncoder;
-use rjni::{Classpath, JavaVM, Options, Type, Value, Version};
-use rjni::ffi;
 use std::io::Error;
 use std::{fs, ptr, thread, env, path::Path, path::PathBuf};
 use std::sync::atomic::{AtomicPtr, Ordering};
-use types::{TransactionContext, TransactionResult};
+use callback::register_callbacks;
+use types::vms::avm::NativeDecoder;
+use types::vms::avm::NativeEncoder;
+use rjni::{Classpath, JavaVM, Options, Type, Value, Version};
+use rjni::ffi;
+use types::vms::avm::{TransactionContext, TransactionResult};
 
 /// We keep a single JVM instance in the background, which will be shared
 /// among multiple threads. Before invoking any JNI methods, the executing

@@ -12,10 +12,10 @@ serde_derive = "1.0.0"
 serde_json = "*"
 bincode = "1.0.0"
 num-bigint = "0.2"
+types = { path = "../../types" }
 aion-types = { path = "../../util/aion-types"}
 patricia-trie = { path = "../../util/patricia_trie" }
 log = "0.3"
-vm_common = { path = "../vm_common" }
 
 [dev-dependencies]
 rand = "0.4.3"

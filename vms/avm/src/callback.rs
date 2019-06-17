@@ -1,12 +1,13 @@
+use std::{mem, ptr};
+use std::convert::Into;
 use core::fmt;
 use core::slice;
 use libc::c_void;
-use std::{mem, ptr};
 use num_bigint::BigUint;
-use vm_common::Ext;
+use types::vms::traits::Ext;
+use types::vms::avm::NativeDecoder;
 use aion_types::{Address, U256, H256};
 use hash::blake2b;
-use codec::NativeDecoder;
 use crypto::{sha2::Sha256, digest::Digest, ed25519};
 use tiny_keccak::keccak256;
 

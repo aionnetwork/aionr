@@ -21,19 +21,20 @@
  ******************************************************************************/
 
 //! Transaction Execution environment.
+use std::thread;
+use std::sync::mpsc::{channel, Sender};
+use std::clone::Clone;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 use blake2b::{blake2b};
 use aion_types::{H256, U256, U512, Address};
+use types::vms::{ActionParams, ActionValue, CallType, EnvInfo, ExecutionResult, ExecStatus, ReturnData, ParamsType};
 #[cfg(test)]
 use aion_types::U128;
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use error::ExecutionError;
-use vms::{
-    self, ActionParams, ActionValue, CallType, EnvInfo, ExecutionResult, ExecStatus, ReturnData,
-    VMType,
-};
+use vms::VMType;
 use vms::constants::{MAX_CALL_DEPTH, GAS_CALL_MAX, GAS_CREATE_MAX};
 
 use externalities::*;
@@ -41,9 +42,6 @@ use transaction::{Action, SignedTransaction};
 use crossbeam;
 pub use executed::Executed;
 use precompiled::builtin::{BuiltinExtImpl, BuiltinContext};
-
-use std::thread;
-use std::sync::mpsc::{channel, Sender};
 
 #[cfg(debug_assertions)]
 /// Roughly estimate what stack size each level of evm depth will use. (Debug build)
@@ -228,7 +226,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         original_transaction_hash: t.hash(),
                         nonce: nonce.low_u64(),
                         static_flag: false,
-                        params_type: vms::ParamsType::Embedded,
+                        params_type: ParamsType::Embedded,
                     }
                 }
                 Action::Call(ref address) => {
@@ -248,11 +246,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         code: self.state.code(address).unwrap(),
                         code_hash: Some(self.state.code_hash(address).unwrap()),
                         data: Some(t.data.clone()),
-                        call_type: call_type,
+                        call_type,
                         transaction_hash: t.hash(),
                         original_transaction_hash: t.hash(),
                         nonce: nonce.low_u64(),
-                        params_type: vms::ParamsType::Embedded,
+                        params_type: ParamsType::Embedded,
                         static_flag: false,
                     }
                 }
@@ -421,7 +419,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 let (new_address, code_hash) = contract_address(&sender, &nonce);
                 let params = ActionParams {
                     code_address: new_address.clone(),
-                    code_hash: code_hash,
+                    code_hash,
                     address: new_address,
                     sender: sender.clone(),
                     origin: sender.clone(),
@@ -432,7 +430,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     data: None,
                     call_type: CallType::None,
                     static_flag: false,
-                    params_type: vms::ParamsType::Embedded,
+                    params_type: ParamsType::Embedded,
                     transaction_hash: t.hash(),
                     original_transaction_hash: t.hash(),
                     nonce: t.nonce.low_u64(),
@@ -453,7 +451,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     data: Some(t.data.clone()),
                     call_type: CallType::Call,
                     static_flag: false,
-                    params_type: vms::ParamsType::Separate,
+                    params_type: ParamsType::Separate,
                     transaction_hash: t.hash(),
                     original_transaction_hash: t.hash(),
                     nonce: t.nonce.low_u64(),

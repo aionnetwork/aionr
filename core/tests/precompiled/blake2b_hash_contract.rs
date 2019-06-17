@@ -2,9 +2,9 @@
 //    use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
 //    use state::{State, Substate};
 //    use tests::helpers::get_temp_state;
-//    use vms::ExecStatus;
 //    use bytes::to_hex;
 //    use aion_types::{Address, H256};
+//    use types::vms::ExecStatus;
 //
 //    fn get_ext_default<'a>(
 //        state: &'a mut State<::state_db::StateDB>,

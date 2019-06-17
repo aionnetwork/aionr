@@ -20,8 +20,7 @@
  ******************************************************************************/
 
 use aion_types::{Address, H256, U256};
-use vms::{ExecStatus, ReturnData};
-use vms::ExecutionResult;
+use types::vms::{ExecStatus, ReturnData, ExecutionResult};
 use precompiled::builtin::{BuiltinContract, BuiltinExt, BuiltinParams};
 use super::bridge_controller::BridgeController;
 use super::bridge_deserializer::{
@@ -343,7 +342,7 @@ impl BuiltinContract for TokenBridgeContract {
 mod test {
     use blake2b::{Blake2b, blake2b};
     use aion_types::{Address, H256, U256};
-    use vms::ExecStatus;
+    use types::vms::ExecStatus;
     use executive::contract_address;
     use fastvm::basetypes::DataWord;
     use key::{Ed25519KeyPair, generate_keypair, public_to_address_ed25519};
