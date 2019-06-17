@@ -64,7 +64,7 @@ pipeline {
 						try{
 							sh '''#!/bin/bash
 							set -o pipefail
-							cargo test  --all -- --nocapture --test-threads=1 2>&1 | tee test_results/ut_result.txt'''
+							cargo test --release --all -- --nocapture --test-threads=1 2>&1 | tee test_results/ut_result.txt'''
 							sh 'echo $?'
 							lastCommit = sh(returnStdout: true, script: 'git rev-parse HEAD | cut -c 1-8')
 							echo "${lastCommit}"
