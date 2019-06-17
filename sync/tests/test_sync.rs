@@ -314,5 +314,5 @@ fn benchtest_sync_storage_synced_block_number() {
         "[benchtest_sync_storage_get_synced_block_number] Duration of 500000 sets/gets: {:#?}",
         duration.subsec_millis() as u64 + duration.as_secs() * 1000
     );
-    assert!(duration < Duration::from_secs(1));
+    assert!(duration < Duration::from_secs(2));
 }

@@ -20,7 +20,6 @@ acore-stratum = { path = "../stratum" }
 aion-types = { path = "../util/aion-types"}
 ethbloom = { path = "../util/ethbloom"}
 memory-cache = { path = "../util/memory_cache" }
-abi-derive = { path = "../util/abi/derive" }
 ajson = { path = "../json" }
 key = { path = "../keystore/key" }
 crypto = { path = "../util/crypto" }

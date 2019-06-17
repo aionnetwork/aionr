@@ -79,7 +79,6 @@ panic = "abort"
 
 [workspace]
 members = [
-	#"core/types",
 	"types",
 	"keystore/key/cli",
 	"keystore/keychain/cli",
