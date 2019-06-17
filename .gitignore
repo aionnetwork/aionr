@@ -3,6 +3,7 @@
 build/
 target/
 package/
+test/
 rpc/manual_test
 testTMP/
 db/core/temp/
