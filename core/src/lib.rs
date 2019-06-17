@@ -21,7 +21,6 @@
  ******************************************************************************/
 
 #![warn(unused_extern_crates)]
-
 #![cfg_attr(feature = "benches", feature(test))]
 extern crate bloomchain;
 extern crate byteorder;
@@ -82,8 +81,6 @@ extern crate bytebuffer;
 extern crate fastvm;
 #[cfg(test)]
 extern crate logger;
-#[macro_use]
-extern crate macros;
 #[cfg(test)]
 extern crate tempdir;
 
@@ -100,6 +97,7 @@ pub mod header;
 pub mod machine;
 pub mod miner;
 pub mod pod_state;
+pub mod pod_account;
 pub mod service;
 pub mod spec;
 pub mod state;
@@ -114,7 +112,6 @@ pub mod tests;
 
 mod cache_manager;
 mod blooms;
-mod pod_account;
 mod account_db;
 mod precompiled;
 mod executive;

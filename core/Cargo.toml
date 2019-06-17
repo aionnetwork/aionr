@@ -62,12 +62,15 @@ macros = { path = "../util/macros" }
 [dev-dependencies]
 tempdir = "*"
 log = "0.3"
+macros =           { path = "../util/macros" }
 trie-standardmap = { path = "../util/trie-standardmap" }
 fastvm =           { path = "../vms/fastvm" }
 vms =              { path = "../vms" }
 logger =           { path = "../util/logger" }
 aion-types =       { path = "../util/aion-types" }
 db =               { path = "../db/core" }
+common-types =     { path = "../types" }
+
 
 [features]
 evm-debug = ["slow-blocks"]
