@@ -650,12 +650,11 @@ mod tests {
     fn test_sha256() {
         let data = [1u8; 10];
         let input: *mut u8 = unsafe { mem::transmute(&data[0]) };
-        let avm_data: *const avm_bytes = unsafe {
-            mem::transmute(&avm_bytes {
-                length: data.len() as u32,
-                pointer: input,
-            })
+        let bytes = avm_bytes {
+            length: data.len() as u32,
+            pointer: input,
         };
+        let avm_data: *const avm_bytes = unsafe { mem::transmute(&bytes) };
         let output: Vec<u8> = avm_sha256(avm_data).into();
         assert_eq!(
             output,
@@ -690,12 +689,11 @@ mod tests {
     fn test_keccak256() {
         let data = [1u8; 10];
         let input: *mut u8 = unsafe { mem::transmute(&data[0]) };
-        let avm_data: *const avm_bytes = unsafe {
-            mem::transmute(&avm_bytes {
-                length: data.len() as u32,
-                pointer: input,
-            })
+        let bytes = avm_bytes {
+            length: data.len() as u32,
+            pointer: input,
         };
+        let avm_data: *const avm_bytes = unsafe { mem::transmute(&bytes) };
         let output: Vec<u8> = avm_keccak256(avm_data).into();
         assert_eq!(
             output,
