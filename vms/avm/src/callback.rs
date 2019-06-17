@@ -31,7 +31,8 @@ pub struct avm_bytes {
 
 impl Into<Vec<u8>> for avm_bytes {
     fn into(self) -> Vec<u8> {
-        unsafe { slice::from_raw_parts(self.pointer, self.length as usize).into() }
+        let ret = unsafe { slice::from_raw_parts(self.pointer, self.length as usize) };
+        ret.into()
     }
 }
 
@@ -529,6 +530,16 @@ pub extern fn avm_blake2b(input: *const avm_bytes) -> avm_bytes {
         ret
     }
 }
+
+#[cfg(test)]
+pub fn avm_blake2b_test(input: *const avm_bytes) -> Vec<u8> {
+    unsafe {
+        println!("input = {:?}", *input);
+    }
+    let data: Vec<u8> = unsafe { (*input).into() };
+    blake2b(data)[..].into()
+}
+
 #[no_mangle]
 pub extern fn avm_keccak256(input: *const avm_bytes) -> avm_bytes {
     let data: Vec<u8> = unsafe { (*input).into() };
@@ -659,12 +670,12 @@ mod tests {
     fn test_blake2b() {
         let data = [1u8; 10];
         let input: *mut u8 = unsafe { mem::transmute(&data[0]) };
-        let avm_data: *const avm_bytes = unsafe {
-            mem::transmute(&avm_bytes {
-                length: data.len() as u32,
-                pointer: input,
-            })
+        let bytes = avm_bytes {
+            length: data.len() as u32,
+            pointer: input,
         };
+        let avm_data: *const avm_bytes = unsafe { mem::transmute(&bytes) };
+        // unsafe {println!("raw = {:?}-{:?}", *avm_data, data.len());}
         let output: Vec<u8> = avm_blake2b(avm_data).into();
         assert_eq!(
             output,
