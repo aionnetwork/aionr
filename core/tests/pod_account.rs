@@ -25,10 +25,10 @@
 #[macro_use]
 extern crate macros;
 extern crate acore;
-extern crate common_types;
+extern crate types;
 
 use std::collections::BTreeMap;
-use common_types::account_diff::{ AccountDiff, Diff };
+use types::account_diff::{ AccountDiff, Diff };
 use acore::pod_account::{PodAccount, diff_pod};
 
 #[test]

@@ -14,7 +14,6 @@ dependencies = [
  "bloomchain 0.2.0",
  "bytebuffer 0.2.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
- "common-types 0.1.0",
  "crossbeam 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "crypto 0.1.0",
  "db 0.0.1",
@@ -53,6 +52,7 @@ dependencies = [
  "transient-hashmap 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "trie-standardmap 0.1.0",
  "triehash 0.1.0",
+ "types 0.1.0",
  "unexpected 0.1.0",
  "using_queue 0.1.0",
  "util-error 0.1.0",
@@ -301,7 +301,7 @@ dependencies = [
  "rlp 0.2.1",
  "rustc-hex 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "tiny-keccak 1.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "vm_common 0.1.0",
+ "types 0.1.0",
 ]
 
 [[package]]
@@ -435,20 +435,6 @@ version = "0.1.33"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 dependencies = [
  "cc 1.0.20 (registry+https://github.com/rust-lang/crates.io-index)",
-]
-
-[[package]]
-name = "common-types"
-version = "0.1.0"
-dependencies = [
- "acore-bytes 0.1.0",
- "aion-types 0.1.0",
- "ajson 0.1.0",
- "ethbloom 0.5.1",
- "heapsize 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "rlp 0.2.1",
- "rlp_derive 0.1.0",
- "rustc-hex 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
 [[package]]
@@ -2429,6 +2415,21 @@ version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 
 [[package]]
+name = "types"
+version = "0.1.0"
+dependencies = [
+ "acore-bytes 0.1.0",
+ "aion-types 0.1.0",
+ "ajson 0.1.0",
+ "blake2b 0.1.0",
+ "ethbloom 0.5.1",
+ "heapsize 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
+ "rlp 0.2.1",
+ "rlp_derive 0.1.0",
+ "rustc-hex 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
+]
+
+[[package]]
 name = "ucd-util"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2558,8 +2559,8 @@ dependencies = [
  "aion-types 0.1.0",
  "ajson 0.1.0",
  "blake2b 0.1.0",
- "common-types 0.1.0",
  "rlp 0.2.1",
+ "types 0.1.0",
 ]
 
 [[package]]

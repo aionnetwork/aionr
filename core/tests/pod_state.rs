@@ -23,13 +23,13 @@
 #![warn(unused_extern_crates)]
 
 extern crate acore;
-extern crate common_types;
+extern crate types;
 #[macro_use]
 extern crate macros;
 
 use std::collections::BTreeMap;
-use common_types::state_diff::StateDiff;
-use common_types::account_diff::{ AccountDiff, Diff };
+use types::state_diff::StateDiff;
+use types::account_diff::{ AccountDiff, Diff };
 use acore::pod_account::{ PodAccount };
 use acore::pod_state::{ PodState, diff_pod };
 

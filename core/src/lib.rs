@@ -25,7 +25,7 @@
 extern crate bloomchain;
 extern crate byteorder;
 extern crate crossbeam;
-extern crate common_types as types;
+extern crate types;
 extern crate acore_bloom_journal as bloom_journal;
 extern crate acore_io as io;
 extern crate acore_bytes as bytes;

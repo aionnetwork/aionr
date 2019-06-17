@@ -30,6 +30,7 @@ extern crate rlp;
 #[macro_use]
 extern crate rlp_derive;
 extern crate heapsize;
+extern crate blake2b;
 
 pub mod account_diff;
 pub mod basic_account;
@@ -47,6 +48,7 @@ pub mod state_diff;
 pub mod trace_filter;
 pub mod tree_route;
 pub mod verification_queue_info;
+pub mod vm;
 
 /// Type for block number.
 pub type BlockNumber = u64;

@@ -1,14 +1,14 @@
 #![warn(unused_extern_crates)]
 
-extern crate common_types;
+extern crate types;
 extern crate aion_types;
 extern crate rlp;
 extern crate rustc_hex;
 
 use rustc_hex::FromHex;
 use rlp::{ encode, decode };
-use common_types::receipt::Receipt;
-use common_types::log_entry::LogEntry;
+use types::receipt::Receipt;
+use types::log_entry::LogEntry;
 use aion_types::{ H256, U256 };
 
 #[test]

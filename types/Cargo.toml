@@ -1,5 +1,5 @@
 [package]
-name = "common-types"
+name = "types"
 description = "common types"
 version = "0.1.0"
 authors = ["Aion Foundation <admin@aion.network>"]
@@ -8,9 +8,10 @@ authors = ["Aion Foundation <admin@aion.network>"]
 rlp         = { path = "../util/rlp" }
 rlp_derive  = { path = "../util/rlp_derive" }
 acore-bytes = { path = "../util/bytes" }
-aion-types  = { path = "../util/aion-types"}
-ethbloom    = { path = "../util/ethbloom"}
-ajson       = { path = "../json" }
+aion-types  = { path = "../util/aion-types" }
+ethbloom    = { path = "../util/ethbloom" }
+blake2b     = { path = "../util/blake2b" }
+#ajson       = { path = "../json" }
 heapsize    = "0.4"
 
 [dev-dependencies]

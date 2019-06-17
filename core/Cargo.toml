@@ -10,7 +10,7 @@ authors = ["Aion Foundation <admin@aion.network>"]
 ansi_term = "0.10"
 bloomchain = { path = "../util/bloomchain" }
 byteorder = "1.0"
-common-types = { path = "../types" }
+types = { path = "../types" }
 crossbeam = "0.3"
 acore-bloom-journal = { path = "../util/bloom" }
 acore-bytes = { path = "../util/bytes" }
@@ -69,7 +69,7 @@ vms =              { path = "../vms" }
 logger =           { path = "../util/logger" }
 aion-types =       { path = "../util/aion-types" }
 db =               { path = "../db/core" }
-common-types =     { path = "../types" }
+types =     { path = "../types" }
 
 
 [features]
