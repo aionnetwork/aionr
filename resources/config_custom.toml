@@ -16,8 +16,8 @@ local_node = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"
 boot_nodes = []
 ip_black_list = []
 
-[rpc]
-#processing_threads = None
+#[rpc]
+#processing_threads = 1
 
 [http]
 disable = false
@@ -26,7 +26,6 @@ interface = "local"
 apis = ["all", "-pubsub"]
 hosts = ["none"]
 cors = ["none"]
-#server_threads = None
 
 [websockets]
 disable = false
@@ -56,7 +55,6 @@ port = 8008
 #secret = None
 
 [mining]
-force_sealing = false
 remove_solved = false
 infinite_pending_block = false
 dynamic_gas_price = false

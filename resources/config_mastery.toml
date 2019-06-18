@@ -11,22 +11,19 @@ boot_nodes = [
 "p2p://a30d4000-729a-4584-86f1-e19ab97cf9cq@13.90.81.122:30303",
 "p2p://a30d5000-8c7e-496c-9c4e-c89318280275@104.42.186.213:30303"
 ]
-
 ip_black_list = []
-
-[websockets]
-disable = false
 
 [http]
 disable = false
 port = 8545
 
+[websockets]
+disable = true
+
 [ipc]
-disable = false
+disable = true
 
 [stratum]
+disable = true
 port = 8008
 interface = "0.0.0.0"
-
-[mining]
-author = "0xa08fc457b39b03c30dc71bdb89a4d0409dd4fa42f6539a5c3ee4054af9b71f23"
