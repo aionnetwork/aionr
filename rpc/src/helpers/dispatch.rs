@@ -133,7 +133,7 @@ impl<C: MiningBlockChainClient, M: MinerService> FullDispatcher<C, M> {
         signed_transaction: PendingTransaction,
     ) -> Result<H256>
     {
-        let hash = signed_transaction.transaction.hash();
+        let hash = signed_transaction.transaction.hash().clone();
 
         miner
             .import_own_transaction(client, signed_transaction)
@@ -187,8 +187,8 @@ impl<C: MiningBlockChainClient, M: MinerService> Dispatcher for FullDispatcher<C
             )));
         }
 
-        let state = self.state_nonce(&filled.from);
-        let reserved = self.nonces.lock().reserve(filled.from, state);
+        let state_nonce = self.state_nonce(&filled.from);
+        let reserved = self.nonces.lock().reserve(filled.from, state_nonce);
 
         Box::new(ProspectiveSigner::new(
             accounts, filled, None, reserved, password,

@@ -362,8 +362,8 @@ pub fn transaction_message(error: TransactionError) -> String {
             got,
         } => {
             format!(
-                "Transaction cost exceeds current block gas limit. Limit: {}, got: {}. Try to \
-                 decrease supplied gas.",
+                "Transaction gas limit exceeded the gas limit set in configuration. Limit: {}, \
+                 got: {}. Try to decrease supplied gas or increase gas limit configuration.",
                 limit, got
             )
         }

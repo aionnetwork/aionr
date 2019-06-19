@@ -1024,7 +1024,7 @@ impl BlockChainClient for Client {
         let cond = |gas| {
             let mut tx = t.as_unsigned().clone();
             tx.gas = gas;
-            let tx = tx.fake_sign(sender);
+            let tx = tx.fake_sign(sender.clone());
 
             let mut state = original_state.clone();
             Ok(Executive::new(&mut state, &env_info, self.engine.machine())
@@ -1498,10 +1498,10 @@ impl BlockChainClient for Client {
         self.miner.ready_transactions(number, timestamp)
     }
 
-    fn queue_consensus_message(&self, message: Bytes) {
+    fn new_block_chained(&self) {
         let channel = self.io_channel.lock().clone();
-        if let Err(e) = channel.send(ClientIoMessage::NewMessage(message)) {
-            debug!(target:"client","Ignoring the message, error queueing: {}", e);
+        if let Err(e) = channel.send(ClientIoMessage::NewChainHead) {
+            debug!("Sending new block chained message failed: {:?}", e);
         }
     }
 
@@ -1741,7 +1741,7 @@ fn transaction_receipt(
         .into_iter()
         .map(|receipt| receipt.logs().len())
         .sum::<usize>();
-    let transaction_hash = tx.hash();
+    let transaction_hash = tx.hash().clone();
     let block_hash = tx.block_hash;
     let block_number = tx.block_number;
     let transaction_index = tx.transaction_index;

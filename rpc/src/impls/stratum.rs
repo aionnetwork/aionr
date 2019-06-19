@@ -232,7 +232,7 @@ where
     fn validate_address(&self, address: H256) -> Result<AddressValidation> {
         let isvalid: bool = address.0[0] == 0xa0 as u8;
         let account_provider = self.account_provider()?;
-        let ismine = match account_provider.has_account(address) {
+        let ismine = match account_provider.has_account(&address) {
             Ok(true) => true,
             _ => false,
         };

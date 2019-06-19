@@ -24,6 +24,7 @@ pub mod error;
 pub mod transaction;
 pub mod banning_queue;
 pub mod local_transactions;
+pub mod transaction_pool;
 pub mod transaction_queue;
 
 pub use self::error::Error;

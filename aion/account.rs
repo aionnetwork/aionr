@@ -164,7 +164,7 @@ fn import_by_private_key(i: ImportAccount) -> Result<String, String> {
     let password = password_prompt()?;
     let address = key_pair.address();
     if acc_provider
-        .has_account(address)
+        .has_account(&address)
         .map_err(|_| "other error!!".to_owned())?
     {
         return Err("Failed to import the private key. Already exists?".to_owned());

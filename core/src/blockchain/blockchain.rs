@@ -1821,7 +1821,7 @@ mod tests {
         }
         .sign(keychain::ethkey::generate_keypair().secret(), None);
 
-        let t1_hash = t1.hash();
+        let t1_hash = t1.hash().clone();
 
         let genesis = BlockBuilder::genesis();
         let b1a = genesis.add_block_with_transactions(iter::once(t1));
@@ -2278,9 +2278,9 @@ mod tests {
             transaction_type: DEFAULT_TRANSACTION_TYPE,
         }
         .sign(keypair.secret(), None);
-        let tx_hash1 = t1.hash();
-        let tx_hash2 = t2.hash();
-        let tx_hash3 = t3.hash();
+        let tx_hash1 = t1.hash().clone();
+        let tx_hash2 = t2.hash().clone();
+        let tx_hash3 = t3.hash().clone();
 
         let genesis = BlockBuilder::genesis();
         let b1 = genesis.add_block_with_transactions(vec![t1, t2]);

@@ -221,8 +221,8 @@ pub trait BlockChainClient: Sync + Send {
     /// Import queued transactions.
     fn import_queued_transactions(&self, transactions: Vec<UnverifiedTransaction>);
 
-    /// Queue conensus engine message.
-    fn queue_consensus_message(&self, message: Bytes);
+    /// New block chained message.
+    fn new_block_chained(&self);
 
     /// List all transactions that are allowed into the next block.
     fn ready_transactions(&self) -> Vec<PendingTransaction>;

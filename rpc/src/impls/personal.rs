@@ -110,19 +110,19 @@ impl<D: Dispatcher + 'static> Personal for PersonalClient<D> {
 
     fn unlock_account(
         &self,
-        account: RpcH256,
+        address: RpcH256,
         account_pass: String,
         duration: Option<u64>,
     ) -> Result<bool>
     {
-        let account: Address = account.into();
+        let address: Address = address.into();
         let store = self.account_provider()?;
         let r = match (self.allow_perm_unlock, duration) {
-            (true, Some(0)) => store.unlock_account_permanently(account, account_pass),
-            (_, Some(d)) => store.unlock_account_timed(account, account_pass, d * 1000),
-            (_, None) => store.unlock_account_timed(account, account_pass, 300_000),
+            (true, Some(0)) => store.unlock_account_permanently(&address, account_pass),
+            (_, Some(d)) => store.unlock_account_timed(&address, account_pass, d * 1000),
+            (_, None) => store.unlock_account_timed(&address, account_pass, 300_000),
             // Temporarily unlock is for one time use (lock after once used). Disabled in official release to be align with Aion Java kernel.
-            // (_, None) => store.unlock_account_temporarily(account, account_pass),
+            // (_, None) => store.unlock_account_temporarily(&address, account_pass),
         };
         match r {
             Ok(_) => Ok(true),
@@ -133,27 +133,27 @@ impl<D: Dispatcher + 'static> Personal for PersonalClient<D> {
         }
     }
 
-    fn lock_account(&self, account: RpcH256, account_pass: String) -> Result<bool> {
-        let account: Address = account.into();
+    fn lock_account(&self, address: RpcH256, account_pass: String) -> Result<bool> {
+        let address: Address = address.into();
         let store = self.account_provider()?;
-        let r = store.lock_account(account, account_pass);
+        let r = store.lock_account(&address, account_pass);
         match r {
             Ok(_) => Ok(true),
             Err(err) => Err(errors::account("Unable to lock the account", err)),
         }
     }
 
-    fn is_account_unlocked(&self, account: RpcH256) -> Result<bool> {
-        let account: Address = account.into();
+    fn is_account_unlocked(&self, address: RpcH256) -> Result<bool> {
+        let address: Address = address.into();
         let store = self.account_provider()?;
-        Ok(store.is_unlocked_generic(&account))
+        Ok(store.is_unlocked_generic(&address))
     }
 
-    fn sign(&self, data: RpcBytes, account: RpcH256, password: String) -> BoxFuture<RpcH768> {
+    fn sign(&self, data: RpcBytes, address: RpcH256, password: String) -> BoxFuture<RpcH768> {
         let dispatcher = self.dispatcher.clone();
         let accounts = try_bf!(self.account_provider());
 
-        let payload = RpcConfirmationPayload::EthSignMessage((account.clone(), data).into());
+        let payload = RpcConfirmationPayload::EthSignMessage((address.clone(), data).into());
 
         Box::new(
             dispatch::from_rpc(payload, &dispatcher)

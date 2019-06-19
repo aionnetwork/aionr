@@ -175,9 +175,9 @@ usage! {
             "Specify a configuration. CONFIG may be a configuration file .",
 
         ["Account Options"]
-            FLAG flag_fast_unlock: (bool) = false, or |c: &Config| c.account.as_ref()?.fast_unlock.clone(),
-            "--fast-unlock",
-            "Use drastically faster unlocking mode. This setting causes raw secrets to be stored unprotected in memory, so use with care.",
+            FLAG flag_fast_signing: (bool) = false, or |c: &Config| c.account.as_ref()?.fast_signing.clone(),
+            "--fast-signing",
+            "Use drastically faster signing mode for permanently unlocked accounts. This setting causes raw secrets of these accounts to be stored unprotected in memory, so use with care.",
 
             ARG arg_keys_iterations: (u32) = 10240u32, or |c: &Config| c.account.as_ref()?.keys_iterations.clone(),
             "--keys-iterations=[NUM]",
@@ -232,7 +232,7 @@ usage! {
         ["Rpc Options"]
             ARG arg_rpc_processing_threads: (Option<usize>) = None, or |c: &Config| c.rpc.as_ref()?.processing_threads,
             "--rpc--processing-threads=[NUM]",
-            "Turn on additional processing threads for JSON-RPC servers (for all severs i.e for websocket and ipc). Setting this to a non-zero value allows parallel execution of cpu-heavy queries.",
+            "Turn on additional processing threads for JSON-RPC servers (for all severs http, websocket and ipc). Setting this to a non-zero value allows parallel execution of cpu-heavy queries.",
 
         ["Http Options"]
             FLAG flag_no_http: (bool) = false, or |c: &Config| c.http.as_ref()?.disable.clone(),
@@ -350,7 +350,7 @@ usage! {
 
             FLAG flag_remove_solved: (bool) = false, or |c: &Config| c.mining.as_ref()?.remove_solved.clone(),
             "--remove-solved",
-            "Move solved blocks from the work package queue instead of cloning them. This gives a slightly faster import speed, but means that extra solutions submitted for the same work package will go unused.",
+            "Remove solved blocks from the work package queue instead of cloning them. This gives a slightly faster import speed, but means that extra solutions submitted for the same work package will go unused.",
 
             FLAG flag_infinite_pending_block: (bool) = false, or |c: &Config| c.mining.as_ref()?.infinite_pending_block.clone(),
             "--infinite-pending-block",
@@ -555,7 +555,7 @@ struct Account {
     password: Option<Vec<String>>,
     keys_iterations: Option<u32>,
     refresh_time: Option<u64>,
-    fast_unlock: Option<bool>,
+    fast_signing: Option<bool>,
 }
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
@@ -859,7 +859,7 @@ mod tests {
                 arg_password: vec!["~/.safe/password.file".into()],
                 arg_keys_iterations: 10240u32,
                 arg_refresh_time: 2,
-                flag_fast_unlock: true,
+                flag_fast_signing: true,
 
                 // -- Networking Options
                 arg_max_peers: 50u32,
@@ -1014,7 +1014,7 @@ mod tests {
                     password: Some(vec!["passwdfile path".into()]),
                     keys_iterations: None,
                     refresh_time: None,
-                    fast_unlock: None,
+                    fast_signing: None,
                 }),
                 network: Some(Network {
                     max_peers: Some(20),

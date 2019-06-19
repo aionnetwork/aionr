@@ -222,8 +222,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         code: Some(Arc::new(t.data.clone())),
                         data: None,
                         call_type: CallType::None,
-                        transaction_hash: t.hash(),
-                        original_transaction_hash: t.hash(),
+                        transaction_hash: t.hash().to_owned(),
+                        original_transaction_hash: t.hash().to_owned(),
                         nonce: nonce.low_u64(),
                         static_flag: false,
                         params_type: ParamsType::Embedded,
@@ -247,8 +247,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         code_hash: Some(self.state.code_hash(address).unwrap()),
                         data: Some(t.data.clone()),
                         call_type,
-                        transaction_hash: t.hash(),
-                        original_transaction_hash: t.hash(),
+                        transaction_hash: t.hash().to_owned(),
+                        original_transaction_hash: t.hash().to_owned(),
                         nonce: nonce.low_u64(),
                         params_type: ParamsType::Embedded,
                         static_flag: false,
@@ -431,8 +431,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     call_type: CallType::None,
                     static_flag: false,
                     params_type: ParamsType::Embedded,
-                    transaction_hash: t.hash(),
-                    original_transaction_hash: t.hash(),
+                    transaction_hash: t.hash().clone(),
+                    original_transaction_hash: t.hash().clone(),
                     nonce: t.nonce.low_u64(),
                 };
                 self.create(params, &mut substate)
@@ -452,8 +452,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     call_type: CallType::Call,
                     static_flag: false,
                     params_type: ParamsType::Separate,
-                    transaction_hash: t.hash(),
-                    original_transaction_hash: t.hash(),
+                    transaction_hash: t.hash().clone(),
+                    original_transaction_hash: t.hash().clone(),
                     nonce: t.nonce.low_u64(),
                 };
                 self.call(params, &mut substate)

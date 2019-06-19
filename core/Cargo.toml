@@ -58,6 +58,8 @@ num-bigint = "0.2"
 bytebuffer = "0.2.1"
 transient-hashmap = "0.4"
 macros = { path = "../util/macros" }
+futures = "0.1.6"
+tokio = "0.1.11"
 
 [dev-dependencies]
 tempdir = "*"

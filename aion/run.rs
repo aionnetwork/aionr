@@ -26,10 +26,9 @@ use std::time::{Duration, Instant};
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
 use acore::client::{BlockChainClient, Client, DatabaseCompactionProfile, VMType};
 use acore::miner::external::ExternalMiner;
-use acore::miner::{Miner, MinerOptions, MinerService};
-use acore::miner::{Stratum, StratumOptions};
-use acore::service::ClientService;
+use acore::miner::{Miner, MinerOptions, MinerService, Stratum, StratumOptions};
 use acore::transaction::local_transactions::TxIoMessage;
+use acore::service::{ClientService, run_miner, run_transaction_pool};
 use acore::verification::queue::VerifierSettings;
 use aion_rpc::{dispatch::DynamicGasPrice, impls::EthClient, informant};
 use aion_version::version;
@@ -180,12 +179,12 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     )
     .map_err(|e| format!("Client service error: {:?}", e))?;
 
-    info!(target: "run","Genesis hash: {:?}",genesis_hash);
+    info!(target: "run"," genesis: {:?}",genesis_hash);
 
     // display info about used pruning algorithm
     info!(
         target: "run",
-        "State DB configuration: {}{}",
+        "state db: {}{}",
         Colour::White.bold().paint(algorithm.as_str()),
         match fat_db {
             true => Colour::White.bold().paint(" +Fat").to_string(),
@@ -287,7 +286,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     )?;
 
     // log apis
-    info!(target: "run", "Apis: rpc-http({}) rpc-ws({}) rpc-ipc({}) pb-zmq({})",
+    info!(target: "run", "    apis: rpc-http({}) rpc-ws({}) rpc-ipc({}) pb-zmq({})",
         if cmd.http_conf.enabled { "enable" } else { "disable" },
         if cmd.ws_conf.enabled { "enable" } else { "disable" },
         if cmd.ipc_conf.enabled { "enable" } else { "disable" },
@@ -300,7 +299,26 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     user_defaults.fat_db = fat_db;
     user_defaults.save(&user_defaults_path)?;
 
-    // enable sync module
+    // start miner module
+    let runtime_transaction_pool = tokio::runtime::Builder::new()
+        .core_threads(1)
+        .name_prefix("transaction-pool-loop #")
+        .build()
+        .expect("seal block runtime loop init failed");
+    let executor_transaction_pool = runtime_transaction_pool.executor();
+    let close_transaction_pool =
+        run_transaction_pool(executor_transaction_pool.clone(), client.clone());
+
+    // start miner module
+    let runtime_miner = tokio::runtime::Builder::new()
+        .core_threads(1)
+        .name_prefix("seal-block-loop #")
+        .build()
+        .expect("seal block runtime loop init failed");
+    let executor_miner = runtime_miner.executor();
+    let close_miner = run_miner(executor_miner.clone(), client.clone());
+
+    // enable Sync module
     network_manager.start_network();
 
     if let Some(config_path) = cmd.dirs.config {
@@ -321,8 +339,13 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // Handle exit
     wait_for_exit();
 
-    // close rpc
     info!(target: "run","Finishing work, please wait...");
+
+    // close pool
+    let _ = close_transaction_pool.send(());
+    let _ = close_miner.send(());
+
+    // close rpc
     if ws_server.is_some() { ws_server.unwrap().close(); }
     if http_server.is_some() { http_server.unwrap().close(); }
     if ipc_server.is_some() { ipc_server.unwrap().close(); }
@@ -343,6 +366,14 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .shutdown_now()
         .wait()
         .expect("Failed to shutdown jsonrpc runtime instance!");
+    runtime_transaction_pool
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown transaction pool runtime instance!");
+    runtime_miner
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown miner runtime instance!");
 
     info!(target: "run","Shutdown.");
 
@@ -371,7 +402,7 @@ fn print_running_environment(
     if let Some(config) = &dirs.config {
         info!(
             target: "run",
-            "Config path {}",
+            " config path: {}",
             Colour::White
                 .bold()
                 .paint(config)
@@ -386,7 +417,7 @@ fn print_running_environment(
         SpecType::Custom(ref filename) => {
             info!(
                 target: "run",
-                "Genesis spec path {}",
+                "genesis path: {}",
             Colour::White
                 .bold()
                 .paint(absolute(filename.to_string()))
@@ -395,14 +426,14 @@ fn print_running_environment(
     }
     info!(
         target: "run",
-        "Keys path {}",
+        "   keys path: {}",
         Colour::White
             .bold()
             .paint(dirs.keys_path(spec_data_dir).to_string_lossy().into_owned())
     );
     info!(
         target: "run",
-        "DB path {}",
+        "     db path: {}",
         Colour::White
             .bold()
             .paint(db_dirs.db_root_path().to_string_lossy().into_owned())
@@ -432,7 +463,7 @@ fn print_logo() {
         Colour::Green.bold().paint("\\"),
         Colour::Blue.bold().paint("____/  |_| \\_|\n\n")
     );
-    info!(target: "run","Starting {}", Colour::White.bold().paint(version()));
+    info!(target: "run","   build: {}", Colour::White.bold().paint(version()));
 }
 
 fn prepare_account_provider(
@@ -452,7 +483,7 @@ fn prepare_account_provider(
             .map_err(|e| format!("Could not open keys directory: {}", e))?,
     );
     let account_settings = AccountProviderSettings {
-        unlock_keep_secret: cfg.enable_fast_unlock,
+        unlock_keep_secret: cfg.enable_fast_signing,
         blacklisted_accounts: vec![
             // blacklist accounts for development. since we change account address to 32 bytes,
             // so just append zero to keep it work.
@@ -469,10 +500,10 @@ fn prepare_account_provider(
 
     for a in cfg.unlocked_accounts {
         // Check if the account exists
-        if !account_provider.has_account(a).unwrap_or(false) {
+        if !account_provider.has_account(&a).unwrap_or(false) {
             return Err(format!(
                 "Account {} not found for the current chain. {}",
-                a,
+                &a,
                 build_create_account_hint(spec, &dirs.keys)
             ));
         }
@@ -481,18 +512,18 @@ fn prepare_account_provider(
         if passwords.is_empty() {
             return Err(format!(
                 "No password found to unlock account {}. {}",
-                a, VERIFY_PASSWORD_HINT
+                &a, VERIFY_PASSWORD_HINT
             ));
         }
 
         if !passwords.iter().any(|p| {
             account_provider
-                .unlock_account_permanently(a, (*p).clone())
+                .unlock_account_permanently(&a, (*p).clone())
                 .is_ok()
         }) {
             return Err(format!(
                 "No valid password to unlock account {}. {}",
-                a, VERIFY_PASSWORD_HINT
+                &a, VERIFY_PASSWORD_HINT
             ));
         }
     }

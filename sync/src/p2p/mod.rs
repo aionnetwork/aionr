@@ -70,7 +70,7 @@ impl P2pMgr {
 
         local_node.net_id = cfg.net_id;
 
-        info!(target:"net","Local node loaded: {}@{}", local_node.get_node_id(), local_node.get_ip_addr());
+        info!(target:"net","Node: {}@{}", local_node.get_node_id(), local_node.get_ip_addr());
 
         LOCAL_NODE.set(local_node.clone());
 
@@ -93,7 +93,6 @@ impl P2pMgr {
     {
         if let Ok(addr) = local_addr.parse() {
             let listener = TcpListener::bind(&addr).expect("Failed to bind");
-            info!(target: "net", "Listening on: {}", local_addr);
             let server = listener
                 .incoming()
                 .map_err(|e| error!(target: "net", "Failed to accept socket; error = {:?}", e))
@@ -134,7 +133,7 @@ impl P2pMgr {
                     Self::process_outbounds(socket, peer_node, handle);
                 })
                 .map_err(
-                    move |e| error!(target: "net", "Node: {}@{}, {}", node_ip_addr, node_id, e),
+                    move |e| error!(target: "net","    node: {}@{}, {}", node_ip_addr, node_id, e),
                 );
             thread_pool.spawn(connect);
         }

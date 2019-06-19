@@ -145,12 +145,12 @@ impl Transaction {
     pub fn from_localized(mut t: LocalizedTransaction, timestamp: u64) -> Transaction {
         let signature = t.signature();
         Transaction {
-            hash: t.hash().into(),
+            hash: t.hash().clone().into(),
             nonce: t.nonce.into(),
             block_hash: Some(t.block_hash.clone().into()),
             block_number: Some(t.block_number.into()),
             transaction_index: Some(t.transaction_index.into()),
-            from: t.sender().into(),
+            from: t.sender().clone().into(),
             to: match t.action {
                 Action::Create => None,
                 Action::Call(ref address) => Some(address.clone().into()),
@@ -182,12 +182,12 @@ impl Transaction {
     pub fn from_signed(t: SignedTransaction) -> Transaction {
         let signature = t.signature();
         Transaction {
-            hash: t.hash().into(),
+            hash: t.hash().clone().into(),
             nonce: t.nonce.into(),
             block_hash: None,
             block_number: None,
             transaction_index: None,
-            from: t.sender().into(),
+            from: t.sender().clone().into(),
             to: match t.action {
                 Action::Create => None,
                 Action::Call(ref address) => Some(address.clone().into()),

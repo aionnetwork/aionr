@@ -73,6 +73,8 @@ extern crate trace_time;
 pub extern crate keychain;
 extern crate equihash;
 extern crate vms;
+extern crate futures;
+extern crate tokio;
 // for aion token bridge
 extern crate tiny_keccak;
 extern crate num_bigint;
