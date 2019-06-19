@@ -48,7 +48,7 @@ pub fn launch_jvm() {
                 let mut libs;
                 if default_var.is_err() {
                     libs = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-                    //warn!("AIONR_HOME is not set, use default path: {:?}", libs);
+                //warn!("AIONR_HOME is not set, use default path: {:?}", libs);
                 } else {
                     libs = PathBuf::from(default_var.unwrap());
                 }

@@ -276,7 +276,11 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // start rpc servers
     let ws_server = rpc::new_ws(cmd.ws_conf.clone(), &dependencies, executor_jsonrpc.clone())?;
-    let ipc_server = rpc::new_ipc(cmd.ipc_conf.clone(), &dependencies, executor_jsonrpc.clone())?;
+    let ipc_server = rpc::new_ipc(
+        cmd.ipc_conf.clone(),
+        &dependencies,
+        executor_jsonrpc.clone(),
+    )?;
     let http_server = rpc::new_http(
         "HTTP JSON-RPC",
         "jsonrpc",
@@ -346,9 +350,15 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     let _ = close_miner.send(());
 
     // close rpc
-    if ws_server.is_some() { ws_server.unwrap().close(); }
-    if http_server.is_some() { http_server.unwrap().close(); }
-    if ipc_server.is_some() { ipc_server.unwrap().close(); }
+    if ws_server.is_some() {
+        ws_server.unwrap().close();
+    }
+    if http_server.is_some() {
+        http_server.unwrap().close();
+    }
+    if ipc_server.is_some() {
+        ipc_server.unwrap().close();
+    }
 
     // close p2p
     network_manager.stop_network();
