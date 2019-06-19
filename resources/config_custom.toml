@@ -2,7 +2,6 @@
 chain = "custom/custom.json"
 
 [account]
-fast_unlock = false
 keys_iterations = 10240
 refresh_time = 5
 unlock = []
