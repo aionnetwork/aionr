@@ -65,6 +65,7 @@ char toChar(evm_revision rev)
 	case EVM_BYZANTIUM: return 'B';
 	case EVM_AION: return 'A';
 	case EVM_CONSTANTINOPLE: return 'C';
+	case EVM_AION_V1: return 'D';
 	}
 	LLVM_BUILTIN_UNREACHABLE;
 }
@@ -354,18 +355,13 @@ ExecFunc JITImpl::compile(evm_revision _rev, bool _staticCall, byte const* _code
 
 	llvm::Module *m = module.get();
 
-  	//module->dump();
 	m_engine->addModule(std::move(module));
-	
-	clock_t t3 = clock();
 	//listener->stateChanged(ExecState::CodeGen);
 	ExecFunc func = (ExecFunc)m_engine->getFunctionAddress(_codeIdentifier);
-	
-	clock_t t4 = clock();
 	m_engine->removeModule(m);
 
-	clock_t t5 = clock();
-	DLOG(jit) << "compile: " << 1000000*(t2 - t1)/CLOCKS_PER_SEC << " " << 1000000*(t3 - t2)/CLOCKS_PER_SEC << " " << t4 - t3 << " " << t5 - t4 << std::endl;
+	clock_t t3 = clock();
+	DLOG(jit) << "compile: " << t2 - t1 << " " << t3 - t2 << std::endl;
 
 	delete m;
 	return func;
@@ -421,7 +417,7 @@ static evm_result execute(evm_instance* instance, evm_context* context, evm_revi
 
 	if (!jit.host)
 		jit.host = context->fn_table;
-	assert(jit.host == context->fn_table);  // Require the fn_table not to change
+	assert(jit.host == context->fn_table);  // Require the fn_table not to change.
 
 	// TODO: Temporary keep track of the current message.
 	evm_message const* prevMsg = jit.currentMsg;
@@ -454,7 +450,6 @@ static evm_result execute(evm_instance* instance, evm_context* context, evm_revi
     {
         //FIXME: We have a race condition here!
 
-		clock_t start = clock();
         if (codeEntry.hits <= jit.hitThreshold)
         {
             result.status_code = EVM_REJECTED;
@@ -472,8 +467,6 @@ static evm_result execute(evm_instance* instance, evm_context* context, evm_revi
             return result;
         }
         jit.mapExecFunc(codeIdentifier, func);
-		clock_t end = clock();
-		DLOG(jit) << "compilation time = " << 1000000*(end - start)/CLOCKS_PER_SEC << std::endl;
     }
 
     auto returnCode = func(&ctx);
@@ -491,7 +484,6 @@ static evm_result execute(evm_instance* instance, evm_context* context, evm_revi
 	else
 	{
 		// In case of success return the amount of gas left.
-		DLOG(jit) << "evmjit gas left = " << rt.gas << std::endl;
 		result.gas_left = rt.gas;
 	}
 
@@ -500,7 +492,6 @@ static evm_result execute(evm_instance* instance, evm_context* context, evm_revi
 		auto out = ctx.getReturnData();
 		result.output_data = std::get<0>(out);
 		result.output_size = std::get<1>(out);
-		DLOG(jit) << "return code size = " << result.output_size << std::endl;
 	}
 
 	// Take care of the internal memory.

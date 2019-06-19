@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use super::DifficultyCalc;
-use error::{Error,BlockError};
+use error::{Error, BlockError};
 use header::Header;
 use unexpected::{Mismatch};
 

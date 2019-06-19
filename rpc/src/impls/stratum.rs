@@ -41,7 +41,8 @@ use helpers::errors;
 use helpers::accounts::unwrap_provider;
 use traits::Stratum;
 use types::{
-    Work, Info, AddressValidation, MiningInfo, MinerStats, TemplateParam, Bytes, StratumHeader, SimpleHeader, BlockNumber
+    Work, Info, AddressValidation, MiningInfo, MinerStats, TemplateParam, Bytes, StratumHeader,
+    SimpleHeader, BlockNumber,
 };
 use aion_types::clean_0x;
 

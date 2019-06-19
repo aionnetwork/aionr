@@ -22,7 +22,8 @@
 use std::cmp;
 use traits::KeyValueDAO;
 use parity_rocksdb::{
-    DB, Options, BlockBasedOptions, Cache, ReadOptions, IteratorMode, Direction, WriteOptions, WriteBatch, DBIterator, Writable, DBCompactionStyle
+    DB, Options, BlockBasedOptions, Cache, ReadOptions, IteratorMode, Direction, WriteOptions,
+    WriteBatch, DBIterator, Writable, DBCompactionStyle,
 };
 use super::{Key, DBValue};
 use std::collections::HashMap;
@@ -50,7 +51,6 @@ pub struct Rockskvdb {
     db: DB,
     write_options: WriteOptions,
     read_options: ReadOptions,
-    block_cache_options: BlockBasedOptions,
     overlay: HashMap<Key, KeyState>,
 }
 impl Rockskvdb {
@@ -60,7 +60,6 @@ impl Rockskvdb {
             db: DB::open_default("./temp/testdb").expect("open default rocksdb failed"),
             write_options: WriteOptions::new(),
             read_options: ReadOptions::new(),
-            block_cache_options: BlockBasedOptions::new(),
             overlay: HashMap::new(),
         }
     }
@@ -92,7 +91,6 @@ impl Rockskvdb {
                             db: t,
                             write_options: write_opts,
                             read_options: read_opts,
-                            block_cache_options: block_opts,
                             overlay: HashMap::new(),
                         })
                     }
@@ -108,7 +106,6 @@ impl Rockskvdb {
                             db: DB::open(&opts, path)?,
                             write_options: write_opts,
                             read_options: read_opts,
-                            block_cache_options: block_opts,
                             overlay: HashMap::new(),
                         })
                     }

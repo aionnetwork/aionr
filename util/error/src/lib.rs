@@ -20,10 +20,7 @@
  *
  ******************************************************************************/
 
-//! General error types for use in ethcore.
-
-#![allow(missing_docs)]
-#![allow(unknown_lints)]
+#![warn(unused_extern_crates)]
 
 #[macro_use]
 extern crate error_chain;

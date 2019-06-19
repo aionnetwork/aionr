@@ -18,20 +18,20 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
+use acore_bytes::to_hex;
 use bincode::config;
-use bytes::{BufMut, BytesMut};
+use bytes::BytesMut;
 use futures::sync::mpsc;
 use futures::{Future, Stream};
-use rand::prelude::*;
+use rand::{thread_rng, Rng};
 use state::Storage;
-use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
+use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::hash::{Hash, Hasher};
 use std::io;
 use std::net::Shutdown;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, RwLock};
+use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
 use tokio::runtime::TaskExecutor;
@@ -40,7 +40,7 @@ use tokio_threadpool::{Builder, ThreadPool};
 
 mod error;
 mod event;
-mod msg;
+pub mod msg;
 mod node;
 
 pub use self::error::*;
@@ -52,7 +52,7 @@ lazy_static! {
     static ref LOCAL_NODE: Storage<Node> = Storage::new();
     static ref NETWORK_CONFIG: Storage<NetworkConfig> = Storage::new();
     static ref SOCKETS_MAP: Storage<Mutex<HashMap<u64, TcpStream>>> = Storage::new();
-    static ref GLOBAL_NODES_MAP: Storage<RwLock<HashMap<u64, Node>>> = Storage::new();
+    static ref GLOBAL_NODES_MAP: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
     static ref ENABLED: Storage<AtomicBool> = Storage::new();
     static ref TP: Storage<ThreadPool> = Storage::new();
 }
@@ -64,9 +64,6 @@ impl P2pMgr {
     pub fn enable(cfg: NetworkConfig) {
         let sockets_map: HashMap<u64, TcpStream> = HashMap::new();
         SOCKETS_MAP.set(Mutex::new(sockets_map));
-
-        let node_map: HashMap<u64, Node> = HashMap::new();
-        GLOBAL_NODES_MAP.set(RwLock::new(node_map));
 
         let local_node_str = cfg.local_node.clone();
         let mut local_node = Node::new_with_node_str(local_node_str);
@@ -101,6 +98,14 @@ impl P2pMgr {
                 .incoming()
                 .map_err(|e| error!(target: "net", "Failed to accept socket; error = {:?}", e))
                 .for_each(move |socket| {
+                    socket
+                        .set_recv_buffer_size(1 << 24)
+                        .expect("set_recv_buffer_size failed");
+
+                    socket
+                        .set_keepalive(Some(Duration::from_secs(30)))
+                        .expect("set_keepalive failed");
+
                     Self::process_inbounds(socket, handle);
 
                     Ok(())
@@ -118,6 +123,14 @@ impl P2pMgr {
             let node_id = peer_node.get_node_id();
             let connect = TcpStream::connect(&addr)
                 .map(move |socket| {
+                    socket
+                        .set_recv_buffer_size(1 << 24)
+                        .expect("set_recv_buffer_size failed");
+
+                    socket
+                        .set_keepalive(Some(Duration::from_secs(30)))
+                        .expect("set_keepalive failed");
+
                     Self::process_outbounds(socket, peer_node, handle);
                 })
                 .map_err(
@@ -158,7 +171,7 @@ impl P2pMgr {
                 }
             }
         }
-        if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.get().write() {
+        if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
             nodes_map.clear();
         }
     }
@@ -179,7 +192,7 @@ impl P2pMgr {
                         warn!(target: "net", "Known node, ...");
                     }
                     None => {
-                        if let Ok(mut peer_nodes) = GLOBAL_NODES_MAP.get().write() {
+                        if let Ok(mut peer_nodes) = GLOBAL_NODES_MAP.write() {
                             let max_peers_num = NETWORK_CONFIG.get().max_peers as usize;
                             if peer_nodes.len() < max_peers_num {
                                 match peer_nodes.get(&node.node_hash) {
@@ -187,7 +200,6 @@ impl P2pMgr {
                                         warn!(target: "net", "Known node...");
                                     }
                                     None => {
-                                        // info!(target: "p2p", "Node {}@{} added.", node.get_node_id(), node.get_ip_addr());
                                         sockets_map.insert(node.node_hash, socket);
                                         peer_nodes.insert(node.node_hash, node);
                                         return;
@@ -213,7 +225,7 @@ impl P2pMgr {
                 }
             }
         }
-        if let Ok(mut peer_nodes) = GLOBAL_NODES_MAP.get().write() {
+        if let Ok(mut peer_nodes) = GLOBAL_NODES_MAP.write() {
             // if let Some(node) = peer_nodes.remove(&node_hash) {
             //     info!(target: "p2p", "Node {}@{} removed.", node.get_node_id(), node.get_ip_addr());
             //     return Some(node);
@@ -227,7 +239,7 @@ impl P2pMgr {
 
     pub fn add_node(node: Node) {
         let max_peers_num = NETWORK_CONFIG.get().max_peers as usize;
-        if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.get().write() {
+        if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
             if nodes_map.len() < max_peers_num {
                 match nodes_map.get(&node.node_hash) {
                     Some(_) => {
@@ -243,7 +255,7 @@ impl P2pMgr {
     }
 
     fn get_tx(node_hash: u64) -> Option<Tx> {
-        if let Ok(nodes_map) = GLOBAL_NODES_MAP.get().read() {
+        if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
             if let Some(node) = nodes_map.get(&node_hash) {
                 return node.tx.clone();
             }
@@ -263,7 +275,7 @@ impl P2pMgr {
 
     pub fn get_nodes_count(state_code: u32) -> usize {
         let mut nodes_count = 0;
-        if let Ok(nodes_map) = GLOBAL_NODES_MAP.get().read() {
+        if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
             for val in nodes_map.values() {
                 if val.state_code & state_code == state_code {
                     nodes_count += 1;
@@ -275,9 +287,9 @@ impl P2pMgr {
 
     pub fn get_nodes_count_with_mode(mode: Mode) -> usize {
         let mut nodes_count = 0;
-        if let Ok(nodes_map) = GLOBAL_NODES_MAP.get().read() {
+        if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
             for val in nodes_map.values() {
-                if val.mode == mode {
+                if val.state_code & ALIVE == ALIVE && val.mode == mode {
                     nodes_count += 1;
                 }
             }
@@ -285,9 +297,37 @@ impl P2pMgr {
         nodes_count
     }
 
+    pub fn get_nodes_count_all_modes() -> (usize, usize, usize, usize, usize) {
+        let mut normal_nodes_count = 0;
+        let mut backward_nodes_count = 0;
+        let mut forward_nodes_count = 0;
+        let mut lightning_nodes_count = 0;
+        let mut thunder_nodes_count = 0;
+        if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
+            for val in nodes_map.values() {
+                if val.state_code & ALIVE == ALIVE {
+                    match val.mode {
+                        Mode::NORMAL => normal_nodes_count += 1,
+                        Mode::BACKWARD => backward_nodes_count += 1,
+                        Mode::FORWARD => forward_nodes_count += 1,
+                        Mode::LIGHTNING => lightning_nodes_count += 1,
+                        Mode::THUNDER => thunder_nodes_count += 1,
+                    }
+                }
+            }
+        }
+        (
+            normal_nodes_count,
+            backward_nodes_count,
+            forward_nodes_count,
+            lightning_nodes_count,
+            thunder_nodes_count,
+        )
+    }
+
     pub fn get_all_nodes_count() -> u16 {
         let mut count = 0;
-        if let Ok(nodes_map) = GLOBAL_NODES_MAP.get().read() {
+        if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
             for _ in nodes_map.values() {
                 count += 1;
             }
@@ -297,7 +337,7 @@ impl P2pMgr {
 
     pub fn get_all_nodes() -> Vec<Node> {
         let mut nodes = Vec::new();
-        if let Ok(nodes_map) = GLOBAL_NODES_MAP.get().read() {
+        if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
             for val in nodes_map.values() {
                 let node = val.clone();
                 nodes.push(node);
@@ -308,7 +348,7 @@ impl P2pMgr {
 
     pub fn get_nodes(state_code_mask: u32) -> Vec<Node> {
         let mut nodes = Vec::new();
-        if let Ok(nodes_map) = GLOBAL_NODES_MAP.get().read() {
+        if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
             for val in nodes_map.values() {
                 let node = val.clone();
                 if node.state_code & state_code_mask == state_code_mask {
@@ -329,10 +369,12 @@ impl P2pMgr {
                 normal_nodes.push(node);
             }
         }
-        if normal_nodes.len() == 0 {
+        let normal_nodes_count = normal_nodes.len();
+        if normal_nodes_count == 0 {
             return None;
         }
-        let random_index = random::<usize>() % normal_nodes.len();
+        let mut rng = thread_rng();
+        let random_index: usize = rng.gen_range(0, normal_nodes_count);
         let node = &normal_nodes[random_index];
 
         Self::remove_peer(node.node_hash)
@@ -340,25 +382,18 @@ impl P2pMgr {
 
     pub fn get_an_active_node() -> Option<Node> {
         let nodes = Self::get_nodes(ALIVE);
-        if nodes.len() != 0 {
-            let random_index = random::<usize>() % nodes.len();
+        let node_count = nodes.len();
+        if node_count > 0 {
+            let mut rng = thread_rng();
+            let random_index: usize = rng.gen_range(0, node_count);
             return Self::get_node(nodes[random_index].node_hash);
         } else {
             None
         }
     }
 
-    pub fn get_an_node_with_state_code(state_code_mask: u32) -> Option<Node> {
-        let nodes = Self::get_nodes(state_code_mask);
-        if nodes.len() == 0 {
-            return None;
-        }
-        let random_index = random::<usize>() % nodes.len();
-        Self::get_node(nodes[random_index].node_hash)
-    }
-
     pub fn get_node(node_hash: u64) -> Option<Node> {
-        if let Ok(nodes_map) = GLOBAL_NODES_MAP.get().read() {
+        if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
             if let Some(node) = nodes_map.get(&node_hash) {
                 return Some(node.clone());
             }
@@ -367,7 +402,7 @@ impl P2pMgr {
     }
 
     pub fn update_node_with_mode(node_hash: u64, node: &Node) {
-        if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.get().write() {
+        if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
             if let Some(n) = nodes_map.get_mut(&node_hash) {
                 n.update(node);
             }
@@ -375,7 +410,7 @@ impl P2pMgr {
     }
 
     pub fn update_node(node_hash: u64, node: &mut Node) {
-        if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.get().write() {
+        if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
             if let Some(n) = nodes_map.get_mut(&node_hash) {
                 node.mode = n.mode.clone();
                 n.update(node);
@@ -553,22 +588,36 @@ impl Decoder for P2pCodec {
         if len >= HEADER_LENGTH {
             let mut decoder = config();
             let decoder = decoder.big_endian();
+            let mut invalid = false;
             let mut decoded = ChannelBuffer::new();
             {
                 let (head_raw, _) = src.split_at(HEADER_LENGTH);
                 if let Ok(head) = decoder.deserialize(head_raw) {
                     decoded.head = head;
-                    if decoded.head.len as usize + HEADER_LENGTH > len {
+                    if decoded.head.ver > Version::V2.value()
+                        || decoded.head.ctrl > Control::SYNC.value()
+                        || decoded.head.action > MAX_VALID_ACTTION_VALUE
+                    {
+                        invalid = true;
+                    } else if decoded.head.len as usize + HEADER_LENGTH > len {
                         return Ok(None);
                     }
                 }
             }
-            let buf = src.split_to(decoded.head.len as usize + HEADER_LENGTH);
-            let (_, body) = buf.split_at(HEADER_LENGTH);
-            decoded.body.put_slice(body);
 
-            Ok(Some(decoded))
+            if invalid {
+                src.split_to(len);
+                Ok(None)
+            } else {
+                let buf = src.split_to(decoded.head.len as usize + HEADER_LENGTH);
+                let (_, body) = buf.split_at(HEADER_LENGTH);
+                decoded.body.extend_from_slice(body);
+                Ok(Some(decoded))
+            }
         } else {
+            if len > 0 {
+                debug!(target: "net", "len = {}, {}", len, to_hex(src));
+            }
             Ok(None)
         }
     }

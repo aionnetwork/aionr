@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 use std::fmt;
-use db::{HashStore,DBValue};
+use db::{HashStore, DBValue};
 use nibbleslice::NibbleSlice;
 use rlp::*;
 use super::node::{Node, OwnedNode};

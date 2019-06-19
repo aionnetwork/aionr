@@ -27,7 +27,7 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use message::{Servs, Retcode};
 use pb_api_util;
-use ::protobuf::ProtobufEnum;
+use protobuf::ProtobufEnum;
 use api_process::{ApiProcess, to_rsp_msg, to_rsp_msg_with_result};
 use aion_rpc::traits::Pb;
 use std::net::SocketAddr;

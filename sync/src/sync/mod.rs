@@ -18,7 +18,6 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
 use acore::client::{BlockChainClient, BlockId, BlockStatus, ChainNotify};
 use acore::transaction::UnverifiedTransaction;
 use aion_types::H256;
@@ -44,9 +43,7 @@ use self::handler::blocks_headers_handler::BlockHeadersHandler;
 use self::handler::broadcast_handler::BroadcastsHandler;
 use self::handler::import_handler::ImportHandler;
 use self::handler::status_handler::StatusHandler;
-use self::storage::{
-    ActivePeerInfo, PeerInfo, SyncState, SyncStatus, SyncStorage, TransactionStats,
-};
+use self::storage::{ActivePeerInfo, PeerInfo, SyncState, SyncStatus, SyncStorage, TransactionStats};
 use rustc_hex::ToHex;
 
 pub mod action;
@@ -60,13 +57,12 @@ const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
 const BLOCKS_IMPORT_INTERVAL: u64 = 50;
 const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
-const SYNC_STATIC_CAPACITY: usize = 25;
 
 #[derive(Clone)]
 struct SyncMgr;
 
 impl SyncMgr {
-    fn enable(executor: &TaskExecutor) {
+    fn enable(executor: &TaskExecutor, max_peers: u32) {
         let status_req_task =
             Interval::new(Instant::now(), Duration::from_secs(STATUS_REQ_INTERVAL))
                 .for_each(move |_| {
@@ -124,9 +120,10 @@ impl SyncMgr {
                             P2pMgr::remove_peer(node.node_hash);
                         }
                     } else if node.last_request_timestamp
-                        + Duration::from_secs(STATICS_INTERVAL * 4)
+                        + Duration::from_secs(STATICS_INTERVAL * 12)
                         < SystemTime::now()
                     {
+                        info!(target: "sync", "Disconnect with idle node: {}@{}.", node.get_node_id(), node.get_ip_addr());
                         P2pMgr::remove_peer(node.node_hash);
                     }
                 }
@@ -152,15 +149,14 @@ impl SyncMgr {
                 info!(target: "sync", "{:-^127}","");
                 info!(target: "sync","      Total Diff    Blk No.    Blk Hash                 Address                 Revision      Conn  Seed  LstReq No.       Mode");
                 info!(target: "sync", "{:-^127}","");
-                active_nodes.sort_by(|a,b|{
-                    if a.target_total_difficulty != b.target_total_difficulty{
+                active_nodes.sort_by(|a, b| {
+                    if a.target_total_difficulty != b.target_total_difficulty {
                         b.target_total_difficulty.cmp(&a.target_total_difficulty)
-                    }
-                    else{
+                    } else {
                         b.best_block_num.cmp(&a.best_block_num)
                     }
                 });
-                let mut count = 0;
+                let mut count: u32 = 0;
                 for node in active_nodes.iter() {
                     if let Ok(_) = node.last_request_timestamp.elapsed() {
                         info!(target: "sync",
@@ -182,7 +178,7 @@ impl SyncMgr {
                             format!("{}",node.mode)
                         );
                         count += 1;
-                        if count == SYNC_STATIC_CAPACITY {
+                        if count ==  max_peers {
                             break;
                         }
                     }
@@ -193,11 +189,15 @@ impl SyncMgr {
                     && block_number_now - block_number_last_time < 2
                 {
                     SyncStorage::get_block_chain().clear_queue();
+                    SyncStorage::get_block_chain().clear_bad();
                     SyncStorage::clear_downloaded_headers();
                     SyncStorage::clear_downloaded_blocks();
+                    SyncStorage::clear_downloaded_block_hashes();
                     SyncStorage::clear_requested_blocks();
                     SyncStorage::clear_headers_with_bodies_requested();
-                    SyncStorage::set_synced_block_number(SyncStorage::get_chain_info().best_block_number);
+                    SyncStorage::set_synced_block_number(
+                        SyncStorage::get_chain_info().best_block_number,
+                    );
                     let abnormal_mode_nodes_count =
                         P2pMgr::get_nodes_count_with_mode(Mode::BACKWARD)
                             + P2pMgr::get_nodes_count_with_mode(Mode::FORWARD);
@@ -341,7 +341,7 @@ impl Sync {
         };
         Arc::new(Sync {
             network: service,
-            starting_block_number: starting_block_number,
+            starting_block_number,
         })
     }
 }
@@ -444,7 +444,7 @@ impl NetworkManager for Sync {
         NetManager::enable(&executor, sync_handler);
         debug!(target: "sync", "###### network enabled... ######");
 
-        SyncMgr::enable(&executor);
+        SyncMgr::enable(&executor, self.network.config.max_peers);
         debug!(target: "sync", "###### SYNC enabled... ######");
     }
 
@@ -468,12 +468,16 @@ impl ChainNotify for Sync {
         _duration: u64,
     )
     {
+        if P2pMgr::get_all_nodes_count() == 0 {
+            return;
+        }
+
         if !imported.is_empty() {
             let min_imported_block_number = SyncStorage::get_synced_block_number() + 1;
             let mut max_imported_block_number = 0;
             let client = SyncStorage::get_block_chain();
             for hash in imported.iter() {
-                ImportHandler::import_staged_blocks(&hash);
+                // ImportHandler::import_staged_blocks(&hash);
                 let block_id = BlockId::Hash(*hash);
                 if client.block_status(block_id) == BlockStatus::InChain {
                     if let Some(block_number) = client.block_number(block_id) {

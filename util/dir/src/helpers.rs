@@ -54,7 +54,7 @@ pub fn absolute(path: String) -> String {
             match env::current_dir() {
                 Ok(ref path) => path.to_string_lossy(),
                 Err(e) => {
-                    error!(target: "dir","Cannot get current dir path!! err:{}", e);
+                    error!(target: "run","Cannot get current dir path!! err:{}", e);
                     return path;
                 }
             },

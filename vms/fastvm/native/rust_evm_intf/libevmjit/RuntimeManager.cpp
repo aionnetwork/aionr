@@ -187,11 +187,7 @@ llvm::Value* RuntimeManager::getRuntimePtr()
 {
 	// Expect first argument of a function to be a pointer to Runtime
 	auto func = m_builder.GetInsertBlock()->getParent();
-	#if defined(llvm50)
-	auto rtPtr = func->arg_begin();
-	#else
 	auto rtPtr = &func->getArgumentList().front();
-	#endif
 	assert(rtPtr->getType() == Type::RuntimePtr);
 	return rtPtr;
 }

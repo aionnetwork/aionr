@@ -19,9 +19,7 @@
  *
  ******************************************************************************/
 
-// this mod requires zmq to be installed.
-// $ apt install libzmq3-dev
-
+#![warn(unused_extern_crates)]
 extern crate zmq;
 extern crate protobuf;
 extern crate aion_rpc;
@@ -45,13 +43,11 @@ extern crate lazy_static;
 #[cfg(test)]
 extern crate rand;
 
-mod message;
+pub mod message;
 mod protobuf_engine;
-mod pb_api_util;
-mod api_process;
+pub mod pb_api_util;
+pub mod api_process;
 mod tx_pending_status;
-#[cfg(test)]
-mod tests;
 
 pub use protobuf_engine::PBEngine;
 pub use protobuf_engine::WalletApiConfiguration;

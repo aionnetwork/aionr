@@ -19,21 +19,10 @@
  *
  ******************************************************************************/
 
-extern crate aion_types;
-extern crate acore_bytes as bytes;
-extern crate ajson;
-extern crate rlp;
-extern crate blake2b as hash;
-extern crate patricia_trie as trie;
-
-use aion_types::{U256, H256, H128, U128, U512, Address};
-use self::bytes::Bytes;
-use hash::{blake2b, BLAKE2B_EMPTY};
-use self::rlp::{Encodable, Decodable, DecoderError, RlpStream, UntrustedRlp};
-use env_info::EnvInfo;
+use aion_types::{U256, U128, U512};
 use ffi::EvmStatusCode;
-
 use std::{fmt, ops, cmp};
+use types::vms::ReturnData;
 
 // result definition
 /// VM errors. from vm/src/errors.rs
@@ -84,8 +73,8 @@ pub enum Error {
     Reverted,
 }
 
-impl From<Box<trie::TrieError>> for Error {
-    fn from(err: Box<trie::TrieError>) -> Self {
+impl From<Box<::trie::TrieError>> for Error {
+    fn from(err: Box<::trie::TrieError>) -> Self {
         Error::Internal(format!("Internal error: {}", err))
     }
 }
@@ -119,320 +108,94 @@ impl fmt::Display for Error {
     }
 }
 
-/// The type of the call-like instruction.
-#[derive(Debug, PartialEq, Clone)]
-pub enum CallType {
-    /// Not a CALL.
-    None,
-    /// CALL.
-    Call,
-    /// CALLCODE.
-    CallCode,
-    /// DELEGATECALL.
-    DelegateCall,
-    /// STATICCALL
-    StaticCall,
-}
-
-impl Encodable for CallType {
-    fn rlp_append(&self, s: &mut RlpStream) {
-        let v = match *self {
-            CallType::None => 0u32,
-            CallType::Call => 1,
-            CallType::CallCode => 2,
-            CallType::DelegateCall => 3,
-            CallType::StaticCall => 4,
-        };
-        Encodable::rlp_append(&v, s);
-    }
-}
-
-impl Decodable for CallType {
-    fn decode(rlp: &UntrustedRlp) -> ::std::result::Result<Self, DecoderError> {
-        rlp.as_val().and_then(|v| {
-            Ok(match v {
-                0u32 => CallType::None,
-                1 => CallType::Call,
-                2 => CallType::CallCode,
-                3 => CallType::DelegateCall,
-                4 => CallType::StaticCall,
-                _ => return Err(DecoderError::Custom("Invalid value of CallType item")),
-            })
-        })
-    }
-}
-
-use std::sync::Arc;
-
-/// Transaction value
-#[derive(Clone, Debug)]
-pub enum ActionValue {
-    /// Value that should be transfered
-    Transfer(U256),
-    /// Apparent value for transaction (not transfered)
-    Apparent(U256),
-}
-
-/// Type of the way parameters encoded
-#[derive(Clone, Debug)]
-pub enum ParamsType {
-    /// Parameters are included in code
-    Embedded,
-    /// Parameters are passed in data section
-    Separate,
-}
-
-impl ActionValue {
-    /// Returns action value as U256.
-    pub fn value(&self) -> U256 {
-        match *self {
-            ActionValue::Transfer(x) | ActionValue::Apparent(x) => x,
-        }
-    }
-
-    /// Returns the transfer action value of the U256-convertable raw value
-    pub fn transfer<T: Into<U256>>(transfer_value: T) -> ActionValue {
-        ActionValue::Transfer(transfer_value.into())
-    }
-
-    /// Returns the apparent action value of the U256-convertable raw value
-    pub fn apparent<T: Into<U256>>(apparent_value: T) -> ActionValue {
-        ActionValue::Apparent(apparent_value.into())
-    }
-}
-
 // TODO: should be a trait, possible to avoid cloning everything from a Transaction(/View).
 /// Action (call/create) input params. Everything else should be specified in Externalities.
-#[derive(Clone, Debug)]
-pub struct ActionParams {
-    /// Address of currently executed code.
-    pub code_address: Address,
-    /// Hash of currently executed code.
-    pub code_hash: Option<H256>,
-    /// Receive address. Usually equal to code_address,
-    /// except when called using CALLCODE.
-    pub address: Address,
-    /// Sender of current part of the transaction.
-    pub sender: Address,
-    /// Transaction initiator.
-    pub origin: Address,
-    /// Gas paid up front for transaction execution
-    pub gas: U256,
-    /// Gas price.
-    pub gas_price: U256,
-    /// Transaction value.
-    pub value: ActionValue,
-    /// Code being executed.
-    pub code: Option<Arc<Bytes>>,
-    /// Input data.
-    pub data: Option<Bytes>,
-    /// Type of call
-    pub call_type: CallType,
-    /// Flag to indicate if the call is static
-    pub static_flag: bool,
-    /// Param types encoding
-    pub params_type: ParamsType,
-    /// transaction hash
-    pub transaction_hash: H256,
-    /// original transaction hash
-    pub original_transaction_hash: H256,
-}
+// #[derive(Clone, Debug)]
+// pub struct ActionParams {
+//     /// Address of currently executed code.
+//     pub code_address: Address,
+//     /// Hash of currently executed code.
+//     pub code_hash: Option<H256>,
+//     /// Receive address. Usually equal to code_address,
+//     /// except when called using CALLCODE.
+//     pub address: Address,
+//     /// Sender of current part of the transaction.
+//     pub sender: Address,
+//     /// Transaction initiator.
+//     pub origin: Address,
+//     /// Gas paid up front for transaction execution
+//     pub gas: U256,
+//     /// Gas price.
+//     pub gas_price: U256,
+//     /// Transaction value.
+//     pub value: ActionValue,
+//     /// Code being executed.
+//     pub code: Option<Arc<Bytes>>,
+//     /// Input data.
+//     pub data: Option<Bytes>,
+//     /// Type of call
+//     pub call_type: CallType,
+//     /// Flag to indicate if the call is static
+//     pub static_flag: bool,
+//     /// Param types encoding
+//     pub params_type: ParamsType,
+//     /// transaction hash
+//     pub transaction_hash: H256,
+//     /// original transaction hash
+//     pub original_transaction_hash: H256,
+// }
 
-impl Default for ActionParams {
-    /// Returns default ActionParams initialized with zeros
-    fn default() -> ActionParams {
-        ActionParams {
-            code_address: Address::new(),
-            code_hash: Some(BLAKE2B_EMPTY),
-            address: Address::new(),
-            sender: Address::new(),
-            origin: Address::new(),
-            gas: U256::zero(),
-            gas_price: U256::zero(),
-            value: ActionValue::Transfer(U256::zero()),
-            code: None,
-            data: None,
-            call_type: CallType::None,
-            static_flag: false,
-            params_type: ParamsType::Separate,
-            transaction_hash: H256::default(),
-            original_transaction_hash: H256::default(),
-        }
-    }
-}
+// impl Default for ActionParams {
+//     /// Returns default ActionParams initialized with zeros
+//     fn default() -> ActionParams {
+//         ActionParams {
+//             code_address: Address::new(),
+//             code_hash: Some(BLAKE2B_EMPTY),
+//             address: Address::new(),
+//             sender: Address::new(),
+//             origin: Address::new(),
+//             gas: U256::zero(),
+//             gas_price: U256::zero(),
+//             value: ActionValue::Transfer(U256::zero()),
+//             code: None,
+//             data: None,
+//             call_type: CallType::None,
+//             static_flag: false,
+//             params_type: ParamsType::Separate,
+//             transaction_hash: H256::default(),
+//             original_transaction_hash: H256::default(),
+//         }
+//     }
+// }
 
-impl From<ajson::vm::Transaction> for ActionParams {
-    fn from(t: ajson::vm::Transaction) -> Self {
-        let address: Address = t.address.into();
-        ActionParams {
-            code_address: Address::new(),
-            code_hash: Some(blake2b(&*t.code)),
-            address: address,
-            sender: t.sender.into(),
-            origin: t.origin.into(),
-            code: Some(Arc::new(t.code.into())),
-            data: Some(t.data.into()),
-            gas: t.gas.into(),
-            gas_price: t.gas_price.into(),
-            value: ActionValue::Transfer(t.value.into()),
-            call_type: match address.is_zero() {
-                true => CallType::None,
-                false => CallType::Call,
-            },
-            static_flag: false,
-            params_type: ParamsType::Separate,
-            transaction_hash: H256::default(),
-            original_transaction_hash: H256::default(),
-        }
-    }
-}
+// impl From<::ajson::vm::Transaction> for ActionParams {
+//     fn from(t: ::ajson::vm::Transaction) -> Self {
+//         let address: Address = t.address.into();
+//         ActionParams {
+//             code_address: Address::new(),
+//             code_hash: Some(blake2b(&*t.code)),
+//             address: address,
+//             sender: t.sender.into(),
+//             origin: t.origin.into(),
+//             code: Some(Arc::new(t.code.into())),
+//             data: Some(t.data.into()),
+//             gas: t.gas.into(),
+//             gas_price: t.gas_price.into(),
+//             value: ActionValue::Transfer(t.value.into()),
+//             call_type: match address.is_zero() {
+//                 true => CallType::None,
+//                 false => CallType::Call,
+//             },
+//             static_flag: false,
+//             params_type: ParamsType::Separate,
+//             transaction_hash: H256::default(),
+//             original_transaction_hash: H256::default(),
+//         }
+//     }
+// }
 
-// return type definition
-/// Return data buffer. Holds memory from a previous call and a slice into that memory.
-#[derive(Debug, PartialEq)]
-pub struct ReturnData {
-    pub mem: Vec<u8>,
-    pub offset: usize,
-    pub size: usize,
-}
-
-impl ::std::ops::Deref for ReturnData {
-    type Target = [u8];
-    fn deref(&self) -> &[u8] { &self.mem[self.offset..self.offset + self.size] }
-}
-
-impl ReturnData {
-    /// Create empty `ReturnData`.
-    pub fn empty() -> Self {
-        ReturnData {
-            mem: Vec::new(),
-            offset: 0,
-            size: 0,
-        }
-    }
-    /// Create `ReturnData` from give buffer and slice.
-    pub fn new(mem: Vec<u8>, offset: usize, size: usize) -> Self {
-        ReturnData {
-            mem: mem,
-            offset: offset,
-            size: size,
-        }
-    }
-}
-
-/// Externalities interface for EVMs
-pub trait Ext {
-    /// Returns a value for given key.
-    fn storage_at(&self, key: &H128) -> H128;
-
-    /// Stores a value for given key.
-    fn set_storage(&mut self, key: H128, value: H128);
-
-    /// Returns a value for given key.
-    fn storage_at_dword(&self, key: &H128) -> H256;
-
-    /// Stores a value for given key.
-    fn set_storage_dword(&mut self, key: H128, value: H256);
-
-    /// Determine whether an account exists.
-    fn exists(&self, address: &Address) -> bool;
-
-    /// Determine whether an account exists and is not null (zero balance/nonce, no code).
-    fn exists_and_not_null(&self, address: &Address) -> bool;
-
-    /// Balance of the origin account.
-    fn origin_balance(&self) -> U256;
-
-    /// Returns address balance.
-    fn balance(&self, address: &Address) -> U256;
-
-    /// Returns the hash of one of the 256 most recent complete blocks.
-    fn blockhash(&mut self, number: &U256) -> H256;
-
-    /// Creates new contract.
-    ///
-    /// Returns gas_left and contract address if contract creation was succesfull.
-    fn create(&mut self, gas: &U256, value: &U256, code: &[u8]) -> ExecutionResult;
-
-    /// Message call.
-    ///
-    /// Returns Err, if we run out of gas.
-    /// Otherwise returns call_result which contains gas left
-    /// and true if subcall was successfull.
-    fn call(
-        &mut self,
-        gas: &U256,
-        sender_address: &Address,
-        receive_address: &Address,
-        value: Option<U256>,
-        data: &[u8],
-        code_address: &Address,
-        call_type: CallType,
-        static_flag: bool,
-    ) -> ExecutionResult;
-
-    /// Returns code at given address
-    fn extcode(&self, address: &Address) -> Arc<Bytes>;
-
-    /// Returns code size at given address
-    fn extcodesize(&self, address: &Address) -> usize;
-
-    /// Creates log entry with given topics and data
-    fn log(&mut self, topics: Vec<H256>, data: &[u8]);
-
-    /// Should be called when contract commits suicide.
-    /// Address to which funds should be refunded.
-    fn suicide(&mut self, refund_address: &Address);
-
-    /// Returns environment info.
-    fn env_info(&self) -> &EnvInfo;
-
-    /// Returns current depth of execution.
-    ///
-    /// If contract A calls contract B, and contract B calls C,
-    /// then A depth is 0, B is 1, C is 2 and so on.
-    fn depth(&self) -> usize;
-
-    /// Increments sstore refunds count by 1.
-    fn inc_sstore_clears(&mut self);
-
-    /// Decide if any more operations should be traced. Passthrough for the VM trace.
-    fn trace_next_instruction(&mut self, _pc: usize, _instruction: u8, _current_gas: U256) -> bool {
-        false
-    }
-
-    /// Prepare to trace an operation. Passthrough for the VM trace.
-    fn trace_prepare_execute(&mut self, _pc: usize, _instruction: u8, _gas_cost: U256) {}
-
-    /// Trace the finalised execution of a single instruction.
-    fn trace_executed(
-        &mut self,
-        _gas_used: U256,
-        _stack_push: &[U256],
-        _mem_diff: Option<(usize, &[u8])>,
-        _store_diff: Option<(U256, U256)>,
-    )
-    {
-    }
-
-    /// Save code to newly created contract.
-    fn save_code(&mut self, code: Bytes);
-
-    fn set_special_empty_flag(&mut self);
-}
-
-/// Virtual Machine interface
-pub trait Vm {
-    /// This function should be used to execute transaction.
-    /// It returns either an error, a known amount of gas left, or parameters to be used
-    /// to compute the final gas left.
-    fn exec(&mut self, params: ActionParams, ext: &mut Ext) -> Result<ExecutionResult, Error>;
-}
-
-/// Finalization result. Gas Left: either it is a known value, or it needs to be computed by processing
-/// a return instruction.
 #[derive(Debug)]
-pub struct ExecutionResult {
+pub struct FvmExecutionResult {
     /// Final amount of gas left.
     pub gas_left: U256,
     /// Status code returned from VM
@@ -441,17 +204,6 @@ pub struct ExecutionResult {
     pub return_data: ReturnData,
     /// exception / error message (empty if success)
     pub exception: String,
-}
-
-impl Default for ExecutionResult {
-    fn default() -> Self {
-        ExecutionResult {
-            gas_left: 0.into(),
-            status_code: EvmStatusCode::Success,
-            return_data: ReturnData::empty(),
-            exception: String::new(),
-        }
-    }
 }
 
 /// Cost calculation type. For low-gas usage we calculate costs using usize instead of U256
@@ -531,84 +283,5 @@ impl CostType for usize {
         let result = parts[0] as usize;
         let overflow = overflow | (parts[0] > result as u64);
         (result, overflow)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use aion_types::U256;
-    use super::*;
-
-    #[test]
-    fn encode_calltype() {
-        let mut s = RlpStream::new();
-        s.append(&CallType::None); // 0
-        assert_eq!(s.as_raw(), [0x80]);
-        s.append(&CallType::Call); // 1
-        assert_eq!(s.as_raw(), [0x80, 1]);
-        s.append(&CallType::CallCode); // 2
-        assert_eq!(s.as_raw(), [0x80, 1, 2]);
-        s.append(&CallType::DelegateCall); // 3
-        assert_eq!(s.as_raw(), [0x80, 1, 2, 3]);
-        s.append(&CallType::StaticCall); // 4
-
-        assert_eq!(s.as_raw(), [0x80u8, 1, 2, 3, 4]);
-    }
-
-    #[test]
-    fn overflowing_add() {
-        let left: U256 = U256::max_value();
-
-        let res = left.overflowing_add(0.into());
-        assert_eq!(res.1, false);
-        let res = left.overflowing_add(1.into());
-        assert_eq!(res.1, true);
-    }
-
-    #[test]
-    fn should_calculate_overflow_mul_shr_without_overflow() {
-        // given
-        let num = 1048576;
-
-        // when
-        let (res1, o1) = U256::from(num).overflow_mul_shr(U256::from(num), 20);
-        let (res2, o2) = num.overflow_mul_shr(num, 20);
-
-        // then
-        assert_eq!(res1, U256::from(num));
-        assert!(!o1);
-        assert_eq!(res2, num);
-        assert!(!o2);
-    }
-
-    #[test]
-    fn should_calculate_overflow_mul_shr_with_overflow() {
-        // given
-        let max = u64::max_value();
-        let num1 = U256([max, max, max, max]);
-        let num2 = usize::max_value();
-
-        // when
-        let (res1, o1) = num1.overflow_mul_shr(num1, 256);
-        let (res2, o2) = num2.overflow_mul_shr(num2, 64);
-
-        // then
-        assert_eq!(res2, num2 - 1);
-        assert!(o2);
-
-        assert_eq!(res1, U256::max_value() - U256::one());
-        assert!(o1);
-    }
-
-    #[test]
-    fn should_validate_u256_to_usize_conversion() {
-        // given
-        let v = U256::from(usize::max_value()) + U256::from(1);
-
-        // when
-        let res = usize::from_u256(v);
-
-        // then
-        assert!(res.is_err());
     }
 }

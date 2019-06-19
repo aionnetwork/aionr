@@ -20,6 +20,7 @@
  ******************************************************************************/
 
 use std::fmt;
+use types::vms::ExecStatus;
 
 pub trait EvmJit<T> {
     // generate raw pointer of type T for EvmJIT
@@ -136,3 +137,27 @@ pub fn get_libc_pointer_of_bytes(input: &[u8]) -> *mut ::libc::wchar_t {
 // input data is limitted by GAS_CREATE_MAX: [5000000/64=78.125KB, 5000000/4=1.25MB]
 // 1024 * 1024 * 10/8 = 1.256MB
 const BUFFER_ALLOC_SIZE: usize = 1024 * 1024 * 10 / 8;
+
+impl Into<EvmStatusCode> for ExecStatus {
+    fn into(self) -> EvmStatusCode {
+        match self {
+            ExecStatus::Success => EvmStatusCode::Success,
+            ExecStatus::OutOfGas => EvmStatusCode::OutOfGas,
+            ExecStatus::Revert => EvmStatusCode::Revert,
+            ExecStatus::Rejected => EvmStatusCode::Rejected,
+            _ => EvmStatusCode::Failure,
+        }
+    }
+}
+
+impl From<EvmStatusCode> for ExecStatus {
+    fn from(status: EvmStatusCode) -> ExecStatus {
+        match status {
+            EvmStatusCode::Success => ExecStatus::Success,
+            EvmStatusCode::OutOfGas => ExecStatus::OutOfGas,
+            EvmStatusCode::Revert => ExecStatus::Revert,
+            EvmStatusCode::Rejected => ExecStatus::Rejected,
+            _ => ExecStatus::Failure,
+        }
+    }
+}

@@ -27,7 +27,7 @@ use serde::de::Error;
 use aion_types::{U256 as EthU256, U128 as EthU128};
 
 macro_rules! impl_uint {
-    ($name: ident, $other: ident, $size: expr) => {
+    ($name:ident, $other:ident, $size:expr) => {
         /// Uint serialization.
         #[derive(Debug, Default, Clone, Copy, PartialEq, Hash)]
         pub struct $name($other);

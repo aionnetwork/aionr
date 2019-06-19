@@ -22,29 +22,26 @@
 
 //! Ethereum-like state machine definition.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::cmp;
 use std::sync::Arc;
 
 use block::{ExecutedBlock, IsBlock};
 use precompiled::builtin::BuiltinContract;
-use client::BlockChainClient;
 use error::Error;
-use executive::Executive;
+use executive::{Executive};
 use header::{BlockNumber, Header};
 use spec::CommonParams;
 use state::{CleanupMode, Substate};
-use transaction::{self, SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
-use tx_filter::TransactionFilter;
-
+use transaction::{SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
 use aion_types::{U256, H256, Address};
-use vms::{ActionParams, ActionValue, CallType, ParamsType};
+use types::vms::{ActionParams, ActionValue, CallType, ParamsType};
 
 /// An ethereum-like state machine.
 pub struct EthereumMachine {
     params: CommonParams,
     builtins: Arc<BTreeMap<Address, Box<BuiltinContract>>>,
-    tx_filter: Option<Arc<TransactionFilter>>,
+    premine: U256,
 }
 
 impl EthereumMachine {
@@ -52,13 +49,13 @@ impl EthereumMachine {
     pub fn regular(
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
+        premine: U256,
     ) -> EthereumMachine
     {
-        let tx_filter = TransactionFilter::from_params(&params).map(Arc::new);
         EthereumMachine {
-            params: params,
+            params,
             builtins: Arc::new(builtins),
-            tx_filter: tx_filter,
+            premine,
         }
     }
 }
@@ -85,24 +82,25 @@ impl EthereumMachine {
             address: contract_address.clone(),
             sender: SYSTEM_ADDRESS.clone(),
             origin: SYSTEM_ADDRESS.clone(),
-            gas: gas,
+            gas,
             gas_price: 0.into(),
             value: ActionValue::Transfer(0.into()),
             code: state.code(&contract_address)?,
             code_hash: Some(state.code_hash(&contract_address)?),
-            data: data,
+            data,
             call_type: CallType::Call,
             static_flag: false,
             params_type: ParamsType::Separate,
             transaction_hash: H256::default(),
             original_transaction_hash: H256::default(),
+            nonce: 0,
         };
         let mut ex = Executive::new(&mut state, &env_info, self);
         let mut substate = Substate::new();
         let result = ex.call(params, &mut substate);
         match result.exception.as_str() {
             "" => {
-                return Ok(result.return_data.mem);
+                return Ok(result.return_data.to_vec());
             }
             error => {
                 warn!(target:"executive","Encountered error on making system call: {}", error);
@@ -120,7 +118,6 @@ impl EthereumMachine {
     /// Logic to perform on a new block: updating last hashes.
     pub fn on_new_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
         self.push_last_hash(block)?;
-
         Ok(())
     }
 
@@ -161,6 +158,8 @@ impl EthereumMachine {
     /// Builtin-contracts for the chain..
     pub fn builtins(&self) -> &BTreeMap<Address, Box<BuiltinContract>> { &*self.builtins }
 
+    pub fn premine(&self) -> U256 { self.premine }
+
     /// Attempt to get a handle to a built-in contract.
     /// Only returns references to activated built-ins.
     // TODO: builtin contract routing - to do this properly, it will require removing the built-in configuration-reading logic
@@ -199,32 +198,6 @@ impl EthereumMachine {
         t.verify_basic(None)?;
 
         Ok(())
-    }
-
-    /// Does verification of the transaction against the parent state.
-    // TODO: refine the bound here to be a "state provider" or similar as opposed
-    // to full client functionality.
-    pub fn verify_transaction(
-        &self,
-        t: &SignedTransaction,
-        header: &Header,
-        client: &BlockChainClient,
-    ) -> Result<(), Error>
-    {
-        if let Some(ref filter) = self.tx_filter.as_ref() {
-            if !filter.transaction_allowed(header.parent_hash(), t, client) {
-                return Err(transaction::Error::NotAllowed.into());
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Additional params.
-    pub fn additional_params(&self) -> HashMap<String, String> {
-        hash_map![
-            "registrar".to_owned() => format!("{:x}", self.params.registrar)
-        ]
     }
 }
 

@@ -30,17 +30,21 @@ use acore::miner::{MinerOptions, Banning, StratumOptions};
 use acore::verification::queue::VerifierSettings;
 
 use pb::WalletApiConfiguration;
-use rpc::{IpcConfiguration, HttpConfiguration, WsConfiguration,};
+use rpc::{IpcConfiguration, HttpConfiguration, WsConfiguration};
 use aion_rpc::dispatch::DynamicGasPrice;
 use cache::CacheConfig;
-use helpers::{to_block_id, to_u256, to_pending_set, aion_ipc_path,parse_log_target,
-to_addresses, to_address, to_queue_strategy,validate_log_level};
+use helpers::{
+    to_block_id, to_u256, to_pending_set, aion_ipc_path, parse_log_target, to_addresses,
+    to_address, to_queue_strategy, validate_log_level,
+};
 use dir::helpers::{replace_home, replace_home_and_local, absolute};
 use params::{ResealPolicy, AccountsConfig, MinerExtras, SpecType};
 use logger::{LogConfig};
 use dir::{self, Directories, default_local_path, default_data_path};
 use run::RunCmd;
-use blockchain::{BlockchainCmd, ImportBlockchain, ExportBlockchain, KillBlockchain, RevertBlockchain, DataFormat};
+use blockchain::{
+    BlockchainCmd, ImportBlockchain, ExportBlockchain, KillBlockchain, RevertBlockchain, DataFormat,
+};
 use account::{AccountCmd, NewAccount, ListAccounts, ImportAccounts, ImportAccount, ExportAccount};
 
 #[derive(Debug, PartialEq)]
@@ -66,7 +70,7 @@ impl Configuration {
         let args = Args::parse(command)?;
 
         let config = Configuration {
-            args: args,
+            args,
         };
 
         Ok(config)
@@ -95,16 +99,16 @@ impl Configuration {
             Cmd::Version
         } else if self.args.cmd_db && self.args.cmd_db_kill {
             Cmd::Blockchain(BlockchainCmd::Kill(KillBlockchain {
-                spec: spec,
-                dirs: dirs,
-                pruning: pruning,
+                spec,
+                dirs,
+                pruning,
             }))
         } else if self.args.cmd_account {
             let account_cmd = if self.args.cmd_account_new {
                 let new_acc = NewAccount {
                     iterations: self.args.arg_keys_iterations,
                     path: dirs.keys,
-                    spec: spec,
+                    spec,
                     password_file: self
                         .accounts_config()?
                         .password_files
@@ -115,7 +119,7 @@ impl Configuration {
             } else if self.args.cmd_account_list {
                 let list_acc = ListAccounts {
                     path: dirs.keys,
-                    spec: spec,
+                    spec,
                 };
                 AccountCmd::List(list_acc)
             } else if self.args.cmd_account_import {
@@ -126,14 +130,14 @@ impl Configuration {
                         .expect("CLI argument is required; qed")
                         .clone(),
                     to: dirs.keys,
-                    spec: spec,
+                    spec,
                 };
                 AccountCmd::Import(import_acc)
             } else if self.args.cmd_account_import_by_key {
                 let import_acc = ImportAccount {
                     iterations: self.args.arg_keys_iterations,
                     path: dirs.keys,
-                    spec: spec,
+                    spec,
                     pri_keys: self.args.arg_account_private_key,
                 };
                 AccountCmd::ImportByPrivkey(import_acc)
@@ -141,7 +145,7 @@ impl Configuration {
                 let export_acc = ExportAccount {
                     iterations: self.args.arg_keys_iterations,
                     path: dirs.keys,
-                    spec: spec,
+                    spec,
                     address: self.args.arg_account_address,
                 };
                 AccountCmd::ExportToProvkey(export_acc)
@@ -151,51 +155,50 @@ impl Configuration {
             Cmd::Account(account_cmd)
         } else if self.args.cmd_import {
             let import_cmd = ImportBlockchain {
-                spec: spec,
-                cache_config: cache_config,
-                dirs: dirs,
+                spec,
+                cache_config,
+                dirs,
                 file_path: self.args.arg_import_file.clone(),
-                format: format,
-                pruning: pruning,
-                pruning_history: pruning_history,
-                pruning_memory: pruning_memory,
-                compaction: compaction,
-                wal: wal,
-                fat_db: fat_db,
-                vm_type: vm_type,
-                check_seal: !self.args.flag_no_seal_check,
+                format,
+                pruning,
+                pruning_history,
+                pruning_memory,
+                compaction,
+                wal,
+                fat_db,
+                vm_type,
                 with_color: logger_config.color,
                 verifier_settings: self.verifier_settings(),
             };
             Cmd::Blockchain(BlockchainCmd::Import(import_cmd))
         } else if self.args.cmd_export {
             let export_cmd = ExportBlockchain {
-                spec: spec,
-                cache_config: cache_config,
-                dirs: dirs,
+                spec,
+                cache_config,
+                dirs,
                 file_path: self.args.arg_export_blocks_file.clone(),
-                format: format,
-                pruning: pruning,
-                pruning_history: pruning_history,
-                pruning_memory: pruning_memory,
-                compaction: compaction,
-                wal: wal,
-                fat_db: fat_db,
+                format,
+                pruning,
+                pruning_history,
+                pruning_memory,
+                compaction,
+                wal,
+                fat_db,
                 from_block: to_block_id(&self.args.arg_export_blocks_from)?,
                 to_block: to_block_id(&self.args.arg_export_blocks_to)?,
             };
             Cmd::Blockchain(BlockchainCmd::Export(export_cmd))
         } else if self.args.cmd_revert {
             let revert_cmd = RevertBlockchain {
-                spec: spec,
-                cache_config: cache_config,
-                dirs: dirs,
-                pruning: pruning,
-                pruning_history: pruning_history,
-                pruning_memory: pruning_memory,
-                compaction: compaction,
-                wal: wal,
-                fat_db: fat_db,
+                spec,
+                cache_config,
+                dirs,
+                pruning,
+                pruning_history,
+                pruning_memory,
+                compaction,
+                wal,
+                fat_db,
                 to_block: to_block_id(&self.args.arg_revert_blocks_to)?,
             };
             Cmd::Blockchain(BlockchainCmd::Revert(revert_cmd))
@@ -214,30 +217,29 @@ impl Configuration {
             let verifier_settings = self.verifier_settings();
 
             let run_cmd = RunCmd {
-                cache_config: cache_config,
-                dirs: dirs,
-                spec: spec,
-                pruning: pruning,
-                pruning_history: pruning_history,
-                pruning_memory: pruning_memory,
-                daemon: daemon,
+                cache_config,
+                dirs,
+                spec,
+                pruning,
+                pruning_history,
+                pruning_memory,
+                daemon,
                 logger_config: logger_config.clone(),
                 miner_options: self.miner_options()?,
                 dynamic_gas_price: self.dynamic_gas_price()?,
-                ws_conf: ws_conf,
-                http_conf: http_conf,
-                ipc_conf: ipc_conf,
-                wallet_api_conf: wallet_api_conf,
-                net_conf: net_conf,
+                ws_conf,
+                http_conf,
+                ipc_conf,
+                wallet_api_conf,
+                net_conf,
                 acc_conf: self.accounts_config()?,
                 miner_extras: self.miner_extras()?,
                 stratum: self.stratum_options()?,
-                fat_db: fat_db,
-                compaction: compaction,
-                wal: wal,
-                vm_type: vm_type,
-                check_seal: !self.args.flag_no_seal_check,
-                verifier_settings: verifier_settings,
+                fat_db,
+                compaction,
+                wal,
+                vm_type,
+                verifier_settings,
                 no_persistent_txqueue: self.args.flag_no_persistent_txqueue,
             };
             Cmd::Run(run_cmd)
@@ -245,7 +247,7 @@ impl Configuration {
 
         Ok(Execute {
             logger: logger_config,
-            cmd: cmd,
+            cmd,
         })
     }
 
@@ -398,11 +400,12 @@ impl Configuration {
         if !self.args.flag_dynamic_gas_price {
             return Ok(None);
         }
-        let dynamic = DynamicGasPrice {
-            blk_price_window: self.args.arg_blk_price_window,
-            max_blk_traverse: self.args.arg_max_blk_traverse,
-            gas_price_percentile: self.args.arg_gas_price_percentile,
-        };
+        let mut dynamic = DynamicGasPrice::default();
+
+        dynamic.blk_price_window = self.args.arg_blk_price_window;
+        dynamic.max_blk_traverse = self.args.arg_max_blk_traverse;
+        dynamic.gas_price_percentile = self.args.arg_gas_price_percentile;
+
         Ok(Some(dynamic))
     }
 
@@ -662,9 +665,6 @@ mod tests {
     use helpers::{default_network_config};
     use params::SpecType;
     use run::RunCmd;
-
-    extern crate ipnetwork;
-
     use super::*;
 
     #[derive(Debug, PartialEq)]
@@ -744,7 +744,6 @@ mod tests {
                 wal: true,
                 fat_db: Default::default(),
                 vm_type: Default::default(),
-                check_seal: true,
                 with_color: !cfg!(windows),
                 verifier_settings: Default::default(),
             }))
@@ -826,7 +825,6 @@ mod tests {
             vm_type: Default::default(),
             fat_db: Default::default(),
             stratum: Default::default(),
-            check_seal: true,
             verifier_settings: Default::default(),
             no_persistent_txqueue: false,
         };

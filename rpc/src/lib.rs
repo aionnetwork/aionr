@@ -20,25 +20,19 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 #[macro_use]
 extern crate futures;
-
 extern crate ansi_term;
-extern crate cid;
-extern crate itertools;
-extern crate multihash;
 extern crate order_stat;
 extern crate parking_lot;
 extern crate rand;
 extern crate rustc_hex;
-extern crate semver;
 extern crate serde;
 extern crate serde_json;
-extern crate time;
 extern crate blake2b;
 extern crate trace_time;
 
-extern crate tokio_timer;
 extern crate tokio;
 extern crate transient_hashmap;
 
@@ -51,12 +45,9 @@ extern crate jsonrpc_pubsub;
 extern crate sync;
 extern crate acore;
 extern crate acore_bytes as bytes;
-extern crate acore_io as io;
 extern crate aion_types;
 extern crate ethbloom;
 extern crate key;
-extern crate keychain;
-extern crate logger;
 extern crate solidity;
 extern crate aion_version as version;
 extern crate rlp;
@@ -91,16 +82,16 @@ pub mod traits;
 pub mod impls;
 
 pub use jsonrpc_pubsub::Session as PubSubSession;
-pub use ipc::{Server as IpcServer, MetaExtractor as IpcMetaExtractor, RequestContext as IpcRequestContext};
-pub use http::{
-    Server as HttpServer,
-    hyper,
-    RequestMiddleware, RequestMiddlewareAction,
-    AccessControlAllowOrigin, Host, DomainsValidation
+pub use ipc::{
+    Server as IpcServer, MetaExtractor as IpcMetaExtractor, RequestContext as IpcRequestContext,
 };
-pub use ws::{Server as WsServer,Error as WsError, ErrorKind as WsErrorKind};
+pub use http::{
+    Server as HttpServer, hyper, RequestMiddleware, RequestMiddlewareAction,
+    AccessControlAllowOrigin, Host, DomainsValidation,
+};
+pub use ws::{Server as WsServer, Error as WsError, ErrorKind as WsErrorKind};
 
-pub use helpers::{block_import::is_major_importing,dispatch};
+pub use helpers::{block_import::is_major_importing, dispatch};
 pub use metadata::Metadata;
 pub use types::Origin;
 

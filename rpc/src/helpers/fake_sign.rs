@@ -20,7 +20,7 @@
  *
  ******************************************************************************/
 
-use acore::transaction::{Transaction, SignedTransaction, Action};
+use acore::transaction::{Transaction, SignedTransaction, Action, DEFAULT_TRANSACTION_TYPE};
 use aion_types::U256;
 
 use jsonrpc_core::Error;
@@ -35,11 +35,12 @@ pub fn sign_call(request: CallRequest) -> Result<SignedTransaction, Error> {
 
     Ok(Transaction::new(
         request.nonce.unwrap_or_else(|| 0.into()),
-        request.gas_price.unwrap_or_else(|| 0.into()),
+        request.gas_price.unwrap_or_else(|| 1.into()),
         gas,
         request.to.map_or(Action::Create, Action::Call),
         request.value.unwrap_or(0.into()),
         request.data.unwrap_or_default(),
+        DEFAULT_TRANSACTION_TYPE,
     )
     .fake_sign(from))
 }

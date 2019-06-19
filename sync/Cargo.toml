@@ -4,24 +4,17 @@ name = "sync"
 version = "0.2.0"
 authors = ["Well Shang <jia@aion.network>"]
 
-[lib]
-
 [dependencies]
-blake2b = { path = "../util/blake2b" }
-acore-bytes = { path = "../util/bytes" }
-acore-io = { path = "../util/io" }
-acore = { path = "../core" }
-aion-types = { path = "../util/aion-types"}
-db = { path = "../db/core" }
-rlp = { path = "../util/rlp" }
+acore-bytes =  { path = "../util/bytes" }
+acore =        { path = "../core" }
+aion-types =   { path = "../util/aion-types"}
+rlp =          { path = "../util/rlp" }
 aion-version = { path = "../util/version" }
-
 bincode = "1.0.1"
 byteorder = "1.2.7"
 bytes = "0.4"
 clone_all = "0.1.1"
 futures = "0.1.25"
-java-properties = "1.1.1"
 lazy_static = "1.1.0"
 log = "0.3"
 lru-cache = "0.1.1"
@@ -30,7 +23,7 @@ num = "0.2.0"
 rand = "0.5.5"
 rustc-hex= "2.0.1"
 serde = "1.0.80"
-serde_derive = "1.0.80"
+serde_derive = "1.0.92"
 state = "0.4.1"
 threadpool = "1.7.1"
 time = "0.1"
@@ -43,3 +36,10 @@ tokio-reactor = "0.1.6"
 tokio-tcp = "0.1.2"
 tokio-threadpool = "0.1.8"
 uuid = { version = "0.6.5", features = ["v4"] }
+
+[dev-dependencies]
+tokio = "0.1.11"
+acore =      { path = "../core" }
+acore-io =   { path = "../util/io" }
+db =         { path = "../db/core" }
+aion-types = { path = "../util/aion-types"}

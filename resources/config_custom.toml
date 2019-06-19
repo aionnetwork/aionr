@@ -1,0 +1,102 @@
+[aion]
+chain = "custom/custom.json"
+
+[account]
+fast_unlock = false
+keys_iterations = 10240
+refresh_time = 5
+unlock = []
+password = []
+
+[network]
+sync_from_boot_nodes_only = false
+max_peers = 128
+net_id = 256
+local_node = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"
+boot_nodes = []
+ip_black_list = []
+
+#[rpc]
+#processing_threads = 1
+
+[http]
+disable = false
+port = 8545
+interface = "local"
+apis = ["all", "-pubsub"]
+hosts = ["none"]
+cors = ["none"]
+
+[websockets]
+disable = false
+port = 8546
+interface = "local"
+apis = ["all", "-pubsub"]
+origins = ["none"]
+hosts = ["none"]
+max_connections = 100
+
+[ipc]
+disable = false
+path = "$BASE/jsonrpc.ipc"
+apis = ["all", "-pubsub"]
+
+[wallet]
+disable = true
+secure_connect = false
+interface = "local"
+port = 8547
+#zmq_key_path = None
+
+[stratum]
+disable = false
+interface = "local"
+port = 8008
+#secret = None
+
+[mining]
+remove_solved = false
+infinite_pending_block = false
+dynamic_gas_price = false
+reseal_on_txs = "own"
+reseal_min_period = 4000
+reseal_max_period = 120000
+work_queue_size = 20
+relay_set = "cheap"
+gas_floor_target = "15000000"
+gas_cap = "20000000"
+tx_queue_mem_limit = 2
+tx_queue_strategy = "gas_price"
+tx_queue_ban_count = 1
+tx_queue_ban_time = 180
+min_gas_price = 10000000000
+max_gas_price = 9000000000000000000
+local_max_gas_price = 100000000000
+blk_price_window = 20
+max_blk_traverse = 64
+gas_price_percentile = 60
+#author = None
+#tx_gas_limit = None
+#tx_time_limit = None
+#extra_data = None
+
+[db]
+no_persistent_txqueue = false
+disable_wal = false
+scale_verifiers = false
+pruning = "archive"
+pruning_history = 64
+pruning_memory = 32
+cache_size_blocks = 8
+cache_size_queue = 40
+cache_size_state = 25
+db_compaction = "auto"
+fat_db = "auto"
+#cache_size = None
+#num_verifiers = None
+
+[log]
+no_color = false
+level = "info"
+targets = []
+#log_file = None

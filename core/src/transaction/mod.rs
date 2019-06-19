@@ -20,8 +20,6 @@
  *
  ******************************************************************************/
 
-//! Ethereum Transactions
-
 pub mod error;
 pub mod transaction;
 pub mod banning_queue;

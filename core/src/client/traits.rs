@@ -20,14 +20,12 @@
  *
  ******************************************************************************/
 
-use std::collections::BTreeMap;
 use std::time::Duration;
 
 use block::{OpenBlock, SealedBlock, ClosedBlock};
 use blockchain::TreeRoute;
 use encoded;
 use error::{ImportResult, CallError, BlockImportError};
-use vms::LastHashes;
 use factory::VmFactory;
 use executive::Executed;
 use filter::Filter;
@@ -36,8 +34,8 @@ use log_entry::LocalizedLogEntry;
 use receipt::LocalizedReceipt;
 use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction};
 use verification::queue::QueueInfo as BlockQueueInfo;
-
 use aion_types::{H256, H128, U256, Address};
+use types::vms::LastHashes;
 use bytes::Bytes;
 use kvdb::DBValue;
 
@@ -170,13 +168,6 @@ pub trait BlockChainClient: Sync + Send {
     /// Import a block into the blockchain.
     fn import_block(&self, bytes: Bytes) -> Result<H256, BlockImportError>;
 
-    /// Import a block with transaction receipts. Does no sealing and transaction validation.
-    fn import_block_with_receipts(
-        &self,
-        block_bytes: Bytes,
-        receipts_bytes: Bytes,
-    ) -> Result<H256, BlockImportError>;
-
     /// Get block queue information.
     fn queue_info(&self) -> BlockQueueInfo;
 
@@ -188,9 +179,6 @@ pub trait BlockChainClient: Sync + Send {
 
     /// Get blockchain information.
     fn chain_info(&self) -> BlockChainInfo;
-
-    /// Get the registrar address, if it exists.
-    fn additional_params(&self) -> BTreeMap<String, String>;
 
     /// Get the best block header.
     fn best_block_header(&self) -> encoded::Header;
@@ -233,9 +221,6 @@ pub trait BlockChainClient: Sync + Send {
     /// Import queued transactions.
     fn import_queued_transactions(&self, transactions: Vec<UnverifiedTransaction>);
 
-    /// Queue conensus engine message.
-    fn queue_consensus_message(&self, message: Bytes);
-
     /// New block chained message.
     fn new_block_chained(&self);
 
@@ -246,14 +231,14 @@ pub trait BlockChainClient: Sync + Send {
     fn gas_price_corpus(
         &self,
         blk_price_window: usize,
-        max_blk_travers: usize,
+        max_blk_traverse: usize,
     ) -> ::stats::Corpus<U256>
     {
         let mut block_num = self.chain_info().best_block_number;
         let mut corpus = Vec::new();
         let mut count = 0;
         while corpus.len() < blk_price_window {
-            if block_num == 0 || count == max_blk_travers {
+            if block_num == 0 || count == max_blk_traverse {
                 return Vec::new().into();
             }
             let block = match self.block(BlockId::Number(block_num)) {
@@ -263,19 +248,28 @@ pub trait BlockChainClient: Sync + Send {
                     return Vec::new().into();
                 }
             };
+            let block_author = block.header_view().author();
             match block
-                .transaction_views()
-                .iter()
-                .map(|t| t.gas_price())
+                .view()
+                .localized_transactions()
+                .iter_mut()
+                .filter_map(|t| {
+                    if t.sender() != block_author {
+                        Some(t)
+                    } else {
+                        None
+                    }
+                })
+                .map(|t| t.gas_price)
                 .min()
             {
                 Some(gas_price) => {
                     corpus.push(gas_price);
+                    block_num -= 1;
                 }
                 None => (),
             }
             count += 1;
-            block_num -= 1;
         }
         corpus.into()
     }
@@ -287,20 +281,11 @@ pub trait BlockChainClient: Sync + Send {
     /// that a subsystem has reason to believe this executable incapable of syncing the chain.
     fn disable(&self);
 
-    /// Returns engine-related extra info for `BlockId`.
-    fn block_extra_info(&self, id: BlockId) -> Option<BTreeMap<String, String>>;
-
     /// Returns information about pruning/data availability.
     fn pruning_info(&self) -> PruningInfo;
 
     /// Like `call`, but with various defaults. Designed to be used for calling contracts.
     fn call_contract(&self, id: BlockId, address: Address, data: Bytes) -> Result<Bytes, String>;
-
-    /// Get the address of the registry itself.
-    fn registrar_address(&self) -> Option<Address>;
-
-    /// Get the address of a particular blockchain service, if available.
-    fn registry_address(&self, name: String, block: BlockId) -> Option<Address>;
 }
 
 /// Extended client interface used for mining

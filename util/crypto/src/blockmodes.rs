@@ -11,12 +11,16 @@
 use std::cmp;
 use std::iter::repeat;
 
-use buffer::{ReadBuffer, WriteBuffer, OwnedReadBuffer, OwnedWriteBuffer, BufferResult,
-RefReadBuffer, RefWriteBuffer};
+use buffer::{
+    ReadBuffer, WriteBuffer, OwnedReadBuffer, OwnedWriteBuffer, BufferResult, RefReadBuffer,
+    RefWriteBuffer,
+};
 use buffer::BufferResult::{BufferUnderflow, BufferOverflow};
 use cryptoutil::{self, symm_enc_or_dec};
-use symmetriccipher::{BlockEncryptor, BlockEncryptorX8, Encryptor, BlockDecryptor, Decryptor,
-SynchronousStreamCipher, SymmetricCipherError};
+use symmetriccipher::{
+    BlockEncryptor, BlockEncryptorX8, Encryptor, BlockDecryptor, Decryptor,
+    SynchronousStreamCipher, SymmetricCipherError,
+};
 use symmetriccipher::SymmetricCipherError::{InvalidPadding, InvalidLength};
 
 /// The BlockProcessor trait is used to implement modes that require processing complete blocks of
@@ -853,8 +857,10 @@ mod test {
     use std::time::Instant;
 
     use aessafe;
-    use blockmodes::{EcbEncryptor, EcbDecryptor, CbcEncryptor, CbcDecryptor, CtrMode, CtrModeX8,
-NoPadding, PkcsPadding};
+    use blockmodes::{
+        EcbEncryptor, EcbDecryptor, CbcEncryptor, CbcDecryptor, CtrMode, CtrModeX8, NoPadding,
+        PkcsPadding,
+};
     use buffer::{ReadBuffer, WriteBuffer, RefReadBuffer, RefWriteBuffer, BufferResult};
     use buffer::BufferResult::{BufferUnderflow, BufferOverflow};
     use symmetriccipher::{Encryptor, Decryptor};

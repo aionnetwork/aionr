@@ -20,9 +20,8 @@
  ******************************************************************************/
 
 use super::builtin::{BuiltinContract, BuiltinExt, BuiltinParams};
-use aion_types::{U256, Address};
-use vms::vm::ExecutionResult;
-use vms::{ReturnData, EvmStatusCode};
+use aion_types::{U256, H256, Address};
+use types::vms::{ExecutionResult, ExecStatus, ReturnData};
 use rcrypto::ed25519::verify;
 
 /// A pre-copmiled contract for ed25519 verification.
@@ -55,9 +54,10 @@ impl BuiltinContract for EDVerifyContract {
         if input.len() != 128 {
             return ExecutionResult {
                 gas_left: U256::zero(),
-                status_code: EvmStatusCode::Failure,
+                status_code: ExecStatus::Failure,
                 return_data: ReturnData::empty(),
                 exception: "Incorrect input length".into(),
+                state_root: H256::default(),
             };
         }
 
@@ -68,17 +68,19 @@ impl BuiltinContract for EDVerifyContract {
         if verify(msg, pub_key, sig) {
             ExecutionResult {
                 gas_left: U256::zero(),
-                status_code: EvmStatusCode::Success,
+                status_code: ExecStatus::Success,
                 return_data: ReturnData::new(pub_key.to_vec(), 0, pub_key.len()),
                 exception: String::default(),
+                state_root: H256::default(),
             }
         } else {
             let return_data = Address::zero();
             ExecutionResult {
                 gas_left: U256::zero(),
-                status_code: EvmStatusCode::Success,
+                status_code: ExecStatus::Success,
                 return_data: ReturnData::new(return_data.to_vec(), 0, return_data.len()),
                 exception: String::default(),
+                state_root: H256::default(),
             }
         }
     }
@@ -92,7 +94,7 @@ mod tests {
     use super::EDVerifyContract;
     use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
     use tests::helpers::get_temp_state;
-    use vms::EvmStatusCode;
+    use types::vms::ExecStatus;
     use state::{State, Substate};
     use aion_types::{Address, H256};
     use bytes::to_hex;
@@ -147,10 +149,10 @@ mod tests {
 
         let input = get_test_data();
         let result = contract.execute(&mut ext, input.as_slice());
-        assert_eq!(result.status_code, EvmStatusCode::Success);
+        assert_eq!(result.status_code, ExecStatus::Success);
         let ret_data = result.return_data;
         let expected = "fff4317ae351bda5e4fa24352904a9366d3a89e38d1ffa51498ba9acfbc65724";
-        assert_eq!(to_hex(&ret_data.mem), expected);
+        assert_eq!(to_hex(&*ret_data), expected);
     }
 
     #[test]
@@ -162,10 +164,10 @@ mod tests {
 
         let input = [0u8; 128];
         let result = contract.execute(&mut ext, &input);
-        assert_eq!(result.status_code, EvmStatusCode::Success);
+        assert_eq!(result.status_code, ExecStatus::Success);
         let ret_data = result.return_data;
         let expected = "0000000000000000000000000000000000000000000000000000000000000000";
-        assert_eq!(to_hex(&ret_data.mem), expected);
+        assert_eq!(to_hex(&*ret_data), expected);
     }
 
     #[test]
@@ -181,10 +183,10 @@ mod tests {
         input[33] = (input[33] as u64 + 4) as u8;
         input[99] = (input[33] as u64 - 40) as u8;
         let result = contract.execute(&mut ext, &input);
-        assert_eq!(result.status_code, EvmStatusCode::Success);
+        assert_eq!(result.status_code, ExecStatus::Success);
         let ret_data = result.return_data;
         let expected = "0000000000000000000000000000000000000000000000000000000000000000";
-        assert_eq!(to_hex(&ret_data.mem), expected);
+        assert_eq!(to_hex(&*ret_data), expected);
     }
 
     #[test]
@@ -197,6 +199,6 @@ mod tests {
         let mut input = [0u8; 129];
         input[128] = 1u8;
         let result = contract.execute(&mut ext, &input);
-        assert_eq!(result.status_code, EvmStatusCode::Failure);
+        assert_eq!(result.status_code, ExecStatus::Failure);
     }
 }

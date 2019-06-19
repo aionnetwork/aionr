@@ -22,9 +22,9 @@
 
 //! `TransactionRequest` type
 
-use types::{Bytes, H256, U256, TransactionCondition};
-use helpers;
 use ansi_term::Colour;
+use helpers;
+use types::{Bytes, H256, TransactionCondition, U256};
 
 use std::fmt;
 
@@ -56,6 +56,9 @@ pub struct TransactionRequest {
     pub data: Option<Bytes>,
     /// Transaction's nonce
     pub nonce: Option<U256>,
+    /// Transaction type
+    #[serde(rename = "type")]
+    pub tx_type: Option<U256>,
     /// Delay until this block condition.
     pub condition: Option<TransactionCondition>,
 }
@@ -110,6 +113,7 @@ impl From<helpers::TransactionRequest> for TransactionRequest {
             value: r.value.map(Into::into),
             data: r.data.map(Into::into),
             nonce: r.nonce.map(Into::into),
+            tx_type: r.tx_type.map(Into::into),
             condition: r.condition.map(Into::into),
         }
     }
@@ -125,6 +129,7 @@ impl From<helpers::FilledTransactionRequest> for TransactionRequest {
             value: Some(r.value.into()),
             data: Some(r.data.into()),
             nonce: r.nonce.map(Into::into),
+            tx_type: Some(r.tx_type.into()),
             condition: r.condition.map(Into::into),
         }
     }
@@ -140,6 +145,7 @@ impl Into<helpers::TransactionRequest> for TransactionRequest {
             value: self.value.map(Into::into),
             data: self.data.map(Into::into),
             nonce: self.nonce.map(Into::into),
+            tx_type: self.tx_type.map(Into::into),
             condition: self.condition.map(Into::into),
         }
     }
@@ -147,11 +153,11 @@ impl Into<helpers::TransactionRequest> for TransactionRequest {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use super::*;
     use rustc_hex::FromHex;
     use serde_json;
-    use types::{U256, H256, TransactionCondition};
-    use super::*;
+    use std::str::FromStr;
+    use types::{H256, TransactionCondition, U256};
 
     #[test]
     fn transaction_request_deserialize() {
@@ -163,6 +169,7 @@ mod tests {
             "value":"0x3",
             "data":"0x123456",
             "nonce":"0x4",
+            "type":"0x01",
             "condition": { "block": 19 }
         }"#;
         let deserialized: TransactionRequest = serde_json::from_str(s).unwrap();
@@ -177,6 +184,7 @@ mod tests {
                 value: Some(U256::from(3)),
                 data: Some(vec![0x12, 0x34, 0x56].into()),
                 nonce: Some(U256::from(4)),
+                tx_type: Some(U256::from(0x01)),
                 condition: Some(TransactionCondition::Number(0x13)),
             }
         );
@@ -203,6 +211,7 @@ mod tests {
             data: Some("d46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675".from_hex().unwrap().into()),
             nonce: None,
             condition: None,
+            tx_type: None,
         });
     }
 
@@ -222,6 +231,7 @@ mod tests {
                 data: None,
                 nonce: None,
                 condition: None,
+                tx_type: None,
             }
         );
     }
@@ -259,6 +269,7 @@ mod tests {
                 data: Some(vec![0x85, 0x95, 0xba, 0xb1].into()),
                 nonce: None,
                 condition: None,
+                tx_type: None,
             }
         );
     }

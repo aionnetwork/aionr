@@ -20,12 +20,12 @@
  *
  ******************************************************************************/
 
-use std::io::{Read, Write};
+use super::{Crypto, H256, Uuid, Version};
 use serde::de::Error;
 use serde_json;
-use serde_json::value::Value;
 use serde_json::error;
-use super::{Uuid, Version, Crypto, H256};
+use serde_json::value::Value;
+use std::io::{Read, Write};
 
 /// Meta key name for vault field
 const VAULT_NAME_META_KEY: &'static str = "vault";
@@ -120,9 +120,11 @@ impl VaultKeyMeta {
 
 #[cfg(test)]
 mod test {
+    use json::{
+        insert_vault_name_to_json_meta, remove_vault_name_from_json_meta, Aes128Ctr, Cipher,
+        Crypto, Kdf, Pbkdf2, Prf, VaultKeyFile, Version,
+};
     use serde_json;
-    use json::{VaultKeyFile, Version, Crypto, Cipher, Aes128Ctr, Kdf, Pbkdf2, Prf,
-insert_vault_name_to_json_meta, remove_vault_name_from_json_meta};
 
     #[test]
     fn to_and_from_json() {

@@ -21,6 +21,7 @@
  ******************************************************************************/
 
 //! Logger for Aion executables
+#![warn(unused_extern_crates)]
 
 extern crate arrayvec;
 extern crate log as rlog;

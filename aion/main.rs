@@ -19,35 +19,25 @@
  *
  ******************************************************************************/
 
-//! Ethcore client application.
-
-#![warn(missing_docs)]
+#![warn(unused_extern_crates)]
 
 extern crate ansi_term;
 extern crate ctrlc;
-extern crate docopt;
 #[macro_use]
 extern crate clap;
 extern crate dir;
 extern crate fdlimit;
-extern crate futures;
-extern crate isatty;
 extern crate jsonrpc_core;
 extern crate num_cpus;
-extern crate number_prefix;
 extern crate parking_lot;
-extern crate regex;
 extern crate rlp;
 extern crate rpassword;
 extern crate rustc_hex;
-extern crate semver;
 extern crate serde;
 extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
-extern crate time;
 extern crate toml;
-
 extern crate sync;
 extern crate acore;
 extern crate acore_bytes as bytes;
@@ -57,10 +47,8 @@ extern crate aion_types;
 extern crate key;
 extern crate keychain;
 extern crate panic_hook;
-extern crate aion_local_store as local_store;
 extern crate aion_rpc;
 extern crate aion_version;
-extern crate path;
 extern crate blake2b;
 extern crate journaldb;
 extern crate aion_pb_apiserver as pb;
@@ -74,11 +62,6 @@ extern crate acore_stratum;
 #[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
-
-#[cfg(windows)]
-extern crate ws2_32;
-#[cfg(windows)]
-extern crate winapi;
 
 #[cfg(test)]
 extern crate tempdir;
@@ -128,44 +111,12 @@ fn execute(command: Execute) -> Result<PostExecutionAction, String> {
 fn start() -> Result<PostExecutionAction, String> {
     let args: Vec<String> = env::args().collect();
     let conf = Configuration::parse(&args).unwrap_or_else(|e| e.exit());
-
     let cmd = conf.into_command()?;
     execute(cmd)
 }
 
-#[cfg(windows)]
-fn global_cleanup() {
-    // We need to cleanup all sockets before spawning another Aion process. This makes shure everything is cleaned up.
-    // The loop is required because of internal refernce counter for winsock dll. We don't know how many crates we use do
-    // initialize it. There's at least 2 now.
-    for _ in 0..10 {
-        unsafe {
-            ::ws2_32::WSACleanup();
-        }
-    }
-}
-
-#[cfg(not(windows))]
-fn global_init() {}
-
-#[cfg(windows)]
-fn global_init() {
-    // When restarting in the same process this reinits windows sockets.
-    unsafe {
-        const WS_VERSION: u16 = 0x202;
-        let mut wsdata: ::winapi::winsock2::WSADATA = ::std::mem::zeroed();
-        ::ws2_32::WSAStartup(WS_VERSION, &mut wsdata);
-    }
-}
-
-#[cfg(not(windows))]
-fn global_cleanup() {}
-
-// Run our version of aion.
-// Returns the exit error code.
-fn main_direct() -> i32 {
-    global_init();
-
+fn main() {
+    panic_hook::set();
     let res = match start() {
         Ok(result) => {
             match result {
@@ -181,28 +132,5 @@ fn main_direct() -> i32 {
             1
         }
     };
-    global_cleanup();
-    res
-}
-
-fn println_trace_main(s: String) {
-    if env::var("RUST_LOG")
-        .ok()
-        .and_then(|s| s.find("main=trace"))
-        .is_some()
-    {
-        println!("{}", s);
-    }
-}
-
-#[macro_export]
-macro_rules! trace_main {
-    ($arg:expr) => (println_trace_main($arg.into()));
-    ($($arg:tt)*) => (println_trace_main(format!("{}", format_args!($($arg)*))));
-}
-
-fn main() {
-    panic_hook::set();
-    trace_main!("Running direct");
-    process::exit(main_direct());
+    process::exit(res);
 }

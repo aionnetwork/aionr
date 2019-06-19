@@ -20,6 +20,7 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 //! Lru-cache related utilities as quick-and-dirty wrappers around the lru-cache
 //! crate.
 // TODO: push changes upstream in a clean way.

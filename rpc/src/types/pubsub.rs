@@ -162,7 +162,7 @@ mod tests {
                 topics: Some(vec![VariadicValue::Single(
                     "000000000000000000000000a94f5374fce5edbc8e2a8697c15331677e6ebf0b"
                         .parse()
-                        .unwrap()
+                        .unwrap(),
                 )]),
                 limit: None,
             })

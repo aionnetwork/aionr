@@ -6,9 +6,9 @@ description = "in memory patricia trie operations"
 license = "GPL-3.0"
 
 [dependencies]
-rlp = { version = "0.2.1", path = "../rlp" }
+rlp =        { path = "../rlp" }
+blake2b =    { path = "../blake2b" }
 aion-types = { path = "../../util/aion-types"}
-blake2b = { path = "../blake2b" }
 
 [dev-dependencies]
 trie-standardmap = { path = "../trie-standardmap" }

@@ -23,17 +23,16 @@ use std::{str, fs, fmt};
 use aion_types::{U256, Address};
 use journaldb::Algorithm;
 use acore::spec::{Spec, SpecParams};
-use acore::ethereum;
 use user_defaults::UserDefaults;
 
 #[derive(Debug, PartialEq)]
 pub enum SpecType {
-    Foundation,
+    Default,
     Custom(String),
 }
 
 impl Default for SpecType {
-    fn default() -> Self { SpecType::Foundation }
+    fn default() -> Self { SpecType::Default }
 }
 
 impl str::FromStr for SpecType {
@@ -41,7 +40,7 @@ impl str::FromStr for SpecType {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let spec = match s {
-            "foundation" | "mainnet" => SpecType::Foundation,
+            "foundation" | "mainnet" => SpecType::Default,
             other => SpecType::Custom(other.into()),
         };
         Ok(spec)
@@ -51,7 +50,7 @@ impl str::FromStr for SpecType {
 impl fmt::Display for SpecType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.write_str(match *self {
-            SpecType::Foundation => "mainnet",
+            SpecType::Default => "mainnet",
             SpecType::Custom(ref custom) => custom,
         })
     }
@@ -60,15 +59,21 @@ impl fmt::Display for SpecType {
 impl SpecType {
     pub fn spec<'a, T: Into<SpecParams<'a>>>(&self, params: T) -> Result<Spec, String> {
         let params = params.into();
+        let file;
         match *self {
-            SpecType::Foundation => Ok(ethereum::new_foundation(params)),
-            SpecType::Custom(ref filename) => {
-                let file = fs::File::open(filename).map_err(|e| {
+            SpecType::Default => {
+                let filename = "../resources/mainnet.json";
+                file = fs::File::open(filename).map_err(|e| {
                     format!("Could not load specification file at {}: {}", filename, e)
                 })?;
-                Spec::load(params, file)
+            }
+            SpecType::Custom(ref filename) => {
+                file = fs::File::open(filename).map_err(|e| {
+                    format!("Could not load specification file at {}: {}", filename, e)
+                })?;
             }
         }
+        Spec::load(params, file)
     }
 }
 
@@ -130,8 +135,8 @@ impl str::FromStr for ResealPolicy {
         };
 
         let reseal = ResealPolicy {
-            own: own,
-            external: external,
+            own,
+            external,
         };
 
         Ok(reseal)
@@ -228,18 +233,17 @@ mod tests {
 
     #[test]
     fn test_spec_type_parsing() {
-        assert_eq!(SpecType::Foundation, "mainnet".parse().unwrap());
-        assert_eq!(SpecType::Foundation, "foundation".parse().unwrap());
+        assert_eq!(SpecType::Default, "mainnet".parse().unwrap());
     }
 
     #[test]
     fn test_spec_type_default() {
-        assert_eq!(SpecType::Foundation, SpecType::default());
+        assert_eq!(SpecType::Default, SpecType::default());
     }
 
     #[test]
     fn test_spec_type_display() {
-        assert_eq!(format!("{}", SpecType::Foundation), "mainnet");
+        assert_eq!(format!("{}", SpecType::Default), "mainnet");
         assert_eq!(format!("{}", SpecType::Custom("foo/bar".into())), "foo/bar");
     }
 

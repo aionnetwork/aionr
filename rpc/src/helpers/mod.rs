@@ -38,6 +38,7 @@ pub use self::dispatch::{Dispatcher, FullDispatcher};
 pub use self::poll_manager::PollManager;
 pub use self::poll_filter::{PollFilter, limit_logs};
 pub use self::requests::{
-    TransactionRequest, FilledTransactionRequest, ConfirmationRequest, ConfirmationPayload, CallRequest,
+    TransactionRequest, FilledTransactionRequest, ConfirmationRequest, ConfirmationPayload,
+    CallRequest,
 };
 pub use self::subscribers::Subscribers;

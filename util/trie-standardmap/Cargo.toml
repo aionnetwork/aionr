@@ -6,6 +6,6 @@ description = "Standard test map for profiling tries"
 
 [dependencies]
 acore-bytes = { path = "../bytes" }
-aion-types = { path = "../../util/aion-types"}
-blake2b= { path = "../blake2b" }
-rlp = { path = "../rlp" }
+aion-types =  { path = "../../util/aion-types"}
+blake2b=      { path = "../blake2b" }
+rlp =         { path = "../rlp" }

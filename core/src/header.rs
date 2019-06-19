@@ -483,8 +483,3 @@ impl ::aion_machine::Header for Header {
 
     fn number(&self) -> BlockNumber { Header::number(self) }
 }
-
-impl ::aion_machine::ScoredHeader for Header {
-    fn score(&self) -> &U256 { self.difficulty() }
-    fn set_score(&mut self, score: U256) { self.set_difficulty(score) }
-}

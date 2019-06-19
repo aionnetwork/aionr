@@ -20,7 +20,7 @@
  *
  ******************************************************************************/
 
-//! Custom panic hook with bug report link
+#![warn(unused_extern_crates)]
 
 extern crate backtrace;
 
@@ -29,26 +29,16 @@ use std::panic::{self, PanicInfo};
 use std::thread;
 use backtrace::Backtrace;
 
-/// Set the panic hook
-pub fn set() {
-    if cfg!(debug_assertions) {
-        // debug is enabled, do not set panic hook.
-    } else {
-        panic::set_hook(Box::new(panic_hook));
-    }
-}
+pub fn set() { panic::set_hook(Box::new(panic_hook)); }
 
 static ABOUT_PANIC: &str = "
-This is a bug. Please report it at:
-
-    https://github.com/aionnetwork/aionr/issues/new
-";
+This is a bug. Help us report here:
+https://github.com/aionnetwork/aionr/issues/new";
 
 fn panic_hook(info: &PanicInfo) {
     let location = info.location();
     let file = location.as_ref().map(|l| l.file()).unwrap_or("<unknown>");
     let line = location.as_ref().map(|l| l.line()).unwrap_or(0);
-
     let msg = match info.payload().downcast_ref::<&'static str>() {
         Some(s) => *s,
         None => {
@@ -58,14 +48,10 @@ fn panic_hook(info: &PanicInfo) {
             }
         }
     };
-
     let thread = thread::current();
     let name = thread.name().unwrap_or("<unnamed>");
-
     let backtrace = Backtrace::new();
-
     let mut stderr = io::stderr();
-
     let _ = writeln!(stderr, "");
     let _ = writeln!(stderr, "====================");
     let _ = writeln!(stderr, "");
@@ -73,9 +59,8 @@ fn panic_hook(info: &PanicInfo) {
     let _ = writeln!(stderr, "");
     let _ = writeln!(
         stderr,
-        "Thread '{}' panicked at '{}', {}:{}",
+        "thread '{}' panicked at '{}', {}:{}",
         name, msg, file, line
     );
-
     let _ = writeln!(stderr, "{}", ABOUT_PANIC);
 }

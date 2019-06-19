@@ -20,8 +20,7 @@
  *
  ******************************************************************************/
 
-//! Stratum protocol implementation for Aion rust clients
-
+#![warn(unused_extern_crates)]
 extern crate jsonrpc_tcp_server;
 extern crate jsonrpc_core;
 extern crate jsonrpc_macros;
@@ -41,13 +40,11 @@ extern crate logger;
 
 mod traits;
 
-pub use traits::{
-    JobDispatcher, PushWorkHandler, Error, ServiceConfiguration,
-};
+pub use traits::{JobDispatcher, PushWorkHandler, Error, ServiceConfiguration};
 
 use jsonrpc_tcp_server::{
-    Server as JsonRpcServer, ServerBuilder as JsonRpcServerBuilder,
-    RequestContext, MetaExtractor, Dispatcher, PushMessageError,
+    Server as JsonRpcServer, ServerBuilder as JsonRpcServerBuilder, RequestContext, MetaExtractor,
+    Dispatcher, PushMessageError,
 };
 use jsonrpc_core::{MetaIoHandler, Params, to_value, Value, Metadata, Compatibility};
 use jsonrpc_macros::IoDelegate;

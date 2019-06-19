@@ -22,7 +22,7 @@
 
 //! Ethereum rpc interface implementation.
 macro_rules! try_bf {
-    ($res: expr) => {
+    ($res:expr) => {
         match $res {
             Ok(val) => val,
             Err(e) => return Box::new(::jsonrpc_core::futures::future::err(e.into())),

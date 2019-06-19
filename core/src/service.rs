@@ -32,8 +32,7 @@ use tokio::timer::Interval;
 use tokio::prelude::{Future, Stream};
 use ansi_term::Colour;
 use bytes::Bytes;
-use client::{ChainNotify, Client, ClientConfig, /*MiningBlockChainClient*/
-};
+use client::{ChainNotify, Client, ClientConfig};
 use db;
 use error::*;
 use io::*;
@@ -62,7 +61,7 @@ pub enum ClientIoMessage {
 pub fn run_miner(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
     let (close, shutdown_signal) = oneshot::channel();
     // let seal_block_task = Interval::new(Instant::now(), client.prepare_block_interval())
-    let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(1))
+    let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(5))
         .for_each(move |_| {
             let client: Arc<Client> = client.clone();
             client.miner().try_prepare_block(&*client, false);
@@ -147,13 +146,11 @@ impl ClientService {
         });
         io_service.register_handler(client_io)?;
 
-        spec.engine.register_client(Arc::downgrade(&client) as _);
-
         let stop_guard = StopGuard::new();
 
         Ok(ClientService {
             io_service: Arc::new(io_service),
-            client: client,
+            client,
             database: dbs,
             _stop_guard: stop_guard,
         })
@@ -286,11 +283,6 @@ impl IoHandler<ClientIoMessage> for ClientIoHandler {
         match *net_message {
             ClientIoMessage::BlockVerified => {
                 self.client.import_verified_blocks();
-            }
-            ClientIoMessage::NewMessage(ref message) => {
-                if let Err(e) = self.client.engine().handle_message(message) {
-                    trace!(target: "io", "Invalid message received: {}", e);
-                }
             }
             ClientIoMessage::NewChainHead => {
                 debug!(target: "block", "ClientIoMessage::NewChainHead");

@@ -62,28 +62,28 @@ macro_rules! if_vec {
 }
 
 macro_rules! if_option_vec {
-    (Option<Vec<String>>, THEN {$then:expr} ELSE {$otherwise:expr}) => {
+    (Option < Vec < String >> ,THEN { $then:expr }ELSE { $otherwise:expr }) => {
         $then
     };
-    (Option<$type:ty>, THEN {$then:expr} ELSE {$otherwise:expr}) => {
+    (Option < $type:ty > ,THEN { $then:expr }ELSE { $otherwise:expr }) => {
         $otherwise
     };
 }
 
 macro_rules! inner_option_type {
-    (Option<$type:ty>) => {
+    (Option < $type:ty >) => {
         $type
     };
 }
 
 macro_rules! inner_vec_type {
-    (Vec<$type:ty>) => {
+    (Vec < $type:ty >) => {
         $type
     };
 }
 
 macro_rules! inner_option_vec_type {
-    (Option<Vec<String>>) => {
+    (Option < Vec < String >>) => {
         String
     };
 }
@@ -164,8 +164,8 @@ macro_rules! usage {
 
         const MAX_TERM_WIDTH: usize = 120;
 
-        #[cfg(test)]
-        use regex::Regex;
+//        #[cfg(test)]
+//        use regex::Regex;
 
         #[derive(Debug)]
         pub enum ArgsError {
@@ -383,7 +383,7 @@ macro_rules! usage {
             }
 
             pub fn print_version() -> String {
-                format!(include_str!("./version.txt"), version())
+                format!(include_str!("../../resources/version.txt"), version())
             }
 
             #[allow(unused_mut)] // subc_subc_exist may be assigned true by the macro
@@ -400,7 +400,7 @@ macro_rules! usage {
                     }
                 };
 
-                let mut help : String = include_str!("./usage_header.txt").to_owned();
+                let mut help : String = include_str!("../../resources/usage_header.txt").to_owned();
 
                 help.push_str("\n");
 
@@ -850,34 +850,34 @@ macro_rules! usage {
 
         }
 
-        #[test]
-        fn usages_valid() {
-            let re = Regex::new(r"^(?:(-[a-zA-Z-]+, )?--[a-z-]+(=\[[a-zA-Z]+\](\.\.\.)?|=<[a-zA-Z]+>(\.\.\.)?)?)|(?:\[[a-zA-Z-]+\])(\.\.\.)?|(?:<[a-zA-Z-]+>)(\.\.\.)?$").unwrap();
-
-            let usages = vec![
-                $(
-                    $(
-                        $(
-                            $subc_subc_arg_usage,
-                        )*
-                    )*
-                    $(
-                        $subc_arg_usage,
-                    )*
-                )*
-                $(
-                    $(
-                        $flag_usage,
-                    )*
-                    $(
-                        $arg_usage,
-                    )*
-                )*
-            ];
-
-            for usage in &usages {
-                assert!(re.is_match(usage));
-            }
-        }
+//        #[test]
+//        fn usages_valid() {
+//            let re = Regex::new(r"^(?:(-[a-zA-Z-]+, )?--[a-z-]+(=\[[a-zA-Z]+\](\.\.\.)?|=<[a-zA-Z]+>(\.\.\.)?)?)|(?:\[[a-zA-Z-]+\])(\.\.\.)?|(?:<[a-zA-Z-]+>)(\.\.\.)?$").unwrap();
+//
+//            let usages = vec![
+//                $(
+//                    $(
+//                        $(
+//                            $subc_subc_arg_usage,
+//                        )*
+//                    )*
+//                    $(
+//                        $subc_arg_usage,
+//                    )*
+//                )*
+//                $(
+//                    $(
+//                        $flag_usage,
+//                    )*
+//                    $(
+//                        $arg_usage,
+//                    )*
+//                )*
+//            ];
+//
+//            for usage in &usages {
+//                assert!(re.is_match(usage));
+//            }
+//        }
     }
 }

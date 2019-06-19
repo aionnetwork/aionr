@@ -51,17 +51,17 @@ impl ImportHandler {
                 let number = header_view.number();
                 let hash = header_view.hash();
 
-                if enable_import && !SyncStorage::is_staged_block_hash(hash) {
+                if enable_import {
                     SyncStorage::insert_requested_time(hash);
                     match client.import_block(block.clone()) {
                         Ok(_)
                         | Err(BlockImportError::Import(ImportError::AlreadyInChain))
                         | Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
-                            trace!(target: "sync", "Staged blocks #{} imported...", number);
+                            trace!(target: "sync", "Staged block #{} imported...", number);
                         }
                         Err(e) => {
                             enable_import = false;
-                            warn!(target: "sync", "Failed to import staged blocks #{}, due to {:?}", number, e);
+                            warn!(target: "sync", "Failed to import staged block #{}, due to {:?}", number, e);
                         }
                     }
                 }
@@ -130,25 +130,26 @@ impl ImportHandler {
                                     {
                                         node.mode = Mode::NORMAL;
                                     } else {
-                                        let lightning_mode_nodes_count =
-                                            P2pMgr::get_nodes_count_with_mode(Mode::LIGHTNING);
-                                        let thunder_mode_nodes_count =
-                                            P2pMgr::get_nodes_count_with_mode(Mode::THUNDER);
-                                        let normal_mode_nodes_count =
-                                            P2pMgr::get_nodes_count_with_mode(Mode::NORMAL);
-                                        if node.synced_block_num + 500
-                                            < SyncStorage::get_network_best_block_number()
-                                            && normal_mode_nodes_count >= 5
-                                            && lightning_mode_nodes_count
-                                                < (thunder_mode_nodes_count
-                                                    + normal_mode_nodes_count)
-                                                    / 3
+                                        let (
+                                            normal_nodes_count,
+                                            _,
+                                            _,
+                                            lightning_nodes_count,
+                                            thunder_nodes_count,
+                                        ) = P2pMgr::get_nodes_count_all_modes();
+                                        if normal_nodes_count == 0 {
+                                            node.mode = Mode::NORMAL;
+                                        } else if node.target_total_difficulty
+                                            >= SyncStorage::get_network_total_diff()
+                                            && node.synced_block_num + 500
+                                                < SyncStorage::get_network_best_block_number()
+                                            && thunder_nodes_count >= 1
+                                            && lightning_nodes_count
+                                                < (thunder_nodes_count + normal_nodes_count) / 5
                                         {
                                             // attempt to jump
                                             node.mode = Mode::LIGHTNING;
-                                        } else if thunder_mode_nodes_count
-                                            < normal_mode_nodes_count * 10
-                                        {
+                                        } else if thunder_nodes_count < normal_nodes_count * 10 {
                                             node.mode = Mode::THUNDER;
                                         } else {
                                             node.mode = Mode::NORMAL;
@@ -235,26 +236,26 @@ impl ImportHandler {
                                         {
                                             node.mode = Mode::NORMAL;
                                         } else {
-                                            let lightning_mode_nodes_count =
-                                                P2pMgr::get_nodes_count_with_mode(Mode::LIGHTNING);
-                                            let thunder_mode_nodes_count =
-                                                P2pMgr::get_nodes_count_with_mode(Mode::THUNDER);
-                                            let normal_mode_nodes_count =
-                                                P2pMgr::get_nodes_count_with_mode(Mode::NORMAL);
-                                            if node.target_total_difficulty
+                                            let (
+                                                normal_nodes_count,
+                                                _,
+                                                _,
+                                                lightning_nodes_count,
+                                                thunder_nodes_count,
+                                            ) = P2pMgr::get_nodes_count_all_modes();
+                                            if normal_nodes_count == 0 {
+                                                node.mode = Mode::NORMAL;
+                                            } else if node.target_total_difficulty
                                                 >= SyncStorage::get_network_total_diff()
                                                 && node.synced_block_num + 500
                                                     < SyncStorage::get_network_best_block_number()
-                                                && normal_mode_nodes_count >= 5
-                                                && lightning_mode_nodes_count
-                                                    < (thunder_mode_nodes_count
-                                                        + normal_mode_nodes_count)
-                                                        / 3
+                                                && thunder_nodes_count >= 1
+                                                && lightning_nodes_count
+                                                    < (thunder_nodes_count + normal_nodes_count) / 5
                                             {
                                                 // attempt to jump
                                                 node.mode = Mode::LIGHTNING;
-                                            } else if thunder_mode_nodes_count
-                                                < normal_mode_nodes_count * 10
+                                            } else if thunder_nodes_count < normal_nodes_count * 10
                                             {
                                                 node.mode = Mode::THUNDER;
                                             } else {
@@ -277,25 +278,20 @@ impl ImportHandler {
                                     if let Ok(mut staged_blocks) =
                                         SyncStorage::get_staged_blocks().lock()
                                     {
-                                        if staged_blocks.len() < 128
+                                        if staged_blocks.len() < 32
                                             && !staged_blocks.contains_key(&parent)
                                         {
                                             let blocks_to_stage =
-                                                blocks_to_import.clone().split_off(offset);
+                                                blocks_to_import.clone().split_off(offset - 1);
                                             let max_staged_block_number =
                                                 number + blocks_to_stage.len() as u64 - 1;
                                             info!(target: "sync", "Staged blocks from {} to {} with parent: {}", number, max_staged_block_number, parent);
                                             debug!(target: "sync", "cache size: {}", staged_blocks.len());
 
-                                            let mut staged_block_numbers = Vec::new();
                                             let mut staged_block_hashes = Vec::new();
                                             for block in blocks_to_import.iter() {
                                                 let block_view = BlockView::new(block);
-                                                let (number, hash) = {
-                                                    let header_view = block_view.header_view();
-                                                    (header_view.number(), header_view.hash())
-                                                };
-                                                staged_block_numbers.push(number);
+                                                let hash = block_view.header_view().hash();
                                                 staged_block_hashes.push(hash);
                                             }
 

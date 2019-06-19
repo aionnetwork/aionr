@@ -1,0 +1,19 @@
+[package]
+name = "avm"
+version = "0.2.0"
+authors = ["Yulong Wu <yulong@aion.network>", "Camus Qiu <camus@aion.network>"]
+build = "build.rs"
+
+[dependencies]
+rjni = { path = "rjni" }
+libc = "*"
+rustc-hex = "1.0"
+num-bigint = "0.2"
+types      = { path = "../../types" }
+aion-types = { path = "../../util/aion-types" }
+lazy_static = "1.0"
+blake2b = { path = "../../util/blake2b" }
+log = "0.3"
+rlp = {path = "../../util/rlp"}
+crypto = {path = "../../util/crypto"}
+tiny-keccak = "1.4.2"

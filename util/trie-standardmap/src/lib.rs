@@ -20,6 +20,7 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 //! Key-value datastore with a modified Merkle tree.
 
 extern crate acore_bytes as bytes;

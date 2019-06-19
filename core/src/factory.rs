@@ -22,10 +22,7 @@
 
 use trie::TrieFactory;
 use account_db::Factory as AccountFactory;
-use vms::factory::{Factory, FastVMFactory, AVMFactory};
-use vms::VMType;
-
-//const WASM_MAGIC_NUMBER: &'static [u8; 4] = b"\0asm";
+use vms::{VMType, Factory, FastVMFactory, AVMFactory};
 
 /// Virtual machine factory
 #[derive(Clone)]

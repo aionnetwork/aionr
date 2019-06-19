@@ -71,10 +71,10 @@ assert_eq!(hex,
  */
 
 use digest::Digest;
-use cryptoutil::{write_u32_be, read_u32v_be,
-                 write_u64_be, read_u64v_be,
-                 add_bytes_to_bits, add_bytes_to_bits_tuple,
-FixedBuffer, FixedBuffer128, FixedBuffer64, StandardPadding};
+use cryptoutil::{
+    write_u32_be, read_u32v_be, write_u64_be, read_u64v_be, add_bytes_to_bits,
+    add_bytes_to_bits_tuple, FixedBuffer, FixedBuffer128, FixedBuffer64, StandardPadding,
+};
 
 use simd::{u32x4, u64x2};
 

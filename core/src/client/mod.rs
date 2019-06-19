@@ -21,33 +21,25 @@
  ******************************************************************************/
 
 //! Blockchain database client.
-
-mod ancient_import;
 mod config;
 mod error;
-mod test_client;
 mod client;
 
 pub use self::client::*;
 pub use self::config::{ClientConfig, DatabaseCompactionProfile, BlockChainConfig, VMType};
 pub use self::error::Error;
-pub use self::test_client::{TestBlockChainClient, EachBlockWith};
 pub use self::chain_notify::ChainNotify;
 pub use self::traits::{BlockChainClient, MiningBlockChainClient, EngineClient};
-
 pub use self::traits::ProvingBlockChainClient;
 
 pub use types::ids::*;
 pub use types::trace_filter::Filter as TraceFilter;
 pub use types::pruning_info::PruningInfo;
 pub use types::call_analytics::CallAnalytics;
-
 pub use executive::{Executed, Executive};
-pub use vms::{EnvInfo, LastHashes};
+pub use types::vms::{EnvInfo, LastHashes};
 
 pub use error::{BlockImportError, TransactionImportError};
-pub use verification::VerifierType;
 
 mod traits;
-
 mod chain_notify;

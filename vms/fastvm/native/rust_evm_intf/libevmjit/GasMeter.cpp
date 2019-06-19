@@ -216,8 +216,10 @@ int64_t GasMeter::getStepCost(Instruction inst) const
 	case Instruction::MSTORE:
 	case Instruction::MSTORE8:
 	case Instruction::ANY_PUSH:
-	case Instruction::ANY_DUP:
-	case Instruction::ANY_SWAP:
+	case Instruction::BASE_DUP:
+	case Instruction::BASE_SWAP:
+	case Instruction::EXT_DUP:
+	case Instruction::EXT_SWAP:
 		return m_rev >= EVM_AION? 1 : JITSchedule::stepGas2::value;
 
 	// Tier 3

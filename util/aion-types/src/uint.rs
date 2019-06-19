@@ -334,7 +334,7 @@ impl From<U512> for [u8; 64] {
 }
 
 macro_rules! impl_serde {
-    ($name: ident, $len: expr) => {
+    ($name:ident, $len:expr) => {
         #[cfg(feature = "serialize")]
         impl Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

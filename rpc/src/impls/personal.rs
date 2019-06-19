@@ -33,12 +33,9 @@ use helpers::dispatch::{self, Dispatcher, SignWith};
 use helpers::accounts::unwrap_provider;
 use traits::Personal;
 use types::{
-    H256 as RpcH256, H768 as RpcH768,
-    Bytes as RpcBytes,
-    ConfirmationPayload as RpcConfirmationPayload,
-    ConfirmationResponse as RpcConfirmationResponse,
-    TransactionRequest,
-    RichRawTransaction as RpcRichRawTransaction,
+    H256 as RpcH256, H768 as RpcH768, Bytes as RpcBytes,
+    ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse as RpcConfirmationResponse,
+    TransactionRequest, RichRawTransaction as RpcRichRawTransaction,
 };
 use helpers::nonce::Ready as NonceReady;
 /// Account management (personal) rpc implementation.

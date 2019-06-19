@@ -46,22 +46,22 @@ struct result_info {
 #define debug(args...)                          \
   if (DEBUG) printf(args);
 
-  typedef int (*exists_cb)(const void *obj, const struct evm_address *address);
-  typedef uint8_t *(*get_storage_cb)(const void *obj, const struct evm_address *address,
-                                 const struct evm_word *key);
-  typedef void (*put_storage_cb)(const void *obj, const struct evm_address *address,
-                                 const struct evm_word *key,
-                                 const struct evm_word *value);
-  typedef uint8_t *(*get_balance_cb)(const void *obj, const struct evm_address *address);
+  typedef int (*exists_cb)(const void *obj, const struct evm_address address);
+  typedef struct evm_word (*get_storage_cb)(const void *obj, const struct evm_address address,
+                                 const struct evm_word key);
+  typedef void (*put_storage_cb)(const void *obj, const struct evm_address address,
+                                 const struct evm_word key,
+                                 const struct evm_word value);
+  typedef struct evm_word (*get_balance_cb)(const void *obj, const struct evm_address address);
   typedef void (*get_code_cb)(const void *obj, struct code_info *info,
-                                const struct evm_address *address);
-  typedef void (*selfdestruct_cb)(const void *obj, const struct evm_address *address,
-                                  const struct evm_address *beneficiary);
+                                const struct evm_address address);
+  typedef void (*selfdestruct_cb)(const void *obj, const struct evm_address address,
+                                  const struct evm_address beneficiary);
   typedef uint8_t *(*call_cb)(const void *obj, struct result_info *info,
                           const struct parity_msg *msg);
   typedef void (*get_tx_context_cb)(const void *obj, struct evm_tx_context *result);
-  typedef uint8_t *(*get_blockhash_cb)(const void *obj, int64_t number);
-  typedef void (*log_cb)(const void *obj, const struct evm_address *address,
+  typedef struct evm_hash (*get_blockhash_cb)(const void *obj, int64_t number);
+  typedef void (*log_cb)(const void *obj, const struct evm_address address,
                          const uint8_t *data,
                          size_t data_size,
                          const struct evm_word topics[],

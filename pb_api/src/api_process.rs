@@ -21,21 +21,23 @@
 
 #![allow(dead_code)]
 #![allow(non_snake_case)]
-use aion_rpc::traits::Pb;
-use std::sync::Arc;
-use pb_api_util::*;
-use message::*;
-use protobuf::{ Message, ProtobufEnum};
-use aion_types::{U256, H256};
-use aion_rpc::types::{Transaction, Block, BlockTransactions, U256 as RpcU256, H256 as RpcH256, SimpleReceipt};
-use rustc_hex::{ToHex};
-use acore::transaction::local_transactions::TxIoMessage;
-use io::{IoService, IoHandler};
-use tx_pending_status::TxPendingStatus;
-use std::collections::HashMap;
-use parking_lot::RwLock;
-use crossbeam::queue::MsQueue;
 use super::LOG_TARGET;
+use acore::transaction::local_transactions::TxIoMessage;
+use aion_rpc::traits::Pb;
+use aion_rpc::types::{
+    Block, BlockTransactions, H256 as RpcH256, SimpleReceipt, Transaction, U256 as RpcU256,
+};
+use aion_types::{H256, U256};
+use crossbeam::queue::MsQueue;
+use io::{IoHandler, IoService};
+use message::*;
+use parking_lot::RwLock;
+use pb_api_util::*;
+use protobuf::{Message, ProtobufEnum};
+use rustc_hex::ToHex;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tx_pending_status::TxPendingStatus;
 
 const API_VER: u8 = 2;
 const API_REQHEADER_LEN: usize = 4;
@@ -43,7 +45,7 @@ const TX_HASH_LEN: usize = 32;
 const ACCOUNT_CREATE_LIMIT: usize = 100;
 
 macro_rules! api_try {
-    ($expr: expr) => {
+    ($expr:expr) => {
         match $expr {
             Ok(val) => val,
             Err(_) => {

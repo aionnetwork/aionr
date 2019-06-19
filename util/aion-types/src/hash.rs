@@ -113,7 +113,7 @@ impl<'a> From<&'a H160> for H256 {
 }
 
 macro_rules! impl_serde {
-    ($name: ident, $len: expr) => {
+    ($name:ident, $len:expr) => {
         #[cfg(feature = "serialize")]
         impl Serialize for $name {
             fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

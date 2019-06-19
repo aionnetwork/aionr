@@ -54,10 +54,10 @@ use helpers::dispatch::{FullDispatcher, default_gas_price};
 use helpers::accounts::unwrap_provider;
 use traits::{Eth, Pb};
 use types::{
-    Block, BlockTransactions, BlockNumber, Bytes, SyncStatus,
-    Transaction, CallRequest, Index, Filter, Log, Receipt, Work,
-    H64 as RpcH64, H256 as RpcH256, U256 as RpcU256, U128 as RpcU128, H128 as RpcH128,
-    Contract, ContractInfo, Abi, AbiIO, SyncInfo, AcitvePeerInfo, PbSyncInfo, SimpleReceipt, SimpleReceiptLog
+    Block, BlockTransactions, BlockNumber, Bytes, SyncStatus, Transaction, CallRequest, Index,
+    Filter, Log, Receipt, Work, H64 as RpcH64, H256 as RpcH256, U256 as RpcU256, U128 as RpcU128,
+    H128 as RpcH128, Contract, ContractInfo, Abi, AbiIO, SyncInfo, AcitvePeerInfo, PbSyncInfo,
+    SimpleReceipt, SimpleReceiptLog,
 };
 
 // const EXTRA_INFO_PROOF: &'static str = "Object exists in in blockchain (fetched earlier), extra_info is always available if object exists; qed";

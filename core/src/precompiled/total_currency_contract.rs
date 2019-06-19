@@ -21,8 +21,7 @@
 
 use super::builtin::{BuiltinExt, BuiltinContract, BuiltinParams};
 use aion_types::{U256, H128, U128, H256, Address};
-use vms::{ReturnData, EvmStatusCode};
-use vms::vm::ExecutionResult;
+use types::vms::{ExecutionResult, ExecStatus, ReturnData};
 use key::{Ed25519Signature, public_to_address_ed25519, verify_signature_ed25519};
 
 /// A pre-compiled contract for retrieving and updating the total amount of currency.
@@ -50,9 +49,10 @@ impl TotalCurrencyContract {
     fn fail(&self, err_msg: String) -> ExecutionResult {
         ExecutionResult {
             gas_left: U256::zero(),
-            status_code: EvmStatusCode::Failure,
+            status_code: ExecStatus::Failure,
             return_data: ReturnData::empty(),
             exception: err_msg,
+            state_root: H256::default(),
         }
     }
 
@@ -61,9 +61,10 @@ impl TotalCurrencyContract {
         let length: usize = result.len();
         ExecutionResult {
             gas_left: U256::zero(),
-            status_code: EvmStatusCode::Success,
+            status_code: ExecStatus::Success,
             return_data: ReturnData::new(result, 0, length),
             exception: String::default(),
+            state_root: H256::default(),
         }
     }
 
@@ -124,9 +125,10 @@ impl TotalCurrencyContract {
         ext.set_storage(chain_id, H128::from(final_value));
         ExecutionResult {
             gas_left: U256::zero(),
-            status_code: EvmStatusCode::Success,
+            status_code: ExecStatus::Success,
             return_data: ReturnData::empty(),
             exception: String::default(),
+            state_root: H256::default(),
         }
     }
 }
@@ -206,7 +208,7 @@ impl BuiltinContract for TotalCurrencyContract {
 mod tests {
     use std::collections::BTreeMap;
     use aion_types::{H128, U128, H256, U256, Address};
-    use vms::EvmStatusCode;
+    use types::vms::ExecStatus;
     use super::TotalCurrencyContract;
     use precompiled::builtin::{BuiltinParams, BuiltinContract, BuiltinExt, BuiltinContext};
     use key::{sign_ed25519, Ed25519Secret, Ed25519KeyPair};
@@ -318,7 +320,7 @@ mod tests {
         let contract = get_total_currency_contract();
         let input = [0u8]; // input = chain_id
         let result = contract.execute(&mut get_ext(), &input);
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
     }
 
     #[test]
@@ -326,7 +328,7 @@ mod tests {
         let contract = get_total_currency_contract();
         let input = []; // empty input size
         let result = contract.execute(&mut get_ext(), &input);
-        assert!(result.status_code == EvmStatusCode::Failure);
+        assert!(result.status_code == ExecStatus::Failure);
         println!("error: {}", result.exception);
     }
 
@@ -340,13 +342,13 @@ mod tests {
         let input_vector = construct_update_input(0u8, 0u8, amount);
 
         let result = contract.execute(&mut ext, &input_vector.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
 
         let query_input = [0u8];
         let query_result = { contract.execute(&mut ext, &query_input) };
-        assert!(query_result.status_code == EvmStatusCode::Success);
+        assert!(query_result.status_code == ExecStatus::Success);
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             amount
         );
     }
@@ -360,13 +362,13 @@ mod tests {
         let input_vector = construct_update_input(0u8, 0u8, amount);
 
         let result = contract.execute(&mut ext, &input_vector.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
 
         let query_input = [1u8];
         let query_result = { contract.execute(&mut ext, &query_input) };
-        assert!(query_result.status_code == EvmStatusCode::Success);
+        assert!(query_result.status_code == ExecStatus::Success);
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             0u64
         );
     }
@@ -380,19 +382,19 @@ mod tests {
         let input_vector = construct_update_input(0u8, 0u8, amount);
 
         let mut result = contract.execute(&mut ext, &input_vector.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         result = contract.execute(&mut ext, &input_vector.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         result = contract.execute(&mut ext, &input_vector.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         result = contract.execute(&mut ext, &input_vector.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
 
         let query_input = [0u8];
         let query_result = { contract.execute(&mut ext, &query_input) };
-        assert!(query_result.status_code == EvmStatusCode::Success);
+        assert!(query_result.status_code == ExecStatus::Success);
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             amount * 4
         );
     }
@@ -405,7 +407,7 @@ mod tests {
         let mut input_vector = construct_update_input(0u8, 0u8, amount);
         input_vector.truncate(100);
         let result = contract.execute(&mut ext, &input_vector.as_slice());
-        assert!(result.status_code == EvmStatusCode::Failure);
+        assert!(result.status_code == ExecStatus::Failure);
         println!("error: {}", result.exception);
     }
 
@@ -431,7 +433,7 @@ mod tests {
         let amount = 1000u64;
         let input_vector = construct_update_input(0u8, 0u8, amount);
         let result = contract.execute(&mut ext, &input_vector.as_slice());
-        assert!(result.status_code == EvmStatusCode::Failure);
+        assert!(result.status_code == ExecStatus::Failure);
         println!("error: {}", result.exception);
     }
 
@@ -444,7 +446,7 @@ mod tests {
         let input_slice = input_vector.as_mut_slice();
         input_slice[30] = !input_slice[30];
         let result = contract.execute(&mut ext, &input_slice);
-        assert!(result.status_code == EvmStatusCode::Failure);
+        assert!(result.status_code == ExecStatus::Failure);
         println!("error: {}", result.exception);
     }
 
@@ -458,37 +460,37 @@ mod tests {
         let input_vector = construct_update_input(0u8, 0u8, amount);
 
         let mut result = contract.execute(&mut ext, &input_vector.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         result = contract.execute(&mut ext, &input_vector.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         result = contract.execute(&mut ext, &input_vector.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
 
         // Remove the balance
         let subtract_input = construct_update_input(0u8, 1u8, amount);
         let subtract_result = contract.execute(&mut ext, &subtract_input.as_slice());
-        assert!(subtract_result.status_code == EvmStatusCode::Success);
+        assert!(subtract_result.status_code == ExecStatus::Success);
 
         // query
         let query_input = [0u8];
         let query_result = { contract.execute(&mut ext, &query_input) };
-        assert!(query_result.status_code == EvmStatusCode::Success);
+        assert!(query_result.status_code == ExecStatus::Success);
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             amount * 2
         );
 
         // remove to zero
         let subtract_result = contract.execute(&mut ext, &subtract_input.as_slice());
-        assert!(subtract_result.status_code == EvmStatusCode::Success);
+        assert!(subtract_result.status_code == ExecStatus::Success);
         let subtract_result = contract.execute(&mut ext, &subtract_input.as_slice());
-        assert!(subtract_result.status_code == EvmStatusCode::Success);
+        assert!(subtract_result.status_code == ExecStatus::Success);
 
         // query
         let query_result = { contract.execute(&mut ext, &query_input) };
-        assert!(query_result.status_code == EvmStatusCode::Success);
+        assert!(query_result.status_code == ExecStatus::Success);
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             0u64
         );
     }
@@ -502,16 +504,16 @@ mod tests {
         let amount = 1000u64;
         let input = construct_update_input(0u8, 1u8, amount);
         let result = contract.execute(&mut ext, &input.as_slice());
-        assert!(result.status_code == EvmStatusCode::Failure);
+        assert!(result.status_code == ExecStatus::Failure);
         println!("error: {}", result.exception);
 
         // query
         let query_input = [0u8];
         let query_result = { contract.execute(&mut ext, &query_input) };
-        assert!(query_result.status_code == EvmStatusCode::Success);
-        println!("output buffer:{}", to_hex(&query_result.return_data.mem));
+        assert!(query_result.status_code == ExecStatus::Success);
+        println!("output buffer:{}", to_hex(&*query_result.return_data));
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             0u64
         );
     }
@@ -524,7 +526,7 @@ mod tests {
         // only 0 and 1 are valid.
         let input = construct_update_input(0u8, 2u8, amount);
         let result = contract.execute(&mut ext, &input.as_slice());
-        assert!(result.status_code == EvmStatusCode::Failure);
+        assert!(result.status_code == ExecStatus::Failure);
         // "signum is invalid, possible value is 0 and 1."
         println!("error: {}", result.exception);
     }
@@ -539,45 +541,45 @@ mod tests {
         let input2 = construct_update_input(16u8, 0u8, amount);
 
         let result = contract.execute(&mut ext, &input0.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         let result = contract.execute(&mut ext, &input1.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         let result = contract.execute(&mut ext, &input1.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         let result = contract.execute(&mut ext, &input2.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         let result = contract.execute(&mut ext, &input2.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         let result = contract.execute(&mut ext, &input2.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
         let result = contract.execute(&mut ext, &input2.as_slice());
-        assert!(result.status_code == EvmStatusCode::Success);
+        assert!(result.status_code == ExecStatus::Success);
 
         //query0
         let query_input = [0u8];
         let query_result = { contract.execute(&mut ext, &query_input) };
-        assert!(query_result.status_code == EvmStatusCode::Success);
-        println!("output buffer:{}", to_hex(&query_result.return_data.mem));
+        assert!(query_result.status_code == ExecStatus::Success);
+        println!("output buffer:{}", to_hex(&*query_result.return_data));
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             amount
         );
         // query2
         let query_input = [1u8];
         let query_result = { contract.execute(&mut ext, &query_input) };
-        assert!(query_result.status_code == EvmStatusCode::Success);
-        println!("output buffer:{}", to_hex(&query_result.return_data.mem));
+        assert!(query_result.status_code == ExecStatus::Success);
+        println!("output buffer:{}", to_hex(&*query_result.return_data));
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             amount * 2
         );
         // query3
         let query_input = [16u8];
         let query_result = { contract.execute(&mut ext, &query_input) };
-        assert!(query_result.status_code == EvmStatusCode::Success);
-        println!("output buffer:{}", to_hex(&query_result.return_data.mem));
+        assert!(query_result.status_code == ExecStatus::Success);
+        println!("output buffer:{}", to_hex(&*query_result.return_data));
         assert_eq!(
-            U128::from(H128::from_slice(&query_result.return_data.mem)).as_u64(),
+            U128::from(H128::from_slice(&*query_result.return_data)).as_u64(),
             amount * 4
         );
     }

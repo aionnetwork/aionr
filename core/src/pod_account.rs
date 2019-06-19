@@ -29,7 +29,7 @@ use kvdb::HashStore;
 use triehash::sec_trie_root;
 use bytes::Bytes;
 use trie::TrieFactory;
-use state::Account;
+use state::{VMAccount, AionVMAccount};
 use ajson;
 use types::account_diff::*;
 use rlp::{self, RlpStream};
@@ -53,24 +53,26 @@ pub struct PodAccount {
 impl PodAccount {
     /// Convert Account to a PodAccount.
     /// NOTE: This will silently fail unless the account is fully cached.
-    pub fn from_account(acc: &Account) -> PodAccount {
+    pub fn from_account(acc: &AionVMAccount) -> PodAccount {
         PodAccount {
             balance: *acc.balance(),
             nonce: *acc.nonce(),
             storage: acc
                 .storage_changes()
                 .iter()
+                .filter(|(_, v)| v.len() == 16)
                 .fold(BTreeMap::new(), |mut m, (k, v)| {
-                    m.insert(k.clone(), v.clone());
+                    m.insert(k.clone().as_slice().into(), v.clone().as_slice().into());
                     m
                 }),
-            storage_dword: acc.storage_changes_dword().iter().fold(
-                BTreeMap::new(),
-                |mut m, (k, v)| {
-                    m.insert(k.clone(), v.clone());
+            storage_dword: acc
+                .storage_changes()
+                .iter()
+                .filter(|(_, v)| v.len() == 32)
+                .fold(BTreeMap::new(), |mut m, (k, v)| {
+                    m.insert(k.clone().as_slice().into(), v.clone().as_slice().into());
                     m
-                },
-            ),
+                }),
             code: acc.code().map(|x| x.to_vec()),
         }
     }
@@ -310,130 +312,5 @@ pub fn diff_pod(pre: Option<&PodAccount>, post: Option<&PodAccount>) -> Option<A
             }
         }
         _ => None,
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use std::collections::BTreeMap;
-    use types::account_diff::*;
-    use super::{PodAccount, diff_pod};
-
-    #[test]
-    fn existence() {
-        let a = PodAccount {
-            balance: 69.into(),
-            nonce: 0.into(),
-            code: Some(vec![]),
-            storage: map![],
-            storage_dword: map![],
-        };
-        assert_eq!(diff_pod(Some(&a), Some(&a)), None);
-        assert_eq!(
-            diff_pod(None, Some(&a)),
-            Some(AccountDiff {
-                balance: Diff::Born(69.into()),
-                nonce: Diff::Born(0.into()),
-                code: Diff::Born(vec![]),
-                storage: map![],
-                storage_dword: map![],
-            })
-        );
-    }
-
-    #[test]
-    fn basic() {
-        let a = PodAccount {
-            balance: 69.into(),
-            nonce: 0.into(),
-            code: Some(vec![]),
-            storage: map![],
-            storage_dword: map![],
-        };
-        let b = PodAccount {
-            balance: 42.into(),
-            nonce: 1.into(),
-            code: Some(vec![]),
-            storage: map![],
-            storage_dword: map![],
-        };
-        assert_eq!(
-            diff_pod(Some(&a), Some(&b)),
-            Some(AccountDiff {
-                balance: Diff::Changed(69.into(), 42.into()),
-                nonce: Diff::Changed(0.into(), 1.into()),
-                code: Diff::Same,
-                storage: map![],
-                storage_dword: map![],
-            })
-        );
-    }
-
-    #[test]
-    fn code() {
-        let a = PodAccount {
-            balance: 0.into(),
-            nonce: 0.into(),
-            code: Some(vec![]),
-            storage: map![],
-            storage_dword: map![],
-        };
-        let b = PodAccount {
-            balance: 0.into(),
-            nonce: 1.into(),
-            code: Some(vec![0]),
-            storage: map![],
-            storage_dword: map![],
-        };
-        assert_eq!(
-            diff_pod(Some(&a), Some(&b)),
-            Some(AccountDiff {
-                balance: Diff::Same,
-                nonce: Diff::Changed(0.into(), 1.into()),
-                code: Diff::Changed(vec![], vec![0]),
-                storage: map![],
-                storage_dword: map![],
-            })
-        );
-    }
-
-    #[test]
-    fn storage() {
-        let a = PodAccount {
-            balance: 0.into(),
-            nonce: 0.into(),
-            code: Some(vec![]),
-            storage: map_into![1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 0, 6 => 0, 7 => 0],
-            storage_dword: map_into![1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 0, 6 => 0, 7 => 0],
-        };
-        let b = PodAccount {
-            balance: 0.into(),
-            nonce: 0.into(),
-            code: Some(vec![]),
-            storage: map_into![1 => 1, 2 => 3, 3 => 0, 5 => 0, 7 => 7, 8 => 0, 9 => 9],
-            storage_dword: map_into![1 => 1, 2 => 3, 3 => 0, 5 => 0, 7 => 7, 8 => 0, 9 => 9],
-        };
-        assert_eq!(
-            diff_pod(Some(&a), Some(&b)),
-            Some(AccountDiff {
-                balance: Diff::Same,
-                nonce: Diff::Same,
-                code: Diff::Same,
-                storage: map![
-                2.into() => Diff::new(2.into(), 3.into()),
-                3.into() => Diff::new(3.into(), 0.into()),
-                4.into() => Diff::new(4.into(), 0.into()),
-                7.into() => Diff::new(0.into(), 7.into()),
-                9.into() => Diff::new(0.into(), 9.into())
-            ],
-                storage_dword: map![
-                2.into() => Diff::new(2.into(), 3.into()),
-                3.into() => Diff::new(3.into(), 0.into()),
-                4.into() => Diff::new(4.into(), 0.into()),
-                7.into() => Diff::new(0.into(), 7.into()),
-                9.into() => Diff::new(0.into(), 9.into())
-            ],
-            })
-        );
     }
 }

@@ -19,7 +19,7 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
+#![warn(unused_extern_crates)]
 extern crate ethbloom as bloom;
 
 mod chain;

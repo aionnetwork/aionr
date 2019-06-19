@@ -20,44 +20,18 @@
  *
  ******************************************************************************/
 
-#![warn(missing_docs)]
-
-//! Miner module
-//! Keeps track of transactions and mined block.
-//!
-//! Usage example:
-//!
-/*
-//! ```rust
-//! extern crate ethcore;
-//! use std::env;
-//! use acore::ethereum;
-//! use acore::client::{Client, ClientConfig};
-//! use acore::miner::{Miner, MinerService};
-//!
-//! fn main() {
-//!        let miner: Miner = Miner::with_spec(&ethereum::new_foundation(&env::temp_dir()));
-//!        // get status
-//!        assert_eq!(miner.status().transactions_in_pending_queue, 0);
-//!
-//!        // Check block for sealing
-//!        //assert!(miner.sealing_block(&*client).lock().is_some());
-//! }
-//! ```
-*/
 mod miner;
 mod stratum;
 pub mod external;
 
 pub use self::miner::{Miner, MinerOptions, Banning, PendingSet};
 pub use self::stratum::{Stratum, Error as StratumError, Options as StratumOptions, NotifyWork};
-
 pub use transaction::local_transactions::Status as LocalTransactionStatus;
 
 use std::collections::{HashMap, BTreeMap};
+
 use aion_types::{H256, U256, Address};
 use bytes::Bytes;
-
 use block::ClosedBlock;
 use client::{MiningBlockChainClient};
 use error::{Error};

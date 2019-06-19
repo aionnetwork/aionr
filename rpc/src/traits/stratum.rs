@@ -24,7 +24,10 @@ use jsonrpc_core::Result;
 use aion_types::{H256, U256};
 use jsonrpc_macros::Trailing;
 
-use types::{Work, AddressValidation, Info, MiningInfo, MinerStats, TemplateParam, StratumHeader, BlockNumber};
+use types::{
+    Work, AddressValidation, Info, MiningInfo, MinerStats, TemplateParam, StratumHeader,
+    BlockNumber,
+};
 
 build_rpc_trait! {
     /// Stratum rpc interface.

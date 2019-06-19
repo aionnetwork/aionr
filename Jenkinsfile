@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-def message, lastCommit
+def message, lastCommit,tag
 
 @NonCPS
 def getCommit(){
@@ -24,9 +24,13 @@ pipeline {
         pollSCM('H/5 * * * *')
     }
 	environment{
-		JAVA_ARGS="-Dorg.apache.commons.jelly.tags.fmt.timeZone=Asia/Shanghai"
-		JENKINS_JAVA_OPTIONS="-Dorg.apache.commons.jelly.tags.fmt.timeZone=Asia/Shanghai"
+		JAVA_HOME="/run/jdk-11"
+		ANT_HOME="/run/apache-ant-1.10.5"
+		PATH="${JAVA_HOME}/bin:${ANT_HOME}/bin:${PATH}"
+		LIBRARY_PATH="${JAVA_HOME}/lib/server"
+		LD_LIBRARY_PATH="${LIBRARY_PATH}:/usr/local/lib:/run/libs"
 	}
+
 
     options {
         timeout(time: 120, unit: 'MINUTES') 
@@ -44,32 +48,34 @@ pipeline {
         stage('Build'){
             steps{
             	sh 'set -e'
-                echo "building..."
-                sh 'RUSTFLAGS="-D warnings" cargo build --release' 
-
+                echo "clean old package"
+            	sh 'rm aionr*.tar.gz || echo "no previous build packages"'
+            	sh 'rm -r package || echo "no previous build package folder"'
+            	echo 'clean compiled version.rs'
+            	sh 'rm -r target/release/build/aion-version* target/release/build/avm-* || echo "no aion-version folders exist"'
+            	echo "building..."
+                sh './resources/package.sh "aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"'
             }
         }
 		stage('Unit Test'){
 			steps{
 					sh 'ls test_results || mkdir test_results'
-					sh 'RUSTFLAGS="-D warnings" cargo +nightly test --all --no-run --release --exclude fastvm --exclude solidity'
-					
 					script{
 						try{
 							sh '''#!/bin/bash
 							set -o pipefail
-							RUSTFLAGS="-D warnings" cargo +nightly test  --all --release -- --nocapture --test-threads 1 2>&1 | tee test_results/ut_result.txt'''
+							cargo test --release --all -- --nocapture --test-threads=1 2>&1 | tee test_results/ut_result.txt'''
 							sh 'echo $?'
 							lastCommit = sh(returnStdout: true, script: 'git rev-parse HEAD | cut -c 1-8')
 							echo "${lastCommit}"
-							sh "python scripts/bench.py -l test_results/ut_result.txt -r test_results/report.html -c ${lastCommit}"
+							sh "python resources/bench.py -l test_results/ut_result.txt -r test_results/report.html -c ${lastCommit}"
 						}
 						catch(Exception e){
 							echo "${e}"
 							throw e
 						}
 					}
-					sh 'rm -rf $HOME/.aion/chains'	
+					
 			}
 		}
 		stage('RPC Test'){
@@ -77,8 +83,7 @@ pipeline {
 				sh 'set -e'
 				script{
 					try{
-						sh './scripts/run_RPCtest.sh'
-						sh 'echo $?'
+						sh './resources/run_RPCtest.sh'
 					}
 					catch(Exception e){
 						echo "${e}"
@@ -100,7 +105,7 @@ pipeline {
         }
 
         success{
-			archiveArtifacts artifacts: 'target/release/aion,test_results/*.*',fingerprint:true
+			archiveArtifacts artifacts: '*.tar.gz,test_results/*.*,target/release/aion',fingerprint:true
             slackSend channel: '#ci',
                       color: 'good',
                       message: "${currentBuild.fullDisplayName} completed successfully. Grab the generated builds at ${env.BUILD_URL}\nArtifacts: ${env.BUILD_URL}artifact/\n Check BenchTest result: ${env.BUILD_URL}artifact/test_results/report.html \nCommit: ${GIT_COMMIT}\nChanges:${message}"

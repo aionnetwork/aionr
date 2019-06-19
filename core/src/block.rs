@@ -29,20 +29,22 @@ use blake2b::BLAKE2B_NULL_RLP;
 use triehash::ordered_trie_root;
 
 use rlp::{UntrustedRlp, RlpStream, Encodable, Decodable, DecoderError};
+use types::vms::{EnvInfo, LastHashes};
 use aion_types::{H256, U256, Address};
 use ethbloom::Bloom;
 use bytes::Bytes;
 use unexpected::Mismatch;
-
-use vms::{EnvInfo, LastHashes};
-use engines::EthEngine;
+use engines::POWEquihashEngine;
 use error::{Error, BlockError};
 use factory::Factories;
 use header::{Header, Seal};
 use receipt::Receipt;
 use state::State;
 use state_db::StateDB;
-use transaction::{UnverifiedTransaction, SignedTransaction, Error as TransactionError};
+use transaction::{
+    UnverifiedTransaction, SignedTransaction, Error as TransactionError, AVM_TRANSACTION_TYPE,
+    Action,
+};
 use verification::PreverifiedBlock;
 use kvdb::KeyValueDB;
 
@@ -102,8 +104,8 @@ impl ExecutedBlock {
             transactions: Default::default(),
             receipts: Default::default(),
             transactions_set: Default::default(),
-            state: state,
-            last_hashes: last_hashes,
+            state,
+            last_hashes,
         }
     }
 
@@ -178,19 +180,13 @@ impl ::aion_machine::LiveBlock for ExecutedBlock {
     fn header(&self) -> &Header { &self.header }
 }
 
-impl ::aion_machine::Transactions for ExecutedBlock {
-    type Transaction = SignedTransaction;
-
-    fn transactions(&self) -> &[SignedTransaction] { &self.transactions }
-}
-
 /// Block that is ready for transactions to be added.
 ///
 /// It's a bit like a Vec<Transaction>, except that whenever a transaction is pushed, we execute it and
 /// maintain the system `state()`. We also archive execution receipts in preparation for later block creation.
 pub struct OpenBlock<'x> {
     block: ExecutedBlock,
-    engine: &'x EthEngine,
+    engine: &'x POWEquihashEngine,
 }
 
 /// Just like `OpenBlock`, except that we've applied `Engine::on_close_block`, finished up the non-seal header fields,
@@ -221,7 +217,7 @@ pub struct SealedBlock {
 impl<'x> OpenBlock<'x> {
     /// Create a new `OpenBlock` ready for transaction pushing.
     pub fn new(
-        engine: &'x EthEngine,
+        engine: &'x POWEquihashEngine,
         factories: Factories,
         db: StateDB,
         parent: &Header,
@@ -230,7 +226,6 @@ impl<'x> OpenBlock<'x> {
         author: Address,
         gas_range_target: (U256, U256),
         extra_data: Bytes,
-        is_epoch_begin: bool,
         kvdb: Arc<KeyValueDB>,
     ) -> Result<Self, Error>
     {
@@ -239,13 +234,13 @@ impl<'x> OpenBlock<'x> {
         let state = State::from_existing(
             db,
             parent.state_root().clone(),
-            engine.account_start_nonce(number),
+            engine.machine().account_start_nonce(number),
             factories,
             kvdb.clone(),
         )?;
         let mut r = OpenBlock {
             block: ExecutedBlock::new(state, last_hashes),
-            engine: engine,
+            engine,
         };
 
         r.block.header.set_parent_hash(parent.hash());
@@ -255,7 +250,8 @@ impl<'x> OpenBlock<'x> {
         r.set_extra_data(extra_data);
         r.block.header.note_dirty();
 
-        let gas_floor_target = cmp::max(gas_range_target.0, engine.params().min_gas_limit);
+        let gas_floor_target =
+            cmp::max(gas_range_target.0, engine.machine().params().min_gas_limit);
         let gas_ceil_target = cmp::max(gas_range_target.1, gas_floor_target);
 
         engine.machine().populate_from_parent(
@@ -267,7 +263,6 @@ impl<'x> OpenBlock<'x> {
         engine.populate_from_parent(&mut r.block.header, parent, grant_parent);
 
         engine.machine().on_new_block(&mut r.block)?;
-        engine.on_new_block(&mut r.block, is_epoch_begin)?;
 
         Ok(r)
     }
@@ -295,7 +290,7 @@ impl<'x> OpenBlock<'x> {
 
     /// Alter the extra_data for the block.
     pub fn set_extra_data(&mut self, extra_data: Bytes) {
-        let len = self.engine.maximum_extra_data_size();
+        let len = self.engine.machine().maximum_extra_data_size();
         let mut data = extra_data;
         data.resize(len, 0u8);
         self.block.header.set_extra_data(data);
@@ -304,9 +299,60 @@ impl<'x> OpenBlock<'x> {
     /// Get the environment info concerning this block.
     pub fn env_info(&self) -> EnvInfo { self.block.env_info() }
 
+    // apply avm transactions
+    pub fn apply_batch_txs(
+        &mut self,
+        txs: &[SignedTransaction],
+        h: Option<H256>,
+    ) -> Vec<Result<Receipt, Error>>
+    {
+        //TODO: deal with AVM parallelism
+        if !txs
+            .iter()
+            .filter(|t| self.block.transactions_set.contains(&t.hash()))
+            .collect::<Vec<_>>()
+            .is_empty()
+        {
+            return vec![Err(From::from(TransactionError::AlreadyImported))];
+        }
+        let env_info = self.env_info();
+        let mut idx = 0;
+        let mut receipts_results = Vec::new();
+        // avm should deal with exceptions correctly
+        for apply_result in self
+            .block
+            .state
+            .apply_batch(&env_info, self.engine.machine(), txs)
+        {
+            let result = match apply_result {
+                Ok(outcome) => {
+                    self.block
+                        .transactions_set
+                        .insert(h.unwrap_or_else(|| txs[idx].hash().clone()));
+                    self.block.transactions.push(txs[idx].clone().into());
+                    self.block
+                        .header
+                        .add_transaction_fee(&outcome.receipt.transaction_fee);
+                    self.block.receipts.push(outcome.receipt.clone());
+                    idx += 1;
+                    Ok(outcome.receipt)
+                }
+                Err(x) => Err(From::from(x)),
+            };
+
+            receipts_results.push(result);
+        }
+
+        receipts_results
+    }
+
     /// Push a transaction into the block.
     ///
     /// If valid, it will be executed, and archived together with the receipt.
+    /// This method is triggered both by sync and miner:
+    /// sync module really call push_transactions, and we do bulk pushes during sync;
+    /// however miner do not use push_transactions due to some special logic:
+    /// transaction penalisation .etc
     pub fn push_transaction(
         &mut self,
         t: SignedTransaction,
@@ -317,8 +363,31 @@ impl<'x> OpenBlock<'x> {
             return Err(From::from(TransactionError::AlreadyImported));
         }
 
+        let mut result = Vec::new();
         let env_info = self.env_info();
-        match self.block.state.apply(&env_info, self.engine.machine(), &t) {
+        debug!(target: "vm", "tx type = {:?}", t.tx_type());
+
+        let aion040fork = self
+            .engine
+            .machine()
+            .params()
+            .monetary_policy_update
+            .map_or(false, |v| self.block.header().number() >= v);
+        if aion040fork {
+            if t.tx_type() == AVM_TRANSACTION_TYPE || is_normal_or_avm_call(self, &t) {
+                result.append(&mut self.block.state.apply_batch(
+                    &env_info,
+                    self.engine.machine(),
+                    &[t.clone()],
+                ));
+            } else {
+                result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
+            }
+        } else {
+            result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
+        }
+
+        match result.pop().unwrap() {
             Ok(outcome) => {
                 self.block
                     .transactions_set
@@ -391,7 +460,7 @@ impl<'x> OpenBlock<'x> {
 
         ClosedBlock {
             block: s.block,
-            unclosed_state: unclosed_state,
+            unclosed_state,
         }
     }
 
@@ -475,13 +544,13 @@ impl ClosedBlock {
     }
 
     /// Given an engine reference, reopen the `ClosedBlock` into an `OpenBlock`.
-    pub fn reopen(self, engine: &EthEngine) -> OpenBlock {
+    pub fn reopen(self, engine: &POWEquihashEngine) -> OpenBlock {
         // revert rewards (i.e. set state back at last transaction's state).
         let mut block = self.block;
         block.state = self.unclosed_state;
         OpenBlock {
-            block: block,
-            engine: engine,
+            block,
+            engine,
         }
     }
 }
@@ -493,7 +562,12 @@ impl LockedBlock {
     /// Provide a valid seal in order to turn this into a `SealedBlock`.
     ///
     /// NOTE: This does not check the validity of `seal` with the engine.
-    pub fn seal(self, engine: &EthEngine, seal: Vec<Bytes>) -> Result<SealedBlock, BlockError> {
+    pub fn seal(
+        self,
+        engine: &POWEquihashEngine,
+        seal: Vec<Bytes>,
+    ) -> Result<SealedBlock, BlockError>
+    {
         let expected_seal_fields = engine.seal_fields(self.header());
         let mut s = self;
         if seal.len() != expected_seal_fields {
@@ -513,7 +587,7 @@ impl LockedBlock {
     /// Returns the `ClosedBlock` back again if the seal is no good.
     pub fn try_seal(
         self,
-        engine: &EthEngine,
+        engine: &POWEquihashEngine,
         seal: Vec<Bytes>,
     ) -> Result<SealedBlock, (Error, LockedBlock)>
     {
@@ -560,13 +634,12 @@ impl IsBlock for SealedBlock {
 pub fn enact(
     header: &Header,
     transactions: &[SignedTransaction],
-    engine: &EthEngine,
+    engine: &POWEquihashEngine,
     db: StateDB,
     parent: &Header,
     grant_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
-    is_epoch_begin: bool,
     kvdb: Arc<KeyValueDB>,
 ) -> Result<LockedBlock, Error>
 {
@@ -575,7 +648,7 @@ pub fn enact(
             let s = State::from_existing(
                 db.boxed_clone(),
                 parent.state_root().clone(),
-                engine.account_start_nonce(parent.number() + 1),
+                engine.machine().account_start_nonce(parent.number() + 1),
                 factories.clone(),
                 kvdb.clone(),
             )?;
@@ -583,9 +656,6 @@ pub fn enact(
                 header.number(), s.root(), header.author(), s.balance(&header.author())?);
         }
     }
-    // let s = State::from_existing(db.boxed_clone(), parent.state_root().clone(), engine.account_start_nonce(parent.number() + 1), factories.clone())?;
-    // error!(target: "enact", "num={}, root={}, author={}, author_balance={}\n",
-    //     header.number(), s.root(), header.author(), s.balance(&header.author())?);
 
     let mut b = OpenBlock::new(
         engine,
@@ -597,7 +667,6 @@ pub fn enact(
         Address::new(),
         (3141562.into(), 31415620.into()),
         vec![],
-        is_epoch_begin,
         kvdb,
     )?;
 
@@ -607,15 +676,81 @@ pub fn enact(
 }
 
 #[inline]
+fn is_normal_or_avm_call(block: &mut OpenBlock, tx: &SignedTransaction) -> bool {
+    if let Action::Call(a) = tx.action {
+        // since fastvm is executed one transaction after another,
+        // code() gets the real code of contract
+        // for avm: when creation and call are in one block
+        // code() will return None. However avm solves the dependency,
+        // call will be executed after creation, and code is retrieved by avm callback
+        let code = block.block.state.code(&a).unwrap_or(None);
+        if a == H256::from("0000000000000000000000000000000000000000000000000000000000000100")
+            || a == H256::from("0000000000000000000000000000000000000000000000000000000000000200")
+        {
+            return false;
+        } else {
+            // not builtin call
+            if let Some(c) = code {
+                debug!(target: "vm", "pre bytes = {:?}", &c[0..2]);
+                // fastvm contract in database must have header 0x60,0x50
+                return c[0..2] != [0x60u8, 0x50];
+            }
+        }
+    }
+
+    // fastvm creation and call a contract with empty code
+
+    return false;
+}
+
+#[inline]
+fn is_for_avm(block: &mut OpenBlock, tx: &SignedTransaction) -> bool {
+    // AVM creation = 0x02; normal call = 0x01
+    return tx.tx_type() == AVM_TRANSACTION_TYPE || is_normal_or_avm_call(block, tx);
+}
+
+#[inline]
 #[cfg(not(feature = "slow-blocks"))]
 fn push_transactions(
     block: &mut OpenBlock,
     transactions: &[SignedTransaction],
 ) -> Result<(), Error>
 {
-    for t in transactions {
-        block.push_transaction(t.clone(), None)?;
+    let aion040fork = block
+        .engine
+        .machine()
+        .params()
+        .monetary_policy_update
+        .map_or(false, |v| block.block.header().number() >= v);
+
+    if aion040fork {
+        let mut tx_batch = Vec::new();
+        debug!(target: "vm", "transactions = {:?}, len = {:?}", transactions, transactions.len());
+        for tx in transactions {
+            if !is_for_avm(block, tx) {
+                if tx_batch.len() >= 1 {
+                    block.apply_batch_txs(tx_batch.as_slice(), None);
+                    tx_batch.clear();
+                }
+                block.push_transaction(tx.clone(), None)?;
+            } else {
+                trace!(target: "vm", "found avm transaction");
+                tx_batch.push(tx.clone())
+            }
+        }
+
+        if !tx_batch.is_empty() {
+            block.apply_batch_txs(tx_batch.as_slice(), None);
+            tx_batch.clear();
+        }
+    } else {
+        for t in transactions {
+            block.push_transaction(t.clone(), None)?;
+        }
     }
+
+    trace!(target: "vm", "push transactions done");
+
     Ok(())
 }
 
@@ -654,13 +789,12 @@ fn push_transactions(
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 pub fn enact_verified(
     block: &PreverifiedBlock,
-    engine: &EthEngine,
+    engine: &POWEquihashEngine,
     db: StateDB,
     parent: &Header,
     grant_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
-    is_epoch_begin: bool,
     kvdb: Arc<KeyValueDB>,
 ) -> Result<LockedBlock, Error>
 {
@@ -673,188 +807,6 @@ pub fn enact_verified(
         grant_parent,
         last_hashes,
         factories,
-        is_epoch_begin,
         kvdb,
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use tests::helpers::*;
-    use super::*;
-    use engines::EthEngine;
-    use vms::LastHashes;
-    use error::Error;
-    use header::Header;
-    use factory::Factories;
-    use state_db::StateDB;
-    use views::BlockView;
-    use aion_types::Address;
-    use std::sync::Arc;
-    use transaction::SignedTransaction;
-    use kvdb::MemoryDBRepository;
-
-    /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
-    fn enact_bytes(
-        block_bytes: &[u8],
-        engine: &EthEngine,
-        db: StateDB,
-        parent: &Header,
-        _grant_parent: Option<&Header>,
-        last_hashes: Arc<LastHashes>,
-        factories: Factories,
-    ) -> Result<LockedBlock, Error>
-    {
-        let block = BlockView::new(block_bytes);
-        let header = block.header();
-        let transactions: Result<Vec<_>, Error> = block
-            .transactions()
-            .into_iter()
-            .map(SignedTransaction::new)
-            .map(|r| r.map_err(Into::into))
-            .collect();
-        let transactions = transactions?;
-
-        {
-            if ::log::max_log_level() >= ::log::LogLevel::Trace {
-                let s = State::from_existing(
-                    db.boxed_clone(),
-                    parent.state_root().clone(),
-                    engine.account_start_nonce(parent.number() + 1),
-                    factories.clone(),
-                    Arc::new(MemoryDBRepository::new()),
-                )?;
-                trace!(target: "enact", "num={}, root={}, author={}, author_balance={}\n",
-                    header.number(), s.root(), header.author(), s.balance(&header.author())?);
-            }
-        }
-
-        let mut b = OpenBlock::new(
-            engine,
-            factories,
-            db,
-            parent,
-            None,
-            last_hashes,
-            Address::new(),
-            (3141562.into(), 31415620.into()),
-            vec![],
-            false,
-            Arc::new(MemoryDBRepository::new()),
-        )?;
-
-        b.populate_from(&header);
-        b.push_transactions(&transactions)?;
-
-        Ok(b.close_and_lock())
-    }
-
-    /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header. Seal the block afterwards
-    fn enact_and_seal(
-        block_bytes: &[u8],
-        engine: &EthEngine,
-        db: StateDB,
-        parent: &Header,
-        last_hashes: Arc<LastHashes>,
-        factories: Factories,
-    ) -> Result<SealedBlock, Error>
-    {
-        let header = BlockView::new(block_bytes).header_view();
-        Ok(enact_bytes(
-            block_bytes,
-            engine,
-            db,
-            parent,
-            None,
-            last_hashes,
-            factories,
-        )?
-        .seal(engine, header.seal())?)
-    }
-
-    #[test]
-    fn open_block() {
-        use spec::*;
-        let spec = Spec::new_test();
-        let genesis_header = spec.genesis_header();
-        let db = spec
-            .ensure_db_good(get_temp_state_db(), &Default::default())
-            .unwrap();
-        let last_hashes = Arc::new(vec![genesis_header.hash()]);
-        let b = OpenBlock::new(
-            &*spec.engine,
-            Default::default(),
-            db,
-            &genesis_header,
-            None,
-            last_hashes,
-            Address::zero(),
-            (3141562.into(), 31415620.into()),
-            vec![],
-            false,
-            Arc::new(MemoryDBRepository::new()),
-        )
-        .unwrap();
-        let b = b.close_and_lock();
-        let _ = b.seal(&*spec.engine, vec![]);
-    }
-
-    #[test]
-    fn enact_block() {
-        use spec::*;
-        let spec = Spec::new_test();
-        let engine = &*spec.engine;
-        let genesis_header = spec.genesis_header();
-
-        let db = spec
-            .ensure_db_good(get_temp_state_db(), &Default::default())
-            .unwrap();
-        let last_hashes = Arc::new(vec![genesis_header.hash()]);
-        let b = OpenBlock::new(
-            engine,
-            Default::default(),
-            db,
-            &genesis_header,
-            None,
-            last_hashes.clone(),
-            Address::zero(),
-            (3141562.into(), 31415620.into()),
-            vec![],
-            false,
-            Arc::new(MemoryDBRepository::new()),
-        )
-        .unwrap()
-        .close_and_lock()
-        .seal(engine, vec![])
-        .unwrap();
-        let orig_bytes = b.rlp_bytes();
-        let orig_db = b.drain();
-
-        let db = spec
-            .ensure_db_good(get_temp_state_db(), &Default::default())
-            .unwrap();
-        let e = enact_and_seal(
-            &orig_bytes,
-            engine,
-            db,
-            &genesis_header,
-            last_hashes,
-            Default::default(),
-        )
-        .unwrap();
-
-        assert_eq!(e.rlp_bytes(), orig_bytes);
-
-        let db = e.drain();
-        assert_eq!(orig_db.journal_db().keys(), db.journal_db().keys());
-        assert!(
-            orig_db
-                .journal_db()
-                .keys()
-                .iter()
-                .filter(|k| orig_db.journal_db().get(k.0) != db.journal_db().get(k.0))
-                .next()
-                == None
-        );
-    }
 }

@@ -6,12 +6,10 @@ authors = ["Aion Foundation <admin@aion.network>"]
 
 [dependencies]
 elastic-array = "0.9.0"
-acore-bytes = { path = "../../util/bytes" }
 aion-types = { path = "../../util/aion-types"}
 log = "0.3"
 num_cpus = "1.0"
 parity-rocksdb = "0.5.0"
-rand = "0.4"
 multimap = "0.4.0"
 error-chain = { version = "0.12", default-features = false }
 regex = "0.2"

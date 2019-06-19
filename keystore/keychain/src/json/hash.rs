@@ -27,7 +27,7 @@ use serde::de::{Visitor, Error as SerdeError};
 use super::Error;
 
 macro_rules! impl_hash {
-    ($name: ident, $size: expr) => {
+    ($name:ident, $size:expr) => {
         pub struct $name([u8; $size]);
 
         impl fmt::Debug for $name {

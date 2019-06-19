@@ -19,39 +19,21 @@
  *
  ******************************************************************************/
 
-#[macro_use]
-pub mod factory;
-mod vmtype;
+#![warn(unused_extern_crates)]
 
-extern crate bit_set;
+extern crate types;
 extern crate aion_types;
-extern crate parking_lot;
-extern crate heapsize;
-extern crate blake2b as hash;
-extern crate memory_cache;
-extern crate acore_bytes as bytes;
-extern crate common_types as types;
-extern crate ajson;
 extern crate fastvm;
+extern crate avm;
 extern crate libc;
 #[macro_use]
 extern crate log;
 
-pub use self::factory::FastVMFactory;
-pub use self::vmtype::VMType;
-pub use fastvm::vm::{
-    self,
-    Vm,
-    ActionParams,
-    CallType,
-    ActionValue,
-    ParamsType,
-    Ext,
-    Error,
-    ReturnData
-};
+#[macro_use]
+mod factory;
+mod vmtype;
 
-pub use fastvm::EvmStatusCode;
-
-pub use fastvm::env_info::{EnvInfo, LastHashes};
+pub use factory::{Factory, FastVMFactory, AVMFactory};
+pub use vmtype::VMType;
+pub use fastvm::vm::{self, Error};
 pub use fastvm::basetypes::constants;

@@ -1,25 +1,23 @@
 [package]
 name = "fastvm"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Camus Qiu <camus@aion.network>"]
 build = "build.rs"
 
 [dependencies]
 libc = "0.2.0"
-rand = "0.5.*"
 time = "0.1"
 num = "*"
 serde_derive = "1.0.0"
 serde_json = "*"
 bincode = "1.0.0"
 num-bigint = "0.2"
+types = { path = "../../types" }
 aion-types = { path = "../../util/aion-types"}
-acore-bytes = { path = "../../util/bytes" }
-ajson = { path = "../../json" }
-rlp = { path = "../../util/rlp" }
 patricia-trie = { path = "../../util/patricia_trie" }
-common-types = { path = "../../core/types" }
-blake2b = { path = "../../util/blake2b" }
 log = "0.3"
-rustc-hex = "1.0"
-db = { path = "../../db/core" }
+
+[dev-dependencies]
+rand = "0.4.3"
+rustc-hex = "2.0.1"
+rlp = { path = "../../util/rlp" }

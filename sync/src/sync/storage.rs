@@ -42,6 +42,7 @@ lazy_static! {
     static ref DOWNLOADED_BLOCKS: Storage<Mutex<VecDeque<BlocksWrapper>>> = Storage::new();
     static ref REQUESTED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, SystemTime>>> = Storage::new();
     static ref IMPORTED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
+    static ref DOWNLOADED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
     static ref SENT_TRANSACTION_HASHES: Storage<Mutex<LruCache<H256, u8>>> = Storage::new();
     static ref RECEIVED_TRANSACTIONS: Storage<Mutex<VecDeque<Vec<u8>>>> = Storage::new();
     static ref STAGED_BLOCKS: Storage<Mutex<LruCache<H256, Vec<Vec<u8>>>>> = Storage::new();
@@ -49,7 +50,7 @@ lazy_static! {
 }
 
 pub const MAX_DOWNLOADED_HEADERS_COUNT: usize = 4096;
-const MAX_CACHED_BLOCK_HASHES: usize = 128;
+const MAX_CACHED_BLOCK_HASHES: usize = 32;
 const MAX_CACHED_TRANSACTION_HASHES: usize = 20480;
 const MAX_RECEIVED_TRANSACTIONS_COUNT: usize = 20480;
 
@@ -98,6 +99,7 @@ impl SyncStorage {
             let mut downloaded_blocks = VecDeque::new();
             let mut requested_block_hashes = LruCache::new(MAX_CACHED_BLOCK_HASHES);
             let mut imported_block_hashes = LruCache::new(MAX_CACHED_BLOCK_HASHES);
+            let mut downloaded_block_hashes = LruCache::new(MAX_CACHED_BLOCK_HASHES * 2);
             let mut sent_transaction_hases = LruCache::new(MAX_CACHED_TRANSACTION_HASHES);
             let mut received_transactions = VecDeque::new();
             let mut staged_blocks = LruCache::new(MAX_CACHED_BLOCK_HASHES);
@@ -112,6 +114,7 @@ impl SyncStorage {
             DOWNLOADED_BLOCKS.set(Mutex::new(downloaded_blocks));
             REQUESTED_BLOCK_HASHES.set(Mutex::new(requested_block_hashes));
             IMPORTED_BLOCK_HASHES.set(Mutex::new(imported_block_hashes));
+            DOWNLOADED_BLOCK_HASHES.set(Mutex::new(downloaded_block_hashes));
             SENT_TRANSACTION_HASHES.set(Mutex::new(sent_transaction_hases));
             RECEIVED_TRANSACTIONS.set(Mutex::new(received_transactions));
             STAGED_BLOCKS.set(Mutex::new(staged_blocks));
@@ -268,6 +271,8 @@ impl SyncStorage {
             if let Ok(ref mut downloaded_headers) = lock {
                 if downloaded_headers.len() <= MAX_DOWNLOADED_HEADERS_COUNT {
                     downloaded_headers.push_back(hw);
+                } else {
+                    warn!(target: "sync", "too many downloaded_headers...");
                 }
             } else {
                 warn!(target: "sync", "downloaded_headers_mutex lock failed");
@@ -372,6 +377,25 @@ impl SyncStorage {
             imported_block_hashes.contains_key(hash)
         } else {
             warn!(target: "sync", "imported_block_hashes_mutex lock failed");
+            false
+        }
+    }
+
+    pub fn get_downloaded_block_hashes() -> &'static Mutex<LruCache<H256, u8>> {
+        return DOWNLOADED_BLOCK_HASHES.get();
+    }
+
+    pub fn clear_downloaded_block_hashes() {
+        if let Ok(ref mut downloaded_block_hashes) = DOWNLOADED_BLOCK_HASHES.get().lock() {
+            downloaded_block_hashes.clear();
+        }
+    }
+
+    pub fn is_downloaded_block_hashes(hash: &H256) -> bool {
+        if let Ok(ref mut downloaded_block_hashes) = DOWNLOADED_BLOCK_HASHES.get().lock() {
+            downloaded_block_hashes.contains_key(hash)
+        } else {
+            warn!(target: "sync", "downloaded_block_hashes lock failed");
             false
         }
     }

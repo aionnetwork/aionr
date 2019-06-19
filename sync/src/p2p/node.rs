@@ -258,6 +258,7 @@ impl Node {
     }
 
     pub fn get_ip_addr(&self) -> String { self.ip_addr.get_addr() }
+
     pub fn get_display_ip_addr(&self) -> String { self.ip_addr.get_display_addr() }
 
     pub fn is_over_repeated_threshold(&self) -> bool { return self.repeated > 5; }

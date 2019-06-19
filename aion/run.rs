@@ -53,6 +53,7 @@ use sync::sync::SyncConfig;
 use tokio;
 use tokio::prelude::*;
 use user_defaults::UserDefaults;
+
 // Pops along with error messages when a password is missing or invalid.
 const VERIFY_PASSWORD_HINT: &'static str = "Make sure valid password is present in files passed \
                                             using `--password` or in the configuration file.";
@@ -82,31 +83,8 @@ pub struct RunCmd {
     pub wal: bool,
     pub vm_type: VMType,
     pub stratum: StratumOptions,
-    pub check_seal: bool,
     pub verifier_settings: VerifierSettings,
     pub no_persistent_txqueue: bool,
-}
-
-// node info fetcher for the local store.
-struct FullNodeInfo {
-    miner: Option<Arc<Miner>>, // TODO: only TXQ needed, just use that after decoupling.
-}
-
-impl ::local_store::NodeInfo for FullNodeInfo {
-    fn pending_transactions(&self) -> Vec<::acore::transaction::PendingTransaction> {
-        let miner = match self.miner.as_ref() {
-            Some(m) => m,
-            None => return Vec::new(),
-        };
-
-        let local_txs = miner.local_transactions();
-        miner
-            .pending_transactions()
-            .into_iter()
-            .chain(miner.future_transactions())
-            .filter(|tx| local_txs.contains_key(&tx.hash()))
-            .collect()
-    }
 }
 
 pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
@@ -138,11 +116,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // create dirs used by aion
     cmd.dirs.create_dirs()?;
-
-    // run in daemon mode
-    if let Some(pid_file) = cmd.daemon {
-        daemonize(pid_file)?;
-    }
 
     //print out running aion environment
     print_running_environment(&cmd.spec, &spec.data_dir, &cmd.dirs, &db_dirs);
@@ -189,7 +162,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         algorithm,
         cmd.pruning_history,
         cmd.pruning_memory,
-        cmd.check_seal,
     );
 
     client_config.queue.verifier_settings = cmd.verifier_settings;
@@ -237,53 +209,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // drop the spec to free up genesis state.
     drop(spec);
-
-    // initialize the local node information store.
-    let store = {
-        let db = service.db();
-        let node_info = FullNodeInfo {
-            miner: match cmd.no_persistent_txqueue {
-                true => None,
-                false => Some(miner.clone()),
-            },
-        };
-
-        let store = ::local_store::create(db, ::acore::db::COL_NODE_INFO, node_info);
-
-        if cmd.no_persistent_txqueue {
-            info!(target: "run","Running without a persistent transaction queue.");
-
-            if let Err(e) = store.clear() {
-                warn!(target: "run","Error clearing persistent transaction queue: {}", e);
-            }
-        }
-
-        // re-queue pending transactions.
-        match store.pending_transactions() {
-            Ok(pending) => {
-                let len = pending.len();
-                if len > 0 {
-                    info!(target: "run","Importing the local pending transactions ...");
-                    for pending_tx in pending {
-                        if let Err(e) = miner.import_own_transaction(&*client, pending_tx) {
-                            warn!(target: "run","Error importing saved transaction: {}", e)
-                        }
-                    }
-                    info!(target: "run","Import completed, total = {}", len);
-                }
-            }
-            Err(e) => {
-                warn!(target: "run","Error loading cached pending transactions from disk: {}", e)
-            }
-        }
-
-        Arc::new(store)
-    };
-
-    // register it as an IO service to update periodically.
-    service
-        .register_io_handler(store)
-        .map_err(|_| "Unable to register local store handler".to_owned())?;
 
     // create external miner
     let external_miner = Arc::new(ExternalMiner::default());
@@ -459,23 +384,6 @@ pub fn execute(cmd: RunCmd) -> Result<(), String> {
     wait(execute_impl(cmd))
 }
 
-#[cfg(not(windows))]
-fn daemonize(pid_file: String) -> Result<(), String> {
-    extern crate daemonize;
-
-    daemonize::Daemonize::new()
-        .pid_file(pid_file)
-        .chown_pid_file(true)
-        .start()
-        .map(|_| ())
-        .map_err(|e| format!("Couldn't daemonize; {}", e))
-}
-
-#[cfg(windows)]
-fn daemonize(_pid_file: String) -> Result<(), String> {
-    Err("daemon is no supported on windows".into())
-}
-
 fn print_running_environment(
     spec: &SpecType,
     spec_data_dir: &String,
@@ -495,7 +403,7 @@ fn print_running_environment(
         info!(target: "run", "Start without config.");
     }
     match spec {
-        SpecType::Foundation => {
+        SpecType::Default => {
             info!(target: "run", "Load built-in Mainnet Genesis Spec.");
         }
         SpecType::Custom(ref filename) => {

@@ -29,7 +29,7 @@ use memory_cache::MemoryLruCache;
 use journaldb::JournalDB;
 use kvdb::{KeyValueDB, DBTransaction, HashStore};
 use aion_types::{H256, Address};
-use state::{self, Account};
+use state::{self, AionVMAccount};
 use header::BlockNumber;
 use blake2b::blake2b;
 use parking_lot::Mutex;
@@ -57,7 +57,7 @@ struct AccountCache {
     /// DB Account cache. `None` indicates that account is known to be missing.
     // When changing the type of the values here, be sure to update `mem_used` and
     // `new`.
-    accounts: LruCache<Address, Option<Account>>,
+    accounts: LruCache<Address, Option<AionVMAccount>>,
     /// Information on the modifications in recently committed blocks; specifically which addresses
     /// changed in which block. Ordered by block number.
     modifications: VecDeque<BlockChanges>,
@@ -133,7 +133,7 @@ impl StateDB {
         let bloom = Self::load_bloom(&**db.backing());
         let acc_cache_size = cache_size * ACCOUNT_CACHE_RATIO / 100;
         let code_cache_size = cache_size - acc_cache_size;
-        let cache_items = acc_cache_size / ::std::mem::size_of::<Option<Account>>();
+        let cache_items = acc_cache_size / ::std::mem::size_of::<Option<AionVMAccount>>();
 
         StateDB {
             db: db,
@@ -392,7 +392,7 @@ impl StateDB {
         self.db.mem_used() + {
             let accounts = self.account_cache.lock().accounts.len();
             let code_size = self.code_cache.lock().current_size();
-            code_size + accounts * ::std::mem::size_of::<Option<Account>>()
+            code_size + accounts * ::std::mem::size_of::<Option<AionVMAccount>>()
         }
     }
 
@@ -455,7 +455,7 @@ impl state::Backend for StateDB {
 
     fn as_hashstore_mut(&mut self) -> &mut HashStore { self.db.as_hashstore_mut() }
 
-    fn add_to_account_cache(&mut self, addr: Address, data: Option<Account>, modified: bool) {
+    fn add_to_account_cache(&mut self, addr: Address, data: Option<AionVMAccount>, modified: bool) {
         self.local_cache.push(CacheQueueItem {
             address: addr,
             account: SyncAccount(data),
@@ -469,7 +469,7 @@ impl state::Backend for StateDB {
         cache.insert(hash, code);
     }
 
-    fn get_cached_account(&self, addr: &Address) -> Option<Option<Account>> {
+    fn get_cached_account(&self, addr: &Address) -> Option<Option<AionVMAccount>> {
         let mut cache = self.account_cache.lock();
         if !Self::is_allowed(addr, &self.parent_hash, &cache.modifications) {
             return None;
@@ -487,7 +487,7 @@ impl state::Backend for StateDB {
     }
 
     fn get_cached<F, U>(&self, a: &Address, f: F) -> Option<U>
-    where F: FnOnce(Option<&mut Account>) -> U {
+    where F: FnOnce(Option<&mut AionVMAccount>) -> U {
         let mut cache = self.account_cache.lock();
         if !Self::is_allowed(a, &self.parent_hash, &cache.modifications) {
             return None;
@@ -510,10 +510,10 @@ impl state::Backend for StateDB {
 }
 
 /// Sync wrapper for the account.
-struct SyncAccount(Option<Account>);
+struct SyncAccount(Option<AionVMAccount>);
 /// That implementation is safe because account is never modified or accessed in any way.
 /// We only need `Sync` here to allow `StateDb` to be kept in a `RwLock`.
-/// `Account` is `!Sync` by default because of `RefCell`s inside it.
+/// `AionVNAccount` is `!Sync` by default because of `RefCell`s inside it.
 unsafe impl Sync for SyncAccount {}
 
 #[cfg(test)]
@@ -521,7 +521,7 @@ mod tests {
     use aion_types::{H256, U256, Address};
     use kvdb::DBTransaction;
     use tests::helpers::*;
-    use state::{Account, Backend};
+    use state::{VMAccount, Backend, AionVMAccount};
     use logger::init_log;
 
     #[test]
@@ -543,7 +543,11 @@ mod tests {
         // blocks  [ 3a(c) 2a(c) 2b 1b 1a(c) 0 ]
         // balance [ 5     5     4  3  2     2 ]
         let mut s = state_db.boxed_clone_canon(&root_parent);
-        s.add_to_account_cache(address, Some(Account::new_basic(2.into(), 0.into())), false);
+        s.add_to_account_cache(
+            address,
+            Some(AionVMAccount::new_basic(2.into(), 0.into())),
+            false,
+        );
         s.journal_under(&mut batch, 0, &h0).unwrap();
         s.sync_cache(&[], &[], true);
 
@@ -552,17 +556,29 @@ mod tests {
         s.sync_cache(&[], &[], true);
 
         let mut s = state_db.boxed_clone_canon(&h0);
-        s.add_to_account_cache(address, Some(Account::new_basic(3.into(), 0.into())), true);
+        s.add_to_account_cache(
+            address,
+            Some(AionVMAccount::new_basic(3.into(), 0.into())),
+            true,
+        );
         s.journal_under(&mut batch, 1, &h1b).unwrap();
         s.sync_cache(&[], &[], false);
 
         let mut s = state_db.boxed_clone_canon(&h1b);
-        s.add_to_account_cache(address, Some(Account::new_basic(4.into(), 0.into())), true);
+        s.add_to_account_cache(
+            address,
+            Some(AionVMAccount::new_basic(4.into(), 0.into())),
+            true,
+        );
         s.journal_under(&mut batch, 2, &h2b).unwrap();
         s.sync_cache(&[], &[], false);
 
         let mut s = state_db.boxed_clone_canon(&h1a);
-        s.add_to_account_cache(address, Some(Account::new_basic(5.into(), 0.into())), true);
+        s.add_to_account_cache(
+            address,
+            Some(AionVMAccount::new_basic(5.into(), 0.into())),
+            true,
+        );
         s.journal_under(&mut batch, 2, &h2a).unwrap();
         s.sync_cache(&[], &[], true);
 
