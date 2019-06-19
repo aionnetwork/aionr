@@ -59,7 +59,7 @@ impl Default for HttpConfiguration {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct IpcConfiguration {
     pub enabled: bool,
     pub socket_addr: String,
