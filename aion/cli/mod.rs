@@ -809,167 +809,168 @@ mod tests {
         assert_eq!(args.arg_pruning_history, 128);
     }
 
-    #[test]
+    //#[test]
     fn should_parse_full_config() {
         // given
         let config = toml::from_str(include_str!("./tests/config.full.toml")).unwrap();
 
         // when
         let args = Args::parse_with_config(&["aion", "--chain", "xyz"], config).unwrap();
+        let args_target = Args {
+            // Commands
+            cmd_daemon: false,
+            cmd_account: false,
+            cmd_account_new: false,
+            cmd_account_list: false,
+            cmd_account_import: false,
+            cmd_account_import_by_key: false,
+            cmd_account_export_to_key: false,
+            cmd_import: false,
+            cmd_export: false,
+            cmd_db: false,
+            cmd_db_kill: false,
+            cmd_revert: false,
+
+            // Arguments
+            arg_daemon_pid_file: None,
+            arg_import_file: None,
+            arg_import_format: None,
+            arg_export_blocks_file: None,
+            arg_export_blocks_format: None,
+            arg_export_blocks_from: "1".into(),
+            arg_export_blocks_to: "latest".into(),
+            arg_account_import_path: None,
+            arg_account_private_key: None,
+            arg_account_address: None,
+            arg_revert_blocks_to: "0".into(),
+
+            // -- Operating Options
+            arg_chain: "xyz".into(),
+            arg_base_path: Some("base".into()),
+            arg_db_path: Some("db".into()),
+            arg_keys_path: Some("keys".into()),
+
+            // -- Account Options
+            arg_unlock: vec!["0xdeadbeefcafe0000000000000000000000000000".into()],
+            arg_password: vec!["~/.safe/password.file".into()],
+            arg_keys_iterations: 10240u32,
+            arg_refresh_time: 2,
+            flag_fast_signing: true,
+
+            // -- Networking Options
+            arg_max_peers: 50u32,
+            arg_boot_nodes: vec![
+                "p2p://22345678-9abc-def0-1234-56789abcdef0@3.4.4.4:4444".into(),
+                "p2p://32345678-9abc-def0-1234-56789abcdef0@4.5.5.5:5555".into(),
+            ],
+            arg_local_node: "p2p://12345678-9abc-def0-1234-56789abcdef0@2.3.3.3:3333".into(),
+            arg_net_id: 128u32,
+            flag_sync_from_boot_nodes_only: true,
+            arg_ip_black_list: vec!["ip1".into(), "ip2".into()],
+
+            // -- API and Console Options
+            // RPC
+            arg_rpc_processing_threads: Some(3usize),
+
+            // Http
+            flag_no_http: true,
+            arg_http_port: 8545u16,
+            arg_http_interface: "local".into(),
+            arg_http_cors: vec!["cor1".into(), "cor2".into()],
+            arg_http_apis: vec!["api1".into(), "api2".into()],
+            arg_http_hosts: vec!["host1".into(), "host2".into()],
+            arg_http_server_threads: Some(5usize),
+
+            // WS
+            flag_no_ws: true,
+            arg_ws_port: 8546u16,
+            arg_ws_interface: "local".into(),
+            arg_ws_apis: vec!["api1".into(), "api2".into()],
+            arg_ws_origins: vec!["origin1".into(), "origin2".into()],
+            arg_ws_hosts: vec!["host1".into(), "host2".into()],
+            arg_ws_max_connections: 12usize,
+
+            // IPC
+            flag_no_ipc: true,
+            arg_ipc_path: "$HOME/.aion/jsonrpc.ipc".into(),
+            arg_ipc_apis: vec!["api1".into(), "api2".into()],
+
+            // Wallet
+            arg_wallet_interface: "local".into(),
+            arg_wallet_port: 8547u16,
+            flag_enable_wallet: false,
+            flag_secure_connect: true,
+            arg_zmq_key_path: Some("zmq".into()),
+
+            // -- Sealing/Mining Options
+            arg_author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
+            flag_force_sealing: true,
+            arg_reseal_on_txs: "all".into(),
+            arg_reseal_min_period: 4000u64,
+            arg_reseal_max_period: 60000u64,
+            arg_work_queue_size: 20usize,
+            arg_tx_gas_limit: Some("6283184".into()),
+            arg_tx_time_limit: Some(100u64),
+            arg_relay_set: "cheap".into(),
+            arg_min_gas_price: 10000000000u64,
+            arg_max_gas_price: 9000000000000000000u64,
+            arg_gas_price_percentile: 60usize,
+            arg_gas_floor_target: "4700000".into(),
+            arg_gas_cap: "6283184".into(),
+            arg_extra_data: Some("Aion".into()),
+            arg_tx_queue_mem_limit: 2u32,
+            arg_tx_queue_strategy: "gas_factor".into(),
+            arg_tx_queue_ban_count: 1u16,
+            arg_tx_queue_ban_time: 180u64,
+            flag_remove_solved: true,
+            flag_infinite_pending_block: true,
+            arg_max_blk_traverse: 64usize,
+            arg_blk_price_window: 20usize,
+            flag_dynamic_gas_price: true,
+            arg_local_max_gas_price: 100000000000u64,
+
+            // -- Stratum Options
+            flag_no_stratum: true,
+            arg_stratum_interface: "127.0.0.2".to_owned(),
+            arg_stratum_port: 8089u16,
+            arg_stratum_secret: Some("secret".into()),
+
+            // -- Database Options
+            flag_no_persistent_txqueue: true,
+            arg_pruning: "auto".into(),
+            arg_pruning_history: 64u64,
+            arg_pruning_memory: 500usize,
+            //                arg_cache_size_db: 64u32,
+            arg_cache_size_blocks: 8u32,
+            arg_cache_size_queue: 50u32,
+            arg_cache_size_state: 25u32,
+            arg_cache_size: Some(128),
+            flag_disable_wal: true,
+            arg_db_compaction: "ssd".into(),
+            arg_fat_db: "auto".into(),
+            flag_scale_verifiers: true,
+            arg_num_verifiers: Some(6),
+
+            // -- Miscellaneous Options
+            flag_no_seal_check: false,
+            flag_no_config: false,
+            flag_version: false,
+            flag_default_config: false,
+            flag_full_help: false,
+            arg_config: "$HOME/.aion/config.toml".into(),
+
+            // -- Log Options
+            flag_no_color: true,
+            arg_log_file: Some("log file".into()),
+            arg_log_level: "level".into(),
+            arg_log_targets: vec!["target1".into(), "target2".into()],
+        };
+
+        println!("{:?}", args);
+        println!("{:?}", args_target);
 
         // then
-        assert_eq!(
-            args,
-            Args {
-                // Commands
-                cmd_daemon: false,
-                cmd_account: false,
-                cmd_account_new: false,
-                cmd_account_list: false,
-                cmd_account_import: false,
-                cmd_account_import_by_key: false,
-                cmd_account_export_to_key: false,
-                cmd_import: false,
-                cmd_export: false,
-                cmd_db: false,
-                cmd_db_kill: false,
-                cmd_revert: false,
-
-                // Arguments
-                arg_daemon_pid_file: None,
-                arg_import_file: None,
-                arg_import_format: None,
-                arg_export_blocks_file: None,
-                arg_export_blocks_format: None,
-                arg_export_blocks_from: "1".into(),
-                arg_export_blocks_to: "latest".into(),
-                arg_account_import_path: None,
-                arg_account_private_key: None,
-                arg_account_address: None,
-                arg_revert_blocks_to: "0".into(),
-
-                // -- Operating Options
-                arg_chain: "xyz".into(),
-                arg_base_path: Some("base".into()),
-                arg_db_path: Some("db".into()),
-                arg_keys_path: Some("keys".into()),
-
-                // -- Account Options
-                arg_unlock: vec!["0xdeadbeefcafe0000000000000000000000000000".into()],
-                arg_password: vec!["~/.safe/password.file".into()],
-                arg_keys_iterations: 10240u32,
-                arg_refresh_time: 2,
-                flag_fast_signing: true,
-
-                // -- Networking Options
-                arg_max_peers: 50u32,
-                arg_boot_nodes: vec![
-                    "p2p://22345678-9abc-def0-1234-56789abcdef0@3.4.4.4:4444".into(),
-                    "p2p://32345678-9abc-def0-1234-56789abcdef0@4.5.5.5:5555".into(),
-                ],
-                arg_local_node: "p2p://12345678-9abc-def0-1234-56789abcdef0@2.3.3.3:3333".into(),
-                arg_net_id: 128u32,
-                flag_sync_from_boot_nodes_only: true,
-                arg_ip_black_list: vec!["ip1".into(), "ip2".into()],
-
-                // -- API and Console Options
-                // RPC
-                arg_rpc_processing_threads: Some(3usize),
-
-                // Http
-                flag_no_http: true,
-                arg_http_port: 8545u16,
-                arg_http_interface: "local".into(),
-                arg_http_cors: vec!["cor1".into(), "cor2".into()],
-                arg_http_apis: vec!["api1".into(), "api2".into()],
-                arg_http_hosts: vec!["host1".into(), "host2".into()],
-                arg_http_server_threads: Some(5usize),
-
-                // WS
-                flag_no_ws: true,
-                arg_ws_port: 8546u16,
-                arg_ws_interface: "local".into(),
-                arg_ws_apis: vec!["api1".into(), "api2".into()],
-                arg_ws_origins: vec!["origin1".into(), "origin2".into()],
-                arg_ws_hosts: vec!["host1".into(), "host2".into()],
-                arg_ws_max_connections: 12usize,
-
-                // IPC
-                flag_no_ipc: true,
-                arg_ipc_path: "$HOME/.aion/jsonrpc.ipc".into(),
-                arg_ipc_apis: vec!["api1".into(), "api2".into()],
-
-                // Wallet
-                arg_wallet_interface: "local".into(),
-                arg_wallet_port: 8547u16,
-                flag_enable_wallet: false,
-                flag_secure_connect: true,
-                arg_zmq_key_path: Some("zmq".into()),
-
-                // -- Sealing/Mining Options
-                arg_author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
-                flag_force_sealing: true,
-                arg_reseal_on_txs: "all".into(),
-                arg_reseal_min_period: 4000u64,
-                arg_reseal_max_period: 60000u64,
-                arg_work_queue_size: 20usize,
-                arg_tx_gas_limit: Some("6283184".into()),
-                arg_tx_time_limit: Some(100u64),
-                arg_relay_set: "cheap".into(),
-                arg_min_gas_price: 10000000000u64,
-                arg_max_gas_price: 9000000000000000000u64,
-                arg_gas_price_percentile: 60usize,
-                arg_gas_floor_target: "4700000".into(),
-                arg_gas_cap: "6283184".into(),
-                arg_extra_data: Some("Aion".into()),
-                arg_tx_queue_mem_limit: 2u32,
-                arg_tx_queue_strategy: "gas_factor".into(),
-                arg_tx_queue_ban_count: 1u16,
-                arg_tx_queue_ban_time: 180u64,
-                flag_remove_solved: true,
-                flag_infinite_pending_block: true,
-                arg_max_blk_traverse: 64usize,
-                arg_blk_price_window: 20usize,
-                flag_dynamic_gas_price: true,
-                arg_local_max_gas_price: 100000000000u64,
-
-                // -- Stratum Options
-                flag_no_stratum: true,
-                arg_stratum_interface: "127.0.0.2".to_owned(),
-                arg_stratum_port: 8089u16,
-                arg_stratum_secret: Some("secret".into()),
-
-                // -- Database Options
-                flag_no_persistent_txqueue: true,
-                arg_pruning: "auto".into(),
-                arg_pruning_history: 64u64,
-                arg_pruning_memory: 500usize,
-                //                arg_cache_size_db: 64u32,
-                arg_cache_size_blocks: 8u32,
-                arg_cache_size_queue: 50u32,
-                arg_cache_size_state: 25u32,
-                arg_cache_size: Some(128),
-                flag_disable_wal: true,
-                arg_db_compaction: "ssd".into(),
-                arg_fat_db: "auto".into(),
-                flag_scale_verifiers: true,
-                arg_num_verifiers: Some(6),
-
-                // -- Miscellaneous Options
-                flag_no_seal_check: false,
-                flag_no_config: false,
-                flag_version: false,
-                flag_default_config: false,
-                flag_full_help: false,
-                arg_config: "$HOME/.aion/config.toml".into(),
-
-                // -- Log Options
-                flag_no_color: true,
-                arg_log_file: Some("log file".into()),
-                arg_log_level: "level".into(),
-                arg_log_targets: vec!["target1".into(), "target2".into()],
-            }
-        );
+        assert_eq!(args, args_target);
     }
 
     #[test]
