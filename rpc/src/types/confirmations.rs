@@ -236,7 +236,8 @@ pub struct TransactionModification {
 mod tests {
     use std::str::FromStr;
     use serde_json;
-    use types::{U256, H256, TransactionCondition};
+    use aion_types::{U256, H256};
+    use types::TransactionCondition;
     use helpers;
     use super::*;
 

@@ -61,15 +61,6 @@ impl<T> Default for Subscribers<T> {
 }
 
 impl<T> Subscribers<T> {
-    /// Create a new Subscribers with given random source.
-    #[cfg(test)]
-    pub fn new_test() -> Self {
-        Subscribers {
-            rand: ::rand::SeedableRng::from_seed([0usize].as_ref()),
-            subscriptions: HashMap::new(),
-        }
-    }
-
     fn next_id(&mut self) -> Id {
         let mut data = H64::default();
         self.rand.fill_bytes(&mut data.0);
