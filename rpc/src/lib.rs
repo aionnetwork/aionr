@@ -26,7 +26,6 @@ extern crate futures;
 extern crate ansi_term;
 extern crate order_stat;
 extern crate parking_lot;
-extern crate rand;
 extern crate rustc_hex;
 extern crate serde;
 extern crate serde_json;

@@ -46,8 +46,6 @@ pub enum Api {
     Eth,
     /// Eth (Safe)
     Stratum,
-    /// Eth Pub-Sub (Safe)
-    EthPubSub,
     /// "personal" api (All)
     Personal,
     /// Rpc (Safe)
@@ -67,7 +65,6 @@ impl FromStr for Api {
             "net" => Ok(Net),
             "eth" => Ok(Eth),
             "stratum" => Ok(Stratum),
-            "pubsub" => Ok(EthPubSub),
             "personal" => Ok(Personal),
             "rpc" => Ok(Rpc),
             "ping" => Ok(Ping),
@@ -131,7 +128,6 @@ fn to_modules(apis: &HashSet<Api>) -> BTreeMap<String, String> {
             Api::Net => ("net", "1.0"),
             Api::Eth => ("eth", "1.0"),
             Api::Stratum => ("stratum", "1.0"),
-            Api::EthPubSub => ("pubsub", "1.0"),
             Api::Personal => ("personal", "1.0"),
             Api::Rpc => ("rpc", "1.0"),
             Api::Ping => ("ping", "1.0"),
@@ -237,24 +233,6 @@ impl FullDependencies {
                     );
                     handler.extend_with(client.to_delegate());
                 }
-                Api::EthPubSub => {
-                    if !for_generic_pubsub {
-                        let client =
-                            EthPubSubClient::new(self.client.clone(), self.executor.clone());
-                        let h = client.handler();
-                        self.miner
-                            .add_transactions_listener(Box::new(move |hashes| {
-                                if let Some(h) = h.upgrade() {
-                                    h.new_transactions(hashes);
-                                }
-                            }));
-
-                        if let Some(h) = client.handler().upgrade() {
-                            self.client.add_notify(h);
-                        }
-                        handler.extend_with(client.to_delegate());
-                    }
-                }
                 Api::Personal => {
                     handler.extend_with(
                         // Permenant unlock is for internal test. Disabled in official release.
@@ -300,7 +278,6 @@ impl ApiSet {
             Api::Stratum,
             Api::Rpc,
             Api::Personal,
-            Api::EthPubSub,
             Api::Ping,
         ]
             .into_iter()
@@ -339,7 +316,6 @@ mod test {
         assert_eq!(Api::Net, "net".parse().unwrap());
         assert_eq!(Api::Eth, "eth".parse().unwrap());
         assert_eq!(Api::Stratum, "stratum".parse().unwrap());
-        assert_eq!(Api::EthPubSub, "pubsub".parse().unwrap());
         assert_eq!(Api::Personal, "personal".parse().unwrap());
         assert_eq!(Api::Rpc, "rpc".parse().unwrap());
         assert!("rp".parse::<Api>().is_err());
@@ -382,7 +358,6 @@ mod test {
                     Api::Stratum,
                     Api::Rpc,
                     Api::Personal,
-                    Api::EthPubSub,
                     Api::Ping,
                 ]
                 .into_iter()
@@ -402,7 +377,6 @@ mod test {
                     Api::Eth,
                     Api::Stratum,
                     Api::Rpc,
-                    Api::EthPubSub,
                     Api::Ping,
                 ]
                 .into_iter()
@@ -410,6 +384,7 @@ mod test {
             )
         );
     }
+
     /*
     #[test]
     fn test_safe_parsing() {
@@ -421,7 +396,6 @@ mod test {
                     Api::Net,
                     Api::Eth,
                     Api::Stratum,
-                    Api::EthPubSub,
                     Api::Rpc,
                 ].into_iter()
                 .collect()

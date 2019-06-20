@@ -45,8 +45,6 @@ mod transaction_request;
 mod transaction_condition;
 mod mining;
 
-pub mod pubsub;
-
 pub use self::bytes::Bytes;
 pub use self::block::{Block, BlockTransactions, Header};
 pub use self::block_number::BlockNumber;

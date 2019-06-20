@@ -32,7 +32,6 @@ pub mod nonce;
 mod poll_filter;
 mod poll_manager;
 mod requests;
-mod subscribers;
 
 pub use self::dispatch::{Dispatcher, FullDispatcher};
 pub use self::poll_manager::PollManager;
@@ -41,4 +40,3 @@ pub use self::requests::{
     TransactionRequest, FilledTransactionRequest, ConfirmationRequest, ConfirmationPayload,
     CallRequest,
 };
-pub use self::subscribers::Subscribers;

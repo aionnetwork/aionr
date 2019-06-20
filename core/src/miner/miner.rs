@@ -37,10 +37,7 @@ use transaction::transaction_pool::TransactionPool;
 use transaction::banning_queue::{BanningTransactionQueue, Threshold};
 use transaction::local_transactions::{Status as LocalTransactionStatus, TxIoMessage};
 use transaction::transaction_queue::{
-    AccountDetails, PrioritizationStrategy, RemovalReason,
-/*TransactionDetailsProvider as TransactionQueueDetailsProvider, */
-TransactionOrigin,
-    TransactionQueue,
+    AccountDetails, PrioritizationStrategy, RemovalReason, TransactionOrigin, TransactionQueue,
 };
 use transaction::{
     Action, Condition as TransactionCondition, Error as TransactionError,
@@ -161,7 +158,6 @@ struct SealingWork {
 pub struct Miner {
     // NOTE [ToDr]  When locking always lock in this order!
     transaction_pool: TransactionPool,
-    transaction_listener: RwLock<Vec<Box<Fn(&[H256]) + Send + Sync>>>,
     sealing_work: Mutex<SealingWork>,
     next_allowed_reseal: Mutex<Instant>,
     sealing_block_last_request: Mutex<u64>,
@@ -240,7 +236,6 @@ impl Miner {
 
         Miner {
             transaction_pool: transaction_pool,
-            transaction_listener: RwLock::new(vec![]),
             next_allowed_reseal: Mutex::new(Instant::now()),
             sealing_block_last_request: Mutex::new(0),
             sealing_work: Mutex::new(SealingWork {
@@ -306,11 +301,6 @@ impl Miner {
     /// Get `Some` `clone()` of the current pending block header or `None` if we're not sealing.
     pub fn pending_block_header(&self, latest_block_number: BlockNumber) -> Option<Header> {
         self.map_pending_block(|b| b.header().clone(), latest_block_number)
-    }
-
-    /// Set a callback to be notified about imported transactions' hashes.
-    pub fn add_transactions_listener(&self, f: Box<Fn(&[H256]) + Send + Sync>) {
-        self.transaction_listener.write().push(f);
     }
 
     fn map_pending_block<F, T>(&self, f: F, latest_block_number: BlockNumber) -> Option<T>
@@ -485,7 +475,7 @@ impl Miner {
         (block, original_work_hash)
     }
 
-    /// Check is reseal is allowed and necessary.
+    /// Check if reseal is allowed and necessary.
     fn requires_reseal(&self, best_block: BlockNumber) -> bool {
         let has_local_transactions = self.transaction_pool.has_local_pending_transactions();
         let mut sealing_work = self.sealing_work.lock();
@@ -712,74 +702,6 @@ impl Miner {
         }
     }
 
-    // fn verify_transactions(
-    //     &self,
-    //     client: &MiningBlockChainClient,
-    //     transactions: Vec<UnverifiedTransaction>,
-    // ) -> Vec<Result<SignedTransaction, Error>> {
-    //     transactions
-    //         .into_iter()
-    //         .map(|transaction| {
-    //             self.verify_transaction(client, transaction)
-    //         })
-    //         .collect()
-    // }
-
-    // fn add_transaction_to_queue(
-    //     &self,
-    //     client: &MiningBlockChainClient,
-    //     transaction: SignedTransaction,
-    //     default_origin: TransactionOrigin,
-    //     condition: Option<TransactionCondition>,
-    // ) -> Result<TransactionImportResult, Error>
-    // {
-    //     let insertion_time = client.chain_info().best_block_number;
-    //     let origin = self
-    //         .accounts
-    //         .as_ref()
-    //         .and_then(|accounts| {
-    //             match accounts.has_account(transaction.sender()).unwrap_or(false) {
-    //                 true => Some(TransactionOrigin::Local),
-    //                 false => None,
-    //             }
-    //         })
-    //         .unwrap_or(default_origin);
-
-    //     let details_provider = TransactionDetailsProvider::new(client);
-    //     let hash = transaction.hash();
-    //     // Be sure to release the lock before we call prepare_work_sealing
-    //     let mut transaction_queue = self.transaction_queue.write();
-    //     let result = match origin {
-    //         TransactionOrigin::Local | TransactionOrigin::RetractedBlock => {
-    //             transaction_queue.add(
-    //                 transaction,
-    //                 origin,
-    //                 insertion_time,
-    //                 condition,
-    //                 &details_provider,
-    //             )?
-    //         }
-    //         TransactionOrigin::External => {
-    //             transaction_queue.add_with_banlist(
-    //                 transaction,
-    //                 insertion_time,
-    //                 &details_provider,
-    //             )?
-    //         }
-    //     };
-    //     debug!(target: "rpc_tx", "{:?} tx finished importing [{:?}]", thread::current().id(), time::Instant::now());
-    //     debug!(target: "sync", "tx pushed hash: {:?}", hash);
-
-    //     for listener in &*self.transaction_listener.read() {
-    //         debug!(target: "rpc_tx", "{:?} tx pubsub listener begins [{:?}]", thread::current().id(), time::Instant::now());
-    //         listener(&vec![hash]);
-    //         debug!(target: "rpc_tx", "{:?} tx pubsub listener ends [{:?}]", thread::current().id(), time::Instant::now());
-    //     }
-    //     debug!(target: "rpc_tx", "{:?} tx import ends [{:?}]", thread::current().id(), time::Instant::now());
-
-    //     Ok(result)
-    // }
-
     fn add_transaction_to_queue(
         &self,
         client: &MiningBlockChainClient,
@@ -800,7 +722,6 @@ impl Miner {
             })
             .unwrap_or(default_origin);
 
-        let hash = transaction.hash().clone();
         let result = self.transaction_pool.add_transaction(
             transaction,
             origin,
@@ -808,13 +729,6 @@ impl Miner {
             insertion_block,
         )?;
         debug!(target: "rpc_tx", "{:?} tx finished importing [{:?}]", thread::current().id(), time::Instant::now());
-
-        for listener in &*self.transaction_listener.read() {
-            debug!(target: "rpc_tx", "{:?} tx pubsub listener begins [{:?}]", thread::current().id(), time::Instant::now());
-            listener(&vec![hash]);
-            debug!(target: "rpc_tx", "{:?} tx pubsub listener ends [{:?}]", thread::current().id(), time::Instant::now());
-        }
-        debug!(target: "rpc_tx", "{:?} tx import ends [{:?}]", thread::current().id(), time::Instant::now());
 
         Ok(result)
     }
@@ -956,9 +870,6 @@ impl MinerService for Miner {
             })
             .collect();
 
-        // if is_imported && self.options.reseal_on_external_tx && self.tx_reseal_allowed() {
-        //     self.update_sealing(client);
-        // }
         results
     }
 
@@ -1197,12 +1108,8 @@ impl MinerService for Miner {
     /// Update sealing if required.
     /// Prepare the block and work if the Engine does not seal internally.
     fn update_sealing(&self, client: &MiningBlockChainClient) {
-        trace!(target: "block", "update_sealing() best_block: {:?}", client.chain_info().best_block_number);
+        trace!(target: "block", "update_sealing: best_block: {:?}", client.chain_info().best_block_number);
         if self.requires_reseal(client.chain_info().best_block_number) {
-            // --------------------------------------------------------------------------
-            // | NOTE Code below requires transaction_queue and sealing_work locks.     |
-            // | Make sure to release the locks before calling that method.             |
-            // --------------------------------------------------------------------------
             trace!(target: "block", "update_sealing: preparing a block");
             let (block, original_work_hash) = self.prepare_block(client);
 
@@ -1271,11 +1178,7 @@ impl MinerService for Miner {
     {
         trace!(target: "block", "chain_new_blocks");
 
-        // 1. We ignore blocks that were `imported` unless resealing on new uncles is enabled.
-        // 2. We ignore blocks that are `invalid` because it doesn't have any meaning in terms of the transactions that
-        //    are in those blocks
-
-        // Then import all transactions in retracted routes...
+        // Import all transactions in retracted routes...
         {
             for hash in retracted {
                 let block = client.block(BlockId::Hash(*hash)).expect(
@@ -1302,27 +1205,6 @@ impl MinerService for Miner {
         client.new_block_chained();
     }
 }
-
-// struct TransactionDetailsProvider<'a> {
-//     client: &'a MiningBlockChainClient,
-// }
-
-// impl<'a> TransactionDetailsProvider<'a> {
-//     pub fn new(client: &'a MiningBlockChainClient) -> Self {
-//         TransactionDetailsProvider {
-//             client: client,
-//         }
-//     }
-// }
-
-// impl<'a> TransactionQueueDetailsProvider for TransactionDetailsProvider<'a> {
-//     fn fetch_account(&self, address: &Address) -> AccountDetails {
-//         AccountDetails {
-//             nonce: self.client.latest_nonce(address),
-//             balance: self.client.latest_balance(address),
-//         }
-//     }
-// }
 
 // #[cfg(test)]
 // mod tests {

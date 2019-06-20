@@ -22,7 +22,7 @@ ip_black_list = []
 disable = false
 port = 8545
 interface = "local"
-apis = ["all", "-pubsub"]
+apis = ["all"]
 hosts = ["none"]
 cors = ["none"]
 
@@ -30,7 +30,7 @@ cors = ["none"]
 disable = false
 port = 8546
 interface = "local"
-apis = ["all", "-pubsub"]
+apis = ["all"]
 origins = ["none"]
 hosts = ["none"]
 max_connections = 100
@@ -38,7 +38,7 @@ max_connections = 100
 [ipc]
 disable = false
 path = "$BASE/jsonrpc.ipc"
-apis = ["all", "-pubsub"]
+apis = ["all"]
 
 [wallet]
 disable = true

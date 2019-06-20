@@ -33,7 +33,6 @@ macro_rules! try_bf {
 #[macro_use]
 mod eth;
 mod eth_filter;
-mod eth_pubsub;
 mod net;
 mod personal;
 mod signing;
@@ -44,7 +43,6 @@ mod ping;
 
 pub use self::eth::EthClient;
 pub use self::eth_filter::EthFilterClient;
-pub use self::eth_pubsub::EthPubSubClient;
 pub use self::net::NetClient;
 pub use self::personal::PersonalClient;
 pub use self::signing::SigningClient;

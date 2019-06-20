@@ -247,9 +247,9 @@ usage! {
             "--http-interface=[IP]",
             "Specify the hostname portion of the HTTP API server, IP should be an interface's IP address, or all (all interfaces) or local.",
 
-            ARG arg_http_apis: (Vec<String>) = vec!["all".into(),"-pubsub".into()], or |c: &Config| c.http.as_ref()?.apis.clone(),
+            ARG arg_http_apis: (Vec<String>) = vec!["all".into()], or |c: &Config| c.http.as_ref()?.apis.clone(),
             "--http-apis=[APIS]...",
-            "Specify the APIs available through the HTTP interface. APIS is a comma-delimited list of API name. Possible name are all, web3, eth, stratum, net, personal, rpc. You can also disable a specific API by putting '-' in the front: all,-personal.NOTE that rpc doesn’t support pubsub",
+            "Specify the APIs available through the HTTP interface. APIS is a comma-delimited list of API name. Possible name are all, web3, eth, stratum, net, personal, rpc. You can also disable a specific API by putting '-' in the front: all,-personal.",
 
             ARG arg_http_hosts: (Vec<String>) = vec!["none".into()], or |c: &Config| c.http.as_ref()?.hosts.clone(),
             "--http-hosts=[HOSTS]...",
@@ -276,9 +276,9 @@ usage! {
             "--ws-interface=[IP]",
             "Specify the hostname portion of the WebSockets server, IP should be an interface's IP address, or all (all interfaces) or local.",
 
-            ARG arg_ws_apis: (Vec<String>) = vec!["all".into(),"-pubsub".into()], or |c: &Config| c.websockets.as_ref()?.apis.clone(),
+            ARG arg_ws_apis: (Vec<String>) = vec!["all".into()], or |c: &Config| c.websockets.as_ref()?.apis.clone(),
             "--ws-apis=[APIS]...",
-            "Specify the APIs available through the WebSockets interface. APIS is a comma-delimited list of API name. Possible name are web3, eth, stratum, net, personal, rpc, pubsub.",
+            "Specify the APIs available through the WebSockets interface. APIS is a comma-delimited list of API name. Possible name are web3, eth, stratum, net, personal, rpc.",
 
             ARG arg_ws_origins: (Vec<String>) = vec!["none".into()], or |c: &Config| c.websockets.as_ref()?.origins.clone(),
             "--ws-origins=[URL]...",
@@ -301,9 +301,9 @@ usage! {
             "--ipc-path=[PATH]",
             "Specify custom path for JSON-RPC over IPC service.",
 
-            ARG arg_ipc_apis: (Vec<String>) = vec!["all".into(),"-pubsub".into()], or |c: &Config| c.ipc.as_ref()?.apis.clone(),
+            ARG arg_ipc_apis: (Vec<String>) = vec!["all".into()], or |c: &Config| c.ipc.as_ref()?.apis.clone(),
             "--ipc-apis=[APIS]...",
-            "Specify custom API set available via JSON-RPC over IPC. Possible name are web3, eth, stratum, net, personal, rpc, pubsub.",
+            "Specify custom API set available via JSON-RPC over IPC. Possible name are web3, eth, stratum, net, personal, rpc.",
 
         ["Wallet Options"]
             FLAG flag_enable_wallet: (bool) = false, or |c: &Config| c.wallet.as_ref()?.disable.clone().map(|a| !a),
