@@ -1,5 +1,5 @@
 [aion]
-chain = "resources/custom.json"
+chain = "custom/custom.json"
 
 [account]
 keys_iterations = 10240

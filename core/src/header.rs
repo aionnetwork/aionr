@@ -74,48 +74,38 @@ pub const V1: HeaderVersion = 1;
 /// Doesn't do all that much on its own.
 #[derive(Debug, Clone, Eq)]
 pub struct Header {
-    /// Version rlp order 0
+    /// Version
     version: HeaderVersion,
-    /// Parent hash. rlp order 2
-    parent_hash: H256,
-    /// Block timestamp. rlp order 12
-    timestamp: u64,
-    /// Block number. rlp order 1
+    /// Block number
     number: BlockNumber,
-    /// Block author. rlp order 3
+    /// Parent hash
+    parent_hash: H256,
+    /// Block author
     author: Address,
-    /// Transactions root. rlp order 5
-    transactions_root: H256,
-    /// Block extra data. rlp order 9
-    extra_data: Bytes,
-    /// State root. rlp order 4
+    /// State root
     state_root: H256,
-    /// Block receipts root. rlp order 6
+    /// Transactions root
+    transactions_root: H256,
+    /// Block receipts root
     receipts_root: H256,
-    /// Block bloom. rlp order 7
+    /// Block bloom
     log_bloom: Bloom,
-    /// Gas used for contracts execution. rlp order 10
-    gas_used: U256,
-    /// Block gas limit. rlp order 11
-    gas_limit: U256,
-
-    /// Block difficulty. rlp order 8
+    /// Block difficulty
     difficulty: U256,
-    /// Vector of post-RLP-encoded fields.
-    // nonce rlp order 13
-    // solution rlp order 14
+    /// Block extra data
+    extra_data: Bytes,
+    /// Gas used for contracts execution
+    gas_used: U256,
+    /// Block gas limit
+    gas_limit: U256,
+    /// Block timestamp
+    timestamp: u64,
+    /// Vector of post-RLP-encoded fields. It includes nonce and solution for a PoW seal.
     seal: Vec<Bytes>,
     /// The memoized hash of the RLP representation *including* the seal fields.
     hash: RefCell<Option<H256>>,
     /// The memoized hash of the RLP representation *without* the seal fields.
     bare_hash: RefCell<Option<H256>>,
-    // [FZH] Put reward and transaction fee in the header to help miners to get this information.
-    // Transaction fee is calculated when a transaction is pushed into a block. In the original
-    // rust version, it is not stored after altered the state balance.
-    // Reward is calculated when closing a block. It is stored in the block trace if tracing
-    // option is activated (but by default it is not).
-    // To keep these two values availble for miners, put them here in the header of a block. They
-    // are not part of the header's rlp so will not be communicated with other nodes on syncing.
     /// transaction fee
     transaction_fee: U256,
     /// reward
