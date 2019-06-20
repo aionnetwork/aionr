@@ -179,12 +179,12 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     )
     .map_err(|e| format!("Client service error: {:?}", e))?;
 
-    info!(target: "run","Genesis hash: {:?}",genesis_hash);
+    info!(target: "run"," genesis: {:?}",genesis_hash);
 
     // display info about used pruning algorithm
     info!(
         target: "run",
-        "State DB configuration: {}{}",
+        "state db: {}{}",
         Colour::White.bold().paint(algorithm.as_str()),
         match fat_db {
             true => Colour::White.bold().paint(" +Fat").to_string(),
@@ -199,10 +199,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
             "Your chosen strategy is {}! You can re-run with --pruning to change.",
             Colour::Red.bold().paint("unstable")
         );
-    }
-
-    if !cmd.wallet_api_conf.enabled {
-        info!(target: "run", "Wallet API is disabled.");
     }
 
     let client = service.client();
@@ -233,7 +229,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // spin up rpc eventloop
     let runtime_rpc = tokio::runtime::Builder::new()
-        .name_prefix("rpc-eventloop-")
+        .name_prefix("rpc-")
         .build()
         .expect("runtime_rpc init failed");
     // set up dependencies for rpc servers
@@ -250,7 +246,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // start pb server
     let pb_handles = Arc::new(pb_client);
-    let pb_server = new_pb(cmd.wallet_api_conf, pb_handles, tx_status_service)?;
+    let pb_server = new_pb(cmd.wallet_api_conf.clone(), pb_handles, tx_status_service)?;
     let deps_for_rpc_apis = Arc::new(rpc_apis::FullDependencies {
         client: client.clone(),
         sync: sync_provider.clone(),
@@ -277,9 +273,14 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
             .map_err(|_| format!("can't spawn jsonrpc eventloop"))?
     };
     let executor_jsonrpc = runtime_jsonrpc.executor();
+
     // start rpc servers
     let ws_server = rpc::new_ws(cmd.ws_conf.clone(), &dependencies, executor_jsonrpc.clone())?;
-    let ipc_server = rpc::new_ipc(cmd.ipc_conf, &dependencies, executor_jsonrpc.clone())?;
+    let ipc_server = rpc::new_ipc(
+        cmd.ipc_conf.clone(),
+        &dependencies,
+        executor_jsonrpc.clone(),
+    )?;
     let http_server = rpc::new_http(
         "HTTP JSON-RPC",
         "jsonrpc",
@@ -287,6 +288,14 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         &dependencies,
         executor_jsonrpc.clone(),
     )?;
+
+    // log apis
+    info!(target: "run", "    apis: rpc-http({}) rpc-ws({}) rpc-ipc({}) pb-zmq({})",
+        if cmd.http_conf.enabled { "enable" } else { "disable" },
+        if cmd.ws_conf.enabled { "enable" } else { "disable" },
+        if cmd.ipc_conf.enabled { "enable" } else { "disable" },
+        if cmd.wallet_api_conf.enabled { "enable" } else { "disable" }
+    );
 
     // save user defaults
     user_defaults.is_first_launch = false;
@@ -334,15 +343,24 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // Handle exit
     wait_for_exit();
 
+    info!(target: "run","Finishing work, please wait...");
+
+    // close pool
     let _ = close_transaction_pool.send(());
     let _ = close_miner.send(());
 
-    info!(target: "run","Finishing work, please wait...");
+    // close rpc
+    if ws_server.is_some() {
+        ws_server.unwrap().close();
+    }
+    if http_server.is_some() {
+        http_server.unwrap().close();
+    }
+    if ipc_server.is_some() {
+        ipc_server.unwrap().close();
+    }
 
-    ws_server.expect("Invalid WS server instance!").close();
-    http_server.expect("Invalid HTTP server instance!").close();
-    ipc_server.expect("Invalid IPC server instance!").close();
-
+    // close p2p
     network_manager.stop_network();
 
     // close/drop this stuff as soon as exit detected.
@@ -394,7 +412,7 @@ fn print_running_environment(
     if let Some(config) = &dirs.config {
         info!(
             target: "run",
-            "Config path {}",
+            " config path: {}",
             Colour::White
                 .bold()
                 .paint(config)
@@ -409,7 +427,7 @@ fn print_running_environment(
         SpecType::Custom(ref filename) => {
             info!(
                 target: "run",
-                "Genesis spec path {}",
+                "genesis path: {}",
             Colour::White
                 .bold()
                 .paint(absolute(filename.to_string()))
@@ -418,14 +436,14 @@ fn print_running_environment(
     }
     info!(
         target: "run",
-        "Keys path {}",
+        "   keys path: {}",
         Colour::White
             .bold()
             .paint(dirs.keys_path(spec_data_dir).to_string_lossy().into_owned())
     );
     info!(
         target: "run",
-        "DB path {}",
+        "     db path: {}",
         Colour::White
             .bold()
             .paint(db_dirs.db_root_path().to_string_lossy().into_owned())
@@ -455,7 +473,7 @@ fn print_logo() {
         Colour::Green.bold().paint("\\"),
         Colour::Blue.bold().paint("____/  |_| \\_|\n\n")
     );
-    info!(target: "run","Starting {}", Colour::White.bold().paint(version()));
+    info!(target: "run","   build: {}", Colour::White.bold().paint(version()));
 }
 
 fn prepare_account_provider(
@@ -569,7 +587,6 @@ fn fill_back_local_node(path: String, local_node_info: String) {
         return;
     }
     let _ = fs::write(&path, ret).expect("Rewrite failed");
-    info!(target: "run","Local node fill back!");
 }
 
 fn wait_for_exit() {
