@@ -32,8 +32,10 @@ use helpers::errors;
 use helpers::dispatch::{self, Dispatcher};
 use helpers::accounts::unwrap_provider;
 use traits::{EthSigning};
+use aion_types::{H256, H768, Address};
+
 use types::{
-    H256 as RpcH256, H768 as RpcH768, Bytes as RpcBytes,
+    Bytes as RpcBytes,
     RichRawTransaction as RpcRichRawTransaction, TransactionRequest as RpcTransactionRequest,
     ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse as RpcConfirmationResponse,
 };
@@ -69,7 +71,7 @@ impl<D: Dispatcher + 'static> SigningClient<D> {
 }
 
 impl<D: Dispatcher + 'static> EthSigning for SigningClient<D> {
-    fn sign(&self, address: RpcH256, data: RpcBytes) -> BoxFuture<RpcH768> {
+    fn sign(&self, address: Address, data: RpcBytes) -> BoxFuture<H768> {
         Box::new(
             self.handle(RpcConfirmationPayload::EthSignMessage(
                 (address.clone(), data).into(),
@@ -84,7 +86,7 @@ impl<D: Dispatcher + 'static> EthSigning for SigningClient<D> {
         )
     }
 
-    fn send_transaction(&self, request: RpcTransactionRequest) -> BoxFuture<RpcH256> {
+    fn send_transaction(&self, request: RpcTransactionRequest) -> BoxFuture<H256> {
         Box::new(
             self.handle(RpcConfirmationPayload::SendTransaction(request))
                 .then(|res| {

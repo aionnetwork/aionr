@@ -1,8 +1,7 @@
 [aion]
-chain = "custom/custom.json"
+chain = "resources/custom.json"
 
 [account]
-fast_unlock = false
 keys_iterations = 10240
 refresh_time = 5
 unlock = []
@@ -12,7 +11,7 @@ password = []
 sync_from_boot_nodes_only = false
 max_peers = 128
 net_id = 256
-local_node = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"
+local_node = "p2p://7c637e7f-7146-42db-ab3b-c0f1ec08f92d@0.0.0.0:30303"
 boot_nodes = []
 ip_black_list = []
 

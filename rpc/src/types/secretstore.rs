@@ -20,7 +20,9 @@
  *
  ******************************************************************************/
 
-use types::{Bytes, H512};
+use aion_types::H512;
+
+use types::Bytes;
 
 /// Encrypted document key.
 #[derive(Default, Debug, Serialize, PartialEq)]

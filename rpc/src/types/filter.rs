@@ -25,7 +25,9 @@ use serde::de::{Error, DeserializeOwned};
 use serde_json::{Value, from_value};
 use acore::filter::Filter as EthFilter;
 use acore::client::BlockId;
-use types::{BlockNumber, H256, Log};
+use aion_types::{H256, Address};
+
+use types::{BlockNumber, Log};
 
 /// Variadic value
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -59,7 +61,7 @@ where T: DeserializeOwned
 }
 
 /// Filter Address
-pub type FilterAddress = VariadicValue<H256>;
+pub type FilterAddress = VariadicValue<Address>;
 /// Topic
 pub type Topic = VariadicValue<H256>;
 

@@ -40,8 +40,8 @@ use helpers::{errors, nonce, ConfirmationPayload, FilledTransactionRequest, Tran
 use jsonrpc_core::futures::{future, Async, Future, Poll};
 use jsonrpc_core::{BoxFuture, Error, Result};
 use types::{
-    ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse, H256 as RpcH256,
-    H768 as RpcH768, RichRawTransaction as RpcRichRawTransaction, SignRequest as RpcSignRequest,
+    ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse,
+    RichRawTransaction as RpcRichRawTransaction, SignRequest as RpcSignRequest,
 };
 
 pub use self::nonce::{Ready as NonceReady, Reservations};
@@ -497,7 +497,6 @@ pub fn execute<D: Dispatcher + 'static>(
                     .and_then(|(tx, tok, nonce, dispatcher)| {
                         dispatcher
                             .dispatch_transaction(tx)
-                            .map(RpcH256::from)
                             .map(ConfirmationResponse::SendTransaction)
                             .map(move |h| {
                                 nonce.map(move |nonce| nonce.mark_used());
@@ -524,7 +523,6 @@ pub fn execute<D: Dispatcher + 'static>(
                 result
                     //.map(|rsv| H768::from(rsv.into()))
                     .map(|rsv| H768(rsv.into()))
-                    .map(RpcH768::from)
                     .map(ConfirmationResponse::SignatureEd25519)
             });
             Box::new(future::done(res))

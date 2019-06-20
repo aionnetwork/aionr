@@ -31,7 +31,6 @@ mod call_request;
 mod confirmations;
 mod contract;
 mod filter;
-mod hash;
 mod histogram;
 mod index;
 mod log;
@@ -44,7 +43,6 @@ mod sync;
 mod transaction;
 mod transaction_request;
 mod transaction_condition;
-mod uint;
 mod mining;
 
 pub mod pubsub;
@@ -61,7 +59,6 @@ pub use self::confirmations::{
 };
 pub use self::contract::{Contract, ContractInfo, Abi, AbiIO};
 pub use self::filter::{Filter, FilterChanges};
-pub use self::hash::{H64, H128, H160, H256, H512, H520, H768, H2048};
 pub use self::histogram::Histogram;
 pub use self::index::Index;
 pub use self::log::Log;
@@ -77,5 +74,4 @@ pub use self::sync::{
 pub use self::transaction::{Transaction, RichRawTransaction};
 pub use self::transaction_request::TransactionRequest;
 pub use self::transaction_condition::TransactionCondition;
-pub use self::uint::{U128, U256, U64};
 pub use self::mining::{Work, Info, AddressValidation, MiningInfo, MinerStats};

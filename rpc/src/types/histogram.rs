@@ -22,7 +22,7 @@
 
 //! Gas prices histogram.
 
-use types::U256;
+use aion_types::U256;
 
 /// Values of RPC settings.
 #[derive(Serialize, Deserialize)]
@@ -38,7 +38,7 @@ pub struct Histogram {
 impl From<::stats::Histogram<::aion_types::U256>> for Histogram {
     fn from(h: ::stats::Histogram<::aion_types::U256>) -> Self {
         Histogram {
-            bucket_bounds: h.bucket_bounds.into_iter().map(Into::into).collect(),
+            bucket_bounds: h.bucket_bounds,
             counts: h.counts,
         }
     }

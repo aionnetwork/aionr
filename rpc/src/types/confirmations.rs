@@ -26,10 +26,10 @@ use std::fmt;
 use serde::{Serialize, Serializer};
 use ansi_term::Colour;
 use bytes::ToPretty;
+use aion_types::{U256, H256, H520, H768, Address};
 
 use types::{
-    U256, TransactionRequest, RichRawTransaction, H256, H520, H768, Bytes, TransactionCondition,
-    Origin,
+    TransactionRequest, RichRawTransaction, Bytes, TransactionCondition, Origin,
 };
 use helpers;
 
@@ -83,13 +83,13 @@ impl fmt::Display for ConfirmationPayload {
 #[serde(deny_unknown_fields)]
 pub struct SignRequest {
     /// Address
-    pub address: H256,
+    pub address: Address,
     /// Hash to sign
     pub data: Bytes,
 }
 
-impl From<(H256, Bytes)> for SignRequest {
-    fn from(tuple: (H256, Bytes)) -> Self {
+impl From<(Address, Bytes)> for SignRequest {
+    fn from(tuple: (Address, Bytes)) -> Self {
         SignRequest {
             address: tuple.0,
             data: tuple.1,
@@ -113,13 +113,13 @@ impl fmt::Display for SignRequest {
 #[serde(deny_unknown_fields)]
 pub struct DecryptRequest {
     /// Address
-    pub address: H256,
+    pub address: Address,
     /// Message to decrypt
     pub msg: Bytes,
 }
 
-impl From<(H256, Bytes)> for DecryptRequest {
-    fn from(tuple: (H256, Bytes)) -> Self {
+impl From<(Address, Bytes)> for DecryptRequest {
+    fn from(tuple: (Address, Bytes)) -> Self {
         DecryptRequest {
             address: tuple.0,
             msg: tuple.1,
@@ -222,7 +222,7 @@ impl From<helpers::ConfirmationPayload> for ConfirmationPayload {
 #[serde(deny_unknown_fields)]
 pub struct TransactionModification {
     /// Modified transaction sender
-    pub sender: Option<H256>,
+    pub sender: Option<Address>,
     /// Modified gas price
     #[serde(rename = "gasPrice")]
     pub gas_price: Option<U256>,

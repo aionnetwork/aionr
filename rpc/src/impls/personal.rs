@@ -25,7 +25,7 @@ use std::sync::Arc;
 use bytes::ToPretty;
 use acore::account_provider::AccountProvider;
 use acore::transaction::PendingTransaction;
-use aion_types::Address;
+use aion_types::{H256, H768, Address};
 use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_core::futures::Future;
 use helpers::errors;
@@ -33,7 +33,7 @@ use helpers::dispatch::{self, Dispatcher, SignWith};
 use helpers::accounts::unwrap_provider;
 use traits::Personal;
 use types::{
-    H256 as RpcH256, H768 as RpcH768, Bytes as RpcBytes,
+    Bytes as RpcBytes,
     ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse as RpcConfirmationResponse,
     TransactionRequest, RichRawTransaction as RpcRichRawTransaction,
 };
@@ -88,34 +88,29 @@ impl<D: Dispatcher + 'static> PersonalClient<D> {
 }
 
 impl<D: Dispatcher + 'static> Personal for PersonalClient<D> {
-    fn accounts(&self) -> Result<Vec<RpcH256>> {
+    fn accounts(&self) -> Result<Vec<Address>> {
         let store = self.account_provider()?;
         let accounts = store
             .accounts()
             .map_err(|e| errors::account("Could not fetch accounts.", e))?;
-        Ok(accounts
-            .into_iter()
-            .map(Into::into)
-            .collect::<Vec<RpcH256>>())
+        Ok(accounts.into_iter().collect::<Vec<H256>>())
     }
 
-    fn new_account(&self, pass: String) -> Result<RpcH256> {
+    fn new_account(&self, pass: String) -> Result<Address> {
         let store = self.account_provider()?;
 
         store
             .new_account_ed25519(&pass)
-            .map(Into::into)
             .map_err(|e| errors::account("Could not create account.", e))
     }
 
     fn unlock_account(
         &self,
-        address: RpcH256,
+        address: Address,
         account_pass: String,
         duration: Option<u64>,
     ) -> Result<bool>
     {
-        let address: Address = address.into();
         let store = self.account_provider()?;
         let r = match (self.allow_perm_unlock, duration) {
             (true, Some(0)) => store.unlock_account_permanently(&address, account_pass),
@@ -133,8 +128,7 @@ impl<D: Dispatcher + 'static> Personal for PersonalClient<D> {
         }
     }
 
-    fn lock_account(&self, address: RpcH256, account_pass: String) -> Result<bool> {
-        let address: Address = address.into();
+    fn lock_account(&self, address: Address, account_pass: String) -> Result<bool> {
         let store = self.account_provider()?;
         let r = store.lock_account(&address, account_pass);
         match r {
@@ -143,13 +137,12 @@ impl<D: Dispatcher + 'static> Personal for PersonalClient<D> {
         }
     }
 
-    fn is_account_unlocked(&self, address: RpcH256) -> Result<bool> {
-        let address: Address = address.into();
+    fn is_account_unlocked(&self, address: H256) -> Result<bool> {
         let store = self.account_provider()?;
         Ok(store.is_unlocked_generic(&address))
     }
 
-    fn sign(&self, data: RpcBytes, address: RpcH256, password: String) -> BoxFuture<RpcH768> {
+    fn sign(&self, data: RpcBytes, address: Address, password: String) -> BoxFuture<H768> {
         let dispatcher = self.dispatcher.clone();
         let accounts = try_bf!(self.account_provider());
 
@@ -190,25 +183,17 @@ impl<D: Dispatcher + 'static> Personal for PersonalClient<D> {
         ))
     }
 
-    fn send_transaction(
-        &self,
-        request: TransactionRequest,
-        password: String,
-    ) -> BoxFuture<RpcH256>
-    {
+    fn send_transaction(&self, request: TransactionRequest, password: String) -> BoxFuture<H256> {
         Box::new(self.do_sign_transaction(request, password).and_then(
             |(pending_tx, dispatcher, nonce)| {
                 let chain_id = pending_tx.chain_id();
                 trace!(target: "miner", "send_transaction: dispatching tx: {} for chain ID {:?}",
                     ::rlp::encode(&*pending_tx).into_vec().pretty(), chain_id);
 
-                dispatcher
-                    .dispatch_transaction(pending_tx)
-                    .map(move |res| {
-                        nonce.map(move |nonce| nonce.mark_used());
-                        res
-                    })
-                    .map(Into::into)
+                dispatcher.dispatch_transaction(pending_tx).map(move |res| {
+                    nonce.map(move |nonce| nonce.mark_used());
+                    res
+                })
             },
         ))
     }
@@ -217,7 +202,7 @@ impl<D: Dispatcher + 'static> Personal for PersonalClient<D> {
         &self,
         request: TransactionRequest,
         password: String,
-    ) -> BoxFuture<RpcH256>
+    ) -> BoxFuture<H256>
     {
         warn!(
             target:"personal",

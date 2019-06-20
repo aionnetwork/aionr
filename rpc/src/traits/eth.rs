@@ -25,10 +25,10 @@ use std::collections::HashMap;
 
 use jsonrpc_core::{Result, BoxFuture};
 use jsonrpc_macros::Trailing;
+use aion_types::{H64, H256, U256, U128, H128, Address};
 
 use types::{Block, BlockNumber, Bytes, CallRequest, Filter, FilterChanges, Index};
 use types::{Log, Receipt, SyncStatus, Transaction, Work, Contract};
-use types::{H64, H256, U256, U128, H128};
 
 build_rpc_trait! {
     /// Eth rpc interface.
@@ -68,11 +68,11 @@ build_rpc_trait! {
 
         /// Returns balance of the given account.
         #[rpc(name = "eth_getBalance")]
-        fn balance(&self, H256, Trailing<BlockNumber>) -> BoxFuture<U256>;
+        fn balance(&self, Address, Trailing<BlockNumber>) -> BoxFuture<U256>;
 
         /// Returns content of the storage at given address.
         #[rpc(name = "eth_getStorageAt")]
-        fn storage_at(&self, H256, U128, Trailing<BlockNumber>) -> BoxFuture<H128>;
+        fn storage_at(&self, Address, U128, Trailing<BlockNumber>) -> BoxFuture<H128>;
 
         /// Returns block with given hash.
         #[rpc(name = "eth_getBlockByHash")]
@@ -84,7 +84,7 @@ build_rpc_trait! {
 
         /// Returns the number of transactions sent from given address at given time (block number).
         #[rpc(name = "eth_getTransactionCount")]
-        fn transaction_count(&self, H256, Trailing<BlockNumber>) -> BoxFuture<U256>;
+        fn transaction_count(&self, Address, Trailing<BlockNumber>) -> BoxFuture<U256>;
 
         /// Returns the number of transactions in a block with given hash.
         #[rpc(name = "eth_getBlockTransactionCountByHash")]
@@ -96,7 +96,7 @@ build_rpc_trait! {
 
         /// Returns the code at given address at given time (block number).
         #[rpc(name = "eth_getCode")]
-        fn code_at(&self, H256, Trailing<BlockNumber>) -> BoxFuture<Bytes>;
+        fn code_at(&self, Address, Trailing<BlockNumber>) -> BoxFuture<Bytes>;
 
         /// Sends signed transaction, returning its hash.
         #[rpc(name = "eth_sendRawTransaction")]

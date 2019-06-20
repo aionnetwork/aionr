@@ -23,7 +23,7 @@
 //! Request Provenance
 
 use std::fmt;
-use types::H256;
+use aion_types::H256;
 
 /// RPC request origin
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]

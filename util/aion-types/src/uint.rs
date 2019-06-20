@@ -26,6 +26,7 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer};
 #[cfg(feature = "serialize")]
 use ethereum_types_serialize;
 
+construct_uint!(U64, 1);
 construct_uint!(U128, 2);
 construct_uint!(U256, 4);
 construct_uint!(U512, 8);
@@ -301,6 +302,22 @@ impl From<U256> for [u8; 32] {
     }
 }
 
+impl<'a> From<&'a [u8; 8]> for U64 {
+    fn from(bytes: &[u8; 8]) -> Self { bytes[..].into() }
+}
+
+impl From<[u8; 8]> for U64 {
+    fn from(bytes: [u8; 8]) -> Self { bytes[..].as_ref().into() }
+}
+
+impl From<U64> for [u8; 8] {
+    fn from(number: U64) -> Self {
+        let mut arr = [0u8; 8];
+        number.to_big_endian(&mut arr);
+        arr
+    }
+}
+
 impl<'a> From<&'a [u8; 16]> for U128 {
     fn from(bytes: &[u8; 16]) -> Self { bytes[..].into() }
 }
@@ -361,6 +378,7 @@ macro_rules! impl_serde {
     };
 }
 
+impl_serde!(U64, 1);
 impl_serde!(U128, 2);
 impl_serde!(U256, 4);
 impl_serde!(U512, 8);

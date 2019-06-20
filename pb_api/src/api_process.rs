@@ -25,7 +25,7 @@ use super::LOG_TARGET;
 use acore::transaction::local_transactions::TxIoMessage;
 use aion_rpc::traits::Pb;
 use aion_rpc::types::{
-    Block, BlockTransactions, H256 as RpcH256, SimpleReceipt, Transaction, U256 as RpcU256,
+    Block, BlockTransactions, SimpleReceipt, Transaction
 };
 use aion_types::{H256, U256};
 use crossbeam::queue::MsQueue;
@@ -229,7 +229,7 @@ impl ApiProcess {
                 }
                 let data = parse_msg_req(request, &msghash);
                 let mut req = req_getBlockDetailsByNumber::new();
-                let best_block_number: u64 = to_u256(self.client.blocknumber()).into();
+                let best_block_number: u64 = self.client.blocknumber().into();
                 api_try!(req.merge_from_bytes(&data));
                 let mut nlknum: Vec<u64> = req
                     .get_blkNumbers()
@@ -336,7 +336,7 @@ impl ApiProcess {
                         Retcode::r_fail_function_arguments.value(),
                     );
                 }
-                let result: Option<RpcH256> = self.client.pb_send_transaction(encodedTx.into());
+                let result: Option<H256> = self.client.pb_send_transaction(encodedTx.into());
                 if result.is_none() {
                     return to_return_header_with_hash(
                         get_api_version(),
@@ -427,12 +427,12 @@ fn get_rsp_getTransaction(tx: Transaction) -> rsp_getTransaction {
     rsp.set_data(tx.input.into_vec());
     rsp.set_from(tx.from.0.to_vec());
     rsp.set_nonce(u256_to_vec(tx.nonce.into()));
-    rsp.set_nrgConsume(to_u256(tx.gas).into());
-    rsp.set_nrgPrice(to_u256(tx.gas_price).into());
+    rsp.set_nrgConsume(tx.gas.into());
+    rsp.set_nrgPrice(tx.gas_price.into());
     let timestamp = tx.timestamp.into_vec();
     rsp.set_timeStamp(U256::from(timestamp.as_slice()).into());
     rsp.set_to(txto.to_vec());
-    rsp.set_txHash(to_h256(tx.hash).0.to_vec());
+    rsp.set_txHash(tx.hash.0.to_vec());
     rsp.set_txIndex(txindex.into());
     rsp.set_value(u256_to_vec(tx.value.into()));
     rsp
@@ -453,10 +453,10 @@ fn create_t_block_detail(block: Block, br: Vec<SimpleReceipt>) -> t_BlockDetail 
     blockdetail.set_logsBloom(block.logs_bloom.0.to_vec());
     blockdetail.set_minerAddress(block.miner.0.to_vec());
     blockdetail.set_nonce(block.nonce.map_or_else(|| Vec::new(), Into::into));
-    blockdetail.set_nrgConsumed(to_u256(block.gas_used).into());
-    blockdetail.set_nrgLimit(to_u256(block.gas_limit).into());
+    blockdetail.set_nrgConsumed(block.gas_used.into());
+    blockdetail.set_nrgLimit(block.gas_limit.into());
     blockdetail.set_parentHash(block.parent_hash.0.to_vec());
-    blockdetail.set_timestamp(to_u256(block.timestamp).into());
+    blockdetail.set_timestamp(block.timestamp.into());
     blockdetail.set_txTrieRoot(block.transactions_root.0.to_vec());
     blockdetail.set_receiptTrieRoot(block.receipts_root.0.to_vec());
     blockdetail.set_stateRoot(block.state_root.0.to_vec());
@@ -488,8 +488,8 @@ fn create_t_tx_detail(tx: Transaction, re: SimpleReceipt) -> t_TxDetail {
     txdetail.set_from(tx.from.0.to_vec());
     txdetail.set_nonce(u256_to_vec(tx.nonce.into()));
     txdetail.set_value(u256_to_vec(tx.value.into()));
-    txdetail.set_nrgConsumed(to_u256(tx.gas).into());
-    txdetail.set_nrgPrice(to_u256(tx.gas_price).into());
+    txdetail.set_nrgConsumed(tx.gas.into());
+    txdetail.set_nrgPrice(tx.gas_price.into());
     txdetail.set_txHash(tx.hash.0.to_vec());
     txdetail.set_txIndex(index.into());
 
@@ -535,13 +535,13 @@ fn create_block_msg(block: Option<Block>) -> Vec<u8> {
     rsp.set_txTrieRoot(block.transactions_root.0.to_vec());
     rsp.set_difficulty(u256_to_vec(block.difficulty.into()));
     rsp.set_extraData(block.extra_data.into());
-    rsp.set_nrgConsumed(to_u256(block.gas_used).into());
-    rsp.set_nrgLimit(to_u256(block.gas_limit).into());
+    rsp.set_nrgConsumed(block.gas_used.into());
+    rsp.set_nrgLimit(block.gas_limit.into());
     rsp.set_hash(blockhash.0.to_vec());
     rsp.set_logsBloom(block.logs_bloom.0.to_vec());
     rsp.set_nonce(block.nonce.map_or_else(|| Vec::new(), Into::into));
     rsp.set_receiptTrieRoot(block.receipts_root.0.to_vec());
-    rsp.set_timestamp(to_u256(block.timestamp).into());
+    rsp.set_timestamp(block.timestamp.into());
     rsp.set_blockNumber(blocknumber.into());
     rsp.set_solution(block.solution.map_or_else(|| Vec::new(), Into::into));
     rsp.set_size(blocksize.into());
@@ -635,16 +635,6 @@ impl IoHandler<TxIoMessage> for TxIoHandler {
 //=========================================================================
 //============================= utils =====================================
 //=========================================================================
-
-fn to_h256(h: RpcH256) -> H256 {
-    let h: H256 = h.into();
-    h
-}
-
-fn to_u256(u: RpcU256) -> U256 {
-    let u: U256 = u.into();
-    u
-}
 
 fn u256_to_vec(u: U256) -> Vec<u8> {
     let u: [u8; 32] = u.into();

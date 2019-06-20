@@ -28,7 +28,7 @@ use std::thread;
 use std::time;
 
 use rlp::UntrustedRlp;
-use aion_types::{H256, H128, U128, Address};
+use aion_types::{H64, H128, U128, H256, U256, Address};
 use serde_json::{self, Value};
 use serde_json::map::Map;
 use dispatch::DynamicGasPrice;
@@ -55,8 +55,7 @@ use helpers::accounts::unwrap_provider;
 use traits::{Eth, Pb};
 use types::{
     Block, BlockTransactions, BlockNumber, Bytes, SyncStatus, Transaction, CallRequest, Index,
-    Filter, Log, Receipt, Work, H64 as RpcH64, H256 as RpcH256, U256 as RpcU256, U128 as RpcU128,
-    H128 as RpcH128, Contract, ContractInfo, Abi, AbiIO, SyncInfo, AcitvePeerInfo, PbSyncInfo,
+    Filter, Log, Receipt, Work, Contract, ContractInfo, Abi, AbiIO, SyncInfo, AcitvePeerInfo, PbSyncInfo,
     SimpleReceipt, SimpleReceiptLog,
 };
 
@@ -257,34 +256,31 @@ where
         }
     }
 
-    fn author(&self) -> Result<RpcH256> { Ok(RpcH256::from(self.miner.author())) }
+    fn author(&self) -> Result<H256> { Ok(H256::from(self.miner.author())) }
 
     fn is_mining(&self) -> Result<bool> { Ok(self.miner.is_currently_sealing()) }
 
     fn hashrate(&self) -> Result<String> { Ok(format!("{}", self.external_miner.hashrate())) }
 
-    fn gas_price(&self) -> Result<RpcU256> {
-        Ok(RpcU256::from(default_gas_price(
+    fn gas_price(&self) -> Result<U256> {
+        Ok(U256::from(default_gas_price(
             &*self.client,
             &*self.miner,
             self.dynamic_gas_price.clone(),
         )))
     }
 
-    fn accounts(&self) -> Result<Vec<RpcH256>> {
+    fn accounts(&self) -> Result<Vec<H256>> {
         let store = self.account_provider()?;
         let accounts = store
             .accounts()
             .map_err(|e| errors::account("Could not fetch accounts.", e))?;
-        Ok(accounts
-            .into_iter()
-            .map(Into::into)
-            .collect::<Vec<RpcH256>>())
+        Ok(accounts.into_iter().map(Into::into).collect::<Vec<H256>>())
     }
 
     fn block_number(&self) -> Result<u64> { Ok(self.client.chain_info().best_block_number) }
 
-    fn balance(&self, address: RpcH256, num: Trailing<BlockNumber>) -> BoxFuture<RpcU256> {
+    fn balance(&self, address: H256, num: Trailing<BlockNumber>) -> BoxFuture<U256> {
         let address = address.into();
 
         let id = num.unwrap_or_default();
@@ -300,52 +296,42 @@ where
 
     fn storage_at(
         &self,
-        address: RpcH256,
-        pos: RpcU128,
+        address: Address,
+        pos: U128,
         num: Trailing<BlockNumber>,
-    ) -> BoxFuture<RpcH128>
+    ) -> BoxFuture<H128>
     {
-        let address: Address = RpcH256::into(address);
-        let position: U128 = RpcU128::into(pos);
-
         let id = num.unwrap_or_default();
 
         try_bf!(check_known(&*self.client, id.clone()));
         let res = match self
             .client
-            .storage_at(&address, &H128::from(position), id.into())
+            .storage_at(&address, &H128::from(pos), id.into())
         {
-            Some(s) => Ok(s.into()),
+            Some(s) => Ok(s),
             None => Err(errors::state_pruned()),
         };
 
         Box::new(future::done(res))
     }
 
-    fn transaction_count(
-        &self,
-        address: RpcH256,
-        num: Trailing<BlockNumber>,
-    ) -> BoxFuture<RpcU256>
-    {
-        let address: Address = RpcH256::into(address);
-
+    fn transaction_count(&self, address: Address, num: Trailing<BlockNumber>) -> BoxFuture<U256> {
         let res = match num.unwrap_or_default() {
             BlockNumber::Pending => {
                 let nonce = self
                     .miner
                     .last_nonce(&address)
-                    .map(|n| n + 1.into())
+                    .map(|n| n + U256::from(1))
                     .or_else(|| self.client.nonce(&address, BlockNumber::Pending.into()));
                 match nonce {
-                    Some(nonce) => Ok(nonce.into()),
+                    Some(nonce) => Ok(nonce),
                     None => Err(errors::database("latest nonce missing")),
                 }
             }
             id => {
                 try_bf!(check_known(&*self.client, id.clone()));
                 match self.client.nonce(&address, id.into()) {
-                    Some(nonce) => Ok(nonce.into()),
+                    Some(nonce) => Ok(nonce),
                     None => Err(errors::state_pruned()),
                 }
             }
@@ -354,15 +340,15 @@ where
         Box::new(future::done(res))
     }
 
-    fn block_transaction_count_by_hash(&self, hash: RpcH256) -> BoxFuture<Option<RpcU256>> {
+    fn block_transaction_count_by_hash(&self, hash: H256) -> BoxFuture<Option<U256>> {
         Box::new(future::ok(
             self.client
-                .block(BlockId::Hash(hash.into()))
+                .block(BlockId::Hash(hash))
                 .map(|block| block.transactions_count().into()),
         ))
     }
 
-    fn block_transaction_count_by_number(&self, num: BlockNumber) -> BoxFuture<Option<RpcU256>> {
+    fn block_transaction_count_by_number(&self, num: BlockNumber) -> BoxFuture<Option<U256>> {
         Box::new(future::ok(match num {
             BlockNumber::Pending => Some(self.miner.status().transactions_in_pending_block.into()),
             _ => {
@@ -373,9 +359,7 @@ where
         }))
     }
 
-    fn code_at(&self, address: RpcH256, num: Trailing<BlockNumber>) -> BoxFuture<Bytes> {
-        let address: Address = RpcH256::into(address);
-
+    fn code_at(&self, address: Address, num: Trailing<BlockNumber>) -> BoxFuture<Bytes> {
         let id = num.unwrap_or_default();
         try_bf!(check_known(&*self.client, id.clone()));
 
@@ -387,18 +371,15 @@ where
         Box::new(future::done(res))
     }
 
-    fn block_by_hash(&self, hash: RpcH256, include_txs: bool) -> BoxFuture<Option<Block>> {
-        Box::new(future::done(
-            self.block(BlockId::Hash(hash.into()), include_txs),
-        ))
+    fn block_by_hash(&self, hash: H256, include_txs: bool) -> BoxFuture<Option<Block>> {
+        Box::new(future::done(self.block(BlockId::Hash(hash), include_txs)))
     }
 
     fn block_by_number(&self, num: BlockNumber, include_txs: bool) -> BoxFuture<Option<Block>> {
         Box::new(future::done(self.block(num.into(), include_txs)))
     }
 
-    fn transaction_by_hash(&self, hash: RpcH256) -> BoxFuture<Option<Transaction>> {
-        let hash: H256 = hash.into();
+    fn transaction_by_hash(&self, hash: H256) -> BoxFuture<Option<Transaction>> {
         let block_number = self.client.chain_info().best_block_number;
         let tx = try_bf!(self.transaction(TransactionId::Hash(hash))).or_else(|| {
             self.miner
@@ -411,12 +392,12 @@ where
 
     fn transaction_by_block_hash_and_index(
         &self,
-        hash: RpcH256,
+        hash: H256,
         index: Index,
     ) -> BoxFuture<Option<Transaction>>
     {
         Box::new(future::done(self.transaction(TransactionId::Location(
-            BlockId::Hash(hash.into()),
+            BlockId::Hash(hash),
             index.value(),
         ))))
     }
@@ -432,8 +413,7 @@ where
         ))
     }
 
-    fn transaction_receipt(&self, hash: RpcH256) -> BoxFuture<Option<Receipt>> {
-        let hash: H256 = hash.into();
+    fn transaction_receipt(&self, hash: H256) -> BoxFuture<Option<Receipt>> {
         let receipt = self.client.transaction_receipt(TransactionId::Hash(hash));
         Box::new(future::ok(receipt.map(Into::into)))
     }
@@ -467,18 +447,18 @@ where
         ))
     }
 
-    fn submit_work(&self, _nonce: RpcH64, _pow_hash: RpcH256, _solution: Bytes) -> Result<bool> {
+    fn submit_work(&self, _nonce: H64, _pow_hash: H256, _solution: Bytes) -> Result<bool> {
         Err(errors::deprecated(
             "eth_submitWork is deprecated, use stratum api submitblock instead".to_string(),
         ))
     }
 
-    fn submit_hashrate(&self, rate: RpcU256, id: RpcH256) -> Result<bool> {
-        self.external_miner.submit_hashrate(rate.into(), id.into());
+    fn submit_hashrate(&self, rate: U256, id: H256) -> Result<bool> {
+        self.external_miner.submit_hashrate(rate, id);
         Ok(true)
     }
 
-    fn send_raw_transaction(&self, raw: Bytes) -> Result<RpcH256> {
+    fn send_raw_transaction(&self, raw: Bytes) -> Result<H256> {
         UntrustedRlp::new(&raw.into_vec())
             .as_val()
             .map_err(errors::rlp)
@@ -491,10 +471,9 @@ where
                     signed_transaction.into(),
                 )
             })
-            .map(Into::into)
     }
 
-    fn submit_transaction(&self, raw: Bytes) -> Result<RpcH256> { self.send_raw_transaction(raw) }
+    fn submit_transaction(&self, raw: Bytes) -> Result<H256> { self.send_raw_transaction(raw) }
 
     fn call(&self, request: CallRequest, num: Trailing<BlockNumber>) -> BoxFuture<Bytes> {
         let request = CallRequest::into(request);
@@ -508,13 +487,12 @@ where
         ))
     }
 
-    fn estimate_gas(&self, request: CallRequest, num: Trailing<BlockNumber>) -> BoxFuture<RpcU256> {
+    fn estimate_gas(&self, request: CallRequest, num: Trailing<BlockNumber>) -> BoxFuture<U256> {
         let request = CallRequest::into(request);
         let signed = try_bf!(fake_sign::sign_call(request));
         Box::new(future::done(
             self.client
                 .estimate_gas(&signed, num.unwrap_or_default().into())
-                .map(Into::into)
                 .map_err(errors::call),
         ))
     }
@@ -743,43 +721,40 @@ where
     M: MinerService,
     EM: ExternalMinerService,
 {
-    fn balance(&self, address: RpcH256) -> RpcU256 {
-        let address = address.into();
-
+    fn balance(&self, address: Address) -> U256 {
         let id = BlockNumber::default();
-        match self.client.balance(&address, id.into()) {
-            Some(balance) => balance.into(),
-            None => 0.into(),
-        }
+        self.client
+            .balance(&address, id.into())
+            .unwrap_or(U256::from(0))
     }
 
-    fn transaction_by_hash(&self, txhash: RpcH256) -> Option<Transaction> {
-        let hash: H256 = txhash.into();
+    fn transaction_by_hash(&self, txhash: H256) -> Option<Transaction> {
         let block_number = self.client.chain_info().best_block_number;
-        let tx = self.transaction(TransactionId::Hash(hash)).unwrap_or(
+        let tx = self.transaction(TransactionId::Hash(txhash)).unwrap_or(
             self.miner
-                .transaction(block_number, &hash)
+                .transaction(block_number, &txhash)
                 .map(|t| Transaction::from_pending(t)),
         );
         tx
     }
 
-    fn nonce(&self, address: RpcH256) -> RpcU256 {
-        let address = address.into();
+    fn nonce(&self, address: Address) -> U256 {
         let id = BlockNumber::default();
-        match self.client.nonce(&address, id.into()) {
-            Some(nonce) => nonce.into(),
-            None => 0.into(),
-        }
+        self.client
+            .nonce(&address, id.into())
+            .unwrap_or(U256::from(0))
     }
 
-    fn blocknumber(&self) -> RpcU256 { RpcU256::from(self.client.chain_info().best_block_number) }
+    fn blocknumber(&self) -> U256 { U256::from(self.client.chain_info().best_block_number) }
 
     fn block_by_number(&self, number: i64, include_txs: bool) -> Option<Block> {
         let id = match number {
             -1 => BlockId::Latest,
             0 => BlockId::Earliest,
-            number => BlockId::Number(number as u64),
+            number if number > 0 => BlockId::Number(number as u64),
+            _ => {
+                return None;
+            }
         };
         match self.block(id, include_txs) {
             Ok(t) => t,
@@ -814,8 +789,7 @@ where
         }
     }
 
-    fn transaction_receipt(&self, txhash: RpcH256) -> Option<Receipt> {
-        let txhash: H256 = txhash.into();
+    fn transaction_receipt(&self, txhash: H256) -> Option<Receipt> {
         self.client
             .transaction_receipt(TransactionId::Hash(txhash))
             .map(|r| r.into())
@@ -846,7 +820,10 @@ where
         let id = match number {
             -1 => BlockId::Latest,
             0 => BlockId::Earliest,
-            number => BlockId::Number(number as u64),
+            number if number > 0 => BlockId::Number(number as u64),
+            _ => {
+                return vec![];
+            }
         };
         if let Some(blk_hash) = self.client.block_hash(id) {
             if let Some(raw_data) = self.client.block_receipts(&blk_hash) {
@@ -865,7 +842,7 @@ where
         }
     }
 
-    fn pb_send_transaction(&self, raw: Bytes) -> Option<RpcH256> {
+    fn pb_send_transaction(&self, raw: Bytes) -> Option<H256> {
         match UntrustedRlp::new(&raw.into_vec()).as_val() {
             Err(_) => None,
             Ok(tx) => {
@@ -878,7 +855,7 @@ where
                             &*self.miner,
                             tx.into(),
                         );
-                        Some(hash.into())
+                        Some(hash)
                     }
                 }
             }

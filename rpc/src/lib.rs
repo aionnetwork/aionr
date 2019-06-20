@@ -63,9 +63,6 @@ extern crate jsonrpc_macros;
 extern crate serde_derive;
 
 #[cfg(test)]
-extern crate ajson;
-
-#[cfg(test)]
 #[macro_use]
 extern crate pretty_assertions;
 

@@ -6,7 +6,7 @@
 
 use std::{cmp, mem, str};
 use byteorder::{ByteOrder, BigEndian};
-use bigint::{U128, U256, H64, H128, H160, H256, H512, H520, H768};
+use bigint::{U64, U128, U256, H64, H128, H160, H256, H512, H520, H768};
 use ethbloom::Bloom;
 use traits::{Encodable, Decodable};
 use stream::RlpStream;
@@ -253,9 +253,11 @@ macro_rules! impl_decodable_for_uint {
 
 impl_encodable_for_uint!(U256, 32);
 impl_encodable_for_uint!(U128, 16);
+impl_encodable_for_uint!(U64, 8);
 
 impl_decodable_for_uint!(U256, 32);
 impl_decodable_for_uint!(U128, 16);
+impl_decodable_for_uint!(U64, 8);
 
 impl<'a> Encodable for &'a str {
     fn rlp_append(&self, s: &mut RlpStream) { s.encoder().encode_value(self.as_bytes()); }

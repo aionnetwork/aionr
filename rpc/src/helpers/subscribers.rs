@@ -26,7 +26,7 @@ use std::{ops, str};
 use std::collections::HashMap;
 use jsonrpc_macros::pubsub::{Subscriber, Sink, SubscriptionId};
 use rand::{Rng, StdRng};
-use types::H64;
+use aion_types::H64;
 
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Id(H64);

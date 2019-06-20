@@ -22,7 +22,9 @@
 
 //! Personal rpc interface.
 use jsonrpc_core::{BoxFuture, Result};
-use types::{Bytes, H256, H768, TransactionRequest, RichRawTransaction as RpcRichRawTransaction};
+use aion_types::{H256, H768, Address};
+
+use types::{Bytes, TransactionRequest, RichRawTransaction as RpcRichRawTransaction};
 
 build_rpc_trait! {
     /// Personal rpc interface. Safe (read-only) functions.
@@ -30,24 +32,24 @@ build_rpc_trait! {
 
         /// Lists all stored accounts
         #[rpc(name = "personal_listAccounts")]
-        fn accounts(&self) -> Result<Vec<H256>>;
+        fn accounts(&self) -> Result<Vec<Address>>;
 
         /// Creates new account (it becomes new current unlocked account)
         /// Param is the password for the account.
         #[rpc(name = "personal_newAccount")]
-        fn new_account(&self, String) -> Result<H256>;
+        fn new_account(&self, String) -> Result<Address>;
 
         /// Unlocks specified account for use (can only be one unlocked account at one moment)
         #[rpc(name = "personal_unlockAccount")]
-        fn unlock_account(&self, H256, String, Option<u64>) -> Result<bool>;
+        fn unlock_account(&self, Address, String, Option<u64>) -> Result<bool>;
 
         /// Locks specified account for use
         #[rpc(name = "personal_lockAccount")]
-        fn lock_account(&self, H256, String) -> Result<bool>;
+        fn lock_account(&self, Address, String) -> Result<bool>;
 
         /// Check if a specified account is unlocked
         #[rpc(name = "personal_isAccountUnlocked")]
-        fn is_account_unlocked(&self, H256) -> Result<bool>;
+        fn is_account_unlocked(&self, Address) -> Result<bool>;
 
         /// Signs the hash of data with given account signature using the given password to unlock the account during
         /// the request.

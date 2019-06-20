@@ -28,14 +28,14 @@ use std::collections::HashSet;
 use acore::miner::MinerService;
 use acore::filter::Filter as EthcoreFilter;
 use acore::client::{BlockChainClient, BlockId};
-use aion_types::H256;
+use aion_types::{H256, U256};
 use parking_lot::Mutex;
 
 use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_core::futures::{future, Future};
 use jsonrpc_core::futures::future::Either;
 use traits::EthFilter;
-use types::{BlockNumber, Index, Filter, FilterChanges, Log, H256 as RpcH256, U256 as RpcU256};
+use types::{BlockNumber, Index, Filter, FilterChanges, Log};
 use helpers::{errors, PollFilter, PollManager, limit_logs};
 use impls::eth::pending_logs;
 
@@ -48,7 +48,7 @@ pub trait Filterable {
     fn block_number(&self, id: BlockId) -> Option<u64>;
 
     /// Get a block hash by block id.
-    fn block_hash(&self, id: BlockId) -> Option<RpcH256>;
+    fn block_hash(&self, id: BlockId) -> Option<H256>;
 
     /// pending transaction hashes at the given block.
     fn pending_transactions_hashes(&self, block_number: u64) -> Vec<H256>;
@@ -98,9 +98,7 @@ where
 
     fn block_number(&self, id: BlockId) -> Option<u64> { self.client.block_number(id) }
 
-    fn block_hash(&self, id: BlockId) -> Option<RpcH256> {
-        self.client.block_hash(id).map(Into::into)
-    }
+    fn block_hash(&self, id: BlockId) -> Option<H256> { self.client.block_hash(id) }
 
     fn pending_transactions_hashes(&self, best: u64) -> Vec<H256> {
         self.miner.pending_transactions_hashes(best)
@@ -124,7 +122,7 @@ where
 }
 
 impl<T: Filterable + Send + Sync + 'static> EthFilter for T {
-    fn new_filter(&self, filter: Filter) -> Result<RpcU256> {
+    fn new_filter(&self, filter: Filter) -> Result<U256> {
         let mut polls = self.polls().lock();
         match self.block_number(
             filter
@@ -141,14 +139,14 @@ impl<T: Filterable + Send + Sync + 'static> EthFilter for T {
         }
     }
 
-    fn new_block_filter(&self) -> Result<RpcU256> {
+    fn new_block_filter(&self) -> Result<U256> {
         let mut polls = self.polls().lock();
         // +1, since we don't want to include the current block
         let id = polls.create_poll(PollFilter::Block(self.best_block_number() + 1));
         Ok(id.into())
     }
 
-    fn new_pending_transaction_filter(&self) -> Result<RpcU256> {
+    fn new_pending_transaction_filter(&self) -> Result<U256> {
         let mut polls = self.polls().lock();
         let best_block = self.best_block_number();
         let pending_transactions = self.pending_transactions_hashes(best_block);
@@ -169,7 +167,7 @@ impl<T: Filterable + Send + Sync + 'static> EthFilter for T {
                             .into_iter()
                             .map(BlockId::Number)
                             .filter_map(|id| self.block_hash(id))
-                            .collect::<Vec<RpcH256>>();
+                            .collect::<Vec<H256>>();
 
                         *block_number = current_number;
 
@@ -190,7 +188,7 @@ impl<T: Filterable + Send + Sync + 'static> EthFilter for T {
                                 .filter(|hash| !previous_hashes_set.contains(hash))
                                 .cloned()
                                 .map(Into::into)
-                                .collect::<Vec<RpcH256>>()
+                                .collect::<Vec<H256>>()
                         };
 
                         // save all hashes of pending transactions

@@ -25,7 +25,8 @@
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::Error;
 use serde_json::{Value, from_value};
-use types::{Header, Filter, Log, H256};
+use aion_types::H256;
+use types::{Header, Filter, Log};
 
 /// Subscription result.
 #[derive(Debug, Clone, PartialEq, Eq)]

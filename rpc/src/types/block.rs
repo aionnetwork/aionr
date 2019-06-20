@@ -21,9 +21,11 @@
  ******************************************************************************/
 
 use acore::encoded::Header as EthHeader;
+use aion_types::{H256, U256};
+use ethbloom::Bloom;
 
 use serde::{Serialize, Serializer};
-use types::{Bytes, Transaction, H256, H2048, U256};
+use types::{Bytes, Transaction};
 
 /// Block Transactions
 #[derive(Debug)]
@@ -77,7 +79,7 @@ pub struct Block {
     pub extra_data: Bytes,
     /// Logs bloom
     #[serde(rename = "logsBloom")]
-    pub logs_bloom: H2048,
+    pub logs_bloom: Bloom,
     /// Timestamp
     pub timestamp: U256,
     /// Difficulty
@@ -128,7 +130,7 @@ pub struct Header {
     pub extra_data: Bytes,
     /// Logs bloom
     #[serde(rename = "logsBloom")]
-    pub logs_bloom: H2048,
+    pub logs_bloom: Bloom,
     /// Timestamp
     pub timestamp: U256,
     /// Difficulty
@@ -154,19 +156,19 @@ impl<'a> From<&'a EthHeader> for Header {
             _ => (None, None),
         };
         Header {
-            hash: Some(h.hash().into()),
+            hash: Some(h.hash()),
             size: Some(h.rlp().as_raw().len().into()),
-            parent_hash: h.parent_hash().into(),
-            miner: h.author().into(),
-            state_root: h.state_root().into(),
-            transactions_root: h.transactions_root().into(),
-            receipts_root: h.receipts_root().into(),
+            parent_hash: h.parent_hash(),
+            miner: h.author(),
+            state_root: h.state_root(),
+            transactions_root: h.transactions_root(),
+            receipts_root: h.receipts_root(),
             number: Some(h.number().into()),
-            gas_used: h.gas_used().into(),
-            gas_limit: h.gas_limit().into(),
-            logs_bloom: h.log_bloom().into(),
+            gas_used: h.gas_used(),
+            gas_limit: h.gas_limit(),
+            logs_bloom: h.log_bloom(),
             timestamp: h.timestamp().into(),
-            difficulty: h.difficulty().into(),
+            difficulty: h.difficulty(),
             extra_data: h.extra_data().into(),
             nonce: nonce,
             solution: solution,
@@ -177,7 +179,9 @@ impl<'a> From<&'a EthHeader> for Header {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use types::{Transaction, H256, H2048, Bytes, U256};
+    use ethbloom::Bloom;
+    use aion_types::{H256, U256};
+    use types::{Transaction, Bytes};
     use super::{Block, BlockTransactions, Header};
 
     #[test]
@@ -207,7 +211,7 @@ mod tests {
             gas_used: U256::default(),
             gas_limit: U256::default(),
             extra_data: Bytes::default(),
-            logs_bloom: H2048::default(),
+            logs_bloom: Bloom::default(),
             timestamp: U256::default(),
             difficulty: U256::default(),
             total_difficulty: Some(U256::default()),
@@ -234,7 +238,7 @@ mod tests {
             gas_used: U256::default(),
             gas_limit: U256::default(),
             extra_data: Bytes::default(),
-            logs_bloom: H2048::default(),
+            logs_bloom: Bloom::default(),
             timestamp: U256::default(),
             difficulty: U256::default(),
             total_difficulty: Some(U256::default()),
@@ -261,7 +265,7 @@ mod tests {
             gas_used: U256::default(),
             gas_limit: U256::default(),
             extra_data: Bytes::default(),
-            logs_bloom: H2048::default(),
+            logs_bloom: Bloom::default(),
             timestamp: U256::default(),
             difficulty: U256::default(),
             nonce: Some(Bytes::default()),
