@@ -64,7 +64,7 @@ impl OriginInfo {
 }
 
 /// Implementation of evm Externalities.
-#[allow(dead_code)]
+#[allow(unused)]
 pub struct AVMExternalities<'a, B: 'a>
 where B: StateBackend
 {

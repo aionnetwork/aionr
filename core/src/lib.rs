@@ -85,6 +85,8 @@ extern crate fastvm;
 extern crate logger;
 #[cfg(test)]
 extern crate tempdir;
+#[cfg(test)]
+extern crate avm_abi;
 
 pub mod account_provider;
 pub mod block;
