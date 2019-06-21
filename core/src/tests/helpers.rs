@@ -20,6 +20,8 @@
  *
  ******************************************************************************/
 
+extern crate aion_types;
+
 use aion_types::{H256, U256};
 use account_provider::AccountProvider;
 use block::{OpenBlock, Drain};

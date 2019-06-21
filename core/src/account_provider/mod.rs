@@ -81,7 +81,7 @@ impl From<SSError> for SignError {
 }
 
 /// `AccountProvider` errors.
-pub type Error = SSError;
+type Error = SSError;
 
 fn transient_sstore() -> EthMultiStore {
     EthMultiStore::open(Box::new(MemoryDirectory::default()))
