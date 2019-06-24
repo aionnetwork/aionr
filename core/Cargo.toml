@@ -72,6 +72,7 @@ logger =           { path = "../util/logger" }
 aion-types =       { path = "../util/aion-types" }
 db =               { path = "../db/core" }
 types =     { path = "../types" }
+avm_abi =   { path = "../util/avm_abi" }
 
 
 [features]

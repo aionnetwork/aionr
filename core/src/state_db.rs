@@ -520,7 +520,7 @@ unsafe impl Sync for SyncAccount {}
 mod tests {
     use aion_types::{H256, U256, Address};
     use kvdb::DBTransaction;
-    use tests::helpers::*;
+    use helpers::*;
     use state::{VMAccount, Backend, AionVMAccount};
     use logger::init_log;
 

@@ -39,4 +39,7 @@ pub mod maybe;
 pub mod state;
 pub mod transaction;
 pub mod misc;
-pub mod test;
+#[cfg(test)]
+mod test;
+#[cfg(test)]
+use bytes::Bytes;

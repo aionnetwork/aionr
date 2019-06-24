@@ -93,7 +93,7 @@ mod tests {
     use tiny_keccak::keccak256;
     use super::EDVerifyContract;
     use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
-    use tests::helpers::get_temp_state;
+    use helpers::get_temp_state;
     use types::vms::ExecStatus;
     use state::{State, Substate};
     use aion_types::{Address, H256};

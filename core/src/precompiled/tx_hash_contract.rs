@@ -62,7 +62,7 @@ impl BuiltinContract for TxHashContract {
 mod tests {
     use super::TxHashContract;
     use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
-    use tests::helpers::get_temp_state;
+    use helpers::get_temp_state;
     use state::Substate;
     use aion_types::{H256, Address};
     use types::vms::ExecStatus;

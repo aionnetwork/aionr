@@ -29,6 +29,13 @@ use serde_json::Error;
 use hash::H256;
 use uint::Uint;
 
+use super::*;
+
+mod bytes;
+mod hash;
+mod maybe;
+mod uint;
+
 /// Blockchain test header deserializer.
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct DifficultyTestCase {

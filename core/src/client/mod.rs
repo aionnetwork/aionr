@@ -24,6 +24,10 @@
 mod config;
 mod error;
 mod client;
+#[cfg(test)]
+mod test_client;
+mod traits;
+mod chain_notify;
 
 pub use self::client::*;
 pub use self::config::{ClientConfig, DatabaseCompactionProfile, BlockChainConfig, VMType};
@@ -41,5 +45,5 @@ pub use types::vms::{EnvInfo, LastHashes};
 
 pub use error::{BlockImportError, TransactionImportError};
 
-mod traits;
-mod chain_notify;
+#[cfg(test)]
+pub use self::test_client::{EachBlockWith, TestBlockChainClient};

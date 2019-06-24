@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-def message, lastCommit,tag
+def message, lastCommit,tag, packageName
 
 @NonCPS
 def getCommit(){
@@ -80,18 +80,20 @@ pipeline {
 		}
 		stage('RPC Test'){
 			steps{
-				sh 'set -e'
-				script{
-					try{
-						sh './resources/run_RPCtest.sh'
-					}
-					catch(Exception e){
-						echo "${e}"
-						
-						throw e
-					}
+				script {
+					packageName = sh(returnStdout:true,script: 'echo aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)').trim();
 				}
-			}
+				echo "${env.WORKSPACE}"
+				echo "${packageName}"
+				build job: 'rpc-qa', parameters:[
+						string(name:'kernel_type',value:"aionr"),
+						string(name:'kernel_src',value:"${env.WORKSPACE}/package/${packageName}"),
+						string(name:'run_mode',value:"normal"),
+						string(name:'test_cases',value:"smoke-test"),
+						string(name:'test_socket',value:"http")
+					]
+				}
+		
 		}
     }
     post{

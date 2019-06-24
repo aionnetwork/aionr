@@ -801,7 +801,7 @@ mod tests {
     use spec::*;
     use super::{BlockQueue, Config, State};
     use super::kind::blocks::Unverified;
-    use tests::helpers::*;
+    use helpers::*;
     use error::*;
     use views::*;
 

@@ -19,7 +19,7 @@ protobuf = "2.1.1"
 log = "0.3"
 env_logger = "0.4"
 rustc-hex = "*"
-parking_lot = "*"
+parking_lot = "0.5"
 crossbeam = "0.4.1"
 
 [dependencies.zmq]

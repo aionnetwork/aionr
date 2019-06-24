@@ -357,7 +357,7 @@ mod test {
     use rustc_hex::FromHex;
     use state::{State, Substate};
     use super::{*};
-    use tests::helpers::get_temp_state;
+    use helpers::get_temp_state;
 
     lazy_static! {
         static ref OWNER_ADDRESS: Address =
