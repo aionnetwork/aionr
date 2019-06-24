@@ -312,7 +312,7 @@ mod tests {
     use encoded;
     use error::BlockError::*;
     use spec::Spec;
-    use tests::helpers::{create_test_block_with_data, create_test_block};
+    use helpers::{create_test_block_with_data, create_test_block};
     use transaction::{SignedTransaction, Transaction, UnverifiedTransaction, Action};
     use types::log_entry::{LogEntry, LocalizedLogEntry};
     use rlp;

@@ -33,6 +33,8 @@ mod update;
 
 #[cfg(test)]
 pub mod generator;
+#[cfg(test)]
+mod test;
 
 pub use self::blockchain::{BlockProvider, BlockChain};
 pub use self::cache::CacheSize;

@@ -151,6 +151,17 @@ pub struct Spec {
 }
 
 #[cfg(test)]
+macro_rules! load_bundled {
+    ($e:expr) => {
+        Spec::load(
+            &::std::env::temp_dir(),
+            include_bytes!(concat!("../../../resources/", $e, ".json")) as &[u8],
+        )
+        .expect(concat!("Chain spec ", $e, " is invalid."))
+    };
+}
+
+#[cfg(test)]
 impl Clone for Spec {
     fn clone(&self) -> Spec {
         Spec {
@@ -240,6 +251,16 @@ fn load_from(spec_params: SpecParams, s: ajson::spec::Spec) -> Result<Spec, Erro
 }
 
 impl Spec {
+    #[cfg(test)]
+    /// Create a new Spec which conforms to the Frontier-era Morden chain except that it's a
+    /// NullEngine consensus.
+    pub fn new_test() -> Spec { load_bundled!("null_morden") }
+
+    #[cfg(test)]
+    /// Create a new Spec which is a NullEngine consensus with a premine of address whose
+    /// secret is blake2b('').
+    pub fn new_null() -> Spec { load_bundled!("null") }
+
     // create an instance of an Ethereum state machine, minus consensus logic.
     fn machine(
         _engine_spec: &ajson::spec::Engine,

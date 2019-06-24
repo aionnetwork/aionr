@@ -1279,6 +1279,3 @@ impl Clone for State<StateDB> {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {}

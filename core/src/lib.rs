@@ -87,6 +87,11 @@ extern crate logger;
 extern crate tempdir;
 #[cfg(test)]
 extern crate avm_abi;
+#[cfg(test)]
+pub mod helpers;
+#[cfg(test)]
+#[macro_use]
+extern crate macros;
 
 pub mod account_provider;
 pub mod block;

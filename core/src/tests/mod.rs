@@ -20,6 +20,7 @@
  *
  ******************************************************************************/
 
-pub mod helpers;
 mod client;
 mod executive;
+
+use super::helpers::*;
