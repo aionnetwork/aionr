@@ -123,9 +123,6 @@ pub trait MinerService: Send + Sync {
         retracted: &[H256],
     );
 
-    /// PoW chain - can produce work package
-    fn can_produce_work_package(&self) -> bool;
-
     /// New chain head event. Restart mining operation.
     fn update_sealing(&self, chain: &MiningBlockChainClient);
 

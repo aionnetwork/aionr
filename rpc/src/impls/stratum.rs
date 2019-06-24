@@ -102,11 +102,6 @@ where
 {
     /// Returns the work of current block
     fn work(&self, _tpl_param: Trailing<TemplateParam>) -> Result<Work> {
-        if !self.miner.can_produce_work_package() {
-            warn!(target: "miner", "Cannot give work package - engine seals internally.");
-            return Err(errors::no_work_required());
-        }
-
         // check if we're still syncing and return empty strings in that case
         {
             //TODO: check if initial sync is complete here
@@ -200,11 +195,6 @@ where
         let pow_hash: H256 = clean_0x(pow_hash_str.as_str())
             .parse()
             .map_err(|_e| Error::invalid_params("invalid pow_hash"))?;
-
-        if !self.miner.can_produce_work_package() {
-            warn!(target: "miner", "Cannot submit work - engine seals internally.");
-            return Err(errors::no_work_required());
-        }
 
         trace!(target: "miner", "submit_work: Decoded: nonce={}, pow_hash={}, solution={:?}", nonce, pow_hash, solution);
 

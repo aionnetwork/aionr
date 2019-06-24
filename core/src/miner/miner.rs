@@ -154,7 +154,7 @@ struct SealingWork {
 }
 
 /// Keeps track of transactions using priority queue and holds currently mined block.
-/// Handles preparing work for "work sealing" or seals "internally" if Engine does not require work.
+/// Handles preparing work for "work sealing".
 pub struct Miner {
     // NOTE [ToDr]  When locking always lock in this order!
     transaction_pool: TransactionPool,
@@ -485,13 +485,11 @@ impl Miner {
             // Reseal when:
             // 1. forced sealing OR
             // 2. has local pending transactions OR
-            // 3. engine seals internally OR
-            // 4. best block is not higher than the last requested block (last time when a rpc
+            // 3. best block is not higher than the last requested block (last time when a rpc
             //    transaction entered or a miner requested work from rpc or stratum) by
             //    SEALING_TIMEOUT_IN_BLOCKS (hard coded 5)
             let should_disable_sealing = !self.forced_sealing()
                 && !has_local_transactions
-                && self.engine.seals_internally().is_none()
                 && best_block > last_request
                 && best_block - last_request > SEALING_TIMEOUT_IN_BLOCKS;
 
@@ -783,13 +781,7 @@ impl MinerService for Miner {
         }
     }
 
-    fn set_author(&self, author: Address) {
-        if self.engine.seals_internally().is_some() {
-            let mut sealing_work = self.sealing_work.lock();
-            sealing_work.enabled = true;
-        }
-        *self.author.write() = author;
-    }
+    fn set_author(&self, author: Address) { *self.author.write() = author; }
 
     fn set_extra_data(&self, extra_data: Bytes) { *self.extra_data.write() = extra_data; }
 
@@ -908,18 +900,6 @@ impl MinerService for Miner {
             }
         }
 
-        // if result.is_ok() && self.options.reseal_on_own_tx && self.tx_reseal_allowed() {
-        //     // Make sure to do it after transaction is imported and lock is droped.
-        //     // We need to create pending block and enable sealing.
-        //     if self.engine.seals_internally().unwrap_or(false) || !self.prepare_work_sealing(client)
-        //     {
-        //         // If new block has not been prepared (means we already had one)
-        //         // or Engine might be able to seal internally,
-        //         // we need to update sealing.
-        //         debug!(target: "rpc_tx", "{:?} tx start resealing [{:?}]", thread::current().id(), time::Instant::now());
-        //         self.update_sealing(client);
-        //     }
-        // }
         debug!(target: "rpc_tx", "{:?} tx ready to return [{:?}]", thread::current().id(), time::Instant::now());
         result
     }
@@ -1103,17 +1083,12 @@ impl MinerService for Miner {
         self.transaction_pool.last_nonce(address)
     }
 
-    fn can_produce_work_package(&self) -> bool { self.engine.seals_internally().is_none() }
-
-    /// Update sealing if required.
-    /// Prepare the block and work if the Engine does not seal internally.
+    /// Prepare new best block or update existing best block if required.
     fn update_sealing(&self, client: &MiningBlockChainClient) {
         trace!(target: "block", "update_sealing: best_block: {:?}", client.chain_info().best_block_number);
         if self.requires_reseal(client.chain_info().best_block_number) {
             trace!(target: "block", "update_sealing: preparing a block");
             let (block, original_work_hash) = self.prepare_block(client);
-
-            trace!(target: "block", "update_sealing: engine does not seal internally, preparing work");
             self.prepare_work(block, original_work_hash)
         }
     }
