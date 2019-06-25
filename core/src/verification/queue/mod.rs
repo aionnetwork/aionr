@@ -807,30 +807,30 @@ mod tests {
 
     // create a test block queue.
     // auto_scaling enables verifier adjustment.
-    //    fn get_test_queue(auto_scale: bool) -> BlockQueue {
-    //        let spec = get_test_spec();
-    //        let engine = spec.engine;
-    //
-    //        let mut config = Config::default();
-    //        config.verifier_settings.scale_verifiers = auto_scale;
-    //        BlockQueue::new(config, engine, IoChannel::disconnected())
-    //    }
+    fn get_test_queue(auto_scale: bool) -> BlockQueue {
+        let spec = get_test_spec();
+        let engine = spec.engine;
 
-    //    #[test]
-    //    fn can_be_created() {
-    //        // TODO better test
-    //        let spec = Spec::new_test();
-    //        let engine = spec.engine;
-    //        let _ = BlockQueue::new(Config::default(), engine, IoChannel::disconnected());
-    //    }
+        let mut config = Config::default();
+        config.verifier_settings.scale_verifiers = auto_scale;
+        BlockQueue::new(config, engine, IoChannel::disconnected())
+    }
 
-    //    #[test]
-    //    fn can_import_blocks() {
-    //        let queue = get_test_queue(false);
-    //        if let Err(e) = queue.import(Unverified::new(get_good_dummy_block())) {
-    //            panic!("error importing block that is valid by definition({:?})", e);
-    //        }
-    //    }
+    #[test]
+    fn can_be_created() {
+        // TODO better test
+        let spec = Spec::new_test();
+        let engine = spec.engine;
+        let _ = BlockQueue::new(Config::default(), engine, IoChannel::disconnected());
+    }
+
+    #[test]
+    fn can_import_blocks() {
+        let queue = get_test_queue(false);
+        if let Err(e) = queue.import(Unverified::new(get_good_dummy_block())) {
+            panic!("error importing block that is valid by definition({:?})", e);
+        }
+    }
 
     //    #[test]
     //    fn returns_error_for_duplicates() {
