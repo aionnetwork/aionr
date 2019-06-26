@@ -88,14 +88,8 @@ pub enum Banning {
 pub struct MinerOptions {
     /// Force the miner to reseal, even when nobody has asked for work.
     pub force_sealing: bool,
-    /// Reseal on receipt of new external transactions.
-    pub reseal_on_external_tx: bool,
-    /// Reseal on receipt of new local transactions.
-    pub reseal_on_own_tx: bool,
     /// Minimum period between transaction-inspired reseals.
     pub reseal_min_period: Duration,
-    /// Maximum period between blocks (enables force sealing after that).
-    pub reseal_max_period: Duration,
     /// Preparing block interval
     pub prepare_block_interval: Duration,
     /// Maximum amount of gas to bother considering for block insertion.
@@ -128,14 +122,11 @@ impl Default for MinerOptions {
     fn default() -> Self {
         MinerOptions {
             force_sealing: false,
-            reseal_on_external_tx: false,
-            reseal_on_own_tx: true,
             tx_gas_limit: !U256::zero(),
             tx_queue_memory_limit: Some(2 * 1024 * 1024),
             tx_queue_strategy: PrioritizationStrategy::GasPriceOnly,
             pending_set: PendingSet::AlwaysQueue,
             reseal_min_period: Duration::from_secs(4),
-            reseal_max_period: Duration::from_secs(120),
             prepare_block_interval: Duration::from_secs(4),
             work_queue_size: 20,
             enable_resubmission: true,
@@ -326,12 +317,6 @@ impl Miner {
                 .map(|pb| pb.block().header().hash());
             let best_hash = chain_info.best_block_hash;
 
-            // check to see if last ClosedBlock in would_seals is actually same parent block.
-            // if so
-            //   duplicate, re-open and push any new transactions.
-            //   if at least one was pushed successfully, close and enqueue new ClosedBlock;
-            //   otherwise, leave everything alone.
-            // otherwise, author a fresh block.
             let mut open_block = match sealing_work
                 .queue
                 .pop_if(|b| b.block().header().parent_hash() == &best_hash)
@@ -371,19 +356,6 @@ impl Miner {
         for tx in transactions {
             let hash = tx.hash().clone();
             let start = Instant::now();
-            // Disable transaction permission verification for now.
-            // TODO: remove this functionality or keep it?
-            // Check whether transaction type is allowed for sender
-            // let result = match self.engine.machine().verify_transaction(
-            //     &tx,
-            //     open_block.header(),
-            //     client.as_block_chain_client(),
-            // ) {
-            //     Err(Error::Transaction(TransactionError::NotAllowed)) => {
-            //         Err(TransactionError::NotAllowed.into())
-            //     }
-            //     _ => open_block.push_transaction(tx, None),
-            // };
             let result = open_block.push_transaction(tx, None);
             let took = start.elapsed();
 
@@ -501,8 +473,6 @@ impl Miner {
                 sealing_work.queue.reset();
                 false
             } else {
-                // sealing enabled and we don't want to sleep.
-                // *self.next_allowed_reseal.lock() = Instant::now() + self.options.reseal_min_period;
                 true
             }
         } else {
@@ -565,10 +535,6 @@ impl Miner {
             }
         };
         if prepare_new {
-            // --------------------------------------------------------------------------
-            // | NOTE Code below requires transaction_queue and sealing_work locks.     |
-            // | Make sure to release the locks before calling that method.             |
-            // --------------------------------------------------------------------------
             let (block, original_work_hash) = self.prepare_block(client);
             self.prepare_work(block, original_work_hash);
         }
@@ -807,13 +773,6 @@ impl MinerService for Miner {
     fn set_local_maximal_gas_price(&mut self, local_max_gas_price: U256) {
         self.options.local_max_gas_price = local_max_gas_price;
     }
-
-    // fn sensible_gas_price(&self) -> U256 {
-    //     // 10% above our minimum.
-    //     self.minimal_gas_price * 110u32 / 100.into()
-    // }
-
-    // fn sensible_gas_limit(&self) -> U256 { self.gas_range_target.read().0 / 5.into() }
 
     fn default_gas_limit(&self) -> U256 { 2_000_000.into() }
 

@@ -175,14 +175,6 @@ pub trait MinerService: Send + Sync {
 
     /// Is it currently sealing?
     fn is_currently_sealing(&self) -> bool;
-    /*
-    
-        /// Suggested gas price.
-        fn sensible_gas_price(&self) -> U256;
-    
-        /// Sensible suggested gas limit.
-        fn sensible_gas_limit(&self) -> U256;
-    */
 
     /// Default suggested gas limit.
     fn default_gas_limit(&self) -> U256;

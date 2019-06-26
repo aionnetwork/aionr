@@ -38,7 +38,7 @@ use helpers::{
     to_address, to_queue_strategy, validate_log_level,
 };
 use dir::helpers::{replace_home, replace_home_and_local, absolute};
-use params::{ResealPolicy, AccountsConfig, MinerExtras, SpecType};
+use params::{AccountsConfig, MinerExtras, SpecType};
 use logger::{LogConfig};
 use dir::{self, Directories, default_local_path, default_data_path};
 use run::RunCmd;
@@ -355,12 +355,8 @@ impl Configuration {
     }
 
     fn miner_options(&self) -> Result<MinerOptions, String> {
-        let reseal = self.args.arg_reseal_on_txs.parse::<ResealPolicy>()?;
-
         let options = MinerOptions {
             force_sealing: self.args.flag_force_sealing,
-            reseal_on_external_tx: reseal.external,
-            reseal_on_own_tx: reseal.own,
             tx_gas_limit: match self.args.arg_tx_gas_limit {
                 Some(ref d) => to_u256(d)?,
                 None => U256::max_value(),
@@ -373,7 +369,6 @@ impl Configuration {
             tx_queue_strategy: to_queue_strategy(&self.args.arg_tx_queue_strategy)?,
             pending_set: to_pending_set(&self.args.arg_relay_set)?,
             reseal_min_period: Duration::from_millis(self.args.arg_reseal_min_period),
-            reseal_max_period: Duration::from_millis(self.args.arg_reseal_max_period),
             prepare_block_interval: Duration::from_millis(self.args.arg_reseal_min_period),
             work_queue_size: self.args.arg_work_queue_size,
             enable_resubmission: !self.args.flag_remove_solved,

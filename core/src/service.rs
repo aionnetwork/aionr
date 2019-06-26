@@ -32,7 +32,7 @@ use tokio::timer::Interval;
 use tokio::prelude::{Future, Stream};
 use ansi_term::Colour;
 use bytes::Bytes;
-use client::{ChainNotify, Client, ClientConfig};
+use client::{ChainNotify, Client, ClientConfig, MiningBlockChainClient};
 use db;
 use error::*;
 use io::*;
@@ -60,8 +60,8 @@ pub enum ClientIoMessage {
 /// Run the miner
 pub fn run_miner(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
     let (close, shutdown_signal) = oneshot::channel();
-    // let seal_block_task = Interval::new(Instant::now(), client.prepare_block_interval())
-    let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(5))
+    let seal_block_task = Interval::new(Instant::now(), client.prepare_block_interval())
+        // let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(5))
         .for_each(move |_| {
             let client: Arc<Client> = client.clone();
             client.miner().try_prepare_block(&*client, false);

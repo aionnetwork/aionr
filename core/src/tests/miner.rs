@@ -44,10 +44,7 @@ fn miner() -> Miner {
     Arc::try_unwrap(Miner::new(
         MinerOptions {
             force_sealing: false,
-            reseal_on_external_tx: false,
-            reseal_on_own_tx: true,
             reseal_min_period: Duration::from_secs(5),
-            reseal_max_period: Duration::from_secs(120),
             prepare_block_interval: Duration::from_secs(5),
             tx_gas_limit: !U256::zero(),
             tx_queue_memory_limit: None,

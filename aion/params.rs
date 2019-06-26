@@ -108,42 +108,6 @@ impl Pruning {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ResealPolicy {
-    pub own: bool,
-    pub external: bool,
-}
-
-impl Default for ResealPolicy {
-    fn default() -> Self {
-        ResealPolicy {
-            own: true,
-            external: true,
-        }
-    }
-}
-
-impl str::FromStr for ResealPolicy {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (own, external) = match s {
-            "none" => (false, false),
-            "own" => (true, false),
-            "ext" => (false, true),
-            "all" => (true, true),
-            x => return Err(format!("Invalid reseal value: {}", x)),
-        };
-
-        let reseal = ResealPolicy {
-            own,
-            external,
-        };
-
-        Ok(reseal)
-    }
-}
-
-#[derive(Debug, PartialEq)]
 pub struct AccountsConfig {
     pub iterations: u32,
     pub refresh_time: u64,
@@ -229,7 +193,7 @@ pub fn fatdb_switch_to_bool(
 #[cfg(test)]
 mod tests {
     use journaldb::Algorithm;
-    use super::{SpecType, Pruning, ResealPolicy, Switch};
+    use super::{SpecType, Pruning, Switch};
 
     #[test]
     fn test_spec_type_parsing() {
@@ -263,39 +227,6 @@ mod tests {
     #[test]
     fn test_pruning_default() {
         assert_eq!(Pruning::Specific(Algorithm::Archive), Pruning::default());
-    }
-
-    #[test]
-    fn test_reseal_policy_parsing() {
-        let none = ResealPolicy {
-            own: false,
-            external: false,
-        };
-        let own = ResealPolicy {
-            own: true,
-            external: false,
-        };
-        let ext = ResealPolicy {
-            own: false,
-            external: true,
-        };
-        let all = ResealPolicy {
-            own: true,
-            external: true,
-        };
-        assert_eq!(none, "none".parse().unwrap());
-        assert_eq!(own, "own".parse().unwrap());
-        assert_eq!(ext, "ext".parse().unwrap());
-        assert_eq!(all, "all".parse().unwrap());
-    }
-
-    #[test]
-    fn test_reseal_policy_default() {
-        let all = ResealPolicy {
-            own: true,
-            external: true,
-        };
-        assert_eq!(all, ResealPolicy::default());
     }
 
     #[test]

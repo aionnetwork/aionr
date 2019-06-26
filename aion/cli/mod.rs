@@ -360,17 +360,9 @@ usage! {
             "--dynamic-gas-price",
             "use dynamic gas price which adjust with --gas-price-percentile, --max-blk-traverse, --blk-price-window",
 
-            ARG arg_reseal_on_txs: (String) = "own", or |c: &Config| c.mining.as_ref()?.reseal_on_txs.clone(),
-            "--reseal-on-txs=[SET]",
-            "Specify which transactions should force the node to reseal a block. SET is one of: none - never reseal on new transactions; own - reseal only on a new local transaction; ext - reseal only on a new external transaction; all - reseal on all new transactions.",
-
             ARG arg_reseal_min_period: (u64) = 4000u64, or |c: &Config| c.mining.as_ref()?.reseal_min_period.clone(),
             "--reseal-min-period=[MS]",
             "Specify the minimum time between reseals from incoming transactions. MS is time measured in milliseconds.",
-
-            ARG arg_reseal_max_period: (u64) = 120000u64, or |c: &Config| c.mining.as_ref()?.reseal_max_period.clone(),
-            "--reseal-max-period=[MS]",
-            "Specify the maximum time since last block to enable force-sealing. MS is time measured in milliseconds.",
 
             ARG arg_work_queue_size: (usize) = 20usize, or |c: &Config| c.mining.as_ref()?.work_queue_size.clone(),
             "--work-queue-size=[ITEMS]",
@@ -622,9 +614,7 @@ struct WalletApi {
 struct Mining {
     author: Option<String>,
     force_sealing: Option<bool>,
-    reseal_on_txs: Option<String>,
     reseal_min_period: Option<u64>,
-    reseal_max_period: Option<u64>,
     work_queue_size: Option<usize>,
     tx_gas_limit: Option<String>,
     tx_time_limit: Option<u64>,
@@ -905,9 +895,7 @@ mod tests {
             // -- Sealing/Mining Options
             arg_author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
             flag_force_sealing: true,
-            arg_reseal_on_txs: "all".into(),
             arg_reseal_min_period: 4000u64,
-            arg_reseal_max_period: 60000u64,
             arg_work_queue_size: 20usize,
             arg_tx_gas_limit: Some("6283184".into()),
             arg_tx_time_limit: Some(100u64),
@@ -1059,9 +1047,7 @@ mod tests {
                 mining: Some(Mining {
                     author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
                     force_sealing: Some(true),
-                    reseal_on_txs: Some("all".into()),
                     reseal_min_period: Some(4000),
-                    reseal_max_period: Some(60000),
                     work_queue_size: None,
                     relay_set: None,
                     min_gas_price: None,

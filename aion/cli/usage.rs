@@ -642,19 +642,16 @@ macro_rules! usage {
                     };
                 }
 
-                // Check if reseal_min_period > reseal_max_period
-                check!(low:arg_reseal_min_period,up:arg_reseal_max_period);
-
-                // Check if gas_floor_target > gas_cap
+                // Check if gas_floor_target < gas_cap
                 check!(low:arg_gas_floor_target,up:arg_gas_cap);
 
-                // Check if blk_price_window > max_blk_traverse
+                // Check if blk_price_window < max_blk_traverse
                 check!(low:arg_blk_price_window,up:arg_max_blk_traverse);
 
-                // Check if min_gas_price　> max_gas_price
+                // Check if min_gas_price　< max_gas_price
                 check!(low:arg_min_gas_price,up:arg_max_gas_price);
 
-                // Check if min_gas_price　> local_max_gas_price
+                // Check if min_gas_price　< local_max_gas_price
                 check!(low:arg_min_gas_price,up:arg_local_max_gas_price);
 
                 // Check if gas_price_percentile > 100 , usize never < 0
