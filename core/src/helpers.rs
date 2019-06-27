@@ -20,8 +20,6 @@
  *
  ******************************************************************************/
 
-extern crate aion_types;
-
 use aion_types::{H256, U256};
 use account_provider::AccountProvider;
 use block::{OpenBlock, Drain};
@@ -34,7 +32,6 @@ use transaction::{Action, Transaction, SignedTransaction};
 use views::BlockView;
 use io::*;
 use miner::{Miner, MinerService};
-use parking_lot::RwLock;
 use rlp::{self, RlpStream};
 use spec::*;
 use state_db::StateDB;

@@ -103,12 +103,4 @@ impl<'a> HeaderView<'a> {
         }
         seal
     }
-
-    //    /// Returns a vector of seal fields (RLP-decoded).
-    //    pub fn decode_seal(&self) -> Result<Vec<Bytes>, rlp::DecoderError> {
-    //        let seal = self.seal();
-    //        seal.into_iter()
-    //            .map(|s| rlp::UntrustedRlp::new(&s).data().map(|x| x.to_vec()))
-    //            .collect()
-    //    }
 }

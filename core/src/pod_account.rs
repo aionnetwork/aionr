@@ -24,7 +24,7 @@ use std::fmt;
 use std::collections::BTreeMap;
 use itertools::Itertools;
 use blake2b::{blake2b};
-use aion_types::{H256, U256, U128, H128};
+use aion_types::{H256, U256, U128};
 use kvdb::HashStore;
 use triehash::sec_trie_root;
 use bytes::Bytes;
@@ -45,9 +45,7 @@ pub struct PodAccount {
     /// The code of the account or `None` in the special case that it is unknown.
     pub code: Option<Bytes>,
     /// The storage of the account.
-    pub storage: BTreeMap<H128, H128>,
-
-    pub storage_dword: BTreeMap<H128, H256>,
+    pub storage: BTreeMap<Bytes, Bytes>,
 }
 
 impl PodAccount {
@@ -60,15 +58,6 @@ impl PodAccount {
             storage: acc
                 .storage_changes()
                 .iter()
-                .filter(|(_, v)| v.len() == 16)
-                .fold(BTreeMap::new(), |mut m, (k, v)| {
-                    m.insert(k.clone().as_slice().into(), v.clone().as_slice().into());
-                    m
-                }),
-            storage_dword: acc
-                .storage_changes()
-                .iter()
-                .filter(|(_, v)| v.len() == 32)
                 .fold(BTreeMap::new(), |mut m, (k, v)| {
                     m.insert(k.clone().as_slice().into(), v.clone().as_slice().into());
                     m
@@ -85,15 +74,8 @@ impl PodAccount {
         stream.append(&sec_trie_root(
             self.storage
                 .iter()
-                .map(|(k, v)| (k, rlp::encode(&U128::from(&**v)))),
+                .map(|(k, v)| (k, rlp::encode(&U256::from(&**v)))),
         ));
-        if !self.storage_dword.is_empty() {
-            stream.append(&sec_trie_root(
-                self.storage_dword
-                    .iter()
-                    .map(|(k, v)| (k, rlp::encode(&U256::from(&**v)))),
-            ));
-        }
         stream.append(&blake2b(&self.code.as_ref().unwrap_or(&vec![])));
         stream.out()
     }
@@ -113,11 +95,6 @@ impl PodAccount {
                 warn!(target:"db","Encountered potential DB corruption: {}", e);
             }
         }
-        for (k, v) in &self.storage_dword {
-            if let Err(e) = t.insert(k, &rlp::encode(&U256::from(&**v))) {
-                warn!(target:"db","Encountered potential DB corruption: {}", e);
-            }
-        }
     }
 }
 
@@ -131,23 +108,14 @@ impl From<ajson::blockchain::Account> for PodAccount {
                 .storage
                 .into_iter()
                 .map(|(key, value)| {
-                    let key: U256 = key.into();
                     let key: U128 = key.into();
-                    let value: U256 = value.into();
                     let value: U128 = value.into();
-                    (H128::from(key), H128::from(value))
+                    (
+                        <[u8; 16]>::from(key).to_vec(),
+                        <[u8; 16]>::from(value).to_vec(),
+                    )
                 })
                 .collect(),
-            storage_dword: a.storage_dword.map_or_else(BTreeMap::new, |s| {
-                s.into_iter()
-                    .map(|(key, value)| {
-                        let key: U256 = key.into();
-                        let key: U128 = key.into();
-                        let value: U256 = value.into();
-                        (H128::from(key), H256::from(value))
-                    })
-                    .collect()
-            }),
         }
     }
 }
@@ -161,21 +129,12 @@ impl From<ajson::spec::Account> for PodAccount {
             storage: a.storage.map_or_else(BTreeMap::new, |s| {
                 s.into_iter()
                     .map(|(key, value)| {
-                        let key: U256 = key.into();
                         let key: U128 = key.into();
-                        let value: U256 = value.into();
                         let value: U128 = value.into();
-                        (H128::from(key), H128::from(value))
-                    })
-                    .collect()
-            }),
-            storage_dword: a.storage_dword.map_or_else(BTreeMap::new, |s| {
-                s.into_iter()
-                    .map(|(key, value)| {
-                        let key: U256 = key.into();
-                        let key: U128 = key.into();
-                        let value: U256 = value.into();
-                        (H128::from(key), H256::from(value))
+                        (
+                            <[u8; 16]>::from(key).to_vec(),
+                            <[u8; 16]>::from(value).to_vec(),
+                        )
                     })
                     .collect()
             }),
@@ -187,13 +146,12 @@ impl fmt::Display for PodAccount {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
-            "(bal={}; nonce={}; code={} bytes, #{}; storage={} items; storage_dword={} items)",
+            "(bal={}; nonce={}; code={} bytes, #{}; storage={} items)",
             self.balance,
             self.nonce,
             self.code.as_ref().map_or(0, |c| c.len()),
             self.code.as_ref().map_or_else(H256::new, |c| blake2b(c)),
             self.storage.len(),
-            self.storage_dword.len(),
         )
     }
 }
@@ -220,11 +178,6 @@ pub fn diff_pod(pre: Option<&PodAccount>, post: Option<&PodAccount>) -> Option<A
                     .iter()
                     .map(|(k, v)| (k.clone(), Diff::Born(v.clone())))
                     .collect(),
-                storage_dword: x
-                    .storage_dword
-                    .iter()
-                    .map(|(k, v)| (k.clone(), Diff::Born(v.clone())))
-                    .collect(),
             })
         }
         (Some(x), None) => {
@@ -246,11 +199,6 @@ pub fn diff_pod(pre: Option<&PodAccount>, post: Option<&PodAccount>) -> Option<A
                     .iter()
                     .map(|(k, v)| (k.clone(), Diff::Died(v.clone())))
                     .collect(),
-                storage_dword: x
-                    .storage_dword
-                    .iter()
-                    .map(|(k, v)| (k.clone(), Diff::Died(v.clone())))
-                    .collect(),
             })
         }
         (Some(pre), Some(post)) => {
@@ -259,17 +207,8 @@ pub fn diff_pod(pre: Option<&PodAccount>, post: Option<&PodAccount>) -> Option<A
                 .keys()
                 .merge(post.storage.keys())
                 .filter(|k| {
-                    pre.storage.get(k).unwrap_or(&H128::new())
-                        != post.storage.get(k).unwrap_or(&H128::new())
-                })
-                .collect();
-            let storage_dword: Vec<_> = pre
-                .storage_dword
-                .keys()
-                .merge(post.storage_dword.keys())
-                .filter(|k| {
-                    pre.storage_dword.get(k).unwrap_or(&H256::new())
-                        != post.storage_dword.get(k).unwrap_or(&H256::new())
+                    pre.storage.get(&**k).unwrap_or(&Vec::new())
+                        != post.storage.get(&**k).unwrap_or(&Vec::new())
                 })
                 .collect();
             let r = AccountDiff {
@@ -285,20 +224,8 @@ pub fn diff_pod(pre: Option<&PodAccount>, post: Option<&PodAccount>) -> Option<A
                         (
                             k.clone(),
                             Diff::new(
-                                pre.storage.get(k).cloned().unwrap_or_else(H128::new),
-                                post.storage.get(k).cloned().unwrap_or_else(H128::new),
-                            ),
-                        )
-                    })
-                    .collect(),
-                storage_dword: storage_dword
-                    .into_iter()
-                    .map(|k| {
-                        (
-                            k.clone(),
-                            Diff::new(
-                                pre.storage_dword.get(k).cloned().unwrap_or_else(H256::new),
-                                post.storage_dword.get(k).cloned().unwrap_or_else(H256::new),
+                                pre.storage.get(k).cloned().unwrap_or_else(Vec::new),
+                                post.storage.get(k).cloned().unwrap_or_else(Vec::new),
                             ),
                         )
                     })

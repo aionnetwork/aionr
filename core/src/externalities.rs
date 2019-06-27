@@ -571,13 +571,12 @@ where B: StateBackend
     fn remove_storage(&mut self, _address: &Address, _data: Bytes) { unimplemented!() }
 }
 
-#[allow(unused)]
 impl<'a, B: 'a> Ext for AVMExternalities<'a, B>
 where B: StateBackend
 {
     fn storage_at(&self, _key: &H128) -> H128 { unimplemented!() }
 
-    fn set_storage(&mut self, _key: H128, value: H128) { unimplemented!() }
+    fn set_storage(&mut self, _key: H128, _value: H128) { unimplemented!() }
 
     fn storage_at_dword(&self, _key: &H128) -> H256 { unimplemented!() }
 
@@ -650,21 +649,21 @@ where B: StateBackend
     }
 
     /// Create new contract account
-    fn create(&mut self, gas: &U256, value: &U256, code: &[u8]) -> ExecutionResult {
+    fn create(&mut self, _gas: &U256, _value: &U256, _code: &[u8]) -> ExecutionResult {
         unimplemented!()
     }
 
     /// Call contract
     fn call(
         &mut self,
-        gas: &U256,
-        sender_address: &Address,
-        receive_address: &Address,
-        value: Option<U256>,
-        data: &[u8],
-        code_address: &Address,
-        call_type: CallType,
-        static_flag: bool,
+        _gas: &U256,
+        _sender_address: &Address,
+        _receive_address: &Address,
+        _value: Option<U256>,
+        _data: &[u8],
+        _code_address: &Address,
+        _call_type: CallType,
+        _static_flag: bool,
     ) -> ExecutionResult
     {
         unimplemented!()
@@ -688,9 +687,9 @@ where B: StateBackend
             .unwrap_or(0)
     }
 
-    fn log(&mut self, topics: Vec<H256>, data: &[u8]) { unimplemented!() }
+    fn log(&mut self, _topics: Vec<H256>, _data: &[u8]) { unimplemented!() }
 
-    fn suicide(&mut self, refund_address: &Address) { unimplemented!() }
+    fn suicide(&mut self, _refund_address: &Address) { unimplemented!() }
 
     fn env_info(&self) -> &EnvInfo { self.env_info }
 
@@ -698,7 +697,7 @@ where B: StateBackend
 
     fn inc_sstore_clears(&mut self) { unimplemented!() }
 
-    fn save_code(&mut self, code: Bytes) { unimplemented!() }
+    fn save_code(&mut self, _code: Bytes) { unimplemented!() }
 
     fn save_code_at(&mut self, address: &Address, code: Bytes) {
         debug!(target: "vm", "AVM save code at: {:?}", address);

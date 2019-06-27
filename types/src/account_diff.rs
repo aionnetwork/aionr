@@ -25,7 +25,7 @@
 use std::cmp::*;
 use std::fmt;
 use std::collections::BTreeMap;
-use aion_types::{U256, H128, U128, H256};
+use aion_types::{U256, H128, U128};
 use bytes::Bytes;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -90,9 +90,7 @@ pub struct AccountDiff {
     /// Change in code, allowed to be `Diff::Same`.
     pub code: Diff<Bytes>, // Allowed to be Same
     /// Change in storage, values are not allowed to be `Diff::Same`.
-    pub storage: BTreeMap<H128, Diff<H128>>,
-
-    pub storage_dword: BTreeMap<H128, Diff<H256>>,
+    pub storage: BTreeMap<Bytes, Diff<Bytes>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -130,43 +128,21 @@ impl AccountDiff {
 }
 
 // TODO: refactor into something nicer.
-fn interpreted_hash(u: &H128) -> String {
-    if u <= &H128::from(U128::from(0xffffffffu32)) {
+fn interpreted_hash(u: &Vec<u8>) -> String {
+    if &H128::from(u.as_slice()) <= &H128::from(U128::from(0xffffffffu32)) {
         format!(
             "{} = 0x{:x}",
             U256::from(&**u).low_u32(),
             U256::from(&**u).low_u32()
         )
-    } else if u <= &H128::from(U128::from(u64::max_value())) {
+    } else if &H128::from(u.as_slice()) <= &H128::from(U128::from(u64::max_value())) {
         format!(
             "{} = 0x{:x}",
             U256::from(&**u).low_u64(),
             U256::from(&**u).low_u64()
         )
-    //    } else if u <= &H256::from("0xffffffffffffffffffffffffffffffffffffffff") {
-    //        format!("@{}", Address::from(u))
     } else {
-        format!("#{}", u)
-    }
-}
-
-fn interpreted_hash_dword(u: &H256) -> String {
-    if u <= &H256::from(U256::from(0xffffffffu32)) {
-        format!(
-            "{} = 0x{:x}",
-            U256::from(&**u).low_u32(),
-            U256::from(&**u).low_u32()
-        )
-    } else if u <= &H256::from(U256::from(u64::max_value())) {
-        format!(
-            "{} = 0x{:x}",
-            U256::from(&**u).low_u64(),
-            U256::from(&**u).low_u64()
-        )
-    //    } else if u <= &H256::from("0xffffffffffffffffffffffffffffffffffffffff") {
-    //        format!("@{}", Address::from(u))
-    } else {
-        format!("#{}", u)
+        format!("#{:?}", u)
     }
 }
 
@@ -230,29 +206,6 @@ impl fmt::Display for AccountDiff {
             }
         }
         write!(f, "\n")?;
-        for (k, dv) in &self.storage_dword {
-            match *dv {
-                Diff::Born(ref v) => {
-                    write!(
-                        f,
-                        "    +  {} => {}\n",
-                        interpreted_hash(k),
-                        interpreted_hash_dword(v)
-                    )?
-                }
-                Diff::Changed(ref pre, ref post) => {
-                    write!(
-                        f,
-                        "    *  {} => {} (was {})\n",
-                        interpreted_hash(k),
-                        interpreted_hash_dword(post),
-                        interpreted_hash_dword(pre)
-                    )?
-                }
-                Diff::Died(_) => write!(f, "    X  {}\n", interpreted_hash(k))?,
-                _ => {}
-            }
-        }
         Ok(())
     }
 }

@@ -31,7 +31,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
-            Error::NotFound(ref message) => write!(f, "db: {} not found", message),
+            Error::NotFound(ref info) => write!(f, "db: {} not found", info),
             Error::OpenError {
                 ref name,
                 ref desc,
@@ -40,9 +40,7 @@ impl fmt::Display for Error {
                 ref name,
                 ref desc,
             } => write!(f, "db {} flush error: {}", name, desc),
-            Error::Other(ref message) => {
-                write!(f, "db crashed: {}, please clean and resync", message)
-            }
+            Error::Other(ref info) => write!(f, "db crashed: {}, please clean and resync", info),
         }
     }
 }

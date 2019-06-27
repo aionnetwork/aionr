@@ -40,6 +40,6 @@ pub mod state;
 pub mod transaction;
 pub mod misc;
 #[cfg(test)]
-mod test;
+mod tests;
 #[cfg(test)]
 use bytes::Bytes;

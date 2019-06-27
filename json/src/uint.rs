@@ -26,7 +26,7 @@ use std::fmt;
 use std::str::FromStr;
 use serde::{Deserialize, Deserializer};
 use serde::de::{Error, Visitor, Unexpected};
-use aion_types::U256;
+use aion_types::{U128, U256};
 
 /// Lenient uint json deserialization for test json files.
 #[derive(
@@ -44,6 +44,10 @@ pub struct Uint(pub U256);
 
 impl Into<U256> for Uint {
     fn into(self) -> U256 { self.0 }
+}
+
+impl Into<U128> for Uint {
+    fn into(self) -> U128 { self.0.into() }
 }
 
 impl Into<u64> for Uint {
