@@ -33,6 +33,7 @@ use std::fmt;
 use std::sync::Arc;
 
 use error::Error;
+use account::BasicAccount;
 use executed::{Executed, ExecutionError};
 use executive::Executive;
 use factory::Factories;
@@ -43,7 +44,6 @@ use pod_state::{self, PodState};
 use receipt::Receipt;
 use state_db::StateDB;
 use transaction::SignedTransaction;
-use types::basic_account::BasicAccount;
 use types::state_diff::StateDiff;
 use types::vms::EnvInfo;
 

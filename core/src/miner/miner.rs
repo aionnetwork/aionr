@@ -112,7 +112,7 @@ pub struct MinerOptions {
     pub infinite_pending_block: bool,
     /// minimal gas price of a transaction to be accepted by the miner/transaction queue
     pub minimal_gas_price: U256,
-    /// minimal gas price of a transaction to be accepted by the miner/transaction queue
+    /// maximal gas price of a transaction to be accepted by the miner/transaction queue
     pub maximal_gas_price: U256,
     /// maximal gas price of a new local transaction to be accepted by the miner/transaction queue when using dynamic gas price
     pub local_max_gas_price: U256,

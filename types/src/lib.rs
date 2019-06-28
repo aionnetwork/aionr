@@ -33,7 +33,6 @@ extern crate heapsize;
 extern crate blake2b;
 
 pub mod account_diff;
-pub mod basic_account;
 pub mod block_status;
 pub mod blockchain_info;
 pub mod call_analytics;
@@ -42,7 +41,6 @@ pub mod ids;
 pub mod log_entry;
 pub mod pruning_info;
 pub mod receipt;
-pub mod restoration_status;
 pub mod security_level;
 pub mod state_diff;
 pub mod trace_filter;

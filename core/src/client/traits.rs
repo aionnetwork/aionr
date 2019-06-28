@@ -22,6 +22,7 @@
 
 use std::time::Duration;
 
+use account::BasicAccount;
 use block::{OpenBlock, SealedBlock, ClosedBlock};
 use blockchain::TreeRoute;
 use encoded;
@@ -40,7 +41,6 @@ use bytes::Bytes;
 use kvdb::DBValue;
 
 use types::ids::*;
-use types::basic_account::BasicAccount;
 use types::call_analytics::CallAnalytics;
 use types::blockchain_info::BlockChainInfo;
 use types::block_status::BlockStatus;
