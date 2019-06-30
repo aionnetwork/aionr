@@ -22,7 +22,7 @@
 use std::sync::Arc;
 
 use sync::p2p::NetworkConfig;
-use sync::sync::{Sync, SyncConfig, NetworkManager, Params, SyncProvider};
+use sync::sync::{Sync, NetworkManager, Params, SyncProvider};
 use sync::sync::error::SyncError;
 use acore::client::BlockChainClient;
 
@@ -31,13 +31,11 @@ pub use acore::client::ChainNotify;
 pub type SyncModules = (Arc<SyncProvider>, Arc<NetworkManager>, Arc<ChainNotify>);
 
 pub fn sync(
-    sync_cfg: SyncConfig,
     net_cfg: NetworkConfig,
     cli: Arc<BlockChainClient>,
 ) -> Result<SyncModules, SyncError>
 {
     let sync = Sync::get_instance(Params {
-        config: sync_cfg,
         client: cli,
         network_config: net_cfg,
     });

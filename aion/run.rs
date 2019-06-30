@@ -49,7 +49,6 @@ use pb::{new_pb, WalletApiConfiguration};
 use rpc;
 use rpc_apis;
 use sync::p2p::{NetworkConfig, P2pMgr};
-use sync::sync::SyncConfig;
 use tokio;
 use tokio::prelude::*;
 use user_defaults::UserDefaults;
@@ -216,10 +215,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     }
 
     // create sync object
-    let sync_config = SyncConfig::default();
-
     let (sync_provider, network_manager, chain_notify) = modules::sync(
-        sync_config,
         net_conf,
         client.clone() as Arc<BlockChainClient>,
     )

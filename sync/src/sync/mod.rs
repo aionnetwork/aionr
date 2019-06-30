@@ -290,25 +290,8 @@ impl SyncMgr {
     fn disable() { SyncStorage::reset(); }
 }
 
-/// Sync configuration
-#[derive(Debug, Clone, Copy)]
-pub struct SyncConfig {
-    /// Max blocks to download ahead
-    pub max_download_ahead_blocks: usize,
-}
-
-impl Default for SyncConfig {
-    fn default() -> SyncConfig {
-        SyncConfig {
-            max_download_ahead_blocks: 20000,
-        }
-    }
-}
-
 /// Sync initialization parameters.
 pub struct Params {
-    /// Configuration.
-    pub config: SyncConfig,
     /// Blockchain client.
     pub client: Arc<BlockChainClient>,
     /// Network layer configuration.
@@ -573,8 +556,6 @@ impl ChainNotify for Sync {
 /// Configuration for IPC service.
 #[derive(Debug, Clone)]
 pub struct ServiceConfiguration {
-    /// Sync config.
-    pub sync: SyncConfig,
     /// Network configuration.
     pub net: NetworkConfig,
 }
