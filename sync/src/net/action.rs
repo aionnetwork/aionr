@@ -48,7 +48,6 @@ impl NetAction {
             NetAction::UNKNOWN => 0xFF as u8,
         }
     }
-
     pub fn from(value: u8) -> NetAction {
         match value {
             0 => NetAction::DISCONNECT,

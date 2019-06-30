@@ -28,12 +28,10 @@ use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 
 mod action;
-mod error;
 pub mod event;
 pub mod handler;
 
 use self::action::NetAction;
-// use self::error::*;
 use self::handler::active_nodes_handler::ActiveNodesHandler;
 use self::handler::default_handler::DefaultHandler;
 use self::handler::handshake_handler::HandshakeHandler;

@@ -24,7 +24,7 @@ use bytes::BufMut;
 use rand::prelude::*;
 use std::mem;
 
-use p2p::*;
+use p2p::{ChannelBuffer, Control, Version, NODE_ID_LENGTH, Node, DISCONNECTED, IP_LENGTH, P2pMgr};
 use super::super::action::NetAction;
 use super::super::event::{NetEvent, HANDSHAKE_DONE};
 

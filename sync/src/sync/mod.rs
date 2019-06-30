@@ -37,7 +37,6 @@ use p2p::*;
 use net::event::HANDSHAKE_DONE;
 
 use self::action::SyncAction;
-// use self::error::*;
 use self::handler::blocks_bodies_handler::BlockBodiesHandler;
 use self::handler::blocks_headers_handler::BlockHeadersHandler;
 use self::handler::broadcast_handler::BroadcastsHandler;
@@ -46,10 +45,9 @@ use self::handler::status_handler::StatusHandler;
 use self::storage::{ActivePeerInfo, PeerInfo, SyncState, SyncStatus, SyncStorage, TransactionStats};
 use rustc_hex::ToHex;
 
-pub mod action;
-pub mod error;
 mod event;
 mod handler;
+pub mod action;
 pub mod storage;
 
 const STATUS_REQ_INTERVAL: u64 = 2;

@@ -38,12 +38,12 @@ use tokio::runtime::TaskExecutor;
 use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_threadpool::{Builder, ThreadPool};
 
-mod error;
+//mod error;
 mod event;
 pub mod msg;
 mod node;
 
-pub use self::error::*;
+//pub use self::error::*;
 pub use self::event::*;
 pub use self::msg::*;
 pub use self::node::*;

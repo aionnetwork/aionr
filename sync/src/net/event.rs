@@ -37,7 +37,6 @@ pub enum NetEvent {
 impl NetEvent {
     pub fn update_node_state(node: &mut Node, event: NetEvent) {
         let state_code = node.state_code;
-
         match event {
             NetEvent::OnHandshakeReq | NetEvent::OnHandshakeRes => {
                 node.state_code = state_code | HANDSHAKE_DONE | ALIVE;
