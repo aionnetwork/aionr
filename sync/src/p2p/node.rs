@@ -28,7 +28,7 @@ use std::net::SocketAddr;
 use std::time::SystemTime;
 use uuid::Uuid;
 
-pub use super::event::*;
+//pub use super::event::*;
 pub use super::msg::*;
 
 pub type Tx = mpsc::Sender<ChannelBuffer>;

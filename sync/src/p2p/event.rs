@@ -37,10 +37,3 @@ impl fmt::Display for Event {
         write!(f, "{}", printable)
     }
 }
-
-#[test]
-fn display_event_test() {
-    println!("Event: {}", Event::OnConnect);
-    println!("Event: {}", Event::OnDisconnect);
-    println!("Event: {}", Event::Unknown);
-}

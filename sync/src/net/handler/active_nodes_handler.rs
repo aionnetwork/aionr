@@ -36,16 +36,14 @@ impl ActiveNodesHandler {
         req.head.ver = Version::V0.value();
         req.head.ctrl = Control::NET.value();
         req.head.action = NetAction::ACTIVENODESREQ.value();
-
         req.head.len = 0;
-
         let handshaked_nodes = P2pMgr::get_nodes(HANDSHAKE_DONE);
         let handshaked_nodes_count = handshaked_nodes.len();
         if handshaked_nodes_count > 0 {
             let random_index = random::<usize>() % handshaked_nodes_count;
             let node = &handshaked_nodes[random_index];
             P2pMgr::send(node.node_hash, req.clone());
-            trace!(target: "net", "Net activenodes req sent...");
+            trace!(target: "net", "send active nodes req");
         } else {
             trace!(target: "net", "Net no active node...");
         }
