@@ -290,14 +290,6 @@ impl SyncMgr {
     fn disable() { SyncStorage::reset(); }
 }
 
-/// Sync initialization parameters.
-pub struct Params {
-    /// Blockchain client.
-    pub client: Arc<BlockChainClient>,
-    /// Network layer configuration.
-    pub network_config: NetworkConfig,
-}
-
 pub struct NetworkService {
     pub config: NetworkConfig,
 }
@@ -311,16 +303,18 @@ pub struct Sync {
 }
 
 impl Sync {
-    /// Create handler with the network service
-    pub fn get_instance(params: Params) -> Arc<Sync> {
-        let chain_info = params.client.chain_info();
+    pub fn new(
+        client: Arc<BlockChainClient>,
+        config: NetworkConfig
+    ) -> Arc<Sync> {
+        let chain_info = client.chain_info();
         // starting block number is the local best block number during kernel startup.
         let starting_block_number = chain_info.best_block_number;
 
-        SyncStorage::init(params.client);
+        SyncStorage::init(client);
 
         let service = NetworkService {
-            config: params.network_config.clone(),
+            config: config.clone(),
         };
         Arc::new(Sync {
             network: service,

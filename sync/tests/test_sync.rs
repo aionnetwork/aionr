@@ -36,11 +36,9 @@ use acore_io::IoChannel;
 use aion_types::H256;
 use sync::p2p::P2pMgr;
 use sync::p2p::NetworkConfig;
-use sync::sync::SyncConfig;
 use sync::sync::storage::SyncStorage;
 use sync::sync::SyncProvider;
 use sync::sync::NetworkManager;
-use sync::sync::Params;
 use sync::sync::Sync;
 use db::KeyValueDB;
 use db::MockDbRepository;
@@ -127,11 +125,10 @@ fn benchtest_sync_mainnet() {
     let sync_config = SyncConfig::default();
     let net_config = get_network_config();
 
-    let sync = Sync::get_instance(Params {
-        config: sync_config,
-        client: client.clone() as Arc<BlockChainClient>,
-        network_config: net_config,
-    });
+    let sync = Sync::new(
+        client.clone() as Arc<BlockChainClient>,
+        net_config,
+    );
 
     let (sync_provider, network_manager, _chain_notify) = (
         sync.clone() as Arc<SyncProvider>,

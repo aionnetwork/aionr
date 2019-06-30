@@ -72,7 +72,6 @@ mod cache;
 mod cli;
 mod configuration;
 mod helpers;
-mod modules;
 mod params;
 mod rpc;
 mod rpc_apis;

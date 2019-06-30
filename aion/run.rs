@@ -24,7 +24,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
-use acore::client::{BlockChainClient, Client, DatabaseCompactionProfile, VMType};
+use acore::client::{Client, DatabaseCompactionProfile, VMType, ChainNotify};
 use acore::miner::external::ExternalMiner;
 use acore::miner::{Miner, MinerOptions, MinerService, Stratum, StratumOptions};
 use acore::transaction::local_transactions::TxIoMessage;
@@ -41,7 +41,6 @@ use helpers::{passwords_from_files, to_client_config};
 use dir::helpers::absolute;
 use io::{IoChannel, IoService};
 use logger::LogConfig;
-use modules;
 use num_cpus;
 use params::{fatdb_switch_to_bool, AccountsConfig, MinerExtras, Pruning, SpecType, Switch};
 use parking_lot::{Condvar, Mutex};
@@ -49,6 +48,7 @@ use pb::{new_pb, WalletApiConfiguration};
 use rpc;
 use rpc_apis;
 use sync::p2p::{NetworkConfig, P2pMgr};
+use sync::sync::{Sync, NetworkManager};
 use tokio;
 use tokio::prelude::*;
 use user_defaults::UserDefaults;
@@ -213,14 +213,49 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
             .map_err(|e| format!("Stratum start error: {:?}", e))?;
     }
 
-    // create sync object
-    let (sync_provider, network_manager, chain_notify) = modules::sync(
-        net_conf,
-        client.clone() as Arc<BlockChainClient>,
-    )
-    .map_err(|e| format!("Sync error: {}", e))?;
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    // chris
+    // start p2p
+//    let (sync_provider, network_manager, chain_notify) = modules::sync(
+//        net_conf,
+//        client.clone() as Arc<BlockChainClient>,
+//    )
+//    .map_err(|e| format!("Sync error: {}", e))?;
+
+    let sync_provider = Sync::new(client.clone(), net_conf);
+    let network_manager = sync_provider.clone() as Arc<NetworkManager>;
+    let chain_notify = sync_provider.clone() as Arc<ChainNotify>;
     service.add_notify(chain_notify.clone());
+    network_manager.start_network();
+
+
+
+
+
+
+
+
+
+
+
+
+
 
     // spin up rpc eventloop
     let runtime_rpc = tokio::runtime::Builder::new()
@@ -316,9 +351,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .expect("seal block runtime loop init failed");
     let executor_miner = runtime_miner.executor();
     let close_miner = run_miner(executor_miner.clone(), client.clone());
-
-    // enable Sync module
-    network_manager.start_network();
 
     if let Some(config_path) = cmd.dirs.config {
         let local_node = P2pMgr::get_local_node();
