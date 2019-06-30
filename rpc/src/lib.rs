@@ -40,8 +40,8 @@ extern crate jsonrpc_http_server as http;
 extern crate jsonrpc_ipc_server as ipc;
 extern crate jsonrpc_ws_server as ws;
 extern crate jsonrpc_pubsub;
-
 extern crate sync;
+
 extern crate acore;
 extern crate acore_bytes as bytes;
 extern crate aion_types;
@@ -87,7 +87,7 @@ pub use http::{
 };
 pub use ws::{Server as WsServer, Error as WsError, ErrorKind as WsErrorKind};
 
-pub use helpers::{block_import::is_major_importing, dispatch};
+pub use helpers::dispatch;
 pub use metadata::Metadata;
 pub use types::Origin;
 
