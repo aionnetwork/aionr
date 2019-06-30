@@ -30,7 +30,7 @@ use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 
-use net::handler::default_handler::DefaultHandler;
+use p2p::handlers::DefaultHandler;
 use net::NetManager;
 use p2p::*;
 

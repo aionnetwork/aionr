@@ -39,6 +39,7 @@ use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_threadpool::{Builder, ThreadPool};
 
 pub mod msg;
+pub mod handlers;
 mod node;
 
 pub use self::msg::*;
@@ -648,6 +649,48 @@ impl NetworkConfig {
             net_id: 0,
             sync_from_boot_nodes_only: false,
             ip_black_list: Vec::new(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq)]
+pub enum Action {
+    DISCONNECT = 0,
+    HANDSHAKEREQ = 1,
+    HANDSHAKERES = 2,
+    PING = 3,
+    PONG = 4,
+    ACTIVENODESREQ = 5,
+    ACTIVENODESRES = 6,
+    CONNECT = 7,
+    UNKNOWN = 0xFF,
+}
+
+impl Action {
+    pub fn value(&self) -> u8 {
+        match *self {
+            Action::DISCONNECT => 0 as u8,
+            Action::HANDSHAKEREQ => 1 as u8,
+            Action::HANDSHAKERES => 2 as u8,
+            Action::PING => 3 as u8,
+            Action::PONG => 4 as u8,
+            Action::ACTIVENODESREQ => 5 as u8,
+            Action::ACTIVENODESRES => 6 as u8,
+            Action::CONNECT => 7 as u8,
+            Action::UNKNOWN => 0xFF as u8,
+        }
+    }
+    pub fn from(value: u8) -> Action {
+        match value {
+            0 => Action::DISCONNECT,
+            1 => Action::HANDSHAKEREQ,
+            2 => Action::HANDSHAKERES,
+            3 => Action::PING,
+            4 => Action::PONG,
+            5 => Action::ACTIVENODESREQ,
+            6 => Action::ACTIVENODESRES,
+            7 => Action::CONNECT,
+            _ => Action::UNKNOWN,
         }
     }
 }

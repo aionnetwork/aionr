@@ -27,15 +27,16 @@ use std::time::{Duration, Instant};
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 
-mod action;
 pub mod event;
-pub mod handler;
-
-use self::action::NetAction;
-use self::handler::active_nodes_handler::ActiveNodesHandler;
-use self::handler::default_handler::DefaultHandler;
-use self::handler::handshake_handler::HandshakeHandler;
-use self::handler::pingpong_handler::PingPongHandler;
+use super::p2p::handlers::{
+    send_handshake_req,
+    send_activenodes_req,
+    handle_handshake_res,
+    handle_handshake_req,
+    handle_active_nodes_req,
+    handle_active_nodes_res,
+    DefaultHandler
+};
 
 lazy_static! {
     static ref DEFAULT_HANDLER: Storage<DefaultHandler> = Storage::new();
@@ -152,8 +153,7 @@ impl NetManager {
             Duration::from_secs(NODE_ACTIVE_REQ_INTERVAL),
         )
         .for_each(move |_| {
-            ActiveNodesHandler::send_activenodes_req();
-
+            send_activenodes_req();
             Ok(())
         })
         .map_err(|e| error!("interval errored; err={:?}", e));
@@ -169,27 +169,27 @@ impl NetManager {
                     Control::NET => {
                         trace!(target: "net", "P2P NET message received.");
 
-                        match NetAction::from(req.head.action) {
-                            NetAction::DISCONNECT => {
+                        match Action::from(req.head.action) {
+                            Action::DISCONNECT => {
                                 trace!(target: "net", "DISCONNECT received.");
                             }
-                            NetAction::HANDSHAKEREQ => {
-                                HandshakeHandler::handle_handshake_req(node, req);
+                            Action::HANDSHAKEREQ => {
+                                handle_handshake_req(node, req);
                             }
-                            NetAction::HANDSHAKERES => {
-                                HandshakeHandler::handle_handshake_res(node, req);
+                            Action::HANDSHAKERES => {
+                                handle_handshake_res(node, req);
                             }
-                            NetAction::PING => {
-                                PingPongHandler::handle_ping(node, req);
+                            Action::PING => {
+                                // ignore
                             }
-                            NetAction::PONG => {
-                                PingPongHandler::handle_pong(node, req);
+                            Action::PONG => {
+                                // ignore
                             }
-                            NetAction::ACTIVENODESREQ => {
-                                ActiveNodesHandler::handle_active_nodes_req(node);
+                            Action::ACTIVENODESREQ => {
+                                handle_active_nodes_req(node);
                             }
-                            NetAction::ACTIVENODESRES => {
-                                ActiveNodesHandler::handle_active_nodes_res(node, req);
+                            Action::ACTIVENODESRES => {
+                                handle_active_nodes_res(node, req);
                             }
                             _ => {
                                 error!(target: "net", "Invalid action {} received.", req.head.action);
@@ -209,7 +209,7 @@ impl NetManager {
             }
             Version::V1 => {
                 trace!(target: "net", "Ver 1 package received.");
-                HandshakeHandler::send_handshake_req(node);
+                send_handshake_req(node);
             }
             _ => {
                 error!(target: "net", "Invalid Version.");

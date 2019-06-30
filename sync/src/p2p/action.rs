@@ -22,7 +22,7 @@
 use std::fmt;
 
 #[derive(Serialize, Deserialize, PartialEq)]
-pub enum NetAction {
+pub enum Action {
     DISCONNECT = 0,
     HANDSHAKEREQ = 1,
     HANDSHAKERES = 2,
@@ -34,7 +34,7 @@ pub enum NetAction {
     UNKNOWN = 0xFF,
 }
 
-impl NetAction {
+impl Action {
     pub fn value(&self) -> u8 {
         match *self {
             NetAction::DISCONNECT => 0 as u8,
@@ -50,15 +50,15 @@ impl NetAction {
     }
     pub fn from(value: u8) -> NetAction {
         match value {
-            0 => NetAction::DISCONNECT,
-            1 => NetAction::HANDSHAKEREQ,
-            2 => NetAction::HANDSHAKERES,
-            3 => NetAction::PING,
-            4 => NetAction::PONG,
-            5 => NetAction::ACTIVENODESREQ,
-            6 => NetAction::ACTIVENODESRES,
-            7 => NetAction::CONNECT,
-            _ => NetAction::UNKNOWN,
+            0 => Action::DISCONNECT,
+            1 => Action::HANDSHAKEREQ,
+            2 => Action::HANDSHAKERES,
+            3 => Action::PING,
+            4 => Action::PONG,
+            5 => Action::ACTIVENODESREQ,
+            6 => Action::ACTIVENODESRES,
+            7 => Action::CONNECT,
+            _ => Action::UNKNOWN,
         }
     }
 }
