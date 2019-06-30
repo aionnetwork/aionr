@@ -116,10 +116,9 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // create dirs used by aion
     cmd.dirs.create_dirs()?;
 
-    //print out running aion environment
-    print_running_environment(&cmd.spec, &spec.data_dir, &cmd.dirs, &db_dirs);
-
     print_logo();
+
+    print_running_environment(&cmd.spec, &spec.data_dir, &cmd.dirs, &db_dirs);
 
     let passwords = passwords_from_files(&cmd.acc_conf.password_files)?;
 
@@ -178,12 +177,12 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     )
     .map_err(|e| format!("Client service error: {:?}", e))?;
 
-    info!(target: "run"," genesis: {:?}",genesis_hash);
+    info!(target: "run","     genesis: {:?}",genesis_hash);
 
     // display info about used pruning algorithm
     info!(
         target: "run",
-        "state db: {}{}",
+        "    state db: {}{}",
         Colour::White.bold().paint(algorithm.as_str()),
         match fat_db {
             true => Colour::White.bold().paint(" +Fat").to_string(),
@@ -286,7 +285,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     )?;
 
     // log apis
-    info!(target: "run", "    apis: rpc-http({}) rpc-ws({}) rpc-ipc({}) pb-zmq({})",
+    info!(target: "run", "        apis: rpc-http({}) rpc-ws({}) rpc-ipc({}) pb-zmq({})",
         if cmd.http_conf.enabled { "enable" } else { "disable" },
         if cmd.ws_conf.enabled { "enable" } else { "disable" },
         if cmd.ipc_conf.enabled { "enable" } else { "disable" },
@@ -403,8 +402,7 @@ fn print_running_environment(
     spec_data_dir: &String,
     dirs: &Directories,
     db_dirs: &DatabaseDirectories,
-)
-{
+) {
     if let Some(config) = &dirs.config {
         info!(
             target: "run",
@@ -469,7 +467,7 @@ fn print_logo() {
         Colour::Green.bold().paint("\\"),
         Colour::Blue.bold().paint("____/  |_| \\_|\n\n")
     );
-    info!(target: "run","   build: {}", Colour::White.bold().paint(version()));
+    info!(target: "run","       build: {}", Colour::White.bold().paint(version()));
 }
 
 fn prepare_account_provider(

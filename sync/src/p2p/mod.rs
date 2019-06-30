@@ -70,7 +70,7 @@ impl P2pMgr {
 
         local_node.net_id = cfg.net_id;
 
-        info!(target:"net","    node: {}@{}", local_node.get_node_id(), local_node.get_ip_addr());
+        info!(target:"net","        node: {}@{}", local_node.get_node_id(), local_node.get_ip_addr());
 
         LOCAL_NODE.set(local_node.clone());
 

@@ -114,10 +114,8 @@ impl ClientService {
 
         info!(
             target:"run",
-            //"Config: {} / {}",
-            " network: {}",
+            "     network: {}",
             Colour::White.bold().paint(spec.name.clone()),
-            // Colour::Yellow.bold().paint(spec.engine.name())
         );
 
         let mut db_config = DatabaseConfig::default();
