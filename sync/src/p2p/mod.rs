@@ -38,11 +38,9 @@ use tokio::runtime::TaskExecutor;
 use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_threadpool::{Builder, ThreadPool};
 
-//mod event;
 pub mod msg;
 mod node;
 
-//pub use self::event::*;
 pub use self::msg::*;
 pub use self::node::*;
 
