@@ -70,8 +70,7 @@ pub fn handle_active_nodes_req(peer_node: &mut Node) {
     if active_nodes_count > 1 {
         let mut active_nodes_to_send = Vec::new();
         for node in active_nodes.iter() {
-            if node.node_hash != peer_node.node_hash && peer_node.ip_addr.ip != node.ip_addr.ip
-            {
+            if node.node_hash != peer_node.node_hash && peer_node.ip_addr.ip != node.ip_addr.ip {
                 active_nodes_to_send.push(node);
             }
         }

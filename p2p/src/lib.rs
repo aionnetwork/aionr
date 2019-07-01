@@ -123,7 +123,8 @@ impl P2pMgr {
         executor: &TaskExecutor,
         local_addr: &String,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    ) {
+    )
+    {
         if let Ok(addr) = local_addr.parse() {
             let listener = TcpListener::bind(&addr).expect("Failed to bind");
             let server = listener
@@ -671,23 +672,23 @@ impl NetManager {
             Instant::now(),
             Duration::from_secs(RECONNECT_NORMAL_NOEDS_INTERVAL),
         )
-            .for_each(move |_| {
-                let active_nodes_count = P2pMgr::get_nodes_count(ALIVE);
-                if !sync_from_boot_nodes_only && active_nodes_count < max_peers_num {
-                    if let Some(peer_node) = P2pMgr::get_an_inactive_node() {
-                        let peer_node_id_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
-                        if peer_node_id_hash != local_node_id_hash {
-                            let peer_ip = peer_node.ip_addr.get_ip();
-                            if !client_ip_black_list.contains(&peer_ip) {
-                                Self::connet_peer(peer_node);
-                            }
+        .for_each(move |_| {
+            let active_nodes_count = P2pMgr::get_nodes_count(ALIVE);
+            if !sync_from_boot_nodes_only && active_nodes_count < max_peers_num {
+                if let Some(peer_node) = P2pMgr::get_an_inactive_node() {
+                    let peer_node_id_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
+                    if peer_node_id_hash != local_node_id_hash {
+                        let peer_ip = peer_node.ip_addr.get_ip();
+                        if !client_ip_black_list.contains(&peer_ip) {
+                            Self::connet_peer(peer_node);
                         }
-                    };
-                }
+                    }
+                };
+            }
 
-                Ok(())
-            })
-            .map_err(|e| error!("interval errored; err={:?}", e));
+            Ok(())
+        })
+        .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(connect_normal_nodes_task);
     }
 
@@ -703,11 +704,11 @@ impl NetManager {
             Instant::now(),
             Duration::from_secs(NODE_ACTIVE_REQ_INTERVAL),
         )
-            .for_each(move |_| {
-                send_activenodes_req();
-                Ok(())
-            })
-            .map_err(|e| error!("interval errored; err={:?}", e));
+        .for_each(move |_| {
+            send_activenodes_req();
+            Ok(())
+        })
+        .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(activenodes_req_task);
     }
 
@@ -768,7 +769,6 @@ impl NetManager {
         };
     }
 }
-
 
 pub struct P2pCodec;
 
