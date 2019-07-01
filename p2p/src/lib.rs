@@ -19,6 +19,32 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
+
+#[macro_use]
+extern crate log;
+#[macro_use]
+extern crate lazy_static;
+extern crate futures;
+extern crate bincode;
+extern crate rand;
+#[macro_use]
+extern crate serde_derive;
+extern crate state;
+extern crate tokio;
+extern crate tokio_codec;
+extern crate tokio_threadpool;
+extern crate acore_bytes;
+extern crate aion_types;
+extern crate uuid;
+extern crate aion_version as version;
+extern crate bytes;
+extern crate byteorder;
+
+mod msg;
+mod node;
+pub mod handlers;
+
 use std::fmt;
 use acore_bytes::to_hex;
 use bincode::config;
@@ -42,7 +68,7 @@ use tokio::timer::Interval;
 use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_threadpool::{Builder, ThreadPool};
 
-use p2p::handlers::{
+use handlers::{
     send_handshake_req,
     send_activenodes_req,
     handle_handshake_res,
@@ -51,11 +77,6 @@ use p2p::handlers::{
     handle_active_nodes_res,
     DefaultHandler
 };
-
-
-pub mod msg;
-pub mod handlers;
-mod node;
 
 pub use self::msg::*;
 pub use self::node::*;
@@ -67,6 +88,7 @@ lazy_static! {
     static ref GLOBAL_NODES_MAP: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
     static ref ENABLED: Storage<AtomicBool> = Storage::new();
     static ref TP: Storage<ThreadPool> = Storage::new();
+    static ref DEFAULT_HANDLER: Storage<DefaultHandler> = Storage::new();
 }
 
 #[derive(Clone, Copy)]
@@ -569,11 +591,6 @@ impl P2pMgr {
     ) {
         P2pCodec.framed(socket).split()
     }
-}
-
-
-lazy_static! {
-    static ref DEFAULT_HANDLER: Storage<DefaultHandler> = Storage::new();
 }
 
 const RECONNECT_BOOT_NOEDS_INTERVAL: u64 = 10;

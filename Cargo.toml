@@ -43,6 +43,7 @@ panic_hook =        { path = "util/panic_hook" }
 journaldb =         { path = "db/journaldb" }
 db =                { path = "db/core" }
 aion-pb-apiserver = { path = "pb_api"}
+p2p =               { path = "p2p" }
 
 [dev-dependencies]
 pretty_assertions = "0.1"
@@ -62,6 +63,7 @@ members = [
 "rpc",
 "stratum",
 "sync",
+"p2p",
 "util/aion-types",
 "util/avm_abi",
 "util/blake2b",

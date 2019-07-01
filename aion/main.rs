@@ -53,6 +53,7 @@ extern crate blake2b;
 extern crate journaldb;
 extern crate aion_pb_apiserver as pb;
 extern crate tokio;
+extern crate p2p;
 #[macro_use]
 extern crate log as rlog;
 

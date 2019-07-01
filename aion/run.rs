@@ -47,7 +47,7 @@ use parking_lot::{Condvar, Mutex};
 use pb::{new_pb, WalletApiConfiguration};
 use rpc;
 use rpc_apis;
-use sync::p2p::{NetworkConfig, P2pMgr};
+use p2p::{NetworkConfig, P2pMgr};
 use sync::sync::{Sync, NetworkManager};
 use tokio;
 use tokio::prelude::*;

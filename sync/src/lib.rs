@@ -21,7 +21,6 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate bincode;
 extern crate byteorder;
 extern crate bytes;
 extern crate futures;
@@ -30,21 +29,15 @@ extern crate lazy_static;
 #[macro_use]
 extern crate log;
 extern crate lru_cache;
-extern crate rand;
 extern crate rustc_hex;
 #[macro_use]
 extern crate serde_derive;
 extern crate state;
 extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_threadpool;
 extern crate acore;
 extern crate acore_bytes;
 extern crate aion_types;
 extern crate rlp;
-extern crate uuid;
-extern crate aion_version as version;
+extern crate p2p;
 
-//pub mod net;
-pub mod p2p;
 pub mod sync;

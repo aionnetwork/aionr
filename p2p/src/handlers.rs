@@ -20,19 +20,20 @@
  ******************************************************************************/
 
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
-use bytes::BufMut;
+
 use rand::prelude::*;
 use std::mem;
+use bytes::buf::BufMut;
 use version::short_version;
 
-use p2p::{ChannelBuffer, Control, Version, NODE_ID_LENGTH, Node, DISCONNECTED, IP_LENGTH, P2pMgr};
-use p2p::Action;
-use p2p::node::{ MAX_REVISION_LENGTH };
-use p2p::Event;
-use p2p::HANDSHAKE_DONE;
+use super::{ChannelBuffer, Control, Version, NODE_ID_LENGTH, Node, DISCONNECTED, IP_LENGTH, P2pMgr};
+use super::Action;
+use super::Event;
+use super::HANDSHAKE_DONE;
 
 const VERSION: &str = "02";
 const REVISION_PREFIX: &str = "r-";
+const MAX_REVISION_LENGTH: usize = 24;
 
 pub fn send_activenodes_req() {
     let mut req = ChannelBuffer::new();
