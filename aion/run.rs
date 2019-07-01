@@ -213,21 +213,22 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
             .map_err(|e| format!("Stratum start error: {:?}", e))?;
     }
 
-    // chris
-    // start p2p
-    //    let (sync_provider, network_manager, chain_notify) = modules::sync(
-    //        net_conf,
-    //        client.clone() as Arc<BlockChainClient>,
-    //    )
-    //    .map_err(|e| format!("Sync error: {}", e))?;
+    // log apis
+    info!(target: "run", "        apis: rpc-http({}) rpc-ws({}) rpc-ipc({}) pb-zmq({})",
+          if cmd.http_conf.enabled { "enable" } else { "disable" },
+          if cmd.ws_conf.enabled { "enable" } else { "disable" },
+          if cmd.ipc_conf.enabled { "enable" } else { "disable" },
+          if cmd.wallet_api_conf.enabled { "enable" } else { "disable" }
+    );
 
+    // start sync
     let sync_provider = Sync::new(client.clone(), net_conf);
     let network_manager = sync_provider.clone() as Arc<NetworkManager>;
     let chain_notify = sync_provider.clone() as Arc<ChainNotify>;
     service.add_notify(chain_notify.clone());
     network_manager.start_network();
 
-    // spin up rpc eventloop
+    // spin up rpc event loop
     let runtime_rpc = tokio::runtime::Builder::new()
         .name_prefix("rpc-")
         .build()
@@ -288,14 +289,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         &dependencies,
         executor_jsonrpc.clone(),
     )?;
-
-    // log apis
-    info!(target: "run", "        apis: rpc-http({}) rpc-ws({}) rpc-ipc({}) pb-zmq({})",
-        if cmd.http_conf.enabled { "enable" } else { "disable" },
-        if cmd.ws_conf.enabled { "enable" } else { "disable" },
-        if cmd.ipc_conf.enabled { "enable" } else { "disable" },
-        if cmd.wallet_api_conf.enabled { "enable" } else { "disable" }
-    );
 
     // save user defaults
     user_defaults.is_first_launch = false;

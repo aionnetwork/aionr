@@ -130,6 +130,7 @@ impl SyncMgr {
                 let mut active_nodes = P2pMgr::get_nodes(ALIVE);
                 let active_nodes_count = active_nodes.len();
 
+                info!(target: "sync", "");
                 info!(target: "sync", "{:=^127}", " Sync Statics ");
                 info!(target: "sync", "Best block number: {}, hash: {}", chain_info.best_block_number, chain_info.best_block_hash);
                 info!(target: "sync", "Network Best block number: {}, hash: {}", SyncStorage::get_network_best_block_number(), SyncStorage::get_network_best_block_hash());
@@ -141,44 +142,47 @@ impl SyncMgr {
                     P2pMgr::get_nodes_count(CONNECTED),
                     active_nodes_count,
                 );
-                info!(target: "sync", "{:-^127}","");
-                info!(target: "sync","      Total Diff    Blk No.    Blk Hash                 Address                 Revision      Conn  Seed  LstReq No.       Mode");
-                info!(target: "sync", "{:-^127}","");
-                active_nodes.sort_by(|a, b| {
-                    if a.target_total_difficulty != b.target_total_difficulty {
-                        b.target_total_difficulty.cmp(&a.target_total_difficulty)
-                    } else {
-                        b.best_block_num.cmp(&a.best_block_num)
-                    }
-                });
-                let mut count: u32 = 0;
-                for node in active_nodes.iter() {
-                    if let Ok(_) = node.last_request_timestamp.elapsed() {
-                        info!(target: "sync",
-                            "{:>16}{:>11}{:>12}{:>24}{:>25}{:>10}{:>6}{:>12}{:>11}",
-                            format!("{}",node.target_total_difficulty),
-                            node.best_block_num,
-                            format!("{}",node.best_hash),
-                            node.get_display_ip_addr(),
-                            String::from_utf8_lossy(&node.revision).trim(),
-                            match node.ip_addr.is_server{
-                                true => "Outbound",
-                                _=>"Inbound"
-                            },
-                            match node.is_from_boot_list{
-                                true => "Y",
-                                _ => ""
-                            },
-                            node.last_request_num,
-                            format!("{}",node.mode)
-                        );
-                        count += 1;
-                        if count ==  max_peers {
-                            break;
+
+                if active_nodes_count > 0 {
+                    info!(target: "sync", "{:-^127}","");
+                    info!(target: "sync","      Total Diff    Blk No.    Blk Hash                 Address                 Revision      Conn  Seed  LstReq No.       Mode");
+                    info!(target: "sync", "{:-^127}","");
+                    active_nodes.sort_by(|a, b| {
+                        if a.target_total_difficulty != b.target_total_difficulty {
+                            b.target_total_difficulty.cmp(&a.target_total_difficulty)
+                        } else {
+                            b.best_block_num.cmp(&a.best_block_num)
+                        }
+                    });
+                    let mut count: u32 = 0;
+                    for node in active_nodes.iter() {
+                        if let Ok(_) = node.last_request_timestamp.elapsed() {
+                            info!(target: "sync",
+                                "{:>16}{:>11}{:>12}{:>24}{:>25}{:>10}{:>6}{:>12}{:>11}",
+                                format!("{}",node.target_total_difficulty),
+                                node.best_block_num,
+                                format!("{}",node.best_hash),
+                                node.get_display_ip_addr(),
+                                String::from_utf8_lossy(&node.revision).trim(),
+                                match node.ip_addr.is_server{
+                                    true => "Outbound",
+                                    _=>"Inbound"
+                                },
+                                match node.is_from_boot_list{
+                                    true => "Y",
+                                    _ => ""
+                                },
+                                node.last_request_num,
+                                format!("{}",node.mode)
+                            );
+                            count += 1;
+                            if count ==  max_peers {
+                                break;
+                            }
                         }
                     }
+                    info!(target: "sync", "{:-^127}","");
                 }
-                info!(target: "sync", "{:-^127}","");
 
                 if block_number_now + 8 < SyncStorage::get_network_best_block_number()
                     && block_number_now - block_number_last_time < 2
