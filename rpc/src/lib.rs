@@ -40,7 +40,6 @@ extern crate jsonrpc_http_server as http;
 extern crate jsonrpc_ipc_server as ipc;
 extern crate jsonrpc_ws_server as ws;
 extern crate jsonrpc_pubsub;
-extern crate sync;
 
 extern crate acore;
 extern crate acore_bytes as bytes;

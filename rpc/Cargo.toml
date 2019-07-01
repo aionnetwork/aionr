@@ -28,7 +28,6 @@ jsonrpc-ipc-server = { git = "https://github.com/paritytech/jsonrpc.git", branch
 jsonrpc-macros = { git = "https://github.com/paritytech/jsonrpc.git", branch = "parity-2.2" }
 jsonrpc-pubsub = { git = "https://github.com/paritytech/jsonrpc.git", branch = "parity-2.2" }
 
-sync = { path = "../sync" }
 acore = { path = "../core" }
 acore-bytes = { path = "../util/bytes" }
 aion-types = { path = "../util/aion-types"}

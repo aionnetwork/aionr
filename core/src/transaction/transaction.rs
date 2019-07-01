@@ -37,7 +37,7 @@ use vms::constants::{
     GAS_TX_DATA_ZERO,
 };
 
-use bytes::i64_to_bytes;
+use acore_bytes::i64_to_bytes;
 use trace_time::to_epoch_micro;
 
 type Bytes = Vec<u8>;

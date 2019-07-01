@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use aion_types::{Address, H256, U256};
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use kvdb::{KeyValueDB, HashStore};
 use state::{Backend, RequireCache};
 use trie::TrieError;

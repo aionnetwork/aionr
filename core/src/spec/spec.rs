@@ -30,7 +30,7 @@ use std::sync::Arc;
 use aion_types::{Address, H256, U256};
 use ajson;
 use blake2b::{blake2b, BLAKE2B_NULL_RLP};
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use ethbloom::Bloom;
 use kvdb::{MemoryDB, MemoryDBRepository};
 use parking_lot::RwLock;

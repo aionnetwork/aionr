@@ -36,7 +36,7 @@ use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction};
 use verification::queue::QueueInfo as BlockQueueInfo;
 use aion_types::{H256, H128, U256, Address};
 use types::vms::LastHashes;
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use kvdb::DBValue;
 
 use types::ids::*;

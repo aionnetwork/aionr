@@ -32,7 +32,7 @@ use rlp::{UntrustedRlp, RlpStream, Encodable, Decodable, DecoderError};
 use types::vms::{EnvInfo, LastHashes};
 use aion_types::{H256, U256, Address};
 use ethbloom::Bloom;
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use unexpected::Mismatch;
 use engines::POWEquihashEngine;
 use error::{Error, BlockError};

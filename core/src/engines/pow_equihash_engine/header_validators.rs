@@ -25,7 +25,7 @@ use blake2b::Blake2b;
 use aion_types::U256;
 use error::{BlockError, Error};
 use unexpected::{Mismatch, OutOfBounds};
-use bytes::to_hex;
+use acore_bytes::to_hex;
 
 /// Header validator.
 pub trait HeaderValidator {

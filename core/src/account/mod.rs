@@ -32,7 +32,7 @@ use std::sync::Arc;
 use std::fmt;
 
 use aion_types::{H256, U256, Address};
-use bytes::{Bytes, ToPretty};
+use acore_bytes::{Bytes, ToPretty};
 use self::generic::{Filth, BasicAccount};
 use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP, blake2b};
 use rlp::*;

@@ -25,7 +25,7 @@
 use rlp::RlpStream;
 use aion_types::H256;
 use ajson;
-use bytes::Bytes;
+use acore_bytes::Bytes;
 
 pub struct POWEquihash {
     pub nonce: H256,

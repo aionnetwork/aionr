@@ -18,8 +18,14 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use acore::client::{BlockChainClient, BlockId, BlockStatus, ChainNotify};
-use acore::transaction::UnverifiedTransaction;
+
+mod event;
+mod handler;
+mod action;
+mod storage;
+
+use client::{BlockChainClient, BlockId, BlockStatus, ChainNotify};
+use transaction::UnverifiedTransaction;
 use aion_types::H256;
 use futures::{Future, Stream};
 use rlp::UntrustedRlp;
@@ -29,12 +35,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
-
 use p2p::handlers::DefaultHandler;
-use p2p::NetManager;
 use p2p::*;
-
-use super::p2p::HANDSHAKE_DONE;
 
 use self::action::SyncAction;
 use self::handler::blocks_bodies_handler::BlockBodiesHandler;
@@ -44,11 +46,6 @@ use self::handler::import_handler::ImportHandler;
 use self::handler::status_handler::StatusHandler;
 use self::storage::{ActivePeerInfo, PeerInfo, SyncState, SyncStatus, SyncStorage, TransactionStats};
 use rustc_hex::ToHex;
-
-mod event;
-mod handler;
-pub mod action;
-pub mod storage;
 
 const STATUS_REQ_INTERVAL: u64 = 2;
 const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;

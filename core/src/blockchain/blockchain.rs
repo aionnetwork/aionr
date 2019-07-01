@@ -31,7 +31,7 @@ use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
 use ethbloom::Bloom;
 use parking_lot::{Mutex, RwLock};
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use rlp::*;
 use rlp_compress::{compress, decompress, blocks_swapper};
 use header::*;

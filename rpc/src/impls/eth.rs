@@ -33,7 +33,7 @@ use serde_json::{self, Value};
 use serde_json::map::Map;
 use dispatch::DynamicGasPrice;
 
-use sync::sync::SyncProvider;
+use acore::sync::SyncProvider;
 use acore::account_provider::AccountProvider;
 use acore::client::{MiningBlockChainClient, BlockId, TransactionId};
 use acore::filter::Filter as EthcoreFilter;

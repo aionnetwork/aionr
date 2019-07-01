@@ -28,10 +28,10 @@ use std::collections::{HashMap, LinkedList};
 use rustc_hex::FromHex;
 use rustc_hex::ToHex;
 
-use sync::sync::SyncProvider;
 use jsonrpc_macros::Trailing;
 use aion_types::{H256, U256};
 use acore::block::IsBlock;
+use acore::sync::SyncProvider;
 use acore::client::{MiningBlockChainClient, BlockId};
 use acore::miner::MinerService;
 use acore::account_provider::AccountProvider;

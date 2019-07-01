@@ -23,7 +23,7 @@
 //! Transaction execution format module.
 
 use aion_types::{H256, U256, U512, Address};
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use trie;
 use log_entry::LogEntry;
 use state_diff::StateDiff;

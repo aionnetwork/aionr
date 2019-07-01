@@ -19,10 +19,10 @@
  *
  ******************************************************************************/
 
-use acore::client::{BlockId, BlockImportError, BlockStatus};
-use acore::error::{BlockError, ImportError};
-use acore::header::Seal;
-use acore::views::BlockView;
+use client::{BlockId, BlockImportError, BlockStatus};
+use error::{BlockError, ImportError};
+use header::Seal;
+use views::BlockView;
 use aion_types::{H256, U256};
 
 use p2p::{Mode, P2pMgr};

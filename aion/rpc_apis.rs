@@ -28,12 +28,12 @@ use acore::account_provider::AccountProvider;
 use acore::client::Client;
 use acore::miner::external::ExternalMiner;
 use acore::miner::Miner;
+use acore::sync::SyncProvider;
 use aion_rpc::dispatch::{DynamicGasPrice, FullDispatcher};
 use aion_rpc::informant::{ActivityNotifier, ClientNotifier};
 use aion_rpc::Metadata;
 use jsonrpc_core::{self as core, MetaIoHandler};
 use parking_lot::Mutex;
-use sync::sync::SyncProvider;
 use tokio::runtime::TaskExecutor;
 
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]

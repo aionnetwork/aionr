@@ -38,7 +38,6 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 extern crate toml;
-extern crate sync;
 extern crate acore;
 extern crate acore_bytes as bytes;
 extern crate acore_io as io;

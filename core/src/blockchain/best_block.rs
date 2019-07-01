@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 use aion_types::{H256, U256};
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use header::BlockNumber;
 
 /// Best block info.

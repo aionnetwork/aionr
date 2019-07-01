@@ -27,7 +27,7 @@ use blake2b::{blake2b};
 use aion_types::{H256, U256, U128};
 use kvdb::HashStore;
 use triehash::sec_trie_root;
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use trie::TrieFactory;
 use state::{VMAccount, AionVMAccount};
 use ajson;

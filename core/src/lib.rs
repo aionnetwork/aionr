@@ -28,7 +28,8 @@ extern crate crossbeam;
 extern crate types;
 extern crate acore_bloom_journal as bloom_journal;
 extern crate acore_io as io;
-extern crate acore_bytes as bytes;
+extern crate acore_bytes;
+extern crate bytes;
 extern crate acore_stratum;
 extern crate aion_types;
 extern crate ethbloom;
@@ -75,7 +76,7 @@ extern crate equihash;
 extern crate vms;
 extern crate futures;
 extern crate tokio;
-// for aion token bridge
+extern crate state as crate_state;
 extern crate tiny_keccak;
 extern crate num_bigint;
 extern crate bytebuffer;
@@ -92,6 +93,7 @@ pub mod helpers;
 #[cfg(test)]
 #[macro_use]
 extern crate macros;
+extern crate p2p;
 
 pub mod account_provider;
 pub mod block;
@@ -116,6 +118,7 @@ pub mod views;
 pub mod account;
 pub mod blockchain;
 pub mod factory;
+pub mod sync;
 #[cfg(test)]
 pub mod tests;
 

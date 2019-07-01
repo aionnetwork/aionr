@@ -22,7 +22,6 @@
 use std::fmt;
 
 use p2p::*;
-use p2p::HANDSHAKE_DONE;
 
 pub const STATUS_GOT: u32 = 1 << 4;
 pub const HEADERS_DOWNLOADED: u32 = 1 << 5;

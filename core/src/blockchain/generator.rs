@@ -26,7 +26,7 @@ use std::collections::VecDeque;
 use aion_types::{U256, H256};
 use ethbloom::Bloom;
 
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use header::Header;
 use rlp::encode;
 use transaction::SignedTransaction;

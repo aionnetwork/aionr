@@ -22,7 +22,7 @@
 use std::cmp::Ordering;
 use num::ToPrimitive;
 use num_bigint::{BigInt, ToBigInt, Sign};
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use aion_types::H256;
 use super::bundle_request_call::BundleRequestCall;
 use super::bridge_transfer::{BridgeTransfer, get_instance};

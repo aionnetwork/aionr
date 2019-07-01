@@ -24,7 +24,6 @@ fdlimit = "0.1"
 tokio = "0.1.13"
 ctrlc =             { git = "https://github.com/paritytech/rust-ctrlc.git" }
 jsonrpc-core =      { git = "https://github.com/paritytech/jsonrpc.git", branch = "parity-2.2" }
-sync =              { path = "sync" }
 acore =             { path = "core" }
 acore-bytes =       { path = "util/bytes" }
 acore-io =          { path = "util/io" }
@@ -62,7 +61,6 @@ members = [
 "pb_api",
 "rpc",
 "stratum",
-"sync",
 "p2p",
 "util/aion-types",
 "util/avm_abi",

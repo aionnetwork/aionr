@@ -35,7 +35,7 @@ use parking_lot::RwLock;
 use journaldb;
 use kvdb::DBValue;
 use kvdb::{RepositoryConfig, DatabaseConfig, DbRepository};
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use rlp::*;
 use key::{generate_keypair, public_to_address_ed25519};
 use tempdir::TempDir;
