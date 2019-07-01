@@ -45,6 +45,6 @@ extern crate rlp;
 extern crate uuid;
 extern crate aion_version as version;
 
-pub mod net;
+//pub mod net;
 pub mod p2p;
 pub mod sync;

@@ -31,10 +31,10 @@ use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 
 use p2p::handlers::DefaultHandler;
-use net::NetManager;
+use p2p::NetManager;
 use p2p::*;
 
-use net::event::HANDSHAKE_DONE;
+use super::p2p::HANDSHAKE_DONE;
 
 use self::action::SyncAction;
 use self::handler::blocks_bodies_handler::BlockBodiesHandler;

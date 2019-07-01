@@ -28,7 +28,8 @@ use version::short_version;
 use p2p::{ChannelBuffer, Control, Version, NODE_ID_LENGTH, Node, DISCONNECTED, IP_LENGTH, P2pMgr};
 use p2p::Action;
 use p2p::node::{ MAX_REVISION_LENGTH };
-use super::super::net::event::{NetEvent, HANDSHAKE_DONE};
+use p2p::Event;
+use p2p::HANDSHAKE_DONE;
 
 const VERSION: &str = "02";
 const REVISION_PREFIX: &str = "r-";
@@ -91,7 +92,7 @@ pub fn handle_active_nodes_req(peer_node: &mut Node) {
     res.body.put_slice(res_body.as_slice());
     res.head.set_length(res.body.len() as u32);
 
-    NetEvent::update_node_state(peer_node, NetEvent::OnActiveNodesReq);
+    Event::update_node_state(peer_node, Event::OnActiveNodesReq);
     P2pMgr::update_node(peer_node_hash, peer_node);
     P2pMgr::send(peer_node_hash, res);
 }
@@ -138,7 +139,7 @@ pub fn handle_active_nodes_res(peer_node: &mut Node, req: ChannelBuffer) {
             }
         }
     }
-    NetEvent::update_node_state(peer_node, NetEvent::OnActiveNodesRes);
+    Event::update_node_state(peer_node, Event::OnActiveNodesRes);
     P2pMgr::update_node(peer_node_hash, peer_node);
 }
 
@@ -226,7 +227,7 @@ pub fn handle_handshake_req(node: &mut Node, req: ChannelBuffer) {
     if P2pMgr::is_connected(node_id_hash) {
         trace!(target: "net", "known node {}@{} ...", node.get_node_id(), node.get_ip_addr());
     } else {
-        NetEvent::update_node_state(node, NetEvent::OnHandshakeReq);
+        Event::update_node_state(node, Event::OnHandshakeReq);
         if let Some(socket) = P2pMgr::get_peer(old_node_hash) {
             P2pMgr::add_peer(node.clone(), &socket);
         }
@@ -249,7 +250,7 @@ pub fn handle_handshake_res(node: &mut Node, req: ChannelBuffer) {
         node.revision[0..revision_len].copy_from_slice(revision);
     }
 
-    NetEvent::update_node_state(node, NetEvent::OnHandshakeRes);
+    Event::update_node_state(node, Event::OnHandshakeRes);
     P2pMgr::update_node(node.node_hash, node);
 }
 
