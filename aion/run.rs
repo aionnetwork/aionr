@@ -30,7 +30,7 @@ use acore::miner::{Miner, MinerOptions, MinerService, Stratum, StratumOptions};
 use acore::transaction::local_transactions::TxIoMessage;
 use acore::service::{ClientService, run_miner, run_transaction_pool};
 use acore::verification::queue::VerifierSettings;
-use acore::sync::{Sync, NetworkManager};
+use acore::sync::Sync;
 use aion_rpc::{dispatch::DynamicGasPrice, impls::EthClient, informant};
 use aion_version::version;
 use ansi_term::Colour;
@@ -222,23 +222,21 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     );
 
     // start sync
-    let sync_provider = Sync::new(client.clone(), net_conf);
-    let network_manager = sync_provider.clone() as Arc<NetworkManager>;
-    let chain_notify = sync_provider.clone() as Arc<ChainNotify>;
+    let sync = Sync::new(client.clone(), net_conf);
+    let chain_notify = sync.clone() as Arc<ChainNotify>;
     service.add_notify(chain_notify.clone());
-    network_manager.start_network();
+    sync.start_network();
 
-    // spin up rpc event loop
+    // start rpc server
     let runtime_rpc = tokio::runtime::Builder::new()
         .name_prefix("rpc-")
         .build()
         .expect("runtime_rpc init failed");
-    // set up dependencies for rpc servers
     let rpc_stats = Arc::new(informant::RpcStats::default());
     let account_store = Some(account_provider.clone());
     let pb_client = EthClient::new(
         &client.clone(),
-        &sync_provider.clone(),
+        &sync.clone(),
         &account_store,
         &miner.clone(),
         &external_miner.clone(),
@@ -250,7 +248,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     let pb_server = new_pb(cmd.wallet_api_conf.clone(), pb_handles, tx_status_service)?;
     let deps_for_rpc_apis = Arc::new(rpc_apis::FullDependencies {
         client: client.clone(),
-        sync: sync_provider.clone(),
+        sync: sync.clone(),
         account_store,
         miner: miner.clone(),
         external_miner: external_miner.clone(),
@@ -351,10 +349,10 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     }
 
     // close p2p
-    network_manager.stop_network();
+    sync.stop_network();
 
     // close/drop this stuff as soon as exit detected.
-    drop((sync_provider, network_manager, chain_notify, pb_server));
+    drop((sync, chain_notify, pb_server));
 
     thread::sleep(Duration::from_secs(5));
 
@@ -365,7 +363,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     runtime_jsonrpc
         .shutdown_now()
         .wait()
-        .expect("Failed to shutdown jsonrpc runtime instance!");
+        .expect("Failed to shutdown json rpc runtime instance!");
     runtime_transaction_pool
         .shutdown_now()
         .wait()

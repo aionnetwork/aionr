@@ -333,7 +333,6 @@ mod node_tests {
     fn new_with_node_str_test() {
         let node_str = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303".to_string();
         let node = Node::new_with_node_str(node_str);
-
         println!("Node: {}", node);
     }
 

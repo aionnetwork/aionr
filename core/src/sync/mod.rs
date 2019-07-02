@@ -289,37 +289,54 @@ impl SyncMgr {
     fn disable() { SyncStorage::reset(); }
 }
 
-pub struct NetworkService {
-    pub config: NetworkConfig,
-}
-
 /// Sync
 pub struct Sync {
     /// Network service
-    network: NetworkService,
+    config: NetworkConfig,
     /// starting block number.
     starting_block_number: u64,
 }
 
 impl Sync {
     pub fn new(client: Arc<BlockChainClient>, config: NetworkConfig) -> Arc<Sync> {
+
+        println!("here {:?}", config);
+
         let chain_info = client.chain_info();
         // starting block number is the local best block number during kernel startup.
         let starting_block_number = chain_info.best_block_number;
 
         SyncStorage::init(client);
-
-        let service = NetworkService {
-            config: config.clone(),
-        };
         Arc::new(Sync {
-            network: service,
+            config,
             starting_block_number,
         })
+    }
+
+    pub fn start_network(&self) {
+        let executor = SyncStorage::get_executor();
+        let sync_handler = DefaultHandler {
+            callback: SyncMgr::handle,
+        };
+
+        P2pMgr::enable(self.config.clone());
+        debug!(target: "sync", "###### P2P enabled... ######");
+
+        NetManager::enable(&executor, sync_handler);
+        debug!(target: "sync", "###### network enabled... ######");
+
+        SyncMgr::enable(&executor, self.config.max_peers);
+        debug!(target: "sync", "###### sync enabled... ######");
+    }
+
+    pub fn stop_network(&self) {
+        SyncMgr::disable();
+        P2pMgr::disable();
     }
 }
 
 pub trait SyncProvider: Send + ::std::marker::Sync {
+
     /// Get sync status
     fn status(&self) -> SyncStatus;
 
@@ -337,6 +354,7 @@ pub trait SyncProvider: Send + ::std::marker::Sync {
 }
 
 impl SyncProvider for Sync {
+
     /// Get sync status
     fn status(&self) -> SyncStatus {
         // TODO:  only set start_block_number/highest_block_number.
@@ -386,50 +404,8 @@ impl SyncProvider for Sync {
     }
 }
 
-/// Trait for managing network
-pub trait NetworkManager: Send + ::std::marker::Sync {
-    /// Set to allow unreserved peers to connect
-    fn accept_unreserved_peers(&self);
-    /// Set to deny unreserved peers to connect
-    fn deny_unreserved_peers(&self);
-    /// Start network
-    fn start_network(&self);
-    /// Stop network
-    fn stop_network(&self);
-    /// Query the current configuration of the network
-    fn network_config(&self) -> NetworkConfig;
-}
-
-impl NetworkManager for Sync {
-    fn accept_unreserved_peers(&self) {}
-
-    fn deny_unreserved_peers(&self) {}
-
-    fn start_network(&self) {
-        let executor = SyncStorage::get_executor();
-        let sync_handler = DefaultHandler {
-            callback: SyncMgr::handle,
-        };
-
-        P2pMgr::enable(self.network_config());
-        debug!(target: "sync", "###### P2P enabled... ######");
-
-        NetManager::enable(&executor, sync_handler);
-        debug!(target: "sync", "###### network enabled... ######");
-
-        SyncMgr::enable(&executor, self.network.config.max_peers);
-        debug!(target: "sync", "###### SYNC enabled... ######");
-    }
-
-    fn stop_network(&self) {
-        SyncMgr::disable();
-        P2pMgr::disable();
-    }
-
-    fn network_config(&self) -> NetworkConfig { NetworkConfig::from(self.network.config.clone()) }
-}
-
 impl ChainNotify for Sync {
+
     fn new_blocks(
         &self,
         imported: Vec<H256>,
@@ -439,8 +415,7 @@ impl ChainNotify for Sync {
         sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
         _duration: u64,
-    )
-    {
+    ) {
         if P2pMgr::get_all_nodes_count() == 0 {
             return;
         }
@@ -541,11 +516,4 @@ impl ChainNotify for Sync {
             }
         }
     }
-}
-
-/// Configuration for IPC service.
-#[derive(Debug, Clone)]
-pub struct ServiceConfiguration {
-    /// Network configuration.
-    pub net: NetworkConfig,
 }

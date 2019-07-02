@@ -25,7 +25,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::SystemTime;
 use block::Block;
 use client::{BlockChainClient, BlockChainInfo, BlockQueueInfo};
-use header::Header as BlockHeader;
+use header::Header;
 use aion_types::{H256, U256};
 use lru_cache::LruCache;
 use crate_state::Storage;
@@ -596,7 +596,7 @@ impl fmt::Display for NetworkStatus {
 pub struct HeadersWrapper {
     pub node_hash: u64,
     pub timestamp: SystemTime,
-    pub headers: Vec<BlockHeader>,
+    pub headers: Vec<Header>,
 }
 
 impl HeadersWrapper {
