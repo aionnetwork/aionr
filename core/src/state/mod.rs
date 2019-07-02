@@ -45,11 +45,11 @@ use receipt::Receipt;
 use state_db::StateDB;
 use transaction::SignedTransaction;
 use types::state_diff::StateDiff;
-use types::vms::EnvInfo;
+use vms::EnvInfo;
 
 use aion_types::{Address, H256, U256};
 use acore_bytes::Bytes;
-use kvdb::{KeyValueDB, AsHashStore, DBValue, MemoryDBRepository};
+use kvdb::{KeyValueDB, AsHashStore, DBValue};
 
 use trie;
 use trie::recorder::Recorder;
@@ -80,52 +80,6 @@ pub struct ApplyOutcome {
 
 /// Result type for the execution ("application") of a transaction.
 pub type ApplyResult = Result<ApplyOutcome, Error>;
-
-/// Return type of proof validity check.
-#[derive(Debug, Clone)]
-pub enum ProvedExecution {
-    /// Proof wasn't enough to complete execution.
-    BadProof,
-    /// The transaction failed, but not due to a bad proof.
-    Failed(ExecutionError),
-    /// The transaction successfully completd with the given proof.
-    Complete(Executed),
-}
-
-/// Check the given proof of execution.
-/// `Err(ExecutionError::Internal)` indicates failure, everything else indicates
-/// a successful proof (as the transaction itself may be poorly chosen).
-pub fn check_proof(
-    proof: &[DBValue],
-    root: H256,
-    transaction: &SignedTransaction,
-    machine: &Machine,
-    env_info: &EnvInfo,
-) -> ProvedExecution
-{
-    let backend = self::backend::ProofCheck::new(proof);
-    let mut factories = Factories::default();
-    factories.accountdb = ::account_db::Factory::Plain;
-
-    let res = State::from_existing(
-        backend,
-        root,
-        machine.account_start_nonce(env_info.number),
-        factories,
-        Arc::new(MemoryDBRepository::new()),
-    );
-
-    let mut state = match res {
-        Ok(state) => state,
-        Err(_) => return ProvedExecution::BadProof,
-    };
-
-    match state.execute(env_info, machine, transaction, true, true) {
-        Ok(executed) => ProvedExecution::Complete(executed),
-        Err(ExecutionError::Internal(_)) => ProvedExecution::BadProof,
-        Err(e) => ProvedExecution::Failed(e),
-    }
-}
 
 /// Prove a transaction on the given state.
 /// Returns `None` when the transacion could not be proved,
@@ -882,17 +836,14 @@ impl<B: Backend> State<B> {
                         ) {
                         account
                             .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
-                        account.update_root(address, self.kvdb.clone());
+                        account.update_root(self.kvdb.clone());
                     } else if !account.storage_changes().is_empty() {
                         // TODO: check key/value storage in avm
                         // to see whether discard is needed
                         account.discard_storage_changes();
                         a.state = AccountState::CleanFresh;
                     } else {
-                        if a.state == AccountState::Dirty
-                            && account.code_hash() == BLAKE2B_EMPTY
-                            && !account.get_empty_but_commit()
-                        {
+                        if !account.get_empty_but_commit() {
                             // Aion Java Kernel specific:
                             // 1. for code != NULL && return code == NULL && no storage chanage
                             // eg: [0x00, 0x60, 0x00]
@@ -908,7 +859,6 @@ impl<B: Backend> State<B> {
         }
 
         {
-            // commit fvm accounts
             let mut trie = self
                 .factories
                 .trie
@@ -925,7 +875,6 @@ impl<B: Backend> State<B> {
                 };
             }
         }
-        //println!("new state = {:?}", self);
         debug!(target: "cons", "after commit: accounts = {:?}, state root = {:?}", accounts, self.root);
 
         Ok(())

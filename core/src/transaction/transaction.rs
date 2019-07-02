@@ -57,11 +57,9 @@ pub const AVM_TRANSACTION_TYPE: U256 = U256([2, 0, 0, 0]);
 
 struct TransactionEnergyRule;
 impl TransactionEnergyRule {
-    pub fn is_valid_gas_create(gas: U256) -> bool {
-        (gas >= GAS_CREATE_MIN) && (gas <= GAS_CREATE_MAX)
-    }
+    fn is_valid_gas_create(gas: U256) -> bool { (gas >= GAS_CREATE_MIN) && (gas <= GAS_CREATE_MAX) }
 
-    pub fn is_valid_gas_call(gas: U256) -> bool { gas >= GAS_CALL_MIN && gas <= GAS_CALL_MAX }
+    fn is_valid_gas_call(gas: U256) -> bool { gas >= GAS_CALL_MIN && gas <= GAS_CALL_MAX }
 }
 
 /// Transaction action type.
@@ -288,21 +286,6 @@ impl Transaction {
             }
             .compute_hash(),
             sender: from,
-            public: None,
-        }
-    }
-
-    /// Add EIP-86 compatible empty signature.
-    pub fn null_sign(self, _chain_id: u64) -> SignedTransaction {
-        SignedTransaction {
-            transaction: UnverifiedTransaction {
-                unsigned: self,
-                timestamp: vec![0x00; 8],
-                sig: vec![0u8; 96],
-                hash: 0.into(),
-            }
-            .compute_hash(),
-            sender: UNSIGNED_SENDER,
             public: None,
         }
     }
@@ -599,7 +582,7 @@ impl SignedTransaction {
     }
 
     /// Returns transaction type.
-    pub fn tx_type(&self) -> U256 { self.transaction.unsigned.transaction_type }
+    pub fn tx_type(&self) -> U256 { self.transaction_type }
 
     /// Returns transaction sender.
     pub fn sender(&self) -> &Address { &self.sender }
@@ -609,11 +592,6 @@ impl SignedTransaction {
 
     /// Checks is signature is empty.
     pub fn is_unsigned(&self) -> bool { self.transaction.is_unsigned() }
-
-    /// Deconstructs this transaction back into `UnverifiedTransaction`
-    pub fn deconstruct(self) -> (UnverifiedTransaction, Address, Option<Ed25519Public>) {
-        (self.transaction, self.sender, self.public)
-    }
 }
 
 /// Signed Transaction that is a part of canon blockchain.

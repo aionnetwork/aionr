@@ -22,7 +22,7 @@
 use std::cmp;
 use acore_bytes::Bytes;
 use aion_types::{H256, U256};
-use types::vms::{ReturnData, ExecStatus, ExecutionResult};
+use vms::{ReturnData, ExecStatus, ExecutionResult};
 use num_bigint::BigInt;
 use num_bigint::ToBigInt;
 

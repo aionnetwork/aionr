@@ -36,7 +36,7 @@ use receipt::LocalizedReceipt;
 use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction};
 use verification::queue::QueueInfo as BlockQueueInfo;
 use aion_types::{H256, H128, U256, Address};
-use types::vms::LastHashes;
+use vms::LastHashes;
 use acore_bytes::Bytes;
 use kvdb::DBValue;
 

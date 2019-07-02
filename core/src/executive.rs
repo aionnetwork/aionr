@@ -28,7 +28,7 @@ use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
 use blake2b::{blake2b};
 use aion_types::{H256, U256, U512, Address};
-use types::vms::{ActionParams, ActionValue, CallType, EnvInfo, ExecutionResult, ExecStatus, ReturnData, ParamsType};
+use vms::{ActionParams, ActionValue, CallType, EnvInfo, ExecutionResult, ExecStatus, ReturnData, ParamsType};
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use error::ExecutionError;
@@ -477,10 +477,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         if self.depth != depth_threshold {
             let mut vm_factory = self.state.vm_factory();
             // consider put global callback in ext
-            let mut ext = self.as_externalities(
-                OriginInfo::from(&[&params as &ActionParams]),
-                unconfirmed_substate,
-            );
+            let mut ext = self.as_externalities(OriginInfo::from(&[&params]), unconfirmed_substate);
             //TODO: make create/exec compatible with fastvm
             let vm = vm_factory.create(VMType::FastVM);
             // fastvm local call flag is unused
@@ -675,6 +672,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         return res;
     }
 
+    #[cfg(test)]
     pub fn create_avm(
         &mut self,
         params: Vec<ActionParams>,
@@ -690,6 +688,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         res
     }
 
+    #[cfg(test)]
     pub fn call_avm(
         &mut self,
         params: Vec<ActionParams>,

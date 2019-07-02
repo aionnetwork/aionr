@@ -29,7 +29,7 @@ extern crate aion_types;
 #[macro_use]
 extern crate log;
 extern crate patricia_trie as trie;
-extern crate types;
+extern crate vm_common as types;
 
 pub mod context;
 pub mod basetypes;

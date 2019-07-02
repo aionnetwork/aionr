@@ -20,7 +20,7 @@
  *
  ******************************************************************************/
 
-use std::collections::{HashMap, BTreeMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use std::time::{self, Duration, Instant};
 use std::thread;
@@ -31,16 +31,16 @@ use ansi_term::Colour;
 use acore_bytes::Bytes;
 use engines::POWEquihashEngine;
 use error::*;
-use miner::{MinerService, MinerStatus, NotifyWork};
+use super::{MinerService, MinerStatus, NotifyWork};
 use parking_lot::{Mutex, RwLock};
 use transaction::transaction_pool::TransactionPool;
 use transaction::banning_queue::{BanningTransactionQueue, Threshold};
-use transaction::local_transactions::{Status as LocalTransactionStatus, TxIoMessage};
+use transaction::local_transactions::TxIoMessage;
 use transaction::transaction_queue::{
     AccountDetails, PrioritizationStrategy, RemovalReason, TransactionOrigin, TransactionQueue,
 };
 use transaction::{
-    Action, Condition as TransactionCondition, Error as TransactionError,
+    Condition as TransactionCondition, Error as TransactionError,
 /*ImportResult as TransactionImportResult,*/
  PendingTransaction, SignedTransaction,
     UnverifiedTransaction,
@@ -48,10 +48,9 @@ use transaction::{
 use using_queue::{GetAction, UsingQueue};
 use block::{ClosedBlock, IsBlock, Block};
 use client::{MiningBlockChainClient, BlockId, TransactionId};
-use executive::contract_address;
 use header::{Header, BlockNumber};
 use io::IoChannel;
-use receipt::{Receipt, RichReceipt};
+use receipt::Receipt;
 use spec::Spec;
 use state::State;
 
@@ -182,6 +181,62 @@ impl Miner {
         Arc::new(Miner::new_raw(options, spec, accounts, message_channel))
     }
 
+    /// get the interval to prepare a new / update an existing block
+    pub fn prepare_block_interval(&self) -> Duration { self.options.prepare_block_interval.clone() }
+
+    /// Creates new instance of miner without accounts, but with given spec.
+    pub fn with_spec(spec: &Spec) -> Miner {
+        Miner::new_raw(Default::default(), spec, None, IoChannel::disconnected())
+    }
+
+    /// Clear all pending block states
+    pub fn clear(&self) { self.sealing_work.lock().queue.reset(); }
+
+    /// Get `Some` `clone()` of the current pending block's state or `None` if we're not sealing.
+    pub fn pending_state(
+        &self,
+        latest_block_number: BlockNumber,
+    ) -> Option<State<::state_db::StateDB>>
+    {
+        self.map_pending_block(|b| b.state().clone(), latest_block_number)
+    }
+
+    /// Get `Some` `clone()` of the current pending block or `None` if we're not sealing.
+    pub fn pending_block(&self, latest_block_number: BlockNumber) -> Option<Block> {
+        self.map_pending_block(|b| b.to_base(), latest_block_number)
+    }
+
+    /// Get `Some` `clone()` of the current pending block header or `None` if we're not sealing.
+    pub fn pending_block_header(&self, latest_block_number: BlockNumber) -> Option<Header> {
+        self.map_pending_block(|b| b.header().clone(), latest_block_number)
+    }
+
+    /// Try to prepare a work.
+    /// Create a new work if no work exists or update an existing work depending on the
+    /// configurations and the current conditions.
+    pub fn try_prepare_block(&self, client: &MiningBlockChainClient, is_forced: bool) {
+        if is_forced || self.tx_reseal_allowed() {
+            *self.next_allowed_reseal.lock() = Instant::now() + self.options.reseal_min_period;
+            self.update_sealing(client);
+        }
+    }
+
+    /// Update transaction pool
+    pub fn update_transaction_pool(&self, client: &MiningBlockChainClient, is_forced: bool) {
+        let update_lock = self.transaction_pool_update_lock.try_lock();
+        if !is_forced && update_lock.is_none() {
+            return;
+        }
+        let fetch_account = |a: &Address| {
+            AccountDetails {
+                nonce: client.latest_nonce(a),
+                balance: client.latest_balance(a),
+            }
+        };
+        let best_block = || client.chain_info().best_block_number;
+        self.transaction_pool.update(&fetch_account, &best_block);
+    }
+
     /// Creates new instance of miner.
     fn new_raw(
         options: MinerOptions,
@@ -245,53 +300,8 @@ impl Miner {
         }
     }
 
-    /// get the interval to prepare a new / update an existing block
-    pub fn prepare_block_interval(&self) -> Duration { self.options.prepare_block_interval.clone() }
-
-    /// Replace tx message channel. Useful for testing.
-    pub fn set_tx_message_channel(&self, tx_message: IoChannel<TxIoMessage>) {
-        *self.tx_message.lock() = tx_message;
-    }
-
-    /// Creates new instance of miner with accounts and with given spec.
-    pub fn with_spec_and_accounts(spec: &Spec, accounts: Option<Arc<AccountProvider>>) -> Miner {
-        Miner::new_raw(
-            Default::default(),
-            spec,
-            accounts,
-            IoChannel::disconnected(),
-        )
-    }
-
-    /// Creates new instance of miner without accounts, but with given spec.
-    pub fn with_spec(spec: &Spec) -> Miner {
-        Miner::new_raw(Default::default(), spec, None, IoChannel::disconnected())
-    }
-
     fn forced_sealing(&self) -> bool {
         self.options.force_sealing || !self.notifiers.read().is_empty()
-    }
-
-    /// Clear all pending block states
-    pub fn clear(&self) { self.sealing_work.lock().queue.reset(); }
-
-    /// Get `Some` `clone()` of the current pending block's state or `None` if we're not sealing.
-    pub fn pending_state(
-        &self,
-        latest_block_number: BlockNumber,
-    ) -> Option<State<::state_db::StateDB>>
-    {
-        self.map_pending_block(|b| b.state().clone(), latest_block_number)
-    }
-
-    /// Get `Some` `clone()` of the current pending block or `None` if we're not sealing.
-    pub fn pending_block(&self, latest_block_number: BlockNumber) -> Option<Block> {
-        self.map_pending_block(|b| b.to_base(), latest_block_number)
-    }
-
-    /// Get `Some` `clone()` of the current pending block header or `None` if we're not sealing.
-    pub fn pending_block_header(&self, latest_block_number: BlockNumber) -> Option<Header> {
-        self.map_pending_block(|b| b.header().clone(), latest_block_number)
     }
 
     fn map_pending_block<F, T>(&self, f: F, latest_block_number: BlockNumber) -> Option<T>
@@ -549,32 +559,6 @@ impl Miner {
         prepare_new
     }
 
-    /// Try to prepare a work.
-    /// Create a new work if no work exists or update an existing work depending on the
-    /// configurations and the current conditions.
-    pub fn try_prepare_block(&self, client: &MiningBlockChainClient, is_forced: bool) {
-        if is_forced || self.tx_reseal_allowed() {
-            *self.next_allowed_reseal.lock() = Instant::now() + self.options.reseal_min_period;
-            self.update_sealing(client);
-        }
-    }
-
-    /// Update transaction pool
-    pub fn update_transaction_pool(&self, client: &MiningBlockChainClient, is_forced: bool) {
-        let update_lock = self.transaction_pool_update_lock.try_lock();
-        if !is_forced && update_lock.is_none() {
-            return;
-        }
-        let fetch_account = |a: &Address| {
-            AccountDetails {
-                nonce: client.latest_nonce(a),
-                balance: client.latest_balance(a),
-            }
-        };
-        let best_block = || client.chain_info().best_block_number;
-        self.transaction_pool.update(&fetch_account, &best_block);
-    }
-
     /// Verification for mining purpose to determine if a transaction is qualified to
     /// be added into transaction queue.
     fn verify_transaction_miner(
@@ -724,6 +708,23 @@ impl Miner {
             },
         )
     }
+
+    #[cfg(test)]
+    /// Replace tx message channel. Useful for testing.
+    pub fn set_tx_message_channel(&self, tx_message: IoChannel<TxIoMessage>) {
+        *self.tx_message.lock() = tx_message;
+    }
+
+    #[cfg(test)]
+    /// Creates new instance of miner with accounts and with given spec.
+    pub fn with_spec_and_accounts(spec: &Spec, accounts: Option<Arc<AccountProvider>>) -> Miner {
+        Miner::new_raw(
+            Default::default(),
+            spec,
+            accounts,
+            IoChannel::disconnected(),
+        )
+    }
 }
 
 const SEALING_TIMEOUT_IN_BLOCKS: u64 = 5;
@@ -734,6 +735,9 @@ impl MinerService for Miner {
         self.update_sealing(client);
     }
 
+    /// MinerStatus     -   pending transaction number
+    ///                 -   future transaction number
+    ///                 -   transaction number in pending block
     fn status(&self) -> MinerStatus {
         let status = self.transaction_pool.status();
         let sealing_work = self.sealing_work.lock();
@@ -770,13 +774,7 @@ impl MinerService for Miner {
 
     fn local_maximal_gas_price(&self) -> U256 { self.options.local_max_gas_price }
 
-    fn set_local_maximal_gas_price(&mut self, local_max_gas_price: U256) {
-        self.options.local_max_gas_price = local_max_gas_price;
-    }
-
     fn default_gas_limit(&self) -> U256 { 2_000_000.into() }
-
-    fn set_tx_gas_limit(&mut self, limit: U256) { self.options.tx_gas_limit = limit; }
 
     fn tx_gas_limit(&self) -> U256 { self.options.tx_gas_limit }
 
@@ -792,7 +790,7 @@ impl MinerService for Miner {
     /// Get the gas limit we wish to target when sealing a new block.
     fn gas_ceil_target(&self) -> U256 { self.gas_range_target.read().1 }
 
-    /// Verify and import external transactions to transaction queue
+    /// Verify and import external transactions to transaction queue, from client
     fn import_external_transactions(
         &self,
         client: &MiningBlockChainClient,
@@ -824,7 +822,7 @@ impl MinerService for Miner {
         results
     }
 
-    /// Verify and import own transaction to transaction queue
+    /// Verify and import own transaction to transaction queue, tx from rpc
     fn import_own_transaction(
         &self,
         client: &MiningBlockChainClient,
@@ -863,19 +861,22 @@ impl MinerService for Miner {
         result
     }
 
+    /// Get all Pending Transactions
     fn pending_transactions(&self) -> Vec<PendingTransaction> {
         self.transaction_pool
             .pending_transactions(BlockNumber::max_value(), u64::max_value())
     }
 
-    fn local_transactions(&self) -> HashMap<H256, LocalTransactionStatus> {
-        self.transaction_pool.local_transactions()
-    }
+    //    fn local_transactions(&self) -> HashMap<H256, LocalTransactionStatus> {
+    //        self.transaction_pool.local_transactions()
+    //    }
 
+    // Return all future transactions, and transfer them to Pending
     fn future_transactions(&self) -> Vec<PendingTransaction> {
         self.transaction_pool.future_transactions()
     }
 
+    /// Called by client
     fn ready_transactions(
         &self,
         best_block: BlockNumber,
@@ -919,6 +920,7 @@ impl MinerService for Miner {
         }
     }
 
+    /// part of eth filter
     fn pending_transactions_hashes(&self, best_block: BlockNumber) -> Vec<H256> {
         match self.options.pending_set {
             PendingSet::AlwaysQueue => self.transaction_pool.pending_hashes(),
@@ -951,6 +953,7 @@ impl MinerService for Miner {
         }
     }
 
+    /// try to find transaction util best_block, rpc uses this
     fn transaction(&self, best_block: BlockNumber, hash: &H256) -> Option<PendingTransaction> {
         match self.options.pending_set {
             PendingSet::AlwaysQueue => self.transaction_pool.find_transaction(hash),
@@ -985,49 +988,50 @@ impl MinerService for Miner {
         }
     }
 
-    fn remove_pending_transaction(&self, hash: H256) {
-        self.transaction_pool
-            .remove_transaction(hash, RemovalReason::Canceled);
-    }
+    //    fn remove_pending_transaction(&self, hash: H256) {
+    //        self.transaction_pool
+    //            .remove_transaction(hash, RemovalReason::Canceled);
+    //    }
 
-    fn pending_receipt(&self, best_block: BlockNumber, hash: &H256) -> Option<RichReceipt> {
-        self.from_pending_block(
-            best_block,
-            || None,
-            |pending| {
-                let txs = pending.transactions();
-                txs.iter()
-                    .map(|t| t.hash())
-                    .position(|t| t == hash)
-                    .map(|index| {
-                        let prev_gas = if index == 0 {
-                            Default::default()
-                        } else {
-                            pending.receipts()[index - 1].gas_used
-                        };
-                        let tx = &txs[index];
-                        let receipt = &pending.receipts()[index];
-                        RichReceipt {
-                            transaction_hash: hash.clone(),
-                            transaction_index: index,
-                            cumulative_gas_used: receipt.gas_used,
-                            gas_used: receipt.gas_used - prev_gas,
-                            contract_address: match tx.action {
-                                Action::Call(_) => None,
-                                Action::Create => {
-                                    let sender = tx.sender();
-                                    Some(contract_address(&sender, &tx.nonce).0)
-                                }
-                            },
-                            logs: receipt.logs().clone(),
-                            log_bloom: receipt.log_bloom().clone(),
-                            state_root: receipt.state_root().clone(),
-                        }
-                    })
-            },
-        )
-    }
+    //    fn pending_receipt(&self, best_block: BlockNumber, hash: &H256) -> Option<RichReceipt> {
+    //        self.from_pending_block(
+    //            best_block,
+    //            || None,
+    //            |pending| {
+    //                let txs = pending.transactions();
+    //                txs.iter()
+    //                    .map(|t| t.hash())
+    //                    .position(|t| t == hash)
+    //                    .map(|index| {
+    //                        let prev_gas = if index == 0 {
+    //                            Default::default()
+    //                        } else {
+    //                            pending.receipts()[index - 1].gas_used
+    //                        };
+    //                        let tx = &txs[index];
+    //                        let receipt = &pending.receipts()[index];
+    //                        RichReceipt {
+    //                            transaction_hash: hash.clone(),
+    //                            transaction_index: index,
+    //                            cumulative_gas_used: receipt.gas_used,
+    //                            gas_used: receipt.gas_used - prev_gas,
+    //                            contract_address: match tx.action {
+    //                                Action::Call(_) => None,
+    //                                Action::Create => {
+    //                                    let sender = tx.sender();
+    //                                    Some(contract_address(&sender, &tx.nonce).0)
+    //                                }
+    //                            },
+    //                            logs: receipt.logs().clone(),
+    //                            log_bloom: receipt.log_bloom().clone(),
+    //                            state_root: receipt.state_root().clone(),
+    //                        }
+    //                    })
+    //            },
+    //        )
+    //    }
 
+    // rpc related
     fn pending_receipts(&self, best_block: BlockNumber) -> BTreeMap<H256, Receipt> {
         self.from_pending_block(best_block, BTreeMap::new, |pending| {
             let hashes = pending.transactions().iter().map(|t| t.hash().clone());
@@ -1038,11 +1042,12 @@ impl MinerService for Miner {
         })
     }
 
+    // rpc related
     fn last_nonce(&self, address: &Address) -> Option<U256> {
         self.transaction_pool.last_nonce(address)
     }
 
-    /// Prepare new best block or update existing best block if required.
+    /// Client: Prepare new best block or update existing best block if required.
     fn update_sealing(&self, client: &MiningBlockChainClient) {
         trace!(target: "block", "update_sealing: best_block: {:?}", client.chain_info().best_block_number);
         if self.requires_reseal(client.chain_info().best_block_number) {
@@ -1052,8 +1057,10 @@ impl MinerService for Miner {
         }
     }
 
+    /// RPC
     fn is_currently_sealing(&self) -> bool { self.sealing_work.lock().queue.is_in_use() }
 
+    // Stratum server receives a finished job, and updates sealing work
     fn map_sealing_work<F, T>(&self, client: &MiningBlockChainClient, f: F) -> Option<T>
     where F: FnOnce(&ClosedBlock) -> T {
         trace!(target: "miner", "map_sealing_work: entering");
@@ -1065,6 +1072,7 @@ impl MinerService for Miner {
         ret.map(f)
     }
 
+    /// stratum server receives a finished job, import as a sealed block
     fn submit_seal(
         &self,
         client: &MiningBlockChainClient,
@@ -1101,6 +1109,7 @@ impl MinerService for Miner {
         })
     }
 
+    /// Client
     fn chain_new_blocks(
         &self,
         client: &MiningBlockChainClient,

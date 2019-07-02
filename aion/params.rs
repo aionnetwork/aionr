@@ -22,7 +22,7 @@
 use std::{str, fs, fmt};
 use aion_types::{U256, Address};
 use journaldb::Algorithm;
-use acore::spec::{Spec, SpecParams};
+use acore::spec::{Spec};
 use user_defaults::UserDefaults;
 
 #[derive(Debug, PartialEq)]
@@ -57,8 +57,7 @@ impl fmt::Display for SpecType {
 }
 
 impl SpecType {
-    pub fn spec<'a, T: Into<SpecParams<'a>>>(&self, params: T) -> Result<Spec, String> {
-        let params = params.into();
+    pub fn spec<'a>(&self) -> Result<Spec, String> {
         let file;
         match *self {
             SpecType::Default => {
@@ -73,7 +72,7 @@ impl SpecType {
                 })?;
             }
         }
-        Spec::load(params, file)
+        Spec::load(file)
     }
 }
 

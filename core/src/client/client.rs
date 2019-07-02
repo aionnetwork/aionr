@@ -65,7 +65,7 @@ use transaction::{
     DEFAULT_TRANSACTION_TYPE, AVM_TRANSACTION_TYPE
 };
 use types::filter::Filter;
-use types::vms::{EnvInfo, LastHashes};
+use vms::{EnvInfo, LastHashes};
 use verification::queue::BlockQueue;
 use verification::{
     PreverifiedBlock,
