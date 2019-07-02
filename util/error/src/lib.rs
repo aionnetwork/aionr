@@ -24,7 +24,6 @@
 
 #[macro_use]
 extern crate error_chain;
-
 extern crate aion_types;
 extern crate rlp;
 extern crate rustc_hex;

@@ -31,7 +31,7 @@ use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use tokio::prelude::{Future, Stream};
 use ansi_term::Colour;
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use client::{ChainNotify, Client, ClientConfig, MiningBlockChainClient};
 use db;
 use error::*;
@@ -114,10 +114,8 @@ impl ClientService {
 
         info!(
             target:"run",
-            //"Config: {} / {}",
-            " network: {}",
+            "     network: {}",
             Colour::White.bold().paint(spec.name.clone()),
-            // Colour::Yellow.bold().paint(spec.engine.name())
         );
 
         let mut db_config = DatabaseConfig::default();

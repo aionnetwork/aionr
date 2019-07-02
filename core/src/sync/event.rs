@@ -23,8 +23,6 @@ use std::fmt;
 
 use p2p::*;
 
-use net::event::HANDSHAKE_DONE;
-
 pub const STATUS_GOT: u32 = 1 << 4;
 pub const HEADERS_DOWNLOADED: u32 = 1 << 5;
 pub const BODIES_DOWNLOADED: u32 = 1 << 6;

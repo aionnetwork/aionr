@@ -19,9 +19,9 @@
  *
  ******************************************************************************/
 
-use acore::block::Block;
-use acore::client::BlockId;
-use acore::header::Seal;
+use block::Block;
+use client::BlockId;
+use header::Seal;
 use aion_types::H256;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};

@@ -24,7 +24,6 @@ fdlimit = "0.1"
 tokio = "0.1.13"
 ctrlc =             { git = "https://github.com/paritytech/rust-ctrlc.git" }
 jsonrpc-core =      { git = "https://github.com/paritytech/jsonrpc.git", branch = "parity-2.2" }
-sync =              { path = "sync" }
 acore =             { path = "core" }
 acore-bytes =       { path = "util/bytes" }
 acore-io =          { path = "util/io" }
@@ -43,6 +42,7 @@ panic_hook =        { path = "util/panic_hook" }
 journaldb =         { path = "db/journaldb" }
 db =                { path = "db/core" }
 aion-pb-apiserver = { path = "pb_api"}
+p2p =               { path = "p2p" }
 
 [dev-dependencies]
 pretty_assertions = "0.1"
@@ -57,11 +57,10 @@ members = [
 "types",
 "keystore/key/cli",
 "keystore/keychain/cli",
-"machine",
 "pb_api",
 "rpc",
 "stratum",
-"sync",
+"p2p",
 "util/aion-types",
 "util/avm_abi",
 "util/blake2b",

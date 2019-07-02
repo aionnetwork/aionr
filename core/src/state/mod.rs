@@ -48,7 +48,7 @@ use types::state_diff::StateDiff;
 use types::vms::EnvInfo;
 
 use aion_types::{Address, H256, U256};
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use kvdb::{KeyValueDB, AsHashStore, DBValue, MemoryDBRepository};
 
 use trie;

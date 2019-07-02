@@ -19,16 +19,16 @@
  *
  ******************************************************************************/
 
-use acore::block::Block;
-use acore::client::{BlockChainClient, BlockChainInfo, BlockQueueInfo};
-use acore::header::Header as BlockHeader;
-use aion_types::{H256, U256};
-use lru_cache::LruCache;
-use state::Storage;
 use std::collections::{HashMap, VecDeque};
 use std::fmt;
 use std::sync::{Arc, Mutex, RwLock};
 use std::time::SystemTime;
+use block::Block;
+use client::{BlockChainClient, BlockChainInfo, BlockQueueInfo};
+use header::Header as BlockHeader;
+use aion_types::{H256, U256};
+use lru_cache::LruCache;
+use crate_state::Storage;
 use tokio::runtime::{Runtime, TaskExecutor};
 
 lazy_static! {
@@ -223,16 +223,6 @@ impl SyncStorage {
         HEADERS_WITH_BODIES_REQUESTED.get()
     }
 
-    pub fn insert_headers_with_bodies_requested(hw: HeadersWrapper) {
-        if let Ok(ref mut headers_with_bodies_requested) =
-            HEADERS_WITH_BODIES_REQUESTED.get().lock()
-        {
-            headers_with_bodies_requested.insert(hw.node_hash, hw);
-        } else {
-            warn!(target: "sync", "headers_with_bodies_requested_mutex lock failed");
-        }
-    }
-
     pub fn pick_headers_with_bodies_requested(node_hash: &u64) -> Option<HeadersWrapper> {
         if let Ok(ref mut headers_with_bodies_requested) =
             HEADERS_WITH_BODIES_REQUESTED.get().lock()
@@ -254,14 +244,6 @@ impl SyncStorage {
 
     pub fn get_downloaded_blocks() -> &'static Mutex<VecDeque<BlocksWrapper>> {
         DOWNLOADED_BLOCKS.get()
-    }
-
-    pub fn get_downloaded_blocks_count() -> usize {
-        if let Ok(downloaded_blocks) = DOWNLOADED_BLOCKS.get().lock() {
-            return downloaded_blocks.len();
-        } else {
-            0
-        }
     }
 
     pub fn insert_downloaded_headers(hw: HeadersWrapper) {
@@ -421,14 +403,6 @@ impl SyncStorage {
 
     pub fn get_received_transactions() -> &'static Mutex<VecDeque<Vec<u8>>> {
         RECEIVED_TRANSACTIONS.get()
-    }
-
-    pub fn get_received_transactions_count() -> usize {
-        if let Ok(received_transactions) = RECEIVED_TRANSACTIONS.get().lock() {
-            return received_transactions.len();
-        } else {
-            0
-        }
     }
 
     pub fn insert_received_transaction(transaction: Vec<u8>) {

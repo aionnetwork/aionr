@@ -32,8 +32,7 @@ use std::sync::Arc;
 use std::fmt;
 
 use aion_types::{H256, U256, Address};
-use bytes::{Bytes, ToPretty};
-use self::generic::Filth;
+use acore_bytes::{Bytes, ToPretty};
 use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP, blake2b};
 use rlp::*;
 use pod_account::*;
@@ -43,7 +42,7 @@ use trie::{Trie, SecTrieDB, TrieFactory, TrieError};
 // use db::Writable;
 use kvdb::{KeyValueDB, DBTransaction, DBValue, HashStore};
 
-pub use self::generic::{BasicAccount, Account};
+pub use self::generic::{Filth, BasicAccount, Account};
 pub use self::traits::{VMAccount, AccType};
 use state::Backend;
 

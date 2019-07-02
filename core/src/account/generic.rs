@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::collections::HashSet;
 
 use aion_types::{H256, U256};
-use bytes::{Bytes};
+use acore_bytes::{Bytes};
 use account::traits::AccType;
 
 /// Basic account type.

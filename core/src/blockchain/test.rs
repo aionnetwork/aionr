@@ -11,7 +11,7 @@ use blockchain::generator::{BlockGenerator, BlockBuilder, BlockOptions};
 use blockchain::extras::TransactionAddress;
 use transaction::{Transaction, Action, DEFAULT_TRANSACTION_TYPE};
 use log_entry::{LogEntry, LocalizedLogEntry};
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use keychain;
 use db;
 

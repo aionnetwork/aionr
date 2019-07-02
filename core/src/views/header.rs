@@ -22,7 +22,7 @@
 
 //! View onto block header rlp
 
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use aion_types::{H256, U256, Address, to_u256};
 use ethbloom::Bloom;
 use blake2b::blake2b;

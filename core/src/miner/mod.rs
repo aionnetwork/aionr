@@ -31,7 +31,7 @@ pub use transaction::local_transactions::Status as LocalTransactionStatus;
 use std::collections::{HashMap, BTreeMap};
 
 use aion_types::{H256, U256, Address};
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use block::ClosedBlock;
 use client::{MiningBlockChainClient};
 use error::{Error};

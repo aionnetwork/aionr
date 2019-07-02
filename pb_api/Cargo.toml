@@ -27,7 +27,6 @@ version = "0.8.2"
 features = ["zmq_has"]
 
 [dev-dependencies]
-sync =     { path = "../sync" }
 acore-io = { path = "../util/io" }
 db =       { path = "../db/core" }
 lazy_static = "1.3.0"

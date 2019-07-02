@@ -7,6 +7,7 @@ test/
 rpc/manual_test
 testTMP/
 db/core/temp/
+local_tests/
 vms/fastvm/native/rust_evm_intf/dist
 vms/avm/libs/aion_vm/org-aion-avm-jni.jar
 *.o

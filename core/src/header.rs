@@ -23,7 +23,7 @@
 //! Block header.
 
 use blake2b::{blake2b, BLAKE2B_NULL_RLP};
-use bytes::{u64_to_bytes, Bytes};
+use acore_bytes::{u64_to_bytes, Bytes};
 use ethbloom::Bloom;
 use aion_types::{Address, H256, U128, U256, to_u256};
 use heapsize::HeapSizeOf;

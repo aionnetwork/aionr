@@ -24,7 +24,7 @@ use cli::{Args, ArgsError};
 use blake2b::blake2b;
 use aion_types::{U256, H256, Address};
 use bytes::Bytes;
-use sync::p2p::NetworkConfig;
+use p2p::NetworkConfig;
 use acore::client::{VMType};
 use acore::miner::{MinerOptions, Banning, StratumOptions};
 use acore::verification::queue::VerifierSettings;

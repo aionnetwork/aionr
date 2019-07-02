@@ -36,8 +36,6 @@ extern crate log;
 #[cfg(test)]
 extern crate db as kvdb;
 #[cfg(test)]
-extern crate sync;
-#[cfg(test)]
 #[macro_use]
 extern crate lazy_static;
 #[cfg(test)]

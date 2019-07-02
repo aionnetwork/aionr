@@ -36,7 +36,7 @@ use miner::{self, Miner, MinerService};
 use dir::helpers::replace_home_and_local;
 use dir::{default_data_path, default_local_path, CHAINS_PATH};
 
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use rustc_hex::FromHex;
 
 /// Trait for notifying about new mining work

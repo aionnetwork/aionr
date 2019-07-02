@@ -1,6 +1,6 @@
 use std::sync::Arc;
 use std::collections::BTreeMap;
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use rustc_hex::FromHex;
 use aion_types::{U512,U256, U128, Address};
 use types::vms::{

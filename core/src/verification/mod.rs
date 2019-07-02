@@ -29,7 +29,7 @@
 
 pub mod queue;
 
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use aion_types::{H256, U256};
 use heapsize::HeapSizeOf;
 use rlp::UntrustedRlp;

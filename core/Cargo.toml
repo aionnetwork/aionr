@@ -10,7 +10,10 @@ authors = ["Aion Foundation <admin@aion.network>"]
 ansi_term = "0.10"
 bloomchain = { path = "../util/bloomchain" }
 byteorder = "1.0"
+bytes = "0.4"
+state = "0.4.1"
 types = { path = "../types" }
+p2p = { path = "../p2p" }
 crossbeam = "0.3"
 acore-bloom-journal = { path = "../util/bloom" }
 acore-bytes = { path = "../util/bytes" }

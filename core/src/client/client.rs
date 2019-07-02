@@ -29,7 +29,7 @@ use time::precise_time_ns;
 
 // util
 use blake2b::blake2b;
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use journaldb;
 use kvdb::{DBTransaction, DBValue, KeyValueDB};
 use trie::{Trie, TrieFactory, TrieSpec};

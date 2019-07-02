@@ -24,7 +24,6 @@
 pub mod errors;
 
 pub mod accounts;
-pub mod block_import;
 pub mod dispatch;
 pub mod fake_sign;
 pub mod nonce;

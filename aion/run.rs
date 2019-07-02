@@ -24,12 +24,13 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
-use acore::client::{BlockChainClient, Client, DatabaseCompactionProfile, VMType};
+use acore::client::{Client, DatabaseCompactionProfile, VMType, ChainNotify};
 use acore::miner::external::ExternalMiner;
 use acore::miner::{Miner, MinerOptions, MinerService, Stratum, StratumOptions};
 use acore::transaction::local_transactions::TxIoMessage;
 use acore::service::{ClientService, run_miner, run_transaction_pool};
 use acore::verification::queue::VerifierSettings;
+use acore::sync::{Sync, NetworkManager};
 use aion_rpc::{dispatch::DynamicGasPrice, impls::EthClient, informant};
 use aion_version::version;
 use ansi_term::Colour;
@@ -41,15 +42,13 @@ use helpers::{passwords_from_files, to_client_config};
 use dir::helpers::absolute;
 use io::{IoChannel, IoService};
 use logger::LogConfig;
-use modules;
 use num_cpus;
 use params::{fatdb_switch_to_bool, AccountsConfig, MinerExtras, Pruning, SpecType, Switch};
 use parking_lot::{Condvar, Mutex};
 use pb::{new_pb, WalletApiConfiguration};
 use rpc;
 use rpc_apis;
-use sync::p2p::{NetworkConfig, P2pMgr};
-use sync::sync::SyncConfig;
+use p2p::{NetworkConfig, P2pMgr};
 use tokio;
 use tokio::prelude::*;
 use user_defaults::UserDefaults;
@@ -117,10 +116,9 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // create dirs used by aion
     cmd.dirs.create_dirs()?;
 
-    //print out running aion environment
-    print_running_environment(&cmd.spec, &spec.data_dir, &cmd.dirs, &db_dirs);
-
     print_logo();
+
+    print_running_environment(&cmd.spec, &spec.data_dir, &cmd.dirs, &db_dirs);
 
     let passwords = passwords_from_files(&cmd.acc_conf.password_files)?;
 
@@ -179,12 +177,12 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     )
     .map_err(|e| format!("Client service error: {:?}", e))?;
 
-    info!(target: "run"," genesis: {:?}",genesis_hash);
+    info!(target: "run","     genesis: {:?}",genesis_hash);
 
     // display info about used pruning algorithm
     info!(
         target: "run",
-        "state db: {}{}",
+        "    state db: {}{}",
         Colour::White.bold().paint(algorithm.as_str()),
         match fat_db {
             true => Colour::White.bold().paint(" +Fat").to_string(),
@@ -215,19 +213,22 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
             .map_err(|e| format!("Stratum start error: {:?}", e))?;
     }
 
-    // create sync object
-    let sync_config = SyncConfig::default();
+    // log apis
+    info!(target: "run", "        apis: rpc-http({}) rpc-ws({}) rpc-ipc({}) pb-zmq({})",
+          if cmd.http_conf.enabled { "enable" } else { "disable" },
+          if cmd.ws_conf.enabled { "enable" } else { "disable" },
+          if cmd.ipc_conf.enabled { "enable" } else { "disable" },
+          if cmd.wallet_api_conf.enabled { "enable" } else { "disable" }
+    );
 
-    let (sync_provider, network_manager, chain_notify) = modules::sync(
-        sync_config,
-        net_conf,
-        client.clone() as Arc<BlockChainClient>,
-    )
-    .map_err(|e| format!("Sync error: {}", e))?;
-
+    // start sync
+    let sync_provider = Sync::new(client.clone(), net_conf);
+    let network_manager = sync_provider.clone() as Arc<NetworkManager>;
+    let chain_notify = sync_provider.clone() as Arc<ChainNotify>;
     service.add_notify(chain_notify.clone());
+    network_manager.start_network();
 
-    // spin up rpc eventloop
+    // spin up rpc event loop
     let runtime_rpc = tokio::runtime::Builder::new()
         .name_prefix("rpc-")
         .build()
@@ -289,14 +290,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         executor_jsonrpc.clone(),
     )?;
 
-    // log apis
-    info!(target: "run", "    apis: rpc-http({}) rpc-ws({}) rpc-ipc({}) pb-zmq({})",
-        if cmd.http_conf.enabled { "enable" } else { "disable" },
-        if cmd.ws_conf.enabled { "enable" } else { "disable" },
-        if cmd.ipc_conf.enabled { "enable" } else { "disable" },
-        if cmd.wallet_api_conf.enabled { "enable" } else { "disable" }
-    );
-
     // save user defaults
     user_defaults.is_first_launch = false;
     user_defaults.pruning = algorithm;
@@ -321,9 +314,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .expect("seal block runtime loop init failed");
     let executor_miner = runtime_miner.executor();
     let close_miner = run_miner(executor_miner.clone(), client.clone());
-
-    // enable Sync module
-    network_manager.start_network();
 
     if let Some(config_path) = cmd.dirs.config {
         let local_node = P2pMgr::get_local_node();
@@ -473,7 +463,7 @@ fn print_logo() {
         Colour::Green.bold().paint("\\"),
         Colour::Blue.bold().paint("____/  |_| \\_|\n\n")
     );
-    info!(target: "run","   build: {}", Colour::White.bold().paint(version()));
+    info!(target: "run","       build: {}", Colour::White.bold().paint(version()));
 }
 
 fn prepare_account_provider(

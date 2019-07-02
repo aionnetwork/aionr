@@ -18,8 +18,14 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use acore::client::{BlockChainClient, BlockId, BlockStatus, ChainNotify};
-use acore::transaction::UnverifiedTransaction;
+
+mod event;
+mod handler;
+mod action;
+mod storage;
+
+use client::{BlockChainClient, BlockId, BlockStatus, ChainNotify};
+use transaction::UnverifiedTransaction;
 use aion_types::H256;
 use futures::{Future, Stream};
 use rlp::UntrustedRlp;
@@ -29,15 +35,10 @@ use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
-
-use net::handler::default_handler::DefaultHandler;
-use net::NetManager;
+use p2p::handlers::DefaultHandler;
 use p2p::*;
 
-use net::event::HANDSHAKE_DONE;
-
 use self::action::SyncAction;
-// use self::error::*;
 use self::handler::blocks_bodies_handler::BlockBodiesHandler;
 use self::handler::blocks_headers_handler::BlockHeadersHandler;
 use self::handler::broadcast_handler::BroadcastsHandler;
@@ -45,12 +46,6 @@ use self::handler::import_handler::ImportHandler;
 use self::handler::status_handler::StatusHandler;
 use self::storage::{ActivePeerInfo, PeerInfo, SyncState, SyncStatus, SyncStorage, TransactionStats};
 use rustc_hex::ToHex;
-
-pub mod action;
-pub mod error;
-mod event;
-mod handler;
-pub mod storage;
 
 const STATUS_REQ_INTERVAL: u64 = 2;
 const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
@@ -135,6 +130,7 @@ impl SyncMgr {
                 let mut active_nodes = P2pMgr::get_nodes(ALIVE);
                 let active_nodes_count = active_nodes.len();
 
+                info!(target: "sync", "");
                 info!(target: "sync", "{:=^127}", " Sync Statics ");
                 info!(target: "sync", "Best block number: {}, hash: {}", chain_info.best_block_number, chain_info.best_block_hash);
                 info!(target: "sync", "Network Best block number: {}, hash: {}", SyncStorage::get_network_best_block_number(), SyncStorage::get_network_best_block_hash());
@@ -146,44 +142,47 @@ impl SyncMgr {
                     P2pMgr::get_nodes_count(CONNECTED),
                     active_nodes_count,
                 );
-                info!(target: "sync", "{:-^127}","");
-                info!(target: "sync","      Total Diff    Blk No.    Blk Hash                 Address                 Revision      Conn  Seed  LstReq No.       Mode");
-                info!(target: "sync", "{:-^127}","");
-                active_nodes.sort_by(|a, b| {
-                    if a.target_total_difficulty != b.target_total_difficulty {
-                        b.target_total_difficulty.cmp(&a.target_total_difficulty)
-                    } else {
-                        b.best_block_num.cmp(&a.best_block_num)
-                    }
-                });
-                let mut count: u32 = 0;
-                for node in active_nodes.iter() {
-                    if let Ok(_) = node.last_request_timestamp.elapsed() {
-                        info!(target: "sync",
-                            "{:>16}{:>11}{:>12}{:>24}{:>25}{:>10}{:>6}{:>12}{:>11}",
-                            format!("{}",node.target_total_difficulty),
-                            node.best_block_num,
-                            format!("{}",node.best_hash),
-                            node.get_display_ip_addr(),
-                            String::from_utf8_lossy(&node.revision).trim(),
-                            match node.ip_addr.is_server{
-                                true => "Outbound",
-                                _=>"Inbound"
-                            },
-                            match node.is_from_boot_list{
-                                true => "Y",
-                                _ => ""
-                            },
-                            node.last_request_num,
-                            format!("{}",node.mode)
-                        );
-                        count += 1;
-                        if count ==  max_peers {
-                            break;
+
+                if active_nodes_count > 0 {
+                    info!(target: "sync", "{:-^127}","");
+                    info!(target: "sync","      Total Diff    Blk No.    Blk Hash                 Address                 Revision      Conn  Seed  LstReq No.       Mode");
+                    info!(target: "sync", "{:-^127}","");
+                    active_nodes.sort_by(|a, b| {
+                        if a.target_total_difficulty != b.target_total_difficulty {
+                            b.target_total_difficulty.cmp(&a.target_total_difficulty)
+                        } else {
+                            b.best_block_num.cmp(&a.best_block_num)
+                        }
+                    });
+                    let mut count: u32 = 0;
+                    for node in active_nodes.iter() {
+                        if let Ok(_) = node.last_request_timestamp.elapsed() {
+                            info!(target: "sync",
+                                "{:>16}{:>11}{:>12}{:>24}{:>25}{:>10}{:>6}{:>12}{:>11}",
+                                format!("{}",node.target_total_difficulty),
+                                node.best_block_num,
+                                format!("{}",node.best_hash),
+                                node.get_display_ip_addr(),
+                                String::from_utf8_lossy(&node.revision).trim(),
+                                match node.ip_addr.is_server{
+                                    true => "Outbound",
+                                    _=>"Inbound"
+                                },
+                                match node.is_from_boot_list{
+                                    true => "Y",
+                                    _ => ""
+                                },
+                                node.last_request_num,
+                                format!("{}",node.mode)
+                            );
+                            count += 1;
+                            if count ==  max_peers {
+                                break;
+                            }
                         }
                     }
+                    info!(target: "sync", "{:-^127}","");
                 }
-                info!(target: "sync", "{:-^127}","");
 
                 if block_number_now + 8 < SyncStorage::get_network_best_block_number()
                     && block_number_now - block_number_last_time < 2
@@ -290,31 +289,6 @@ impl SyncMgr {
     fn disable() { SyncStorage::reset(); }
 }
 
-/// Sync configuration
-#[derive(Debug, Clone, Copy)]
-pub struct SyncConfig {
-    /// Max blocks to download ahead
-    pub max_download_ahead_blocks: usize,
-}
-
-impl Default for SyncConfig {
-    fn default() -> SyncConfig {
-        SyncConfig {
-            max_download_ahead_blocks: 20000,
-        }
-    }
-}
-
-/// Sync initialization parameters.
-pub struct Params {
-    /// Configuration.
-    pub config: SyncConfig,
-    /// Blockchain client.
-    pub client: Arc<BlockChainClient>,
-    /// Network layer configuration.
-    pub network_config: NetworkConfig,
-}
-
 pub struct NetworkService {
     pub config: NetworkConfig,
 }
@@ -328,16 +302,15 @@ pub struct Sync {
 }
 
 impl Sync {
-    /// Create handler with the network service
-    pub fn get_instance(params: Params) -> Arc<Sync> {
-        let chain_info = params.client.chain_info();
+    pub fn new(client: Arc<BlockChainClient>, config: NetworkConfig) -> Arc<Sync> {
+        let chain_info = client.chain_info();
         // starting block number is the local best block number during kernel startup.
         let starting_block_number = chain_info.best_block_number;
 
-        SyncStorage::init(params.client);
+        SyncStorage::init(client);
 
         let service = NetworkService {
-            config: params.network_config.clone(),
+            config: config.clone(),
         };
         Arc::new(Sync {
             network: service,
@@ -573,8 +546,6 @@ impl ChainNotify for Sync {
 /// Configuration for IPC service.
 #[derive(Debug, Clone)]
 pub struct ServiceConfiguration {
-    /// Sync config.
-    pub sync: SyncConfig,
     /// Network configuration.
     pub net: NetworkConfig,
 }

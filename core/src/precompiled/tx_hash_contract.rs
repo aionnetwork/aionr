@@ -67,7 +67,7 @@ mod tests {
     use aion_types::{H256, Address};
     use types::vms::ExecStatus;
     use rustc_hex::ToHex;
-    use bytes::to_hex;
+    use acore_bytes::to_hex;
 
     #[test]
     fn test_txhash_contract() {

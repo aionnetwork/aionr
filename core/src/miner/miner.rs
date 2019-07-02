@@ -28,7 +28,7 @@ use std::thread;
 use account_provider::AccountProvider;
 use aion_types::{Address, H256, U256};
 use ansi_term::Colour;
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use engines::POWEquihashEngine;
 use error::*;
 use miner::{MinerService, MinerStatus, NotifyWork};

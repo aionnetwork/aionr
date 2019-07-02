@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 use aion_types::H256;
-use bytes::Bytes;
+use acore_bytes::Bytes;
 
 /// Represents what has to be handled by actor listening to chain events
 pub trait ChainNotify: Send + Sync {
