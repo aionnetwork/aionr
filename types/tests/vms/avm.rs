@@ -24,7 +24,7 @@
 
 extern crate types;
 
-use types::vms::avm::{NativeDecoder, NativeEncoder};
+use vms::avm::{NativeDecoder, NativeEncoder};
 use std::{u16, u32, u64, u8};
 
 #[test]

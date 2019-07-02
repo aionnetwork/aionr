@@ -28,7 +28,7 @@ extern crate rlp;
 
 use std::convert::Into;
 use aion_types::U256;
-use types::vms::CallType;
+use vms::CallType;
 use fastvm::vm::CostType;
 use rlp::RlpStream;
 

@@ -212,6 +212,44 @@ impl SyncMgr {
                     }
                 }
 
+                // if block_number_now + 8 < SyncStorage::get_network_best_block_number()
+                //     && block_number_now - block_number_last_time < 2
+                // {
+                //     SyncStorage::get_block_chain().clear_queue();
+                //     SyncStorage::get_block_chain().clear_bad();
+                //     SyncStorage::clear_downloaded_headers();
+                //     SyncStorage::clear_downloaded_blocks();
+                //     SyncStorage::clear_downloaded_block_hashes();
+                //     SyncStorage::clear_requested_blocks();
+                //     SyncStorage::clear_headers_with_bodies_requested();
+                //     SyncStorage::set_synced_block_number(
+                //         SyncStorage::get_chain_info().best_block_number,
+                //     );
+                //     let abnormal_mode_nodes_count =
+                //         P2pMgr::get_nodes_count_with_mode(Mode::BACKWARD)
+                //             + P2pMgr::get_nodes_count_with_mode(Mode::FORWARD);
+                //     if abnormal_mode_nodes_count > (active_nodes_count / 5)
+                //         || active_nodes_count == 0
+                //     {
+                //         info!(target: "sync", "Abnormal status, reseting network...");
+                //         P2pMgr::reset();
+
+                //         SyncStorage::clear_imported_block_hashes();
+                //         SyncStorage::clear_staged_blocks();
+                //         SyncStorage::set_max_staged_block_number(0);
+                //     }
+                // }
+                // ------
+                // FIX: abnormal reset will be triggered in chain reorg.
+                //   block_number_now is the local best block
+                //   network_best_block_number is the network best block
+                //   block_number_last_time is the local best block set last time where these codes are executed
+                //   when doing a deep chain reorg, if the BACKWARD and FORWARD syncing can't finish within one data batch, block_number_now acctually won't change
+                //   so we will have block_number_now == block_number_last_time, and block_number_now smaller than network_best_block_number.
+                //   This condition triggers reset but it's not abnormal.
+                // PoC disabled it. We should fix it.
+                // ------
+
                 SyncStorage::set_synced_block_number_last_time(block_number_now);
                 SyncStorage::set_sync_speed(sync_speed as u16);
 
@@ -299,7 +337,6 @@ pub struct Sync {
 
 impl Sync {
     pub fn new(client: Arc<BlockChainClient>, config: NetworkConfig) -> Arc<Sync> {
-
         let chain_info = client.chain_info();
         // starting block number is the local best block number during kernel startup.
         let starting_block_number = chain_info.best_block_number;
@@ -334,7 +371,6 @@ impl Sync {
 }
 
 pub trait SyncProvider: Send + ::std::marker::Sync {
-
     /// Get sync status
     fn status(&self) -> SyncStatus;
 
@@ -352,7 +388,6 @@ pub trait SyncProvider: Send + ::std::marker::Sync {
 }
 
 impl SyncProvider for Sync {
-
     /// Get sync status
     fn status(&self) -> SyncStatus {
         // TODO:  only set start_block_number/highest_block_number.
@@ -403,7 +438,6 @@ impl SyncProvider for Sync {
 }
 
 impl ChainNotify for Sync {
-
     fn new_blocks(
         &self,
         imported: Vec<H256>,
@@ -413,7 +447,8 @@ impl ChainNotify for Sync {
         sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
         _duration: u64,
-    ) {
+    )
+    {
         if P2pMgr::get_all_nodes_count() == 0 {
             return;
         }

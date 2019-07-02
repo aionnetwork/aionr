@@ -84,7 +84,7 @@ pub struct RunCmd {
 
 pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // load spec
-    let spec = cmd.spec.spec(&cmd.dirs.cache)?;
+    let spec = cmd.spec.spec()?;
 
     // load genesis hash
     let genesis_hash = spec.genesis_header().hash();
@@ -128,6 +128,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     )?);
 
     let tx_status_channel = IoChannel::disconnected();
+
     // create miner
     let miner = Miner::new(
         cmd.miner_options,
@@ -444,8 +445,8 @@ fn prepare_account_provider(
     passwords: &[String],
 ) -> Result<AccountProvider, String>
 {
-    use acore::keychain::accounts_dir::RootDiskDirectory;
-    use acore::keychain::EthStore;
+    use keychain::accounts_dir::RootDiskDirectory;
+    use keychain::EthStore;
 
     let path = dirs.keys_path(data_dir);
     let dir = Box::new(

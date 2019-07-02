@@ -25,7 +25,7 @@
 use std::fmt;
 
 use aion_types::{U256, H256};
-use security_level::SecurityLevel;
+// use security_level::SecurityLevel;
 use {BlockNumber};
 
 /// Information about the blockchain gathered together.
@@ -54,18 +54,18 @@ pub struct BlockChainInfo {
 }
 
 impl BlockChainInfo {
-    /// Determine the security model for the current state.
-    pub fn security_level(&self) -> SecurityLevel {
-        if self.ancient_block_number.is_none() || self.first_block_number.is_none() {
-            SecurityLevel::FullProofOfWork
-        } else {
-            SecurityLevel::PartialProofOfWork(
-                self.best_block_number - self
-                    .first_block_number
-                    .expect("Guard condition means this is not none"),
-            )
-        }
-    }
+    // Determine the security model for the current state.
+    // pub fn security_level(&self) -> SecurityLevel {
+    //     if self.ancient_block_number.is_none() || self.first_block_number.is_none() {
+    //         SecurityLevel::FullProofOfWork
+    //     } else {
+    //         SecurityLevel::PartialProofOfWork(
+    //             self.best_block_number - self
+    //                 .first_block_number
+    //                 .expect("Guard condition means this is not none"),
+    //         )
+    //     }
+    // }
 }
 
 impl fmt::Display for BlockChainInfo {

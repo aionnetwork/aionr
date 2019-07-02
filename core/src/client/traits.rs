@@ -22,6 +22,7 @@
 
 use std::time::Duration;
 
+use account::BasicAccount;
 use block::{OpenBlock, SealedBlock, ClosedBlock};
 use blockchain::TreeRoute;
 use encoded;
@@ -35,12 +36,11 @@ use receipt::LocalizedReceipt;
 use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction};
 use verification::queue::QueueInfo as BlockQueueInfo;
 use aion_types::{H256, H128, U256, Address};
-use types::vms::LastHashes;
+use vms::LastHashes;
 use acore_bytes::Bytes;
 use kvdb::DBValue;
 
 use types::ids::*;
-use types::basic_account::BasicAccount;
 use types::call_analytics::CallAnalytics;
 use types::blockchain_info::BlockChainInfo;
 use types::block_status::BlockStatus;

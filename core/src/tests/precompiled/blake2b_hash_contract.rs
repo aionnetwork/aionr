@@ -4,7 +4,7 @@
 //    use tests::helpers::get_temp_state;
 //    use bytes::to_hex;
 //    use aion_types::{Address, H256};
-//    use types::vms::ExecStatus;
+//    use vms::ExecStatus;
 //
 //    fn get_ext_default<'a>(
 //        state: &'a mut State<::state_db::StateDB>,

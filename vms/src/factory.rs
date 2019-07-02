@@ -27,9 +27,9 @@ use fastvm::ffi::EvmStatusCode;
 use fastvm::core::FastVM;
 use fastvm::basetypes::{constants::GAS_CODE_DEPOSIT, DataWord};
 use fastvm::context::{execution_kind, ExecutionContext, TransactionResult};
-use types::vms::{ExecutionResult, ExecStatus, CallType, ReturnData, ActionParams, ActionValue};
-use types::vms::traits::Ext;
-use types::vms::avm::{TransactionContext as AVMTxContext, AvmStatusCode};
+use types::{ExecutionResult, ExecStatus, CallType, ReturnData, ActionParams, ActionValue};
+use types::traits::Ext;
+use types::avm::{TransactionContext as AVMTxContext, AvmStatusCode};
 use aion_types::{U128, U256, H256};
 
 pub trait Factory {
@@ -80,6 +80,7 @@ impl Factory for FastVMFactory {
 
         let call_data = params.data.unwrap_or_else(Vec::new);
 
+        // AIP: needs fix that in java kernel
         if code.is_empty() {
             ext.set_special_empty_flag();
             return vec![ExecutionResult {

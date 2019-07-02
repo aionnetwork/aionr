@@ -35,7 +35,7 @@ use spec::CommonParams;
 use state::{CleanupMode, Substate};
 use transaction::{SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
 use aion_types::{U256, H256, Address};
-use types::vms::{ActionParams, ActionValue, CallType, ParamsType};
+use vms::{ActionParams, ActionValue, CallType, ParamsType};
 
 /// An ethereum-like state machine.
 pub struct EthereumMachine {

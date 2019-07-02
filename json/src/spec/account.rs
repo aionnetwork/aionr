@@ -40,8 +40,6 @@ pub struct Account {
     pub code: Option<Bytes>,
     /// Storage.
     pub storage: Option<BTreeMap<Uint, Uint>>,
-    /// Double word Storage.
-    pub storage_dword: Option<BTreeMap<Uint, Uint>>,
     /// Constructor.
     pub constructor: Option<Bytes>,
 }
@@ -53,7 +51,6 @@ impl Account {
             && self.nonce.is_none()
             && self.code.is_none()
             && self.storage.is_none()
-            && self.storage_dword.is_none()
     }
 }
 

@@ -32,7 +32,7 @@ mod import_route;
 mod update;
 
 #[cfg(test)]
-pub mod generator;
+mod generator;
 #[cfg(test)]
 mod test;
 
