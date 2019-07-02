@@ -300,8 +300,6 @@ pub struct Sync {
 impl Sync {
     pub fn new(client: Arc<BlockChainClient>, config: NetworkConfig) -> Arc<Sync> {
 
-        println!("here {:?}", config);
-
         let chain_info = client.chain_info();
         // starting block number is the local best block number during kernel startup.
         let starting_block_number = chain_info.best_block_number;

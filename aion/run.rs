@@ -26,12 +26,11 @@ use std::time::{Duration, Instant};
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
 use acore::client::{Client, DatabaseCompactionProfile, VMType, ChainNotify};
 use acore::miner::external::ExternalMiner;
-use acore::miner::{Miner, MinerOptions, MinerService, Stratum, StratumOptions};
-use acore::transaction::local_transactions::TxIoMessage;
+use acore::miner::{Miner, MinerOptions, MinerService};
 use acore::service::{ClientService, run_miner, run_transaction_pool};
 use acore::verification::queue::VerifierSettings;
 use acore::sync::Sync;
-use aion_rpc::{dispatch::DynamicGasPrice, impls::EthClient, informant};
+use aion_rpc::{dispatch::DynamicGasPrice, informant};
 use aion_version::version;
 use ansi_term::Colour;
 use cache::CacheConfig;
@@ -40,12 +39,11 @@ use dir::{DatabaseDirectories, Directories};
 use fdlimit::raise_fd_limit;
 use helpers::{passwords_from_files, to_client_config};
 use dir::helpers::absolute;
-use io::{IoChannel, IoService};
+use io::IoChannel;
 use logger::LogConfig;
 use num_cpus;
 use params::{fatdb_switch_to_bool, AccountsConfig, MinerExtras, Pruning, SpecType, Switch};
 use parking_lot::{Condvar, Mutex};
-use pb::{new_pb, WalletApiConfiguration};
 use rpc;
 use rpc_apis;
 use p2p::{NetworkConfig, P2pMgr};
@@ -73,7 +71,6 @@ pub struct RunCmd {
     pub ws_conf: rpc::WsConfiguration,
     pub http_conf: rpc::HttpConfiguration,
     pub ipc_conf: rpc::IpcConfiguration,
-    pub wallet_api_conf: WalletApiConfiguration,
     pub net_conf: NetworkConfig,
     pub acc_conf: AccountsConfig,
     pub miner_extras: MinerExtras,
@@ -81,7 +78,6 @@ pub struct RunCmd {
     pub compaction: DatabaseCompactionProfile,
     pub wal: bool,
     pub vm_type: VMType,
-    pub stratum: StratumOptions,
     pub verifier_settings: VerifierSettings,
     pub no_persistent_txqueue: bool,
 }
@@ -131,13 +127,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         &passwords,
     )?);
 
-    let tx_status_service = IoService::<TxIoMessage>::start()
-        .map_err(|e| format!("tx status server start failed : {}", e))?;
-    let tx_status_channel = if cmd.wallet_api_conf.enabled {
-        tx_status_service.channel()
-    } else {
-        IoChannel::disconnected()
-    };
+    let tx_status_channel = IoChannel::disconnected();
     // create miner
     let miner = Miner::new(
         cmd.miner_options,
@@ -207,18 +197,11 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // create external miner
     let external_miner = Arc::new(ExternalMiner::default());
 
-    // start stratum
-    if cmd.stratum.enable {
-        Stratum::register(&cmd.stratum, miner.clone(), Arc::downgrade(&client))
-            .map_err(|e| format!("Stratum start error: {:?}", e))?;
-    }
-
     // log apis
-    info!(target: "run", "        apis: rpc-http({}) rpc-ws({}) rpc-ipc({}) pb-zmq({})",
+    info!(target: "run", "        apis: rpc-http({}) rpc-ws({}) rpc-ipc({})",
           if cmd.http_conf.enabled { "enable" } else { "disable" },
           if cmd.ws_conf.enabled { "enable" } else { "disable" },
           if cmd.ipc_conf.enabled { "enable" } else { "disable" },
-          if cmd.wallet_api_conf.enabled { "enable" } else { "disable" }
     );
 
     // start sync
@@ -234,18 +217,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .expect("runtime_rpc init failed");
     let rpc_stats = Arc::new(informant::RpcStats::default());
     let account_store = Some(account_provider.clone());
-    let pb_client = EthClient::new(
-        &client.clone(),
-        &sync.clone(),
-        &account_store,
-        &miner.clone(),
-        &external_miner.clone(),
-        cmd.dynamic_gas_price.clone(),
-    );
 
-    // start pb server
-    let pb_handles = Arc::new(pb_client);
-    let pb_server = new_pb(cmd.wallet_api_conf.clone(), pb_handles, tx_status_service)?;
     let deps_for_rpc_apis = Arc::new(rpc_apis::FullDependencies {
         client: client.clone(),
         sync: sync.clone(),
@@ -352,7 +324,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     sync.stop_network();
 
     // close/drop this stuff as soon as exit detected.
-    drop((sync, chain_notify, pb_server));
+    drop((sync, chain_notify));
 
     thread::sleep(Duration::from_secs(5));
 

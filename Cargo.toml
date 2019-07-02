@@ -30,18 +30,16 @@ acore-io =          { path = "util/io" }
 blake2b =           { path = "util/blake2b" }
 equihash =          { path = "util/equihash" }
 logger =            { path = "util/logger" }
-acore-stratum =     { path = "stratum" }
 aion-types =        { path = "util/aion-types" }
-key =               { path = "keystore/key" }
-keychain =          { path = "keystore/keychain" }
-rlp =               { path = "util/rlp" }
-aion-rpc =          { path = "rpc" }
 aion-version =      { path = "util/version" }
 dir =               { path = "util/dir" }
+rlp =               { path = "util/rlp" }
 panic_hook =        { path = "util/panic_hook" }
 journaldb =         { path = "db/journaldb" }
 db =                { path = "db/core" }
-aion-pb-apiserver = { path = "pb_api"}
+key =               { path = "keystore/key" }
+keychain =          { path = "keystore/keychain" }
+aion-rpc =          { path = "rpc" }
 p2p =               { path = "p2p" }
 
 [dev-dependencies]
@@ -57,9 +55,7 @@ members = [
 "types",
 "keystore/key/cli",
 "keystore/keychain/cli",
-"pb_api",
 "rpc",
-"stratum",
 "p2p",
 "util/aion-types",
 "util/avm_abi",

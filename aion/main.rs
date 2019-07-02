@@ -48,16 +48,11 @@ extern crate keychain;
 extern crate panic_hook;
 extern crate aion_rpc;
 extern crate aion_version;
-extern crate blake2b;
 extern crate journaldb;
-extern crate aion_pb_apiserver as pb;
 extern crate tokio;
 extern crate p2p;
 #[macro_use]
 extern crate log as rlog;
-
-#[cfg(feature = "stratum")]
-extern crate acore_stratum;
 
 #[cfg(test)]
 #[macro_use]
