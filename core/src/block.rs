@@ -29,7 +29,7 @@ use blake2b::BLAKE2B_NULL_RLP;
 use triehash::ordered_trie_root;
 
 use rlp::{UntrustedRlp, RlpStream, Encodable, Decodable, DecoderError};
-use types::vms::{EnvInfo, LastHashes};
+use vms::{EnvInfo, LastHashes};
 use aion_types::{H256, U256, Address};
 use ethbloom::Bloom;
 use acore_bytes::Bytes;

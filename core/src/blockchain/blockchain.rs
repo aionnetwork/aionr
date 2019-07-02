@@ -822,6 +822,7 @@ impl BlockChain {
         })
     }
 
+    #[cfg(test)]
     /// Inserts a verified, known block from the canonical chain.
     ///
     /// Can be performed out-of-order, but care must be taken that the final chain is in a correct state.
@@ -1034,47 +1035,11 @@ impl BlockChain {
         None
     }
 
-    /// Write a pending epoch transition by block hash.
-    pub fn insert_pending_transition(
-        &self,
-        batch: &mut DBTransaction,
-        hash: H256,
-        t: PendingEpochTransition,
-    )
-    {
-        batch.write(db::COL_EXTRA, &hash, &t);
-    }
-
     /// Get a pending epoch transition by block hash.
     // TODO: implement removal safely: this can only be done upon finality of a block
     // that _uses_ the pending transition.
     pub fn get_pending_transition(&self, hash: H256) -> Option<PendingEpochTransition> {
         self.db.read(db::COL_EXTRA, &hash)
-    }
-
-    /// Add a child to a given block. Assumes that the block hash is in
-    /// the chain and the child's parent is this block.
-    pub fn add_child(&self, batch: &mut DBTransaction, block_hash: H256, child_hash: H256) {
-        let mut parent_details = self
-            .block_details(&block_hash)
-            .unwrap_or_else(|| panic!("Invalid block hash: {:?}", block_hash));
-
-        parent_details.children.push(child_hash);
-
-        let mut update = HashMap::new();
-        update.insert(block_hash, parent_details);
-
-        let mut write_details = self.block_details.write();
-        batch.extend_with_cache(
-            db::COL_EXTRA,
-            &mut *write_details,
-            update,
-            CacheUpdatePolicy::Overwrite,
-        );
-
-        self.cache_man
-            .lock()
-            .note_used(CacheId::BlockDetails(block_hash));
     }
 
     /// Inserts the block into backing cache database.

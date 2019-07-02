@@ -204,7 +204,7 @@ fn imports_block_sequence() {
 }
 
 #[test]
-fn can_collect_garbage() {
+fn can_client_collect_garbage() {
     let client = generate_dummy_client(100);
     client.tick();
     assert!(client.blockchain_cache_info().blocks < 100 * 1024);

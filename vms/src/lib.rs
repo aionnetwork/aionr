@@ -21,7 +21,7 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate types;
+extern crate vm_common as types;
 extern crate aion_types;
 extern crate fastvm;
 extern crate avm;
@@ -37,3 +37,5 @@ pub use factory::{Factory, FastVMFactory, AVMFactory};
 pub use vmtype::VMType;
 pub use fastvm::vm::{self, Error};
 pub use fastvm::basetypes::constants;
+// export vm related types from vms module
+pub use types::*;

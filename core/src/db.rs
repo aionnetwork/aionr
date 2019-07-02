@@ -42,7 +42,7 @@ pub const COL_EXTRA: &'static str = "extra";
 /// Column for the empty accounts bloom filter.
 pub const COL_ACCOUNT_BLOOM: &'static str = "account_bloom";
 /// Column for general information from the local node which can persist.
-pub const COL_NODE_INFO: &'static str = "node_info";
+// pub const COL_NODE_INFO: &'static str = "node_info";
 /// Column for avm object graph
 pub const COL_AVM_GRAPH: &'static str = "avm_graph";
 

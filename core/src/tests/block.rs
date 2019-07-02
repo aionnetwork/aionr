@@ -42,7 +42,7 @@ use acore::views::BlockView;
 use acore::transaction::SignedTransaction;
 use db::MemoryDBRepository;
 use aion_types::Address;
-use types::vms::LastHashes;
+use vms::LastHashes;
 
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 fn enact_bytes(

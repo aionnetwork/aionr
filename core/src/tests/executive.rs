@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use acore_bytes::Bytes;
 use rustc_hex::FromHex;
 use aion_types::{U512,U256, U128, Address};
-use types::vms::{
+use vms::{
     ActionParams,
     ActionValue,
     CallType,

@@ -23,11 +23,10 @@ use std::io::Error;
 use std::{fs, ptr, thread, env, path::Path, path::PathBuf};
 use std::sync::atomic::{AtomicPtr, Ordering};
 use callback::register_callbacks;
-use types::vms::avm::NativeDecoder;
-use types::vms::avm::NativeEncoder;
+use types::avm::{NativeDecoder, NativeEncoder};
 use rjni::{Classpath, JavaVM, Options, Type, Value, Version};
 use rjni::ffi;
-use types::vms::avm::{TransactionContext, TransactionResult};
+use types::avm::{TransactionContext, TransactionResult};
 
 /// We keep a single JVM instance in the background, which will be shared
 /// among multiple threads. Before invoking any JNI methods, the executing
@@ -156,8 +155,6 @@ impl AVM {
         unsafe {
             let vm = JVM_SINGLETON.load(Ordering::Relaxed);
             let env: *mut ffi::JNIEnv = ptr::null_mut();
-
-            //((**vm).AttachCurrentThread)(vm, &mut env, ptr::null_mut());
 
             AVM {
                 jvm: JavaVM {

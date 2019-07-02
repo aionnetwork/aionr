@@ -26,8 +26,8 @@ use std::clone::Clone;
 use libc;
 use basetypes::{EvmMessage, constants};
 use ffi::{EvmResult, EvmStatusCode};
-use types::vms::CallType;
-use types::vms::traits::Ext;
+use types::CallType;
+use types::traits::Ext;
 use aion_types::{U128, H256, U256, Address};
 
 #[derive(Debug)]

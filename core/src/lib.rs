@@ -71,7 +71,7 @@ extern crate journaldb;
 extern crate log;
 #[macro_use]
 extern crate trace_time;
-pub extern crate keychain;
+extern crate keychain;
 extern crate equihash;
 extern crate vms;
 extern crate futures;
@@ -95,33 +95,37 @@ pub mod helpers;
 extern crate macros;
 extern crate p2p;
 
+/// pub mod is used here to avoid name collision when used in other module
 pub mod account_provider;
+// encoded header
+pub mod encoded;
+pub mod blockchain;
+pub mod miner;
 pub mod block;
 pub mod client;
+// unverified transaction
 pub mod transaction;
-pub mod db;
-pub mod encoded;
+// PoW Engine
 pub mod engines;
 pub mod error;
-pub mod executed;
 pub mod header;
-pub mod machine;
-pub mod miner;
-pub mod pod_state;
-pub mod pod_account;
+pub mod views;
+pub mod sync;
+
+// boot
 pub mod service;
 pub mod spec;
-pub mod state;
-pub mod state_db;
 pub mod verification;
-pub mod views;
-pub mod account;
-pub mod blockchain;
-pub mod factory;
-pub mod sync;
-#[cfg(test)]
-pub mod tests;
 
+mod machine;
+mod executed;
+mod pod_state;
+mod pod_account;
+mod state;
+mod state_db;
+mod db;
+mod factory;
+mod account;
 mod cache_manager;
 mod blooms;
 mod account_db;
@@ -129,5 +133,14 @@ mod precompiled;
 mod executive;
 mod externalities;
 
-pub use types::*;
+#[cfg(test)]
+mod tests;
+
+pub use types::{
+    filter,
+    log_entry,
+    receipt,
+    state_diff,
+    block_status
+};
 pub use executive::contract_address;

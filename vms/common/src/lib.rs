@@ -1,5 +1,4 @@
 /*******************************************************************************
- * Copyright (c) 2015-2018 Parity Technologies (UK) Ltd.
  * Copyright (c) 2018-2019 Aion foundation.
  *
  *     This file is part of the aion network project.
@@ -20,27 +19,15 @@
  *
  ******************************************************************************/
 
-//! Indication of how secure the chain is.
+extern crate acore_bytes as bytes;
+extern crate aion_types;
+extern crate ajson;
+extern crate rlp;
+extern crate blake2b;
 
-use {BlockNumber};
+pub mod traits;
+pub mod avm;
 
-/// Indication of how secure the chain is.
-#[derive(Debug, PartialEq, Copy, Clone, Hash, Eq)]
-pub enum SecurityLevel {
-    /// All blocks from genesis to chain head are known to have valid state transitions and PoW.
-    FullState,
-    /// All blocks from genesis to chain head are known to have a valid PoW.
-    FullProofOfWork,
-    /// Some recent headers (the argument) are known to have a valid PoW.
-    PartialProofOfWork(BlockNumber),
-}
+mod fvm;
 
-impl SecurityLevel {
-    /// `true` for `FullPoW`/`FullState`.
-    pub fn is_full(&self) -> bool {
-        match *self {
-            SecurityLevel::FullState | SecurityLevel::FullProofOfWork => true,
-            _ => false,
-        }
-    }
-}
+pub use fvm::*;

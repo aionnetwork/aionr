@@ -12,7 +12,7 @@ serde_derive = "1.0.0"
 serde_json = "*"
 bincode = "1.0.0"
 num-bigint = "0.2"
-types = { path = "../../types" }
+vm_common = {path = "../common"}
 aion-types = { path = "../../util/aion-types"}
 patricia-trie = { path = "../../util/patricia_trie" }
 log = "0.3"
