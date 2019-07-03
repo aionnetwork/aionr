@@ -31,6 +31,7 @@ pub enum Version {
     UNKNOWN = 0xFFFF,
 }
 
+
 impl Version {
     pub fn value(&self) -> u16 {
         match *self {

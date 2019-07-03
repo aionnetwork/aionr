@@ -327,7 +327,9 @@ pub fn convert_ip_string(ip_str: String) -> Vec<u8> {
 
 #[cfg(test)]
 mod node_tests {
-    use p2p::{Node, CONNECTED};
+
+    use Node;
+    use CONNECTED;
 
     #[test]
     fn new_with_node_str_test() {

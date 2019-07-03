@@ -140,6 +140,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     miner.set_gas_floor_target(cmd.miner_extras.gas_floor_target);
     miner.set_gas_ceil_target(cmd.miner_extras.gas_ceil_target);
     miner.set_extra_data(cmd.miner_extras.extra_data);
+
     // create client config
     let mut client_config = to_client_config(
         &cmd.cache_config,

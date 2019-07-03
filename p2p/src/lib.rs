@@ -41,9 +41,14 @@ extern crate aion_version as version;
 extern crate bytes;
 extern crate byteorder;
 
+mod action;
 mod msg;
 mod node;
 pub mod handlers;
+
+
+use action::Action;
+
 
 use std::fmt;
 use acore_bytes::to_hex;
@@ -75,7 +80,7 @@ use handlers::{
     handle_handshake_req,
     handle_active_nodes_req,
     handle_active_nodes_res,
-    DefaultHandler
+    DefaultHandler,
 };
 
 pub use self::msg::*;
@@ -103,7 +108,7 @@ impl P2pMgr {
         let mut local_node = Node::new_with_node_str(local_node_str);
 
         local_node.net_id = cfg.net_id;
-        info!(target:"net","        node: {}@{}", local_node.get_node_id(), local_node.get_ip_addr());
+        info!(target: "net", "        node: {}@{}", local_node.get_node_id(), local_node.get_ip_addr());
 
         LOCAL_NODE.set(local_node.clone());
         ENABLED.set(AtomicBool::new(true));
@@ -165,7 +170,7 @@ impl P2pMgr {
                     Self::process_outbounds(socket, peer_node, handle);
                 })
                 .map_err(
-                    move |e| error!(target: "net","    node: {}@{}, {}", node_ip_addr, node_id, e),
+                    move |e| error!(target: "net", "    node: {}@{}, {}", node_ip_addr, node_id, e),
                 );
             thread_pool.spawn(connect);
         }
@@ -493,7 +498,7 @@ impl P2pMgr {
                     io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")
                 }));
                 thread_pool.spawn(write.then(move |_| {
-                    trace!(target:"net", "Connection with {:?} closed.", peer_ip);
+                    trace!(target: "net", "Connection with {:?} closed.", peer_ip);
                     Ok(())
                 }));
             }
@@ -553,7 +558,7 @@ impl P2pMgr {
             rx.map_err(|()| io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")),
         );
         thread_pool.spawn(write.then(move |_| {
-            trace!(target:"net", "Connection with {:?} closed.", peer_ip);
+            trace!(target: "net", "Connection with {:?} closed.", peer_ip);
             Ok(())
         }));
     }
@@ -644,11 +649,11 @@ impl NetManager {
                 if let Some(node) = P2pMgr::get_node(node_hash) {
                     if node.state_code == DISCONNECTED {
                         trace!(target: "net", "boot node reconnected: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
-                        Self::connet_peer(boot_node.clone());
+                        Self::connect_peer(boot_node.clone());
                     }
                 } else {
                     trace!(target: "net", "boot node loaded: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
-                    Self::connet_peer(boot_node.clone());
+                    Self::connect_peer(boot_node.clone());
                 }
             }
 
@@ -670,27 +675,27 @@ impl NetManager {
             Instant::now(),
             Duration::from_secs(RECONNECT_NORMAL_NOEDS_INTERVAL),
         )
-        .for_each(move |_| {
-            let active_nodes_count = P2pMgr::get_nodes_count(ALIVE);
-            if !sync_from_boot_nodes_only && active_nodes_count < max_peers_num {
-                if let Some(peer_node) = P2pMgr::get_an_inactive_node() {
-                    let peer_node_id_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
-                    if peer_node_id_hash != local_node_id_hash {
-                        let peer_ip = peer_node.ip_addr.get_ip();
-                        if !client_ip_black_list.contains(&peer_ip) {
-                            Self::connet_peer(peer_node);
+            .for_each(move |_| {
+                let active_nodes_count = P2pMgr::get_nodes_count(ALIVE);
+                if !sync_from_boot_nodes_only && active_nodes_count < max_peers_num {
+                    if let Some(peer_node) = P2pMgr::get_an_inactive_node() {
+                        let peer_node_id_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
+                        if peer_node_id_hash != local_node_id_hash {
+                            let peer_ip = peer_node.ip_addr.get_ip();
+                            if !client_ip_black_list.contains(&peer_ip) {
+                                Self::connect_peer(peer_node);
+                            }
                         }
-                    }
-                };
-            }
+                    };
+                }
 
-            Ok(())
-        })
-        .map_err(|e| error!("interval errored; err={:?}", e));
+                Ok(())
+            })
+            .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(connect_normal_nodes_task);
     }
 
-    fn connet_peer(peer_node: Node) {
+    fn connect_peer(peer_node: Node) {
         trace!(target: "net", "Try to connect to node {}", peer_node.get_ip_addr());
         let node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
         P2pMgr::remove_peer(node_hash);
@@ -702,11 +707,11 @@ impl NetManager {
             Instant::now(),
             Duration::from_secs(NODE_ACTIVE_REQ_INTERVAL),
         )
-        .for_each(move |_| {
-            send_activenodes_req();
-            Ok(())
-        })
-        .map_err(|e| error!("interval errored; err={:?}", e));
+            .for_each(move |_| {
+                send_activenodes_req();
+                Ok(())
+            })
+            .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(activenodes_req_task);
     }
 
@@ -861,48 +866,6 @@ impl NetworkConfig {
     }
 }
 
-#[derive(Serialize, Deserialize, PartialEq)]
-pub enum Action {
-    DISCONNECT = 0,
-    HANDSHAKEREQ = 1,
-    HANDSHAKERES = 2,
-    PING = 3,
-    PONG = 4,
-    ACTIVENODESREQ = 5,
-    ACTIVENODESRES = 6,
-    CONNECT = 7,
-    UNKNOWN = 0xFF,
-}
-
-impl Action {
-    pub fn value(&self) -> u8 {
-        match *self {
-            Action::DISCONNECT => 0 as u8,
-            Action::HANDSHAKEREQ => 1 as u8,
-            Action::HANDSHAKERES => 2 as u8,
-            Action::PING => 3 as u8,
-            Action::PONG => 4 as u8,
-            Action::ACTIVENODESREQ => 5 as u8,
-            Action::ACTIVENODESRES => 6 as u8,
-            Action::CONNECT => 7 as u8,
-            Action::UNKNOWN => 0xFF as u8,
-        }
-    }
-    pub fn from(value: u8) -> Action {
-        match value {
-            0 => Action::DISCONNECT,
-            1 => Action::HANDSHAKEREQ,
-            2 => Action::HANDSHAKERES,
-            3 => Action::PING,
-            4 => Action::PONG,
-            5 => Action::ACTIVENODESREQ,
-            6 => Action::ACTIVENODESRES,
-            7 => Action::CONNECT,
-            _ => Action::UNKNOWN,
-        }
-    }
-}
-
 pub const HANDSHAKE_DONE: u32 = 1 << 2;
 
 pub enum Event {
@@ -929,9 +892,7 @@ impl Event {
                 }
             }
             Event::OnPing | Event::OnPong => {
-                if state_code & HANDSHAKE_DONE == HANDSHAKE_DONE {
-
-                } else {
+                if state_code & HANDSHAKE_DONE == HANDSHAKE_DONE {} else {
                     warn!(target: "net", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
                 }
             }
