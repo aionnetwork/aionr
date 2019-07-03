@@ -24,7 +24,6 @@
 
 use std::collections::BTreeMap;
 use std::io::Read;
-use std::path::Path;
 use std::sync::Arc;
 
 use aion_types::{Address, H256, U256};
@@ -80,34 +79,6 @@ impl From<ajson::spec::Params> for CommonParams {
             transaction_permission_contract: p.transaction_permission_contract.map(Into::into),
         }
     }
-}
-
-/// Runtime parameters for the spec that are related to how the software should run the chain,
-/// rather than integral properties of the chain itself.
-#[derive(Debug, Clone, Copy)]
-pub struct SpecParams<'a> {
-    /// The path to the folder used to cache nodes. This is typically /tmp/ on Unix-like systems
-    pub cache_dir: &'a Path,
-}
-
-impl<'a> SpecParams<'a> {
-    /// Create from a cache path, with null values for the other fields
-    pub fn from_path(path: &'a Path) -> Self {
-        SpecParams {
-            cache_dir: path,
-        }
-    }
-
-    /// Create from a cache path and an optimization setting
-    pub fn new(path: &'a Path) -> Self {
-        SpecParams {
-            cache_dir: path,
-        }
-    }
-}
-
-impl<'a, T: AsRef<Path>> From<&'a T> for SpecParams<'a> {
-    fn from(path: &'a T) -> Self { Self::from_path(path.as_ref()) }
 }
 
 /// Parameters for a block chain; includes both those intrinsic to the design of the
@@ -410,35 +381,12 @@ impl Spec {
         ret.out()
     }
 
-    /// Overwrite the genesis components.
-    pub fn overwrite_genesis_params(&mut self, g: Genesis) {
-        let GenericSeal(seal_rlp) = g.seal.into();
-        self.parent_hash = g.parent_hash;
-        self.transactions_root = g.transactions_root;
-        self.receipts_root = g.receipts_root;
-        self.author = g.author;
-        self.difficulty = g.difficulty;
-        self.gas_limit = g.gas_limit;
-        self.gas_used = g.gas_used;
-        self.timestamp = g.timestamp;
-        self.extra_data = g.extra_data;
-        self.seal_rlp = seal_rlp;
-    }
-
     /// Alter the value of the genesis state.
     pub fn set_genesis_state(&mut self, s: PodState) -> Result<(), Error> {
         self.genesis_state = s;
         let _ = self.run_constructors(&Default::default(), BasicBackend(MemoryDB::new()))?;
 
         Ok(())
-    }
-
-    /// Returns `false` if the memoized state root is invalid. `true` otherwise.
-    pub fn is_state_root_valid(&self) -> bool {
-        // TODO: get rid of this function and ensure state root always is valid.
-        // we're mostly there, but `self.genesis_state.root()` doesn't encompass
-        // post-constructor state.
-        *self.state_root_memo.read() == self.genesis_state.root()
     }
 
     /// Ensure that the given state DB has the trie nodes in for the genesis state.

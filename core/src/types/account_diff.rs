@@ -26,7 +26,7 @@ use std::cmp::*;
 use std::fmt;
 use std::collections::BTreeMap;
 use aion_types::{U256, H128, U128};
-use bytes::Bytes;
+use acore_bytes::Bytes;
 
 #[derive(Debug, PartialEq, Eq, Clone)]
 /// Diff type for specifying a change (or not).
@@ -148,7 +148,7 @@ fn interpreted_hash(u: &Vec<u8>) -> String {
 
 impl fmt::Display for AccountDiff {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        use bytes::ToPretty;
+        use acore_bytes::ToPretty;
 
         match self.nonce {
             Diff::Born(ref x) => write!(f, "  non {}", x)?,

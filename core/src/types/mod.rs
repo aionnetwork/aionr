@@ -20,38 +20,21 @@
  *
  ******************************************************************************/
 
-//! State diff module.
+pub mod account_diff;
+pub mod basic_account;
+pub mod block_status;
+pub mod blockchain_info;
+pub mod call_analytics;
+pub mod filter;
+pub mod ids;
+pub mod log_entry;
+pub mod pruning_info;
+pub mod receipt;
+pub mod state_diff;
+pub mod tree_route;
+pub mod verification_queue_info;
 
-use std::fmt;
-use std::ops::*;
-use std::collections::BTreeMap;
-use aion_types::Address;
-use account_diff::*;
-
-/// Expression for the delta between two system states. Encoded the
-/// delta of every altered account.
-#[derive(Debug, PartialEq, Eq, Clone)]
-pub struct StateDiff {
-    /// Raw diff key-value
-    pub raw: BTreeMap<Address, AccountDiff>,
-}
-
-impl StateDiff {
-    /// Get the actual data.
-    pub fn get(&self) -> &BTreeMap<Address, AccountDiff> { &self.raw }
-}
-
-impl fmt::Display for StateDiff {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        for (add, acc) in &self.raw {
-            write!(f, "{} {}: {}", acc.existance(), add, acc)?;
-        }
-        Ok(())
-    }
-}
-
-impl Deref for StateDiff {
-    type Target = BTreeMap<Address, AccountDiff>;
-
-    fn deref(&self) -> &Self::Target { &self.raw }
-}
+/// Type for block number.
+pub type BlockNumber = u64;
+/// Type for header version.
+pub type HeaderVersion = u8;
