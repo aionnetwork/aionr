@@ -39,6 +39,7 @@ use transaction::{PendingTransaction, Transaction, Action, Condition};
 use miner::MinerService;
 use tempdir::TempDir;
 use kvdb::MemoryDBRepository;
+use helpers::{get_test_spec,generate_dummy_client,get_good_dummy_block,get_bad_state_dummy_block,get_test_client_with_blocks,push_blocks_to_client,get_good_dummy_block_seq,generate_dummy_client_with_data};
 
 #[test]
 fn imports_from_empty() {

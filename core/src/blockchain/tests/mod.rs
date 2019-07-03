@@ -1,3 +1,5 @@
+mod generator;
+
 use std::iter;
 use std::sync::Arc;
 use rustc_hex::FromHex;
@@ -5,9 +7,9 @@ use kvdb::{KeyValueDB, MockDbRepository, DBTransaction};
 use aion_types::*;
 use ethbloom::Bloom;
 use receipt::{Receipt, SimpleReceipt};
-use blockchain::{BlockProvider, BlockChain, Config, ImportRoute};
+use blockchain::{BlockProvider, BlockChain, ImportRoute};
 use helpers::*;
-use blockchain::generator::{BlockGenerator, BlockBuilder, BlockOptions};
+use self::generator::{BlockGenerator, BlockBuilder, BlockOptions};
 use blockchain::extras::TransactionAddress;
 use transaction::{Transaction, Action, DEFAULT_TRANSACTION_TYPE};
 use log_entry::{LogEntry, LocalizedLogEntry};
@@ -24,7 +26,7 @@ fn new_db() -> Arc<KeyValueDB> {
 }
 
 fn new_chain(genesis: &[u8], db: Arc<KeyValueDB>) -> BlockChain {
-    BlockChain::new(Config::default(), genesis, db)
+    BlockChain::new(Default::default(), genesis, db)
 }
 
 #[test]
@@ -134,7 +136,7 @@ fn test_fork_transaction_addresses() {
         gas_price_bytes: Vec::new(),
         value_bytes: Vec::new(),
     }
-    .sign(keychain::ethkey::generate_keypair().secret(), None);
+        .sign(keychain::ethkey::generate_keypair().secret(), None);
 
     let t1_hash = t1.hash().clone();
 
@@ -194,7 +196,7 @@ fn test_overwriting_transaction_addresses() {
         value_bytes: Vec::new(),
         nonce_bytes: Vec::new(),
     }
-    .sign(&keypair.secret(), None);
+        .sign(&keypair.secret(), None);
 
     let t2 = Transaction {
         nonce: 1.into(),
@@ -211,7 +213,7 @@ fn test_overwriting_transaction_addresses() {
         nonce_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-    .sign(&keypair.secret(), None);
+        .sign(&keypair.secret(), None);
     let t3 = Transaction {
         nonce: 2.into(),
         gas_price: 0.into(),
@@ -227,7 +229,7 @@ fn test_overwriting_transaction_addresses() {
         nonce_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-    .sign(&keypair.secret(), None);
+        .sign(&keypair.secret(), None);
 
     let genesis = BlockBuilder::genesis();
     let b1a = genesis.add_block_with_transactions(vec![t1.clone(), t2.clone()]);
@@ -559,7 +561,7 @@ fn test_logs() {
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-    .sign(keypair.secret(), None);
+        .sign(keypair.secret(), None);
     let t2 = Transaction {
         nonce: 0.into(),
         gas_price: 0.into(),
@@ -575,7 +577,7 @@ fn test_logs() {
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-    .sign(keypair.secret(), None);
+        .sign(keypair.secret(), None);
     let t3 = Transaction {
         nonce: 0.into(),
         gas_price: 0.into(),
@@ -591,7 +593,7 @@ fn test_logs() {
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-    .sign(keypair.secret(), None);
+        .sign(keypair.secret(), None);
     let tx_hash1 = t1.hash().clone();
     let tx_hash2 = t2.hash().clone();
     let tx_hash3 = t3.hash().clone();
@@ -613,7 +615,7 @@ fn test_logs() {
         vec![
             Receipt {
                 simple_receipt: SimpleReceipt {
-                    state_root: H256::default(),
+                    state_root: Default::default(),
                     log_bloom: Default::default(),
                     logs: vec![
                         LogEntry {
@@ -630,12 +632,12 @@ fn test_logs() {
                 },
                 gas_used: 10_000.into(),
                 transaction_fee: U256::zero(),
-                output: Bytes::default(),
-                error_message: String::default(),
+                output: Default::default(),
+                error_message: Default::default(),
             },
             Receipt {
                 simple_receipt: SimpleReceipt {
-                    state_root: H256::default(),
+                    state_root: Default::default(),
                     log_bloom: Default::default(),
                     logs: vec![LogEntry {
                         address: Default::default(),
@@ -645,8 +647,8 @@ fn test_logs() {
                 },
                 gas_used: 10_000.into(),
                 transaction_fee: U256::zero(),
-                output: Bytes::default(),
-                error_message: String::default(),
+                output: Default::default(),
+                error_message: Default::default(),
             },
         ],
     );
@@ -656,7 +658,7 @@ fn test_logs() {
         &b2.last().encoded(),
         vec![Receipt {
             simple_receipt: SimpleReceipt {
-                state_root: H256::default(),
+                state_root: Default::default(),
                 log_bloom: Default::default(),
                 logs: vec![LogEntry {
                     address: Default::default(),
@@ -666,8 +668,8 @@ fn test_logs() {
             },
             gas_used: 10_000.into(),
             transaction_fee: U256::zero(),
-            output: Bytes::default(),
-            error_message: String::default(),
+            output: Default::default(),
+            error_message: Default::default(),
         }],
     );
 

@@ -20,6 +20,7 @@ use executive::{Executive, contract_address};
 use avm_abi::{AVMEncoder, AbiToken, ToBytes};
 
 use super::*;
+use helpers::{get_temp_state};
 
 fn make_aion_machine() -> EthereumMachine {
     EthereumMachine::regular(Default::default(), BTreeMap::new(), U256::zero())

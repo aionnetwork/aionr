@@ -32,6 +32,7 @@ use transaction::{Action, Transaction, SignedTransaction};
 use views::BlockView;
 use io::*;
 use miner::{Miner, MinerService};
+use parking_lot::RwLock;
 use rlp::{self, RlpStream};
 use spec::*;
 use state_db::StateDB;
@@ -40,7 +41,7 @@ use std::sync::Arc;
 use kvdb::{MockDbRepository, DBTransaction, KeyValueDB, MemoryDBRepository};
 use db;
 
-//// TODO: move everything over to get_null_spec.
+// TODO: move everything over to get_null_spec.
 pub fn get_test_spec() -> Spec { Spec::new_test() }
 
 pub fn create_test_block(header: &Header) -> Bytes {
@@ -453,4 +454,23 @@ pub fn get_bad_state_dummy_block() -> Bytes {
     block_header.set_state_root(0xbad.into());
 
     create_test_block(&block_header)
+}
+
+#[derive(Default)]
+pub struct TestNotify {
+    pub messages: RwLock<Vec<Bytes>>,
+}
+
+impl ChainNotify for TestNotify {
+    fn new_blocks(
+        &self,
+        imported: Vec<H256>,
+        invalid: Vec<H256>,
+        enacted: Vec<H256>,
+        retracted: Vec<H256>,
+        sealed: Vec<H256>,
+        // Block bytes.
+        proposed: Vec<Bytes>,
+        duration: u64,) {unimplemented!()}
+    fn broadcast(&self, data: Vec<u8>) { self.messages.write().push(data); }
 }

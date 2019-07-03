@@ -1,6 +1,6 @@
 use super::*;
 use kvdb::MemoryDB;
-use account_db::*;
+use account_db::AccountDBMut;
 
 #[test]
 fn storage_at() {
@@ -120,5 +120,5 @@ fn cached_storage_at() {
     assert!(a.cached_storage_at(&vec![0x12, 0x34]).is_some());
 
     a.storage_cache.borrow_mut().clear();
-    assert!(!a.cached_storage_at(&vec![0x12, 0x34]).is_some());
+    assert!(a.cached_storage_at(&vec![0x12, 0x34]).is_none());
 }

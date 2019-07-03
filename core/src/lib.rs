@@ -88,8 +88,8 @@ extern crate logger;
 extern crate tempdir;
 #[cfg(test)]
 extern crate avm_abi;
-#[cfg(test)]
-pub mod helpers;
+//#[cfg(test)]
+//pub mod helpers;
 #[cfg(test)]
 #[macro_use]
 extern crate macros;
@@ -129,5 +129,9 @@ mod precompiled;
 mod executive;
 mod externalities;
 
+
 pub use types::*;
 pub use executive::contract_address;
+
+#[cfg(test)]
+use tests::helpers;
