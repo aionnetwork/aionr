@@ -19,7 +19,6 @@ acore-bloom-journal = { path = "../util/bloom" }
 acore-bytes = { path = "../util/bytes" }
 patricia-trie = { path = "../util/patricia_trie" }
 acore-io = { path = "../util/io" }
-acore-stratum = { path = "../stratum" }
 aion-types = { path = "../util/aion-types"}
 ethbloom = { path = "../util/ethbloom"}
 memory-cache = { path = "../util/memory_cache" }
@@ -55,7 +54,6 @@ journaldb = { path = "../db/journaldb" }
 db = { path = "../db/core" }
 equihash = { path = "../util/equihash" }
 blake2b = { path = "../util/blake2b" }
-dir = { path = "../util/dir" }
 tiny-keccak = "1.4.2"
 num-bigint = "0.2"
 bytebuffer = "0.2.1"

@@ -29,7 +29,6 @@ extern crate acore_bloom_journal as bloom_journal;
 extern crate acore_io as io;
 extern crate acore_bytes;
 extern crate bytes;
-extern crate acore_stratum;
 extern crate aion_types;
 extern crate ethbloom;
 extern crate ajson;
@@ -52,7 +51,6 @@ extern crate ansi_term;
 extern crate unexpected;
 extern crate util_error;
 extern crate db as kvdb;
-extern crate dir;
 extern crate transient_hashmap;
 #[macro_use]
 extern crate lazy_static;

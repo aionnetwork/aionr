@@ -36,6 +36,7 @@ use trie::{Trie, TrieFactory, TrieSpec};
 
 // other
 use aion_types::{Address, H128, H256, H264, U256};
+use account::BasicAccount;
 use block::*;
 use blockchain::{BlockChain, BlockProvider, ImportRoute, TransactionAddress, TreeRoute};
 use client::Error as ClientError;
@@ -1675,12 +1676,7 @@ impl ProvingBlockChainClient for Client {
             .and_then(move |state| state.prove_storage(key1, key2).ok())
     }
 
-    fn prove_account(
-        &self,
-        key1: H256,
-        id: BlockId,
-    ) -> Option<(Vec<Bytes>, ::types::basic_account::BasicAccount)>
-    {
+    fn prove_account(&self, key1: H256, id: BlockId) -> Option<(Vec<Bytes>, BasicAccount)> {
         self.state_at(id)
             .and_then(move |state| state.prove_account(key1).ok())
     }

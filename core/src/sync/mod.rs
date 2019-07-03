@@ -212,6 +212,44 @@ impl SyncMgr {
                     }
                 }
 
+                // if block_number_now + 8 < SyncStorage::get_network_best_block_number()
+                //     && block_number_now - block_number_last_time < 2
+                // {
+                //     SyncStorage::get_block_chain().clear_queue();
+                //     SyncStorage::get_block_chain().clear_bad();
+                //     SyncStorage::clear_downloaded_headers();
+                //     SyncStorage::clear_downloaded_blocks();
+                //     SyncStorage::clear_downloaded_block_hashes();
+                //     SyncStorage::clear_requested_blocks();
+                //     SyncStorage::clear_headers_with_bodies_requested();
+                //     SyncStorage::set_synced_block_number(
+                //         SyncStorage::get_chain_info().best_block_number,
+                //     );
+                //     let abnormal_mode_nodes_count =
+                //         P2pMgr::get_nodes_count_with_mode(Mode::BACKWARD)
+                //             + P2pMgr::get_nodes_count_with_mode(Mode::FORWARD);
+                //     if abnormal_mode_nodes_count > (active_nodes_count / 5)
+                //         || active_nodes_count == 0
+                //     {
+                //         info!(target: "sync", "Abnormal status, reseting network...");
+                //         P2pMgr::reset();
+
+                //         SyncStorage::clear_imported_block_hashes();
+                //         SyncStorage::clear_staged_blocks();
+                //         SyncStorage::set_max_staged_block_number(0);
+                //     }
+                // }
+                // ------
+                // FIX: abnormal reset will be triggered in chain reorg.
+                //   block_number_now is the local best block
+                //   network_best_block_number is the network best block
+                //   block_number_last_time is the local best block set last time where these codes are executed
+                //   when doing a deep chain reorg, if the BACKWARD and FORWARD syncing can't finish within one data batch, block_number_now acctually won't change
+                //   so we will have block_number_now == block_number_last_time, and block_number_now smaller than network_best_block_number.
+                //   This condition triggers reset but it's not abnormal.
+                // PoC disabled it. We should fix it.
+                // ------
+
                 SyncStorage::set_synced_block_number_last_time(block_number_now);
                 SyncStorage::set_sync_speed(sync_speed as u16);
 
@@ -289,14 +327,10 @@ impl SyncMgr {
     fn disable() { SyncStorage::reset(); }
 }
 
-pub struct NetworkService {
-    pub config: NetworkConfig,
-}
-
 /// Sync
 pub struct Sync {
     /// Network service
-    network: NetworkService,
+    config: NetworkConfig,
     /// starting block number.
     starting_block_number: u64,
 }
@@ -308,14 +342,31 @@ impl Sync {
         let starting_block_number = chain_info.best_block_number;
 
         SyncStorage::init(client);
-
-        let service = NetworkService {
-            config: config.clone(),
-        };
         Arc::new(Sync {
-            network: service,
+            config,
             starting_block_number,
         })
+    }
+
+    pub fn start_network(&self) {
+        let executor = SyncStorage::get_executor();
+        let sync_handler = DefaultHandler {
+            callback: SyncMgr::handle,
+        };
+
+        P2pMgr::enable(self.config.clone());
+        debug!(target: "sync", "###### P2P enabled... ######");
+
+        NetManager::enable(&executor, sync_handler);
+        debug!(target: "sync", "###### network enabled... ######");
+
+        SyncMgr::enable(&executor, self.config.max_peers);
+        debug!(target: "sync", "###### sync enabled... ######");
+    }
+
+    pub fn stop_network(&self) {
+        SyncMgr::disable();
+        P2pMgr::disable();
     }
 }
 
@@ -384,49 +435,6 @@ impl SyncProvider for Sync {
             })
             .collect()
     }
-}
-
-/// Trait for managing network
-pub trait NetworkManager: Send + ::std::marker::Sync {
-    /// Set to allow unreserved peers to connect
-    fn accept_unreserved_peers(&self);
-    /// Set to deny unreserved peers to connect
-    fn deny_unreserved_peers(&self);
-    /// Start network
-    fn start_network(&self);
-    /// Stop network
-    fn stop_network(&self);
-    /// Query the current configuration of the network
-    fn network_config(&self) -> NetworkConfig;
-}
-
-impl NetworkManager for Sync {
-    fn accept_unreserved_peers(&self) {}
-
-    fn deny_unreserved_peers(&self) {}
-
-    fn start_network(&self) {
-        let executor = SyncStorage::get_executor();
-        let sync_handler = DefaultHandler {
-            callback: SyncMgr::handle,
-        };
-
-        P2pMgr::enable(self.network_config());
-        debug!(target: "sync", "###### P2P enabled... ######");
-
-        NetManager::enable(&executor, sync_handler);
-        debug!(target: "sync", "###### network enabled... ######");
-
-        SyncMgr::enable(&executor, self.network.config.max_peers);
-        debug!(target: "sync", "###### SYNC enabled... ######");
-    }
-
-    fn stop_network(&self) {
-        SyncMgr::disable();
-        P2pMgr::disable();
-    }
-
-    fn network_config(&self) -> NetworkConfig { NetworkConfig::from(self.network.config.clone()) }
 }
 
 impl ChainNotify for Sync {
@@ -541,11 +549,4 @@ impl ChainNotify for Sync {
             }
         }
     }
-}
-
-/// Configuration for IPC service.
-#[derive(Debug, Clone)]
-pub struct ServiceConfiguration {
-    /// Network configuration.
-    pub net: NetworkConfig,
 }

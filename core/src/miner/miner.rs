@@ -31,7 +31,7 @@ use ansi_term::Colour;
 use acore_bytes::Bytes;
 use engines::POWEquihashEngine;
 use error::*;
-use super::{MinerService, MinerStatus, NotifyWork};
+use miner::{MinerService, MinerStatus};
 use parking_lot::{Mutex, RwLock};
 use transaction::transaction_pool::TransactionPool;
 use transaction::banning_queue::{BanningTransactionQueue, Threshold};
@@ -40,9 +40,10 @@ use transaction::transaction_queue::{
     AccountDetails, PrioritizationStrategy, RemovalReason, TransactionOrigin, TransactionQueue,
 };
 use transaction::{
-    Condition as TransactionCondition, Error as TransactionError,
-/*ImportResult as TransactionImportResult,*/
- PendingTransaction, SignedTransaction,
+    Condition as TransactionCondition,
+    Error as TransactionError,
+    PendingTransaction,
+    SignedTransaction,
     UnverifiedTransaction,
 };
 use using_queue::{GetAction, UsingQueue};
@@ -158,18 +159,11 @@ pub struct Miner {
     extra_data: RwLock<Bytes>,
     engine: Arc<POWEquihashEngine>,
     accounts: Option<Arc<AccountProvider>>,
-    notifiers: RwLock<Vec<Box<NotifyWork>>>,
     tx_message: Mutex<IoChannel<TxIoMessage>>,
     transaction_pool_update_lock: Mutex<bool>,
 }
 
 impl Miner {
-    /// Push notifier that will handle new jobs
-    pub fn push_notifier(&self, notifier: Box<NotifyWork>) {
-        self.notifiers.write().push(notifier);
-        self.sealing_work.lock().enabled = true;
-    }
-
     /// Creates new instance of miner Arc.
     pub fn new(
         options: MinerOptions,
@@ -275,13 +269,11 @@ impl Miner {
             }
         };
 
-        let notifiers: Vec<Box<NotifyWork>> = Vec::new();
-
         let transaction_pool: TransactionPool =
             TransactionPool::new(RwLock::new(transaction_queue));
 
         Miner {
-            transaction_pool: transaction_pool,
+            transaction_pool,
             next_allowed_reseal: Mutex::new(Instant::now()),
             sealing_block_last_request: Mutex::new(0),
             sealing_work: Mutex::new(SealingWork {
@@ -294,15 +286,12 @@ impl Miner {
             options,
             accounts,
             engine: spec.engine.clone(),
-            notifiers: RwLock::new(notifiers),
             tx_message: Mutex::new(message_channel),
             transaction_pool_update_lock: Mutex::new(true),
         }
     }
 
-    fn forced_sealing(&self) -> bool {
-        self.options.force_sealing || !self.notifiers.read().is_empty()
-    }
+    fn forced_sealing(&self) -> bool { self.options.force_sealing }
 
     fn map_pending_block<F, T>(&self, f: F, latest_block_number: BlockNumber) -> Option<T>
     where F: FnOnce(&ClosedBlock) -> T {
@@ -493,41 +482,26 @@ impl Miner {
 
     /// Prepares work which has to be done to seal.
     fn prepare_work(&self, block: ClosedBlock, original_work_hash: Option<H256>) {
-        let (work, is_new) = {
-            let mut sealing_work = self.sealing_work.lock();
-            let last_work_hash = sealing_work
-                .queue
-                .peek_last_ref()
-                .map(|pb| pb.block().header().mine_hash());
-            trace!(target: "block", "prepare_work: Checking whether we need to reseal: orig={:?} last={:?}, this={:?}", original_work_hash, last_work_hash, block.block().header().mine_hash());
-            let (work, is_new) = if last_work_hash
-                .map_or(true, |h| h != block.block().header().mine_hash())
-            {
-                trace!(target: "block", "prepare_work: Pushing a new, refreshed or borrowed pending {}...", block.block().header().mine_hash());
-                let pow_hash = block.block().header().mine_hash();
-                let number = block.block().header().number();
-                let target = block.block().header().boundary();
-                let is_new =
-                    original_work_hash.map_or(true, |h| block.block().header().mine_hash() != h);
-                sealing_work.queue.push(block);
-                // If push notifications are enabled we assume all work items are used.
-                if !self.notifiers.read().is_empty() && is_new {
-                    sealing_work.queue.use_last_ref();
-                }
-                (Some((pow_hash, target, number)), is_new)
-            } else {
-                (None, false)
-            };
-            trace!(target: "block", "prepare_work: leaving (last={:?})", sealing_work.queue.peek_last_ref().map(|b| b.block().header().mine_hash()));
-            (work, is_new)
+        let mut sealing_work = self.sealing_work.lock();
+        let last_work_hash = sealing_work
+            .queue
+            .peek_last_ref()
+            .map(|pb| pb.block().header().mine_hash());
+        trace!(target: "block", "prepare_work: Checking whether we need to reseal: orig={:?} last={:?}, this={:?}", original_work_hash, last_work_hash, block.block().header().mine_hash());
+        if last_work_hash.map_or(true, |h| h != block.block().header().mine_hash()) {
+            trace!(target: "block", "prepare_work: Pushing a new, refreshed or borrowed pending {}...", block.block().header().mine_hash());
+            let _pow_hash = block.block().header().mine_hash();
+            let _number = block.block().header().number();
+            let _target = block.block().header().boundary();
+            let is_new =
+                original_work_hash.map_or(true, |h| block.block().header().mine_hash() != h);
+            sealing_work.queue.push(block);
+            // If push notifications are enabled we assume all work items are used.
+            if is_new {
+                sealing_work.queue.use_last_ref();
+            }
         };
-        if is_new {
-            work.map(|(pow_hash, target, _number)| {
-                for notifier in self.notifiers.read().iter() {
-                    notifier.notify_work(pow_hash, target)
-                }
-            });
-        }
+        trace!(target: "block", "prepare_work: leaving (last={:?})", sealing_work.queue.peek_last_ref().map(|b| b.block().header().mine_hash()));
     }
 
     /// Returns true if we had to prepare new pending block.

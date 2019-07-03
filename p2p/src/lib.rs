@@ -103,11 +103,9 @@ impl P2pMgr {
         let mut local_node = Node::new_with_node_str(local_node_str);
 
         local_node.net_id = cfg.net_id;
-
         info!(target:"net","        node: {}@{}", local_node.get_node_id(), local_node.get_ip_addr());
 
         LOCAL_NODE.set(local_node.clone());
-
         ENABLED.set(AtomicBool::new(true));
 
         TP.set(
@@ -843,14 +841,10 @@ pub struct NetworkConfig {
     pub net_id: u32,
     /// local node
     pub local_node: String,
-    /// if only sync from bootnodes
+    /// if only sync from boot nodes
     pub sync_from_boot_nodes_only: bool,
     /// IP black list
     pub ip_black_list: Vec<String>,
-}
-
-impl Default for NetworkConfig {
-    fn default() -> Self { NetworkConfig::new() }
 }
 
 impl NetworkConfig {

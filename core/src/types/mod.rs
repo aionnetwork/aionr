@@ -21,7 +21,6 @@
  ******************************************************************************/
 
 pub mod account_diff;
-pub mod basic_account;
 pub mod block_status;
 pub mod blockchain_info;
 pub mod call_analytics;

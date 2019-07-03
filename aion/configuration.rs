@@ -21,15 +21,13 @@
 
 use std::time::Duration;
 use cli::{Args, ArgsError};
-use blake2b::blake2b;
-use aion_types::{U256, H256, Address};
+use aion_types::{U256, Address};
 use bytes::Bytes;
 use p2p::NetworkConfig;
 use acore::client::{VMType};
-use acore::miner::{MinerOptions, Banning, StratumOptions};
+use acore::miner::{MinerOptions, Banning};
 use acore::verification::queue::VerifierSettings;
 
-use pb::WalletApiConfiguration;
 use rpc::{IpcConfiguration, HttpConfiguration, WsConfiguration};
 use aion_rpc::dispatch::DynamicGasPrice;
 use cache::CacheConfig;
@@ -87,7 +85,6 @@ impl Configuration {
         let ws_conf = self.ws_config()?;
         let http_conf = self.http_config()?;
         let ipc_conf = self.ipc_config()?;
-        let wallet_api_conf = self.wallet_api_config()?;
         let net_conf = self.net_config()?;
         let cache_config = self.cache_config();
         let fat_db = self.args.arg_fat_db.parse()?;
@@ -230,11 +227,9 @@ impl Configuration {
                 ws_conf,
                 http_conf,
                 ipc_conf,
-                wallet_api_conf,
                 net_conf,
                 acc_conf: self.accounts_config()?,
                 miner_extras: self.miner_extras()?,
-                stratum: self.stratum_options()?,
                 fat_db,
                 compaction,
                 wal,
@@ -338,20 +333,6 @@ impl Configuration {
         };
 
         Ok(cfg)
-    }
-
-    fn stratum_options(&self) -> Result<StratumOptions, String> {
-        Ok(StratumOptions {
-            enable: !self.args.flag_no_stratum,
-            io_path: self.directories().db,
-            listen_addr: self.stratum_interface(),
-            port: self.args.arg_stratum_port,
-            secret: self
-                .args
-                .arg_stratum_secret
-                .as_ref()
-                .map(|s| s.parse::<H256>().unwrap_or_else(|_| blake2b(s))),
-        })
     }
 
     fn miner_options(&self) -> Result<MinerOptions, String> {
@@ -483,18 +464,6 @@ impl Configuration {
         Ok(conf)
     }
 
-    fn wallet_api_config(&self) -> Result<WalletApiConfiguration, String> {
-        let conf = WalletApiConfiguration {
-            enabled: self.args.flag_enable_wallet,
-            interface: self.wallet_api_interface(),
-            port: self.args.arg_wallet_port,
-            secure_connect_enabled: self.args.flag_secure_connect,
-            zmq_key_path: self.directories().zmq,
-        };
-
-        Ok(conf)
-    }
-
     fn http_config(&self) -> Result<HttpConfiguration, String> {
         let conf = HttpConfiguration {
             enabled: self.rpc_enabled(),
@@ -619,19 +588,12 @@ impl Configuration {
         .into()
     }
 
-    fn wallet_api_interface(&self) -> String {
-        let wallet_api_interface = self.args.arg_wallet_interface.clone();
-        self.interface(&wallet_api_interface)
-    }
-
     fn rpc_interface(&self) -> String {
         let rpc_interface = self.args.arg_http_interface.clone();
         self.interface(&rpc_interface)
     }
 
     fn ws_interface(&self) -> String { self.interface(&self.args.arg_ws_interface) }
-
-    fn stratum_interface(&self) -> String { self.interface(&self.args.arg_stratum_interface) }
 
     fn rpc_enabled(&self) -> bool { !self.args.flag_no_http }
 
@@ -812,7 +774,6 @@ mod tests {
             http_conf: Default::default(),
             ipc_conf: Default::default(),
             net_conf: default_network_config(),
-            wallet_api_conf: Default::default(),
             acc_conf: Default::default(),
             miner_extras: Default::default(),
             compaction: Default::default(),
