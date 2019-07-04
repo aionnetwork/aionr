@@ -56,7 +56,6 @@ dependencies = [
  "transient-hashmap 0.4.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "trie-standardmap 0.1.0",
  "triehash 0.1.0",
- "types 0.1.0",
  "unexpected 0.1.0",
  "using_queue 0.1.0",
  "util-error 0.1.0",
@@ -2218,21 +2217,6 @@ dependencies = [
 name = "try-lock"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-
-[[package]]
-name = "types"
-version = "0.1.0"
-dependencies = [
- "acore-bytes 0.1.0",
- "aion-types 0.1.0",
- "ajson 0.1.0",
- "blake2b 0.1.0",
- "ethbloom 0.5.1",
- "heapsize 0.4.2 (registry+https://github.com/rust-lang/crates.io-index)",
- "rlp 0.2.1",
- "rlp_derive 0.1.0",
- "rustc-hex 2.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
-]
 
 [[package]]
 name = "ucd-util"

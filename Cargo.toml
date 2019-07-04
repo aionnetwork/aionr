@@ -52,7 +52,6 @@ members = [
 "db/core",
 "db/journaldb",
 "json",
-"types",
 "keystore/key/cli",
 "keystore/keychain/cli",
 "rpc",
