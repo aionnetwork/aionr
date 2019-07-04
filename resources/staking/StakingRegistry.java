@@ -24,8 +24,6 @@ public class StakingRegistry {
     }
     
     private static Map<Address, Staker> stakers;
-
-    private static byte[] seed;
     
     public static byte[] main() {
         return null;
@@ -86,14 +84,5 @@ public class StakingRegistry {
         } else {
             return 0;
         }
-    }
-
-    public static byte[] getSeed() {
-        return seed;
-    }
-
-    public static void setSeed(byte[] newSeed) {
-        Blockchain.require(newSeed.length == 32);
-        seed = newSeed;
     }
 }
