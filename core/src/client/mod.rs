@@ -37,11 +37,10 @@ pub use self::traits::{BlockChainClient, MiningBlockChainClient, EngineClient};
 pub use self::traits::ProvingBlockChainClient;
 
 pub use types::ids::*;
-pub use types::trace_filter::Filter as TraceFilter;
 pub use types::pruning_info::PruningInfo;
 pub use types::call_analytics::CallAnalytics;
 pub use executive::{Executed, Executive};
-pub use types::vms::{EnvInfo, LastHashes};
+pub use vms::{EnvInfo, LastHashes};
 
 pub use error::{BlockImportError, TransactionImportError};
 

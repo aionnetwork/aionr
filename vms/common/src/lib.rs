@@ -1,5 +1,4 @@
 /*******************************************************************************
- * Copyright (c) 2015-2018 Parity Technologies (UK) Ltd.
  * Copyright (c) 2018-2019 Aion foundation.
  *
  *     This file is part of the aion network project.
@@ -20,24 +19,15 @@
  *
  ******************************************************************************/
 
-//! Restoration status type definition
+extern crate acore_bytes as bytes;
+extern crate aion_types;
+extern crate ajson;
+extern crate rlp;
+extern crate blake2b;
 
-/// Statuses for restorations.
-#[derive(PartialEq, Eq, Clone, Copy, Debug)]
-pub enum RestorationStatus {
-    ///    No restoration.
-    Inactive,
-    /// Ongoing restoration.
-    Ongoing {
-        /// Total number of state chunks.
-        state_chunks: u32,
-        /// Total number of block chunks.
-        block_chunks: u32,
-        /// Number of state chunks completed.
-        state_chunks_done: u32,
-        /// Number of block chunks completed.
-        block_chunks_done: u32,
-    },
-    /// Failed restoration.
-    Failed,
-}
+pub mod traits;
+pub mod avm;
+
+mod fvm;
+
+pub use fvm::*;

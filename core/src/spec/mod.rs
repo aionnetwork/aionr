@@ -25,4 +25,4 @@ mod seal;
 pub mod spec;
 
 pub use self::genesis::Genesis;
-pub use self::spec::{Spec, SpecParams, CommonParams};
+pub use self::spec::{Spec, CommonParams};

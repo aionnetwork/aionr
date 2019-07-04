@@ -24,7 +24,6 @@
 
 use std::collections::BTreeMap;
 use std::io::Read;
-use std::path::Path;
 use std::sync::Arc;
 
 use aion_types::{Address, H256, U256};
@@ -36,7 +35,7 @@ use kvdb::{MemoryDB, MemoryDBRepository};
 use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
 use types::BlockNumber;
-use types::vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
+use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
 use engines::POWEquihashEngine;
 use error::Error;
 use executive::Executive;
@@ -82,34 +81,6 @@ impl From<ajson::spec::Params> for CommonParams {
     }
 }
 
-/// Runtime parameters for the spec that are related to how the software should run the chain,
-/// rather than integral properties of the chain itself.
-#[derive(Debug, Clone, Copy)]
-pub struct SpecParams<'a> {
-    /// The path to the folder used to cache nodes. This is typically /tmp/ on Unix-like systems
-    pub cache_dir: &'a Path,
-}
-
-impl<'a> SpecParams<'a> {
-    /// Create from a cache path, with null values for the other fields
-    pub fn from_path(path: &'a Path) -> Self {
-        SpecParams {
-            cache_dir: path,
-        }
-    }
-
-    /// Create from a cache path and an optimization setting
-    pub fn new(path: &'a Path) -> Self {
-        SpecParams {
-            cache_dir: path,
-        }
-    }
-}
-
-impl<'a, T: AsRef<Path>> From<&'a T> for SpecParams<'a> {
-    fn from(path: &'a T) -> Self { Self::from_path(path.as_ref()) }
-}
-
 /// Parameters for a block chain; includes both those intrinsic to the design of the
 /// chain and those to be interpreted by the active chain engine.
 pub struct Spec {
@@ -153,11 +124,8 @@ pub struct Spec {
 #[cfg(test)]
 macro_rules! load_bundled {
     ($e:expr) => {
-        Spec::load(
-            &::std::env::temp_dir(),
-            include_bytes!(concat!("../../../resources/", $e, ".json")) as &[u8],
-        )
-        .expect(concat!("Chain spec ", $e, " is invalid."))
+        Spec::load(include_bytes!(concat!("../../../resources/", $e, ".json")) as &[u8])
+            .expect(concat!("Chain spec ", $e, " is invalid."))
     };
 }
 
@@ -194,11 +162,11 @@ fn load_machine_from(s: ajson::spec::Spec) -> EthereumMachine {
         .collect();
     let params = CommonParams::from(s.params);
 
-    Spec::machine(&s.engine, params, builtins, s.accounts.premine())
+    Spec::machine(params, builtins, s.accounts.premine())
 }
 
 /// Load from JSON object.
-fn load_from(spec_params: SpecParams, s: ajson::spec::Spec) -> Result<Spec, Error> {
+fn load_from(s: ajson::spec::Spec) -> Result<Spec, Error> {
     let builtins = s
         .accounts
         .builtins()
@@ -211,13 +179,7 @@ fn load_from(spec_params: SpecParams, s: ajson::spec::Spec) -> Result<Spec, Erro
 
     let mut s = Spec {
         name: s.name.clone().into(),
-        engine: Spec::engine(
-            spec_params,
-            s.engine,
-            params,
-            builtins,
-            s.accounts.premine(),
-        ),
+        engine: Spec::engine(s.engine, params, builtins, s.accounts.premine()),
         data_dir: s.data_dir.unwrap_or(s.name).into(),
         parent_hash: g.parent_hash,
         transactions_root: g.transactions_root,
@@ -263,7 +225,6 @@ impl Spec {
 
     // create an instance of an Ethereum state machine, minus consensus logic.
     fn machine(
-        _engine_spec: &ajson::spec::Engine,
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
         premine: U256,
@@ -275,14 +236,13 @@ impl Spec {
     /// Convert engine spec into a arc'd Engine of the right underlying type.
     /// TODO avoid this hard-coded nastiness - use dynamic-linked plugin framework instead.
     fn engine(
-        _spec_params: SpecParams,
         engine_spec: ajson::spec::Engine,
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
         premine: U256,
     ) -> Arc<POWEquihashEngine>
     {
-        let machine = Self::machine(&engine_spec, params, builtins, premine);
+        let machine = Self::machine(params, builtins, premine);
 
         match engine_spec {
             ajson::spec::Engine::POWEquihashEngine(pow_equihash_engine) => {
@@ -421,35 +381,12 @@ impl Spec {
         ret.out()
     }
 
-    /// Overwrite the genesis components.
-    pub fn overwrite_genesis_params(&mut self, g: Genesis) {
-        let GenericSeal(seal_rlp) = g.seal.into();
-        self.parent_hash = g.parent_hash;
-        self.transactions_root = g.transactions_root;
-        self.receipts_root = g.receipts_root;
-        self.author = g.author;
-        self.difficulty = g.difficulty;
-        self.gas_limit = g.gas_limit;
-        self.gas_used = g.gas_used;
-        self.timestamp = g.timestamp;
-        self.extra_data = g.extra_data;
-        self.seal_rlp = seal_rlp;
-    }
-
     /// Alter the value of the genesis state.
     pub fn set_genesis_state(&mut self, s: PodState) -> Result<(), Error> {
         self.genesis_state = s;
         let _ = self.run_constructors(&Default::default(), BasicBackend(MemoryDB::new()))?;
 
         Ok(())
-    }
-
-    /// Returns `false` if the memoized state root is invalid. `true` otherwise.
-    pub fn is_state_root_valid(&self) -> bool {
-        // TODO: get rid of this function and ensure state root always is valid.
-        // we're mostly there, but `self.genesis_state.root()` doesn't encompass
-        // post-constructor state.
-        *self.state_root_memo.read() == self.genesis_state.root()
     }
 
     /// Ensure that the given state DB has the trie nodes in for the genesis state.
@@ -473,11 +410,11 @@ impl Spec {
 
     /// Loads spec from json file. Provide factories for executing contracts and ensuring
     /// storage goes to the right place.
-    pub fn load<'a, T: Into<SpecParams<'a>>, R>(params: T, reader: R) -> Result<Self, String>
+    pub fn load<'a, R>(reader: R) -> Result<Self, String>
     where R: Read {
         ajson::spec::Spec::load(reader)
             .map_err(fmt_err)
-            .and_then(|x| load_from(params.into(), x).map_err(fmt_err))
+            .and_then(|x| load_from(x).map_err(fmt_err))
     }
 }
 
@@ -487,7 +424,7 @@ mod tests {
     use views::BlockView;
     #[test]
     fn test_load_empty() {
-        assert!(Spec::load(&::std::env::temp_dir(), &[] as &[u8]).is_err());
+        assert!(Spec::load(&[] as &[u8]).is_err());
     }
 
     //    #[test]

@@ -20,27 +20,38 @@
  *
  ******************************************************************************/
 
-//! Indication of how secure the chain is.
+//! State diff module.
 
-use {BlockNumber};
+use std::fmt;
+use std::ops::*;
+use std::collections::BTreeMap;
+use aion_types::Address;
+use types::account_diff::*;
 
-/// Indication of how secure the chain is.
-#[derive(Debug, PartialEq, Copy, Clone, Hash, Eq)]
-pub enum SecurityLevel {
-    /// All blocks from genesis to chain head are known to have valid state transitions and PoW.
-    FullState,
-    /// All blocks from genesis to chain head are known to have a valid PoW.
-    FullProofOfWork,
-    /// Some recent headers (the argument) are known to have a valid PoW.
-    PartialProofOfWork(BlockNumber),
+/// Expression for the delta between two system states. Encoded the
+/// delta of every altered account.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct StateDiff {
+    /// Raw diff key-value
+    pub raw: BTreeMap<Address, AccountDiff>,
 }
 
-impl SecurityLevel {
-    /// `true` for `FullPoW`/`FullState`.
-    pub fn is_full(&self) -> bool {
-        match *self {
-            SecurityLevel::FullState | SecurityLevel::FullProofOfWork => true,
-            _ => false,
+impl StateDiff {
+    /// Get the actual data.
+    pub fn get(&self) -> &BTreeMap<Address, AccountDiff> { &self.raw }
+}
+
+impl fmt::Display for StateDiff {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (add, acc) in &self.raw {
+            write!(f, "{} {}: {}", acc.existance(), add, acc)?;
         }
+        Ok(())
     }
+}
+
+impl Deref for StateDiff {
+    type Target = BTreeMap<Address, AccountDiff>;
+
+    fn deref(&self) -> &Self::Target { &self.raw }
 }

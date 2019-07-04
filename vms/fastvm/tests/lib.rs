@@ -39,8 +39,8 @@ use fastvm::basetypes::{DataWord};
 use fastvm::context::{execution_kind, TransactionResult, ExecutionContext};
 use fastvm::ffi::EvmJit;
 use aion_types::{Address, H128, U256, H256};
-use types::vms::traits::Ext;
-use types::vms::{ExecutionResult, CallType, EnvInfo};
+use vms::traits::Ext;
+use vms::{ExecutionResult, CallType, EnvInfo};
 
 type Bytes = Vec<u8>;
 

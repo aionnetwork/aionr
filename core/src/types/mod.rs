@@ -20,22 +20,20 @@
  *
  ******************************************************************************/
 
-//! Trace filter related types
+pub mod account_diff;
+pub mod block_status;
+pub mod blockchain_info;
+pub mod call_analytics;
+pub mod filter;
+pub mod ids;
+pub mod log_entry;
+pub mod pruning_info;
+pub mod receipt;
+pub mod state_diff;
+pub mod tree_route;
+pub mod verification_queue_info;
 
-use std::ops::Range;
-use aion_types::Address;
-use ids::BlockId;
-
-/// Easy to use trace filter.
-pub struct Filter {
-    /// Range of filtering.
-    pub range: Range<BlockId>,
-    /// From address.
-    pub from_address: Vec<Address>,
-    /// To address.
-    pub to_address: Vec<Address>,
-    /// Output offset
-    pub after: Option<usize>,
-    /// Output amount
-    pub count: Option<usize>,
-}
+/// Type for block number.
+pub type BlockNumber = u64;
+/// Type for header version.
+pub type HeaderVersion = u8;

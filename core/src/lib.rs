@@ -25,12 +25,10 @@
 extern crate bloomchain;
 extern crate byteorder;
 extern crate crossbeam;
-extern crate types;
 extern crate acore_bloom_journal as bloom_journal;
 extern crate acore_io as io;
 extern crate acore_bytes;
 extern crate bytes;
-extern crate acore_stratum;
 extern crate aion_types;
 extern crate ethbloom;
 extern crate ajson;
@@ -53,7 +51,6 @@ extern crate ansi_term;
 extern crate unexpected;
 extern crate util_error;
 extern crate db as kvdb;
-extern crate dir;
 extern crate transient_hashmap;
 #[macro_use]
 extern crate lazy_static;
@@ -71,7 +68,7 @@ extern crate journaldb;
 extern crate log;
 #[macro_use]
 extern crate trace_time;
-pub extern crate keychain;
+extern crate keychain;
 extern crate equihash;
 extern crate vms;
 extern crate futures;
@@ -95,42 +92,56 @@ extern crate avm_abi;
 extern crate macros;
 extern crate p2p;
 
+/// pub mod is used here to avoid name collision when used in other module
 pub mod account_provider;
+// encoded header
+pub mod encoded;
+pub mod blockchain;
+pub mod miner;
 pub mod block;
 pub mod client;
+// unverified transaction
 pub mod transaction;
-pub mod db;
-pub mod encoded;
+// PoW Engine
 pub mod engines;
 pub mod error;
-pub mod executed;
 pub mod header;
-pub mod machine;
-pub mod miner;
-pub mod pod_state;
-pub mod pod_account;
+pub mod views;
+pub mod sync;
+
+// boot
 pub mod service;
 pub mod spec;
-pub mod state;
-pub mod state_db;
 pub mod verification;
-pub mod views;
-pub mod account;
-pub mod blockchain;
-pub mod factory;
-pub mod sync;
-#[cfg(test)]
-pub mod tests;
 
+mod machine;
+mod executed;
+mod pod_state;
+mod pod_account;
+mod state;
+mod state_db;
+mod db;
+mod factory;
+mod account;
 mod cache_manager;
 mod blooms;
 mod account_db;
 mod precompiled;
 mod executive;
 mod externalities;
+mod types;
 
+#[cfg(test)]
+mod tests;
 
-pub use types::*;
+pub use types::{
+    filter,
+    log_entry,
+    receipt,
+    state_diff,
+    block_status
+};
+
 pub use executive::contract_address;
 
 #[cfg(test)]

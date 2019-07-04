@@ -84,6 +84,7 @@ pub struct ProofCheck(MemoryDB);
 
 impl ProofCheck {
     /// Create a new `ProofCheck` backend from the given state items.
+    #[cfg(test)]
     pub fn new(proof: &[DBValue]) -> Self {
         let mut db = MemoryDB::new();
         for item in proof {

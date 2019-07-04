@@ -21,7 +21,7 @@
 
 use super::builtin::{BuiltinContract, BuiltinExt, BuiltinParams};
 use aion_types::{U256, H256, Address};
-use types::vms::{ExecutionResult, ExecStatus, ReturnData};
+use vms::{ExecutionResult, ExecStatus, ReturnData};
 use rcrypto::ed25519::verify;
 
 /// A pre-copmiled contract for ed25519 verification.
@@ -94,7 +94,7 @@ mod tests {
     use super::EDVerifyContract;
     use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
     use helpers::get_temp_state;
-    use types::vms::ExecStatus;
+    use vms::ExecStatus;
     use state::{State, Substate};
     use aion_types::{Address, H256};
     use acore_bytes::to_hex;

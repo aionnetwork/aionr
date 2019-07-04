@@ -20,8 +20,9 @@
  *
  ******************************************************************************/
 
-pub mod error;
-pub mod transaction;
+mod error;
+mod transaction;
+// miner
 pub mod banning_queue;
 pub mod local_transactions;
 pub mod transaction_pool;

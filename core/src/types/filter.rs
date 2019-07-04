@@ -24,7 +24,7 @@
 
 use aion_types::{H256, Address};
 use ethbloom::{Bloom, Input as BloomInput};
-use ids::BlockId;
+use types::ids::BlockId;
 use log_entry::LogEntry;
 
 /// Blockchain Filter.
@@ -130,7 +130,7 @@ impl Filter {
 mod tests {
     use ethbloom::Bloom;
     use filter::Filter;
-    use ids::BlockId;
+    use types::ids::BlockId;
     use log_entry::LogEntry;
 
     #[test]

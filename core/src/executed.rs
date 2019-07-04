@@ -226,5 +226,5 @@ impl fmt::Display for CallError {
     }
 }
 
-/// Transaction execution result.
-pub type ExecutionResult = Result<Executed, ExecutionError>;
+// Transaction execution result.
+// pub type ExecutionResult = Result<Executed, ExecutionError>;

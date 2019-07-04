@@ -26,9 +26,9 @@ use aion_types::{H256, U256, Address};
 use ethbloom::Bloom;
 use heapsize::HeapSizeOf;
 use rlp::*;
-use bytes::Bytes;
+use acore_bytes::Bytes;
 
-use {BlockNumber};
+use types::BlockNumber;
 use log_entry::{LogEntry, LocalizedLogEntry};
 
 /// Simple information describing execution of a transaction for syncing

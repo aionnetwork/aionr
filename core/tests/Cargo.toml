@@ -1,0 +1,8 @@
+[package]
+description = "Core test"
+name = "acore-test"
+version = "0.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+
+[dependencies]
+acore = { path = ".." }

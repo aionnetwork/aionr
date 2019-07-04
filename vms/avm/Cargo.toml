@@ -9,7 +9,7 @@ rjni = { path = "rjni" }
 libc = "*"
 rustc-hex = "1.0"
 num-bigint = "0.2"
-types      = { path = "../../types" }
+vm_common      = { path = "../common" }
 aion-types = { path = "../../util/aion-types" }
 lazy_static = "1.0"
 blake2b = { path = "../../util/blake2b" }

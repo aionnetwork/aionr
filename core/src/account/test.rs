@@ -1,6 +1,9 @@
 use super::*;
 use kvdb::MemoryDB;
 use account_db::AccountDBMut;
+use aion_types::Address;
+
+use std::sync::Arc;
 
 #[test]
 fn storage_at() {
@@ -53,10 +56,10 @@ fn note_code() {
         a.rlp()
     };
 
-    let mut a = Account::from_rlp(&rlp);
+    let mut a = AionVMAccount::from_rlp(&rlp);
     assert!(a.cache_code(&db.immutable()).is_some());
 
-    let mut a = Account::from_rlp(&rlp);
+    let mut a = AionVMAccount::from_rlp(&rlp);
     assert_eq!(a.note_code(vec![0x55, 0x44, 0xffu8]), Ok(()));
 }
 
@@ -92,12 +95,13 @@ fn cache_transformed_code() {
 //     let mut db = MemoryDB::new();
 //     let mut db = AccountDBMut::new(&mut db, &address);
 //     let mut a = AionVMAccount::new_contract(69.into(), 0.into());
+//     let kvdb = Mockkvdb::new_default();
 
 //     let rlp = {
 //         a.init_objectgraph(vec![0x55, 0x44, 0xffu8]);
 //         a.commit_storage(&Default::default(), &mut db).unwrap();
 //         // calculate delta_root and save it in accountDB
-//         a.update_root(&address, &mut db);
+//         a.update_root(&address, Arc::new(kvdb));
 //         a.rlp()
 //     };
 

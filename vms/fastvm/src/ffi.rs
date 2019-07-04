@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use std::fmt;
-use types::vms::ExecStatus;
+use types::ExecStatus;
 
 pub trait EvmJit<T> {
     // generate raw pointer of type T for EvmJIT

@@ -26,7 +26,7 @@ extern crate rustc_hex;
 extern crate libc;
 extern crate num_bigint;
 extern crate rjni;
-extern crate types;
+extern crate vm_common as types;
 extern crate aion_types;
 extern crate blake2b as hash;
 #[macro_use]
