@@ -29,8 +29,9 @@ use rlp::{RlpStream, UntrustedRlp};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime};
-
-use super::super::action::SyncAction;
+use sync::route::VERSION;
+use sync::route::MODULE;
+use sync::route::ACTION;
 use super::super::event::SyncEvent;
 use super::super::storage::SyncStorage;
 use p2p::*;
@@ -59,9 +60,9 @@ impl BroadcastsHandler {
 
         if active_nodes.len() > 0 {
             let mut req = ChannelBuffer::new();
-            req.head.ver = Version::V0.value();
-            req.head.ctrl = Control::SYNC.value();
-            req.head.action = SyncAction::BROADCASTTX.value();
+            req.head.ver = VERSION::V0.value();
+            req.head.ctrl = MODULE::SYNC.value();
+            req.head.action = ACTION::BROADCASTTX.value();
 
             let mut txs_rlp = RlpStream::new_list(size);
             txs_rlp.append_raw(transactions.as_slice(), size);
@@ -90,9 +91,9 @@ impl BroadcastsHandler {
 
         if active_nodes.len() > 0 {
             let mut req = ChannelBuffer::new();
-            req.head.ver = Version::V0.value();
-            req.head.ctrl = Control::SYNC.value();
-            req.head.action = SyncAction::BROADCASTBLOCK.value();
+            req.head.ver = VERSION::V0.value();
+            req.head.ctrl = MODULE::SYNC.value();
+            req.head.action = ACTION::BROADCASTBLOCK.value();
 
             if let Some(block_rlp) = client.block(BlockId::Hash(block_hash.clone())) {
                 req.body.put_slice(&block_rlp.into_inner());

@@ -25,7 +25,9 @@ use bytes::BufMut;
 use std::mem;
 use std::time::SystemTime;
 
-use super::super::action::SyncAction;
+use sync::route::VERSION;
+use sync::route::MODULE;
+use sync::route::ACTION;
 use super::super::event::SyncEvent;
 use super::super::storage::SyncStorage;
 use super::blocks_headers_handler::BlockHeadersHandler;
@@ -39,11 +41,10 @@ pub struct StatusHandler;
 impl StatusHandler {
     pub fn send_status_req_to_node(node_hash: u64) {
         let mut req = ChannelBuffer::new();
-        req.head.ver = Version::V0.value();
-        req.head.ctrl = Control::SYNC.value();
-        req.head.action = SyncAction::STATUSREQ.value();
+        req.head.ver = VERSION::V0.value();
+        req.head.ctrl = MODULE::SYNC.value();
+        req.head.action = ACTION::STATUSREQ.value();
         req.head.len = 0;
-
         P2pMgr::send(node_hash, req);
     }
 
@@ -61,9 +62,9 @@ impl StatusHandler {
         let mut res = ChannelBuffer::new();
         let node_hash = node.node_hash;
 
-        res.head.ver = Version::V0.value();
-        res.head.ctrl = Control::SYNC.value();
-        res.head.action = SyncAction::STATUSRES.value();
+        res.head.ver = VERSION::V0.value();
+        res.head.ctrl = MODULE::SYNC.value();
+        res.head.action = ACTION::STATUSRES.value();
 
         let mut res_body = Vec::new();
         let chain_info = SyncStorage::get_chain_info();
@@ -86,7 +87,7 @@ impl StatusHandler {
         res_body.put_slice(&genesis_hash);
 
         res.body.put_slice(res_body.as_slice());
-        res.head.set_length(res.body.len() as u32);
+        res.head.len = res.body.len() as u32;
         SyncEvent::update_node_state(node, SyncEvent::OnStatusReq);
         P2pMgr::update_node(node_hash, node);
         P2pMgr::send(node_hash, res);

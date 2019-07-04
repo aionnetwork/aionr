@@ -20,49 +20,10 @@
  ******************************************************************************/
 
 use std::fmt;
+use route_versions::VERSION;
+use route_modules::MODULE;
 
 pub const MAX_VALID_ACTTION_VALUE: u8 = 7;
-
-#[derive(Serialize, Deserialize, PartialEq)]
-pub enum Version {
-    V0 = 0,
-    V1 = 1,
-    V2 = 2,
-    UNKNOWN = 0xFFFF,
-}
-
-
-impl Version {
-    pub fn value(&self) -> u16 {
-        match *self {
-            Version::V0 => 0 as u16,
-            Version::V1 => 1 as u16,
-            Version::V2 => 2 as u16,
-            Version::UNKNOWN => 0xFFFF as u16,
-        }
-    }
-
-    pub fn from(value: u16) -> Version {
-        match value {
-            0 => Version::V0,
-            1 => Version::V1,
-            2 => Version::V2,
-            _ => Version::UNKNOWN,
-        }
-    }
-}
-
-impl fmt::Display for Version {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let printable = match *self {
-            Version::V0 => "V0",
-            Version::V1 => "V1",
-            Version::V2 => "V2",
-            Version::UNKNOWN => "UNKNOWN",
-        };
-        write!(f, "{}", printable)
-    }
-}
 
 #[derive(Serialize, Deserialize, PartialEq)]
 pub enum Control {
@@ -111,18 +72,12 @@ pub struct Head {
 impl Head {
     pub fn new() -> Head {
         Head {
-            ver: Version::UNKNOWN.value(),
-            ctrl: Control::UNKNOWN.value(),
+            ver: VERSION::V2.value(),
+            ctrl: MODULE::P2P.value(),
             action: 0xFF,
             len: 0,
         }
     }
-
-    pub fn set_version(&mut self, ver: Version) { self.ver = ver.value(); }
-
-    pub fn set_control(&mut self, ctrl: Control) { self.ctrl = ctrl.value(); }
-
-    pub fn set_length(&mut self, len: u32) { self.len = len; }
 }
 
 impl fmt::Display for Head {

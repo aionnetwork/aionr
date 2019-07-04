@@ -20,26 +20,28 @@
  ******************************************************************************/
 
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
-
 use rand::prelude::*;
 use std::mem;
 use bytes::buf::BufMut;
 use version::short_version;
 
-use super::{ChannelBuffer, Control, Version, NODE_ID_LENGTH, Node, DISCONNECTED, IP_LENGTH, P2pMgr};
-use super::Action;
+use super::{ChannelBuffer, Control, NODE_ID_LENGTH, Node, DISCONNECTED, IP_LENGTH, P2pMgr};
+use super::route_versions::VERSION;
+use super::route_actions::ACTION;
+
 use super::Event;
 use super::HANDSHAKE_DONE;
+use route_modules::MODULE;
 
 const VERSION: &str = "02";
 const REVISION_PREFIX: &str = "r-";
 const MAX_REVISION_LENGTH: usize = 24;
 
-pub fn send_activenodes_req() {
+pub fn send_active_nodes_req() {
     let mut req = ChannelBuffer::new();
-    req.head.ver = Version::V0.value();
+    req.head.ver = VERSION::V0.value();
     req.head.ctrl = Control::NET.value();
-    req.head.action = Action::ACTIVENODESREQ.value();
+    req.head.action = ACTION::ACTIVENODESREQ.value();
     req.head.len = 0;
     let handshaked_nodes = P2pMgr::get_nodes(HANDSHAKE_DONE);
     let handshaked_nodes_count = handshaked_nodes.len();
@@ -59,9 +61,9 @@ pub fn handle_active_nodes_req(peer_node: &mut Node) {
     let mut res = ChannelBuffer::new();
     let peer_node_hash = peer_node.node_hash;
 
-    res.head.set_version(Version::V0);
-    res.head.set_control(Control::NET);
-    res.head.action = Action::ACTIVENODESRES.value();
+    res.head.ver = VERSION::V0.value();
+    res.head.ctrl = Control::NET.value();
+    res.head.action = ACTION::ACTIVENODESRES.value();
 
     let active_nodes = P2pMgr::get_nodes(HANDSHAKE_DONE);
     let mut res_body = Vec::new();
@@ -90,7 +92,7 @@ pub fn handle_active_nodes_req(peer_node: &mut Node) {
         res_body.push(0 as u8);
     }
     res.body.put_slice(res_body.as_slice());
-    res.head.set_length(res.body.len() as u32);
+    res.head.len = res.body.len() as u32;
 
     Event::update_node_state(peer_node, Event::OnActiveNodesReq);
     P2pMgr::update_node(peer_node_hash, peer_node);
@@ -146,9 +148,9 @@ pub fn handle_active_nodes_res(peer_node: &mut Node, req: ChannelBuffer) {
 pub fn send_handshake_req(node: &mut Node) {
     let local_node = P2pMgr::get_local_node();
     let mut req = ChannelBuffer::new();
-    req.head.ver = Version::V0.value();
+    req.head.ver = VERSION::V0.value();
     req.head.ctrl = Control::NET.value();
-    req.head.action = Action::HANDSHAKEREQ.value();
+    req.head.action = ACTION::HANDSHAKEREQ.value();
 
     req.body.clear();
     req.body.put_slice(&local_node.node_id);
@@ -210,16 +212,16 @@ pub fn handle_handshake_req(node: &mut Node, req: ChannelBuffer) {
     let mut res = ChannelBuffer::new();
     let mut res_body = Vec::new();
 
-    res.head.set_version(Version::V0);
-    res.head.set_control(Control::NET);
-    res.head.action = Action::HANDSHAKERES.value();
+    res.head.ver = VERSION::V0.value();
+    res.head.ctrl = MODULE::P2P.value();
+    res.head.action = ACTION::HANDSHAKERES.value();
     res_body.push(1 as u8);
     let mut revision = short_version();
     revision.insert_str(0, REVISION_PREFIX);
     res_body.push(revision.len() as u8);
     res_body.put_slice(revision.as_bytes());
     res.body.put_slice(res_body.as_slice());
-    res.head.set_length(res.body.len() as u32);
+    res.head.len = res.body.len() as u32;
 
     let old_node_hash = node.node_hash;
     let node_id_hash = P2pMgr::calculate_hash(&node.get_node_id());

@@ -20,23 +20,25 @@
  ******************************************************************************/
 
 /// p2p node state
+/// states defined here only for p2p layer
 #[derive(Debug, PartialEq)]
-pub enum State {
-    HANDSHAKE_SUCCESS,
-    HANDSHAKE_FAIL
+pub enum STATE {
+    CONNECTED,
+    ACTIVE,
 }
 
-impl State {
+impl STATE {
     pub fn value(&self) -> u8 {
-        match *self {
-            State::HANDSHAKE_SUCCESS => 0u8,
-            State::HANDSHAKE_FAIL => 1u8,
+        match self {
+            STATE::CONNECTED => 0u8,
+            STATE::ACTIVE => 1u8,
         }
     }
-    pub fn from(value: u8) -> State {
+    pub fn from(value: u8) -> STATE {
         match value {
-            0 => State::HANDSHAKE_SUCCESS,
-            _ => State::HANDSHAKE_FAIL,
+            0 => STATE::CONNECTED,
+            1 => STATE::ACTIVE,
+            _ => STATE::CONNECTED,
         }
     }
 }
@@ -44,25 +46,25 @@ impl State {
 #[cfg(test)]
 mod tests {
 
-    use state::STATE;
+    use states::STATE;
 
     #[test]
     fn equal() {
-        assert_eq!(State::HANDSHAKE_SUCCESS, State::HANDSHAKE_SUCCESS);
-        assert_eq!(State::HANDSHAKE_FALSE, State::HANDSHAKE_FALSE);
+        assert_eq!(STATE::CONNECTED, STATE::CONNECTED);
+        assert_eq!(STATE::ACTIVE, STATE::ACTIVE);
     }
 
     #[test]
     fn value() {
-        assert_eq!(State::HANDSHAKE_SUCCESS.value(), 0);
-        assert_eq!(State::HANDSHAKE_FAIL.value(), 1);
+        assert_eq!(STATE::CONNECTED.value(), 0);
+        assert_eq!(STATE::ACTIVE.value(), 1);
     }
 
     #[test]
     fn from() {
-        assert_eq!(State::HANDSHAKE_SUCCESS, State::from(0));
-        assert_eq!(State::HANDSHAKE_FAIL, State::from(1));
-        assert_eq!(State::HANDSHAKE_FAIL, State::from(2));
-        assert_eq!(State::HANDSHAKE_FAIL, State::from(255));
+        assert_eq!(STATE::CONNECTED, STATE::from(0));
+        assert_eq!(STATE::ACTIVE, STATE::from(1));
+        assert_eq!(STATE::CONNECTED, STATE::from(2));
+        assert_eq!(STATE::CONNECTED, STATE::from(255));
     }
 }

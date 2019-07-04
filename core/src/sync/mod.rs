@@ -21,24 +21,33 @@
 
 mod event;
 mod handler;
-mod action;
+mod route;
 mod storage;
 
+use std::collections::BTreeMap;
+use std::ops::Index;
+use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime};
 use client::{BlockChainClient, BlockId, BlockStatus, ChainNotify};
 use transaction::UnverifiedTransaction;
 use aion_types::H256;
 use futures::{Future, Stream};
 use rlp::UntrustedRlp;
-use std::collections::BTreeMap;
-use std::ops::Index;
-use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use p2p::handlers::DefaultHandler;
-use p2p::*;
-
-use self::action::SyncAction;
+use p2p::HANDSHAKE_DONE;
+use p2p::CONNECTED;
+use p2p::ALIVE;
+use p2p::P2pMgr;
+use p2p::NetManager;
+use p2p::Node;
+use p2p::Mode;
+use p2p::ChannelBuffer;
+use p2p::NetworkConfig;
+use self::route::VERSION;
+use self::route::MODULE;
+use self::route::ACTION;
 use self::handler::blocks_bodies_handler::BlockBodiesHandler;
 use self::handler::blocks_headers_handler::BlockHeadersHandler;
 use self::handler::broadcast_handler::BroadcastsHandler;
@@ -271,38 +280,35 @@ impl SyncMgr {
             return;
         }
 
-        match Version::from(req.head.ver) {
-            Version::V0 => {
+        match VERSION::from(req.head.ver) {
+            VERSION::V0 => {
                 trace!(target: "sync", "Ver 0 package received.");
-
-                match Control::from(req.head.ctrl) {
-                    Control::NET => {}
-                    Control::SYNC => {
+                match MODULE::from(req.head.ctrl) {
+                    MODULE::SYNC => {
                         trace!(target: "sync", "P2P message received.");
-
-                        match SyncAction::from(req.head.action) {
-                            SyncAction::STATUSREQ => {
+                        match ACTION::from(req.head.action) {
+                            ACTION::STATUSREQ => {
                                 StatusHandler::handle_status_req(node);
                             }
-                            SyncAction::STATUSRES => {
+                            ACTION::STATUSRES => {
                                 StatusHandler::handle_status_res(node, req);
                             }
-                            SyncAction::BLOCKSHEADERSREQ => {
+                            ACTION::BLOCKSHEADERSREQ => {
                                 BlockHeadersHandler::handle_blocks_headers_req(node, req);
                             }
-                            SyncAction::BLOCKSHEADERSRES => {
+                            ACTION::BLOCKSHEADERSRES => {
                                 BlockHeadersHandler::handle_blocks_headers_res(node, req);
                             }
-                            SyncAction::BLOCKSBODIESREQ => {
+                            ACTION::BLOCKSBODIESREQ => {
                                 BlockBodiesHandler::handle_blocks_bodies_req(node, req);
                             }
-                            SyncAction::BLOCKSBODIESRES => {
+                            ACTION::BLOCKSBODIESRES => {
                                 BlockBodiesHandler::handle_blocks_bodies_res(node, req);
                             }
-                            SyncAction::BROADCASTTX => {
+                            ACTION::BROADCASTTX => {
                                 BroadcastsHandler::handle_broadcast_tx(node, req);
                             }
-                            SyncAction::BROADCASTBLOCK => {
+                            ACTION::BROADCASTBLOCK => {
                                 BroadcastsHandler::handle_broadcast_block(node, req);
                             }
                             _ => {
@@ -315,11 +321,8 @@ impl SyncMgr {
                     }
                 }
             }
-            Version::V1 => {
+            VERSION::V1 => {
                 trace!(target: "sync", "Ver 1 package received.");
-            }
-            _ => {
-                error!(target: "sync", "Invalid Version.");
             }
         };
     }

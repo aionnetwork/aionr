@@ -41,14 +41,14 @@ extern crate aion_version as version;
 extern crate bytes;
 extern crate byteorder;
 
-mod action;
+mod route;
+mod route_versions;
+mod route_modules;
+mod route_actions;
+mod states;
 mod msg;
 mod node;
 pub mod handlers;
-
-
-use action::Action;
-
 
 use std::fmt;
 use acore_bytes::to_hex;
@@ -72,10 +72,12 @@ use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_threadpool::{Builder, ThreadPool};
-
+use route_versions::VERSION;
+use route_modules::MODULE;
+use route_actions::ACTION;
 use handlers::{
     send_handshake_req,
-    send_activenodes_req,
+    send_active_nodes_req,
     handle_handshake_res,
     handle_handshake_req,
     handle_active_nodes_req,
@@ -126,8 +128,7 @@ impl P2pMgr {
         executor: &TaskExecutor,
         local_addr: &String,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    )
-    {
+    ) {
         if let Ok(addr) = local_addr.parse() {
             let listener = TcpListener::bind(&addr).expect("Failed to bind");
             let server = listener
@@ -511,8 +512,7 @@ impl P2pMgr {
         socket: TcpStream,
         peer_node: Node,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    )
-    {
+    ) {
         let mut peer_node = peer_node.clone();
         peer_node.node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
         let node_hash = peer_node.node_hash;
@@ -540,7 +540,7 @@ impl P2pMgr {
 
         // OnConnect
         let mut req = ChannelBuffer::new();
-        req.head.set_version(Version::V1);
+        req.head.ver = VERSION::V1.value();
         handle(&mut peer_node, req);
 
         let read = stream.for_each(move |msg| {
@@ -607,11 +607,9 @@ pub struct NetManager;
 impl NetManager {
     pub fn enable(executor: &TaskExecutor, handler: DefaultHandler) {
         DEFAULT_HANDLER.set(handler);
-
         Self::enable_p2p_server(executor);
         Self::enable_p2p_clients(executor);
-
-        Self::enable_activenodes_req_task(executor);
+        Self::enable_active_nodes_req_task(executor);
     }
 
     fn enable_p2p_server(executor: &TaskExecutor) {
@@ -702,13 +700,13 @@ impl NetManager {
         P2pMgr::create_client(peer_node, Self::handle);
     }
 
-    fn enable_activenodes_req_task(executor: &TaskExecutor) {
+    fn enable_active_nodes_req_task(executor: &TaskExecutor) {
         let activenodes_req_task = Interval::new(
             Instant::now(),
             Duration::from_secs(NODE_ACTIVE_REQ_INTERVAL),
         )
             .for_each(move |_| {
-                send_activenodes_req();
+                send_active_nodes_req();
                 Ok(())
             })
             .map_err(|e| error!("interval errored; err={:?}", e));
@@ -716,34 +714,34 @@ impl NetManager {
     }
 
     fn handle(node: &mut Node, req: ChannelBuffer) {
-        match Version::from(req.head.ver) {
-            Version::V0 => {
+        match VERSION::from(req.head.ver) {
+            VERSION::V0 => {
                 trace!(target: "net", "Ver 0 package received.");
 
                 match Control::from(req.head.ctrl) {
                     Control::NET => {
                         trace!(target: "net", "P2P NET message received.");
 
-                        match Action::from(req.head.action) {
-                            Action::DISCONNECT => {
+                        match ACTION::from(req.head.action) {
+                            ACTION::DISCONNECT => {
                                 trace!(target: "net", "DISCONNECT received.");
                             }
-                            Action::HANDSHAKEREQ => {
+                            ACTION::HANDSHAKEREQ => {
                                 handle_handshake_req(node, req);
                             }
-                            Action::HANDSHAKERES => {
+                            ACTION::HANDSHAKERES => {
                                 handle_handshake_res(node, req);
                             }
-                            Action::PING => {
+                            ACTION::PING => {
                                 // ignore
                             }
-                            Action::PONG => {
+                            ACTION::PONG => {
                                 // ignore
                             }
-                            Action::ACTIVENODESREQ => {
+                            ACTION::ACTIVENODESREQ => {
                                 handle_active_nodes_req(node);
                             }
-                            Action::ACTIVENODESRES => {
+                            ACTION::ACTIVENODESRES => {
                                 handle_active_nodes_res(node, req);
                             }
                             _ => {
@@ -762,7 +760,7 @@ impl NetManager {
                     }
                 }
             }
-            Version::V1 => {
+            VERSION::V1 => {
                 trace!(target: "net", "Ver 1 package received.");
                 send_handshake_req(node);
             }
@@ -806,7 +804,7 @@ impl Decoder for P2pCodec {
                 let (head_raw, _) = src.split_at(HEADER_LENGTH);
                 if let Ok(head) = decoder.deserialize(head_raw) {
                     decoded.head = head;
-                    if decoded.head.ver > Version::V2.value()
+                    if decoded.head.ver > VERSION::V2.value()
                         || decoded.head.ctrl > Control::SYNC.value()
                         || decoded.head.action > MAX_VALID_ACTTION_VALUE
                     {
