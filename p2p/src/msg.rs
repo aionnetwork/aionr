@@ -20,8 +20,8 @@
  ******************************************************************************/
 
 use std::fmt;
-use route_versions::VERSION;
-use route_modules::MODULE;
+use route::VERSION;
+use route::MODULE;
 
 pub const MAX_VALID_ACTTION_VALUE: u8 = 7;
 

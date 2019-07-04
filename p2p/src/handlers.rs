@@ -26,12 +26,12 @@ use bytes::buf::BufMut;
 use version::short_version;
 
 use super::{ChannelBuffer, Control, NODE_ID_LENGTH, Node, DISCONNECTED, IP_LENGTH, P2pMgr};
-use super::route_versions::VERSION;
-use super::route_actions::ACTION;
+use super::route::VERSION;
+use super::route::ACTION;
+use route::MODULE;
 
 use super::Event;
 use super::HANDSHAKE_DONE;
-use route_modules::MODULE;
 
 const VERSION: &str = "02";
 const REVISION_PREFIX: &str = "r-";

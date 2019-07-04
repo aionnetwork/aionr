@@ -19,6 +19,8 @@
  *
  ******************************************************************************/
 
+use sync::route::MODULE::SYNC;
+
 /// sync related messages routing info defined here
 
 #[derive(Debug, PartialEq)]
@@ -56,11 +58,8 @@ impl MODULE {
         }
     }
 
-    pub fn from(value: u8) -> MODULE {
-        match value {
-            1 => MODULE::SYNC,
-            _ => MODULE::SYNC,
-        }
+    pub fn from(_value: u8) -> MODULE {
+        SYNC
     }
 }
 

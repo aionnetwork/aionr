@@ -42,10 +42,7 @@ extern crate bytes;
 extern crate byteorder;
 
 mod route;
-mod route_versions;
-mod route_modules;
-mod route_actions;
-mod states;
+//mod states;
 mod msg;
 mod node;
 pub mod handlers;
@@ -72,9 +69,8 @@ use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_threadpool::{Builder, ThreadPool};
-use route_versions::VERSION;
-use route_modules::MODULE;
-use route_actions::ACTION;
+use route::VERSION;
+use route::ACTION;
 use handlers::{
     send_handshake_req,
     send_active_nodes_req,

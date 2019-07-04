@@ -19,6 +19,9 @@
  *
  ******************************************************************************/
 
+use std::sync::Arc;
+use std::thread;
+use std::time::{Duration, SystemTime};
 use client::{BlockChainClient, BlockId, BlockImportError};
 use error::{BlockError, ImportError};
 use header::Header as BlockHeader;
@@ -26,15 +29,12 @@ use transaction::UnverifiedTransaction;
 use aion_types::H256;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
-use std::sync::Arc;
-use std::thread;
-use std::time::{Duration, SystemTime};
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
+use p2p::*;
 use super::super::event::SyncEvent;
 use super::super::storage::SyncStorage;
-use p2p::*;
 
 const MAX_NEW_BLOCK_AGE: u64 = 20;
 
