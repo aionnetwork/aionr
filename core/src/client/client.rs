@@ -61,8 +61,7 @@ use spec::Spec;
 use state::{self, State};
 use state_db::StateDB;
 use transaction::{
-    Action, LocalizedTransaction, PendingTransaction, SignedTransaction, Transaction,
-    DEFAULT_TRANSACTION_TYPE, AVM_TRANSACTION_TYPE
+    Action, LocalizedTransaction, PendingTransaction, SignedTransaction, AVM_TRANSACTION_TYPE
 };
 use types::filter::Filter;
 use vms::{EnvInfo, LastHashes};
@@ -755,29 +754,6 @@ impl Client {
                 })
             }
         }
-    }
-
-    // transaction for calling contracts from services like engine.
-    // from the null sender, with 50M gas.
-    fn contract_call_tx(
-        &self,
-        block_id: BlockId,
-        address: Address,
-        data: Bytes,
-    ) -> SignedTransaction
-    {
-        let from = Address::default();
-        Transaction::new(
-            self.nonce(&from, block_id)
-                .unwrap_or_else(|| self.engine.machine().account_start_nonce(0)),
-            U256::default(),
-            U256::from(50_000_000),
-            Action::Call(address),
-            U256::default(),
-            data,
-            DEFAULT_TRANSACTION_TYPE,
-        )
-        .fake_sign(from)
     }
 
     fn do_virtual_call(
@@ -1516,20 +1492,6 @@ impl BlockChainClient for Client {
                 .earliest_era()
                 .unwrap_or(0),
         }
-    }
-
-    fn call_contract(
-        &self,
-        block_id: BlockId,
-        address: Address,
-        data: Bytes,
-    ) -> Result<Bytes, String>
-    {
-        let transaction = self.contract_call_tx(block_id, address, data);
-
-        self.call(&transaction, Default::default(), block_id)
-            .map_err(|e| format!("{:?}", e))
-            .map(|executed| executed.output)
     }
 }
 

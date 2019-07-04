@@ -25,7 +25,6 @@
 extern crate bloomchain;
 extern crate byteorder;
 extern crate crossbeam;
-extern crate types;
 extern crate acore_bloom_journal as bloom_journal;
 extern crate acore_io as io;
 extern crate acore_bytes;
@@ -130,6 +129,7 @@ mod account_db;
 mod precompiled;
 mod executive;
 mod externalities;
+mod types;
 
 #[cfg(test)]
 mod tests;

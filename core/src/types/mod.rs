@@ -20,15 +20,23 @@
  *
  ******************************************************************************/
 
-#![warn(unused_extern_crates)]
+pub mod account_diff;
+pub mod block_status;
+pub mod blockchain_info;
+pub mod call_analytics;
+pub mod filter;
+pub mod ids;
+pub mod log_entry;
+pub mod pruning_info;
+pub mod receipt;
+pub mod state_diff;
+pub mod tree_route;
+pub mod verification_queue_info;
 
-extern crate types;
+#[cfg(test)]
+mod test;
 
-use types::vm::EnvInfo;
-use std::convert::Into;
-
-#[test]
-fn it_can_be_created_as_default() {
-    let default_env_info = EnvInfo::default();
-    assert_eq!(default_env_info.difficulty, 0.into());
-}
+/// Type for block number.
+pub type BlockNumber = u64;
+/// Type for header version.
+pub type HeaderVersion = u8;

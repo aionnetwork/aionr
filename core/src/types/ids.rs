@@ -23,7 +23,7 @@
 //! Unique identifiers.
 
 use aion_types::H256;
-use {BlockNumber};
+use {types::BlockNumber};
 
 /// Uniquely identifies block.
 #[derive(Debug, PartialEq, Copy, Clone, Hash, Eq)]

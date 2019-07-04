@@ -284,8 +284,8 @@ pub trait BlockChainClient: Sync + Send {
     /// Returns information about pruning/data availability.
     fn pruning_info(&self) -> PruningInfo;
 
-    /// Like `call`, but with various defaults. Designed to be used for calling contracts.
-    fn call_contract(&self, id: BlockId, address: Address, data: Bytes) -> Result<Bytes, String>;
+    // Like `call`, but with various defaults. Designed to be used for calling contracts.
+    //fn call_contract(&self, id: BlockId, address: Address, data: Bytes) -> Result<Bytes, String>;
 }
 
 /// Extended client interface used for mining

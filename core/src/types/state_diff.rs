@@ -20,32 +20,38 @@
  *
  ******************************************************************************/
 
-#![warn(unused_extern_crates)]
+//! State diff module.
 
-extern crate aion_types;
-extern crate ethbloom;
-extern crate acore_bytes as bytes;
-extern crate ajson;
-extern crate rlp;
-#[macro_use]
-extern crate rlp_derive;
-extern crate heapsize;
+use std::fmt;
+use std::ops::*;
+use std::collections::BTreeMap;
+use aion_types::Address;
+use types::account_diff::*;
 
-pub mod account_diff;
-pub mod block_status;
-pub mod blockchain_info;
-pub mod call_analytics;
-pub mod filter;
-pub mod ids;
-pub mod log_entry;
-pub mod pruning_info;
-pub mod receipt;
-pub mod state_diff;
-pub mod tree_route;
-pub mod verification_queue_info;
-// pub mod vms;
+/// Expression for the delta between two system states. Encoded the
+/// delta of every altered account.
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub struct StateDiff {
+    /// Raw diff key-value
+    pub raw: BTreeMap<Address, AccountDiff>,
+}
 
-/// Type for block number.
-pub type BlockNumber = u64;
-/// Type for header version.
-pub type HeaderVersion = u8;
+impl StateDiff {
+    /// Get the actual data.
+    pub fn get(&self) -> &BTreeMap<Address, AccountDiff> { &self.raw }
+}
+
+impl fmt::Display for StateDiff {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        for (add, acc) in &self.raw {
+            write!(f, "{} {}: {}", acc.existance(), add, acc)?;
+        }
+        Ok(())
+    }
+}
+
+impl Deref for StateDiff {
+    type Target = BTreeMap<Address, AccountDiff>;
+
+    fn deref(&self) -> &Self::Target { &self.raw }
+}
