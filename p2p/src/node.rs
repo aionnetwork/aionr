@@ -38,7 +38,7 @@ pub const PROTOCOL_LENGTH: usize = 6;
 pub const IP_LENGTH: usize = 8;
 pub const DIFFICULTY_LENGTH: usize = 16;
 pub const MAX_REVISION_LENGTH: usize = 24;
-
+pub const REVISION_PREFIX: &str = "r-";
 pub const CONNECTED: u32 = 1;
 pub const IS_SERVER: u32 = 1 << 1;
 pub const ALIVE: u32 = 1 << 3;
@@ -66,7 +66,7 @@ impl fmt::Display for Mode {
     }
 }
 
-#[derive(Clone, Copy, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
 pub struct IpAddr {
     pub ip: [u8; 8],
     pub port: u32,

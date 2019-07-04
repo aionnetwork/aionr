@@ -43,6 +43,9 @@ impl STATE {
     }
 }
 
+pub const HANDSHAKE_DONE: u32 = 1 << 2;
+pub const DISCONNECTED: u32 = 1 << 10;
+
 #[cfg(test)]
 mod tests {
 

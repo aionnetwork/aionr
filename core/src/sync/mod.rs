@@ -36,7 +36,7 @@ use futures::{Future, Stream};
 use rlp::UntrustedRlp;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
-use p2p::handlers::DefaultHandler;
+use p2p::handler::external::DefaultHandler;
 use p2p::HANDSHAKE_DONE;
 use p2p::CONNECTED;
 use p2p::ALIVE;

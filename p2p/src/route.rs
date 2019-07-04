@@ -47,7 +47,7 @@ impl VERSION {
         match self {
             VERSION::V0 => 0u16,
             VERSION::V1 => 1u16,
-            VERSION::V2 => 1u16,
+            VERSION::V2 => 2u16,
         }
     }
 
@@ -67,12 +67,20 @@ impl VERSION {
 #[derive(Debug, PartialEq)]
 pub enum MODULE {
     P2P,
+    EXTERNAL
 }
 
 impl MODULE {
     pub fn value(&self) -> u8 {
         match self {
             MODULE::P2P => 0u8,
+            MODULE::EXTERNAL => 1u8,
+        }
+    }
+    pub fn from(value: u8) -> MODULE {
+        match value {
+            0 => MODULE::P2P,
+            _ => MODULE::EXTERNAL
         }
     }
 }
@@ -168,11 +176,21 @@ mod tests {
     #[test]
     fn test_module_equal() {
         assert_eq!(MODULE::P2P, MODULE::P2P);
+        assert_eq!(MODULE::EXTERNAL, MODULE::EXTERNAL);
+    }
+
+    #[test]
+    fn test_module_from() {
+        assert_eq!(MODULE::P2P, MODULE::from(0));
+        assert_eq!(MODULE::EXTERNAL, MODULE::from(1));
+        assert_eq!(MODULE::EXTERNAL, MODULE::from(2));
+        assert_eq!(MODULE::EXTERNAL, MODULE::from(255));
     }
 
     #[test]
     fn test_module_value() {
         assert_eq!(MODULE::P2P.value(), 0);
+        assert_eq!(MODULE::EXTERNAL.value(), 1);
     }
 
     #[test]

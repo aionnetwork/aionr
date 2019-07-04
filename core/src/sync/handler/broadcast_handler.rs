@@ -24,7 +24,7 @@ use std::thread;
 use std::time::{Duration, SystemTime};
 use client::{BlockChainClient, BlockId, BlockImportError};
 use error::{BlockError, ImportError};
-use header::Header as BlockHeader;
+use header::Header;
 use transaction::UnverifiedTransaction;
 use aion_types::H256;
 use bytes::BufMut;
@@ -111,8 +111,7 @@ impl BroadcastsHandler {
     pub fn handle_broadcast_block(node: &mut Node, req: ChannelBuffer) {
         trace!(target: "sync", "BROADCASTBLOCK received.");
 
-        if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number()
-        {
+        if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number() {
             // Ignore BROADCASTBLOCK message until full synced
             trace!(target: "sync", "Syncing..., ignore BROADCASTBLOCK message.");
             return;
@@ -121,7 +120,7 @@ impl BroadcastsHandler {
         let block_rlp = UntrustedRlp::new(req.body.as_slice());
         if let Ok(header_rlp) = block_rlp.at(0) {
             if let Ok(h) = header_rlp.as_val() {
-                let header: BlockHeader = h;
+                let header: Header = h;
                 let last_imported_number = SyncStorage::get_synced_block_number();
                 let hash = header.hash();
 

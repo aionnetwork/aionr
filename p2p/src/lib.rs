@@ -25,11 +25,11 @@
 extern crate log;
 #[macro_use]
 extern crate lazy_static;
+#[macro_use]
+extern crate serde_derive;
 extern crate futures;
 extern crate bincode;
 extern crate rand;
-#[macro_use]
-extern crate serde_derive;
 extern crate state;
 extern crate tokio;
 extern crate tokio_codec;
@@ -42,10 +42,10 @@ extern crate bytes;
 extern crate byteorder;
 
 mod route;
-//mod states;
+mod states;
 mod msg;
 mod node;
-pub mod handlers;
+pub mod handler;
 
 use std::fmt;
 use acore_bytes::to_hex;
@@ -70,16 +70,11 @@ use tokio::timer::Interval;
 use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_threadpool::{Builder, ThreadPool};
 use route::VERSION;
+use route::MODULE;
 use route::ACTION;
-use handlers::{
-    send_handshake_req,
-    send_active_nodes_req,
-    handle_handshake_res,
-    handle_handshake_req,
-    handle_active_nodes_req,
-    handle_active_nodes_res,
-    DefaultHandler,
-};
+use handler::handshake;
+use handler::active_nodes;
+use handler::external::DefaultHandler;
 
 pub use self::msg::*;
 pub use self::node::*;
@@ -702,31 +697,29 @@ impl NetManager {
             Duration::from_secs(NODE_ACTIVE_REQ_INTERVAL),
         )
             .for_each(move |_| {
-                send_active_nodes_req();
+                active_nodes::send();
                 Ok(())
             })
             .map_err(|e| error!("interval errored; err={:?}", e));
         executor.spawn(activenodes_req_task);
     }
 
+    /// messages with module code other than p2p module
+    /// should flow into external handlers
     fn handle(node: &mut Node, req: ChannelBuffer) {
         match VERSION::from(req.head.ver) {
             VERSION::V0 => {
-                trace!(target: "net", "Ver 0 package received.");
-
-                match Control::from(req.head.ctrl) {
-                    Control::NET => {
-                        trace!(target: "net", "P2P NET message received.");
-
+                match MODULE::from(req.head.ctrl) {
+                    MODULE::P2P => {
                         match ACTION::from(req.head.action) {
                             ACTION::DISCONNECT => {
                                 trace!(target: "net", "DISCONNECT received.");
                             }
                             ACTION::HANDSHAKEREQ => {
-                                handle_handshake_req(node, req);
+                                handshake::receive_req(node, req);
                             }
                             ACTION::HANDSHAKERES => {
-                                handle_handshake_res(node, req);
+                                handshake::receive_res(node, req);
                             }
                             ACTION::PING => {
                                 // ignore
@@ -735,33 +728,28 @@ impl NetManager {
                                 // ignore
                             }
                             ACTION::ACTIVENODESREQ => {
-                                handle_active_nodes_req(node);
+                                active_nodes::receive_req(node);
                             }
                             ACTION::ACTIVENODESRES => {
-                                handle_active_nodes_res(node, req);
+                                active_nodes::receive_res(node, req);
                             }
                             _ => {
                                 error!(target: "net", "Invalid action {} received.", req.head.action);
                             }
                         };
                     }
-                    Control::SYNC => {
+                    MODULE::EXTERNAL => {
                         trace!(target: "net", "P2P SYNC message received.");
-
                         let handler = DEFAULT_HANDLER.get();
                         handler.handle(node, req);
-                    }
-                    _ => {
-                        error!(target: "net", "Invalid message received: {}", req.head);
                     }
                 }
             }
             VERSION::V1 => {
-                trace!(target: "net", "Ver 1 package received.");
-                send_handshake_req(node);
+                handshake::send(node);
             }
             _ => {
-                error!(target: "net", "Invalid Version.");
+                error!(target: "net", "invalid version code");
             }
         };
     }
@@ -801,8 +789,7 @@ impl Decoder for P2pCodec {
                 if let Ok(head) = decoder.deserialize(head_raw) {
                     decoded.head = head;
                     if decoded.head.ver > VERSION::V2.value()
-                        || decoded.head.ctrl > Control::SYNC.value()
-                        || decoded.head.action > MAX_VALID_ACTTION_VALUE
+                        || decoded.head.ctrl > 1 //TODO: FIX IT
                     {
                         invalid = true;
                     } else if decoded.head.len as usize + HEADER_LENGTH > len {

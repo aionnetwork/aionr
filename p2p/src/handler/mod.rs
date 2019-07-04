@@ -19,39 +19,6 @@
  *
  ******************************************************************************/
 
-use route::VERSION;
-use route::MODULE;
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Head {
-    pub ver: u16,
-    pub ctrl: u8,
-    pub action: u8,
-    pub len: u32,
-}
-
-impl Head {
-    pub fn new() -> Head {
-        Head {
-            ver: VERSION::V2.value(),
-            ctrl: MODULE::P2P.value(),
-            action: 0xFF,
-            len: 0,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ChannelBuffer {
-    pub head: Head,
-    pub body: Vec<u8>,
-}
-
-impl ChannelBuffer {
-    pub fn new() -> ChannelBuffer {
-        ChannelBuffer {
-            head: Head::new(),
-            body: Vec::new(),
-        }
-    }
-}
+pub mod active_nodes;
+pub mod handshake;
+pub mod external;
