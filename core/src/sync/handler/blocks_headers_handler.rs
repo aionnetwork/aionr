@@ -28,8 +28,9 @@ use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use std::mem;
 use std::time::{Duration, SystemTime};
-
-use super::super::action::SyncAction;
+use sync::route::VERSION;
+use sync::route::MODULE;
+use sync::route::ACTION;
 use super::super::event::SyncEvent;
 use super::super::storage::{HeadersWrapper, SyncStorage};
 
@@ -144,9 +145,9 @@ impl BlockHeadersHandler {
 
     fn send_blocks_headers_req(node_hash: u64, from: u64, size: u32) {
         let mut req = ChannelBuffer::new();
-        req.head.ver = Version::V0.value();
-        req.head.ctrl = Control::SYNC.value();
-        req.head.action = SyncAction::BLOCKSHEADERSREQ.value();
+        req.head.ver = VERSION::V0.value();
+        req.head.ctrl = MODULE::SYNC.value();
+        req.head.action = ACTION::BLOCKSHEADERSREQ.value();
 
         let mut from_buf = [0; 8];
         BigEndian::write_u64(&mut from_buf, from);
@@ -169,9 +170,9 @@ impl BlockHeadersHandler {
         let mut res = ChannelBuffer::new();
         let node_hash = node.node_hash;
 
-        res.head.ver = Version::V0.value();
-        res.head.ctrl = Control::SYNC.value();
-        res.head.action = SyncAction::BLOCKSHEADERSRES.value();
+        res.head.ver = VERSION::V0.value();
+        res.head.ctrl = MODULE::SYNC.value();
+        res.head.action = ACTION::BLOCKSHEADERSRES.value();
 
         let mut res_body = Vec::new();
 
@@ -203,7 +204,7 @@ impl BlockHeadersHandler {
         }
 
         res.body.put_slice(res_body.as_slice());
-        res.head.set_length(res.body.len() as u32);
+        res.head.len = res.body.len() as u32;
 
         SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersReq);
         P2pMgr::update_node(node_hash, node);

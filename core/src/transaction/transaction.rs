@@ -28,8 +28,10 @@ use ajson;
 use blake2b::blake2b;
 use heapsize::HeapSizeOf;
 use key::{
-    self, public_to_address_ed25519, recover_ed25519, sign_ed25519, Ed25519Secret, Ed25519Signature,
+    self, public_to_address_ed25519, recover_ed25519, Ed25519Signature,
 };
+#[cfg(test)]
+use key::{sign_ed25519, Ed25519Secret};
 use rlp::{self, DecoderError, Encodable, RlpStream, UntrustedRlp};
 use std::ops::Deref;
 use vms::constants::{
@@ -37,7 +39,9 @@ use vms::constants::{
     GAS_TX_DATA_ZERO,
 };
 
+#[cfg(test)]
 use acore_bytes::i64_to_bytes;
+#[cfg(test)]
 use trace_time::to_epoch_micro;
 
 type Bytes = Vec<u8>;
@@ -235,6 +239,7 @@ impl Transaction {
         blake2b(stream.as_raw())
     }
 
+    #[cfg(test)]
     pub fn sign(self, key: &[u8], chain_id: Option<u64>) -> SignedTransaction {
         let timestamp = i64_to_bytes(to_epoch_micro());
         //        let sig = sign_with_secret(secret_from_slice(key), &self.hash(chain_id, &timestamp))

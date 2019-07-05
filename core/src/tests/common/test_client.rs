@@ -820,15 +820,15 @@ impl BlockChainClient for TestBlockChainClient {
         }
     }
 
-    fn call_contract(
-        &self,
-        _id: BlockId,
-        _address: Address,
-        _data: Bytes,
-    ) -> Result<Bytes, String>
-    {
-        Ok(vec![])
-    }
+    // fn call_contract(
+    //     &self,
+    //     _id: BlockId,
+    //     _address: Address,
+    //     _data: Bytes,
+    // ) -> Result<Bytes, String>
+    // {
+    //     Ok(vec![])
+    // }
 
     // fn registrar_address(&self) -> Option<Address> { None }
 

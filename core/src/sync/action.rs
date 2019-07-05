@@ -21,7 +21,6 @@
 
 use std::fmt;
 
-//#[derive(Serialize, Deserialize, PartialEq)]
 #[derive(PartialEq)]
 pub enum SyncAction {
     STATUSREQ = 0,

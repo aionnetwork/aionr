@@ -12,7 +12,6 @@ bloomchain = { path = "../util/bloomchain" }
 byteorder = "1.0"
 bytes = "0.4"
 state = "0.4.1"
-types = { path = "../types" }
 p2p = { path = "../p2p" }
 crossbeam = "0.3"
 acore-bloom-journal = { path = "../util/bloom" }
@@ -72,12 +71,10 @@ vms =              { path = "../vms" }
 logger =           { path = "../util/logger" }
 aion-types =       { path = "../util/aion-types" }
 db =               { path = "../db/core" }
-types =     { path = "../types" }
 avm_abi =   { path = "../util/avm_abi" }
 
 
 [features]
-evm-debug = ["slow-blocks"]
 slow-blocks = [] # Use SLOW_TX_DURATION="50" (compile time!) to track transactions over 50ms
 json-tests = []
 test-heavy = []

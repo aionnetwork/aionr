@@ -21,31 +21,39 @@
 
 mod event;
 mod handler;
-mod action;
+mod route;
 mod storage;
 
+use std::collections::BTreeMap;
+use std::ops::Index;
+use std::sync::Arc;
+use std::time::{Duration, Instant, SystemTime};
+use rustc_hex::ToHex;
 use client::{BlockChainClient, BlockId, BlockStatus, ChainNotify};
 use transaction::UnverifiedTransaction;
 use aion_types::H256;
 use futures::{Future, Stream};
 use rlp::UntrustedRlp;
-use std::collections::BTreeMap;
-use std::ops::Index;
-use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
-use p2p::handlers::DefaultHandler;
-use p2p::*;
-
-use self::action::SyncAction;
+use p2p::handler::external::DefaultHandler;
+use p2p::HANDSHAKE_DONE;
+use p2p::CONNECTED;
+use p2p::ALIVE;
+use p2p::P2pMgr;
+use p2p::NetManager;
+use p2p::Node;
+use p2p::Mode;
+use p2p::ChannelBuffer;
+use p2p::NetworkConfig;
+use self::route::VERSION;
+use self::route::ACTION;
 use self::handler::blocks_bodies_handler::BlockBodiesHandler;
 use self::handler::blocks_headers_handler::BlockHeadersHandler;
 use self::handler::broadcast_handler::BroadcastsHandler;
 use self::handler::import_handler::ImportHandler;
 use self::handler::status_handler::StatusHandler;
 use self::storage::{ActivePeerInfo, PeerInfo, SyncState, SyncStatus, SyncStorage, TransactionStats};
-use rustc_hex::ToHex;
 
 const STATUS_REQ_INTERVAL: u64 = 2;
 const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
@@ -271,55 +279,45 @@ impl SyncMgr {
             return;
         }
 
-        match Version::from(req.head.ver) {
-            Version::V0 => {
-                trace!(target: "sync", "Ver 0 package received.");
-
-                match Control::from(req.head.ctrl) {
-                    Control::NET => {}
-                    Control::SYNC => {
-                        trace!(target: "sync", "P2P message received.");
-
-                        match SyncAction::from(req.head.action) {
-                            SyncAction::STATUSREQ => {
-                                StatusHandler::handle_status_req(node);
-                            }
-                            SyncAction::STATUSRES => {
-                                StatusHandler::handle_status_res(node, req);
-                            }
-                            SyncAction::BLOCKSHEADERSREQ => {
-                                BlockHeadersHandler::handle_blocks_headers_req(node, req);
-                            }
-                            SyncAction::BLOCKSHEADERSRES => {
-                                BlockHeadersHandler::handle_blocks_headers_res(node, req);
-                            }
-                            SyncAction::BLOCKSBODIESREQ => {
-                                BlockBodiesHandler::handle_blocks_bodies_req(node, req);
-                            }
-                            SyncAction::BLOCKSBODIESRES => {
-                                BlockBodiesHandler::handle_blocks_bodies_res(node, req);
-                            }
-                            SyncAction::BROADCASTTX => {
-                                BroadcastsHandler::handle_broadcast_tx(node, req);
-                            }
-                            SyncAction::BROADCASTBLOCK => {
-                                BroadcastsHandler::handle_broadcast_block(node, req);
-                            }
-                            _ => {
-                                trace!(target: "sync", "UNKNOWN received.");
-                            }
-                        }
+        match VERSION::from(req.head.ver) {
+            VERSION::V0 => {
+                trace!(target: "sync", "version {0} module {1} action{2}",
+                    req.head.ver,
+                    req.head.ctrl,
+                    req.head.action
+                );
+                match ACTION::from(req.head.action) {
+                    ACTION::STATUSREQ => {
+                        StatusHandler::handle_status_req(node);
+                    }
+                    ACTION::STATUSRES => {
+                        StatusHandler::handle_status_res(node, req);
+                    }
+                    ACTION::BLOCKSHEADERSREQ => {
+                        BlockHeadersHandler::handle_blocks_headers_req(node, req);
+                    }
+                    ACTION::BLOCKSHEADERSRES => {
+                        BlockHeadersHandler::handle_blocks_headers_res(node, req);
+                    }
+                    ACTION::BLOCKSBODIESREQ => {
+                        BlockBodiesHandler::handle_blocks_bodies_req(node, req);
+                    }
+                    ACTION::BLOCKSBODIESRES => {
+                        BlockBodiesHandler::handle_blocks_bodies_res(node, req);
+                    }
+                    ACTION::BROADCASTTX => {
+                        BroadcastsHandler::handle_broadcast_tx(node, req);
+                    }
+                    ACTION::BROADCASTBLOCK => {
+                        BroadcastsHandler::handle_broadcast_block(node, req);
                     }
                     _ => {
-                        error!(target: "sync", "Invalid message received: {}", req.head);
+                        trace!(target: "sync", "UNKNOWN received.");
                     }
                 }
             }
-            Version::V1 => {
+            VERSION::V1 => {
                 trace!(target: "sync", "Ver 1 package received.");
-            }
-            _ => {
-                error!(target: "sync", "Invalid Version.");
             }
         };
     }

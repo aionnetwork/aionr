@@ -19,21 +19,22 @@
  *
  ******************************************************************************/
 
+use std::sync::Arc;
+use std::thread;
+use std::time::{Duration, SystemTime};
 use client::{BlockChainClient, BlockId, BlockImportError};
 use error::{BlockError, ImportError};
-use header::Header as BlockHeader;
+use header::Header;
 use transaction::UnverifiedTransaction;
 use aion_types::H256;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
-use std::sync::Arc;
-use std::thread;
-use std::time::{Duration, SystemTime};
-
-use super::super::action::SyncAction;
+use sync::route::VERSION;
+use sync::route::MODULE;
+use sync::route::ACTION;
+use p2p::*;
 use super::super::event::SyncEvent;
 use super::super::storage::SyncStorage;
-use p2p::*;
 
 const MAX_NEW_BLOCK_AGE: u64 = 20;
 
@@ -59,9 +60,9 @@ impl BroadcastsHandler {
 
         if active_nodes.len() > 0 {
             let mut req = ChannelBuffer::new();
-            req.head.ver = Version::V0.value();
-            req.head.ctrl = Control::SYNC.value();
-            req.head.action = SyncAction::BROADCASTTX.value();
+            req.head.ver = VERSION::V0.value();
+            req.head.ctrl = MODULE::SYNC.value();
+            req.head.action = ACTION::BROADCASTTX.value();
 
             let mut txs_rlp = RlpStream::new_list(size);
             txs_rlp.append_raw(transactions.as_slice(), size);
@@ -90,9 +91,9 @@ impl BroadcastsHandler {
 
         if active_nodes.len() > 0 {
             let mut req = ChannelBuffer::new();
-            req.head.ver = Version::V0.value();
-            req.head.ctrl = Control::SYNC.value();
-            req.head.action = SyncAction::BROADCASTBLOCK.value();
+            req.head.ver = VERSION::V0.value();
+            req.head.ctrl = MODULE::SYNC.value();
+            req.head.action = ACTION::BROADCASTBLOCK.value();
 
             if let Some(block_rlp) = client.block(BlockId::Hash(block_hash.clone())) {
                 req.body.put_slice(&block_rlp.into_inner());
@@ -110,8 +111,7 @@ impl BroadcastsHandler {
     pub fn handle_broadcast_block(node: &mut Node, req: ChannelBuffer) {
         trace!(target: "sync", "BROADCASTBLOCK received.");
 
-        if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number()
-        {
+        if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number() {
             // Ignore BROADCASTBLOCK message until full synced
             trace!(target: "sync", "Syncing..., ignore BROADCASTBLOCK message.");
             return;
@@ -120,7 +120,7 @@ impl BroadcastsHandler {
         let block_rlp = UntrustedRlp::new(req.body.as_slice());
         if let Ok(header_rlp) = block_rlp.at(0) {
             if let Ok(h) = header_rlp.as_val() {
-                let header: BlockHeader = h;
+                let header: Header = h;
                 let last_imported_number = SyncStorage::get_synced_block_number();
                 let hash = header.hash();
 

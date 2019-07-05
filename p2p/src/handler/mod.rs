@@ -1,5 +1,4 @@
 /*******************************************************************************
- * Copyright (c) 2015-2018 Parity Technologies (UK) Ltd.
  * Copyright (c) 2018-2019 Aion foundation.
  *
  *     This file is part of the aion network project.
@@ -20,15 +19,6 @@
  *
  ******************************************************************************/
 
-#![warn(unused_extern_crates)]
-
-extern crate types;
-
-use types::vm::EnvInfo;
-use std::convert::Into;
-
-#[test]
-fn it_can_be_created_as_default() {
-    let default_env_info = EnvInfo::default();
-    assert_eq!(default_env_info.difficulty, 0.into());
-}
+pub mod active_nodes;
+pub mod handshake;
+pub mod external;

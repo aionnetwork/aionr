@@ -19,39 +19,18 @@
  *
  ******************************************************************************/
 
-use route::VERSION;
-use route::MODULE;
+/// call back registered for upper layer modules which use p2p module
+use ChannelBuffer;
+use Node;
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Head {
-    pub ver: u16,
-    pub ctrl: u8,
-    pub action: u8,
-    pub len: u32,
+pub type Callback = fn(node: &mut Node, cb: ChannelBuffer);
+
+#[derive(Clone, Copy)]
+pub struct DefaultHandler {
+    pub callback: Callback,
 }
 
-impl Head {
-    pub fn new() -> Head {
-        Head {
-            ver: VERSION::V2.value(),
-            ctrl: MODULE::P2P.value(),
-            action: 0xFF,
-            len: 0,
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ChannelBuffer {
-    pub head: Head,
-    pub body: Vec<u8>,
-}
-
-impl ChannelBuffer {
-    pub fn new() -> ChannelBuffer {
-        ChannelBuffer {
-            head: Head::new(),
-            body: Vec::new(),
-        }
-    }
+impl DefaultHandler {
+    pub fn set_callback(&mut self, c: Callback) { self.callback = c; }
+    pub fn handle(&self, node: &mut Node, cb: ChannelBuffer) { (self.callback)(node, cb); }
 }

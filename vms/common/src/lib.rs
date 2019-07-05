@@ -28,6 +28,9 @@ extern crate blake2b;
 pub mod traits;
 pub mod avm;
 
+#[cfg(test)]
+mod test;
+
 mod fvm;
 
 pub use fvm::*;

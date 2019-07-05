@@ -26,7 +26,6 @@ use views::BlockView;
 use aion_types::{H256, U256};
 
 use p2p::{Mode, P2pMgr};
-
 use super::super::storage::SyncStorage;
 pub struct ImportHandler;
 use super::blocks_headers_handler::BlockHeadersHandler;
