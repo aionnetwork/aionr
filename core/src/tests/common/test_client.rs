@@ -24,7 +24,7 @@
 
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrder};
 use std::sync::Arc;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{HashMap};
 use std::mem;
 use std::time::Duration;
 use itertools::Itertools;
@@ -66,7 +66,7 @@ use state_db::StateDB;
 use encoded;
 use kvdb::{KeyValueDB, MemoryDBRepository};
 
-use super::super::transaction::UnverifiedTransaction;
+use transaction::UnverifiedTransaction;
 
 /// Test client.
 pub struct TestBlockChainClient {
@@ -847,7 +847,7 @@ impl ProvingBlockChainClient for TestBlockChainClient {
     fn epoch_signal(&self, _: H256) -> Option<Vec<u8>> { None }
 }
 
-impl super::traits::EngineClient for TestBlockChainClient {
+impl ::client::EngineClient for TestBlockChainClient {
     fn update_sealing(&self) { self.miner.update_sealing(self) }
 
     fn submit_seal(&self, block_hash: H256, seal: Vec<Bytes>) {

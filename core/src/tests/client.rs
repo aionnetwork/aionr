@@ -27,7 +27,6 @@ use client::{BlockChainClient, MiningBlockChainClient, Client, ClientConfig, Blo
 use state::{self, State, CleanupMode};
 use executive::Executive;
 use block::IsBlock;
-use super::*;
 use types::filter::Filter;
 use aion_types::{Address, U256};
 use kvdb::{DatabaseConfig, DbRepository, RepositoryConfig};
@@ -279,7 +278,7 @@ fn change_history_size() {
 
     {
         let client = Client::new(
-            ClientConfig::default(),
+            config,//ClientConfig::default(),
             &test_spec,
             client_db.clone(),
             Arc::new(Miner::with_spec(&test_spec)),

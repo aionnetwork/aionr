@@ -45,6 +45,7 @@ p2p =               { path = "p2p" }
 [dev-dependencies]
 pretty_assertions = "0.1"
 tempdir = "0.3"
+acore-test = { path = "core/tests" }
 
 [workspace]
 members = [

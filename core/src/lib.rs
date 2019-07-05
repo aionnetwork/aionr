@@ -145,4 +145,4 @@ pub use types::{
 pub use executive::contract_address;
 
 #[cfg(test)]
-use tests::helpers;
+use tests::common::helpers;

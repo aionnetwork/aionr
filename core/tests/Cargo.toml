@@ -4,5 +4,10 @@ name = "acore-test"
 version = "0.1.0"
 authors = ["Aion Foundation <admin@aion.network>"]
 
-[dependencies]
+[dev-dependencies]
 acore = { path = ".." }
+acore-io = { path = "../../util/io" }
+aion-types = { path = "../../util/aion-types"}
+db = { path = "../../db/core" }
+key = { path = "../../keystore/key" }
+tempdir = "*"
