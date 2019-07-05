@@ -2,7 +2,7 @@
 description = "Aion Blockchain client"
 name = "aion"
 # NOTE Make sure to update util/version/Cargo.toml as well
-version = "0.2.4"
+version = "0.2.5"
 license = "GPL-3.0"
 authors = ["Aion Foundation <admin@aion.network>"]
 
