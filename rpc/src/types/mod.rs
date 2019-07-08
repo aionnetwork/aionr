@@ -44,6 +44,19 @@ mod transaction;
 mod transaction_request;
 mod transaction_condition;
 mod mining;
+mod seed;
+mod signature;
+mod address;
+mod hash;
+
+pub use self::seed::Seed;
+pub use self::seed::BLANK_SEED;
+pub use self::signature::Signature;
+pub use self::signature::BLANK_SIGNATURE;
+pub use self::address::Address;
+pub use self::address::BLANK_ADDRESS;
+pub use self::hash::Hash;
+pub use self::hash::BLANK_HASH;
 
 pub use self::bytes::Bytes;
 pub use self::block::{Block, BlockTransactions, Header};
