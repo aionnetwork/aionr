@@ -26,8 +26,9 @@ use aion_types::H256;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use std::time::SystemTime;
-
-use super::super::action::SyncAction;
+use sync::route::VERSION;
+use sync::route::MODULE;
+use sync::route::ACTION;
 use super::super::event::SyncEvent;
 use super::super::storage::{BlocksWrapper, SyncStorage};
 use p2p::*;
@@ -41,9 +42,9 @@ pub struct BlockBodiesHandler;
 impl BlockBodiesHandler {
     pub fn send_blocks_bodies_req() {
         let mut req = ChannelBuffer::new();
-        req.head.ver = Version::V0.value();
-        req.head.ctrl = Control::SYNC.value();
-        req.head.action = SyncAction::BLOCKSBODIESREQ.value();
+        req.head.ver = VERSION::V0.value();
+        req.head.ctrl = MODULE::SYNC.value();
+        req.head.action = ACTION::BLOCKSBODIESREQ.value();
 
         let mut hws = Vec::new();
         if let Ok(mut downloaded_headers) = SyncStorage::get_downloaded_headers().try_lock() {
@@ -74,7 +75,7 @@ impl BlockBodiesHandler {
                     SyncStorage::get_headers_with_bodies_requested().lock()
                 {
                     if !headers_with_bodies_requested.contains_key(&hw.node_hash) {
-                        req.head.set_length(body_len as u32);
+                        req.head.len = body_len as u32;
 
                         P2pMgr::send(hw.node_hash, req);
 
@@ -96,9 +97,9 @@ impl BlockBodiesHandler {
         let mut res = ChannelBuffer::new();
         let node_hash = node.node_hash;
 
-        res.head.ver = Version::V0.value();
-        res.head.ctrl = Control::SYNC.value();
-        res.head.action = SyncAction::BLOCKSBODIESRES.value();
+        res.head.ver = VERSION::V0.value();
+        res.head.ctrl = MODULE::SYNC.value();
+        res.head.action = ACTION::BLOCKSBODIESRES.value();
 
         let mut res_body = Vec::new();
         let hash_count = req.body.len() / HASH_LEN;
@@ -127,7 +128,7 @@ impl BlockBodiesHandler {
         }
 
         res.body.put_slice(res_body.as_slice());
-        res.head.set_length(res.body.len() as u32);
+        res.head.len = res.body.len() as u32;
 
         SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
         P2pMgr::update_node(node_hash, node);

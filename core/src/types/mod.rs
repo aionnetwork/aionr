@@ -33,6 +33,9 @@ pub mod state_diff;
 pub mod tree_route;
 pub mod verification_queue_info;
 
+#[cfg(test)]
+mod test;
+
 /// Type for block number.
 pub type BlockNumber = u64;
 /// Type for header version.

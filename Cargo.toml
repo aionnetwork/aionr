@@ -2,7 +2,7 @@
 description = "aion network rust implementation"
 name = "aionr"
 # NOTE Make sure to update util/version/Cargo.toml as well
-version = "0.2.4"
+version = "0.2.5"
 license = "GPL-3.0"
 authors = ["aion foundation <admin@aion.network>"]
 
@@ -52,7 +52,6 @@ members = [
 "db/core",
 "db/journaldb",
 "json",
-"types",
 "keystore/key/cli",
 "keystore/keychain/cli",
 "rpc",
