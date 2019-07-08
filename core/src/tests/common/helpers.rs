@@ -465,13 +465,13 @@ pub struct TestNotify {
 impl ChainNotify for TestNotify {
     fn new_blocks(
         &self,
-        imported: Vec<H256>,
-        invalid: Vec<H256>,
-        enacted: Vec<H256>,
-        retracted: Vec<H256>,
-        sealed: Vec<H256>,
+        _imported: Vec<H256>,
+        _invalid: Vec<H256>,
+        _enacted: Vec<H256>,
+        _retracted: Vec<H256>,
+        _sealed: Vec<H256>,
         // Block bytes.
-        proposed: Vec<Bytes>,
-        duration: u64,) {unimplemented!()}
+        _proposed: Vec<Bytes>,
+        _duration: u64,) {unimplemented!()}
     fn broadcast(&self, data: Vec<u8>) { self.messages.write().push(data); }
 }

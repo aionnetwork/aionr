@@ -121,12 +121,8 @@ pub struct TestBlockChainClient {
 pub enum EachBlockWith {
     /// Plain block.
     Nothing,
-    /// Block with an uncle.
-    Uncle,
     /// Block with a transaction.
     Transaction,
-    /// Block with an uncle and transaction.
-    UncleAndTransaction,
 }
 
 impl Default for TestBlockChainClient {
@@ -236,7 +232,7 @@ impl TestBlockChainClient {
             header.set_gas_limit(U256::from(1_000_000));
             header.set_extra_data(self.extra_data.clone());
             let txs = match with {
-                EachBlockWith::Transaction | EachBlockWith::UncleAndTransaction => {
+                EachBlockWith::Transaction => {
                     let mut txs = RlpStream::new_list(1);
                     let keypair = generate_keypair();
                     // Update nonces value

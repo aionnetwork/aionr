@@ -26,6 +26,7 @@ fn make_aion_machine() -> EthereumMachine {
     EthereumMachine::regular(Default::default(), BTreeMap::new(), U256::zero())
 }
 
+
 #[test]
 fn test_contract_address() {
     let address = Address::from_slice(b"0f572e5295c57f15886f9b263e2f6d2d6c7b5ec6");

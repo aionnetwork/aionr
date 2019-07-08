@@ -20,18 +20,12 @@
  *
  ******************************************************************************/
 
-#![warn(unused_extern_crates)]
-
-extern crate acore;
-extern crate types;
-#[macro_use]
-extern crate macros;
 
 use std::collections::BTreeMap;
 use types::state_diff::StateDiff;
 use types::account_diff::{ AccountDiff, Diff };
-use acore::pod_account::{ PodAccount };
-use acore::pod_state::{ PodState, diff_pod };
+use pod_account::{ PodAccount };
+use pod_state::{ PodState, diff_pod };
 
 #[test]
 fn create_delete() {
@@ -41,7 +35,6 @@ fn create_delete() {
                 nonce: 0.into(),
                 code: Some(Vec::new()),
                 storage: map![],
-                storage_dword: map![],
             }
         ]);
     assert_eq!(
@@ -53,7 +46,6 @@ fn create_delete() {
                         nonce: Diff::Died(0.into()),
                         code: Diff::Died(vec![]),
                         storage: map![],
-                        storage_dword: map![],
                     }
                 ],
         }
@@ -67,7 +59,6 @@ fn create_delete() {
                         nonce: Diff::Born(0.into()),
                         code: Diff::Born(vec![]),
                         storage: map![],
-                        storage_dword: map![],
                     }
                 ],
         }
@@ -82,7 +73,6 @@ fn create_delete_with_unchanged() {
                 nonce: 0.into(),
                 code: Some(Vec::new()),
                 storage: map![],
-                storage_dword: map![],
             }
         ]);
     let b = PodState::from(map![
@@ -91,14 +81,12 @@ fn create_delete_with_unchanged() {
                 nonce: 0.into(),
                 code: Some(Vec::new()),
                 storage: map![],
-                storage_dword: map![],
             },
             2.into() => PodAccount {
                 balance: 69.into(),
                 nonce: 0.into(),
                 code: Some(Vec::new()),
                 storage: map![],
-                storage_dword: map![],
             }
         ]);
     assert_eq!(
@@ -110,7 +98,6 @@ fn create_delete_with_unchanged() {
                         nonce: Diff::Born(0.into()),
                         code: Diff::Born(vec![]),
                         storage: map![],
-                        storage_dword: map![],
                     }
                 ],
         }
@@ -124,7 +111,6 @@ fn create_delete_with_unchanged() {
                         nonce: Diff::Died(0.into()),
                         code: Diff::Died(vec![]),
                         storage: map![],
-                        storage_dword: map![],
                     }
                 ],
         }
@@ -139,14 +125,12 @@ fn change_with_unchanged() {
                 nonce: 0.into(),
                 code: Some(Vec::new()),
                 storage: map![],
-                storage_dword: map![],
             },
             2.into() => PodAccount {
                 balance: 69.into(),
                 nonce: 0.into(),
                 code: Some(Vec::new()),
                 storage: map![],
-                storage_dword: map![],
             }
         ]);
     let b = PodState::from(map![
@@ -155,14 +139,12 @@ fn change_with_unchanged() {
                 nonce: 1.into(),
                 code: Some(Vec::new()),
                 storage: map![],
-                storage_dword: map![],
             },
             2.into() => PodAccount {
                 balance: 69.into(),
                 nonce: 0.into(),
                 code: Some(Vec::new()),
                 storage: map![],
-                storage_dword: map![],
             }
         ]);
     assert_eq!(
@@ -174,7 +156,6 @@ fn change_with_unchanged() {
                         nonce: Diff::Changed(0.into(), 1.into()),
                         code: Diff::Same,
                         storage: map![],
-                        storage_dword: map![],
                     }
                 ],
         }
