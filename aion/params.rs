@@ -130,6 +130,7 @@ impl Default for AccountsConfig {
 #[derive(Debug, PartialEq)]
 pub struct MinerExtras {
     pub author: Address,
+    pub author_pos: Address,
     pub extra_data: Vec<u8>,
     pub gas_floor_target: U256,
     pub gas_ceil_target: U256,
@@ -139,6 +140,7 @@ impl Default for MinerExtras {
     fn default() -> Self {
         MinerExtras {
             author: Default::default(),
+            author_pos: Default::default(),
             extra_data: "AION".as_bytes().to_vec(),
             gas_floor_target: U256::from(15_000_000),
             gas_ceil_target: U256::from(20_000_000),

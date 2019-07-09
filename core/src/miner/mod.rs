@@ -46,8 +46,14 @@ pub trait MinerService: Send + Sync {
     /// Get the author that we will seal blocks as.
     fn author(&self) -> Address;
 
+    /// Get the PoS author that will seal PoS blocks.
+    fn author_pos(&self) -> Address;
+
     /// Set the author that we will seal blocks as.
     fn set_author(&self, author: Address);
+
+    /// Set the PoS author that will seal PoS blocks.
+    fn set_author_pos(&self, author: Address);
 
     /// Get the extra_data that we will seal blocks with.
     fn extra_data(&self) -> Bytes;

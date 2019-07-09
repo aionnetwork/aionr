@@ -1096,6 +1096,11 @@ impl BlockChainClient for Client {
         Self::block_hash(&chain, &self.miner, id).and_then(|hash| chain.block_header_data(&hash))
     }
 
+    fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header> {
+        let chain = self.chain.read();
+        chain.block_header_data(hash)
+    }
+
     fn block_number(&self, id: BlockId) -> Option<BlockNumber> { self.block_number_ref(&id) }
 
     fn block_body(&self, id: BlockId) -> Option<encoded::Body> {

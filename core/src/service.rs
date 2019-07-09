@@ -32,7 +32,7 @@ use tokio::timer::Interval;
 use tokio::prelude::{Future, Stream};
 use ansi_term::Colour;
 use acore_bytes::Bytes;
-use client::{ChainNotify, Client, ClientConfig, MiningBlockChainClient};
+use client::{ChainNotify, Client, ClientConfig};
 use db;
 use error::*;
 use io::*;
@@ -60,11 +60,30 @@ pub enum ClientIoMessage {
 /// Run the miner
 pub fn run_miner(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
     let (close, shutdown_signal) = oneshot::channel();
-    let seal_block_task = Interval::new(Instant::now(), client.prepare_block_interval())
-        // let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(5))
+    let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(1))
         .for_each(move |_| {
             let client: Arc<Client> = client.clone();
             client.miner().try_prepare_block(&*client, false);
+            Ok(())
+        })
+        .map_err(|e| panic!("interval err: {:?}", e))
+        .select(shutdown_signal.map_err(|_| {}))
+        .map(|_| ())
+        .map_err(|_| ());
+    executor.spawn(seal_block_task);
+    close
+}
+
+/// Run the internal staker to generate PoS block
+pub fn run_staker(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
+    let (close, shutdown_signal) = oneshot::channel();
+    let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(1))
+        .for_each(move |_| {
+            let client: Arc<Client> = client.clone();
+            client
+                .miner()
+                .try_prepare_block_pos(&*client, false)
+                .map_err(|e| panic!("pos block generation err: {:?}", e))?;
             Ok(())
         })
         .map_err(|e| panic!("interval err: {:?}", e))
@@ -287,7 +306,7 @@ impl IoHandler<ClientIoMessage> for ClientIoHandler {
                 debug!(target: "block", "ClientIoMessage::NewChainHead");
                 let client: Arc<Client> = self.client.clone();
                 client.miner().update_transaction_pool(&*client, true);
-                client.miner().try_prepare_block(&*client, true);
+                client.miner().try_prepare_block(&*client, true); // TODO: handle PoW and PoS better
             }
             _ => {} // ignore other messages
         }

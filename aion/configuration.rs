@@ -249,6 +249,7 @@ impl Configuration {
     fn miner_extras(&self) -> Result<MinerExtras, String> {
         let extras = MinerExtras {
             author: self.author()?,
+            author_pos: self.author_pos()?,
             extra_data: self.extra_data()?,
             gas_floor_target: to_u256(&self.args.arg_gas_floor_target)?,
             gas_ceil_target: to_u256(&self.args.arg_gas_cap)?,
@@ -258,6 +259,8 @@ impl Configuration {
     }
 
     fn author(&self) -> Result<Address, String> { to_address(self.args.arg_author.clone()) }
+
+    fn author_pos(&self) -> Result<Address, String> { to_address(self.args.arg_author_pos.clone()) }
 
     fn format(&self) -> Result<Option<DataFormat>, String> {
         match self

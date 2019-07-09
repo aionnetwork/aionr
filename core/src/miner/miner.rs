@@ -47,13 +47,14 @@ use transaction::{
     UnverifiedTransaction,
 };
 use using_queue::{GetAction, UsingQueue};
-use block::{ClosedBlock, IsBlock, Block};
+use block::{Block, IsBlock, ClosedBlock, SealedBlock};
 use client::{MiningBlockChainClient, BlockId, TransactionId};
-use header::{Header, BlockNumber};
+use header::{Header, BlockNumber, SealType};
 use io::IoChannel;
 use receipt::Receipt;
 use spec::Spec;
 use state::State;
+use rcrypto::ed25519;
 
 /// Different possible definitions for pending transaction set.
 #[derive(Debug, PartialEq)]
@@ -156,6 +157,8 @@ pub struct Miner {
     options: MinerOptions,
     gas_range_target: RwLock<(U256, U256)>,
     author: RwLock<Address>,
+    // TOREMOVE: Unity MS1 use only.
+    author_pos: RwLock<Address>,
     extra_data: RwLock<Bytes>,
     engine: Arc<POWEquihashEngine>,
     accounts: Option<Arc<AccountProvider>>,
@@ -213,6 +216,84 @@ impl Miner {
             *self.next_allowed_reseal.lock() = Instant::now() + self.options.reseal_min_period;
             self.update_sealing(client);
         }
+    }
+
+    // TOREMOVE: Unity MS1 use only
+    /// Try to generate PoS block if minimum resealing duration is met
+    pub fn try_prepare_block_pos(
+        &self,
+        client: &MiningBlockChainClient,
+        is_forced: bool,
+    ) -> Result<(), Error>
+    {
+        if is_forced || self.tx_reseal_allowed() {
+            trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
+            // Set minimal next reseal time
+            *self.next_allowed_reseal.lock() = Instant::now() + self.options.reseal_min_period;
+
+            // 1. Create a block with transactions
+            let (raw_block, _): (ClosedBlock, Option<H256>) =
+                self.prepare_block(client, &Some(SealType::PoS));
+
+            // 2. Generate seed and signature
+            let bare_hash: H256 = raw_block.header().bare_hash();
+            let parent_hash: H256 = raw_block.header().parent_hash().to_owned();
+            // TODO: should be pos parent's seed, not direct parent
+            let parent_seed: Bytes = match client.block_header_data(&parent_hash) {
+                Some(header) => {
+                    let seed: Bytes = header
+                        .seal()
+                        .get(0)
+                        .expect("A pos block has to contain a seed")
+                        .to_owned();
+                    seed
+                }
+                None => Bytes::new(),
+            };
+            let key_pair: [u8; 64] = [0; 64]; // TODO: add a real staker private key in configuration
+            let seed = self.sign(&key_pair, &parent_seed);
+            let signature = self.sign(&key_pair, &bare_hash.0);
+
+            // 3. Seal the block
+            let mut seal: Vec<Bytes> = Vec::new();
+            seal.push(seed.to_vec());
+            seal.push(signature.to_vec());
+            let sealed_block: SealedBlock = raw_block
+                .lock()
+                .try_seal(&*self.engine, seal)
+                .or_else(|(e, _)| {
+                    warn!(target: "miner", "Staking seal rejected: {}", e);
+                    Err(Error::PosInvalid)
+                })?;
+
+            // Log
+            let n = sealed_block.header().number();
+            let d = sealed_block.header().difficulty().clone();
+            let h = sealed_block.header().hash();
+
+            // 4. Import block
+            client.import_sealed_block(sealed_block)?;
+
+            // Log
+            info!(target: "miner", "PoS block imported OK. #{}: {}, {}",
+                Colour::White.bold().paint(format!("{}", n)),
+                Colour::White.bold().paint(format!("{}", d)),
+                Colour::White.bold().paint(format!("{:x}", h)));
+        }
+        Ok(())
+    }
+
+    // TOREMOVE: Unity MS1 use only
+    // ed25519 sign
+    fn sign(&self, keypair: &[u8; 64], message: &[u8]) -> [u8; 96] {
+        let pk = &keypair[32..64];
+        let signature = ed25519::signature(message, keypair);
+
+        let mut result = [0u8; 96];
+        result[0..32].copy_from_slice(pk);
+        result[32..96].copy_from_slice(&signature);
+
+        result
     }
 
     /// Update transaction pool
@@ -282,6 +363,7 @@ impl Miner {
             }),
             gas_range_target: RwLock::new((U256::zero(), U256::zero())),
             author: RwLock::new(Address::default()),
+            author_pos: RwLock::new(Address::default()),
             extra_data: RwLock::new(Vec::new()),
             options,
             accounts,
@@ -299,7 +381,12 @@ impl Miner {
     }
 
     /// Prepares new block for sealing including top transactions from queue.
-    fn prepare_block(&self, client: &MiningBlockChainClient) -> (ClosedBlock, Option<H256>) {
+    fn prepare_block(
+        &self,
+        client: &MiningBlockChainClient,
+        seal_type: &Option<SealType>,
+    ) -> (ClosedBlock, Option<H256>)
+    {
         trace_time!("prepare_block");
         let chain_info = client.chain_info();
         let (transactions, mut open_block, original_work_hash) = {
@@ -328,8 +415,12 @@ impl Miner {
                 None => {
                     // block not found - create it.
                     trace!(target: "block", "prepare_block: No existing work - making new block");
+                    let author: Address = match seal_type {
+                        Some(SealType::PoS) => self.author_pos(),
+                        _ => self.author(),
+                    };
                     client.prepare_open_block(
-                        self.author(),
+                        author,
                         (self.gas_floor_target(), self.gas_ceil_target()),
                         self.extra_data(),
                     )
@@ -505,7 +596,12 @@ impl Miner {
     }
 
     /// Returns true if we had to prepare new pending block.
-    fn prepare_work_sealing(&self, client: &MiningBlockChainClient) -> bool {
+    fn prepare_work_sealing(
+        &self,
+        client: &MiningBlockChainClient,
+        seal_type: &Option<SealType>,
+    ) -> bool
+    {
         trace!(target: "block", "prepare_work_sealing: entering");
         let prepare_new = {
             let mut sealing_work = self.sealing_work.lock();
@@ -519,7 +615,7 @@ impl Miner {
             }
         };
         if prepare_new {
-            let (block, original_work_hash) = self.prepare_block(client);
+            let (block, original_work_hash) = self.prepare_block(client, seal_type);
             self.prepare_work(block, original_work_hash);
         }
         let mut sealing_block_last_request = self.sealing_block_last_request.lock();
@@ -727,6 +823,8 @@ impl MinerService for Miner {
 
     fn set_author(&self, author: Address) { *self.author.write() = author; }
 
+    fn set_author_pos(&self, author: Address) { *self.author_pos.write() = author; }
+
     fn set_extra_data(&self, extra_data: Bytes) { *self.extra_data.write() = extra_data; }
 
     /// Set the gas limit we wish to target when sealing a new block.
@@ -754,6 +852,9 @@ impl MinerService for Miner {
 
     /// Get the author that we will seal blocks as.
     fn author(&self) -> Address { *self.author.read() }
+
+    /// Get the PoS author that we will seal PoS blocks.
+    fn author_pos(&self) -> Address { *self.author_pos.read() }
 
     /// Get the extra_data that we will seal blocks with.
     fn extra_data(&self) -> Bytes { self.extra_data.read().clone() }
@@ -1026,7 +1127,7 @@ impl MinerService for Miner {
         trace!(target: "block", "update_sealing: best_block: {:?}", client.chain_info().best_block_number);
         if self.requires_reseal(client.chain_info().best_block_number) {
             trace!(target: "block", "update_sealing: preparing a block");
-            let (block, original_work_hash) = self.prepare_block(client);
+            let (block, original_work_hash) = self.prepare_block(client, &Some(SealType::PoW));
             self.prepare_work(block, original_work_hash)
         }
     }
@@ -1038,7 +1139,7 @@ impl MinerService for Miner {
     fn map_sealing_work<F, T>(&self, client: &MiningBlockChainClient, f: F) -> Option<T>
     where F: FnOnce(&ClosedBlock) -> T {
         trace!(target: "miner", "map_sealing_work: entering");
-        self.prepare_work_sealing(client);
+        self.prepare_work_sealing(client, &None); // TODO: handle PoW and PoS better
         trace!(target: "miner", "map_sealing_work: sealing prepared");
         let mut sealing_work = self.sealing_work.lock();
         let ret = sealing_work.queue.use_last_ref();

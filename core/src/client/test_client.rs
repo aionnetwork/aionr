@@ -600,6 +600,11 @@ impl BlockChainClient for TestBlockChainClient {
             .map(encoded::Header::new)
     }
 
+    fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header> {
+        let chain = self.chain.read();
+        chain.block_header_data(hash)
+    }
+
     fn block_number(&self, _id: BlockId) -> Option<BlockNumber> { unimplemented!() }
 
     fn block_body(&self, id: BlockId) -> Option<encoded::Body> {
@@ -848,7 +853,7 @@ impl ProvingBlockChainClient for TestBlockChainClient {
 }
 
 impl super::traits::EngineClient for TestBlockChainClient {
-    fn update_sealing(&self) { self.miner.update_sealing(self) }
+    fn update_sealing(&self) { self.miner.update_sealing(self, None) }
 
     fn submit_seal(&self, block_hash: H256, seal: Vec<Bytes>) {
         if self.miner.submit_seal(self, block_hash, seal).is_err() {

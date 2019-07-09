@@ -183,7 +183,7 @@ fn internal_seals_without_work() {
             .is_ok()
     );
     miner.update_transaction_pool(&*client, true);
-    miner.update_sealing(&*client);
+    miner.update_sealing(&*client, None);
     client.flush_queue();
     assert!(miner.pending_block(0).is_none());
     assert_eq!(client.chain_info().best_block_number, 3 as BlockNumber);
@@ -197,7 +197,7 @@ fn internal_seals_without_work() {
             .is_ok()
     );
     miner.update_transaction_pool(&*client, true);
-    miner.update_sealing(&*client);
+    miner.update_sealing(&*client, None);
     client.flush_queue();
     assert!(miner.pending_block(0).is_none());
     assert_eq!(client.chain_info().best_block_number, 4 as BlockNumber);

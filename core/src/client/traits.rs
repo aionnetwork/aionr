@@ -53,6 +53,9 @@ pub trait BlockChainClient: Sync + Send {
     /// Get raw block header data by block id.
     fn block_header(&self, id: BlockId) -> Option<encoded::Header>;
 
+    /// Get raw block header data by block hash.
+    fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header>;
+
     /// Look up the block number for the given block ID.
     fn block_number(&self, id: BlockId) -> Option<BlockNumber>;
 

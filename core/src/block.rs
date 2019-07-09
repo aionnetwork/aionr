@@ -603,6 +603,8 @@ impl LockedBlock {
                 })
             }
         }
+
+        // TODO: handle PoS validation
     }
 }
 
