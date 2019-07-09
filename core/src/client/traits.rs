@@ -42,8 +42,8 @@ use kvdb::DBValue;
 
 use types::ids::*;
 use types::call_analytics::CallAnalytics;
-use types::blockchain_info::BlockChainInfo;
-use types::block_status::BlockStatus;
+use types::blockchain::info::BlockChainInfo;
+use types::block::status::BlockStatus;
 use types::pruning_info::PruningInfo;
 
 use super::super::transaction::UnverifiedTransaction;
@@ -331,13 +331,6 @@ pub trait EngineClient: Sync + Send {
     /// Broadcast a consensus message to the network.
     fn broadcast_consensus_message(&self, message: Bytes);
 
-    /// Get the transition to the epoch the given parent hash is part of
-    /// or transitions to.
-    /// This will give the epoch that any children of this parent belong to.
-    ///
-    /// The block corresponding the the parent hash must be stored already.
-    fn epoch_transition_for(&self, parent_hash: H256) -> Option<::engines::EpochTransition>;
-
     /// Get block chain info.
     fn chain_info(&self) -> BlockChainInfo;
 
@@ -373,6 +366,6 @@ pub trait ProvingBlockChainClient: BlockChainClient {
         id: BlockId,
     ) -> Option<(Bytes, Vec<DBValue>)>;
 
-    /// Get an epoch change signal by block hash.
-    fn epoch_signal(&self, hash: H256) -> Option<Vec<u8>>;
+    // Get an epoch change signal by block hash.
+    // fn epoch_signal(&self, hash: H256) -> Option<Vec<u8>>;
 }

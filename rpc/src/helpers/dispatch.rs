@@ -26,7 +26,7 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use acore::account_provider::AccountProvider;
+use acore::account_provider::{AccountProvider, AccountToken};
 use acore::client::MiningBlockChainClient;
 use acore::miner::MinerService;
 use acore::transaction::{Action, PendingTransaction, SignedTransaction, Transaction};
@@ -360,9 +360,6 @@ impl Future for ProspectiveSigner {
         }
     }
 }
-
-/// Single-use account token.
-pub type AccountToken = String;
 
 /// Values used to unlock accounts for signing.
 #[derive(Debug, Clone, PartialEq)]

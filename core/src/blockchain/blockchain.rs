@@ -40,19 +40,21 @@ use views::*;
 use log_entry::{LogEntry, LocalizedLogEntry};
 use receipt::Receipt;
 use blooms::{BloomGroup, GroupPosition};
-use blockchain::best_block::{BestBlock, BestAncientBlock};
-use blockchain::block_info::{BlockInfo, BlockLocation, BranchBecomingCanonChainData};
-use blockchain::extras::{
-    BlockReceipts, BlockDetails, TransactionAddress, EPOCH_KEY_PREFIX, EpochTransitions,
+use types::blockchain::best_block::{BestBlock, BestAncientBlock};
+use types::block::info::{BlockInfo, BlockLocation, BranchBecomingCanonChainData};
+use types::blockchain::extra::{
+    BlockReceipts, BlockDetails, TransactionAddress,
 };
-use types::blockchain_info::BlockChainInfo;
-use types::tree_route::TreeRoute;
-use blockchain::update::ExtrasUpdate;
-use blockchain::{CacheSize, ImportRoute, Config};
+use types::blockchain::info::BlockChainInfo;
+use types::blockchain::tree_route::TreeRoute;
+use types::block::extra_update::ExtrasUpdate;
+use types::blockchain::config::Config;
+use types::blockchain::cache::CacheSize;
+use types::blockchain::import_route::ImportRoute;
 use db::{self, Writable, Readable, CacheUpdatePolicy};
 use cache_manager::CacheManager;
 use encoded;
-use engines::epoch::{Transition as EpochTransition, PendingTransition as PendingEpochTransition};
+// use engines::epoch::{PendingTransition as PendingEpochTransition};
 use rayon::prelude::*;
 use ansi_term::Colour;
 use kvdb::{DBTransaction, KeyValueDB};
@@ -498,71 +500,23 @@ impl BlockProvider for BlockChain {
 }
 
 /// An iterator which walks the blockchain towards the genesis.
+#[cfg(test)]
 #[derive(Clone)]
 pub struct AncestryIter<'a> {
     current: H256,
     chain: &'a BlockChain,
 }
 
+#[cfg(test)]
 impl<'a> Iterator for AncestryIter<'a> {
     type Item = H256;
-    fn next(&mut self) -> Option<H256> {
+    fn next(&mut self) -> Option<Self::Item> {
         if self.current.is_zero() {
             None
         } else {
             self.chain
                 .block_details(&self.current)
                 .map(|details| mem::replace(&mut self.current, details.parent))
-        }
-    }
-}
-
-/// An iterator which walks all epoch transitions.
-/// Returns epoch transitions.
-pub struct EpochTransitionIter<'a> {
-    chain: &'a BlockChain,
-    prefix_iter: Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)> + 'a>,
-}
-
-impl<'a> Iterator for EpochTransitionIter<'a> {
-    type Item = (u64, EpochTransition);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        loop {
-            match self.prefix_iter.next() {
-                Some((key, val)) => {
-                    // iterator may continue beyond values beginning with this
-                    // prefix.
-                    if !key.starts_with(&EPOCH_KEY_PREFIX[..]) {
-                        return None;
-                    }
-
-                    let transitions: EpochTransitions = ::rlp::decode(&val[..]);
-
-                    // if there are multiple candidates, at most one will be on the
-                    // canon chain.
-                    for transition in transitions.candidates.into_iter() {
-                        let is_in_canon_chain = self
-                            .chain
-                            .block_hash(transition.block_number)
-                            .map_or(false, |hash| hash == transition.block_hash);
-
-                        // if the transition is within the block gap, there will only be
-                        // one candidate.
-                        let is_ancient = self
-                            .chain
-                            .first_block_number()
-                            .map_or(false, |first| first > transition.block_number);
-
-                        if is_ancient || is_in_canon_chain {
-                            return Some((transitions.number, transition));
-                        }
-                    }
-
-                    // some epochs never occurred on the main chain.
-                }
-                None => return None,
-            }
         }
     }
 }
@@ -942,106 +896,6 @@ impl BlockChain {
         }
     }
 
-    /// Insert an epoch transition. Provide an epoch number being transitioned to
-    /// and epoch transition object.
-    ///
-    /// The block the transition occurred at should have already been inserted into the chain.
-    pub fn insert_epoch_transition(
-        &self,
-        batch: &mut DBTransaction,
-        epoch_num: u64,
-        transition: EpochTransition,
-    )
-    {
-        let mut transitions = match self.db.read(db::COL_EXTRA, &epoch_num) {
-            Some(existing) => existing,
-            None => {
-                EpochTransitions {
-                    number: epoch_num,
-                    candidates: Vec::with_capacity(1),
-                }
-            }
-        };
-
-        // ensure we don't write any duplicates.
-        if transitions
-            .candidates
-            .iter()
-            .find(|c| c.block_hash == transition.block_hash)
-            .is_none()
-        {
-            transitions.candidates.push(transition);
-            batch.write(db::COL_EXTRA, &epoch_num, &transitions);
-        }
-    }
-
-    /// Iterate over all epoch transitions.
-    /// This will only return transitions within the canonical chain.
-    pub fn epoch_transitions(&self) -> EpochTransitionIter {
-        let iter = self
-            .db
-            .iter_from_prefix(db::COL_EXTRA, &EPOCH_KEY_PREFIX[..]);
-        EpochTransitionIter {
-            chain: self,
-            prefix_iter: iter,
-        }
-    }
-
-    /// Get a specific epoch transition by block number and provided block hash.
-    pub fn epoch_transition(&self, block_num: u64, block_hash: H256) -> Option<EpochTransition> {
-        trace!(target: "blockchain", "Loading epoch transition at block {}, {}",
-            block_num, block_hash);
-
-        self.db
-            .read(db::COL_EXTRA, &block_num)
-            .and_then(|transitions: EpochTransitions| {
-                transitions
-                    .candidates
-                    .into_iter()
-                    .find(|c| c.block_hash == block_hash)
-            })
-    }
-
-    /// Get the transition to the epoch the given parent hash is part of
-    /// or transitions to.
-    /// This will give the epoch that any children of this parent belong to.
-    ///
-    /// The block corresponding the the parent hash must be stored already.
-    pub fn epoch_transition_for(&self, parent_hash: H256) -> Option<EpochTransition> {
-        // slow path: loop back block by block
-        for hash in self.ancestry_iter(parent_hash)? {
-            let details = self.block_details(&hash)?;
-
-            // look for transition in database.
-            if let Some(transition) = self.epoch_transition(details.number, hash) {
-                return Some(transition);
-            }
-
-            // canonical hash -> fast breakout:
-            // get the last epoch transition up to this block.
-            //
-            // if `block_hash` is canonical it will only return transitions up to
-            // the parent.
-            if self.block_hash(details.number)? == hash {
-                return self
-                    .epoch_transitions()
-                    .map(|(_, t)| t)
-                    .take_while(|t| t.block_number <= details.number)
-                    .last();
-            }
-        }
-
-        // should never happen as the loop will encounter genesis before concluding.
-        None
-    }
-
-    /// Get a pending epoch transition by block hash.
-    // TODO: implement removal safely: this can only be done upon finality of a block
-    // that _uses_ the pending transition.
-    pub fn get_pending_transition(&self, hash: H256) -> Option<PendingEpochTransition> {
-        self.db.read(db::COL_EXTRA, &hash)
-    }
-
     /// Inserts the block into backing cache database.
     /// Expects the block to be valid and already verified.
     /// If the block is already known, does nothing.
@@ -1289,6 +1143,7 @@ impl BlockChain {
     }
 
     /// Iterator that lists `first` and then all of `first`'s ancestors, by hash.
+    #[cfg(test)]
     pub fn ancestry_iter(&self, first: H256) -> Option<AncestryIter> {
         if self.is_known(&first) {
             Some(AncestryIter {

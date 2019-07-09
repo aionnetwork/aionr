@@ -24,7 +24,7 @@
 #[derive(Debug, PartialEq)]
 pub enum VERSION {
     V0,
-    V1
+    V1,
 }
 
 impl VERSION {

@@ -161,20 +161,25 @@ impl Default for Header {
 impl Header {
     /// Create a new, default-valued, header.
     pub fn new() -> Self { Self::default() }
+
     /// Get version field of the header
     pub fn version(&self) -> HeaderVersion { self.version }
 
     /// Get the parent_hash field of the header.
     pub fn parent_hash(&self) -> &H256 { &self.parent_hash }
+
     /// Get the timestamp field of the header.
     pub fn timestamp(&self) -> u64 { self.timestamp }
+
     /// Get the number field of the header.
     pub fn number(&self) -> BlockNumber { self.number }
+
     /// Get the author field of the header.
     pub fn author(&self) -> &Address { &self.author }
 
     /// Get the extra data field of the header.
     pub fn extra_data(&self) -> &Bytes { &self.extra_data }
+
     /// Get a mutable reference to extra_data
     pub fn extra_data_mut(&mut self) -> &mut Bytes {
         self.note_dirty();
@@ -183,14 +188,19 @@ impl Header {
 
     /// Get the state root field of the header.
     pub fn state_root(&self) -> &H256 { &self.state_root }
+
     /// Get the receipts root field of the header.
     pub fn receipts_root(&self) -> &H256 { &self.receipts_root }
+
     /// Get the log bloom field of the header.
     pub fn log_bloom(&self) -> &Bloom { &self.log_bloom }
+
     /// Get the transactions root field of the header.
     pub fn transactions_root(&self) -> &H256 { &self.transactions_root }
+
     /// Get the gas used field of the header.
     pub fn gas_used(&self) -> &U256 { &self.gas_used }
+
     /// Get the gas limit field of the header.
     pub fn gas_limit(&self) -> &U256 { &self.gas_limit }
 
@@ -227,41 +237,49 @@ impl Header {
         self.parent_hash = a;
         self.note_dirty();
     }
+
     /// Set the state root field of the header.
     pub fn set_state_root(&mut self, a: H256) {
         self.state_root = a;
         self.note_dirty();
     }
+
     /// Set the transactions root field of the header.
     pub fn set_transactions_root(&mut self, a: H256) {
         self.transactions_root = a;
         self.note_dirty()
     }
+
     /// Set the receipts root field of the header.
     pub fn set_receipts_root(&mut self, a: H256) {
         self.receipts_root = a;
         self.note_dirty()
     }
+
     /// Set the log bloom field of the header.
     pub fn set_log_bloom(&mut self, a: Bloom) {
         self.log_bloom = a;
         self.note_dirty()
     }
+
     /// Set the timestamp field of the header.
     pub fn set_timestamp(&mut self, a: u64) {
         self.timestamp = a;
         self.note_dirty();
     }
+
     /// Set the timestamp field of the header to the current time.
     pub fn set_timestamp_now(&mut self, but_later_than: u64) {
         self.timestamp = cmp::max(get_time().sec as u64, but_later_than + 1);
         self.note_dirty();
     }
+
     /// Set the number field of the header.
     pub fn set_number(&mut self, a: BlockNumber) {
         self.number = a;
         self.note_dirty();
     }
+
     /// Set the author field of the header.
     pub fn set_author(&mut self, a: Address) {
         if a != self.author {
@@ -283,6 +301,7 @@ impl Header {
         self.gas_used = a;
         self.note_dirty();
     }
+
     /// Set the gas limit field of the header.
     pub fn set_gas_limit(&mut self, a: U256) {
         self.gas_limit = a;
