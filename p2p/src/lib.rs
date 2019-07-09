@@ -46,6 +46,8 @@ mod states;
 mod msg;
 mod node;
 pub mod handler;
+#[cfg(test)]
+mod test;
 
 use std::fmt;
 use acore_bytes::to_hex;
