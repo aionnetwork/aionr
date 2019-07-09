@@ -28,7 +28,7 @@ use journaldb;
 use kvdb::CompactionProfile;
 
 pub use std::time::Duration;
-pub use blockchain::Config as BlockChainConfig;
+pub use types::blockchain::config::Config as BlockChainConfig;
 pub use vms::VMType;
 
 /// Client state db compaction profile

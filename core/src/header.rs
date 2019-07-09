@@ -301,7 +301,7 @@ impl Header {
         self.gas_used = a;
         self.note_dirty();
     }
-    
+
     /// Set the gas limit field of the header.
     pub fn set_gas_limit(&mut self, a: U256) {
         self.gas_limit = a;

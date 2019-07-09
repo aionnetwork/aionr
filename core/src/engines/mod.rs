@@ -22,17 +22,13 @@
 
 //! Consensus engine specification and basic implementations.
 pub mod pow_equihash_engine;
-pub mod epoch;
-
-pub use self::epoch::{EpochVerifier, Transition as EpochTransition};
 pub use self::pow_equihash_engine::POWEquihashEngine;
 
 use std::sync::Arc;
 use std::fmt;
-use error::Error;
 
 use aion_machine::{Machine, LocalizedMachine as Localized};
-use aion_types::{H256, Address};
+use aion_types::Address;
 use unexpected::{Mismatch, OutOfBounds};
 
 /// Voting errors.
@@ -97,26 +93,4 @@ pub enum Proof<M: Machine> {
     Known(Vec<u8>),
     /// State dependent proof.
     WithState(Arc<StateDependentProof<M>>),
-}
-
-/// Generated epoch verifier.
-pub enum ConstructedVerifier<'a, M: Machine> {
-    /// Fully trusted verifier.
-    Trusted(Box<EpochVerifier<M>>),
-    /// Verifier unconfirmed. Check whether given finality proof finalizes given hash
-    /// under previous epoch.
-    Unconfirmed(Box<EpochVerifier<M>>, &'a [u8], H256),
-    /// Error constructing verifier.
-    Err(Error),
-}
-
-impl<'a, M: Machine> ConstructedVerifier<'a, M> {
-    /// Convert to a result, indicating that any necessary confirmation has been done
-    /// already.
-    pub fn known_confirmed(self) -> Result<Box<EpochVerifier<M>>, Error> {
-        match self {
-            ConstructedVerifier::Trusted(v) | ConstructedVerifier::Unconfirmed(v, _, _) => Ok(v),
-            ConstructedVerifier::Err(e) => Err(e),
-        }
-    }
 }

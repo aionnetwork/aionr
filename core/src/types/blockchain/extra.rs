@@ -23,16 +23,13 @@
 //! Blockchain DB extras.
 
 use std::ops;
-use std::io::Write;
 use blooms::{GroupPosition, BloomGroup};
 use db::Key;
-use engines::epoch::{Transition as EpochTransition};
 use header::BlockNumber;
 use receipt::Receipt;
 
 use heapsize::HeapSizeOf;
 use aion_types::{H256, H264, U256};
-use kvdb::PREFIX_LEN as DB_PREFIX_LEN;
 
 /// Represents index of extra data in database
 #[derive(Copy, Debug, Hash, Eq, PartialEq, Clone)]
@@ -47,10 +44,6 @@ pub enum ExtrasIndex {
     BlocksBlooms = 3,
     /// Block receipts index
     BlockReceipts = 4,
-    /// Epoch transition data index.
-    EpochTransitions = 5,
-    /// Pending epoch transition data index.
-    PendingEpochTransition = 6,
 }
 
 fn with_index(hash: &H256, i: ExtrasIndex) -> H264 {
@@ -85,7 +78,7 @@ impl Key<H256> for BlockNumber {
 impl Key<BlockDetails> for H256 {
     type Target = H264;
 
-    fn key(&self) -> H264 { with_index(self, ExtrasIndex::BlockDetails) }
+    fn key(&self) -> Self::Target { with_index(self, ExtrasIndex::BlockDetails) }
 }
 
 pub struct LogGroupKey([u8; 6]);
@@ -121,54 +114,6 @@ impl Key<BlockReceipts> for H256 {
     type Target = H264;
 
     fn key(&self) -> H264 { with_index(self, ExtrasIndex::BlockReceipts) }
-}
-
-impl Key<::engines::epoch::PendingTransition> for H256 {
-    type Target = H264;
-
-    fn key(&self) -> H264 { with_index(self, ExtrasIndex::PendingEpochTransition) }
-}
-
-/// length of epoch keys.
-pub const EPOCH_KEY_LEN: usize = DB_PREFIX_LEN + 16;
-
-/// epoch key prefix.
-/// used to iterate over all epoch transitions in order from genesis.
-pub const EPOCH_KEY_PREFIX: &'static [u8; DB_PREFIX_LEN] = &[
-    ExtrasIndex::EpochTransitions as u8,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-    0,
-];
-
-pub struct EpochTransitionsKey([u8; EPOCH_KEY_LEN]);
-
-impl ops::Deref for EpochTransitionsKey {
-    type Target = [u8];
-
-    fn deref(&self) -> &[u8] { &self.0[..] }
-}
-
-impl Key<EpochTransitions> for u64 {
-    type Target = EpochTransitionsKey;
-
-    fn key(&self) -> Self::Target {
-        let mut arr = [0u8; EPOCH_KEY_LEN];
-        arr[..DB_PREFIX_LEN].copy_from_slice(&EPOCH_KEY_PREFIX[..]);
-
-        write!(&mut arr[DB_PREFIX_LEN..], "{:016x}", self)
-            .expect("format arg is valid; no more than 16 chars will be written; qed");
-
-        EpochTransitionsKey(arr)
-    }
 }
 
 /// Familial details concerning a block
@@ -217,13 +162,6 @@ impl BlockReceipts {
 
 impl HeapSizeOf for BlockReceipts {
     fn heap_size_of_children(&self) -> usize { self.receipts.heap_size_of_children() }
-}
-
-/// Candidate transitions to an epoch with specific number.
-#[derive(Clone, RlpEncodable, RlpDecodable)]
-pub struct EpochTransitions {
-    pub number: u64,
-    pub candidates: Vec<EpochTransition>,
 }
 
 #[cfg(test)]

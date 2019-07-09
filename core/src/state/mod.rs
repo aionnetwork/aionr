@@ -44,7 +44,7 @@ use pod_state::{self, PodState};
 use receipt::Receipt;
 use state_db::StateDB;
 use transaction::SignedTransaction;
-use types::state_diff::StateDiff;
+use types::state::state_diff::StateDiff;
 use vms::EnvInfo;
 
 use aion_types::{Address, H256, U256};

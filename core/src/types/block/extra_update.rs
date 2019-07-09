@@ -22,9 +22,10 @@
 use std::collections::HashMap;
 use aion_types::H256;
 use header::BlockNumber;
-use blockchain::block_info::BlockInfo;
-use blockchain::extras::{BlockDetails, BlockReceipts, TransactionAddress};
 use blooms::{BloomGroup, GroupPosition};
+
+use types::block::info::BlockInfo;
+use types::blockchain::extra::{BlockDetails, BlockReceipts, TransactionAddress};
 
 /// Block extras update info.
 pub struct ExtrasUpdate<'a> {
