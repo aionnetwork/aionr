@@ -1,5 +1,6 @@
-/// Only test the operation of docking with the database, public function will test in tests dir
-use super::{State,CleanupMode,AccType,AionVMAccount};
+/// tests the operation of docking with the database with `require` or `require_or_from`
+/// public function will test in tests dir
+use super::super::{State,CleanupMode,AccType,AionVMAccount};
 use std::sync::Arc;
 use aion_types::{Address, H256, U256};
 use helpers::{get_temp_state,get_temp_state_with_nonce};

@@ -31,6 +31,7 @@ pub mod transaction_queue;
 pub use self::error::Error;
 pub use self::transaction::*;
 
+
 /// Represents the result of importing transaction.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ImportResult {

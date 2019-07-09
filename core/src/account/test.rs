@@ -1,4 +1,4 @@
-use super::*;
+use account::{AionVMAccount,AccType,VMAccount};
 use kvdb::MemoryDB;
 use account_db::AccountDBMut;
 use aion_types::Address;

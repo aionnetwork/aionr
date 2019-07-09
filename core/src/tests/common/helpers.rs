@@ -39,8 +39,14 @@ use state_db::StateDB;
 use state::*;
 use std::sync::Arc;
 use kvdb::{MockDbRepository, DBTransaction, KeyValueDB, MemoryDBRepository};
+use machine::EthereumMachine;
+use std::collections::BTreeMap;
 use db;
 
+
+pub fn make_aion_machine() -> EthereumMachine {
+    EthereumMachine::regular(Default::default(), BTreeMap::new(), U256::zero())
+}
 
 // TODO: move everything over to get_null_spec.
 pub fn get_test_spec() -> Spec { Spec::new_test() }

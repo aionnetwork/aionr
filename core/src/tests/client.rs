@@ -177,6 +177,7 @@ fn returns_logs_with_limit() {
         to_block: BlockId::Latest,
         address: None,
         topics: vec![],
+        // TODO: with limit
         limit: None,
     });
     assert_eq!(logs.len(), 0);
@@ -232,6 +233,7 @@ fn can_handle_long_fork() {
     for _ in 0..400 {
         client.import_verified_blocks();
     }
+    // TODO: how to judge the first two
     assert_eq!(2000, client.chain_info().best_block_number);
 }
 

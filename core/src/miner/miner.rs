@@ -1125,7 +1125,6 @@ impl MinerService for Miner {
 
 #[cfg(test)]
 mod tests{
-//    use super::*;
     use io::IoChannel;
     use transaction::{SignedTransaction,PendingTransaction};
     use super::{MinerOptions,PendingSet,Banning};

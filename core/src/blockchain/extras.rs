@@ -225,6 +225,3 @@ pub struct EpochTransitions {
     pub number: u64,
     pub candidates: Vec<EpochTransition>,
 }
-
-#[cfg(test)]
-mod tests {}

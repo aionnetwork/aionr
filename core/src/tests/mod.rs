@@ -27,6 +27,7 @@ mod miner;
 mod pod_account;
 mod pod_state;
 mod state;
+mod externalities;
 
 pub mod common;
 
