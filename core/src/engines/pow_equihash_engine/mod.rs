@@ -43,7 +43,6 @@ use self::dependent_header_validators::{
 //    EnergyLimitValidator
 };
 use self::header_validators::{
-    VersionValidator,
 //    ExtraDataValidator,
     HeaderValidator,
     POWValidator,
@@ -341,7 +340,6 @@ impl POWEquihashEngine {
 
     pub fn validate_block_header(header: &Header) -> Result<(), Error> {
         let mut block_header_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(4);
-        block_header_validators.push(Box::new(VersionValidator {}));
         block_header_validators.push(Box::new(EnergyConsumedValidator {}));
         block_header_validators.push(Box::new(POWValidator {}));
 
@@ -356,7 +354,6 @@ impl POWEquihashEngine {
 
     pub fn verify_block_basic(&self, header: &Header) -> Result<(), Error> {
         let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(4);
-        cheap_validators.push(Box::new(VersionValidator {}));
         cheap_validators.push(Box::new(EnergyConsumedValidator {}));
         cheap_validators.push(Box::new(POWValidator {}));
 

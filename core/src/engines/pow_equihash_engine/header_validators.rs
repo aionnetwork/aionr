@@ -19,7 +19,7 @@
  *
  ******************************************************************************/
 
-use header::{Header, V1};
+use header::Header;
 use equihash::EquihashValidator;
 use blake2b::Blake2b;
 use aion_types::U256;
@@ -73,21 +73,6 @@ impl HeaderValidator for EnergyConsumedValidator {
                 min: None,
                 max: Some(gas_limit),
                 found: gas_used,
-            })
-            .into());
-        }
-        Ok(())
-    }
-}
-pub struct VersionValidator;
-impl HeaderValidator for VersionValidator {
-    fn validate(&self, header: &Header) -> Result<(), Error> {
-        let version = header.version();
-        if version != V1 {
-            error!(target: "equihash", "Invalid header version, found version {}, expected {}", version, V1);
-            return Err(BlockError::InvalidHeaderVersion(Mismatch {
-                expected: V1,
-                found: version,
             })
             .into());
         }

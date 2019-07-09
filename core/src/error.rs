@@ -42,8 +42,6 @@ pub use executed::{ExecutionError, CallError};
 #[derive(Debug, PartialEq, Clone, Copy, Eq)]
 /// Errors concerning block processing.
 pub enum BlockError {
-    /// Header version is invalid.
-    InvalidHeaderVersion(Mismatch<u8>),
     /// Solution is invalid.
     InvalidSolution,
     /// result is of an invalid length.
@@ -103,7 +101,6 @@ impl fmt::Display for BlockError {
         use self::BlockError::*;
 
         let msg = match *self {
-            InvalidHeaderVersion(ref mis) => format!("Invalid header version. {}", mis),
             InvalidSolution => format!("Invalid solution. "),
             ResultOutOfBounds(ref oob) => {
                 format!("Computed output violates boundary condition. {}", oob)

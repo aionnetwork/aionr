@@ -26,8 +26,7 @@ use acore_bytes::Bytes;
 use aion_types::{H256, U256, Address, to_u256};
 use ethbloom::Bloom;
 use blake2b::blake2b;
-use header::BlockNumber;
-use header::HeaderVersion;
+use header::{BlockNumber, SealType};
 use rlp::Rlp;
 
 /// View onto block header rlp.
@@ -56,8 +55,8 @@ impl<'a> HeaderView<'a> {
     /// Returns raw rlp.
     pub fn rlp(&self) -> &Rlp<'a> { &self.rlp }
 
-    /// Returns version.
-    pub fn version(&self) -> HeaderVersion { self.rlp.val_at(0) }
+    /// Returns seal type.
+    pub fn seal_type(&self) -> Option<SealType> { self.rlp.val_at(0) }
 
     /// Returns parent hash.
     pub fn parent_hash(&self) -> H256 { self.rlp.val_at(2) }

@@ -44,8 +44,9 @@ pub struct StratumHeader {
 
 #[derive(Default, Debug, Serialize)]
 pub struct SimpleHeader {
-    /// header version
-    pub version: String,
+    /// seal type
+    #[serde(rename = "sealType")]
+    pub seal_type: String,
     /// block number
     pub number: String,
     /// parent hash
@@ -84,7 +85,7 @@ pub struct SimpleHeader {
 impl From<Header> for SimpleHeader {
     fn from(h: Header) -> Self {
         SimpleHeader {
-            version: format!("{}", h.version()),
+            seal_type: format!("{}", h.seal_type().to_owned().unwrap_or_default()),
             number: format!("{:x}", h.number()),
             parent_hash: clean_0x(&format!("{:?}", h.parent_hash())).to_owned(),
             coin_base: clean_0x(&format!("{:?}", h.author())).to_owned(),
