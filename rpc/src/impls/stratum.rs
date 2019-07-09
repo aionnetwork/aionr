@@ -361,7 +361,14 @@ where
     }
 
     /// Pos submit work
-    fn pos_submit_work(&self, _seed: Seed, _address: Address, _signature: Signature, _hash: Hash) -> Result<bool> {
+    fn pos_submit_work(
+        &self,
+        _seed: Seed,
+        _address: Address,
+        _signature: Signature,
+        _hash: Hash,
+    ) -> Result<bool>
+    {
         // TODO: implement logic
         Ok(true)
     }

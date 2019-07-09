@@ -21,7 +21,6 @@
  ******************************************************************************/
 
 /// Address struct used for stratum pos
-
 use std::fmt;
 use rustc_hex::{ToHex, FromHex};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -30,19 +29,19 @@ use serde::de::{Error, Visitor};
 const LEN: usize = 32;
 
 pub const BLANK_ADDRESS: [u8; LEN] = [
-    0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
-    0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+    0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
+    0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
 ];
 
 pub struct Address(pub [u8; LEN]);
 
-impl Address{
+impl Address {
     pub fn new(bytes: [u8; LEN]) -> Address { Address(bytes) }
 }
 
 impl Serialize for Address {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer {
+    where S: Serializer {
         let mut serialized = "0x".to_owned();
         serialized.push_str(self.0.to_hex().as_ref());
         serializer.serialize_str(serialized.as_ref())
@@ -51,7 +50,7 @@ impl Serialize for Address {
 
 impl<'a> Deserialize<'a> for Address {
     fn deserialize<D>(deserializer: D) -> Result<Address, D::Error>
-        where D: Deserializer<'a> {
+    where D: Deserializer<'a> {
         deserializer.deserialize_any(AddressVisitor)
     }
 }
@@ -66,23 +65,24 @@ impl<'a> Visitor<'a> for AddressVisitor {
     }
 
     fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-        where E: Error {
+    where E: Error {
         if value.len() == (LEN + 1) * 2 && &value[0..2] == "0x" {
             let data = FromHex::from_hex(&value[2..]).unwrap();
             let mut res: [u8; LEN] = BLANK_ADDRESS;
-            for i in 0 .. LEN {
+            for i in 0..LEN {
                 res[i] = data[i];
             }
             Ok(Address::new(res))
         } else {
             Err(Error::custom(
-                "Invalid seed format. Expected a 0x-prefixed hex string with total 192 characters in len"
+                "Invalid seed format. Expected a 0x-prefixed hex string with total 192 characters \
+                 in len",
             ))
         }
     }
 
     fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
-        where E: Error {
+    where E: Error {
         self.visit_str(value.as_ref())
     }
 }
