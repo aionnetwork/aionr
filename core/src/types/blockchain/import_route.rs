@@ -23,7 +23,7 @@
 //! Import route.
 
 use aion_types::H256;
-use blockchain::block_info::{BlockInfo, BlockLocation};
+use types::block::info::{BlockInfo, BlockLocation};
 
 /// Import route for newly inserted block.
 #[derive(Debug, PartialEq)]
