@@ -20,25 +20,25 @@
  *
  ******************************************************************************/
 
-use std::collections::{BTreeMap, HashSet};
-use std::sync::Arc;
-use std::time::{self, Duration, Instant};
-use std::thread;
-
 use account_provider::AccountProvider;
+use acore_bytes::Bytes;
 use aion_types::{Address, H256, U256};
 use ansi_term::Colour;
-use acore_bytes::Bytes;
+use block::{Block, ClosedBlock, IsBlock};
+use client::{BlockId, MiningBlockChainClient, TransactionId};
 use engines::POWEquihashEngine;
 use error::*;
+use header::{BlockNumber, Header};
+use io::IoChannel;
 use miner::{MinerService, MinerStatus};
 use parking_lot::{Mutex, RwLock};
-use transaction::transaction_pool::TransactionPool;
-use transaction::banning_queue::{BanningTransactionQueue, Threshold};
-use transaction::local_transactions::TxIoMessage;
-use transaction::transaction_queue::{
-    AccountDetails, PrioritizationStrategy, RemovalReason, TransactionOrigin, TransactionQueue,
-};
+use receipt::Receipt;
+use spec::Spec;
+use state::State;
+use std::collections::{BTreeMap, HashSet};
+use std::sync::Arc;
+use std::thread;
+use std::time::{self, Duration, Instant};
 use transaction::{
     Condition as TransactionCondition,
     Error as TransactionError,
@@ -46,14 +46,13 @@ use transaction::{
     SignedTransaction,
     UnverifiedTransaction,
 };
+use transaction::banning_queue::{BanningTransactionQueue, Threshold};
+use transaction::local_transactions::TxIoMessage;
+use transaction::transaction_pool::TransactionPool;
+use transaction::transaction_queue::{
+    AccountDetails, PrioritizationStrategy, RemovalReason, TransactionOrigin, TransactionQueue,
+};
 use using_queue::{GetAction, UsingQueue};
-use block::{ClosedBlock, IsBlock, Block};
-use client::{MiningBlockChainClient, BlockId, TransactionId};
-use header::{Header, BlockNumber};
-use io::IoChannel;
-use receipt::Receipt;
-use spec::Spec;
-use state::State;
 
 /// Different possible definitions for pending transaction set.
 #[derive(Debug, PartialEq)]
@@ -1125,22 +1124,54 @@ impl MinerService for Miner {
 
 #[cfg(test)]
 mod tests{
-    use io::IoChannel;
-    use transaction::{SignedTransaction,PendingTransaction};
-    use super::{MinerOptions,PendingSet,Banning};
-    use spec::Spec;
-    use types::BlockNumber;
-    use std::time::Duration;
-    use std::sync::Arc;
     use aion_types::U256;
+    use block::IsBlock;
+    use client::BlockChainClient;
+    use io::IoChannel;
     use keychain;
+    use miner::{Miner, MinerService};
     use rustc_hex::FromHex;
-    use transaction::transaction_queue::PrioritizationStrategy;
-    use transaction::Transaction;
+    use spec::Spec;
+    use std::sync::Arc;
+    use std::time::Duration;
+    use super::{Banning, MinerOptions, PendingSet};
+    use tests::common::{EachBlockWith, helpers::generate_dummy_client, TestBlockChainClient};
+    use transaction::{PendingTransaction, SignedTransaction};
     use transaction::Action;
-    use client::{BlockChainClient};
-    use tests::common::{EachBlockWith, TestBlockChainClient, helpers::generate_dummy_client};
-    use miner::{Miner,MinerService};
+    use transaction::Transaction;
+    use transaction::transaction_queue::PrioritizationStrategy;
+    use types::BlockNumber;
+
+    #[test]
+    fn should_prepare_block_to_seal() {
+        // given
+        let client = TestBlockChainClient::default();
+        let miner = Miner::with_spec(&Spec::new_test());
+
+        // when
+        let sealing_work = miner.map_sealing_work(&client, |_| ());
+        assert!(sealing_work.is_some(), "Expected closed block");
+    }
+    #[test]
+    fn should_still_work_after_a_couple_of_blocks() {
+        // given
+        let client = TestBlockChainClient::default();
+        let miner = Miner::with_spec(&Spec::new_test());
+
+        let res = miner.map_sealing_work(&client, |b| b.block().header().mine_hash());
+        assert!(res.is_some());
+        assert!(miner.submit_seal(&client, res.unwrap(), vec![]).is_ok());
+
+        // two more blocks mined, work requested.
+        client.add_blocks(1, EachBlockWith::Nothing);
+        miner.map_sealing_work(&client, |b| b.block().header().mine_hash());
+
+        client.add_blocks(1, EachBlockWith::Nothing);
+        miner.map_sealing_work(&client, |b| b.block().header().mine_hash());
+
+        // solution to original work submitted.
+        assert!(miner.submit_seal(&client, res.unwrap(), vec![]).is_ok());
+    }
 
     fn miner() -> Miner {
         Arc::try_unwrap(Miner::new(

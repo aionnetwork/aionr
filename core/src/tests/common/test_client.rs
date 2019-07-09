@@ -839,8 +839,6 @@ impl ProvingBlockChainClient for TestBlockChainClient {
     fn prove_transaction(&self, _: SignedTransaction, _: BlockId) -> Option<(Bytes, Vec<DBValue>)> {
         None
     }
-
-    fn epoch_signal(&self, _: H256) -> Option<Vec<u8>> { None }
 }
 
 impl ::client::EngineClient for TestBlockChainClient {
@@ -853,8 +851,6 @@ impl ::client::EngineClient for TestBlockChainClient {
     }
 
     fn broadcast_consensus_message(&self, _message: Bytes) {}
-
-    fn epoch_transition_for(&self, _block_hash: H256) -> Option<::engines::EpochTransition> { None }
 
     fn chain_info(&self) -> BlockChainInfo { BlockChainClient::chain_info(self) }
 

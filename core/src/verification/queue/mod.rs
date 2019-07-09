@@ -799,11 +799,9 @@ impl<K: Kind> Drop for VerificationQueue<K> {
 mod tests {
     use io::*;
     use spec::*;
-    use super::{BlockQueue, Config, State};
+    use super::{BlockQueue, Config};
     use super::kind::blocks::Unverified;
     use helpers::*;
-    use error::*;
-    use views::*;
 
     // create a test block queue.
     // auto_scaling enables verifier adjustment.

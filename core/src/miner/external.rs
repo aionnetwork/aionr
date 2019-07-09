@@ -91,5 +91,37 @@ mod tests {
     use std::thread::sleep;
     use std::time::Duration;
     use aion_types::{H256, U256};
+    fn ext_miner() -> ExternalMiner { ExternalMiner::default() }
+
+    #[test]
+    fn it_should_forget_old_hashrates() {
+        // given
+        let m = ext_miner();
+        assert_eq!(m.hashrate(), U256::from(0));
+        m.submit_hashrate(U256::from(10), H256::from(1));
+        assert_eq!(m.hashrate(), U256::from(10));
+
+        // when
+        sleep(Duration::from_secs(3));
+
+        // then
+        assert_eq!(m.hashrate(), U256::from(0));
+    }
+
+    #[test]
+    fn should_sum_up_hashrate() {
+        // given
+        let m = ext_miner();
+        assert_eq!(m.hashrate(), U256::from(0));
+        m.submit_hashrate(U256::from(10), H256::from(1));
+        assert_eq!(m.hashrate(), U256::from(10));
+
+        // when
+        m.submit_hashrate(U256::from(15), H256::from(1));
+        m.submit_hashrate(U256::from(20), H256::from(2));
+
+        // then
+        assert_eq!(m.hashrate(), U256::from(35));
+    }
 
 }

@@ -136,10 +136,10 @@ mod tests;
 
 pub use types::{
     filter,
-    log_entry,
-    receipt,
-    state_diff,
-    block_status
+    state::log_entry,
+    state::receipt,
+    state::state_diff,
+    block::status as block_status
 };
 
 pub use executive::contract_address;

@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 use std::collections::BTreeMap;
-use types::account_diff::{ AccountDiff, Diff };
+use types::account::account_diff::{ AccountDiff, Diff };
 use pod_account::{PodAccount, diff_pod};
 
 #[test]

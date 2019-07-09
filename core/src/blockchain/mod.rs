@@ -22,22 +22,24 @@
 
 //! Blockchain database.
 
-mod best_block;
-mod block_info;
+// mod best_block;
+// mod block_info;
 mod blockchain;
-mod cache;
-mod config;
-mod extras;
-mod import_route;
-mod update;
+// mod cache;
+// mod config;
+// mod extras;
+// mod import_route;
+// mod update;
 
 
 #[cfg(test)]
 mod tests;
 
 pub use self::blockchain::{BlockProvider, BlockChain};
-pub use self::cache::CacheSize;
-pub use self::config::Config;
-pub use self::extras::{BlockReceipts, BlockDetails, TransactionAddress};
-pub use self::import_route::ImportRoute;
-pub use types::tree_route::TreeRoute;
+// pub use self::cache::CacheSize;
+// pub use self::config::Config;
+// pub use self::extras::{BlockReceipts, BlockDetails, TransactionAddress};
+// pub use self::import_route::ImportRoute;
+// re-export
+pub use types::blockchain::tree_route::TreeRoute;
+pub use types::blockchain::extra::BlockReceipts;

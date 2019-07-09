@@ -179,7 +179,7 @@ impl ClientService {
     /// check db if correct
     fn correct_db(dbs: Arc<KeyValueDB>) -> Result<(), String> {
         use db::Readable;
-        use blockchain::BlockDetails;
+        use types::blockchain::extra::BlockDetails;
         // get best block hash
         let best_block_hash = dbs.get(db::COL_EXTRA, b"best").expect("EXTRA db not found");
         match best_block_hash {

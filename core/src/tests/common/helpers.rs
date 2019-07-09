@@ -23,7 +23,8 @@
 use aion_types::{H256, U256};
 use account_provider::AccountProvider;
 use block::{OpenBlock, Drain};
-use blockchain::{BlockChain, Config as BlockChainConfig};
+use blockchain::{BlockChain};
+use types::blockchain::config::Config as BlockChainConfig;
 use acore_bytes::Bytes;
 use client::{BlockChainClient, ChainNotify, Client, ClientConfig};
 use key::{Ed25519Secret, Ed25519KeyPair};

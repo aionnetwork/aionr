@@ -111,7 +111,8 @@ impl BroadcastsHandler {
     pub fn handle_broadcast_block(node: &mut Node, req: ChannelBuffer) {
         trace!(target: "sync", "BROADCASTBLOCK received.");
 
-        if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number() {
+        if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number()
+        {
             // Ignore BROADCASTBLOCK message until full synced
             trace!(target: "sync", "Syncing..., ignore BROADCASTBLOCK message.");
             return;

@@ -23,7 +23,6 @@
 mod client;
 mod executive;
 mod block;
-mod miner;
 mod pod_account;
 mod pod_state;
 mod state;

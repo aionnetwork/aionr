@@ -26,7 +26,8 @@ use std::fmt;
 use std::ops::*;
 use std::collections::BTreeMap;
 use aion_types::Address;
-use types::account_diff::*;
+
+use types::account::account_diff::*;
 
 /// Expression for the delta between two system states. Encoded the
 /// delta of every altered account.

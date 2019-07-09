@@ -308,13 +308,13 @@ mod tests {
     use std::collections::HashMap;
     use aion_types::H256;
     use ethbloom::Bloom;
-    use blockchain::{BlockDetails, TransactionAddress, BlockReceipts};
+    use types::blockchain::extra::{BlockDetails, TransactionAddress, BlockReceipts};
     use encoded;
     use error::BlockError::*;
     use spec::Spec;
     use helpers::{create_test_block_with_data, create_test_block};
     use transaction::{SignedTransaction, Transaction, UnverifiedTransaction, Action};
-    use types::log_entry::{LogEntry, LocalizedLogEntry};
+    use types::state::log_entry::{LogEntry, LocalizedLogEntry};
     use rlp;
     use keychain;
 

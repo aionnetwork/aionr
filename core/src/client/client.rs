@@ -38,14 +38,16 @@ use trie::{Trie, TrieFactory, TrieSpec};
 use aion_types::{Address, H128, H256, H264, U256};
 use account::BasicAccount;
 use block::*;
-use blockchain::{BlockChain, BlockProvider, ImportRoute, TransactionAddress, TreeRoute};
+use blockchain::{BlockChain, BlockProvider, TreeRoute};
+use types::blockchain::import_route::ImportRoute;
+use types::blockchain::extra::TransactionAddress;
 use client::Error as ClientError;
 use client::{
     BlockChainClient, BlockId, BlockImportError, CallAnalytics, ChainNotify, ClientConfig,
     MiningBlockChainClient, ProvingBlockChainClient, PruningInfo, TransactionId,
 };
 use encoded;
-use engines::{EpochTransition, POWEquihashEngine};
+use engines::{POWEquihashEngine};
 use error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
 use executive::{contract_address, Executed, Executive};
 use factory::{Factories, VmFactory};
@@ -74,9 +76,10 @@ use verification::{
 use views::BlockView;
 
 // re-export
-pub use blockchain::CacheSize as BlockChainCacheSize;
-pub use types::block_status::BlockStatus;
-pub use types::blockchain_info::BlockChainInfo;
+#[cfg(test)]
+use types::blockchain::cache::CacheSize as BlockChainCacheSize;
+pub use types::block::status::BlockStatus;
+pub use types::blockchain::info::BlockChainInfo;
 pub use verification::queue::QueueInfo as BlockQueueInfo;
 
 const MIN_HISTORY_SIZE: u64 = 8;
@@ -235,29 +238,6 @@ impl Client {
             let state_db = client.state_db.read().boxed_clone();
             let chain = client.chain.read();
             client.prune_ancient(state_db, &chain)?;
-        }
-
-        // ensure genesis epoch proof in the DB.
-        {
-            let chain = client.chain.read();
-            let gh = spec.genesis_header();
-            if chain.epoch_transition(0, gh.hash()).is_none() {
-                trace!(target: "client", "No genesis transition found.");
-
-                let proof = Vec::new();
-                let mut batch = DBTransaction::new();
-                chain.insert_epoch_transition(
-                    &mut batch,
-                    0,
-                    EpochTransition {
-                        block_hash: gh.hash(),
-                        block_number: 0,
-                        proof,
-                    },
-                );
-
-                client.db.read().write_buffered(batch);
-            }
         }
 
         // ensure buffered changes are flushed.
@@ -706,6 +686,7 @@ impl Client {
         .expect("State root of best block header always valid.")
     }
 
+    #[cfg(test)]
     /// Get info on the cache.
     pub fn blockchain_cache_info(&self) -> BlockChainCacheSize { self.chain.read().cache_size() }
 
@@ -1615,10 +1596,6 @@ impl super::traits::EngineClient for Client {
         self.notify(|notify| notify.broadcast(message.clone()));
     }
 
-    fn epoch_transition_for(&self, parent_hash: H256) -> Option<::engines::EpochTransition> {
-        self.chain.read().epoch_transition_for(parent_hash)
-    }
-
     fn chain_info(&self) -> BlockChainInfo { BlockChainClient::chain_info(self) }
 
     fn as_full_client(&self) -> Option<&BlockChainClient> { Some(self) }
@@ -1667,15 +1644,6 @@ impl ProvingBlockChainClient for Client {
             false,
             self.db.read().clone(),
         )
-    }
-
-    fn epoch_signal(&self, hash: H256) -> Option<Vec<u8>> {
-        // pending transitions are never deleted, and do not contain
-        // finality proofs by definition.
-        self.chain
-            .read()
-            .get_pending_transition(hash)
-            .map(|pending| pending.proof)
     }
 }
 
