@@ -435,11 +435,11 @@ impl SyncStorage {
         return false;
     }
 
-    pub fn remove_staged_block_hash(hash: H256) {
-        if let Ok(mut staged_block_hashes) = STAGED_BLOCK_HASHES.get().lock() {
-            staged_block_hashes.remove(&hash);
-        }
-    }
+    //    pub fn remove_staged_block_hash(hash: H256) {
+    //        if let Ok(mut staged_block_hashes) = STAGED_BLOCK_HASHES.get().lock() {
+    //            staged_block_hashes.remove(&hash);
+    //        }
+    //    }
 
     pub fn clear_staged_blocks() {
         if let Ok(mut staged_blocks) = STAGED_BLOCKS.get().lock() {
