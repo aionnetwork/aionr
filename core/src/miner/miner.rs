@@ -231,7 +231,7 @@ impl Miner {
         is_forced: bool,
     ) -> Result<(), Error>
     {
-        if is_forced || self.tx_reseal_allowed() {
+        if (is_forced || self.tx_reseal_allowed()) && self.staker.is_some() {
             trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
             // Set minimal next reseal time
             *self.next_allowed_reseal.lock() = Instant::now() + self.options.reseal_min_period;
