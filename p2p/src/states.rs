@@ -49,26 +49,25 @@ pub const DISCONNECTED: u32 = 1 << 10;
 #[cfg(test)]
 mod tests {
 
-
-//    use states::STATE;
-//
-//    #[test]
-//    fn equal() {
-//        assert_eq!(STATE::CONNECTED, STATE::CONNECTED);
-//        assert_eq!(STATE::ACTIVE, STATE::ACTIVE);
-//    }
-//
-//    #[test]
-//    fn value() {
-//        assert_eq!(STATE::CONNECTED.value(), 0);
-//        assert_eq!(STATE::ACTIVE.value(), 1);
-//    }
-//
-//    #[test]
-//    fn from() {
-//        assert_eq!(STATE::CONNECTED, STATE::from(0));
-//        assert_eq!(STATE::ACTIVE, STATE::from(1));
-//        assert_eq!(STATE::CONNECTED, STATE::from(2));
-//        assert_eq!(STATE::CONNECTED, STATE::from(255));
-//    }
+    //    use states::STATE;
+    //
+    //    #[test]
+    //    fn equal() {
+    //        assert_eq!(STATE::CONNECTED, STATE::CONNECTED);
+    //        assert_eq!(STATE::ACTIVE, STATE::ACTIVE);
+    //    }
+    //
+    //    #[test]
+    //    fn value() {
+    //        assert_eq!(STATE::CONNECTED.value(), 0);
+    //        assert_eq!(STATE::ACTIVE.value(), 1);
+    //    }
+    //
+    //    #[test]
+    //    fn from() {
+    //        assert_eq!(STATE::CONNECTED, STATE::from(0));
+    //        assert_eq!(STATE::ACTIVE, STATE::from(1));
+    //        assert_eq!(STATE::CONNECTED, STATE::from(2));
+    //        assert_eq!(STATE::CONNECTED, STATE::from(255));
+    //    }
 }
