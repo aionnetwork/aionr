@@ -47,7 +47,7 @@ use client::{
     ProvingBlockChainClient,
 };
 use db::{COL_STATE, DB_NAMES};
-use header::{Header as BlockHeader, BlockNumber};
+use header::{Header as BlockHeader, BlockNumber, SealType};
 use filter::Filter;
 use log_entry::LocalizedLogEntry;
 use receipt::{Receipt, LocalizedReceipt};
@@ -379,6 +379,7 @@ impl MiningBlockChainClient for TestBlockChainClient {
         author: Address,
         gas_range_target: (U256, U256),
         extra_data: Bytes,
+        seal_type: Option<SealType>,
     ) -> OpenBlock
     {
         let engine = &*self.spec.engine;
@@ -395,6 +396,7 @@ impl MiningBlockChainClient for TestBlockChainClient {
             Default::default(),
             db,
             &genesis_header,
+            seal_type.unwrap_or_default(),
             None,
             Arc::new(last_hashes),
             author,

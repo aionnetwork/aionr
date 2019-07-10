@@ -51,7 +51,7 @@ use engines::{POWEquihashEngine};
 use error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
 use executive::{contract_address, Executed, Executive};
 use factory::{Factories, VmFactory};
-use header::{BlockNumber, Header, Seal};
+use header::{BlockNumber, Header, Seal, SealType};
 use io::*;
 use log_entry::LocalizedLogEntry;
 use miner::{Miner, MinerService};
@@ -1489,6 +1489,7 @@ impl MiningBlockChainClient for Client {
         author: Address,
         gas_range_target: (U256, U256),
         extra_data: Bytes,
+        seal_type: Option<SealType>,
     ) -> OpenBlock
     {
         let engine = &*self.engine;
@@ -1505,6 +1506,7 @@ impl MiningBlockChainClient for Client {
             self.factories.clone(),
             self.state_db.read().boxed_clone_canon(&h),
             best_header,
+            seal_type.unwrap_or_default(),
             grant_parent_header,
             self.build_last_hashes(h.clone()),
             author,

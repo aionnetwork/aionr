@@ -423,6 +423,7 @@ impl Miner {
                         author,
                         (self.gas_floor_target(), self.gas_ceil_target()),
                         self.extra_data(),
+                        seal_type.to_owned(),
                     )
                 }
             };

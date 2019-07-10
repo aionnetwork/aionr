@@ -37,7 +37,7 @@ use unexpected::Mismatch;
 use engines::POWEquihashEngine;
 use error::{Error, BlockError};
 use factory::Factories;
-use header::{Header, Seal};
+use header::{Header, Seal, SealType};
 use receipt::Receipt;
 use state::State;
 use state_db::StateDB;
@@ -221,6 +221,7 @@ impl<'x> OpenBlock<'x> {
         factories: Factories,
         db: StateDB,
         parent: &Header,
+        seal_type: SealType,
         grant_parent: Option<&Header>,
         last_hashes: Arc<LastHashes>,
         author: Address,
@@ -247,6 +248,7 @@ impl<'x> OpenBlock<'x> {
         r.block.header.set_number(number);
         r.block.header.set_author(author);
         r.block.header.set_timestamp_now(parent.timestamp());
+        r.block.header.set_seal_type(seal_type);
         r.set_extra_data(extra_data);
         r.block.header.note_dirty();
 
@@ -664,6 +666,7 @@ pub fn enact(
         factories,
         db,
         parent,
+        header.seal_type().to_owned().unwrap_or_default(),
         grant_parent,
         last_hashes,
         Address::new(),

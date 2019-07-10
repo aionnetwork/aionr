@@ -30,7 +30,7 @@ use error::{ImportResult, CallError, BlockImportError};
 use factory::VmFactory;
 use executive::Executed;
 use filter::Filter;
-use header::{BlockNumber};
+use header::{BlockNumber, SealType};
 use log_entry::LocalizedLogEntry;
 use receipt::LocalizedReceipt;
 use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction};
@@ -299,6 +299,7 @@ pub trait MiningBlockChainClient: BlockChainClient {
         author: Address,
         gas_range_target: (U256, U256),
         extra_data: Bytes,
+        seal_type: Option<SealType>,
     ) -> OpenBlock;
 
     /// Reopens an OpenBlock and updates uncles.

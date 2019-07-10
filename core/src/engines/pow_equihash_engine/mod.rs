@@ -28,7 +28,7 @@ mod test;
 use ajson;
 use machine::EthereumMachine;
 use aion_types::{U256, U512};
-use header::Header;
+use header::{Header, SealType};
 use block::ExecutedBlock;
 use error::Error;
 use std::cmp;
@@ -353,9 +353,11 @@ impl POWEquihashEngine {
     pub fn name(&self) -> &str { "POWEquihashEngine" }
 
     pub fn verify_block_basic(&self, header: &Header) -> Result<(), Error> {
-        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(4);
+        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(2);
         cheap_validators.push(Box::new(EnergyConsumedValidator {}));
-        cheap_validators.push(Box::new(POWValidator {}));
+        if header.seal_type() == &Some(SealType::PoW) {
+            cheap_validators.push(Box::new(POWValidator {}));
+        }
 
         for v in cheap_validators.iter() {
             v.validate(header)?;
@@ -366,9 +368,11 @@ impl POWEquihashEngine {
 
     pub fn verify_block_unordered(&self, header: &Header) -> Result<(), Error> {
         let mut costly_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(1);
-        costly_validators.push(Box::new(EquihashSolutionValidator {
-            solution_validator: EquihashValidator::new(210, 9),
-        }));
+        if header.seal_type() == &Some(SealType::PoW) {
+            costly_validators.push(Box::new(EquihashSolutionValidator {
+                solution_validator: EquihashValidator::new(210, 9),
+            }));
+        }
         for v in costly_validators.iter() {
             v.validate(header)?;
         }
@@ -392,7 +396,7 @@ impl POWEquihashEngine {
     ) -> Result<(), Error>
     {
         // verify parent
-        let mut parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(3);
+        let mut parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(2);
         parent_validators.push(Box::new(NumberValidator {}));
         parent_validators.push(Box::new(TimestampValidator {}));
         for v in parent_validators.iter() {
