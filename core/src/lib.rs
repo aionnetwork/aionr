@@ -85,8 +85,8 @@ extern crate logger;
 extern crate tempdir;
 #[cfg(test)]
 extern crate avm_abi;
-#[cfg(test)]
-pub mod helpers;
+//#[cfg(test)]
+//pub mod helpers;
 #[cfg(test)]
 #[macro_use]
 extern crate macros;
@@ -141,4 +141,8 @@ pub use types::{
     state::state_diff,
     block::status as block_status
 };
+
 pub use executive::contract_address;
+
+#[cfg(test)]
+use tests::common::helpers;

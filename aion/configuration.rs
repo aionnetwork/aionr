@@ -613,13 +613,11 @@ impl Configuration {
 #[cfg(test)]
 mod tests {
     use acore::client::{BlockId};
-    use acore::miner::MinerOptions;
     use acore::transaction::transaction_queue::PrioritizationStrategy;
     use account::{AccountCmd, NewAccount, ImportAccounts, ListAccounts};
     use blockchain::{BlockchainCmd, ImportBlockchain, ExportBlockchain, DataFormat};
     use cli::Args;
     use dir::Directories;
-    use params::SpecType;
     use run::RunCmd;
     use p2p::NetworkConfig;
     use super::*;
@@ -633,7 +631,6 @@ mod tests {
         }
     }
 
-    #[cfg(test)]
     pub fn default_network_config() -> NetworkConfig {
         NetworkConfig {
             boot_nodes: vec![
@@ -670,7 +667,7 @@ mod tests {
                 iterations: 10240,
                 path: Directories::default().keys,
                 password_file: None,
-                spec: SpecType::default(),
+                spec: Default::default(),
             }))
         );
     }
@@ -683,7 +680,7 @@ mod tests {
             conf.into_command().unwrap().cmd,
             Cmd::Account(AccountCmd::List(ListAccounts {
                 path: Directories::default().keys,
-                spec: SpecType::default(),
+                spec: Default::default(),
             }))
         );
     }
@@ -697,7 +694,7 @@ mod tests {
             Cmd::Account(AccountCmd::Import(ImportAccounts {
                 from: vec!["my_dir".into(), "another_dir".into()],
                 to: Directories::default().keys,
-                spec: SpecType::default(),
+                spec: Default::default(),
             }))
         );
     }
@@ -809,7 +806,7 @@ mod tests {
     #[test]
     fn should_parse_mining_options() {
         // given
-        let mut mining_options = MinerOptions::default();
+        let mut mining_options = Default::default();
 
         // when
         let conf0 = parse(&["aion"]);

@@ -24,7 +24,7 @@
 
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrder};
 use std::sync::Arc;
-use std::collections::{HashMap, BTreeMap};
+use std::collections::{HashMap};
 use std::mem;
 use std::time::Duration;
 use itertools::Itertools;
@@ -66,7 +66,7 @@ use state_db::StateDB;
 use encoded;
 use kvdb::{KeyValueDB, MemoryDBRepository};
 
-use super::super::transaction::UnverifiedTransaction;
+use transaction::UnverifiedTransaction;
 
 /// Test client.
 pub struct TestBlockChainClient {
@@ -121,12 +121,8 @@ pub struct TestBlockChainClient {
 pub enum EachBlockWith {
     /// Plain block.
     Nothing,
-    /// Block with an uncle.
-    Uncle,
     /// Block with a transaction.
     Transaction,
-    /// Block with an uncle and transaction.
-    UncleAndTransaction,
 }
 
 impl Default for TestBlockChainClient {
@@ -236,7 +232,7 @@ impl TestBlockChainClient {
             header.set_gas_limit(U256::from(1_000_000));
             header.set_extra_data(self.extra_data.clone());
             let txs = match with {
-                EachBlockWith::Transaction | EachBlockWith::UncleAndTransaction => {
+                EachBlockWith::Transaction => {
                     let mut txs = RlpStream::new_list(1);
                     let keypair = generate_keypair();
                     // Update nonces value
@@ -843,11 +839,9 @@ impl ProvingBlockChainClient for TestBlockChainClient {
     fn prove_transaction(&self, _: SignedTransaction, _: BlockId) -> Option<(Bytes, Vec<DBValue>)> {
         None
     }
-
-    fn epoch_signal(&self, _: H256) -> Option<Vec<u8>> { None }
 }
 
-impl super::traits::EngineClient for TestBlockChainClient {
+impl ::client::EngineClient for TestBlockChainClient {
     fn update_sealing(&self) { self.miner.update_sealing(self) }
 
     fn submit_seal(&self, block_hash: H256, seal: Vec<Bytes>) {
@@ -857,8 +851,6 @@ impl super::traits::EngineClient for TestBlockChainClient {
     }
 
     fn broadcast_consensus_message(&self, _message: Bytes) {}
-
-    fn epoch_transition_for(&self, _block_hash: H256) -> Option<::engines::EpochTransition> { None }
 
     fn chain_info(&self) -> BlockChainInfo { BlockChainClient::chain_info(self) }
 

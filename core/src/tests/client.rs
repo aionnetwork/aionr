@@ -27,7 +27,6 @@ use client::{BlockChainClient, MiningBlockChainClient, Client, ClientConfig, Blo
 use state::{self, State, CleanupMode};
 use executive::Executive;
 use block::IsBlock;
-use super::*;
 use types::filter::Filter;
 use aion_types::{Address, U256};
 use kvdb::{DatabaseConfig, DbRepository, RepositoryConfig};
@@ -39,6 +38,7 @@ use transaction::{PendingTransaction, Transaction, Action, Condition};
 use miner::MinerService;
 use tempdir::TempDir;
 use kvdb::MemoryDBRepository;
+use helpers::{get_test_spec,generate_dummy_client,get_good_dummy_block,get_bad_state_dummy_block,get_test_client_with_blocks,push_blocks_to_client,get_good_dummy_block_seq,generate_dummy_client_with_data};
 
 #[test]
 fn imports_from_empty() {
@@ -177,6 +177,7 @@ fn returns_logs_with_limit() {
         to_block: BlockId::Latest,
         address: None,
         topics: vec![],
+        // TODO: with limit
         limit: None,
     });
     assert_eq!(logs.len(), 0);
@@ -232,6 +233,7 @@ fn can_handle_long_fork() {
     for _ in 0..400 {
         client.import_verified_blocks();
     }
+    // TODO: how to judge the first two
     assert_eq!(2000, client.chain_info().best_block_number);
 }
 
@@ -278,7 +280,7 @@ fn change_history_size() {
 
     {
         let client = Client::new(
-            ClientConfig::default(),
+            config,//ClientConfig::default(),
             &test_spec,
             client_db.clone(),
             Arc::new(Miner::with_spec(&test_spec)),

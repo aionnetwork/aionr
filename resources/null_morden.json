@@ -1,7 +1,7 @@
 {
 	"name": "Morden",
 	"engine": {
-		"pos": {
+		"null": {
 			"params": {}
 		}
 	},

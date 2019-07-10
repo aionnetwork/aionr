@@ -20,16 +20,9 @@
  *
  ******************************************************************************/
 
-#![warn(unused_extern_crates)]
-
-#[macro_use]
-extern crate macros;
-extern crate acore;
-extern crate types;
-
 use std::collections::BTreeMap;
-use types::account_diff::{ AccountDiff, Diff };
-use acore::pod_account::{PodAccount, diff_pod};
+use types::account::account_diff::{ AccountDiff, Diff };
+use pod_account::{PodAccount, diff_pod};
 
 #[test]
 fn existence() {
@@ -38,7 +31,6 @@ fn existence() {
         nonce: 0.into(),
         code: Some(vec![]),
         storage: map![],
-        storage_dword: map![],
     };
     assert_eq!(diff_pod(Some(&a), Some(&a)), None);
     assert_eq!(
@@ -48,7 +40,6 @@ fn existence() {
             nonce: Diff::Born(0.into()),
             code: Diff::Born(vec![]),
             storage: map![],
-            storage_dword: map![],
         })
     );
 }
@@ -60,14 +51,12 @@ fn basic() {
         nonce: 0.into(),
         code: Some(vec![]),
         storage: map![],
-        storage_dword: map![],
     };
     let b = PodAccount {
         balance: 42.into(),
         nonce: 1.into(),
         code: Some(vec![]),
         storage: map![],
-        storage_dword: map![],
     };
     assert_eq!(
         diff_pod(Some(&a), Some(&b)),
@@ -76,7 +65,6 @@ fn basic() {
             nonce: Diff::Changed(0.into(), 1.into()),
             code: Diff::Same,
             storage: map![],
-            storage_dword: map![],
         })
     );
 }
@@ -88,14 +76,12 @@ fn code() {
         nonce: 0.into(),
         code: Some(vec![]),
         storage: map![],
-        storage_dword: map![],
     };
     let b = PodAccount {
         balance: 0.into(),
         nonce: 1.into(),
         code: Some(vec![0]),
         storage: map![],
-        storage_dword: map![],
     };
     assert_eq!(
         diff_pod(Some(&a), Some(&b)),
@@ -104,26 +90,24 @@ fn code() {
             nonce: Diff::Changed(0.into(), 1.into()),
             code: Diff::Changed(vec![], vec![0]),
             storage: map![],
-            storage_dword: map![],
         })
     );
 }
 
 #[test]
 fn storage() {
+    let vec:Vec<Vec<u8>>=vec![vec![],vec![1],vec![2],vec![3],vec![4],vec![5],vec![6],vec![7],vec![8],vec![9]];
     let a = PodAccount {
         balance: 0.into(),
         nonce: 0.into(),
         code: Some(vec![]),
-        storage: map_into![1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 0, 6 => 0, 7 => 0],
-        storage_dword: map_into![1 => 1, 2 => 2, 3 => 3, 4 => 4, 5 => 0, 6 => 0, 7 => 0],
+        storage: map_into![vec[1].clone() => vec[1].clone(), vec[2].clone() => vec[2].clone(), vec[3].clone() => vec[3].clone(), vec[4].clone() => vec[4].clone(), vec[5].clone() => vec[0].clone(), vec[6].clone() => vec[0].clone(), vec[7].clone() => vec[0].clone()],
     };
     let b = PodAccount {
         balance: 0.into(),
         nonce: 0.into(),
         code: Some(vec![]),
-        storage: map_into![1 => 1, 2 => 3, 3 => 0, 5 => 0, 7 => 7, 8 => 0, 9 => 9],
-        storage_dword: map_into![1 => 1, 2 => 3, 3 => 0, 5 => 0, 7 => 7, 8 => 0, 9 => 9],
+        storage: map_into![vec[1].clone() => vec[1].clone(), vec[2].clone() => vec[3].clone(), vec[3].clone() => vec[0].clone(), vec[5].clone() => vec[0].clone(), vec[7].clone() => vec[7].clone(), vec[8].clone() => vec[0].clone(), vec[9].clone() => vec[9].clone()],
     };
     assert_eq!(
         diff_pod(Some(&a), Some(&b)),
@@ -132,18 +116,11 @@ fn storage() {
             nonce: Diff::Same,
             code: Diff::Same,
             storage: map![
-                    2.into() => Diff::new(2.into(), 3.into()),
-                    3.into() => Diff::new(3.into(), 0.into()),
-                    4.into() => Diff::new(4.into(), 0.into()),
-                    7.into() => Diff::new(0.into(), 7.into()),
-                    9.into() => Diff::new(0.into(), 9.into())
-                ],
-            storage_dword: map![
-                    2.into() => Diff::new(2.into(), 3.into()),
-                    3.into() => Diff::new(3.into(), 0.into()),
-                    4.into() => Diff::new(4.into(), 0.into()),
-                    7.into() => Diff::new(0.into(), 7.into()),
-                    9.into() => Diff::new(0.into(), 9.into())
+                    vec[2].clone() => Diff::new(vec[2].clone(), vec[3].clone()),
+                    vec[3].clone() => Diff::new(vec[3].clone(), vec[0].clone()),
+                    vec[4].clone() => Diff::new(vec[4].clone(), vec[0].clone()),
+                    vec[7].clone() => Diff::new(vec[0].clone(), vec[7].clone()),
+                    vec[9].clone() => Diff::new(vec[0].clone(), vec[9].clone())
                 ],
         })
     );

@@ -23,7 +23,8 @@
 use aion_types::{H256, U256};
 use account_provider::AccountProvider;
 use block::{OpenBlock, Drain};
-use blockchain::{BlockChain, Config as BlockChainConfig};
+use blockchain::{BlockChain};
+use types::blockchain::config::Config as BlockChainConfig;
 use acore_bytes::Bytes;
 use client::{BlockChainClient, ChainNotify, Client, ClientConfig};
 use key::{Ed25519Secret, Ed25519KeyPair};
@@ -32,15 +33,23 @@ use transaction::{Action, Transaction, SignedTransaction};
 use views::BlockView;
 use io::*;
 use miner::{Miner, MinerService};
+use parking_lot::RwLock;
 use rlp::{self, RlpStream};
 use spec::*;
 use state_db::StateDB;
 use state::*;
 use std::sync::Arc;
 use kvdb::{MockDbRepository, DBTransaction, KeyValueDB, MemoryDBRepository};
+use machine::EthereumMachine;
+use std::collections::BTreeMap;
 use db;
 
-//// TODO: move everything over to get_null_spec.
+
+pub fn make_aion_machine() -> EthereumMachine {
+    EthereumMachine::regular(Default::default(), BTreeMap::new(), U256::zero())
+}
+
+// TODO: move everything over to get_null_spec.
 pub fn get_test_spec() -> Spec { Spec::new_test() }
 
 pub fn create_test_block(header: &Header) -> Bytes {
@@ -453,4 +462,23 @@ pub fn get_bad_state_dummy_block() -> Bytes {
     block_header.set_state_root(0xbad.into());
 
     create_test_block(&block_header)
+}
+
+#[derive(Default)]
+pub struct TestNotify {
+    pub messages: RwLock<Vec<Bytes>>,
+}
+
+impl ChainNotify for TestNotify {
+    fn new_blocks(
+        &self,
+        _imported: Vec<H256>,
+        _invalid: Vec<H256>,
+        _enacted: Vec<H256>,
+        _retracted: Vec<H256>,
+        _sealed: Vec<H256>,
+        // Block bytes.
+        _proposed: Vec<Bytes>,
+        _duration: u64,) {unimplemented!()}
+    fn broadcast(&self, data: Vec<u8>) { self.messages.write().push(data); }
 }

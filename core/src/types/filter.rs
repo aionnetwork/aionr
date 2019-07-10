@@ -130,7 +130,7 @@ impl Filter {
 mod tests {
     use ethbloom::Bloom;
     use filter::Filter;
-    use ids::BlockId;
+    use types::ids::BlockId;
     use log_entry::LogEntry;
 
     #[test]

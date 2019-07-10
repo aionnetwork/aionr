@@ -1,5 +1,4 @@
 use std::sync::Arc;
-use std::collections::BTreeMap;
 use acore_bytes::Bytes;
 use rustc_hex::FromHex;
 use aion_types::{U512,U256, U128, Address};
@@ -12,18 +11,14 @@ use vms::{
     ExecStatus,
     ReturnData
 };
-use machine::EthereumMachine;
 use state::{Substate, CleanupMode};
 use transaction::{Action, Transaction, SignedTransaction, DEFAULT_TRANSACTION_TYPE};
 use error::ExecutionError;
 use executive::{Executive, contract_address};
 use avm_abi::{AVMEncoder, AbiToken, ToBytes};
 
-use super::*;
+use helpers::{get_temp_state,make_aion_machine};
 
-fn make_aion_machine() -> EthereumMachine {
-    EthereumMachine::regular(Default::default(), BTreeMap::new(), U256::zero())
-}
 
 #[test]
 fn test_contract_address() {

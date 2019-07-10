@@ -308,13 +308,13 @@ mod tests {
     use std::collections::HashMap;
     use aion_types::H256;
     use ethbloom::Bloom;
-    use blockchain::{BlockDetails, TransactionAddress, BlockReceipts};
+    use types::blockchain::extra::{BlockDetails, TransactionAddress, BlockReceipts};
     use encoded;
     use error::BlockError::*;
     use spec::Spec;
     use helpers::{create_test_block_with_data, create_test_block};
     use transaction::{SignedTransaction, Transaction, UnverifiedTransaction, Action};
-    use types::log_entry::{LogEntry, LocalizedLogEntry};
+    use types::state::log_entry::{LogEntry, LocalizedLogEntry};
     use rlp;
     use keychain;
 
@@ -486,281 +486,281 @@ mod tests {
         Ok(())
     }
 
-    //    #[test]
-    //    fn test_verify_block_basic_with_invalid_transactions() {
-    //        let spec = Spec::new_test();
-    //        let engine = &*spec.engine;
-    //
-    //        let block = {
-    //            let mut rlp = rlp::RlpStream::new_list(3);
-    //            let mut header = Header::default();
-    //            // that's an invalid transaction list rlp
-    //            let invalid_transactions = vec![vec![0u8]];
-    //            header.set_transactions_root(ordered_trie_root(&invalid_transactions));
-    //            header.set_gas_limit(engine.params().min_gas_limit);
-    //            rlp.append(&header);
-    //            rlp.append_list::<Vec<u8>, _>(&invalid_transactions);
-    //            rlp.append_raw(&rlp::EMPTY_LIST_RLP, 1);
-    //            rlp.out()
-    //        };
-    //
-    //        assert!(basic_test(&block, engine).is_err());
-    //    }
+        #[test]
+        fn test_verify_block_basic_with_invalid_transactions() {
+            let spec = Spec::new_test();
+            let engine = &*spec.engine;
 
-    //    #[test]
-    //    fn test_verify_block() {
-    //        // Test against morden
-    //        let mut good = Header::new();
-    //        let spec = Spec::new_test();
-    //        let engine = &*spec.engine;
-    //
-    //        let min_gas_limit = engine.params().min_gas_limit;
-    //        good.set_gas_limit(min_gas_limit);
-    //        good.set_timestamp(40);
-    //        good.set_number(10);
-    //
-    //        let keypair = keychain::ethkey::generate_keypair();
-    //
-    //        let tr1 = Transaction {
-    //            action: Action::Create,
-    //            value: U256::from(0),
-    //            data: Bytes::new(),
-    //            gas: U256::from(300_000),
-    //            gas_price: U256::from(40_000),
-    //            nonce: U256::one(),
-    //            nonce_bytes: Vec::new(),
-    //            gas_bytes: Vec::new(),
-    //            gas_price_bytes: Vec::new(),
-    //            value_bytes: Vec::new(),
-    //            transaction_type: U256::from(1),
-    //        }
-    //        .sign(keypair.secret().into(), None);
-    //
-    //        let tr2 = Transaction {
-    //            action: Action::Create,
-    //            value: U256::from(0),
-    //            data: Bytes::new(),
-    //            gas: U256::from(300_000),
-    //            gas_price: U256::from(40_000),
-    //            nonce: U256::from(2),
-    //            nonce_bytes: Vec::new(),
-    //            gas_bytes: Vec::new(),
-    //            gas_price_bytes: Vec::new(),
-    //            value_bytes: Vec::new(),
-    //            transaction_type: U256::from(1),
-    //        }
-    //        .sign(keypair.secret().into(), None);
-    //
-    //        let good_transactions = [tr1.clone(), tr2.clone()];
-    //
-    //        let diff_inc = U256::from(0x40);
-    //
-    //        let mut parent6 = good.clone();
-    //        parent6.set_number(6);
-    //        let mut parent7 = good.clone();
-    //        parent7.set_number(7);
-    //        parent7.set_parent_hash(parent6.hash());
-    //        parent7.set_difficulty(parent6.difficulty().clone() + diff_inc);
-    //        parent7.set_timestamp(parent6.timestamp() + 10);
-    //        let mut parent8 = good.clone();
-    //        parent8.set_number(8);
-    //        parent8.set_parent_hash(parent7.hash());
-    //        parent8.set_difficulty(parent7.difficulty().clone() + diff_inc);
-    //        parent8.set_timestamp(parent7.timestamp() + 10);
-    //
-    //        let good_transactions_root = ordered_trie_root(
-    //            good_transactions
-    //                .iter()
-    //                .map(|t| ::rlp::encode::<UnverifiedTransaction>(t)),
-    //        );
-    //
-    //        let mut parent = good.clone();
-    //        parent.set_number(9);
-    //        parent.set_timestamp(parent8.timestamp() + 10);
-    //        parent.set_parent_hash(parent8.hash());
-    //        parent.set_difficulty(parent8.difficulty().clone() + diff_inc);
-    //
-    //        good.set_parent_hash(parent.hash());
-    //        good.set_difficulty(parent.difficulty().clone() + diff_inc);
-    //        good.set_timestamp(parent.timestamp() + 10);
-    //
-    //        let mut bc = TestBlockChain::new();
-    //        bc.insert(create_test_block(&good));
-    //        bc.insert(create_test_block(&parent));
-    //        bc.insert(create_test_block(&parent6));
-    //        bc.insert(create_test_block(&parent7));
-    //        bc.insert(create_test_block(&parent8));
-    //
-    //        check_ok(basic_test(&create_test_block(&good), engine));
-    //
-    //        let mut header = good.clone();
-    //        header.set_transactions_root(good_transactions_root.clone());
-    //        check_ok(basic_test(
-    //            &create_test_block_with_data(&header, &good_transactions),
-    //            engine,
-    //        ));
-    //
-    //        header.set_gas_limit(min_gas_limit - From::from(1));
-    //        check_fail(
-    //            basic_test(&create_test_block(&header), engine),
-    //            InvalidGasLimit(OutOfBounds {
-    //                min: Some(min_gas_limit),
-    //                max: None,
-    //                found: header.gas_limit().clone(),
-    //            }),
-    //        );
-    //
-    //        header = good.clone();
-    //        header.set_number(BlockNumber::max_value());
-    //        check_fail(
-    //            basic_test(&create_test_block(&header), engine),
-    //            RidiculousNumber(OutOfBounds {
-    //                max: Some(BlockNumber::max_value()),
-    //                min: None,
-    //                found: header.number(),
-    //            }),
-    //        );
-    //
-    //        header = good.clone();
-    //        let gas_used = header.gas_limit().clone() + 1.into();
-    //        header.set_gas_used(gas_used);
-    //        check_fail(
-    //            basic_test(&create_test_block(&header), engine),
-    //            TooMuchGasUsed(OutOfBounds {
-    //                max: Some(header.gas_limit().clone()),
-    //                min: None,
-    //                found: header.gas_used().clone(),
-    //            }),
-    //        );
-    //
-    //        header = good.clone();
-    //        header
-    //            .extra_data_mut()
-    //            .resize(engine.maximum_extra_data_size() + 1, 0u8);
-    //        check_fail(
-    //            basic_test(&create_test_block(&header), engine),
-    //            ExtraDataOutOfBounds(OutOfBounds {
-    //                max: Some(engine.maximum_extra_data_size()),
-    //                min: None,
-    //                found: header.extra_data().len(),
-    //            }),
-    //        );
-    //
-    //        header = good.clone();
-    //        header
-    //            .extra_data_mut()
-    //            .resize(engine.maximum_extra_data_size() + 1, 0u8);
-    //        check_fail(
-    //            basic_test(&create_test_block(&header), engine),
-    //            ExtraDataOutOfBounds(OutOfBounds {
-    //                max: Some(engine.maximum_extra_data_size()),
-    //                min: None,
-    //                found: header.extra_data().len(),
-    //            }),
-    //        );
-    //
-    //        header = good.clone();
-    //        check_fail(
-    //            basic_test(
-    //                &create_test_block_with_data(&header, &good_transactions),
-    //                engine,
-    //            ),
-    //            InvalidTransactionsRoot(Mismatch {
-    //                expected: good_transactions_root.clone(),
-    //                found: header.transactions_root().clone(),
-    //            }),
-    //        );
-    //
-    //        check_ok(family_test(&create_test_block(&good), engine, &bc));
-    //        check_ok(family_test(
-    //            &create_test_block_with_data(&good, &good_transactions),
-    //            engine,
-    //            &bc,
-    //        ));
-    //
-    //        header = good.clone();
-    //        header.set_parent_hash(H256::random());
-    //        check_fail(
-    //            family_test(
-    //                &create_test_block_with_data(&header, &good_transactions),
-    //                engine,
-    //                &bc,
-    //            ),
-    //            UnknownParent(header.parent_hash().clone()),
-    //        );
-    //
-    //        header = good.clone();
-    //        header.set_timestamp(10);
-    //        check_fail(
-    //            family_test(
-    //                &create_test_block_with_data(&header, &good_transactions),
-    //                engine,
-    //                &bc,
-    //            ),
-    //            InvalidTimestamp(OutOfBounds {
-    //                max: None,
-    //                min: Some(parent.timestamp() + 1),
-    //                found: header.timestamp(),
-    //            }),
-    //        );
-    //
-    //        header = good.clone();
-    //        header.set_timestamp(2450000000);
-    //        check_fail_timestamp(
-    //            basic_test(
-    //                &create_test_block_with_data(&header, &good_transactions),
-    //                engine,
-    //            ),
-    //            false,
-    //        );
-    //
-    //        header = good.clone();
-    //        header.set_timestamp(get_time().sec as u64 + 20);
-    //        check_fail_timestamp(
-    //            basic_test(
-    //                &create_test_block_with_data(&header, &good_transactions),
-    //                engine,
-    //            ),
-    //            true,
-    //        );
-    //
-    //        header = good.clone();
-    //        header.set_timestamp(get_time().sec as u64 + 10);
-    //        header.set_transactions_root(good_transactions_root.clone());
-    //        check_ok(basic_test(
-    //            &create_test_block_with_data(&header, &good_transactions),
-    //            engine,
-    //        ));
-    //
-    //        header = good.clone();
-    //        header.set_number(9);
-    //        check_fail(
-    //            family_test(
-    //                &create_test_block_with_data(&header, &good_transactions),
-    //                engine,
-    //                &bc,
-    //            ),
-    //            InvalidNumber(Mismatch {
-    //                expected: parent.number() + 1,
-    //                found: header.number(),
-    //            }),
-    //        );
-    //
-    //        header = good.clone();
-    //        header.set_gas_limit(0.into());
-    //        header.set_difficulty(
-    //            "0000000000000000000000000000000000000000000000000000000000020000"
-    //                .parse::<U256>()
-    //                .unwrap(),
-    //        );
-    //        match family_test(&create_test_block(&header), engine, &bc) {
-    //            Err(Error::Block(InvalidGasLimit(_))) => {}
-    //            Err(_) => {
-    //                panic!("should be invalid difficulty fail");
-    //            }
-    //            _ => {
-    //                panic!("Should be error, got Ok");
-    //            }
-    //        }
-    //    }
+            let block = {
+                let mut rlp = rlp::RlpStream::new_list(3);
+                let mut header = Header::default();
+                // that's an invalid transaction list rlp
+                let invalid_transactions = vec![vec![0u8]];
+                header.set_transactions_root(ordered_trie_root(&invalid_transactions));
+                header.set_gas_limit(engine.machine().params().min_gas_limit);
+                rlp.append(&header);
+                rlp.append_list::<Vec<u8>, _>(&invalid_transactions);
+                rlp.append_raw(&rlp::EMPTY_LIST_RLP, 1);
+                rlp.out()
+            };
+
+            assert!(basic_test(&block, engine).is_err());
+        }
+
+        #[test]
+        fn test_verify_block() {
+            // Test against morden
+            let mut good = Header::new();
+            let spec = Spec::new_test();
+            let engine = &*spec.engine;
+
+            let min_gas_limit = engine.machine().params().min_gas_limit;
+            good.set_gas_limit(min_gas_limit);
+            good.set_timestamp(40);
+            good.set_number(10);
+
+            let keypair = keychain::ethkey::generate_keypair();
+
+            let tr1 = Transaction {
+                action: Action::Create,
+                value: U256::from(0),
+                data: Bytes::new(),
+                gas: U256::from(300_000),
+                gas_price: U256::from(40_000),
+                nonce: U256::one(),
+                nonce_bytes: Vec::new(),
+                gas_bytes: Vec::new(),
+                gas_price_bytes: Vec::new(),
+                value_bytes: Vec::new(),
+                transaction_type: U256::from(1),
+            }
+            .sign(keypair.secret(), None);
+
+            let tr2 = Transaction {
+                action: Action::Create,
+                value: U256::from(0),
+                data: Bytes::new(),
+                gas: U256::from(300_000),
+                gas_price: U256::from(40_000),
+                nonce: U256::from(2),
+                nonce_bytes: Vec::new(),
+                gas_bytes: Vec::new(),
+                gas_price_bytes: Vec::new(),
+                value_bytes: Vec::new(),
+                transaction_type: U256::from(1),
+            }
+            .sign(keypair.secret(), None);
+
+            let good_transactions = [tr1.clone(), tr2.clone()];
+
+            let diff_inc = U256::from(0x40);
+
+            let mut parent6 = good.clone();
+            parent6.set_number(6);
+            let mut parent7 = good.clone();
+            parent7.set_number(7);
+            parent7.set_parent_hash(parent6.hash());
+            parent7.set_difficulty(parent6.difficulty().clone() + diff_inc);
+            parent7.set_timestamp(parent6.timestamp() + 10);
+            let mut parent8 = good.clone();
+            parent8.set_number(8);
+            parent8.set_parent_hash(parent7.hash());
+            parent8.set_difficulty(parent7.difficulty().clone() + diff_inc);
+            parent8.set_timestamp(parent7.timestamp() + 10);
+
+            let good_transactions_root = ordered_trie_root(
+                good_transactions
+                    .iter()
+                    .map(|t| ::rlp::encode::<UnverifiedTransaction>(t)),
+            );
+
+            let mut parent = good.clone();
+            parent.set_number(9);
+            parent.set_timestamp(parent8.timestamp() + 10);
+            parent.set_parent_hash(parent8.hash());
+            parent.set_difficulty(parent8.difficulty().clone() + diff_inc);
+
+            good.set_parent_hash(parent.hash());
+            good.set_difficulty(parent.difficulty().clone() + diff_inc);
+            good.set_timestamp(parent.timestamp() + 10);
+
+            let mut bc = TestBlockChain::new();
+            bc.insert(create_test_block(&good));
+            bc.insert(create_test_block(&parent));
+            bc.insert(create_test_block(&parent6));
+            bc.insert(create_test_block(&parent7));
+            bc.insert(create_test_block(&parent8));
+
+            check_ok(basic_test(&create_test_block(&good), engine));
+
+            let mut header = good.clone();
+            header.set_transactions_root(good_transactions_root.clone());
+            check_ok(basic_test(
+                &create_test_block_with_data(&header, &good_transactions),
+                engine,
+            ));
+
+            header.set_gas_limit(min_gas_limit - From::from(1));
+            check_fail(
+                basic_test(&create_test_block(&header), engine),
+                InvalidGasLimit(OutOfBounds {
+                    min: Some(min_gas_limit),
+                    max: None,
+                    found: header.gas_limit().clone(),
+                }),
+            );
+
+            header = good.clone();
+            header.set_number(BlockNumber::max_value());
+            check_fail(
+                basic_test(&create_test_block(&header), engine),
+                RidiculousNumber(OutOfBounds {
+                    max: Some(BlockNumber::max_value()),
+                    min: None,
+                    found: header.number(),
+                }),
+            );
+
+            header = good.clone();
+            let gas_used = header.gas_limit().clone() + 1.into();
+            header.set_gas_used(gas_used);
+            check_fail(
+                basic_test(&create_test_block(&header), engine),
+                TooMuchGasUsed(OutOfBounds {
+                    max: Some(header.gas_limit().clone()),
+                    min: None,
+                    found: header.gas_used().clone(),
+                }),
+            );
+
+            header = good.clone();
+            header
+                .extra_data_mut()
+                .resize(engine.machine().maximum_extra_data_size() + 1, 0u8);
+            check_fail(
+                basic_test(&create_test_block(&header), engine),
+                ExtraDataOutOfBounds(OutOfBounds {
+                    max: Some(engine.machine().maximum_extra_data_size()),
+                    min: None,
+                    found: header.extra_data().len(),
+                }),
+            );
+
+            header = good.clone();
+            header
+                .extra_data_mut()
+                .resize(engine.machine().maximum_extra_data_size() + 1, 0u8);
+            check_fail(
+                basic_test(&create_test_block(&header), engine),
+                ExtraDataOutOfBounds(OutOfBounds {
+                    max: Some(engine.machine().maximum_extra_data_size()),
+                    min: None,
+                    found: header.extra_data().len(),
+                }),
+            );
+
+            header = good.clone();
+            check_fail(
+                basic_test(
+                    &create_test_block_with_data(&header, &good_transactions),
+                    engine,
+                ),
+                InvalidTransactionsRoot(Mismatch {
+                    expected: good_transactions_root.clone(),
+                    found: header.transactions_root().clone(),
+                }),
+            );
+
+            check_ok(family_test(&create_test_block(&good), engine, &bc));
+            check_ok(family_test(
+                &create_test_block_with_data(&good, &good_transactions),
+                engine,
+                &bc,
+            ));
+
+            header = good.clone();
+            header.set_parent_hash(H256::random());
+            check_fail(
+                family_test(
+                    &create_test_block_with_data(&header, &good_transactions),
+                    engine,
+                    &bc,
+                ),
+                UnknownParent(header.parent_hash().clone()),
+            );
+
+            header = good.clone();
+            header.set_timestamp(10);
+            check_fail(
+                family_test(
+                    &create_test_block_with_data(&header, &good_transactions),
+                    engine,
+                    &bc,
+                ),
+                InvalidTimestamp(OutOfBounds {
+                    max: None,
+                    min: Some(parent.timestamp() + 1),
+                    found: header.timestamp(),
+                }),
+            );
+
+            header = good.clone();
+            header.set_timestamp(2450000000);
+            check_fail_timestamp(
+                basic_test(
+                    &create_test_block_with_data(&header, &good_transactions),
+                    engine,
+                ),
+                false,
+            );
+
+            header = good.clone();
+            header.set_timestamp(get_time().sec as u64 + 20);
+            check_fail_timestamp(
+                basic_test(
+                    &create_test_block_with_data(&header, &good_transactions),
+                    engine,
+                ),
+                true,
+            );
+
+            header = good.clone();
+            header.set_timestamp(get_time().sec as u64 + 10);
+            header.set_transactions_root(good_transactions_root.clone());
+            check_ok(basic_test(
+                &create_test_block_with_data(&header, &good_transactions),
+                engine,
+            ));
+
+            header = good.clone();
+            header.set_number(9);
+            check_fail(
+                family_test(
+                    &create_test_block_with_data(&header, &good_transactions),
+                    engine,
+                    &bc,
+                ),
+                InvalidNumber(Mismatch {
+                    expected: parent.number() + 1,
+                    found: header.number(),
+                }),
+            );
+
+            header = good.clone();
+            header.set_gas_limit(0.into());
+            header.set_difficulty(
+                "0000000000000000000000000000000000000000000000000000000000020000"
+                    .parse::<U256>()
+                    .unwrap(),
+            );
+            match family_test(&create_test_block(&header), engine, &bc) {
+                Err(Error::Block(InvalidGasLimit(_))) => {}
+                Err(_) => {
+                    panic!("should be invalid difficulty fail");
+                }
+                _ => {
+                    panic!("Should be error, got Ok");
+                }
+            }
+        }
 }

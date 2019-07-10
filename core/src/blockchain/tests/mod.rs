@@ -1,3 +1,5 @@
+mod generator;
+
 use std::iter;
 use std::sync::Arc;
 use rustc_hex::FromHex;
@@ -5,13 +7,13 @@ use kvdb::{KeyValueDB, MockDbRepository, DBTransaction};
 use aion_types::*;
 use ethbloom::Bloom;
 use receipt::{Receipt, SimpleReceipt};
-use blockchain::{BlockProvider, BlockChain, Config, ImportRoute};
+use blockchain::{BlockProvider, BlockChain};
+use types::blockchain::import_route::ImportRoute;
 use helpers::*;
-use blockchain::generator::{BlockGenerator, BlockBuilder, BlockOptions};
-use blockchain::extras::TransactionAddress;
+use self::generator::{BlockGenerator, BlockBuilder, BlockOptions};
+use types::blockchain::extra::TransactionAddress;
 use transaction::{Transaction, Action, DEFAULT_TRANSACTION_TYPE};
 use log_entry::{LogEntry, LocalizedLogEntry};
-use acore_bytes::Bytes;
 use keychain;
 use db;
 
@@ -24,7 +26,7 @@ fn new_db() -> Arc<KeyValueDB> {
 }
 
 fn new_chain(genesis: &[u8], db: Arc<KeyValueDB>) -> BlockChain {
-    BlockChain::new(Config::default(), genesis, db)
+    BlockChain::new(Default::default(), genesis, db)
 }
 
 #[test]
@@ -134,7 +136,7 @@ fn test_fork_transaction_addresses() {
         gas_price_bytes: Vec::new(),
         value_bytes: Vec::new(),
     }
-    .sign(keychain::ethkey::generate_keypair().secret(), None);
+        .sign(keychain::ethkey::generate_keypair().secret(), None);
 
     let t1_hash = t1.hash().clone();
 
@@ -194,7 +196,7 @@ fn test_overwriting_transaction_addresses() {
         value_bytes: Vec::new(),
         nonce_bytes: Vec::new(),
     }
-    .sign(&keypair.secret(), None);
+        .sign(&keypair.secret(), None);
 
     let t2 = Transaction {
         nonce: 1.into(),
@@ -211,7 +213,7 @@ fn test_overwriting_transaction_addresses() {
         nonce_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-    .sign(&keypair.secret(), None);
+        .sign(&keypair.secret(), None);
     let t3 = Transaction {
         nonce: 2.into(),
         gas_price: 0.into(),
@@ -227,7 +229,7 @@ fn test_overwriting_transaction_addresses() {
         nonce_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-    .sign(&keypair.secret(), None);
+        .sign(&keypair.secret(), None);
 
     let genesis = BlockBuilder::genesis();
     let b1a = genesis.add_block_with_transactions(vec![t1.clone(), t2.clone()]);
@@ -559,7 +561,7 @@ fn test_logs() {
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-    .sign(keypair.secret(), None);
+        .sign(keypair.secret(), None);
     let t2 = Transaction {
         nonce: 0.into(),
         gas_price: 0.into(),
@@ -575,7 +577,7 @@ fn test_logs() {
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-    .sign(keypair.secret(), None);
+        .sign(keypair.secret(), None);
     let t3 = Transaction {
         nonce: 0.into(),
         gas_price: 0.into(),
@@ -591,7 +593,7 @@ fn test_logs() {
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-    .sign(keypair.secret(), None);
+        .sign(keypair.secret(), None);
     let tx_hash1 = t1.hash().clone();
     let tx_hash2 = t2.hash().clone();
     let tx_hash3 = t3.hash().clone();
@@ -613,7 +615,7 @@ fn test_logs() {
         vec![
             Receipt {
                 simple_receipt: SimpleReceipt {
-                    state_root: H256::default(),
+                    state_root: Default::default(),
                     log_bloom: Default::default(),
                     logs: vec![
                         LogEntry {
@@ -630,12 +632,12 @@ fn test_logs() {
                 },
                 gas_used: 10_000.into(),
                 transaction_fee: U256::zero(),
-                output: Bytes::default(),
-                error_message: String::default(),
+                output: Default::default(),
+                error_message: Default::default(),
             },
             Receipt {
                 simple_receipt: SimpleReceipt {
-                    state_root: H256::default(),
+                    state_root: Default::default(),
                     log_bloom: Default::default(),
                     logs: vec![LogEntry {
                         address: Default::default(),
@@ -645,8 +647,8 @@ fn test_logs() {
                 },
                 gas_used: 10_000.into(),
                 transaction_fee: U256::zero(),
-                output: Bytes::default(),
-                error_message: String::default(),
+                output: Default::default(),
+                error_message: Default::default(),
             },
         ],
     );
@@ -656,7 +658,7 @@ fn test_logs() {
         &b2.last().encoded(),
         vec![Receipt {
             simple_receipt: SimpleReceipt {
-                state_root: H256::default(),
+                state_root: Default::default(),
                 log_bloom: Default::default(),
                 logs: vec![LogEntry {
                     address: Default::default(),
@@ -666,8 +668,8 @@ fn test_logs() {
             },
             gas_used: 10_000.into(),
             transaction_fee: U256::zero(),
-            output: Bytes::default(),
-            error_message: String::default(),
+            output: Default::default(),
+            error_message: Default::default(),
         }],
     );
 
@@ -894,158 +896,6 @@ fn test_best_block_update() {
     // re-loading the blockchain should load the correct best block.
     let bc = new_chain(&genesis.last().encoded(), db);
     assert_eq!(bc.best_block_number(), 5);
-}
-
-#[test]
-fn epoch_transitions_iter() {
-    use engines::EpochTransition;
-
-    let genesis = BlockBuilder::genesis();
-    let next_5 = genesis.add_blocks(5);
-    let uncle = genesis.add_block_with_difficulty(9);
-    let generator = BlockGenerator::new(iter::once(next_5));
-
-    let db = new_db();
-    {
-        let bc = new_chain(&genesis.last().encoded(), db.clone());
-
-        let mut batch = DBTransaction::new();
-        // create a longer fork
-        for (i, block) in generator.into_iter().enumerate() {
-            bc.insert_block(&mut batch, &block.encoded(), vec![]);
-            bc.insert_epoch_transition(
-                &mut batch,
-                i as u64,
-                EpochTransition {
-                    block_hash: block.hash(),
-                    block_number: i as u64 + 1,
-                    proof: vec![],
-                },
-            );
-            bc.commit();
-        }
-
-        assert_eq!(bc.best_block_number(), 5);
-
-        bc.insert_block(&mut batch, &uncle.last().encoded(), vec![]);
-        bc.insert_epoch_transition(
-            &mut batch,
-            999,
-            EpochTransition {
-                block_hash: uncle.last().hash(),
-                block_number: 1,
-                proof: vec![],
-            },
-        );
-
-        db.write(batch).unwrap();
-        bc.commit();
-
-        // epoch 999 not in canonical chain.
-        assert_eq!(
-            bc.epoch_transitions().map(|(i, _)| i).collect::<Vec<_>>(),
-            vec![0, 1, 2, 3, 4]
-        );
-    }
-
-    // re-loading the blockchain should load the correct best block.
-    let bc = new_chain(&genesis.last().encoded(), db);
-
-    assert_eq!(bc.best_block_number(), 5);
-    assert_eq!(
-        bc.epoch_transitions().map(|(i, _)| i).collect::<Vec<_>>(),
-        vec![0, 1, 2, 3, 4]
-    );
-}
-
-#[test]
-fn epoch_transition_for() {
-    use engines::EpochTransition;
-
-    let genesis = BlockBuilder::genesis();
-    let fork_7 = genesis.add_blocks_with(7, || {
-        BlockOptions {
-            difficulty: 9.into(),
-            ..Default::default()
-        }
-    });
-    let next_10 = genesis.add_blocks(10);
-    let fork_generator = BlockGenerator::new(iter::once(fork_7));
-    let next_generator = BlockGenerator::new(iter::once(next_10));
-
-    let db = new_db();
-
-    let bc = new_chain(&genesis.last().encoded(), db.clone());
-
-    let mut batch = DBTransaction::new();
-    bc.insert_epoch_transition(
-        &mut batch,
-        0,
-        EpochTransition {
-            block_hash: bc.genesis_hash(),
-            block_number: 0,
-            proof: vec![],
-        },
-    );
-    db.write(batch).unwrap();
-
-    // set up a chain where we have a canonical chain of 10 blocks
-    // and a non-canonical fork of 8 from genesis.
-    let fork_hash = {
-        for block in fork_generator {
-            let mut batch = DBTransaction::new();
-
-            bc.insert_block(&mut batch, &block.encoded(), vec![]);
-            bc.commit();
-            db.write(batch).unwrap();
-        }
-
-        assert_eq!(bc.best_block_number(), 7);
-        bc.chain_info().best_block_hash
-    };
-
-    for block in next_generator {
-        let mut batch = DBTransaction::new();
-        bc.insert_block(&mut batch, &block.encoded(), vec![]);
-        bc.commit();
-
-        db.write(batch).unwrap();
-    }
-
-    assert_eq!(bc.best_block_number(), 10);
-
-    let mut batch = DBTransaction::new();
-    bc.insert_epoch_transition(
-        &mut batch,
-        4,
-        EpochTransition {
-            block_hash: bc.block_hash(4).unwrap(),
-            block_number: 4,
-            proof: vec![],
-        },
-    );
-    db.write(batch).unwrap();
-
-    // blocks where the parent is one of the first 4 will be part of genesis epoch.
-    for i in 0..4 {
-        let hash = bc.block_hash(i).unwrap();
-        assert_eq!(bc.epoch_transition_for(hash).unwrap().block_number, 0);
-    }
-
-    // blocks where the parent is the transition at 4 or after will be
-    // part of that epoch.
-    for i in 4..11 {
-        let hash = bc.block_hash(i).unwrap();
-        assert_eq!(bc.epoch_transition_for(hash).unwrap().block_number, 4);
-    }
-
-    let fork_hashes = bc.ancestry_iter(fork_hash).unwrap().collect::<Vec<_>>();
-    assert_eq!(fork_hashes.len(), 8);
-
-    // non-canonical fork blocks should all have genesis transition
-    for fork_hash in fork_hashes {
-        assert_eq!(bc.epoch_transition_for(fork_hash).unwrap().block_number, 0);
-    }
 }
 
 use rlp::*;

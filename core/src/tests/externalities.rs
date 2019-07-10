@@ -20,29 +20,13 @@
  *
  ******************************************************************************/
 
-#![warn(unused_extern_crates)]
-
-extern crate aion_types;
-extern crate vms;
-extern crate acore;
-extern crate db;
-
 use std::sync::Arc;
 use aion_types::{U256, H256, Address};
-use vms::{EnvInfo, Ext, CallType};
-use acore::state::{State, Substate};
-//use acore::tests::helpers::*;
-use db::MemoryDBRepository;
-
-fn get_test_origin() -> OriginInfo {
-   OriginInfo {
-       address: Address::zero(),
-       origin: Address::zero(),
-       gas_price: U256::zero(),
-       value: U256::zero(),
-       origin_tx_hash: H256::default(),
-   }
-}
+use vms::{EnvInfo, traits::Ext,  CallType};
+use state::{State, Substate};
+use helpers::{get_temp_state,make_aion_machine};
+use kvdb::MemoryDBRepository;
+use externalities::{OriginInfo,Externalities};
 
 fn get_test_env_info() -> EnvInfo {
    EnvInfo {
@@ -71,7 +55,7 @@ impl TestSetup {
    fn new() -> Self {
        TestSetup {
            state: get_temp_state(),
-           machine: ::spec::Spec::new_test_machine(),
+           machine: make_aion_machine(),
            sub_state: Substate::new(),
            env_info: get_test_env_info(),
        }
@@ -87,7 +71,7 @@ fn can_be_created() {
        &setup.env_info,
        &setup.machine,
        0,
-       vec![get_test_origin()],
+       vec![OriginInfo::get_test_origin()],
        &mut setup.sub_state,
        Arc::new(MemoryDBRepository::new()),
    );
@@ -116,7 +100,7 @@ fn can_return_block_hash() {
        &setup.env_info,
        &setup.machine,
        0,
-       vec![get_test_origin()],
+       vec![OriginInfo::get_test_origin()],
        &mut setup.sub_state,
        Arc::new(MemoryDBRepository::new()),
    );
@@ -141,7 +125,7 @@ fn can_call_fail_empty() {
        &setup.env_info,
        &setup.machine,
        0,
-       vec![get_test_origin()],
+       vec![OriginInfo::get_test_origin()],
        &mut setup.sub_state,
        Arc::new(MemoryDBRepository::new()),
    );
@@ -181,14 +165,16 @@ fn can_log() {
            &setup.env_info,
            &setup.machine,
            0,
-           vec![get_test_origin()],
+           vec![OriginInfo::get_test_origin()],
            &mut setup.sub_state,
            Arc::new(MemoryDBRepository::new()),
        );
-       ext.log(log_topics, &log_data);
+       ext.log(log_topics.clone(), &log_data);
    }
 
-   assert_eq!(setup.sub_state.logs.len(), 1);
+    assert_eq!(setup.sub_state.logs.len(), 1);
+    assert_eq!(setup.sub_state.logs[0].topics, log_topics);
+    assert_eq!(setup.sub_state.logs[0].data, log_data);
 }
 
 #[test]
@@ -204,7 +190,7 @@ fn can_suicide() {
            &setup.env_info,
            &setup.machine,
            0,
-           vec![get_test_origin()],
+           vec![OriginInfo::get_test_origin()],
            &mut setup.sub_state,
            Arc::new(MemoryDBRepository::new()),
        );

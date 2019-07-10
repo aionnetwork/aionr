@@ -60,6 +60,9 @@ mod substate;
 
 pub mod backend;
 
+#[cfg(test)]
+mod tests;
+
 pub use account::{
     AionVMAccount,
     VMAccount,

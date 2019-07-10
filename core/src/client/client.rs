@@ -77,7 +77,7 @@ use views::BlockView;
 
 // re-export
 #[cfg(test)]
-use blockchain::CacheSize as BlockChainCacheSize;
+use types::blockchain::cache::CacheSize as BlockChainCacheSize;
 pub use types::block::status::BlockStatus;
 pub use types::blockchain::info::BlockChainInfo;
 pub use verification::queue::QueueInfo as BlockQueueInfo;
@@ -1713,13 +1713,13 @@ fn transaction_receipt(
     }
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
 
     #[test]
     fn should_not_cache_details_before_commit() {
         use client::BlockChainClient;
-        use tests::helpers::*;
+        use helpers::{generate_dummy_client,get_good_dummy_block_hash};
 
         use std::thread;
         use std::time::Duration;
@@ -1753,4 +1753,4 @@ mod tests {
 
         assert!(client.tree_route(&genesis, &new_hash).is_none());
     }
-}*/
+}

@@ -44,6 +44,18 @@ pub struct OriginInfo {
 }
 
 impl OriginInfo {
+    /// build a OriginInfo for test
+    #[cfg(test)]
+    pub fn get_test_origin() -> OriginInfo {
+        OriginInfo {
+            address: Address::zero(),
+            origin: Address::zero(),
+            gas_price: U256::zero(),
+            value: U256::zero(),
+            origin_tx_hash: H256::default(),
+        }
+    }
+
     /// Populates origin info from action params.
     pub fn from(params: &[&ActionParams]) -> Vec<Self> {
         params

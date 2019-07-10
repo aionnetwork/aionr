@@ -24,8 +24,6 @@
 mod config;
 mod error;
 mod client;
-#[cfg(test)]
-mod test_client;
 mod traits;
 mod chain_notify;
 
@@ -44,5 +42,4 @@ pub use vms::{EnvInfo, LastHashes};
 
 pub use error::{BlockImportError, TransactionImportError};
 
-#[cfg(test)]
-pub use self::test_client::{EachBlockWith, TestBlockChainClient};
+
