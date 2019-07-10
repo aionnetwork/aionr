@@ -1,11 +1,10 @@
 /// tests the operation of docking with the database with `require` or `require_or_from`
 /// public function will test in tests dir
-use super::super::{State,CleanupMode,AccType,AionVMAccount};
+use super::super::{State, CleanupMode, AccType, AionVMAccount};
 use std::sync::Arc;
 use aion_types::{Address, H256, U256};
 use helpers::{get_temp_state,get_temp_state_with_nonce};
 use kvdb::MemoryDBRepository;
-
 
 #[test]
 fn balance_from_database() {
@@ -32,7 +31,7 @@ fn balance_from_database() {
         Default::default(),
         Arc::new(MemoryDBRepository::new()),
     )
-        .unwrap();
+    .unwrap();
     assert_eq!(state.balance(&a).unwrap(), 42.into());
 }
 
@@ -96,7 +95,7 @@ fn code_from_database() {
         Default::default(),
         Arc::new(MemoryDBRepository::new()),
     )
-        .unwrap();
+    .unwrap();
     assert_eq!(state.code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
 }
 
@@ -133,7 +132,7 @@ fn transformed_code_from_database() {
         Default::default(),
         Arc::new(MemoryDBRepository::new()),
     )
-        .unwrap();
+    .unwrap();
     assert_eq!(
         state.transformed_code(&a).unwrap(),
         Some(Arc::new(vec![1u8, 2, 3]))
@@ -157,7 +156,7 @@ fn storage_at_from_database() {
         Default::default(),
         Arc::new(MemoryDBRepository::new()),
     )
-        .unwrap();
+    .unwrap();
     assert_eq!(s.storage_at(&a, &vec![2]).unwrap_or(None), Some(vec![69]));
 }
 
@@ -182,7 +181,7 @@ fn get_from_database() {
         Default::default(),
         Arc::new(MemoryDBRepository::new()),
     )
-        .unwrap();
+    .unwrap();
     assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
     assert_eq!(state.nonce(&a).unwrap(), U256::from(1u64));
 }

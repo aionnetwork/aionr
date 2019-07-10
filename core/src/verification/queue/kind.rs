@@ -22,7 +22,7 @@
 
 //! Definition of valid items for the verification queue.
 use engines::POWEquihashEngine;
-use error::Error;
+use types::error::Error;
 
 use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
@@ -77,7 +77,7 @@ pub mod blocks {
     use super::{Kind, BlockLike};
 
     use engines::POWEquihashEngine;
-    use error::{Error, BlockError};
+    use types::error::{Error, BlockError};
     use header::Header;
     use verification::{PreverifiedBlock, verify_block_basic, verify_block_unordered};
 
@@ -174,7 +174,7 @@ pub mod headers {
     use super::{Kind, BlockLike};
 
     use engines::POWEquihashEngine;
-    use error::Error;
+    use types::error::Error;
     use header::Header;
     use verification::verify_header_params;
 

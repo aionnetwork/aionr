@@ -68,5 +68,4 @@ impl Substate {
 }
 
 #[cfg(test)]
-mod tests {
-}
+mod tests {}

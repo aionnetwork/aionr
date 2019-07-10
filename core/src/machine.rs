@@ -28,7 +28,7 @@ use std::sync::Arc;
 
 use block::{ExecutedBlock, IsBlock};
 use precompiled::builtin::BuiltinContract;
-use error::Error;
+use types::error::Error;
 use executive::{Executive};
 use header::{BlockNumber, Header};
 use spec::CommonParams;

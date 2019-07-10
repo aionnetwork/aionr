@@ -48,7 +48,7 @@ use client::{
 };
 use encoded;
 use engines::{POWEquihashEngine};
-use error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
+use types::error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
 use executive::{contract_address, Executed, Executive};
 use factory::{Factories, VmFactory};
 use header::{BlockNumber, Header, Seal};
@@ -152,7 +152,7 @@ impl Client {
         db: Arc<KeyValueDB>,
         miner: Arc<Miner>,
         message_channel: IoChannel<ClientIoMessage>,
-    ) -> Result<Arc<Client>, ::error::Error>
+    ) -> Result<Arc<Client>, ::types::error::Error>
     {
         let trie_spec = match config.fat_db {
             true => TrieSpec::Fat,
@@ -569,6 +569,7 @@ impl Client {
         // prune all ancient eras until we're below the memory target,
         // but have at least the minimum number of states.
         loop {
+            // true for OverlayRecentDB, false for ArchiveDB
             let needs_pruning = state_db.journal_db().is_pruned()
                 && state_db.journal_db().journal_size() >= self.config.history_mem;
 
@@ -1583,6 +1584,7 @@ impl MiningBlockChainClient for Client {
     fn prepare_block_interval(&self) -> Duration { self.miner.prepare_block_interval() }
 }
 
+#[cfg(test)]
 impl super::traits::EngineClient for Client {
     fn update_sealing(&self) { self.miner.update_sealing(self) }
 

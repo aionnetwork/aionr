@@ -32,9 +32,9 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 
-use error::Error;
+use types::error::Error;
 use account::BasicAccount;
-use executed::{Executed, ExecutionError};
+use types::executed::{Executed, ExecutionError};
 use executive::Executive;
 use factory::Factories;
 use factory::VmFactory;

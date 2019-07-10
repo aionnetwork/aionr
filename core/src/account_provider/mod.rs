@@ -24,4 +24,10 @@ mod test;
 
 mod provider;
 
-pub use self::provider::*;
+pub use self::provider::{
+    Unlock,
+    SignError,
+    AccountToken,
+    AccountProvider,
+    AccountProviderSettings
+};

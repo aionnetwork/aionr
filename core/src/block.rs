@@ -35,7 +35,7 @@ use ethbloom::Bloom;
 use acore_bytes::Bytes;
 use unexpected::Mismatch;
 use engines::POWEquihashEngine;
-use error::{Error, BlockError};
+use types::error::{Error, BlockError};
 use factory::Factories;
 use header::{Header, Seal};
 use receipt::Receipt;
@@ -631,7 +631,7 @@ impl IsBlock for SealedBlock {
 }
 
 /// Enact the block given by block header, transactions
-pub fn enact(
+fn enact(
     header: &Header,
     transactions: &[SignedTransaction],
     engine: &POWEquihashEngine,

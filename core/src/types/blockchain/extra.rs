@@ -163,4 +163,3 @@ impl BlockReceipts {
 impl HeapSizeOf for BlockReceipts {
     fn heap_size_of_children(&self) -> usize { self.receipts.heap_size_of_children() }
 }
-

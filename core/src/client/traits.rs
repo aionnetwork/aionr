@@ -26,7 +26,7 @@ use account::BasicAccount;
 use block::{OpenBlock, SealedBlock, ClosedBlock};
 use blockchain::TreeRoute;
 use encoded;
-use error::{ImportResult, CallError, BlockImportError};
+use types::error::{ImportResult, CallError, BlockImportError};
 use factory::VmFactory;
 use executive::Executed;
 use filter::Filter;

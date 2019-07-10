@@ -87,7 +87,7 @@ impl BuiltinContract for Blake2bHashContract {
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::Blake2bHashContract;
     use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
     use state::{State, Substate};
@@ -155,23 +155,23 @@ mod tests{
         assert_eq!(to_hex(&*ret_data), expected);
     }
 
-// uncomment if uncomment box_syntax in root crate
-//    #[test]
-//    fn test_blake256_3() {
-//        // long input
-//        let contract = get_contract();
-//        let state = &mut get_temp_state();
-//        let substate = &mut Substate::new();
-//        let mut ext = get_ext_default(state, substate);
-//
-//        let input = box [0u8; 2 * 1024 * 1024];
-//        let result = contract.execute(&mut ext, input.as_ref());
-//        assert!(result.status_code == ExecStatus::Success);
-//        let ret_data = result.return_data;
-//        assert_eq!(ret_data.mem.len(), 32);
-//        let expected = "9852d74e002f23d14ba2638b905609419bd16e50843ac147ccf4d509ed2c9dfc";
-//        assert_eq!(to_hex(&ret_data.mem), expected);
-//    }
+    // uncomment if uncomment box_syntax in root crate
+    //    #[test]
+    //    fn test_blake256_3() {
+    //        // long input
+    //        let contract = get_contract();
+    //        let state = &mut get_temp_state();
+    //        let substate = &mut Substate::new();
+    //        let mut ext = get_ext_default(state, substate);
+    //
+    //        let input = box [0u8; 2 * 1024 * 1024];
+    //        let result = contract.execute(&mut ext, input.as_ref());
+    //        assert!(result.status_code == ExecStatus::Success);
+    //        let ret_data = result.return_data;
+    //        assert_eq!(ret_data.mem.len(), 32);
+    //        let expected = "9852d74e002f23d14ba2638b905609419bd16e50843ac147ccf4d509ed2c9dfc";
+    //        assert_eq!(to_hex(&ret_data.mem), expected);
+    //    }
 
     #[test]
     fn test_blake256_invalid_length() {
@@ -184,16 +184,16 @@ mod tests{
         assert!(result.status_code == ExecStatus::Failure);
     }
 
-// uncomment if uncomment box_syntax in root crate
-//    #[test]
-//    fn test_blake256_larger_length() {
-//        let contract = get_contract();
-//        let state = &mut get_temp_state();
-//        let substate = &mut Substate::new();
-//        let mut ext = get_ext_default(state, substate);
-//        let input = box [0u8; 2 * 1024 * 1024 + 1];
-//        let result = contract.execute(&mut ext, input.as_ref());
-//        assert!(result.status_code == ExecStatus::Failure);
-//    }
+    // uncomment if uncomment box_syntax in root crate
+    //    #[test]
+    //    fn test_blake256_larger_length() {
+    //        let contract = get_contract();
+    //        let state = &mut get_temp_state();
+    //        let substate = &mut Substate::new();
+    //        let mut ext = get_ext_default(state, substate);
+    //        let input = box [0u8; 2 * 1024 * 1024 + 1];
+    //        let result = contract.execute(&mut ext, input.as_ref());
+    //        assert!(result.status_code == ExecStatus::Failure);
+    //    }
 
 }

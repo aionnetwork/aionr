@@ -13,12 +13,11 @@ use vms::{
 };
 use state::{Substate, CleanupMode};
 use transaction::{Action, Transaction, SignedTransaction, DEFAULT_TRANSACTION_TYPE};
-use error::ExecutionError;
+use types::error::ExecutionError;
 use executive::{Executive, contract_address};
 use avm_abi::{AVMEncoder, AbiToken, ToBytes};
 
 use helpers::{get_temp_state,make_aion_machine};
-
 
 #[test]
 fn test_contract_address() {
