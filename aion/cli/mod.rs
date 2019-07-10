@@ -422,12 +422,12 @@ usage! {
 
             ARG arg_author: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.author.clone(),
             "--author=[ADDRESS]",
-            "Specify the block author (aka \"coinbase\") address for sending block rewards from sealed blocks. NOTE: MINING WILL NOT WORK WITHOUT THIS OPTION.", // Sealing/Mining Option
+            "Specify the block author (aka \"coinbase\") address for sending block rewards from sealed blocks. NOTE: MINING WILL NOT WORK WITHOUT THIS OPTION.",
 
             // TOREMOVE: Unity MS1 use only
-            ARG arg_author_pos: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.author_pos.clone(),
-            "--author-pos=[ADDRESS]",
-            "Specify the PoS block author (aka \"coinbase\") address for sending block rewards from sealed blocks. NOTE: MINING WILL NOT WORK WITHOUT THIS OPTION.", // Sealing/Mining Option
+            ARG arg_staker_private_key: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.staker_private_key.clone(),
+            "--staker-private-key=[ADDRESS]",
+            "Specify the PoS block author's private key for sending block rewards from sealed blocks. NOTE: INTERNAL STAKING WILL NOT WORK WITHOUT THIS OPTION.",
 
             ARG arg_tx_gas_limit: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.tx_gas_limit.clone(),
             "--tx-gas-limit=[GAS]",
@@ -618,7 +618,7 @@ struct WalletApi {
 #[serde(deny_unknown_fields)]
 struct Mining {
     author: Option<String>,
-    author_pos: Option<String>,
+    staker_private_key: Option<String>,
     force_sealing: Option<bool>,
     reseal_min_period: Option<u64>,
     work_queue_size: Option<usize>,

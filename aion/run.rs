@@ -138,7 +138,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         tx_status_channel,
     );
     miner.set_author(cmd.miner_extras.author);
-    miner.set_author_pos(cmd.miner_extras.author_pos);
     miner.set_gas_floor_target(cmd.miner_extras.gas_floor_target);
     miner.set_gas_ceil_target(cmd.miner_extras.gas_ceil_target);
     miner.set_extra_data(cmd.miner_extras.extra_data);

@@ -24,6 +24,7 @@ use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
 use std::time::{self, Duration, Instant};
 use std::thread;
+use rustc_hex::FromHex;
 
 use account_provider::AccountProvider;
 use aion_types::{Address, H256, U256};
@@ -55,6 +56,7 @@ use receipt::Receipt;
 use spec::Spec;
 use state::State;
 use rcrypto::ed25519;
+use key::Ed25519KeyPair;
 
 /// Different possible definitions for pending transaction set.
 #[derive(Debug, PartialEq)]
@@ -117,6 +119,8 @@ pub struct MinerOptions {
     pub maximal_gas_price: U256,
     /// maximal gas price of a new local transaction to be accepted by the miner/transaction queue when using dynamic gas price
     pub local_max_gas_price: U256,
+    /// Staker private key
+    pub staker_private_key: Option<String>,
 }
 
 impl Default for MinerOptions {
@@ -136,6 +140,7 @@ impl Default for MinerOptions {
             minimal_gas_price: 10_000_000_000u64.into(),
             maximal_gas_price: 9_000_000_000_000_000_000u64.into(),
             local_max_gas_price: 100_000_000_000u64.into(),
+            staker_private_key: None,
         }
     }
 }
@@ -158,7 +163,7 @@ pub struct Miner {
     gas_range_target: RwLock<(U256, U256)>,
     author: RwLock<Address>,
     // TOREMOVE: Unity MS1 use only.
-    author_pos: RwLock<Address>,
+    staker: Option<Ed25519KeyPair>,
     extra_data: RwLock<Bytes>,
     engine: Arc<POWEquihashEngine>,
     accounts: Option<Arc<AccountProvider>>,
@@ -353,6 +358,12 @@ impl Miner {
         let transaction_pool: TransactionPool =
             TransactionPool::new(RwLock::new(transaction_queue));
 
+        // TOREMOVE: Unity MS1 use only
+        let staker: Option<Ed25519KeyPair> = match options.staker_private_key.to_owned() {
+            Some(key) => parse_staker(key).ok(),
+            None => None,
+        };
+
         Miner {
             transaction_pool,
             next_allowed_reseal: Mutex::new(Instant::now()),
@@ -363,7 +374,7 @@ impl Miner {
             }),
             gas_range_target: RwLock::new((U256::zero(), U256::zero())),
             author: RwLock::new(Address::default()),
-            author_pos: RwLock::new(Address::default()),
+            staker: staker,
             extra_data: RwLock::new(Vec::new()),
             options,
             accounts,
@@ -416,7 +427,15 @@ impl Miner {
                     // block not found - create it.
                     trace!(target: "block", "prepare_block: No existing work - making new block");
                     let author: Address = match seal_type {
-                        Some(SealType::PoS) => self.author_pos(),
+                        Some(SealType::PoS) => {
+                            self.staker()
+                                .to_owned()
+                                .expect(
+                                    "staker key not specified in configuration. Should have \
+                                     checked before.",
+                                )
+                                .address()
+                        }
                         _ => self.author(),
                     };
                     client.prepare_open_block(
@@ -824,7 +843,7 @@ impl MinerService for Miner {
 
     fn set_author(&self, author: Address) { *self.author.write() = author; }
 
-    fn set_author_pos(&self, author: Address) { *self.author_pos.write() = author; }
+    fn set_staker(&mut self, staker: Ed25519KeyPair) { self.staker = Some(staker); }
 
     fn set_extra_data(&self, extra_data: Bytes) { *self.extra_data.write() = extra_data; }
 
@@ -854,8 +873,8 @@ impl MinerService for Miner {
     /// Get the author that we will seal blocks as.
     fn author(&self) -> Address { *self.author.read() }
 
-    /// Get the PoS author that we will seal PoS blocks.
-    fn author_pos(&self) -> Address { *self.author_pos.read() }
+    /// Get the PoS staker that we will seal PoS blocks.
+    fn staker(&self) -> &Option<Ed25519KeyPair> { &self.staker }
 
     /// Get the extra_data that we will seal blocks with.
     fn extra_data(&self) -> Bytes { self.extra_data.read().clone() }
@@ -1223,4 +1242,27 @@ impl MinerService for Miner {
         self.transaction_pool.record_transaction_sealed();
         client.new_block_chained();
     }
+}
+
+// TOREMOVE: Unity MS1 use only
+fn parse_staker(key: String) -> Result<Ed25519KeyPair, String> {
+    let bytes: Vec<u8>;
+    if key.starts_with("0x") {
+        bytes = String::from(&key[2..])
+            .from_hex()
+            .map_err(|_| "Private key is not hex string.")?;
+    } else {
+        bytes = key
+            .from_hex()
+            .map_err(|_| "Private key is not hex string.")?;
+    }
+    if bytes.len() != 32 {
+        return Err("Private key length is not 32.".to_owned());
+    }
+    let mut sk = [0; 32];
+    sk.copy_from_slice(&bytes[..]);
+    let (secret, public): ([u8; 64], [u8; 32]) = ed25519::keypair(&sk);
+    let mut keypair: Vec<u8> = secret.to_vec();
+    keypair.extend(public.to_vec());
+    Ok(keypair.into())
 }
