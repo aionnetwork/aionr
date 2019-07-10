@@ -127,6 +127,8 @@ pub struct BlockDetails {
     pub parent: H256,
     /// List of children block hashes
     pub children: Vec<H256>,
+    /// The anti seal parent hash
+    pub anti_seal_parent: H256,
 }
 
 impl HeapSizeOf for BlockDetails {

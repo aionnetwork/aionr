@@ -261,6 +261,7 @@ impl ClientService {
                         total_difficulty: U256::from(*parent_header.difficulty()),
                         parent: H256::from(*parent_header.parent_hash()),
                         children: vec![],
+                        anti_seal_parent: H256::default(), // TODO-Unity: implement calculation of anti_seal_parent
                     };
                     // reset state db
                     let latest_era_key = [b'l', b'a', b's', b't', 0, 0, 0, 0, 0, 0, 0, 0];

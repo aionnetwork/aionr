@@ -1101,6 +1101,11 @@ impl BlockChainClient for Client {
         chain.block_header_data(hash)
     }
 
+    fn seal_parent_header(&self, hash: &H256) -> Option<::encoded::Header> {
+        let chain = self.chain.read();
+        chain.seal_parent_header(hash)
+    }
+
     fn block_number(&self, id: BlockId) -> Option<BlockNumber> { self.block_number_ref(&id) }
 
     fn block_body(&self, id: BlockId) -> Option<encoded::Body> {

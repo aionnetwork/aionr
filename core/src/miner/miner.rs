@@ -1164,7 +1164,7 @@ impl MinerService for Miner {
     fn map_sealing_work<F, T>(&self, client: &MiningBlockChainClient, f: F) -> Option<T>
     where F: FnOnce(&ClosedBlock) -> T {
         trace!(target: "miner", "map_sealing_work: entering");
-        self.prepare_work_sealing(client, &None); // TODO: handle PoW and PoS better
+        self.prepare_work_sealing(client, &None); // TODO-Unity-Rpc staking: handle PoW and PoS better
         trace!(target: "miner", "map_sealing_work: sealing prepared");
         let mut sealing_work = self.sealing_work.lock();
         let ret = sealing_work.queue.use_last_ref();
