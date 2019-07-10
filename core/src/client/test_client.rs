@@ -853,7 +853,7 @@ impl ProvingBlockChainClient for TestBlockChainClient {
 }
 
 impl super::traits::EngineClient for TestBlockChainClient {
-    fn update_sealing(&self) { self.miner.update_sealing(self, None) }
+    fn update_sealing(&self) { self.miner.update_sealing(self) }
 
     fn submit_seal(&self, block_hash: H256, seal: Vec<Bytes>) {
         if self.miner.submit_seal(self, block_hash, seal).is_err() {
