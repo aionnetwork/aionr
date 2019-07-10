@@ -61,7 +61,7 @@ use rlp::*;
 use service::ClientIoMessage;
 use spec::Spec;
 use state::{self, State};
-use state_db::StateDB;
+use db::StateDB;
 use transaction::{
     Action, LocalizedTransaction, PendingTransaction, SignedTransaction, AVM_TRANSACTION_TYPE
 };

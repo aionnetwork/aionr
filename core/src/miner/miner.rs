@@ -187,11 +187,7 @@ impl Miner {
     pub fn clear(&self) { self.sealing_work.lock().queue.reset(); }
 
     /// Get `Some` `clone()` of the current pending block's state or `None` if we're not sealing.
-    pub fn pending_state(
-        &self,
-        latest_block_number: BlockNumber,
-    ) -> Option<State<::state_db::StateDB>>
-    {
+    pub fn pending_state(&self, latest_block_number: BlockNumber) -> Option<State<::db::StateDB>> {
         self.map_pending_block(|b| b.state().clone(), latest_block_number)
     }
 

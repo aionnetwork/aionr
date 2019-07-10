@@ -41,7 +41,7 @@ use machine::EthereumMachine as Machine;
 use pod_account::*;
 use pod_state::{self, PodState};
 use receipt::Receipt;
-use state_db::StateDB;
+use db::StateDB;
 use transaction::SignedTransaction;
 use types::state::state_diff::StateDiff;
 use vms::EnvInfo;
