@@ -248,7 +248,7 @@ impl Miner {
                 Some(header) => {
                     let seed: Bytes = header
                         .seal()
-                        .get(0)
+                        .get(1)
                         .expect("A pos block has to contain a seed")
                         .to_owned();
                     seed
@@ -261,8 +261,8 @@ impl Miner {
 
             // 3. Seal the block
             let mut seal: Vec<Bytes> = Vec::new();
-            seal.push(seed.to_vec());
             seal.push(signature.to_vec());
+            seal.push(seed.to_vec());
             let sealed_block: SealedBlock = raw_block
                 .lock()
                 .try_seal(&*self.engine, seal)
