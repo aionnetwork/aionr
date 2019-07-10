@@ -40,6 +40,4 @@ pub use types::call_analytics::CallAnalytics;
 pub use executive::{Executed, Executive};
 pub use vms::{EnvInfo, LastHashes};
 
-pub use error::{BlockImportError, TransactionImportError};
-
-
+pub use types::error::{BlockImportError, TransactionImportError};

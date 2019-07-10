@@ -1,4 +1,5 @@
-use aion_types::{Address, /*H256,*/ U256};
+use aion_types::{Address, /*H256,*/
+U256};
 use key::Ed25519Secret;
 use logger::init_log;
 //use receipt::SimpleReceipt;

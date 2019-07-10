@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use header::Header;
-use error::{BlockError, Error};
+use types::error::{BlockError, Error};
 use unexpected::{Mismatch, OutOfBounds};
 
 pub trait DependentHeaderValidator {

@@ -20,7 +20,6 @@
  *
  ******************************************************************************/
 
-
 use std::collections::BTreeMap;
 use types::state::state_diff::StateDiff;
 use types::account::account_diff::{ AccountDiff, Diff };

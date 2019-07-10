@@ -136,7 +136,7 @@ fn test_fork_transaction_addresses() {
         gas_price_bytes: Vec::new(),
         value_bytes: Vec::new(),
     }
-        .sign(keychain::ethkey::generate_keypair().secret(), None);
+    .sign(keychain::ethkey::generate_keypair().secret(), None);
 
     let t1_hash = t1.hash().clone();
 
@@ -196,7 +196,7 @@ fn test_overwriting_transaction_addresses() {
         value_bytes: Vec::new(),
         nonce_bytes: Vec::new(),
     }
-        .sign(&keypair.secret(), None);
+    .sign(&keypair.secret(), None);
 
     let t2 = Transaction {
         nonce: 1.into(),
@@ -213,7 +213,7 @@ fn test_overwriting_transaction_addresses() {
         nonce_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-        .sign(&keypair.secret(), None);
+    .sign(&keypair.secret(), None);
     let t3 = Transaction {
         nonce: 2.into(),
         gas_price: 0.into(),
@@ -229,7 +229,7 @@ fn test_overwriting_transaction_addresses() {
         nonce_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-        .sign(&keypair.secret(), None);
+    .sign(&keypair.secret(), None);
 
     let genesis = BlockBuilder::genesis();
     let b1a = genesis.add_block_with_transactions(vec![t1.clone(), t2.clone()]);
@@ -561,7 +561,7 @@ fn test_logs() {
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-        .sign(keypair.secret(), None);
+    .sign(keypair.secret(), None);
     let t2 = Transaction {
         nonce: 0.into(),
         gas_price: 0.into(),
@@ -577,7 +577,7 @@ fn test_logs() {
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-        .sign(keypair.secret(), None);
+    .sign(keypair.secret(), None);
     let t3 = Transaction {
         nonce: 0.into(),
         gas_price: 0.into(),
@@ -593,7 +593,7 @@ fn test_logs() {
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
     }
-        .sign(keypair.secret(), None);
+    .sign(keypair.secret(), None);
     let tx_hash1 = t1.hash().clone();
     let tx_hash2 = t2.hash().clone();
     let tx_hash3 = t3.hash().clone();

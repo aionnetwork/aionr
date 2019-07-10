@@ -225,6 +225,3 @@ impl fmt::Display for CallError {
         f.write_fmt(format_args!("Transaction execution error ({}).", msg))
     }
 }
-
-// Transaction execution result.
-// pub type ExecutionResult = Result<Executed, ExecutionError>;

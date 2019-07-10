@@ -20,12 +20,11 @@
  *
  ******************************************************************************/
 
-
 use log;
 use std::sync::Arc;
 use block::{OpenBlock, LockedBlock, SealedBlock, Drain};
 use engines::POWEquihashEngine;
-use error::Error;
+use types::error::Error;
 use header::Header;
 use factory::Factories;
 use state_db::StateDB;
@@ -92,11 +91,10 @@ fn enact_bytes(
     Ok(b.close_and_lock())
 }
 
-
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header. Seal the block afterwards
 fn enact_and_seal(
     block_bytes: &[u8],
-//    engine: &EthEngine,
+    //    engine: &EthEngine,
     engine: &POWEquihashEngine,
     db: StateDB,
     parent: &Header,
@@ -114,10 +112,8 @@ fn enact_and_seal(
         last_hashes,
         factories,
     )?
-        .seal(engine, header.seal())?)
+    .seal(engine, header.seal())?)
 }
-
-
 
 #[test]
 fn open_block() {
@@ -139,12 +135,11 @@ fn open_block() {
         vec![],
         Arc::new(MemoryDBRepository::new()),
     )
-        .unwrap();
+    .unwrap();
     let b = b.close_and_lock();
     let res = b.seal(&*spec.engine, vec![]);
     assert!(res.is_ok());
 }
-
 
 #[test]
 fn enact_block() {
@@ -169,10 +164,10 @@ fn enact_block() {
         vec![],
         Arc::new(MemoryDBRepository::new()),
     )
-        .unwrap()
-        .close_and_lock()
-        .seal(engine, vec![])
-        .unwrap();
+    .unwrap()
+    .close_and_lock()
+    .seal(engine, vec![])
+    .unwrap();
     let orig_bytes = b.rlp_bytes();
     let orig_db = b.drain();
 
@@ -187,7 +182,7 @@ fn enact_block() {
         last_hashes,
         Default::default(),
     )
-        .unwrap();
+    .unwrap();
 
     assert_eq!(e.rlp_bytes(), orig_bytes);
 

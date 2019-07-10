@@ -24,10 +24,7 @@
 pub mod pow_equihash_engine;
 pub use self::pow_equihash_engine::POWEquihashEngine;
 
-use std::sync::Arc;
 use std::fmt;
-
-use aion_machine::{Machine, LocalizedMachine as Localized};
 use aion_types::Address;
 use unexpected::{Mismatch, OutOfBounds};
 
@@ -71,26 +68,4 @@ impl fmt::Display for EngineError {
 
         f.write_fmt(format_args!("Engine error ({})", msg))
     }
-}
-
-/// Proof dependent on state.
-pub trait StateDependentProof<M: Machine>: Send + Sync {
-    /// Generate a proof, given the state.
-    // TODO: make this into an &M::StateContext
-    fn generate_proof<'a>(
-        &self,
-        state: &<M as Localized<'a>>::StateContext,
-    ) -> Result<Vec<u8>, String>;
-    /// Check a proof generated elsewhere (potentially by a peer).
-    // `engine` needed to check state proofs, while really this should
-    // just be state machine params.
-    fn check_proof(&self, machine: &M, proof: &[u8]) -> Result<(), String>;
-}
-
-/// Proof generated on epoch change.
-pub enum Proof<M: Machine> {
-    /// Known proof (extracted from signal)
-    Known(Vec<u8>),
-    /// State dependent proof.
-    WithState(Arc<StateDependentProof<M>>),
 }

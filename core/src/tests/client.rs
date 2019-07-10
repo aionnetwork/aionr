@@ -280,7 +280,7 @@ fn change_history_size() {
 
     {
         let client = Client::new(
-            config,//ClientConfig::default(),
+            config, //ClientConfig::default(),
             &test_spec,
             client_db.clone(),
             Arc::new(Miner::with_spec(&test_spec)),

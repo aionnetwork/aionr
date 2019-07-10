@@ -12,16 +12,9 @@ use sync::*;
 use db;
 use spec::Spec;
 
-fn load<'a>(b: &[u8]) -> Spec {
-    Spec::load( b)
-        .expect("chain spec is invalid")
-}
+fn load<'a>(b: &[u8]) -> Spec { Spec::load(b).expect("chain spec is invalid") }
 
-pub fn new_spec() -> Spec {
-    load(
-        include_bytes!("../../../resources/mainnet.json"),
-    )
-}
+pub fn new_spec() -> Spec { load(include_bytes!("../../../resources/mainnet.json")) }
 
 fn new_db() -> Arc<KeyValueDB> {
     let mut db_configs = Vec::new();
@@ -75,7 +68,7 @@ pub fn get_client(spec: &Spec) -> Arc<Client> {
         Arc::new(Miner::with_spec(&spec)),
         channel.clone(),
     )
-        .unwrap()
+    .unwrap()
 }
 
 #[test]
@@ -85,12 +78,9 @@ fn benchtest_sync_mainnet() {
 
     let net_config = get_network_config();
 
-    let sync = Sync::new(
-        client.clone() as Arc<BlockChainClient>,
-        net_config,
-    );
+    let sync = Sync::new(client.clone() as Arc<BlockChainClient>, net_config);
 
-    let (sync_provider,  _chain_notify) = (
+    let (sync_provider, _chain_notify) = (
         sync.clone() as Arc<SyncProvider>,
         sync.clone() as Arc<ChainNotify>,
     );

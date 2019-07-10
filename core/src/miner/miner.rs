@@ -27,8 +27,9 @@ use ansi_term::Colour;
 use block::{Block, ClosedBlock, IsBlock};
 use client::{BlockId, MiningBlockChainClient, TransactionId};
 use engines::POWEquihashEngine;
-use error::*;
-use header::{BlockNumber, Header};
+// use types::error::*;
+use types::{BlockNumber};
+use types::error::*;
 use io::IoChannel;
 use miner::{MinerService, MinerStatus};
 use parking_lot::{Mutex, RwLock};
@@ -53,6 +54,7 @@ use transaction::transaction_queue::{
     AccountDetails, PrioritizationStrategy, RemovalReason, TransactionOrigin, TransactionQueue,
 };
 use using_queue::{GetAction, UsingQueue};
+use header::Header;
 
 /// Different possible definitions for pending transaction set.
 #[derive(Debug, PartialEq)]
@@ -1123,7 +1125,7 @@ impl MinerService for Miner {
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     use aion_types::U256;
     use block::IsBlock;
     use client::BlockChainClient;
@@ -1195,8 +1197,8 @@ mod tests{
             None, // accounts provider
             IoChannel::disconnected(),
         ))
-            .ok()
-            .expect("Miner was just created.")
+        .ok()
+        .expect("Miner was just created.")
     }
 
     fn transaction() -> SignedTransaction {
@@ -1214,7 +1216,7 @@ mod tests{
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
         }
-            .sign(keypair.secret(), None)
+        .sign(keypair.secret(), None)
     }
 
     fn default_gas_price() -> U256 { 0u64.into() }

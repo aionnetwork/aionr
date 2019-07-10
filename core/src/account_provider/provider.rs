@@ -17,7 +17,7 @@ use keychain::EthStore;
 
 /// Type of unlock.
 #[derive(Clone, PartialEq)]
-enum Unlock {
+pub enum Unlock {
     /// If account is unlocked temporarily, it should be locked after first usage.
     OneTime,
     /// Account unlocked permanently can always sign message.
@@ -426,7 +426,7 @@ impl AccountProvider {
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     use super::{AccountProvider, Unlock};
     use std::time::Instant;
     use keychain::ethkey::{generate_keypair, Address};

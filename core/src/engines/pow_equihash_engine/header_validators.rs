@@ -23,7 +23,7 @@ use header::{Header, V1};
 use equihash::EquihashValidator;
 use blake2b::Blake2b;
 use aion_types::U256;
-use error::{BlockError, Error};
+use types::error::{BlockError, Error};
 use unexpected::{Mismatch, OutOfBounds};
 use acore_bytes::to_hex;
 

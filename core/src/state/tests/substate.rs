@@ -1,4 +1,3 @@
-
 use state::substate::Substate;
 use log_entry::LogEntry;
 

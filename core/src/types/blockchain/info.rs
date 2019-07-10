@@ -53,21 +53,6 @@ pub struct BlockChainInfo {
     pub first_block_number: Option<BlockNumber>,
 }
 
-impl BlockChainInfo {
-    // Determine the security model for the current state.
-    // pub fn security_level(&self) -> SecurityLevel {
-    //     if self.ancient_block_number.is_none() || self.first_block_number.is_none() {
-    //         SecurityLevel::FullProofOfWork
-    //     } else {
-    //         SecurityLevel::PartialProofOfWork(
-    //             self.best_block_number - self
-    //                 .first_block_number
-    //                 .expect("Guard condition means this is not none"),
-    //         )
-    //     }
-    // }
-}
-
 impl fmt::Display for BlockChainInfo {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "#{}.{}", self.best_block_number, self.best_block_hash)

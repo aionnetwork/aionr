@@ -44,7 +44,6 @@ use machine::EthereumMachine;
 use std::collections::BTreeMap;
 use db;
 
-
 pub fn make_aion_machine() -> EthereumMachine {
     EthereumMachine::regular(Default::default(), BTreeMap::new(), U256::zero())
 }
@@ -479,6 +478,10 @@ impl ChainNotify for TestNotify {
         _sealed: Vec<H256>,
         // Block bytes.
         _proposed: Vec<Bytes>,
-        _duration: u64,) {unimplemented!()}
+        _duration: u64,
+    )
+    {
+        unimplemented!()
+    }
     fn broadcast(&self, data: Vec<u8>) { self.messages.write().push(data); }
 }

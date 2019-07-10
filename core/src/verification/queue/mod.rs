@@ -32,7 +32,7 @@ use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
 use parking_lot::{Condvar, Mutex, RwLock};
 use io::*;
-use error::*;
+use types::error::*;
 use engines::POWEquihashEngine;
 use service::*;
 
