@@ -34,7 +34,7 @@ use aion_types::{H256, U256, Address};
 use ethbloom::Bloom;
 use acore_bytes::Bytes;
 use unexpected::Mismatch;
-use engines::POWEquihashEngine;
+use engine::POWEquihashEngine;
 use types::error::{Error, BlockError};
 use factory::Factories;
 use header::{Header, Seal};

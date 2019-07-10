@@ -103,7 +103,7 @@ pub mod client;
 // unverified transaction
 pub mod transaction;
 // PoW Engine
-pub mod engines;
+pub mod engine;
 //pub mod error;
 pub mod header;
 pub mod views;
@@ -121,9 +121,7 @@ mod state;
 mod state_db;
 mod db;
 mod factory;
-mod account;
 mod cache_manager;
-mod blooms;
 mod account_db;
 mod precompiled;
 mod executive;

@@ -39,7 +39,7 @@ use unexpected::{Mismatch, OutOfBounds};
 
 use blockchain::*;
 use client::BlockChainClient;
-use engines::POWEquihashEngine;
+use engine::POWEquihashEngine;
 use types::error::{BlockError, Error};
 use header::{BlockNumber, Header};
 use transaction::{SignedTransaction, UnverifiedTransaction};

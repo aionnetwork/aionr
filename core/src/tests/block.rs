@@ -23,7 +23,7 @@
 use log;
 use std::sync::Arc;
 use block::{OpenBlock, LockedBlock, SealedBlock, Drain};
-use engines::POWEquihashEngine;
+use engine::POWEquihashEngine;
 use types::error::Error;
 use header::Header;
 use factory::Factories;

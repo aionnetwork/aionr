@@ -36,7 +36,7 @@ use trie::{Trie, TrieFactory, TrieSpec};
 
 // other
 use aion_types::{Address, H128, H256, H264, U256};
-use account::BasicAccount;
+use state::BasicAccount;
 use block::*;
 use blockchain::{BlockChain, BlockProvider, TreeRoute};
 use types::blockchain::import_route::ImportRoute;
@@ -47,7 +47,7 @@ use client::{
     MiningBlockChainClient, ProvingBlockChainClient, PruningInfo, TransactionId,
 };
 use encoded;
-use engines::{POWEquihashEngine};
+use engine::{POWEquihashEngine};
 use types::error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
 use executive::{contract_address, Executed, Executive};
 use factory::{Factories, VmFactory};

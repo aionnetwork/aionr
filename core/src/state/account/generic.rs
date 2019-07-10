@@ -4,7 +4,7 @@ use std::collections::HashSet;
 
 use aion_types::{H256, U256};
 use acore_bytes::{Bytes};
-use account::traits::AccType;
+use state::account::traits::AccType;
 
 /// Basic account type.
 #[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]

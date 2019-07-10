@@ -39,7 +39,7 @@ use transaction::*;
 use views::*;
 use log_entry::{LogEntry, LocalizedLogEntry};
 use receipt::Receipt;
-use blooms::{BloomGroup, GroupPosition};
+use types::blooms::{BloomGroup, GroupPosition};
 use types::blockchain::best_block::{BestBlock, BestAncientBlock};
 use types::block::info::{BlockInfo, BlockLocation, BranchBecomingCanonChainData};
 use types::blockchain::extra::{

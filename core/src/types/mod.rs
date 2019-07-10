@@ -31,6 +31,7 @@ pub mod blockchain;
 pub mod state;
 pub mod error;
 pub mod executed;
+pub mod blooms;
 
 #[cfg(test)]
 mod test;

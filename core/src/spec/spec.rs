@@ -36,7 +36,7 @@ use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
 use types::BlockNumber;
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
-use engines::POWEquihashEngine;
+use engine::POWEquihashEngine;
 use types::error::Error;
 use executive::Executive;
 use factory::Factories;

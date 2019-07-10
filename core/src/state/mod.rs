@@ -33,7 +33,6 @@ use std::fmt;
 use std::sync::Arc;
 
 use types::error::Error;
-use account::BasicAccount;
 use types::executed::{Executed, ExecutionError};
 use executive::Executive;
 use factory::Factories;
@@ -56,6 +55,7 @@ use trie::recorder::Recorder;
 use trie::{Trie, TrieDB, TrieError};
 
 mod account_state;
+mod account;
 mod substate;
 
 pub mod backend;
@@ -63,11 +63,12 @@ pub mod backend;
 #[cfg(test)]
 mod tests;
 
-pub use account::{
+pub use state::account::{
     AionVMAccount,
     VMAccount,
     AccType,
     RequireCache,
+    BasicAccount
 };
 pub use self::backend::Backend;
 pub use self::substate::Substate;

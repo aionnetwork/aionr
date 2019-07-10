@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 //! Definition of valid items for the verification queue.
-use engines::POWEquihashEngine;
+use engine::POWEquihashEngine;
 use types::error::Error;
 
 use heapsize::HeapSizeOf;
@@ -76,7 +76,7 @@ pub trait Kind: 'static + Sized + Send + Sync {
 pub mod blocks {
     use super::{Kind, BlockLike};
 
-    use engines::POWEquihashEngine;
+    use engine::POWEquihashEngine;
     use types::error::{Error, BlockError};
     use header::Header;
     use verification::{PreverifiedBlock, verify_block_basic, verify_block_unordered};
@@ -173,7 +173,7 @@ pub mod blocks {
 pub mod headers {
     use super::{Kind, BlockLike};
 
-    use engines::POWEquihashEngine;
+    use engine::POWEquihashEngine;
     use types::error::Error;
     use header::Header;
     use verification::verify_header_params;

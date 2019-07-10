@@ -55,7 +55,7 @@ use types::error::{ImportResult, CallError};
 use factory::VmFactory;
 use miner::{Miner, MinerService};
 use spec::Spec;
-use account::BasicAccount;
+use state::BasicAccount;
 use types::pruning_info::PruningInfo;
 
 use verification::queue::QueueInfo;

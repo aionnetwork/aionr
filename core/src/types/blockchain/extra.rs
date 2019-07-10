@@ -23,7 +23,7 @@
 //! Blockchain DB extras.
 
 use std::ops;
-use blooms::{GroupPosition, BloomGroup};
+use types::blooms::{GroupPosition, BloomGroup};
 use db::Key;
 use header::BlockNumber;
 use receipt::Receipt;

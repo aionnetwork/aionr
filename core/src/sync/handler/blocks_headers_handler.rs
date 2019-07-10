@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use client::BlockId;
-use engines::pow_equihash_engine::POWEquihashEngine;
+use engine::pow_equihash_engine::POWEquihashEngine;
 use header::Header as BlockHeader;
 use acore_bytes::to_hex;
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};

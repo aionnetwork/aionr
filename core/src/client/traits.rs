@@ -22,7 +22,7 @@
 
 use std::time::Duration;
 
-use account::BasicAccount;
+use state::BasicAccount;
 use block::{OpenBlock, SealedBlock, ClosedBlock};
 use blockchain::TreeRoute;
 use encoded;

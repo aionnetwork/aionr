@@ -22,7 +22,7 @@
 use std::collections::HashMap;
 use aion_types::H256;
 use header::BlockNumber;
-use blooms::{BloomGroup, GroupPosition};
+use types::blooms::{BloomGroup, GroupPosition};
 
 use types::block::info::BlockInfo;
 use types::blockchain::extra::{BlockDetails, BlockReceipts, TransactionAddress};
