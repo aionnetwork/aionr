@@ -255,7 +255,12 @@ impl Miner {
                 }
                 None => Bytes::new(),
             };
-            let key_pair: [u8; 64] = [0; 64]; // TODO: add a real staker private key in configuration
+            let key_pair: [u8; 64] = self
+                .staker()
+                .to_owned()
+                .expect("Internal staker is null. Should have checked before.")
+                .secret()
+                .0;
             let seed = self.sign(&key_pair, &parent_seed);
             let signature = self.sign(&key_pair, &bare_hash.0);
 
