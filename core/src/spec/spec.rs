@@ -250,7 +250,7 @@ impl Spec {
                     pow_equihash_engine.params.into(),
                     machine,
                 ))
-            },
+            }
             ajson::spec::Engine::Null(null_engine) => {
                 Arc::new(NullEngine::new(null_engine.params.into(), machine))
             }

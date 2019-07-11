@@ -66,10 +66,7 @@ pub trait Kind: 'static + Sized + Send + Sync {
     fn create(input: Self::Input, engine: &AionEngine) -> Result<Self::Unverified, Error>;
 
     /// Attempt to verify the `Unverified` item using the given engine.
-    fn verify(
-        unverified: Self::Unverified,
-        engine: &AionEngine,
-    ) -> Result<Self::Verified, Error>;
+    fn verify(unverified: Self::Unverified, engine: &AionEngine) -> Result<Self::Verified, Error>;
 }
 
 /// The blocks verification module.
@@ -93,11 +90,7 @@ pub mod blocks {
         type Unverified = Unverified;
         type Verified = PreverifiedBlock;
 
-        fn create(
-            input: Self::Input,
-            engine: &AionEngine,
-        ) -> Result<Self::Unverified, Error>
-        {
+        fn create(input: Self::Input, engine: &AionEngine) -> Result<Self::Unverified, Error> {
             match verify_block_basic(&input.header, &input.bytes, engine) {
                 Ok(()) => Ok(input),
                 Err(Error::Block(BlockError::TemporarilyInvalid(oob))) => {
@@ -111,11 +104,7 @@ pub mod blocks {
             }
         }
 
-        fn verify(
-            un: Self::Unverified,
-            engine: &AionEngine,
-        ) -> Result<Self::Verified, Error>
-        {
+        fn verify(un: Self::Unverified, engine: &AionEngine) -> Result<Self::Verified, Error> {
             let hash = un.hash();
             match verify_block_unordered(un.header, un.bytes, engine) {
                 Ok(verified) => Ok(verified),
@@ -194,11 +183,7 @@ pub mod headers {
         type Unverified = Header;
         type Verified = Header;
 
-        fn create(
-            input: Self::Input,
-            engine: &AionEngine,
-        ) -> Result<Self::Unverified, Error>
-        {
+        fn create(input: Self::Input, engine: &AionEngine) -> Result<Self::Unverified, Error> {
             verify_header_params(&input, engine, true).map(|_| input)
         }
 
