@@ -29,12 +29,18 @@ mod test;
 use std::collections::BTreeMap;
 use std::ops::Index;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::Duration;
+use std::time::Instant;
+use std::time::SystemTime;
 use rustc_hex::ToHex;
-use client::{BlockChainClient, BlockId, BlockStatus, ChainNotify};
+use client::BlockChainClient;
+use client::BlockId;
+use client::BlockStatus;
+use client::ChainNotify;
 use transaction::UnverifiedTransaction;
 use aion_types::H256;
-use futures::{Future, Stream};
+use futures::Future;
+use futures::Stream;
 use rlp::UntrustedRlp;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
@@ -48,14 +54,19 @@ use p2p::NetworkConfig;
 use p2p::states::STATE::HANDSHAKEDONE;
 use p2p::states::STATE::CONNECTED;
 use p2p::states::STATE::ALIVE;
-use self::route::VERSION;
-use self::route::ACTION;
-use self::handler::blocks_bodies_handler::BlockBodiesHandler;
-use self::handler::blocks_headers_handler::BlockHeadersHandler;
-use self::handler::broadcast_handler::BroadcastsHandler;
-use self::handler::import_handler::ImportHandler;
-use self::handler::status_handler::StatusHandler;
-use self::storage::{ActivePeerInfo, PeerInfo, SyncState, SyncStatus, SyncStorage, TransactionStats};
+use sync::route::VERSION;
+use sync::route::ACTION;
+use sync::handler::status;
+use sync::handler::bodies;
+use sync::handler::headers;
+use sync::handler::broadcast;
+use sync::handler::import;
+use sync::storage::ActivePeerInfo;
+use sync::storage::PeerInfo;
+use sync::storage::SyncState;
+use sync::storage::SyncStatus;
+use sync::storage::SyncStorage;
+use sync::storage::TransactionStats;
 
 const STATUS_REQ_INTERVAL: u64 = 2;
 const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
@@ -71,9 +82,11 @@ impl SyncMgr {
         let status_req_task =
             Interval::new(Instant::now(), Duration::from_secs(STATUS_REQ_INTERVAL))
                 .for_each(move |_| {
-                    // status req
-                    StatusHandler::send_status_req();
-
+                    let active_nodes = P2pMgr::get_nodes(ALIVE.value());
+                    for node in active_nodes.iter() {
+                        trace!(target: "sync", "Sync status req sent...");
+                        status::send(node.node_hash);
+                    }
                     Ok(())
                 })
                 .map_err(|e| error!("interval errored; err={:?}", e));
@@ -84,9 +97,7 @@ impl SyncMgr {
             Duration::from_millis(BLOCKS_BODIES_REQ_INTERVAL),
         )
         .for_each(move |_| {
-            // blocks bodies req
-            BlockBodiesHandler::send_blocks_bodies_req();
-
+            bodies::send();
             Ok(())
         })
         .map_err(|e| error!("interval errored; err={:?}", e));
@@ -97,8 +108,7 @@ impl SyncMgr {
             Duration::from_millis(BLOCKS_IMPORT_INTERVAL),
         )
         .for_each(move |_| {
-            ImportHandler::import_blocks();
-
+            import::import_blocks();
             Ok(())
         })
         .map_err(|e| error!("interval errored; err={:?}", e));
@@ -109,8 +119,7 @@ impl SyncMgr {
             Duration::from_millis(BROADCAST_TRANSACTIONS_INTERVAL),
         )
         .for_each(move |_| {
-            BroadcastsHandler::broad_new_transactions();
-
+            broadcast::propagate_transactions();
             Ok(())
         })
         .map_err(|e| error!("interval errored; err={:?}", e));
@@ -290,28 +299,28 @@ impl SyncMgr {
                 );
                 match ACTION::from(req.head.action) {
                     ACTION::STATUSREQ => {
-                        StatusHandler::handle_status_req(node);
+                        status::receive_req(node);
                     }
                     ACTION::STATUSRES => {
-                        StatusHandler::handle_status_res(node, req);
+                        status::receive_res(node, req);
                     }
                     ACTION::BLOCKSHEADERSREQ => {
-                        BlockHeadersHandler::handle_blocks_headers_req(node, req);
+                        headers::handle_blocks_headers_req(node, req);
                     }
                     ACTION::BLOCKSHEADERSRES => {
-                        BlockHeadersHandler::handle_blocks_headers_res(node, req);
+                        headers::handle_blocks_headers_res(node, req);
                     }
                     ACTION::BLOCKSBODIESREQ => {
-                        BlockBodiesHandler::handle_blocks_bodies_req(node, req);
+                        bodies::receive_req(node, req);
                     }
                     ACTION::BLOCKSBODIESRES => {
-                        BlockBodiesHandler::handle_blocks_bodies_res(node, req);
+                        bodies::receive_res(node, req);
                     }
                     ACTION::BROADCASTTX => {
-                        BroadcastsHandler::handle_broadcast_tx(node, req);
+                        broadcast::receive_tx(node, req);
                     }
                     ACTION::BROADCASTBLOCK => {
-                        BroadcastsHandler::handle_broadcast_block(node, req);
+                        broadcast::receive_block(node, req);
                     }
                     _ => {
                         trace!(target: "sync", "UNKNOWN received.");
@@ -458,7 +467,6 @@ impl ChainNotify for Sync {
             let mut max_imported_block_number = 0;
             let client = SyncStorage::get_block_chain();
             for hash in imported.iter() {
-                // ImportHandler::import_staged_blocks(&hash);
                 let block_id = BlockId::Hash(*hash);
                 if client.block_status(block_id) == BlockStatus::InChain {
                     if let Some(block_number) = client.block_number(block_id) {
@@ -494,7 +502,7 @@ impl ChainNotify for Sync {
                 let block_id = BlockId::Number(block_number);
                 if let Some(blk) = client.block(block_id) {
                     let block_hash = blk.hash();
-                    ImportHandler::import_staged_blocks(&block_hash);
+                    import::import_staged_blocks(&block_hash);
                     if let Some(time) = SyncStorage::get_requested_time(&block_hash) {
                         info!(target: "sync",
                             "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
@@ -507,14 +515,14 @@ impl ChainNotify for Sync {
         if enacted.is_empty() {
             for hash in enacted.iter() {
                 debug!(target: "sync", "enacted hash: {:?}", hash);
-                ImportHandler::import_staged_blocks(&hash);
+                import::import_staged_blocks(&hash);
             }
         }
 
         if !sealed.is_empty() {
             debug!(target: "sync", "Propagating blocks...");
             SyncStorage::insert_imported_block_hashes(sealed.clone());
-            BroadcastsHandler::propagate_new_blocks(
+            broadcast::propagate_blocks(
                 sealed.index(0),
                 SyncStorage::get_block_chain(),
             );

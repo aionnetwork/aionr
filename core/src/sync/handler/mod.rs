@@ -19,8 +19,8 @@
  *
  ******************************************************************************/
 
-pub mod status_handler;
-pub mod blocks_headers_handler;
-pub mod blocks_bodies_handler;
-pub mod broadcast_handler;
-pub mod import_handler;
+pub mod status;
+pub mod headers;
+pub mod bodies;
+pub mod broadcast;
+pub mod import;

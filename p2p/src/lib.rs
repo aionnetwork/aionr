@@ -124,8 +124,7 @@ impl P2pMgr {
         executor: &TaskExecutor,
         local_addr: &String,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    )
-    {
+    ) {
         if let Ok(addr) = local_addr.parse() {
             let listener = TcpListener::bind(&addr).expect("Failed to bind");
             let server = listener
