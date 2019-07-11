@@ -418,6 +418,7 @@ impl Miner {
                     chain_info.best_block_timestamp,
                 )
             };
+
             let mut sealing_work = self.sealing_work.lock();
             let last_work_hash = sealing_work
                 .queue
@@ -425,36 +426,45 @@ impl Miner {
                 .map(|pb| pb.block().header().hash());
             let best_hash = chain_info.best_block_hash;
 
-            let mut open_block = match sealing_work
-                .queue
-                .pop_if(|b| b.block().header().parent_hash() == &best_hash)
-            {
-                Some(old_block) => {
-                    trace!(target: "block", "prepare_block: Already have previous work; updating and returning");
-                    // add transactions to old_block
-                    client.reopen_block(old_block)
-                }
-                None => {
-                    // block not found - create it.
-                    trace!(target: "block", "prepare_block: No existing work - making new block");
-                    let author: Address = match seal_type {
-                        Some(SealType::PoS) => {
-                            self.staker()
-                                .to_owned()
-                                .expect(
-                                    "staker key not specified in configuration. Should have \
-                                     checked before.",
-                                )
-                                .address()
-                        }
-                        _ => self.author(),
-                    };
+            let mut open_block = match seal_type {
+                Some(SealType::PoS) => {
+                    let author: Address = self
+                        .staker()
+                        .to_owned()
+                        .expect(
+                            "staker key not specified in configuration. Should have checked \
+                             before.",
+                        )
+                        .address();
                     client.prepare_open_block(
                         author,
                         (self.gas_floor_target(), self.gas_ceil_target()),
                         self.extra_data(),
                         seal_type.to_owned(),
                     )
+                }
+                _ => {
+                    match sealing_work
+                        .queue
+                        .pop_if(|b| b.block().header().parent_hash() == &best_hash)
+                    {
+                        Some(old_block) => {
+                            trace!(target: "block", "prepare_block: Already have previous work; updating and returning");
+                            // add transactions to old_block
+                            client.reopen_block(old_block)
+                        }
+                        None => {
+                            // block not found - create it.
+                            trace!(target: "block", "prepare_block: No existing work - making new block");
+                            let author: Address = self.author();
+                            client.prepare_open_block(
+                                author,
+                                (self.gas_floor_target(), self.gas_ceil_target()),
+                                self.extra_data(),
+                                seal_type.to_owned(),
+                            )
+                        }
+                    }
                 }
             };
 
