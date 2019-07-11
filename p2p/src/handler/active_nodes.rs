@@ -34,8 +34,8 @@ use NODE_ID_LENGTH;
 use route::VERSION;
 use route::MODULE;
 use route::ACTION;
-use states::HANDSHAKE_DONE;
-use states::DISCONNECTED;
+use states::STATE::HANDSHAKEDONE;
+use states::STATE::DISCONNECTED;
 
 pub fn send() {
     let mut req = ChannelBuffer::new();
@@ -43,7 +43,7 @@ pub fn send() {
     req.head.ctrl = MODULE::P2P.value();
     req.head.action = ACTION::ACTIVENODESREQ.value();
     req.head.len = 0;
-    let handshaked_nodes = P2pMgr::get_nodes(HANDSHAKE_DONE);
+    let handshaked_nodes = P2pMgr::get_nodes(HANDSHAKEDONE.value());
     let handshaked_nodes_count = handshaked_nodes.len();
     if handshaked_nodes_count > 0 {
         let random_index = random::<usize>() % handshaked_nodes_count;
@@ -65,7 +65,7 @@ pub fn receive_req(peer_node: &mut Node) {
     res.head.ctrl = MODULE::P2P.value();
     res.head.action = ACTION::ACTIVENODESRES.value();
 
-    let active_nodes = P2pMgr::get_nodes(HANDSHAKE_DONE);
+    let active_nodes = P2pMgr::get_nodes(HANDSHAKEDONE.value());
     let mut res_body = Vec::new();
     let active_nodes_count = active_nodes.len();
 

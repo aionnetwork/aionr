@@ -42,7 +42,7 @@ extern crate bytes;
 extern crate byteorder;
 
 mod route;
-mod states;
+pub mod states;
 mod msg;
 mod node;
 pub mod handler;
@@ -50,11 +50,6 @@ pub mod handler;
 mod test;
 
 use std::fmt;
-use acore_bytes::to_hex;
-use bincode::config;
-use bytes::BytesMut;
-use rand::{thread_rng, Rng};
-use state::Storage;
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::hash::{Hash, Hasher};
 use std::io;
@@ -63,6 +58,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
+use acore_bytes::to_hex;
+use bincode::config;
+use bytes::BytesMut;
+use rand::{thread_rng, Rng};
+use state::Storage;
 use futures::sync::mpsc;
 use futures::{Future, Stream};
 use tokio::net::{TcpListener, TcpStream};
@@ -77,9 +77,12 @@ use route::ACTION;
 use handler::handshake;
 use handler::active_nodes;
 use handler::external::DefaultHandler;
-
-pub use self::msg::*;
-pub use self::node::*;
+use states::STATE::HANDSHAKEDONE;
+use states::STATE::ALIVE;
+use states::STATE::DISCONNECTED;
+use states::STATE::ISSERVER;
+use states::STATE::CONNECTED;
+pub use node::*;
 
 lazy_static! {
     static ref LOCAL_NODE: Storage<Node> = Storage::new();
@@ -320,7 +323,7 @@ impl P2pMgr {
         let mut nodes_count = 0;
         if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
             for val in nodes_map.values() {
-                if val.state_code & ALIVE == ALIVE && val.mode == mode {
+                if val.state_code & ALIVE.value() == ALIVE.value() && val.mode == mode {
                     nodes_count += 1;
                 }
             }
@@ -336,7 +339,7 @@ impl P2pMgr {
         let mut thunder_nodes_count = 0;
         if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
             for val in nodes_map.values() {
-                if val.state_code & ALIVE == ALIVE {
+                if val.state_code & ALIVE.value() == ALIVE.value() {
                     match val.mode {
                         Mode::NORMAL => normal_nodes_count += 1,
                         Mode::BACKWARD => backward_nodes_count += 1,
@@ -391,7 +394,7 @@ impl P2pMgr {
     }
 
     pub fn get_an_inactive_node() -> Option<Node> {
-        let nodes = Self::get_nodes(DISCONNECTED);
+        let nodes = Self::get_nodes(DISCONNECTED.value());
         let mut normal_nodes = Vec::new();
         for node in nodes.iter() {
             if node.is_from_boot_list {
@@ -412,7 +415,7 @@ impl P2pMgr {
     }
 
     pub fn get_an_active_node() -> Option<Node> {
-        let nodes = Self::get_nodes(ALIVE);
+        let nodes = Self::get_nodes(ALIVE.value());
         let node_count = nodes.len();
         if node_count > 0 {
             let mut rng = thread_rng();
@@ -455,20 +458,20 @@ impl P2pMgr {
             let peer_ip = peer_node.ip_addr.get_ip();
             let local_ip = P2pMgr::get_local_node().ip_addr.get_ip();
             let network_config = P2pMgr::get_network_config();
-            if P2pMgr::get_nodes_count(ALIVE) < network_config.max_peers as usize
+            if P2pMgr::get_nodes_count(ALIVE.value()) < network_config.max_peers as usize
                 && !network_config.ip_black_list.contains(&peer_ip)
             {
                 let mut value = peer_node.ip_addr.get_addr();
                 value.push_str(&local_ip);
                 peer_node.node_hash = P2pMgr::calculate_hash(&value);
-                peer_node.state_code = CONNECTED;
+                peer_node.state_code = CONNECTED.value();
                 trace!(target: "net", "New incoming connection: {}", peer_addr);
 
                 let (tx, rx) = mpsc::channel(409600);
                 let thread_pool = P2pMgr::get_thread_pool();
 
                 peer_node.tx = Some(tx);
-                peer_node.state_code = CONNECTED;
+                peer_node.state_code = CONNECTED.value();
                 peer_node.ip_addr.is_server = false;
 
                 trace!(target: "net", "A new peer added: {}", peer_node);
@@ -513,7 +516,7 @@ impl P2pMgr {
         let node_hash = peer_node.node_hash;
 
         if let Some(node) = P2pMgr::get_node(node_hash) {
-            if node.state_code == DISCONNECTED {
+            if node.state_code == DISCONNECTED.value() {
                 trace!(target: "net", "update known peer node {}@{}...", node.get_node_id(), node.get_ip_addr());
                 P2pMgr::remove_peer(node_hash);
             } else {
@@ -523,7 +526,7 @@ impl P2pMgr {
 
         let (tx, rx) = mpsc::channel(409600);
         peer_node.tx = Some(tx);
-        peer_node.state_code = CONNECTED | IS_SERVER;
+        peer_node.state_code = CONNECTED.value() | ISSERVER.value();
         peer_node.ip_addr.is_server = true;
         let peer_ip = peer_node.get_ip_addr().clone();
         trace!(target: "net", "A new peer added: {}@{}", peer_node.get_node_id(), peer_node.get_ip_addr());
@@ -640,7 +643,7 @@ impl NetManager {
             for boot_node in boot_nodes.iter() {
                 let node_hash = P2pMgr::calculate_hash(&boot_node.get_node_id());
                 if let Some(node) = P2pMgr::get_node(node_hash) {
-                    if node.state_code == DISCONNECTED {
+                    if node.state_code == DISCONNECTED.value() {
                         trace!(target: "net", "boot node reconnected: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
                         Self::connect_peer(boot_node.clone());
                     }
@@ -669,7 +672,7 @@ impl NetManager {
             Duration::from_secs(RECONNECT_NORMAL_NOEDS_INTERVAL),
         )
         .for_each(move |_| {
-            let active_nodes_count = P2pMgr::get_nodes_count(ALIVE);
+            let active_nodes_count = P2pMgr::get_nodes_count(ALIVE.value());
             if !sync_from_boot_nodes_only && active_nodes_count < max_peers_num {
                 if let Some(peer_node) = P2pMgr::get_an_inactive_node() {
                     let peer_node_id_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
@@ -851,8 +854,6 @@ impl NetworkConfig {
     }
 }
 
-pub const HANDSHAKE_DONE: u32 = 1 << 2;
-
 pub enum Event {
     OnHandshakeReq,
     OnHandshakeRes,
@@ -867,17 +868,17 @@ impl Event {
         let state_code = node.state_code;
         match event {
             Event::OnHandshakeReq | Event::OnHandshakeRes => {
-                node.state_code = state_code | HANDSHAKE_DONE | ALIVE;
+                node.state_code = state_code | HANDSHAKEDONE.value() | ALIVE.value();
             }
             Event::OnActiveNodesReq | Event::OnActiveNodesRes => {
-                if state_code & HANDSHAKE_DONE == HANDSHAKE_DONE {
-                    node.state_code = state_code | ALIVE;
+                if state_code & HANDSHAKEDONE.value() == HANDSHAKEDONE.value() {
+                    node.state_code = state_code | ALIVE.value();
                 } else {
                     warn!(target: "net", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
                 }
             }
             Event::OnPing | Event::OnPong => {
-                if state_code & HANDSHAKE_DONE == HANDSHAKE_DONE {
+                if state_code & HANDSHAKEDONE.value() == HANDSHAKEDONE.value() {
                 } else {
                     warn!(target: "net", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
                 }

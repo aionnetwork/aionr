@@ -21,53 +21,59 @@
 
 /// p2p node state
 /// states defined here only for p2p layer
-//#[derive(Debug, PartialEq)]
-//pub enum STATE {
-//    CONNECTED,
-//    ACTIVE,
-//}
-//
-//impl STATE {
-//    pub fn value(&self) -> u8 {
-//        match self {
-//            STATE::CONNECTED => 0u8,
-//            STATE::ACTIVE => 1u8,
-//        }
-//    }
-//    pub fn from(value: u8) -> STATE {
-//        match value {
-//            0 => STATE::CONNECTED,
-//            1 => STATE::ACTIVE,
-//            _ => STATE::CONNECTED,
-//        }
-//    }
-//}
+#[derive(Debug, PartialEq)]
+pub enum STATE {
+    CONNECTED,
+    ISSERVER,
+    HANDSHAKEDONE,
+    ALIVE,
+    DISCONNECTED,
+}
 
-pub const HANDSHAKE_DONE: u32 = 1 << 2;
-pub const DISCONNECTED: u32 = 1 << 10;
+impl STATE {
+    pub fn value(&self) -> u32 {
+        match self {
+            STATE::CONNECTED => 1,
+            STATE::ISSERVER => 1 << 1,
+            STATE::HANDSHAKEDONE => 1 << 2,
+            STATE::ALIVE => 1 << 3,
+            STATE::DISCONNECTED => 1 << 4,
+        }
+    }
+    pub fn from(value: u32) -> STATE {
+        match value {
+            0 => STATE::CONNECTED,
+            2 => STATE::ISSERVER,
+            4 => STATE::HANDSHAKEDONE,
+            8 => STATE::ALIVE,
+            16 => STATE::DISCONNECTED,
+            _  => STATE::CONNECTED,
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
 
-    //    use states::STATE;
-    //
-    //    #[test]
-    //    fn equal() {
-    //        assert_eq!(STATE::CONNECTED, STATE::CONNECTED);
-    //        assert_eq!(STATE::ACTIVE, STATE::ACTIVE);
-    //    }
-    //
-    //    #[test]
-    //    fn value() {
-    //        assert_eq!(STATE::CONNECTED.value(), 0);
-    //        assert_eq!(STATE::ACTIVE.value(), 1);
-    //    }
-    //
-    //    #[test]
-    //    fn from() {
-    //        assert_eq!(STATE::CONNECTED, STATE::from(0));
-    //        assert_eq!(STATE::ACTIVE, STATE::from(1));
-    //        assert_eq!(STATE::CONNECTED, STATE::from(2));
-    //        assert_eq!(STATE::CONNECTED, STATE::from(255));
-    //    }
+    use states::STATE;
+
+    #[test]
+    fn equal() {
+        assert_eq!(STATE::CONNECTED, STATE::CONNECTED);
+        assert_eq!(STATE::ACTIVE, STATE::ACTIVE);
+    }
+
+    #[test]
+    fn value() {
+        assert_eq!(STATE::CONNECTED.value(), 0);
+        assert_eq!(STATE::ALIVE.value(), 1);
+    }
+
+    #[test]
+    fn from() {
+        assert_eq!(STATE::CONNECTED, STATE::from(0));
+        assert_eq!(STATE::ALIVE, STATE::from(1));
+        assert_eq!(STATE::CONNECTED, STATE::from(2));
+        assert_eq!(STATE::CONNECTED, STATE::from(255));
+    }
 }

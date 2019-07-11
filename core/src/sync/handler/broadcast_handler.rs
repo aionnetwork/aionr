@@ -33,6 +33,7 @@ use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
 use p2p::*;
+use p2p::states::STATE::ALIVE;
 use super::super::event::SyncEvent;
 use super::super::storage::SyncStorage;
 
@@ -56,7 +57,7 @@ impl BroadcastsHandler {
             return;
         }
 
-        let active_nodes = P2pMgr::get_nodes(ALIVE);
+        let active_nodes = P2pMgr::get_nodes(ALIVE.value());
 
         if active_nodes.len() > 0 {
             let mut req = ChannelBuffer::new();
@@ -87,7 +88,7 @@ impl BroadcastsHandler {
 
     pub fn propagate_new_blocks(block_hash: &H256, client: Arc<BlockChainClient>) {
         // broadcast new blocks
-        let active_nodes = P2pMgr::get_nodes(ALIVE);
+        let active_nodes = P2pMgr::get_nodes(ALIVE.value());
 
         if active_nodes.len() > 0 {
             let mut req = ChannelBuffer::new();
@@ -146,7 +147,7 @@ impl BroadcastsHandler {
                                     Ok(_) => {
                                         trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
                                         imported_block_hashes.insert(hash, 0);
-                                        let active_nodes = P2pMgr::get_nodes(ALIVE);
+                                        let active_nodes = P2pMgr::get_nodes(ALIVE.value());
                                         for n in active_nodes.iter() {
                                             // broadcast new block
                                             trace!(target: "sync", "Sync broadcast new block sent...");

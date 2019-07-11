@@ -39,15 +39,15 @@ use rlp::UntrustedRlp;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use p2p::handler::external::DefaultHandler;
-use p2p::HANDSHAKE_DONE;
-use p2p::CONNECTED;
-use p2p::ALIVE;
 use p2p::P2pMgr;
 use p2p::NetManager;
 use p2p::Node;
 use p2p::Mode;
 use p2p::ChannelBuffer;
 use p2p::NetworkConfig;
+use p2p::states::STATE::HANDSHAKEDONE;
+use p2p::states::STATE::CONNECTED;
+use p2p::states::STATE::ALIVE;
 use self::route::VERSION;
 use self::route::ACTION;
 use self::handler::blocks_bodies_handler::BlockBodiesHandler;
@@ -118,7 +118,7 @@ impl SyncMgr {
 
         let statics_task = Interval::new(Instant::now(), Duration::from_secs(STATICS_INTERVAL))
             .for_each(move |_| {
-                let connected_nodes = P2pMgr::get_nodes(CONNECTED);
+                let connected_nodes = P2pMgr::get_nodes(CONNECTED.value());
                 for node in connected_nodes.iter() {
                     if node.mode == Mode::BACKWARD || node.mode == Mode::FORWARD {
                         if node.target_total_difficulty < SyncStorage::get_network_total_diff() {
@@ -137,7 +137,7 @@ impl SyncMgr {
                 let block_number_last_time = SyncStorage::get_synced_block_number_last_time();
                 let block_number_now = chain_info.best_block_number;
                 let sync_speed = (block_number_now - block_number_last_time) / STATICS_INTERVAL;
-                let mut active_nodes = P2pMgr::get_nodes(ALIVE);
+                let mut active_nodes = P2pMgr::get_nodes(ALIVE.value());
                 let active_nodes_count = active_nodes.len();
 
                 info!(target: "sync", "");
@@ -149,7 +149,7 @@ impl SyncMgr {
                 info!(target: "sync",
                     "Total/Connected/Active peers: {}/{}/{}",
                     P2pMgr::get_all_nodes_count(),
-                    P2pMgr::get_nodes_count(CONNECTED),
+                    P2pMgr::get_nodes_count(CONNECTED.value()),
                     active_nodes_count,
                 );
 
@@ -277,7 +277,7 @@ impl SyncMgr {
     }
 
     fn handle(node: &mut Node, req: ChannelBuffer) {
-        if node.state_code & HANDSHAKE_DONE != HANDSHAKE_DONE {
+        if node.state_code & HANDSHAKEDONE.value() != HANDSHAKEDONE.value() {
             return;
         }
 
@@ -400,7 +400,7 @@ impl SyncProvider for Sync {
             highest_block_number: { Some(SyncStorage::get_network_best_block_number()) },
             blocks_received: 0,
             blocks_total: 0,
-            num_peers: { P2pMgr::get_nodes_count(ALIVE) },
+            num_peers: { P2pMgr::get_nodes_count(ALIVE.value()) },
             num_active_peers: 0,
         }
     }
@@ -423,7 +423,7 @@ impl SyncProvider for Sync {
     fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats> { BTreeMap::new() }
 
     fn active(&self) -> Vec<ActivePeerInfo> {
-        let ac_nodes = P2pMgr::get_nodes(ALIVE);
+        let ac_nodes = P2pMgr::get_nodes(ALIVE.value());
         ac_nodes
             .into_iter()
             .map(|node| {

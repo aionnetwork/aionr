@@ -32,6 +32,7 @@ use super::super::event::SyncEvent;
 use super::super::storage::SyncStorage;
 use super::blocks_headers_handler::BlockHeadersHandler;
 use p2p::*;
+use p2p::states::STATE::ALIVE;
 
 const BEST_HASH_LENGTH: usize = 32;
 const GENESIS_HASH_LENGTH: usize = 32;
@@ -49,7 +50,7 @@ impl StatusHandler {
     }
 
     pub fn send_status_req() {
-        let active_nodes = P2pMgr::get_nodes(ALIVE);
+        let active_nodes = P2pMgr::get_nodes(ALIVE.value());
         for node in active_nodes.iter() {
             trace!(target: "sync","Sync status req sent...");
             Self::send_status_req_to_node(node.node_hash);

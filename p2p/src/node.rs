@@ -27,11 +27,11 @@ use std::fmt;
 use std::net::SocketAddr;
 use std::time::SystemTime;
 use uuid::Uuid;
-
+use states::STATE::CONNECTED;
+use states::STATE::DISCONNECTED;
 pub use super::msg::*;
 
 pub type Tx = mpsc::Sender<ChannelBuffer>;
-
 pub const HEADER_LENGTH: usize = 8;
 pub const NODE_ID_LENGTH: usize = 36;
 pub const PROTOCOL_LENGTH: usize = 6;
@@ -39,10 +39,6 @@ pub const IP_LENGTH: usize = 8;
 pub const DIFFICULTY_LENGTH: usize = 16;
 pub const MAX_REVISION_LENGTH: usize = 24;
 pub const REVISION_PREFIX: &str = "r-";
-pub const CONNECTED: u32 = 1;
-pub const IS_SERVER: u32 = 1 << 1;
-pub const ALIVE: u32 = 1 << 3;
-pub const DISCONNECTED: u32 = 1 << 10;
 
 #[derive(Clone, PartialEq)]
 pub enum Mode {
@@ -149,7 +145,7 @@ impl Node {
             net_id: 0,
             ip_addr: IpAddr::new(),
             node_hash: 0,
-            state_code: DISCONNECTED,
+            state_code: DISCONNECTED.value(),
             best_block_num: 0,
             synced_block_num: 0,
             best_hash: H256::default(),
@@ -190,7 +186,7 @@ impl Node {
             .ip
             .copy_from_slice(convert_ip_string(node_ip.to_string()).as_slice());
         node.ip_addr.port = node_port.parse::<u32>().unwrap_or(30303);
-        node.state_code = CONNECTED;
+        node.state_code = CONNECTED.value();
 
         node
     }
@@ -204,7 +200,7 @@ impl Node {
             .copy_from_slice(convert_ip_string(ip.to_string()).as_slice());
         let port = addr.port();
         node.ip_addr.port = port as u32;
-        node.state_code = CONNECTED;
+        node.state_code = CONNECTED.value();
 
         node
     }
@@ -344,6 +340,6 @@ mod node_tests {
 
         println!("Node: {}", node);
         assert_eq!(node.ip_addr.get_addr(), "127.0.0.1:30303".to_string());
-        assert_eq!(node.state_code, CONNECTED);
+        assert_eq!(node.state_code, CONNECTED.value());
     }
 }
