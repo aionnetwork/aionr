@@ -40,7 +40,7 @@ use engines::POWEquihashEngine;
 use error::Error;
 use executive::Executive;
 use factory::Factories;
-use header::Header;
+use header::{Header, SealType};
 use machine::EthereumMachine;
 use pod_state::PodState;
 use precompiled::builtin::{builtin_contract, BuiltinContract};
@@ -363,6 +363,7 @@ impl Spec {
         header.set_gas_used(self.gas_used.clone());
         header.set_gas_limit(self.gas_limit.clone());
         header.set_difficulty(self.difficulty.clone());
+        header.set_seal_type(SealType::PoW);
         header.set_seal({
             let r = Rlp::new(&self.seal_rlp);
             r.iter().map(|f| f.as_val::<Bytes>()).collect()

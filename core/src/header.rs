@@ -192,7 +192,7 @@ impl PartialEq for Header {
 impl Default for Header {
     fn default() -> Self {
         Header {
-            seal_type: None,
+            seal_type: Some(SealType::PoW),
             parent_hash: H256::default(),
             timestamp: 0,
             number: 0,
