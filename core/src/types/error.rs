@@ -32,12 +32,12 @@ use trie::TrieError;
 use io::*;
 use header::BlockNumber;
 use client::Error as ClientError;
-use engines::EngineError;
+use engine::EngineError;
 use key::Error as EthkeyError;
 use account_provider::SignError as AccountsError;
 use transaction::Error as TransactionError;
 
-pub use executed::{ExecutionError, CallError};
+pub use types::executed::{ExecutionError, CallError};
 
 #[derive(Debug, PartialEq, Clone, Copy, Eq)]
 /// Errors concerning block processing.

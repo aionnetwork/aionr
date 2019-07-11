@@ -32,9 +32,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 
-use error::Error;
-use account::BasicAccount;
-use executed::{Executed, ExecutionError};
+use types::error::Error;
+use types::executed::{Executed, ExecutionError};
 use executive::Executive;
 use factory::Factories;
 use factory::VmFactory;
@@ -42,20 +41,21 @@ use machine::EthereumMachine as Machine;
 use pod_account::*;
 use pod_state::{self, PodState};
 use receipt::Receipt;
-use state_db::StateDB;
+use db::StateDB;
 use transaction::SignedTransaction;
 use types::state::state_diff::StateDiff;
 use vms::EnvInfo;
 
 use aion_types::{Address, H256, U256};
 use acore_bytes::Bytes;
-use kvdb::{KeyValueDB, AsHashStore, DBValue};
+use kvdb::{KeyValueDB};
 
 use trie;
 use trie::recorder::Recorder;
 use trie::{Trie, TrieDB, TrieError};
 
 mod account_state;
+mod account;
 mod substate;
 
 pub mod backend;
@@ -63,11 +63,12 @@ pub mod backend;
 #[cfg(test)]
 mod tests;
 
-pub use account::{
+pub use state::account::{
     AionVMAccount,
     VMAccount,
     AccType,
     RequireCache,
+    BasicAccount
 };
 pub use self::backend::Backend;
 pub use self::substate::Substate;
@@ -83,46 +84,6 @@ pub struct ApplyOutcome {
 
 /// Result type for the execution ("application") of a transaction.
 pub type ApplyResult = Result<ApplyOutcome, Error>;
-
-/// Prove a transaction on the given state.
-/// Returns `None` when the transacion could not be proved,
-/// and a proof otherwise.
-pub fn prove_transaction<H: AsHashStore + Send + Sync>(
-    db: H,
-    root: H256,
-    transaction: &SignedTransaction,
-    machine: &Machine,
-    env_info: &EnvInfo,
-    factories: Factories,
-    virt: bool,
-    kvdb: Arc<KeyValueDB>,
-) -> Option<(Bytes, Vec<DBValue>)>
-{
-    use self::backend::Proving;
-
-    let backend = Proving::new(db);
-    let res = State::from_existing(
-        backend,
-        root,
-        machine.account_start_nonce(env_info.number),
-        factories,
-        kvdb,
-    );
-
-    let mut state = match res {
-        Ok(state) => state,
-        Err(_) => return None,
-    };
-
-    match state.execute(env_info, machine, transaction, false, virt) {
-        Err(ExecutionError::Internal(_)) => None,
-        Err(e) => {
-            trace!(target: "state", "Proved call failed: {}", e);
-            Some((Vec::new(), state.drop().1.extract_proof()))
-        }
-        Ok(res) => Some((res.output, state.drop().1.extract_proof())),
-    }
-}
 
 /// Representation of the entire state of all accounts in the system.
 ///

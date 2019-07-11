@@ -26,9 +26,9 @@ mod null_engine;
 pub use self::null_engine::NullEngine;
 pub use self::pow_equihash_engine::POWEquihashEngine;
 
-use std::sync::Arc;
 use std::fmt;
-use error::Error;
+use std::sync::Arc;
+use types::error::Error;
 use spec::CommonParams;
 use header::{Header, BlockNumber};
 use std::collections::{BTreeMap};

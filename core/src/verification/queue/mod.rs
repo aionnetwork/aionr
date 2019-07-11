@@ -32,8 +32,8 @@ use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
 use parking_lot::{Condvar, Mutex, RwLock};
 use io::*;
-use error::*;
-use engines::{AionEngine};
+use engine::AionEngine;
+use types::error::*;
 use service::*;
 
 use self::kind::{BlockLike, Kind};
@@ -802,7 +802,7 @@ mod tests {
     use super::{BlockQueue,State, Config};
     use super::kind::blocks::Unverified;
     use helpers::*;
-    use error::{Error,ImportError};
+    use types::error::{Error,ImportError};
     use views::BlockView;
 
     // create a test block queue.

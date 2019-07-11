@@ -23,14 +23,14 @@
 ///
 /// there is is no restriction to upper layer modules they could chose same version code as
 /// p2p layer since handlers would be grouped into one route with same route code
-pub fn from(version: u16, module: u8, action: u8) -> [u8; 4]{
-    let mut bytes: [u8; 4] = [0x00; 4];
-    bytes[0] = (version >> 8) as u8;
-    bytes[1] = version as u8;
-    bytes[2] = module;
-    bytes[3] = action;
-    bytes
-}
+//pub fn from(version: u16, module: u8, action: u8) -> [u8; 4]{
+//    let mut bytes: [u8; 4] = [0x00; 4];
+//    bytes[0] = (version >> 8) as u8;
+//    bytes[1] = version as u8;
+//    bytes[2] = module;
+//    bytes[3] = action;
+//    bytes
+//}
 
 /// p2p routing version code, u16
 ///
@@ -67,7 +67,7 @@ impl VERSION {
 #[derive(Debug, PartialEq)]
 pub enum MODULE {
     P2P,
-    EXTERNAL
+    EXTERNAL,
 }
 
 impl MODULE {
@@ -80,7 +80,7 @@ impl MODULE {
     pub fn from(value: u8) -> MODULE {
         match value {
             0 => MODULE::P2P,
-            _ => MODULE::EXTERNAL
+            _ => MODULE::EXTERNAL,
         }
     }
 }
@@ -136,37 +136,112 @@ mod tests {
     use route::VERSION;
     use route::MODULE;
     use route::ACTION;
-    use route::from;
 
-    #[test]
-    fn test_from(){
-        assert_eq!(from(VERSION::V0.value(), MODULE::P2P.value(), ACTION::DISCONNECT.value()),     [0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(from(VERSION::V0.value(), MODULE::P2P.value(), ACTION::HANDSHAKEREQ.value()),   [0x00, 0x00, 0x00, 0x01]);
-        assert_eq!(from(VERSION::V0.value(), MODULE::P2P.value(), ACTION::HANDSHAKERES.value()),   [0x00, 0x00, 0x00, 0x02]);
-        assert_eq!(from(VERSION::V0.value(), MODULE::P2P.value(), ACTION::PING.value()),           [0x00, 0x00, 0x00, 0x03]);
-        assert_eq!(from(VERSION::V0.value(), MODULE::P2P.value(), ACTION::PONG.value()),           [0x00, 0x00, 0x00, 0x04]);
-        assert_eq!(from(VERSION::V0.value(), MODULE::P2P.value(), ACTION::ACTIVENODESREQ.value()), [0x00, 0x00, 0x00, 0x05]);
-        assert_eq!(from(VERSION::V0.value(), MODULE::P2P.value(), ACTION::ACTIVENODESRES.value()), [0x00, 0x00, 0x00, 0x06]);
-        assert_eq!(from(VERSION::V0.value(), MODULE::P2P.value(), ACTION::CONNECT.value()),        [0x00, 0x00, 0x00, 0x07]);
-        assert_eq!(from(VERSION::V0.value(), MODULE::P2P.value(), ACTION::UNKNOWN.value()),        [0x00, 0x00, 0x00, 0xff]);
+    /// p2p route util methods
+    ///
+    /// there is is no restriction to upper layer modules they could chose same version code as
+    /// p2p layer since handlers would be grouped into one route with same route code
+    pub fn from(version: u16, module: u8, action: u8) -> [u8; 4]{
+        let mut bytes: [u8; 4] = [0x00; 4];
+        bytes[0] = (version >> 8) as u8;
+        bytes[1] = version as u8;
+        bytes[2] = module;
+        bytes[3] = action;
+        bytes
     }
 
     #[test]
-    fn test_version_equal(){
+    fn test_from() {
+        assert_eq!(
+            from(
+                VERSION::V0.value(),
+                MODULE::P2P.value(),
+                ACTION::DISCONNECT.value()
+            ),
+            [0x00, 0x00, 0x00, 0x00]
+        );
+        assert_eq!(
+            from(
+                VERSION::V0.value(),
+                MODULE::P2P.value(),
+                ACTION::HANDSHAKEREQ.value()
+            ),
+            [0x00, 0x00, 0x00, 0x01]
+        );
+        assert_eq!(
+            from(
+                VERSION::V0.value(),
+                MODULE::P2P.value(),
+                ACTION::HANDSHAKERES.value()
+            ),
+            [0x00, 0x00, 0x00, 0x02]
+        );
+        assert_eq!(
+            from(
+                VERSION::V0.value(),
+                MODULE::P2P.value(),
+                ACTION::PING.value()
+            ),
+            [0x00, 0x00, 0x00, 0x03]
+        );
+        assert_eq!(
+            from(
+                VERSION::V0.value(),
+                MODULE::P2P.value(),
+                ACTION::PONG.value()
+            ),
+            [0x00, 0x00, 0x00, 0x04]
+        );
+        assert_eq!(
+            from(
+                VERSION::V0.value(),
+                MODULE::P2P.value(),
+                ACTION::ACTIVENODESREQ.value()
+            ),
+            [0x00, 0x00, 0x00, 0x05]
+        );
+        assert_eq!(
+            from(
+                VERSION::V0.value(),
+                MODULE::P2P.value(),
+                ACTION::ACTIVENODESRES.value()
+            ),
+            [0x00, 0x00, 0x00, 0x06]
+        );
+        assert_eq!(
+            from(
+                VERSION::V0.value(),
+                MODULE::P2P.value(),
+                ACTION::CONNECT.value()
+            ),
+            [0x00, 0x00, 0x00, 0x07]
+        );
+        assert_eq!(
+            from(
+                VERSION::V0.value(),
+                MODULE::P2P.value(),
+                ACTION::UNKNOWN.value()
+            ),
+            [0x00, 0x00, 0x00, 0xff]
+        );
+    }
+
+    #[test]
+    fn test_version_equal() {
         assert_eq!(VERSION::V0, VERSION::V0);
         assert_eq!(VERSION::V1, VERSION::V1);
         assert_eq!(VERSION::V2, VERSION::V2);
     }
 
     #[test]
-    fn test_version_value(){
+    fn test_version_value() {
         assert_eq!(VERSION::V0.value(), 0);
         assert_eq!(VERSION::V1.value(), 1);
         assert_eq!(VERSION::V2.value(), 2);
     }
 
     #[test]
-    fn test_version_from(){
+    fn test_version_from() {
         assert_eq!(VERSION::V0, VERSION::from(0));
         assert_eq!(VERSION::V1, VERSION::from(1));
         assert_eq!(VERSION::V2, VERSION::from(2));

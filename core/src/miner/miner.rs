@@ -26,9 +26,9 @@ use aion_types::{Address, H256, U256};
 use ansi_term::Colour;
 use block::{Block, ClosedBlock, IsBlock};
 use client::{BlockId, MiningBlockChainClient, TransactionId};
-use engines::{AionEngine};
-use error::*;
+use engine::AionEngine;
 use header::{BlockNumber, Header};
+use types::error::*;
 use io::IoChannel;
 use miner::{MinerService, MinerStatus};
 use parking_lot::{Mutex, RwLock};
@@ -186,11 +186,7 @@ impl Miner {
     pub fn clear(&self) { self.sealing_work.lock().queue.reset(); }
 
     /// Get `Some` `clone()` of the current pending block's state or `None` if we're not sealing.
-    pub fn pending_state(
-        &self,
-        latest_block_number: BlockNumber,
-    ) -> Option<State<::state_db::StateDB>>
-    {
+    pub fn pending_state(&self, latest_block_number: BlockNumber) -> Option<State<::db::StateDB>> {
         self.map_pending_block(|b| b.state().clone(), latest_block_number)
     }
 
@@ -1196,8 +1192,8 @@ mod tests {
             None, // accounts provider
             IoChannel::disconnected(),
         ))
-            .ok()
-            .expect("Miner was just created.")
+        .ok()
+        .expect("Miner was just created.")
     }
 
     fn transaction() -> SignedTransaction {
@@ -1215,7 +1211,7 @@ mod tests {
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
         }
-            .sign(keypair.secret(), None)
+        .sign(keypair.secret(), None)
     }
 
     fn default_gas_price() -> U256 { 0u64.into() }

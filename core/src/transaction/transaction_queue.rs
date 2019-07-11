@@ -2410,7 +2410,7 @@ pub mod test {
     }
 
         #[test]
-        fn pkil() {
+        fn should_limit_transactions() {
             let mut txq = TransactionQueue::with_limits(
                 PrioritizationStrategy::GasPriceOnly,
                 8,

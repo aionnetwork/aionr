@@ -32,7 +32,7 @@ use machine::EthereumMachine;
 use aion_types::{U256, U512};
 use header::Header;
 use block::ExecutedBlock;
-use error::Error;
+use types::error::Error;
 use std::cmp;
 use std::sync::Mutex;
 use types::BlockNumber;

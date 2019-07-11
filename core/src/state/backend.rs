@@ -192,22 +192,6 @@ impl<H: AsHashStore + Send + Sync> Backend for Proving<H> {
     fn is_known_null(&self, _: &Address) -> bool { false }
 }
 
-impl<H: AsHashStore> Proving<H> {
-    /// Create a new `Proving` over a base database.
-    /// This will store all values ever fetched from that base.
-    pub fn new(base: H) -> Self {
-        Proving {
-            base: base,
-            changed: MemoryDB::new(),
-            proof: Mutex::new(HashSet::new()),
-        }
-    }
-
-    /// Consume the backend, extracting the gathered proof in lexicographical order
-    /// by value.
-    pub fn extract_proof(self) -> Vec<DBValue> { self.proof.into_inner().into_iter().collect() }
-}
-
 impl<H: AsHashStore + Clone> Clone for Proving<H> {
     fn clone(&self) -> Self {
         Proving {

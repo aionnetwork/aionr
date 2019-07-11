@@ -39,8 +39,8 @@ use unexpected::{Mismatch, OutOfBounds};
 
 use blockchain::*;
 use client::BlockChainClient;
-use engines::{AionEngine};
-use error::{BlockError, Error};
+use engine::AionEngine;
+use types::error::{BlockError, Error};
 use header::{BlockNumber, Header};
 use transaction::{SignedTransaction, UnverifiedTransaction};
 use views::BlockView;
@@ -310,7 +310,7 @@ mod tests {
     use ethbloom::Bloom;
     use types::blockchain::extra::{BlockDetails, TransactionAddress, BlockReceipts};
     use encoded;
-    use error::BlockError::*;
+    use types::error::BlockError::*;
     use spec::Spec;
     use helpers::{create_test_block_with_data, create_test_block};
     use transaction::{SignedTransaction, Transaction, UnverifiedTransaction, Action};
@@ -486,26 +486,26 @@ mod tests {
         Ok(())
     }
 
-        #[test]
-        fn test_verify_block_basic_with_invalid_transactions() {
-            let spec = Spec::new_test();
-            let engine = &*spec.engine;
+    #[test]
+    fn test_verify_block_basic_with_invalid_transactions() {
+        let spec = Spec::new_test();
+        let engine = &*spec.engine;
 
-            let block = {
-                let mut rlp = rlp::RlpStream::new_list(3);
-                let mut header = Header::default();
-                // that's an invalid transaction list rlp
-                let invalid_transactions = vec![vec![0u8]];
-                header.set_transactions_root(ordered_trie_root(&invalid_transactions));
-                header.set_gas_limit(engine.params().min_gas_limit);
-                rlp.append(&header);
-                rlp.append_list::<Vec<u8>, _>(&invalid_transactions);
-                rlp.append_raw(&rlp::EMPTY_LIST_RLP, 1);
-                rlp.out()
-            };
+        let block = {
+            let mut rlp = rlp::RlpStream::new_list(3);
+            let mut header = Header::default();
+            // that's an invalid transaction list rlp
+            let invalid_transactions = vec![vec![0u8]];
+            header.set_transactions_root(ordered_trie_root(&invalid_transactions));
+            header.set_gas_limit(engine.params().min_gas_limit);
+            rlp.append(&header);
+            rlp.append_list::<Vec<u8>, _>(&invalid_transactions);
+            rlp.append_raw(&rlp::EMPTY_LIST_RLP, 1);
+            rlp.out()
+        };
 
-            assert!(basic_test(&block, engine).is_err());
-        }
+        assert!(basic_test(&block, engine).is_err());
+    }
 
         #[test]
         fn test_verify_block() {
@@ -664,103 +664,103 @@ mod tests {
                 basic_test(
                     &create_test_block_with_data(&header, &good_transactions),
                     engine,
-                ),
-                InvalidTransactionsRoot(Mismatch {
-                    expected: good_transactions_root.clone(),
-                    found: header.transactions_root().clone(),
-                }),
-            );
+            ),
+            InvalidTransactionsRoot(Mismatch {
+                expected: good_transactions_root.clone(),
+                found: header.transactions_root().clone(),
+            }),
+        );
 
-            check_ok(family_test(&create_test_block(&good), engine, &bc));
-            check_ok(family_test(
-                &create_test_block_with_data(&good, &good_transactions),
-                engine,
-                &bc,
-            ));
+        check_ok(family_test(&create_test_block(&good), engine, &bc));
+        check_ok(family_test(
+            &create_test_block_with_data(&good, &good_transactions),
+            engine,
+            &bc,
+        ));
 
-            header = good.clone();
-            header.set_parent_hash(H256::random());
-            check_fail(
-                family_test(
-                    &create_test_block_with_data(&header, &good_transactions),
-                    engine,
-                    &bc,
-                ),
-                UnknownParent(header.parent_hash().clone()),
-            );
-
-            header = good.clone();
-            header.set_timestamp(10);
-            check_fail(
-                family_test(
-                    &create_test_block_with_data(&header, &good_transactions),
-                    engine,
-                    &bc,
-                ),
-                InvalidTimestamp(OutOfBounds {
-                    max: None,
-                    min: Some(parent.timestamp() + 1),
-                    found: header.timestamp(),
-                }),
-            );
-
-            header = good.clone();
-            header.set_timestamp(2450000000);
-            check_fail_timestamp(
-                basic_test(
-                    &create_test_block_with_data(&header, &good_transactions),
-                    engine,
-                ),
-                false,
-            );
-
-            header = good.clone();
-            header.set_timestamp(get_time().sec as u64 + 20);
-            check_fail_timestamp(
-                basic_test(
-                    &create_test_block_with_data(&header, &good_transactions),
-                    engine,
-                ),
-                true,
-            );
-
-            header = good.clone();
-            header.set_timestamp(get_time().sec as u64 + 10);
-            header.set_transactions_root(good_transactions_root.clone());
-            check_ok(basic_test(
+        header = good.clone();
+        header.set_parent_hash(H256::random());
+        check_fail(
+            family_test(
                 &create_test_block_with_data(&header, &good_transactions),
                 engine,
-            ));
+                &bc,
+            ),
+            UnknownParent(header.parent_hash().clone()),
+        );
 
-            header = good.clone();
-            header.set_number(9);
-            check_fail(
-                family_test(
-                    &create_test_block_with_data(&header, &good_transactions),
-                    engine,
-                    &bc,
-                ),
-                InvalidNumber(Mismatch {
-                    expected: parent.number() + 1,
-                    found: header.number(),
-                }),
-            );
+        header = good.clone();
+        header.set_timestamp(10);
+        check_fail(
+            family_test(
+                &create_test_block_with_data(&header, &good_transactions),
+                engine,
+                &bc,
+            ),
+            InvalidTimestamp(OutOfBounds {
+                max: None,
+                min: Some(parent.timestamp() + 1),
+                found: header.timestamp(),
+            }),
+        );
 
-            header = good.clone();
-            header.set_gas_limit(0.into());
-            header.set_difficulty(
-                "0000000000000000000000000000000000000000000000000000000000020000"
-                    .parse::<U256>()
-                    .unwrap(),
-            );
-            match family_test(&create_test_block(&header), engine, &bc) {
-                Err(Error::Block(InvalidGasLimit(_))) => {}
-                Err(_) => {
-                    panic!("should be invalid difficulty fail");
-                }
-                _ => {
-                    panic!("Should be error, got Ok");
-                }
+        header = good.clone();
+        header.set_timestamp(2450000000);
+        check_fail_timestamp(
+            basic_test(
+                &create_test_block_with_data(&header, &good_transactions),
+                engine,
+            ),
+            false,
+        );
+
+        header = good.clone();
+        header.set_timestamp(get_time().sec as u64 + 20);
+        check_fail_timestamp(
+            basic_test(
+                &create_test_block_with_data(&header, &good_transactions),
+                engine,
+            ),
+            true,
+        );
+
+        header = good.clone();
+        header.set_timestamp(get_time().sec as u64 + 10);
+        header.set_transactions_root(good_transactions_root.clone());
+        check_ok(basic_test(
+            &create_test_block_with_data(&header, &good_transactions),
+            engine,
+        ));
+
+        header = good.clone();
+        header.set_number(9);
+        check_fail(
+            family_test(
+                &create_test_block_with_data(&header, &good_transactions),
+                engine,
+                &bc,
+            ),
+            InvalidNumber(Mismatch {
+                expected: parent.number() + 1,
+                found: header.number(),
+            }),
+        );
+
+        header = good.clone();
+        header.set_gas_limit(0.into());
+        header.set_difficulty(
+            "0000000000000000000000000000000000000000000000000000000000020000"
+                .parse::<U256>()
+                .unwrap(),
+        );
+        match family_test(&create_test_block(&header), engine, &bc) {
+            Err(Error::Block(InvalidGasLimit(_))) => {}
+            Err(_) => {
+                panic!("should be invalid difficulty fail");
+            }
+            _ => {
+                panic!("Should be error, got Ok");
             }
         }
+    }
 }

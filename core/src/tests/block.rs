@@ -20,19 +20,18 @@
  *
  ******************************************************************************/
 
-
 use log;
 use std::sync::Arc;
 use block::{OpenBlock, LockedBlock, SealedBlock, Drain};
-use engines::AionEngine;
-use error::Error;
+use engine::AionEngine;
+use types::error::Error;
 use header::Header;
 use factory::Factories;
-use state_db::StateDB;
+use db::StateDB;
 use state::State;
 use views::BlockView;
 use transaction::SignedTransaction;
-use kvdb::MemoryDBRepository;
+use kvdb::MockDbRepository;
 use aion_types::Address;
 use vms::LastHashes;
 use tests::common::helpers::get_temp_state_db;
@@ -66,7 +65,7 @@ fn enact_bytes(
                 parent.state_root().clone(),
                 engine.account_start_nonce(parent.number() + 1),
                 factories.clone(),
-                Arc::new(MemoryDBRepository::new()),
+                Arc::new(MockDbRepository::init(vec![])),
             )?;
             trace!(target: "enact", "num={}, root={}, author={}, author_balance={}\n",
                    header.number(), s.root(), header.author(), s.balance(&header.author())?);
@@ -83,7 +82,7 @@ fn enact_bytes(
         Address::new(),
         (3141562.into(), 31415620.into()),
         vec![],
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )?;
 
     b.populate_from(&header);
@@ -91,7 +90,6 @@ fn enact_bytes(
 
     Ok(b.close_and_lock())
 }
-
 
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header. Seal the block afterwards
 fn enact_and_seal(
@@ -114,10 +112,8 @@ fn enact_and_seal(
         last_hashes,
         factories,
     )?
-        .seal(engine, header.seal())?)
+    .seal(engine, header.seal())?)
 }
-
-
 
 #[test]
 fn open_block() {
@@ -137,14 +133,13 @@ fn open_block() {
         Address::zero(),
         (3141562.into(), 31415620.into()),
         vec![],
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )
-        .unwrap();
+    .unwrap();
     let b = b.close_and_lock();
     let res = b.seal(&*spec.engine, vec![]);
     assert!(res.is_ok());
 }
-
 
 #[test]
 fn enact_block() {
@@ -167,12 +162,12 @@ fn enact_block() {
         Address::zero(),
         (3141562.into(), 31415620.into()),
         vec![],
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )
-        .unwrap()
-        .close_and_lock()
-        .seal(engine, vec![])
-        .unwrap();
+    .unwrap()
+    .close_and_lock()
+    .seal(engine, vec![])
+    .unwrap();
     let orig_bytes = b.rlp_bytes();
     let orig_db = b.drain();
 
@@ -187,7 +182,7 @@ fn enact_block() {
         last_hashes,
         Default::default(),
     )
-        .unwrap();
+    .unwrap();
 
     assert_eq!(e.rlp_bytes(), orig_bytes);
 

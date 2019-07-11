@@ -34,13 +34,13 @@ use aion_types::{H256, U256, Address};
 use ethbloom::Bloom;
 use acore_bytes::Bytes;
 use unexpected::Mismatch;
-use engines::{AionEngine};
-use error::{Error, BlockError};
+use engine::{AionEngine};
+use types::error::{Error, BlockError};
 use factory::Factories;
 use header::{Header, Seal};
 use receipt::Receipt;
 use state::State;
-use state_db::StateDB;
+use db::StateDB;
 use transaction::{
     UnverifiedTransaction, SignedTransaction, Error as TransactionError, AVM_TRANSACTION_TYPE,
     Action,
@@ -631,7 +631,7 @@ impl IsBlock for SealedBlock {
 }
 
 /// Enact the block given by block header, transactions
-pub fn enact(
+fn enact(
     header: &Header,
     transactions: &[SignedTransaction],
     engine: &AionEngine,

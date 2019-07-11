@@ -1,6 +1,6 @@
-use account::{AionVMAccount,AccType,VMAccount};
+use state::account::{AionVMAccount,AccType,VMAccount};
 use kvdb::MemoryDB;
-use account_db::AccountDBMut;
+use db::AccountDBMut;
 use aion_types::Address;
 
 use std::sync::Arc;

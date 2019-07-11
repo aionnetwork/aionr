@@ -79,7 +79,7 @@ impl From<BlockInfo> for ImportRoute {
 mod tests {
     use aion_types::{H256, U256};
     use types::block::info::{BlockInfo, BlockLocation, BranchBecomingCanonChainData};
-    use super::ImportRoute;
+    use types::blockchain::import_route::ImportRoute;
 
     #[test]
     fn import_route_none() {

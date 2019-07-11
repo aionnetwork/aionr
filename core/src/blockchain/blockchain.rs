@@ -39,7 +39,7 @@ use transaction::*;
 use views::*;
 use log_entry::{LogEntry, LocalizedLogEntry};
 use receipt::Receipt;
-use blooms::{BloomGroup, GroupPosition};
+use types::blooms::{BloomGroup, GroupPosition};
 use types::blockchain::best_block::{BestBlock, BestAncientBlock};
 use types::block::info::{BlockInfo, BlockLocation, BranchBecomingCanonChainData};
 use types::blockchain::extra::{
@@ -54,7 +54,7 @@ use types::blockchain::import_route::ImportRoute;
 use db::{self, Writable, Readable, CacheUpdatePolicy};
 use cache_manager::CacheManager;
 use encoded;
-// use engines::epoch::{PendingTransition as PendingEpochTransition};
+// use engine::epoch::{PendingTransition as PendingEpochTransition};
 use rayon::prelude::*;
 use ansi_term::Colour;
 use kvdb::{DBTransaction, KeyValueDB};

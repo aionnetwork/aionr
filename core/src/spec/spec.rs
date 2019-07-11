@@ -31,13 +31,13 @@ use ajson;
 use blake2b::{blake2b, BLAKE2B_NULL_RLP};
 use acore_bytes::Bytes;
 use ethbloom::Bloom;
-use kvdb::{MemoryDB, MemoryDBRepository};
+use kvdb::{MemoryDB, MockDbRepository};
 use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
 use types::BlockNumber;
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
-use engines::{NullEngine,AionEngine,POWEquihashEngine};
-use error::Error;
+use engine::{NullEngine,AionEngine,POWEquihashEngine};
+use types::error::Error;
 use executive::Executive;
 use factory::Factories;
 use header::Header;
@@ -286,7 +286,7 @@ impl Spec {
                 root,
                 U256::zero(),
                 factories.clone(),
-                Arc::new(MemoryDBRepository::new()),
+                Arc::new(MockDbRepository::init(vec![String::new()])),
             )?;
 
             // Execute contract constructors.
@@ -430,19 +430,19 @@ mod tests {
         assert!(Spec::load(&[] as &[u8]).is_err());
     }
 
-        #[test]
-        fn test_chain() {
-            let test_spec = Spec::new_test();
+    #[test]
+    fn test_chain() {
+        let test_spec = Spec::new_test();
 
-            assert_eq!(
-                test_spec.state_root(),
-                "b3fd94094ccb910e058c00d6763b61472e7bf1b8a9cb2549a83a4d5a397e194e".into()
-            );
-            let genesis = test_spec.genesis_block();
-            assert_eq!(
-                BlockView::new(&genesis).header_view().hash(),
-                "579aed812b43f18210ff9e5406ae76b00dffbfba5f6f7ef2eda650780a119a55".into()
-            );
-        }
+        assert_eq!(
+            test_spec.state_root(),
+            "b3fd94094ccb910e058c00d6763b61472e7bf1b8a9cb2549a83a4d5a397e194e".into()
+        );
+        let genesis = test_spec.genesis_block();
+        assert_eq!(
+            BlockView::new(&genesis).header_view().hash(),
+            "579aed812b43f18210ff9e5406ae76b00dffbfba5f6f7ef2eda650780a119a55".into()
+        );
+    }
 
 }

@@ -33,7 +33,6 @@ use blake2b::blake2b;
 use aion_types::{H256, H128, U256, Address};
 use parking_lot::RwLock;
 use journaldb;
-use kvdb::DBValue;
 use kvdb::{RepositoryConfig, DatabaseConfig, DbRepository};
 use acore_bytes::Bytes;
 use rlp::*;
@@ -51,20 +50,19 @@ use header::{Header as BlockHeader, BlockNumber};
 use filter::Filter;
 use log_entry::LocalizedLogEntry;
 use receipt::{Receipt, LocalizedReceipt};
-use error::ImportResult;
+use types::error::{ImportResult, CallError};
 use factory::VmFactory;
 use miner::{Miner, MinerService};
 use spec::Spec;
-use account::BasicAccount;
+use state::BasicAccount;
 use types::pruning_info::PruningInfo;
 
 use verification::queue::QueueInfo;
 use block::{OpenBlock, SealedBlock, ClosedBlock};
 use executive::Executed;
-use error::CallError;
-use state_db::StateDB;
+use db::StateDB;
 use encoded;
-use kvdb::{KeyValueDB, MemoryDBRepository};
+use kvdb::{KeyValueDB, MockDbRepository};
 
 use transaction::UnverifiedTransaction;
 
@@ -171,7 +169,7 @@ impl TestBlockChainClient {
             ancient_block: RwLock::new(None),
             first_block: RwLock::new(None),
             history: RwLock::new(None),
-            db: Arc::new(MemoryDBRepository::new()),
+            db: Arc::new(MockDbRepository::init(vec![])),
         };
 
         // insert genesis hash.
@@ -836,9 +834,9 @@ impl ProvingBlockChainClient for TestBlockChainClient {
 
     fn prove_account(&self, _: H256, _: BlockId) -> Option<(Vec<Bytes>, BasicAccount)> { None }
 
-    fn prove_transaction(&self, _: SignedTransaction, _: BlockId) -> Option<(Bytes, Vec<DBValue>)> {
-        None
-    }
+    // fn prove_transaction(&self, _: SignedTransaction, _: BlockId) -> Option<(Bytes, Vec<DBValue>)> {
+    //     None
+    // }
 }
 
 impl ::client::EngineClient for TestBlockChainClient {

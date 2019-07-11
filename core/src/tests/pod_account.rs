@@ -96,7 +96,18 @@ fn code() {
 
 #[test]
 fn storage() {
-    let vec:Vec<Vec<u8>>=vec![vec![],vec![1],vec![2],vec![3],vec![4],vec![5],vec![6],vec![7],vec![8],vec![9]];
+    let vec: Vec<Vec<u8>> = vec![
+        vec![],
+        vec![1],
+        vec![2],
+        vec![3],
+        vec![4],
+        vec![5],
+        vec![6],
+        vec![7],
+        vec![8],
+        vec![9],
+    ];
     let a = PodAccount {
         balance: 0.into(),
         nonce: 0.into(),

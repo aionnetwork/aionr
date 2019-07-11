@@ -23,7 +23,6 @@ use std::mem;
 use bytes::BufMut;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
-use rand::random;
 use byteorder::ReadBytesExt;
 use version::short_version;
 use P2pMgr;
@@ -37,8 +36,6 @@ use REVISION_PREFIX;
 use route::VERSION;
 use route::MODULE;
 use route::ACTION;
-use states::HANDSHAKE_DONE;
-use states::DISCONNECTED;
 
 //TODO: remove it
 const VERSION: &str = "02";

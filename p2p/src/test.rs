@@ -55,7 +55,6 @@ pub fn get_network_config() -> NetworkConfig {
     net_config
 }
 
-
 #[test]
 fn test_create_server() {
     let rt = Runtime::new().unwrap();

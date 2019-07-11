@@ -31,14 +31,14 @@ use aion_types::{H256, U256, U512, Address};
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ExecutionResult, ExecStatus, ReturnData, ParamsType};
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
-use error::ExecutionError;
+use types::error::ExecutionError;
 use vms::VMType;
 use vms::constants::{MAX_CALL_DEPTH, GAS_CALL_MAX, GAS_CREATE_MAX};
 
 use externalities::*;
 use transaction::{Action, SignedTransaction};
 use crossbeam;
-pub use executed::Executed;
+pub use types::executed::Executed;
 use precompiled::builtin::{BuiltinExtImpl, BuiltinContext};
 
 #[cfg(debug_assertions)]

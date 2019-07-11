@@ -21,8 +21,8 @@
  ******************************************************************************/
 
 //! Definition of valid items for the verification queue.
-use engines::AionEngine;
-use error::Error;
+use engine::AionEngine;
+use types::error::Error;
 
 use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
@@ -76,8 +76,8 @@ pub trait Kind: 'static + Sized + Send + Sync {
 pub mod blocks {
     use super::{Kind, BlockLike};
 
-    use engines::AionEngine;
-    use error::{Error, BlockError};
+    use engine::AionEngine;
+    use types::error::{Error, BlockError};
     use header::Header;
     use verification::{PreverifiedBlock, verify_block_basic, verify_block_unordered};
 
@@ -173,8 +173,8 @@ pub mod blocks {
 pub mod headers {
     use super::{Kind, BlockLike};
 
-    use engines::{AionEngine};
-    use error::Error;
+    use engine::AionEngine;
+    use types::error::Error;
     use header::Header;
     use verification::verify_header_params;
 

@@ -29,4 +29,3 @@ mod state;
 mod externalities;
 
 pub mod common;
-
