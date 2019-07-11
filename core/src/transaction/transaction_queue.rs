@@ -2421,7 +2421,13 @@ pub mod test {
             let fetch_account = |_: &Address| default_account_details();
 
             txq.add(tx1.clone(), &fetch_account).unwrap();
-            txq.add(tx3.clone(), &fetch_account).unwrap();
+            if tx1.hash().cmp(&tx3.hash()) == Ordering::Greater {
+                txq.add(tx3.clone(), &fetch_account).unwrap();
+            }
+            else {
+                txq.add(tx3.clone(), &fetch_account).unwrap_err();
+            }
+
 
             // Compare by hash in case of  insertion id collision
             assert_eq!(txq.status().pending, 1);
