@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 //! Definition of valid items for the verification queue.
-use engines::POWEquihashEngine;
+use engines::AionEngine;
 use error::Error;
 
 use heapsize::HeapSizeOf;
@@ -63,12 +63,12 @@ pub trait Kind: 'static + Sized + Send + Sync {
     type Verified: Sized + Send + BlockLike + HeapSizeOf;
 
     /// Attempt to create the `Unverified` item from the input.
-    fn create(input: Self::Input, engine: &POWEquihashEngine) -> Result<Self::Unverified, Error>;
+    fn create(input: Self::Input, engine: &AionEngine) -> Result<Self::Unverified, Error>;
 
     /// Attempt to verify the `Unverified` item using the given engine.
     fn verify(
         unverified: Self::Unverified,
-        engine: &POWEquihashEngine,
+        engine: &AionEngine,
     ) -> Result<Self::Verified, Error>;
 }
 
@@ -76,7 +76,7 @@ pub trait Kind: 'static + Sized + Send + Sync {
 pub mod blocks {
     use super::{Kind, BlockLike};
 
-    use engines::POWEquihashEngine;
+    use engines::AionEngine;
     use error::{Error, BlockError};
     use header::Header;
     use verification::{PreverifiedBlock, verify_block_basic, verify_block_unordered};
@@ -95,7 +95,7 @@ pub mod blocks {
 
         fn create(
             input: Self::Input,
-            engine: &POWEquihashEngine,
+            engine: &AionEngine,
         ) -> Result<Self::Unverified, Error>
         {
             match verify_block_basic(&input.header, &input.bytes, engine) {
@@ -113,7 +113,7 @@ pub mod blocks {
 
         fn verify(
             un: Self::Unverified,
-            engine: &POWEquihashEngine,
+            engine: &AionEngine,
         ) -> Result<Self::Verified, Error>
         {
             let hash = un.hash();
@@ -173,7 +173,7 @@ pub mod blocks {
 pub mod headers {
     use super::{Kind, BlockLike};
 
-    use engines::POWEquihashEngine;
+    use engines::{AionEngine};
     use error::Error;
     use header::Header;
     use verification::verify_header_params;
@@ -196,7 +196,7 @@ pub mod headers {
 
         fn create(
             input: Self::Input,
-            engine: &POWEquihashEngine,
+            engine: &AionEngine,
         ) -> Result<Self::Unverified, Error>
         {
             verify_header_params(&input, engine, true).map(|_| input)
@@ -204,7 +204,7 @@ pub mod headers {
 
         fn verify(
             unverified: Self::Unverified,
-            engine: &POWEquihashEngine,
+            engine: &AionEngine,
         ) -> Result<Self::Verified, Error>
         {
             engine

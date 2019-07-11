@@ -36,7 +36,7 @@ use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
 use types::BlockNumber;
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
-use engines::POWEquihashEngine;
+use engines::{NullEngine,AionEngine,POWEquihashEngine};
 use error::Error;
 use executive::Executive;
 use factory::Factories;
@@ -87,7 +87,7 @@ pub struct Spec {
     /// User friendly spec name
     pub name: String,
     /// What engine are we using for this?
-    pub engine: Arc<POWEquihashEngine>,
+    pub engine: Arc<AionEngine>,
     /// Name of the subdir inside the main data dir to use for chain data and settings.
     pub data_dir: String,
     /// The genesis block's parent hash field.
@@ -240,7 +240,7 @@ impl Spec {
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
         premine: U256,
-    ) -> Arc<POWEquihashEngine>
+    ) -> Arc<AionEngine>
     {
         let machine = Self::machine(params, builtins, premine);
 
@@ -250,6 +250,9 @@ impl Spec {
                     pow_equihash_engine.params.into(),
                     machine,
                 ))
+            },
+            ajson::spec::Engine::Null(null_engine) => {
+                Arc::new(NullEngine::new(null_engine.params.into(), machine))
             }
         }
     }
@@ -438,7 +441,7 @@ mod tests {
             let genesis = test_spec.genesis_block();
             assert_eq!(
                 BlockView::new(&genesis).header_view().hash(),
-                "0b10f11ef884982ebeba4e34eb4ee15126ff7f513f6d3dc55528e92c6cb86ab4".into()
+                "579aed812b43f18210ff9e5406ae76b00dffbfba5f6f7ef2eda650780a119a55".into()
             );
         }
 

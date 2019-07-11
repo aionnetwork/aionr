@@ -26,8 +26,8 @@ extern crate rand;
 extern crate libc;
 extern crate fastvm;
 extern crate aion_types;
-extern crate types;
 extern crate rustc_hex;
+extern crate vm_common;
 #[macro_use]
 extern crate log;
 
@@ -39,8 +39,8 @@ use fastvm::basetypes::{DataWord};
 use fastvm::context::{execution_kind, TransactionResult, ExecutionContext};
 use fastvm::ffi::EvmJit;
 use aion_types::{Address, H128, U256, H256};
-use vms::traits::Ext;
-use vms::{ExecutionResult, CallType, EnvInfo};
+use vm_common::traits::Ext;
+use vm_common::{ExecutionResult, CallType, EnvInfo};
 
 type Bytes = Vec<u8>;
 

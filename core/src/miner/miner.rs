@@ -26,7 +26,7 @@ use aion_types::{Address, H256, U256};
 use ansi_term::Colour;
 use block::{Block, ClosedBlock, IsBlock};
 use client::{BlockId, MiningBlockChainClient, TransactionId};
-use engines::POWEquihashEngine;
+use engines::{AionEngine};
 use error::*;
 use header::{BlockNumber, Header};
 use io::IoChannel;
@@ -156,7 +156,7 @@ pub struct Miner {
     gas_range_target: RwLock<(U256, U256)>,
     author: RwLock<Address>,
     extra_data: RwLock<Bytes>,
-    engine: Arc<POWEquihashEngine>,
+    engine: Arc<AionEngine>,
     accounts: Option<Arc<AccountProvider>>,
     tx_message: Mutex<IoChannel<TxIoMessage>>,
     transaction_pool_update_lock: Mutex<bool>,
@@ -1123,7 +1123,7 @@ impl MinerService for Miner {
 }
 
 #[cfg(test)]
-mod tests{
+mod tests {
     use aion_types::U256;
     use block::IsBlock;
     use client::BlockChainClient;
@@ -1152,6 +1152,7 @@ mod tests{
         let sealing_work = miner.map_sealing_work(&client, |_| ());
         assert!(sealing_work.is_some(), "Expected closed block");
     }
+
     #[test]
     fn should_still_work_after_a_couple_of_blocks() {
         // given
@@ -1258,6 +1259,7 @@ mod tests{
         assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
         assert_eq!(miner.pending_receipts(best_block).len(), 0);
     }
+
     //
     #[test]
     fn should_import_external_transaction() {
@@ -1299,42 +1301,4 @@ mod tests{
         // Unless asked to prepare work.
         assert!(miner.requires_reseal(1u8.into()));
     }
-
-    #[test]
-    fn internal_seals_without_work() {
-        //let spec = Spec::new_instant();
-        let spec = Spec::new_test();
-        let mut miner = Miner::with_spec(&spec);
-        miner.set_minimal_gas_price(0.into());
-
-        let client = generate_dummy_client(2);
-
-        assert!(
-            miner
-                .import_external_transactions(&*client, vec![transaction().into()])
-                .pop()
-                .unwrap()
-                .is_ok()
-        );
-        miner.update_transaction_pool(&*client, true);
-        miner.update_sealing(&*client);
-        client.flush_queue();
-        assert!(miner.pending_block(0).is_none());
-        assert_eq!(client.chain_info().best_block_number, 3 as BlockNumber);
-
-        assert!(
-            miner
-                .import_own_transaction(
-                    &*client,
-                    PendingTransaction::new(transaction().into(), None)
-                )
-                .is_ok()
-        );
-        miner.update_transaction_pool(&*client, true);
-        miner.update_sealing(&*client);
-        client.flush_queue();
-        assert!(miner.pending_block(0).is_none());
-        assert_eq!(client.chain_info().best_block_number, 4 as BlockNumber);
-    }
-
 }

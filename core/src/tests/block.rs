@@ -24,7 +24,7 @@
 use log;
 use std::sync::Arc;
 use block::{OpenBlock, LockedBlock, SealedBlock, Drain};
-use engines::POWEquihashEngine;
+use engines::AionEngine;
 use error::Error;
 use header::Header;
 use factory::Factories;
@@ -41,7 +41,7 @@ use spec::Spec;
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 fn enact_bytes(
     block_bytes: &[u8],
-    engine: &POWEquihashEngine,
+    engine: &AionEngine,
     db: StateDB,
     parent: &Header,
     _grant_parent: Option<&Header>,
@@ -64,7 +64,7 @@ fn enact_bytes(
             let s = State::from_existing(
                 db.boxed_clone(),
                 parent.state_root().clone(),
-                engine.machine().account_start_nonce(parent.number() + 1),
+                engine.account_start_nonce(parent.number() + 1),
                 factories.clone(),
                 Arc::new(MemoryDBRepository::new()),
             )?;
@@ -97,7 +97,7 @@ fn enact_bytes(
 fn enact_and_seal(
     block_bytes: &[u8],
 //    engine: &EthEngine,
-    engine: &POWEquihashEngine,
+    engine: &AionEngine,
     db: StateDB,
     parent: &Header,
     last_hashes: Arc<LastHashes>,
