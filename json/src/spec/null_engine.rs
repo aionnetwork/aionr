@@ -20,37 +20,44 @@
  *
  ******************************************************************************/
 
-//! Engine deserialization.
-use super::{POWEquihashEngine};
-use super::{NullEngine};
+//! Null engine params deserialization.
 
-/// Engine deserialization.
+use uint::Uint;
+
+/// Authority params deserialization.
 #[derive(Debug, PartialEq, Deserialize)]
-pub enum Engine {
-    POWEquihashEngine(POWEquihashEngine),
-    #[serde(rename = "null")]
-    Null(NullEngine),
+pub struct NullEngineParams {
+    /// Block reward.
+    #[serde(rename = "blockReward")]
+    pub block_reward: Option<Uint>,
+}
+
+/// Null engine descriptor
+#[derive(Debug, PartialEq, Deserialize)]
+pub struct NullEngine {
+    /// Null engine params.
+    pub params: NullEngineParams,
 }
 
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use spec::Engine;
+    use uint::Uint;
+    use aion_types::U256;
+    use super::*;
 
     #[test]
-    fn engine_deserialization() {
+    fn null_engine_deserialization() {
         let s = r#"{
-            "null": {
-                "params": {
-                    "blockReward": "0x0d"
-                }
+            "params": {
+                "blockReward": "0x0d"
             }
         }"#;
 
-        let deserialized: Engine = serde_json::from_str(s).unwrap();
-        match deserialized {
-            Engine::Null(_) => {} // unit test in its own file.
-            _ => panic!(),
-        }
+        let deserialized: NullEngine = serde_json::from_str(s).unwrap();
+        assert_eq!(
+            deserialized.params.block_reward,
+            Some(Uint(U256::from(0x0d)))
+        );
     }
 }

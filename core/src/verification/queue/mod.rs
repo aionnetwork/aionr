@@ -32,8 +32,8 @@ use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
 use parking_lot::{Condvar, Mutex, RwLock};
 use io::*;
+use engine::AionEngine;
 use types::error::*;
-use engine::POWEquihashEngine;
 use service::*;
 
 use self::kind::{BlockLike, Kind};
@@ -144,7 +144,7 @@ struct Sizes {
 /// A queue of items to be verified. Sits between network or other I/O and the `BlockChain`.
 /// Keeps them in the same order as inserted, minus invalid items.
 pub struct VerificationQueue<K: Kind> {
-    engine: Arc<POWEquihashEngine>,
+    engine: Arc<AionEngine>,
     more_to_verify: Arc<SCondvar>,
     verification: Arc<Verification<K>>,
     deleting: Arc<AtomicBool>,
@@ -220,7 +220,7 @@ impl<K: Kind> VerificationQueue<K> {
     /// Creates a new queue instance.
     pub fn new(
         config: Config,
-        engine: Arc<POWEquihashEngine>,
+        engine: Arc<AionEngine>,
         message_channel: IoChannel<ClientIoMessage>,
     ) -> Self
     {
@@ -298,7 +298,7 @@ impl<K: Kind> VerificationQueue<K> {
 
     fn verify(
         verification: Arc<Verification<K>>,
-        engine: Arc<POWEquihashEngine>,
+        engine: Arc<AionEngine>,
         wait: Arc<SCondvar>,
         ready: Arc<QueueSignal>,
         empty: Arc<SCondvar>,
@@ -799,9 +799,11 @@ impl<K: Kind> Drop for VerificationQueue<K> {
 mod tests {
     use io::*;
     use spec::*;
-    use super::{BlockQueue, Config};
+    use super::{BlockQueue,State, Config};
     use super::kind::blocks::Unverified;
     use helpers::*;
+    use types::error::{Error,ImportError};
+    use views::BlockView;
 
     // create a test block queue.
     // auto_scaling enables verifier adjustment.
@@ -830,128 +832,128 @@ mod tests {
         }
     }
 
-    //    #[test]
-    //    fn returns_error_for_duplicates() {
-    //        let queue = get_test_queue(false);
-    //        if let Err(e) = queue.import(Unverified::new(get_good_dummy_block())) {
-    //            panic!("error importing block that is valid by definition({:?})", e);
-    //        }
-    //
-    //        let duplicate_import = queue.import(Unverified::new(get_good_dummy_block()));
-    //        match duplicate_import {
-    //            Err(e) => {
-    //                match e {
-    //                    Error::Import(ImportError::AlreadyQueued) => {}
-    //                    _ => {
-    //                        panic!("must return AlreadyQueued error");
-    //                    }
-    //                }
-    //            }
-    //            Ok(_) => {
-    //                panic!("must produce error");
-    //            }
-    //        }
-    //    }
+        #[test]
+        fn returns_error_for_duplicates() {
+            let queue = get_test_queue(false);
+            if let Err(e) = queue.import(Unverified::new(get_good_dummy_block())) {
+                panic!("error importing block that is valid by definition({:?})", e);
+            }
 
-    //    #[test]
-    //    fn returns_total_difficulty() {
-    //        let queue = get_test_queue(false);
-    //        let block = get_good_dummy_block();
-    //        let hash = BlockView::new(&block).header().hash().clone();
-    //        if let Err(e) = queue.import(Unverified::new(block)) {
-    //            panic!("error importing block that is valid by definition({:?})", e);
-    //        }
-    //        queue.flush();
-    //        assert_eq!(queue.total_difficulty(), 131072.into());
-    //        queue.drain(10);
-    //        assert_eq!(queue.total_difficulty(), 131072.into());
-    //        queue.mark_as_good(&[hash]);
-    //        assert_eq!(queue.total_difficulty(), 0.into());
-    //    }
+            let duplicate_import = queue.import(Unverified::new(get_good_dummy_block()));
+            match duplicate_import {
+                Err(e) => {
+                    match e {
+                        Error::Import(ImportError::AlreadyQueued) => {}
+                        _ => {
+                            panic!("must return AlreadyQueued error");
+                        }
+                    }
+                }
+                Ok(_) => {
+                    panic!("must produce error");
+                }
+            }
+        }
 
-    //    #[test]
-    //    fn returns_ok_for_drained_duplicates() {
-    //        let queue = get_test_queue(false);
-    //        let block = get_good_dummy_block();
-    //        let hash = BlockView::new(&block).header().hash().clone();
-    //        if let Err(e) = queue.import(Unverified::new(block)) {
-    //            panic!("error importing block that is valid by definition({:?})", e);
-    //        }
-    //        queue.flush();
-    //        queue.drain(10);
-    //        queue.mark_as_good(&[hash]);
-    //
-    //        if let Err(e) = queue.import(Unverified::new(get_good_dummy_block())) {
-    //            panic!(
-    //                "error importing block that has already been drained ({:?})",
-    //                e
-    //            );
-    //        }
-    //    }
+        #[test]
+        fn returns_total_difficulty() {
+            let queue = get_test_queue(false);
+            let block = get_good_dummy_block();
+            let hash = BlockView::new(&block).header().hash().clone();
+            if let Err(e) = queue.import(Unverified::new(block)) {
+                panic!("error importing block that is valid by definition({:?})", e);
+            }
+            queue.flush();
+            assert_eq!(queue.total_difficulty(), 131072.into());
+            queue.drain(10);
+            assert_eq!(queue.total_difficulty(), 131072.into());
+            queue.mark_as_good(&[hash]);
+            assert_eq!(queue.total_difficulty(), 0.into());
+        }
 
-    //    #[test]
-    //    fn returns_empty_once_finished() {
-    //        let queue = get_test_queue(false);
-    //        queue
-    //            .import(Unverified::new(get_good_dummy_block()))
-    //            .expect("error importing block that is valid by definition");
-    //        queue.flush();
-    //        queue.drain(1);
-    //
-    //        assert!(queue.queue_info().is_empty());
-    //    }
+        #[test]
+        fn returns_ok_for_drained_duplicates() {
+            let queue = get_test_queue(false);
+            let block = get_good_dummy_block();
+            let hash = BlockView::new(&block).header().hash().clone();
+            if let Err(e) = queue.import(Unverified::new(block)) {
+                panic!("error importing block that is valid by definition({:?})", e);
+            }
+            queue.flush();
+            queue.drain(10);
+            queue.mark_as_good(&[hash]);
 
-    //    #[test]
-    //    fn test_mem_limit() {
-    //        let spec = get_test_spec();
-    //        let engine = spec.engine;
-    //        let mut config = Config::default();
-    //        config.max_mem_use = super::MIN_MEM_LIMIT; // empty queue uses about 15000
-    //        let queue = BlockQueue::new(config, engine, IoChannel::disconnected());
-    //        assert!(!queue.queue_info().is_full());
-    //        let mut blocks = get_good_dummy_block_seq(50);
-    //        for b in blocks.drain(..) {
-    //            queue.import(Unverified::new(b)).unwrap();
-    //        }
-    //        assert!(queue.queue_info().is_full());
-    //    }
+            if let Err(e) = queue.import(Unverified::new(get_good_dummy_block())) {
+                panic!(
+                    "error importing block that has already been drained ({:?})",
+                    e
+                );
+            }
+        }
 
-    //    #[test]
-    //    fn scaling_limits() {
-    //        use super::MAX_VERIFIERS;
-    //
-    //        let queue = get_test_queue(true);
-    //        queue.scale_verifiers(MAX_VERIFIERS + 1);
-    //
-    //        assert!(queue.num_verifiers() < MAX_VERIFIERS + 1);
-    //
-    //        queue.scale_verifiers(0);
-    //
-    //        assert_eq!(queue.num_verifiers(), 1);
-    //    }
+        #[test]
+        fn returns_empty_once_finished() {
+            let queue = get_test_queue(false);
+            queue
+                .import(Unverified::new(get_good_dummy_block()))
+                .expect("error importing block that is valid by definition");
+            queue.flush();
+            queue.drain(1);
 
-    //    #[test]
-    //    fn readjust_verifiers() {
-    //        let queue = get_test_queue(true);
-    //
-    //        // put all the verifiers to sleep to ensure
-    //        // the test isn't timing sensitive.
-    //        *queue.state.0.lock() = State::Work(0);
-    //
-    //        for block in get_good_dummy_block_seq(5000) {
-    //            queue
-    //                .import(Unverified::new(block))
-    //                .expect("Block good by definition; qed");
-    //        }
-    //
-    //        // almost all unverified == bump verifier count.
-    //        queue.collect_garbage();
-    //        assert_eq!(queue.num_verifiers(), 1);
-    //
-    //        queue.flush();
-    //
-    //        // nothing to verify == use minimum number of verifiers.
-    //        queue.collect_garbage();
-    //        assert_eq!(queue.num_verifiers(), 1);
-    //    }
+            assert!(queue.queue_info().is_empty());
+        }
+
+        #[test]
+        fn test_mem_limit() {
+            let spec = get_test_spec();
+            let engine = spec.engine;
+            let mut config = Config::default();
+            config.max_mem_use = super::MIN_MEM_LIMIT; // empty queue uses about 15000
+            let queue = BlockQueue::new(config, engine, IoChannel::disconnected());
+            assert!(!queue.queue_info().is_full());
+            let mut blocks = get_good_dummy_block_seq(50);
+            for b in blocks.drain(..) {
+                queue.import(Unverified::new(b)).unwrap();
+            }
+            assert!(queue.queue_info().is_full());
+        }
+
+        #[test]
+        fn scaling_limits() {
+            use super::MAX_VERIFIERS;
+
+            let queue = get_test_queue(true);
+            queue.scale_verifiers(MAX_VERIFIERS + 1);
+
+            assert!(queue.num_verifiers() < MAX_VERIFIERS + 1);
+
+            queue.scale_verifiers(0);
+
+            assert_eq!(queue.num_verifiers(), 1);
+        }
+
+        #[test]
+        fn readjust_verifiers() {
+            let queue = get_test_queue(true);
+
+            // put all the verifiers to sleep to ensure
+            // the test isn't timing sensitive.
+            *queue.state.0.lock() = State::Work(0);
+
+            for block in get_good_dummy_block_seq(5000) {
+                queue
+                    .import(Unverified::new(block))
+                    .expect("Block good by definition; qed");
+            }
+
+            // almost all unverified == bump verifier count.
+            queue.collect_garbage();
+            assert_eq!(queue.num_verifiers(), 1);
+
+            queue.flush();
+
+            // nothing to verify == use minimum number of verifiers.
+            queue.collect_garbage();
+            assert_eq!(queue.num_verifiers(), 1);
+        }
 }

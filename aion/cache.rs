@@ -108,7 +108,7 @@ mod tests {
         assert_eq!(config.jump_tables(), 10);
     }
     /*
-    
+
         #[test]
         fn test_cache_config_db_cache_sizes() {
             let config = CacheConfig::new_with_total_cache_size(400);
