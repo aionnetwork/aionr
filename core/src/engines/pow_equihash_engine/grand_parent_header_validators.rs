@@ -28,7 +28,7 @@ pub trait GrandParentHeaderValidator {
     fn validate(
         &self,
         header: &Header,
-        parent_header: &Header,
+        parent_header: Option<&Header>,
         grand_parent_header: Option<&Header>,
     ) -> Result<(), Error>;
 }
@@ -41,44 +41,22 @@ impl<'a> GrandParentHeaderValidator for DifficultyValidator<'a> {
     fn validate(
         &self,
         header: &Header,
-        parent_header: &Header,
+        parent_header: Option<&Header>,
         grand_parent_header: Option<&Header>,
     ) -> Result<(), Error>
     {
-        let difficulty = *header.difficulty();
-        let parent_difficulty = *parent_header.difficulty();
-        if parent_header.number() == 0u64 {
-            if difficulty != parent_difficulty {
-                return Err(BlockError::InvalidDifficulty(Mismatch {
-                    expected: parent_difficulty,
-                    found: difficulty,
-                })
-                .into());
-            } else {
-                return Ok(());
-            }
-        }
-
-        if grand_parent_header.is_none() {
-            panic!(
-                "non-1st block must have grand parent. block num: {}",
-                header.number()
-            );
+        let difficulty = header.difficulty().to_owned();
+        let calc_difficulty =
+            self.difficulty_calc
+                .calculate_difficulty(header, parent_header, grand_parent_header);
+        if difficulty != calc_difficulty {
+            Err(BlockError::InvalidDifficulty(Mismatch {
+                expected: calc_difficulty,
+                found: difficulty,
+            })
+            .into())
         } else {
-            let calc_difficulty = self.difficulty_calc.calculate_difficulty(
-                header,
-                Some(parent_header), // TODO-Unity: handle this well when implementing difficulty validator
-                grand_parent_header,
-            );
-            if difficulty != calc_difficulty {
-                Err(BlockError::InvalidDifficulty(Mismatch {
-                    expected: calc_difficulty,
-                    found: difficulty,
-                })
-                .into())
-            } else {
-                Ok(())
-            }
+            Ok(())
         }
     }
 }

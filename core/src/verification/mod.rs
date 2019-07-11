@@ -121,7 +121,8 @@ pub type FullFamilyParams<'a> = (
 pub fn verify_block_family(
     header: &Header,
     parent: &Header,
-    grand_parent: Option<&Header>,
+    seal_parent: Option<&Header>,
+    seal_grand_parent: Option<&Header>,
     engine: &POWEquihashEngine,
     do_full: Option<FullFamilyParams>,
 ) -> Result<(), Error>
@@ -131,7 +132,7 @@ pub fn verify_block_family(
         &parent,
         engine.machine().params().gas_limit_bound_divisor,
     )?;
-    engine.verify_block_family(&header, &parent, grand_parent)?;
+    engine.verify_block_family(&header, &parent, seal_parent, seal_grand_parent)?;
 
     let (_bytes, _txs, _bc, _client) = match do_full {
         Some(x) => x,

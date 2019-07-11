@@ -399,10 +399,11 @@ impl POWEquihashEngine {
         &self,
         header: &Header,
         parent: &Header,
-        grand_parent: Option<&Header>,
+        seal_parent: Option<&Header>,
+        seal_grand_parent: Option<&Header>,
     ) -> Result<(), Error>
     {
-        // verify parent
+        // verifications related to parent
         let mut parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(2);
         parent_validators.push(Box::new(NumberValidator {}));
         parent_validators.push(Box::new(TimestampValidator {}));
@@ -410,13 +411,13 @@ impl POWEquihashEngine {
             v.validate(header, parent)?;
         }
 
-        // verify grand parent
+        // verifications related to seal parent and seal grand parent
         let mut grand_validators: Vec<Box<GrandParentHeaderValidator>> = Vec::with_capacity(1);
         grand_validators.push(Box::new(DifficultyValidator {
             difficulty_calc: &self.difficulty_calc,
         }));
         for v in grand_validators.iter() {
-            v.validate(header, parent, grand_parent)?;
+            v.validate(header, seal_parent, seal_grand_parent)?;
         }
 
         Ok(())

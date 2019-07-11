@@ -134,7 +134,6 @@ pub struct Client {
     block_queue: BlockQueue,
     report: RwLock<ClientReport>,
     import_lock: Mutex<()>,
-    //verifier: Box<Verifier>,
     miner: Arc<Miner>,
     io_channel: Mutex<IoChannel<ClientIoMessage>>,
     notify: RwLock<Vec<Weak<ChainNotify>>>,
@@ -348,15 +347,15 @@ impl Client {
             None => None,
         };
 
-        let grand_parent = chain.block_header(parent.parent_hash());
-        let grand_parent_header = grand_parent.as_ref();
-
         // Verify Block Family
         let verify_family_result = verify_block_family(
-            //let verify_family_result = self.verifier.verify_block_family(
             header,
             &parent,
-            grand_parent_header,
+            seal_parent.clone().map(|header| header.decode()).as_ref(),
+            seal_grand_parent
+                .clone()
+                .map(|header| header.decode())
+                .as_ref(),
             engine,
             Some((&block.bytes, &block.transactions, &**chain, self)),
         );
