@@ -242,10 +242,11 @@ impl Miner {
 
             // 2. Generate seed and signature
             let bare_hash: H256 = raw_block.header().bare_hash();
-            let seal_parent_seed: Bytes = match client.seal_parent_header(
+            let seal_parent = client.seal_parent_header(
                 raw_block.header().parent_hash(),
                 raw_block.header().seal_type(),
-            ) {
+            );
+            let seal_parent_seed: Bytes = match &seal_parent {
                 Some(header) => {
                     let seed: Bytes = header
                         .seal()
@@ -271,7 +272,11 @@ impl Miner {
             seal.push(seed.to_vec());
             let sealed_block: SealedBlock = raw_block
                 .lock()
-                .try_seal(&*self.engine, seal)
+                .try_seal_pos(
+                    &*self.engine,
+                    seal,
+                    seal_parent.map(|header| header.decode()).as_ref(),
+                )
                 .or_else(|(e, _)| {
                     warn!(target: "miner", "Staking seal rejected: {}", e);
                     Err(Error::PosInvalid)
@@ -1193,7 +1198,7 @@ impl MinerService for Miner {
             },
         ) {
             trace!(target: "miner", "Submitted block {}={} with seal {:?}", block_hash, b.header().mine_hash(), seal);
-            b.lock().try_seal(&*self.engine, seal).or_else(|(e, _)| {
+            b.lock().try_seal_pow(&*self.engine, seal).or_else(|(e, _)| {
                 warn!(target: "miner", "Mined solution rejected: {}", e);
                 Err(Error::PowInvalid)
             })

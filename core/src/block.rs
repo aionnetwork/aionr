@@ -586,10 +586,10 @@ impl LockedBlock {
         })
     }
 
-    /// Provide a valid seal in order to turn this into a `SealedBlock`.
+    /// Provide a valid PoW seal in order to turn this into a `SealedBlock`.
     /// This does check the validity of `seal` with the engine.
-    /// Returns the `ClosedBlock` back again if the seal is no good.
-    pub fn try_seal(
+    /// Returns the `LockedBlock` back again if the seal is no good.
+    pub fn try_seal_pow(
         self,
         engine: &POWEquihashEngine,
         seal: Vec<Bytes>,
@@ -598,8 +598,7 @@ impl LockedBlock {
         let mut s = self;
         s.block.header.set_seal(seal);
 
-        // TODO: passing state context to avoid engines owning it?
-        match engine.verify_local_seal(&s.block.header) {
+        match engine.verify_local_seal_pow(&s.block.header) {
             Err(e) => Err((e, s)),
             _ => {
                 Ok(SealedBlock {
@@ -607,8 +606,29 @@ impl LockedBlock {
                 })
             }
         }
+    }
 
-        // TODO-Unity: handle PoS validation
+    /// Provide a valid PoS seal in order to turn this into a `SealedBlock`.
+    /// This does check the validity of `seal` with the engine.
+    /// Returns the `LockedBlock` back again if the seal is no good.
+    pub fn try_seal_pos(
+        self,
+        engine: &POWEquihashEngine,
+        seal: Vec<Bytes>,
+        seal_parent: Option<&Header>,
+    ) -> Result<SealedBlock, (Error, LockedBlock)>
+    {
+        let mut s = self;
+        s.block.header.set_seal(seal);
+
+        match engine.verify_local_seal_pos(&s.block.header, seal_parent) {
+            Err(e) => Err((e, s)),
+            _ => {
+                Ok(SealedBlock {
+                    block: s.block,
+                })
+            }
+        }
     }
 }
 

@@ -40,6 +40,7 @@ use self::dependent_header_validators::{
     DependentHeaderValidator,
     NumberValidator,
     TimestampValidator,
+    PoSValidator,
 //    EnergyLimitValidator
 };
 use self::header_validators::{
@@ -345,12 +346,15 @@ impl POWEquihashEngine {
         self.rewards_calculator.calculate_reward(header)
     }
 
+    // TODO-Unity: duplcation of verify_block_basic. Handle this better.
     pub fn validate_block_header(header: &Header) -> Result<(), Error> {
-        let mut block_header_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(4);
-        block_header_validators.push(Box::new(EnergyConsumedValidator {}));
-        block_header_validators.push(Box::new(POWValidator {}));
+        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(2);
+        cheap_validators.push(Box::new(EnergyConsumedValidator {}));
+        if header.seal_type() == &Some(SealType::PoW) {
+            cheap_validators.push(Box::new(POWValidator {}));
+        }
 
-        for v in block_header_validators.iter() {
+        for v in cheap_validators.iter() {
             v.validate(header)?;
         }
 
@@ -358,6 +362,10 @@ impl POWEquihashEngine {
     }
 
     pub fn name(&self) -> &str { "POWEquihashEngine" }
+
+    pub fn machine(&self) -> &EthereumMachine { &self.machine }
+
+    pub fn seal_fields(&self, _header: &Header) -> usize { 2 }
 
     pub fn verify_block_basic(&self, header: &Header) -> Result<(), Error> {
         let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(2);
@@ -386,14 +394,28 @@ impl POWEquihashEngine {
         Ok(())
     }
 
-    pub fn verify_local_seal(&self, header: &Header) -> Result<(), Error> {
+    pub fn verify_local_seal_pow(&self, header: &Header) -> Result<(), Error> {
         self.verify_block_basic(header)
             .and_then(|_| self.verify_block_unordered(header))
     }
 
-    pub fn machine(&self) -> &EthereumMachine { &self.machine }
-
-    pub fn seal_fields(&self, _header: &Header) -> usize { 2 }
+    /// Verify the seal of locally produced PoS block
+    pub fn verify_local_seal_pos(
+        &self,
+        header: &Header,
+        seal_parent: Option<&Header>,
+    ) -> Result<(), Error>
+    {
+        if header.seal_type() == &Some(SealType::PoS) && seal_parent.is_some() {
+            // TODO-Unity: handle none seal parent better
+            let pos_seal_validator = PoSValidator {};
+            pos_seal_validator.validate(
+                header,
+                seal_parent.expect("none seal parent checked before."),
+            )?;
+        }
+        Ok(())
+    }
 
     pub fn verify_block_family(
         &self,
@@ -403,7 +425,7 @@ impl POWEquihashEngine {
         seal_grand_parent: Option<&Header>,
     ) -> Result<(), Error>
     {
-        // verifications related to parent
+        // Verifications related to direct parent
         let mut parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(2);
         parent_validators.push(Box::new(NumberValidator {}));
         parent_validators.push(Box::new(TimestampValidator {}));
@@ -411,7 +433,20 @@ impl POWEquihashEngine {
             v.validate(header, parent)?;
         }
 
-        // verifications related to seal parent and seal grand parent
+        // Verifications related to seal parent
+        let mut seal_parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(1);
+        if header.seal_type() == &Some(SealType::PoS) && seal_parent.is_some() {
+            // TODO-Unity: handle none seal parent better
+            seal_parent_validators.push(Box::new(PoSValidator {}));
+        }
+        for v in seal_parent_validators.iter() {
+            v.validate(
+                header,
+                seal_parent.expect("none seal parent checked before."),
+            )?;
+        }
+
+        // Verifications related to seal parent and seal grand parent
         let mut grand_validators: Vec<Box<GrandParentHeaderValidator>> = Vec::with_capacity(1);
         grand_validators.push(Box::new(DifficultyValidator {
             difficulty_calc: &self.difficulty_calc,

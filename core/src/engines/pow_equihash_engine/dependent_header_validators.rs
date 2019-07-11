@@ -22,6 +22,9 @@
 use header::Header;
 use error::{BlockError, Error};
 use unexpected::{Mismatch, OutOfBounds};
+use key::public_to_address_ed25519;
+use rcrypto::ed25519::verify;
+use aion_types::{H256, Address};
 
 pub trait DependentHeaderValidator {
     fn validate(&self, header: &Header, dependent_header: &Header) -> Result<(), Error>;
@@ -59,6 +62,62 @@ impl DependentHeaderValidator for TimestampValidator {
             })
             .into());
         }
+        Ok(())
+    }
+}
+
+pub struct PoSValidator;
+impl DependentHeaderValidator for PoSValidator {
+    fn validate(&self, header: &Header, dependent_header: &Header) -> Result<(), Error> {
+        // Get seal, check seal length
+        let seal = header.seal();
+        if seal.len() != 2 {
+            error!(target: "pos", "seal length != 2");
+            return Err(BlockError::InvalidSealArity(Mismatch {
+                expected: 2,
+                found: seal.len(),
+            })
+            .into());
+        }
+
+        // Get seed and signature
+        let signature = &seal[0];
+        let seed = &seal[1];
+        let parent_seed = dependent_header
+            .seal()
+            .get(1)
+            .expect("parent pos block should have a seed");
+
+        // Verify seed
+        let public_from_seed = &seed[..32];
+        let sig_from_seed = &seed[32..96];
+        if !verify(&parent_seed, public_from_seed, sig_from_seed) {
+            return Err(BlockError::InvalidSeal.into());
+        }
+        let author_from_seed: Address = public_to_address_ed25519(&H256::from(public_from_seed));
+
+        // Verify block signature
+        let public_from_signature = &signature[..32];
+        let sig_from_signature = &signature[32..96];
+        if !verify(
+            &header.bare_hash().0,
+            public_from_signature,
+            sig_from_signature,
+        ) {
+            return Err(BlockError::InvalidSeal.into());
+        }
+        let author_from_signature: Address =
+            public_to_address_ed25519(&H256::from(public_from_signature));
+
+        // Verify seed and block signature are the same as the block producer
+        if (&author_from_seed, &author_from_signature) != (&author_from_signature, header.author())
+        {
+            return Err(BlockError::InvalidSeal.into());
+        }
+
+        // Verify timestamp
+        // TODO-Unity: To verify the timestamp with (stake, seed, difficulty, parent_timestamp)
+
         Ok(())
     }
 }
