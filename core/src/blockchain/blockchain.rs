@@ -120,7 +120,14 @@ pub trait BlockProvider {
     fn block_header_data(&self, hash: &H256) -> Option<encoded::Header>;
 
     /// Get the header RLP of the seal parent of the given block.
-    fn seal_parent_header(&self, hash: &H256) -> Option<::encoded::Header>;
+    /// Parameters:
+    ///   parent_hash: parent hash of the given block
+    ///   seal_type: seal type of the given block
+    fn seal_parent_header(
+        &self,
+        parent_hash: &H256,
+        seal_type: &Option<SealType>,
+    ) -> Option<::encoded::Header>;
 
     /// Get the block body (uncles and transactions).
     fn block_body(&self, hash: &H256) -> Option<encoded::Body>;
@@ -321,32 +328,33 @@ impl BlockProvider for BlockChain {
     }
 
     /// Get the header RLP of the seal parent of the given block.
-    fn seal_parent_header(&self, hash: &H256) -> Option<::encoded::Header> {
-        // Get current header
-        let current_header: ::encoded::Header = match self.block_header_data(hash) {
-            Some(header) => header,
-            None => return None,
-        };
-        let parent_hash: H256 = current_header.parent_hash();
-        let current_seal_type: SealType = current_header.seal_type().to_owned().unwrap_or_default();
+    /// Parameters:
+    ///   parent_hash: parent hash of the given block
+    ///   seal_type: seal type of the given block
+    fn seal_parent_header(
+        &self,
+        parent_hash: &H256,
+        seal_type: &Option<SealType>,
+    ) -> Option<::encoded::Header>
+    {
         // Get parent header
-        let parent_header: ::encoded::Header = match self.block_header_data(&parent_hash) {
+        let parent_header: ::encoded::Header = match self.block_header_data(parent_hash) {
             Some(header) => header,
             None => return None,
         };
-        let parent_seal_type: SealType = parent_header.seal_type().to_owned().unwrap_or_default();
+        let parent_seal_type: Option<SealType> = parent_header.seal_type();
         // If parent's seal type is the same as the current, return parent
-        if current_seal_type == parent_seal_type {
+        if seal_type == &parent_seal_type {
             Some(parent_header)
         }
         // Else return the anti seal parent of the parent
         else {
-            let parent_details: BlockDetails = match self.block_details(&parent_hash) {
+            let parent_details: BlockDetails = match self.block_details(parent_hash) {
                 Some(details) => details,
                 None => return None,
             };
-            let anti_seal_parent_hash: H256 = parent_details.anti_seal_parent;
-            self.block_header_data(&anti_seal_parent_hash)
+            let anti_seal_parent: H256 = parent_details.anti_seal_parent;
+            self.block_header_data(&anti_seal_parent)
         }
     }
 

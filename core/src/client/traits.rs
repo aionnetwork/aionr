@@ -56,8 +56,15 @@ pub trait BlockChainClient: Sync + Send {
     /// Get raw block header data by block hash.
     fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header>;
 
-    /// Get seal parent's raw block header data by block hash.
-    fn seal_parent_header(&self, hash: &H256) -> Option<::encoded::Header>;
+    /// Get the header RLP of the seal parent of the given block.
+    /// Parameters:
+    ///   parent_hash: parent hash of the given block
+    ///   seal_type: seal type of the given block
+    fn seal_parent_header(
+        &self,
+        parent_hash: &H256,
+        seal_type: &Option<SealType>,
+    ) -> Option<::encoded::Header>;
 
     /// Look up the block number for the given block ID.
     fn block_number(&self, id: BlockId) -> Option<BlockNumber>;

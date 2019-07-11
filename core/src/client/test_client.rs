@@ -607,9 +607,14 @@ impl BlockChainClient for TestBlockChainClient {
         chain.block_header_data(hash)
     }
 
-    fn seal_parent_header(&self, hash: &H256) -> Option<::encoded::Header> {
+    fn seal_parent_header(
+        &self,
+        parent_hash: &H256,
+        seal_type: &Option<SealType>,
+    ) -> Option<::encoded::Header>
+    {
         let chain = self.chain.read();
-        chain.seal_parent_header(hash)
+        chain.seal_parent_header(parent_hash, seal_type)
     }
 
     fn block_number(&self, _id: BlockId) -> Option<BlockNumber> { unimplemented!() }

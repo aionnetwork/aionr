@@ -242,9 +242,10 @@ impl Miner {
 
             // 2. Generate seed and signature
             let bare_hash: H256 = raw_block.header().bare_hash();
-            let parent_hash: H256 = raw_block.header().parent_hash().to_owned();
-            // TODO: should be pos parent's seed, not direct parent
-            let parent_seed: Bytes = match client.block_header_data(&parent_hash) {
+            let seal_parent_seed: Bytes = match client.seal_parent_header(
+                raw_block.header().parent_hash(),
+                raw_block.header().seal_type(),
+            ) {
                 Some(header) => {
                     let seed: Bytes = header
                         .seal()
@@ -261,7 +262,7 @@ impl Miner {
                 .expect("Internal staker is null. Should have checked before.")
                 .secret()
                 .0;
-            let seed = self.sign(&key_pair, &parent_seed);
+            let seed = self.sign(&key_pair, &seal_parent_seed);
             let signature = self.sign(&key_pair, &bare_hash.0);
 
             // 3. Seal the block
