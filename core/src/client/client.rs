@@ -1518,7 +1518,7 @@ impl MiningBlockChainClient for Client {
             .expect("h is best block hash: so its header must exist: qed");
 
         let seal_parent: Option<::encoded::Header> =
-            self.seal_parent_header(best_header.parent_hash(), &seal_type);
+            self.seal_parent_header(&best_header.hash(), &seal_type);
         let seal_grand_parent: Option<::encoded::Header> = match &seal_parent {
             Some(header) => self.seal_parent_header(&header.parent_hash(), &header.seal_type()),
             None => None,
