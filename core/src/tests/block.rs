@@ -27,11 +27,11 @@ use engine::POWEquihashEngine;
 use types::error::Error;
 use header::Header;
 use factory::Factories;
-use state_db::StateDB;
+use db::StateDB;
 use state::State;
 use views::BlockView;
 use transaction::SignedTransaction;
-use kvdb::MemoryDBRepository;
+use kvdb::MockDbRepository;
 use aion_types::Address;
 use vms::LastHashes;
 use tests::common::helpers::get_temp_state_db;
@@ -65,7 +65,7 @@ fn enact_bytes(
                 parent.state_root().clone(),
                 engine.machine().account_start_nonce(parent.number() + 1),
                 factories.clone(),
-                Arc::new(MemoryDBRepository::new()),
+                Arc::new(MockDbRepository::init(vec![])),
             )?;
             trace!(target: "enact", "num={}, root={}, author={}, author_balance={}\n",
                    header.number(), s.root(), header.author(), s.balance(&header.author())?);
@@ -82,7 +82,7 @@ fn enact_bytes(
         Address::new(),
         (3141562.into(), 31415620.into()),
         vec![],
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )?;
 
     b.populate_from(&header);
@@ -133,7 +133,7 @@ fn open_block() {
         Address::zero(),
         (3141562.into(), 31415620.into()),
         vec![],
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )
     .unwrap();
     let b = b.close_and_lock();
@@ -162,7 +162,7 @@ fn enact_block() {
         Address::zero(),
         (3141562.into(), 31415620.into()),
         vec![],
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )
     .unwrap()
     .close_and_lock()

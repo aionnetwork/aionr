@@ -8,7 +8,7 @@ use std::str::FromStr;
 use std::sync::Arc;
 use state::{State,CleanupMode};
 use super::common::helpers::{get_temp_state,get_temp_state_db};
-use kvdb::MemoryDBRepository;
+use kvdb::MockDbRepository;
 //use transaction::*;
 
 fn secret() -> Ed25519Secret {
@@ -107,7 +107,7 @@ fn empty_account_is_not_created() {
             db,
             U256::from(0),
             Default::default(),
-            Arc::new(MemoryDBRepository::new()),
+            Arc::new(MockDbRepository::init(vec![])),
         );
         state
             .add_balance(&a, &U256::default(), CleanupMode::NoEmpty)
@@ -120,7 +120,7 @@ fn empty_account_is_not_created() {
         root,
         U256::from(0u8),
         Default::default(),
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )
     .unwrap();
     assert!(!state.exists(&a).unwrap());
@@ -137,7 +137,7 @@ fn empty_account_exists_when_creation_forced() {
             db,
             U256::from(0),
             Default::default(),
-            Arc::new(MemoryDBRepository::new()),
+            Arc::new(MockDbRepository::init(vec![])),
         );
         state
             .add_balance(&a, &U256::default(), CleanupMode::ForceCreate)
@@ -150,7 +150,7 @@ fn empty_account_exists_when_creation_forced() {
         root,
         U256::from(0u8),
         Default::default(),
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )
     .unwrap();
 
@@ -176,7 +176,7 @@ fn remove_from_database() {
             root,
             U256::from(0u8),
             Default::default(),
-            Arc::new(MemoryDBRepository::new()),
+            Arc::new(MockDbRepository::init(vec![])),
         )
         .unwrap();
         assert_eq!(state.exists(&a).unwrap(), true);
@@ -193,7 +193,7 @@ fn remove_from_database() {
         root,
         U256::from(0u8),
         Default::default(),
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )
     .unwrap();
     assert_eq!(state.exists(&a).unwrap(), false);

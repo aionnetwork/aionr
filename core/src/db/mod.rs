@@ -5,3 +5,6 @@ mod account_db;
 pub use self::db::*;
 pub use self::state_db::StateDB;
 pub use self::account_db::{Factory};
+
+#[cfg(test)]
+pub use self::account_db::{AccountDBMut};

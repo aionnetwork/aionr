@@ -25,7 +25,7 @@ use aion_types::{U256, H256, Address};
 use vms::{EnvInfo, traits::Ext,  CallType};
 use state::{State, Substate};
 use helpers::{get_temp_state,make_aion_machine};
-use kvdb::MemoryDBRepository;
+use kvdb::MockDbRepository;
 use externalities::{OriginInfo,Externalities};
 
 fn get_test_env_info() -> EnvInfo {
@@ -41,7 +41,7 @@ fn get_test_env_info() -> EnvInfo {
 }
 
 struct TestSetup {
-    state: State<::state_db::StateDB>,
+    state: State<::db::StateDB>,
     machine: ::machine::EthereumMachine,
     sub_state: Substate,
     env_info: EnvInfo,
@@ -73,7 +73,7 @@ fn can_be_created() {
         0,
         vec![OriginInfo::get_test_origin()],
         &mut setup.sub_state,
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![String::new()])),
     );
 
     assert_eq!(ext.env_info().number, 100);
@@ -101,7 +101,7 @@ fn can_return_block_hash() {
         0,
         vec![OriginInfo::get_test_origin()],
         &mut setup.sub_state,
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![String::new()])),
     );
 
     let hash = ext.blockhash(
@@ -126,7 +126,7 @@ fn can_call_fail_empty() {
         0,
         vec![OriginInfo::get_test_origin()],
         &mut setup.sub_state,
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![String::new()])),
     );
 
     // this should panic because we have no balance on any account
@@ -166,7 +166,7 @@ fn can_log() {
             0,
             vec![OriginInfo::get_test_origin()],
             &mut setup.sub_state,
-            Arc::new(MemoryDBRepository::new()),
+            Arc::new(MockDbRepository::init(vec![String::new()])),
         );
         ext.log(log_topics.clone(), &log_data);
     }
@@ -191,7 +191,7 @@ fn can_suicide() {
             0,
             vec![OriginInfo::get_test_origin()],
             &mut setup.sub_state,
-            Arc::new(MemoryDBRepository::new()),
+            Arc::new(MockDbRepository::init(vec![String::new()])),
         );
         ext.suicide(refund_account);
     }
