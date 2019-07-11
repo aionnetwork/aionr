@@ -50,7 +50,7 @@ fn enact_bytes(
     engine: &POWEquihashEngine,
     db: StateDB,
     parent: &Header,
-    _grant_parent: Option<&Header>,
+    _grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
 ) -> Result<LockedBlock, Error>

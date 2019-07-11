@@ -331,7 +331,6 @@ impl Client {
 
         // Check if parent is in chain
         let parent_hash = header.parent_hash().clone();
-
         let parent = match chain.block_header(&parent_hash) {
             Some(h) => h,
             None => {
@@ -340,15 +339,24 @@ impl Client {
             }
         };
 
-        let grant_parent = chain.block_header(parent.parent_hash());
-        let grant_parent_header = grant_parent.as_ref();
+        // Get seal parent and seal grand parent
+        let seal_type: Option<SealType> = header.seal_type().to_owned();
+        let seal_parent: Option<::encoded::Header> =
+            self.seal_parent_header(&parent_hash, &seal_type);
+        let seal_grand_parent: Option<::encoded::Header> = match &seal_parent {
+            Some(header) => self.seal_parent_header(&header.parent_hash(), &header.seal_type()),
+            None => None,
+        };
+
+        let grand_parent = chain.block_header(parent.parent_hash());
+        let grand_parent_header = grand_parent.as_ref();
 
         // Verify Block Family
         let verify_family_result = verify_block_family(
             //let verify_family_result = self.verifier.verify_block_family(
             header,
             &parent,
-            grant_parent_header,
+            grand_parent_header,
             engine,
             Some((&block.bytes, &block.transactions, &**chain, self)),
         );
@@ -367,7 +375,8 @@ impl Client {
             engine,
             db,
             &parent,
-            grant_parent_header,
+            seal_parent.map(|header| header.decode()).as_ref(),
+            seal_grand_parent.map(|header| header.decode()).as_ref(),
             last_hashes,
             self.factories.clone(),
             self.db.read().clone(),
@@ -1508,8 +1517,13 @@ impl MiningBlockChainClient for Client {
         let best_header = &chain
             .block_header(&h)
             .expect("h is best block hash: so its header must exist: qed");
-        let grant_parent = chain.block_header(best_header.parent_hash());
-        let grant_parent_header = grant_parent.as_ref();
+
+        let seal_parent: Option<::encoded::Header> =
+            self.seal_parent_header(best_header.parent_hash(), &seal_type);
+        let seal_grand_parent: Option<::encoded::Header> = match &seal_parent {
+            Some(header) => self.seal_parent_header(&header.parent_hash(), &header.seal_type()),
+            None => None,
+        };
 
         let open_block = OpenBlock::new(
             engine,
@@ -1517,7 +1531,8 @@ impl MiningBlockChainClient for Client {
             self.state_db.read().boxed_clone_canon(&h),
             best_header,
             seal_type.unwrap_or_default(),
-            grant_parent_header,
+            seal_parent.map(|header| header.decode()).as_ref(),
+            seal_grand_parent.map(|header| header.decode()).as_ref(),
             self.build_last_hashes(h.clone()),
             author,
             gas_range_target,

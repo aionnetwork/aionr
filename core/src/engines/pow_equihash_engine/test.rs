@@ -117,11 +117,11 @@ fn test_calculate_difficulty() {
     parent_header.set_timestamp(1524538000u64);
     parent_header.set_difficulty(U256::from(1));
     parent_header.set_number(2);
-    let mut grant_parent_header = Header::default();
-    grant_parent_header.set_timestamp(1524528000u64);
-    grant_parent_header.set_number(1);
+    let mut grand_parent_header = Header::default();
+    grand_parent_header.set_timestamp(1524528000u64);
+    grand_parent_header.set_number(1);
     let difficulty =
-        calculator.calculate_difficulty(&header, &parent_header, Some(&grant_parent_header));
+        calculator.calculate_difficulty(&header, &parent_header, Some(&grand_parent_header));
     assert_eq!(difficulty, U256::from(16));
 }
 
@@ -146,11 +146,11 @@ fn test_calculate_difficulty2() {
     parent_header.set_timestamp(1524528005u64);
     parent_header.set_number(2);
     parent_header.set_difficulty(U256::from(2000));
-    let mut grant_parent_header = Header::default();
-    grant_parent_header.set_timestamp(1524528000u64);
-    grant_parent_header.set_number(1);
+    let mut grand_parent_header = Header::default();
+    grand_parent_header.set_timestamp(1524528000u64);
+    grand_parent_header.set_number(1);
     let difficulty =
-        calculator.calculate_difficulty(&header, &parent_header, Some(&grant_parent_header));
+        calculator.calculate_difficulty(&header, &parent_header, Some(&grand_parent_header));
     assert_eq!(difficulty, U256::from(2001));
 }
 
@@ -175,11 +175,11 @@ fn test_calculate_difficulty3() {
     parent_header.set_timestamp(1524528010u64);
     parent_header.set_difficulty(U256::from(3000));
     parent_header.set_number(2);
-    let mut grant_parent_header = Header::default();
-    grant_parent_header.set_timestamp(1524528000u64);
-    grant_parent_header.set_number(1);
+    let mut grand_parent_header = Header::default();
+    grand_parent_header.set_timestamp(1524528000u64);
+    grand_parent_header.set_number(1);
     let difficulty =
-        calculator.calculate_difficulty(&header, &parent_header, Some(&grant_parent_header));
+        calculator.calculate_difficulty(&header, &parent_header, Some(&grand_parent_header));
     assert_eq!(difficulty, U256::from(3000));
 }
 
@@ -204,10 +204,10 @@ fn test_calculate_difficulty4() {
     parent_header.set_timestamp(1524528020u64);
     parent_header.set_difficulty(U256::from(3000));
     parent_header.set_number(2);
-    let mut grant_parent_header = Header::default();
-    grant_parent_header.set_timestamp(1524528000u64);
-    grant_parent_header.set_number(1);
+    let mut grand_parent_header = Header::default();
+    grand_parent_header.set_timestamp(1524528000u64);
+    grand_parent_header.set_number(1);
     let difficulty =
-        calculator.calculate_difficulty(&header, &parent_header, Some(&grant_parent_header));
+        calculator.calculate_difficulty(&header, &parent_header, Some(&grand_parent_header));
     assert_eq!(difficulty, U256::from(2999));
 }

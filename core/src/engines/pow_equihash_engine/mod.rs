@@ -21,7 +21,7 @@
 
 mod header_validators;
 mod dependent_header_validators;
-mod grant_parent_header_validators;
+mod grand_parent_header_validators;
 #[cfg(test)]
 mod test;
 
@@ -49,7 +49,7 @@ use self::header_validators::{
     EnergyConsumedValidator,
     EquihashSolutionValidator,
 };
-use self::grant_parent_header_validators::{GrantParentHeaderValidator, DifficultyValidator};
+use self::grand_parent_header_validators::{GrandParentHeaderValidator, DifficultyValidator};
 
 const ANNUAL_BLOCK_MOUNT: u64 = 3110400;
 const COMPOUND_YEAR_MAX: u64 = 128;
@@ -115,19 +115,26 @@ impl DifficultyCalc {
     pub fn calculate_difficulty(
         &self,
         header: &Header,
-        parent: &Header,
-        grant_parent: Option<&Header>,
+        parent: Option<&Header>,
+        grand_parent: Option<&Header>,
     ) -> U256
     {
         if header.number() == 0 {
             panic!("Can't calculate genesis block difficulty.");
         }
-        if parent.number() == 0 {
-            return parent.difficulty().clone();
+
+        // If no seal parent (eg. first PoS block)
+        // Hard code to 16. TODO-Unity: handle this better
+        if parent.is_none() {
+            return U256::from(16);
         }
-        if header.number() != 2 && grant_parent.is_none() {
-            panic!("grant_parent must exist.");
+        let parent: &Header = parent.expect("none parent tested before.");
+
+        // If no seal grand parent, return the difficulty of the parent
+        if grand_parent.is_none() {
+            return parent.difficulty().to_owned();
         }
+        let grand_parent: &Header = grand_parent.expect("none grand parent tested before.");
 
         let parent_difficulty = *parent.difficulty();
 
@@ -139,7 +146,7 @@ impl DifficultyCalc {
         }
 
         let current_timestamp = parent.timestamp();
-        let parent_timestamp = grant_parent.unwrap().timestamp();
+        let parent_timestamp = grand_parent.timestamp();
 
         let delta = current_timestamp - parent_timestamp;
         let bound_domain = 10;
@@ -326,12 +333,12 @@ impl POWEquihashEngine {
     fn calculate_difficulty(
         &self,
         header: &Header,
-        parent: &Header,
-        grant_parent: Option<&Header>,
+        parent: Option<&Header>,
+        grand_parent: Option<&Header>,
     ) -> U256
     {
         self.difficulty_calc
-            .calculate_difficulty(header, parent, grant_parent)
+            .calculate_difficulty(header, parent, grand_parent)
     }
 
     fn calculate_reward(&self, header: &Header) -> U256 {
@@ -392,7 +399,7 @@ impl POWEquihashEngine {
         &self,
         header: &Header,
         parent: &Header,
-        grant_parent: Option<&Header>,
+        grand_parent: Option<&Header>,
     ) -> Result<(), Error>
     {
         // verify parent
@@ -403,13 +410,13 @@ impl POWEquihashEngine {
             v.validate(header, parent)?;
         }
 
-        // verify grant parent
-        let mut grant_validators: Vec<Box<GrantParentHeaderValidator>> = Vec::with_capacity(1);
-        grant_validators.push(Box::new(DifficultyValidator {
+        // verify grand parent
+        let mut grand_validators: Vec<Box<GrandParentHeaderValidator>> = Vec::with_capacity(1);
+        grand_validators.push(Box::new(DifficultyValidator {
             difficulty_calc: &self.difficulty_calc,
         }));
-        for v in grant_validators.iter() {
-            v.validate(header, parent, grant_parent)?;
+        for v in grand_validators.iter() {
+            v.validate(header, parent, grand_parent)?;
         }
 
         Ok(())
@@ -418,11 +425,11 @@ impl POWEquihashEngine {
     pub fn populate_from_parent(
         &self,
         header: &mut Header,
-        parent: &Header,
-        grant_parent: Option<&Header>,
+        parent: Option<&Header>,
+        grand_parent: Option<&Header>,
     )
     {
-        let difficulty = self.calculate_difficulty(header, parent, grant_parent);
+        let difficulty = self.calculate_difficulty(header, parent, grand_parent);
         header.set_difficulty(difficulty);
     }
 

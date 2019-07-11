@@ -222,7 +222,8 @@ impl<'x> OpenBlock<'x> {
         db: StateDB,
         parent: &Header,
         seal_type: SealType,
-        grant_parent: Option<&Header>,
+        seal_parent: Option<&Header>,
+        seal_grand_parent: Option<&Header>,
         last_hashes: Arc<LastHashes>,
         author: Address,
         gas_range_target: (U256, U256),
@@ -247,7 +248,7 @@ impl<'x> OpenBlock<'x> {
         r.block.header.set_parent_hash(parent.hash());
         r.block.header.set_number(number);
         r.block.header.set_author(author);
-        r.block.header.set_timestamp_now(parent.timestamp());
+        r.block.header.set_timestamp_now(parent.timestamp()); // TODO-Unity: handle PoS block timestamp
         r.block.header.set_seal_type(seal_type);
         r.set_extra_data(extra_data);
         r.block.header.note_dirty();
@@ -262,7 +263,8 @@ impl<'x> OpenBlock<'x> {
             gas_floor_target,
             gas_ceil_target,
         );
-        engine.populate_from_parent(&mut r.block.header, parent, grant_parent);
+        // Set difficulty
+        engine.populate_from_parent(&mut r.block.header, seal_parent, seal_grand_parent);
 
         engine.machine().on_new_block(&mut r.block)?;
 
@@ -641,7 +643,8 @@ pub fn enact(
     engine: &POWEquihashEngine,
     db: StateDB,
     parent: &Header,
-    grant_parent: Option<&Header>,
+    seal_parent: Option<&Header>,
+    seal_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
     kvdb: Arc<KeyValueDB>,
@@ -667,7 +670,8 @@ pub fn enact(
         db,
         parent,
         header.seal_type().to_owned().unwrap_or_default(),
-        grant_parent,
+        seal_parent,
+        seal_grand_parent,
         last_hashes,
         Address::new(),
         (3141562.into(), 31415620.into()),
@@ -797,7 +801,8 @@ pub fn enact_verified(
     engine: &POWEquihashEngine,
     db: StateDB,
     parent: &Header,
-    grant_parent: Option<&Header>,
+    seal_parent: Option<&Header>,
+    seal_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
     kvdb: Arc<KeyValueDB>,
@@ -809,7 +814,8 @@ pub fn enact_verified(
         engine,
         db,
         parent,
-        grant_parent,
+        seal_parent,
+        seal_grand_parent,
         last_hashes,
         factories,
         kvdb,

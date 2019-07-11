@@ -24,12 +24,12 @@ use error::{Error, BlockError};
 use header::Header;
 use unexpected::{Mismatch};
 
-pub trait GrantParentHeaderValidator {
+pub trait GrandParentHeaderValidator {
     fn validate(
         &self,
         header: &Header,
         parent_header: &Header,
-        grant_parent_header: Option<&Header>,
+        grand_parent_header: Option<&Header>,
     ) -> Result<(), Error>;
 }
 
@@ -37,12 +37,12 @@ pub struct DifficultyValidator<'a> {
     pub difficulty_calc: &'a DifficultyCalc,
 }
 
-impl<'a> GrantParentHeaderValidator for DifficultyValidator<'a> {
+impl<'a> GrandParentHeaderValidator for DifficultyValidator<'a> {
     fn validate(
         &self,
         header: &Header,
         parent_header: &Header,
-        grant_parent_header: Option<&Header>,
+        grand_parent_header: Option<&Header>,
     ) -> Result<(), Error>
     {
         let difficulty = *header.difficulty();
@@ -59,16 +59,16 @@ impl<'a> GrantParentHeaderValidator for DifficultyValidator<'a> {
             }
         }
 
-        if grant_parent_header.is_none() {
+        if grand_parent_header.is_none() {
             panic!(
-                "non-1st block must have grant parent. block num: {}",
+                "non-1st block must have grand parent. block num: {}",
                 header.number()
             );
         } else {
             let calc_difficulty = self.difficulty_calc.calculate_difficulty(
                 header,
-                parent_header,
-                grant_parent_header,
+                Some(parent_header), // TODO-Unity: handle this well when implementing difficulty validator
+                grand_parent_header,
             );
             if difficulty != calc_difficulty {
                 Err(BlockError::InvalidDifficulty(Mismatch {
