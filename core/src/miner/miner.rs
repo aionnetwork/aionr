@@ -264,7 +264,10 @@ impl Miner {
                 .secret()
                 .0;
             let seed = self.sign(&key_pair, &seal_parent_seed);
-            let signature = self.sign(&key_pair, &bare_hash.0);
+            // TODO-Unity: tmp solution to be align with Java kernel. Java kernel's current signature is 64 length.
+            // let signature = self.sign(&key_pair, &bare_hash.0);
+            let mut signature: [u8; 64] = [0u8; 64];
+            signature.copy_from_slice(&self.sign(&key_pair, &bare_hash.0)[32..96]);
 
             // 3. Seal the block
             let mut seal: Vec<Bytes> = Vec::new();

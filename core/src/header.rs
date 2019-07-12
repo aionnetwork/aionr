@@ -443,7 +443,7 @@ impl Header {
             },
         );
 
-        s.append(&self.seal_type);
+        s.append(&self.seal_type.clone().unwrap_or_default());
         s.append(&self.number);
         s.append(&self.parent_hash);
         s.append(&self.author);
@@ -490,7 +490,7 @@ impl Header {
 impl Decodable for Header {
     fn decode(r: &UntrustedRlp) -> Result<Self, DecoderError> {
         let mut blockheader = Header {
-            seal_type: r.val_at(0)?,
+            seal_type: Some(r.val_at(0)?),
             number: r.val_at::<U256>(1)?.low_u64(),
             parent_hash: r.val_at(2)?,
             author: r.val_at(3)?,

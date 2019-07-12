@@ -56,7 +56,7 @@ impl<'a> HeaderView<'a> {
     pub fn rlp(&self) -> &Rlp<'a> { &self.rlp }
 
     /// Returns seal type.
-    pub fn seal_type(&self) -> Option<SealType> { self.rlp.val_at(0) }
+    pub fn seal_type(&self) -> Option<SealType> { Some(self.rlp.val_at(0)) }
 
     /// Returns parent hash.
     pub fn parent_hash(&self) -> H256 { self.rlp.val_at(2) }
