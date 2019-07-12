@@ -20,23 +20,19 @@
  *
  ******************************************************************************/
 
-#![warn(unused_extern_crates)]
-
-extern crate keychain;
-extern crate tempdir;
 
 use std::{env, fs};
-use keychain::{KeyDirectory, RootDiskDirectory, VaultKey};
-//use account::SafeAccount;
-//use ethkey::Generator;
-use self::tempdir::TempDir;
+use accounts_dir::{KeyDirectory, RootDiskDirectory, VaultKey};
+use account::SafeAccount;
+use ethkey::generate_keypair;
+use tempdir::TempDir;
 
-/*#[test]
+#[test]
 fn should_create_new_account() {
     // given
     let mut dir = env::temp_dir();
     dir.push("ethstore_should_create_new_account");
-    let keypair = Random.generate().unwrap();
+    let keypair = generate_keypair();
     let password = "hello world";
     let directory = RootDiskDirectory::create(dir.clone()).unwrap();
 
@@ -67,7 +63,7 @@ fn should_handle_duplicate_filenames() {
     // given
     let mut dir = env::temp_dir();
     dir.push("ethstore_should_handle_duplicate_filenames");
-    let keypair = Random.generate().unwrap();
+    let keypair = generate_keypair();
     let password = "hello world";
     let directory = RootDiskDirectory::create(dir.clone()).unwrap();
 
@@ -113,7 +109,7 @@ fn should_handle_duplicate_filenames() {
 
     // cleanup
     let _ = fs::remove_dir_all(dir);
-}*/
+}
 
 #[test]
 fn should_manage_vaults() {
@@ -176,7 +172,6 @@ fn should_list_vaults() {
     assert!(vaults.iter().any(|v| &*v == "vault2"));
 }
 
-/*
 #[test]
 fn hash_of_files() {
     let temp_path = TempDir::new("").unwrap();
@@ -187,9 +182,9 @@ fn hash_of_files() {
         .expect("Files hash should be calculated ok");
     assert_eq!(hash, 15130871412783076140);
 
-    let keypair = Random.generate().unwrap();
+    let keypair = generate_keypair();
     let password = "test pass";
-    let account = SafeAccount::create(
+    let account = SafeAccount::create_ed25519(
         &keypair,
         [0u8; 16],
         password,
@@ -209,4 +204,4 @@ fn hash_of_files() {
         new_hash != hash,
         "hash of the file list should change once directory content changed"
     );
-}*/
+}

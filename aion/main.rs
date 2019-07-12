@@ -60,6 +60,8 @@ extern crate pretty_assertions;
 
 #[cfg(test)]
 extern crate tempdir;
+#[cfg(test)]
+extern crate regex;
 
 mod account;
 mod blockchain;

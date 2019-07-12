@@ -1,68 +1,76 @@
-use aion_types::{Address, /*H256,*/
-U256};
+use aion_types::{Address, H256, U256};
 use key::Ed25519Secret;
 use logger::init_log;
-//use receipt::SimpleReceipt;
-//use rustc_hex::FromHex;
+use receipt::{SimpleReceipt,Receipt};
+use rustc_hex::FromHex;
 use std::str::FromStr;
 use std::sync::Arc;
+use vms::EnvInfo;
 use state::{State,CleanupMode};
 use super::common::helpers::{get_temp_state,get_temp_state_db};
 use kvdb::MockDbRepository;
-//use transaction::*;
+use transaction::{Transaction,Action};
+use machine::EthereumMachine;
+use spec::spec::Spec;
 
 fn secret() -> Ed25519Secret {
     Ed25519Secret::from_str("7ea8af7d0982509cd815096d35bc3a295f57b2a078e4e25731e3ea977b9544626702b86f33072a55f46003b1e3e242eb18556be54c5ab12044c3c20829e0abb5").unwrap()
 }
 
-//    fn make_frontier_machine() -> Machine {
-//        let machine = ::ethereum::new_frontier_test_machine();
-//        machine
-//    }
+fn new_frontier_test_machine() -> EthereumMachine {
+    Spec::load_machine(include_bytes!("../../../resources/mastery.json").as_ref()).expect("chain spec is invalid")
+}
 
-//    #[test]
-//    fn should_apply_create_transaction() {
-//        init_log();
-//
-//        let mut state = get_temp_state();
-//        let mut info = EnvInfo::default();
-//        info.gas_limit = 1_000_000.into();
-//        let machine = make_frontier_machine();
-//
-//        let t = Transaction {
-//            nonce: 0.into(),
-//            nonce_bytes: Vec::new(),
-//            gas_price: 0.into(),
-//            gas_price_bytes: Vec::new(),
-//            gas: 500_000.into(),
-//            gas_bytes: Vec::new(),
-//            action: Action::Create,
-//            value: 100.into(),
-//            value_bytes: Vec::new(),
-//            transaction_type: 1.into(),
-//            data: FromHex::from_hex("601080600c6000396000f3006000355415600957005b60203560003555")
-//                .unwrap(),
-//        }
-//        .sign(&secret(), None);
-//
-//        state
-//            .add_balance(&t.sender(), &(100.into()), CleanupMode::NoEmpty)
-//            .unwrap();
-//        let result = state.apply(&info, &machine, &t).unwrap();
-//
-//        let expected_receipt = Receipt {
-//            simple_receipt: SimpleReceipt{log_bloom: "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".into(),
-//            logs: vec![], state_root: H256::from(
-//                    "0xadfb0633de8b1effff5c6b4f347b435f99e48339164160ee04bac13115c90dc9"
-//                ), },
-//            output: vec![96, 0, 53, 84, 21, 96, 9, 87, 0, 91, 96, 32, 53, 96, 0, 53],
-//            gas_used: U256::from(222506),
-//            error_message:  String::new(),
-//            transaction_fee: U256::from(0),
-//        };
-//
-//        assert_eq!(result.receipt, expected_receipt);
-//    }
+
+
+fn make_frontier_machine() -> EthereumMachine {
+    let machine = new_frontier_test_machine();
+    machine
+}
+
+    #[test]
+    fn should_apply_create_transaction() {
+        init_log();
+
+        let mut state = get_temp_state();
+        let mut info = EnvInfo::default();
+        info.gas_limit = 1_000_000.into();
+        let machine = make_frontier_machine();
+
+        let t = Transaction {
+            nonce: 0.into(),
+            nonce_bytes: Vec::new(),
+            gas_price: 0.into(),
+            gas_price_bytes: Vec::new(),
+            gas: 500_000.into(),
+            gas_bytes: Vec::new(),
+            action: Action::Create,
+            value: 100.into(),
+            value_bytes: Vec::new(),
+            transaction_type: 1.into(),
+            data: FromHex::from_hex("601080600c6000396000f3006000355415600957005b60203560003555")
+                .unwrap(),
+        }
+        .sign(&secret(), None);
+
+        state
+            .add_balance(&t.sender(), &(100.into()), CleanupMode::NoEmpty)
+            .unwrap();
+        let result = state.apply(&info, &machine, &t).unwrap();
+
+        let expected_receipt = Receipt {
+            simple_receipt: SimpleReceipt{log_bloom: "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".into(),
+            logs: vec![], state_root: H256::from(
+                    "0xadfb0633de8b1effff5c6b4f347b435f99e48339164160ee04bac13115c90dc9"
+                ), },
+            output: vec![96, 0, 53, 84, 21, 96, 9, 87, 0, 91, 96, 32, 53, 96, 0, 53],
+            gas_used: U256::from(222506),
+            error_message:  String::new(),
+            transaction_fee: U256::from(0),
+        };
+
+        assert_eq!(result.receipt, expected_receipt);
+    }
 
 #[test]
 fn should_work_when_cloned() {
