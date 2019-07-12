@@ -27,7 +27,6 @@ use error::{BlockError, ImportError};
 use header::Header;
 use transaction::UnverifiedTransaction;
 use aion_types::H256;
-use acore_bytes::to_hex;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use sync::route::VERSION;
