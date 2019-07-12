@@ -562,12 +562,7 @@ impl LockedBlock {
     /// Provide a valid seal in order to turn this into a `SealedBlock`.
     ///
     /// NOTE: This does not check the validity of `seal` with the engine.
-    pub fn seal(
-        self,
-        engine: &AionEngine,
-        seal: Vec<Bytes>,
-    ) -> Result<SealedBlock, BlockError>
-    {
+    pub fn seal(self, engine: &AionEngine, seal: Vec<Bytes>) -> Result<SealedBlock, BlockError> {
         let expected_seal_fields = engine.seal_fields(self.header());
         let mut s = self;
         if seal.len() != expected_seal_fields {

@@ -2409,39 +2409,37 @@ pub mod test {
         assert_eq!(txq.last_nonce(tx2.sender()), Some(tx2.nonce().clone()));
     }
 
-        #[test]
-        fn should_limit_transactions() {
-            let mut txq = TransactionQueue::with_limits(
-                PrioritizationStrategy::GasPriceOnly,
-                8,
-                Mutex::new(IoService::<TxIoMessage>::start().unwrap().channel()),
-            );
-            let (tx1, tx2) = new_tx_pair_default(4.into(), 1.into(), TransactionOrigin::External);
-            let (tx3, tx4) = new_tx_pair_default(4.into(), 2.into(), TransactionOrigin::External);
-            let fetch_account = |_: &Address| default_account_details();
+    #[test]
+    fn should_limit_transactions() {
+        let mut txq = TransactionQueue::with_limits(
+            PrioritizationStrategy::GasPriceOnly,
+            8,
+            Mutex::new(IoService::<TxIoMessage>::start().unwrap().channel()),
+        );
+        let (tx1, tx2) = new_tx_pair_default(4.into(), 1.into(), TransactionOrigin::External);
+        let (tx3, tx4) = new_tx_pair_default(4.into(), 2.into(), TransactionOrigin::External);
+        let fetch_account = |_: &Address| default_account_details();
 
-            txq.add(tx1.clone(), &fetch_account).unwrap();
-            if tx1.hash().cmp(&tx3.hash()) == Ordering::Greater {
-                txq.add(tx3.clone(), &fetch_account).unwrap();
-            }
-            else {
-                txq.add(tx3.clone(), &fetch_account).unwrap_err();
-            }
-
-
-            // Compare by hash in case of  insertion id collision
-            assert_eq!(txq.status().pending, 1);
-
-            txq.add(tx2.clone(), &fetch_account).unwrap();
-            assert_eq!(txq.status().future, 1);
-            txq.add(tx4.clone(), &fetch_account).unwrap();
-
-            assert_eq!(txq.status().future, 1);
-            assert_eq!(
-                &txq.future.by_priority.iter().next().unwrap().hash,
-                tx4.hash()
-            );
+        txq.add(tx1.clone(), &fetch_account).unwrap();
+        if tx1.hash().cmp(&tx3.hash()) == Ordering::Greater {
+            txq.add(tx3.clone(), &fetch_account).unwrap();
+        } else {
+            txq.add(tx3.clone(), &fetch_account).unwrap_err();
         }
+
+        // Compare by hash in case of  insertion id collision
+        assert_eq!(txq.status().pending, 1);
+
+        txq.add(tx2.clone(), &fetch_account).unwrap();
+        assert_eq!(txq.status().future, 1);
+        txq.add(tx4.clone(), &fetch_account).unwrap();
+
+        assert_eq!(txq.status().future, 1);
+        assert_eq!(
+            &txq.future.by_priority.iter().next().unwrap().hash,
+            tx4.hash()
+        );
+    }
 
     #[test]
     fn should_keep_own_transactions_above_gas_limit() {

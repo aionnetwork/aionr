@@ -94,7 +94,7 @@ fn enact_bytes(
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header. Seal the block afterwards
 fn enact_and_seal(
     block_bytes: &[u8],
-//    engine: &EthEngine,
+    //    engine: &EthEngine,
     engine: &AionEngine,
     db: StateDB,
     parent: &Header,

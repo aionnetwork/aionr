@@ -119,7 +119,6 @@ pub trait Engine<M: Machine>: Sync + Send {
     /// Block transformation functions, after the transactions.
     fn on_close_block(&self, _block: &mut M::LiveBlock) -> Result<(), M::Error> { Ok(()) }
 
-
     /// Verify a locally-generated seal of a header.
     ///
     /// If this engine seals internally,
@@ -208,7 +207,6 @@ pub trait AionEngine: Engine<::machine::EthereumMachine> {
     fn verify_transaction_basic(&self, t: &UnverifiedTransaction) -> Result<(), Error> {
         self.machine().verify_transaction_basic(t)
     }
-
 }
 
 // convenience wrappers for existing functions.

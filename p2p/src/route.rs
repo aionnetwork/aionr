@@ -141,7 +141,7 @@ mod tests {
     ///
     /// there is is no restriction to upper layer modules they could chose same version code as
     /// p2p layer since handlers would be grouped into one route with same route code
-    pub fn from(version: u16, module: u8, action: u8) -> [u8; 4]{
+    pub fn from(version: u16, module: u8, action: u8) -> [u8; 4] {
         let mut bytes: [u8; 4] = [0x00; 4];
         bytes[0] = (version >> 8) as u8;
         bytes[1] = version as u8;
