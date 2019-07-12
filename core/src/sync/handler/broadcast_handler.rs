@@ -121,10 +121,6 @@ impl BroadcastsHandler {
 
         let block_rlp = UntrustedRlp::new(req.body.as_slice());
         if let Ok(header_rlp) = block_rlp.at(0) {
-            println!(
-                "Receive broadcast block header: {}",
-                to_hex(header_rlp.as_raw())
-            );
             if let Ok(h) = header_rlp.as_val() {
                 let header: Header = h;
                 let last_imported_number = SyncStorage::get_synced_block_number();

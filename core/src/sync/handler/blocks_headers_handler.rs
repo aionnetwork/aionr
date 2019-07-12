@@ -220,7 +220,6 @@ impl BlockHeadersHandler {
         let mut hw = HeadersWrapper::new();
 
         for header_rlp in rlp.iter() {
-            println!("Import block header: {}", to_hex(header_rlp.as_raw()));
             if let Ok(header) = header_rlp.as_val() {
                 let result = POWEquihashEngine::validate_block_header(&header);
                 match result {
