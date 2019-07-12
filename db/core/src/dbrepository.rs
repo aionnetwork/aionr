@@ -24,7 +24,7 @@ use mockkvdb;
 use std::collections::{HashMap, BTreeMap};
 use parking_lot::RwLock;
 
-use super::{Result, DBValue};
+use super::{Result, DBValue, HashStore};
 use traits::{KeyValueDAO, KeyValueDB};
 use dbconfigs::RepositoryConfig;
 use dbtransaction::{DBTransaction, DBOp};
@@ -179,6 +179,9 @@ impl MockDbRepository {
             let mut db = mockkvdb::Mockkvdb::new_default();
             self.dbs.insert(db_name, RwLock::new(db));
         }
+    }
+    pub fn get_db(&mut self, db_name: &str) -> &mut RwLock<MockDb> {
+        self.dbs.get_mut(db_name).unwrap()
     }
 }
 
