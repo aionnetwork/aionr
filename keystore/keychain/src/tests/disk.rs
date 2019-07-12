@@ -20,7 +20,6 @@
  *
  ******************************************************************************/
 
-
 use std::{env, fs};
 use accounts_dir::{KeyDirectory, RootDiskDirectory, VaultKey};
 use account::SafeAccount;
@@ -113,7 +112,6 @@ fn should_handle_duplicate_filenames() {
 
 #[test]
 fn should_manage_vaults() {
-
     println!("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
     // given
     let mut dir = env::temp_dir();

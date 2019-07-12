@@ -18,47 +18,46 @@ fn secret() -> Ed25519Secret {
 }
 
 fn new_frontier_test_machine() -> EthereumMachine {
-    Spec::load_machine(include_bytes!("../../../resources/mastery.json").as_ref()).expect("chain spec is invalid")
+    Spec::load_machine(include_bytes!("../../../resources/mastery.json").as_ref())
+        .expect("chain spec is invalid")
 }
-
-
 
 fn make_frontier_machine() -> EthereumMachine {
     let machine = new_frontier_test_machine();
     machine
 }
 
-    #[test]
-    fn should_apply_create_transaction() {
-        init_log();
+#[test]
+fn should_apply_create_transaction() {
+    init_log();
 
-        let mut state = get_temp_state();
-        let mut info = EnvInfo::default();
-        info.gas_limit = 1_000_000.into();
-        let machine = make_frontier_machine();
+    let mut state = get_temp_state();
+    let mut info = EnvInfo::default();
+    info.gas_limit = 1_000_000.into();
+    let machine = make_frontier_machine();
 
-        let t = Transaction {
-            nonce: 0.into(),
-            nonce_bytes: Vec::new(),
-            gas_price: 0.into(),
-            gas_price_bytes: Vec::new(),
-            gas: 500_000.into(),
-            gas_bytes: Vec::new(),
-            action: Action::Create,
-            value: 100.into(),
-            value_bytes: Vec::new(),
-            transaction_type: 1.into(),
-            data: FromHex::from_hex("601080600c6000396000f3006000355415600957005b60203560003555")
-                .unwrap(),
-        }
-        .sign(&secret(), None);
+    let t = Transaction {
+        nonce: 0.into(),
+        nonce_bytes: Vec::new(),
+        gas_price: 0.into(),
+        gas_price_bytes: Vec::new(),
+        gas: 500_000.into(),
+        gas_bytes: Vec::new(),
+        action: Action::Create,
+        value: 100.into(),
+        value_bytes: Vec::new(),
+        transaction_type: 1.into(),
+        data: FromHex::from_hex("601080600c6000396000f3006000355415600957005b60203560003555")
+            .unwrap(),
+    }
+    .sign(&secret(), None);
 
-        state
-            .add_balance(&t.sender(), &(100.into()), CleanupMode::NoEmpty)
-            .unwrap();
-        let result = state.apply(&info, &machine, &t).unwrap();
+    state
+        .add_balance(&t.sender(), &(100.into()), CleanupMode::NoEmpty)
+        .unwrap();
+    let result = state.apply(&info, &machine, &t).unwrap();
 
-        let expected_receipt = Receipt {
+    let expected_receipt = Receipt {
             simple_receipt: SimpleReceipt{log_bloom: "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".into(),
             logs: vec![], state_root: H256::from(
                     "0xadfb0633de8b1effff5c6b4f347b435f99e48339164160ee04bac13115c90dc9"
@@ -69,8 +68,8 @@ fn make_frontier_machine() -> EthereumMachine {
             transaction_fee: U256::from(0),
         };
 
-        assert_eq!(result.receipt, expected_receipt);
-    }
+    assert_eq!(result.receipt, expected_receipt);
+}
 
 #[test]
 fn should_work_when_cloned() {
