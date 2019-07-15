@@ -23,8 +23,9 @@
 //! Eth rpc interface.
 
 use jsonrpc_core::BoxFuture;
+use aion_types::{H256, H768};
 
-use types::{Bytes, H256, H768, TransactionRequest, RichRawTransaction};
+use types::{Bytes, TransactionRequest, RichRawTransaction};
 
 build_rpc_trait! {
     /// Signing methods implementation relying on unlocked accounts.

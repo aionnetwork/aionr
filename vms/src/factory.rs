@@ -19,14 +19,18 @@
  *
  ******************************************************************************/
 
-use aion_types::{U128, U256, H256};
-use fastvm::{EvmStatusCode, FastVM};
+use std::convert::Into;
+use std::string::ToString;
+use std::sync::Arc;
+use avm::AVM;
+use fastvm::ffi::EvmStatusCode;
+use fastvm::core::FastVM;
 use fastvm::basetypes::{constants::GAS_CODE_DEPOSIT, DataWord};
 use fastvm::context::{execution_kind, ExecutionContext, TransactionResult};
-use vm_common::{ExecutionResult, ExecStatus, CallType, ReturnData, ActionParams, ActionValue, Ext};
-use std::sync::Arc;
-use avm::{AVM};
-use avm::types::{TransactionContext as AVMTxContext, AvmStatusCode};
+use types::{ExecutionResult, ExecStatus, CallType, ReturnData, ActionParams, ActionValue};
+use types::traits::Ext;
+use types::avm::{TransactionContext as AVMTxContext, AvmStatusCode};
+use aion_types::{U128, U256, H256};
 
 pub trait Factory {
     fn exec(
@@ -76,6 +80,7 @@ impl Factory for FastVMFactory {
 
         let call_data = params.data.unwrap_or_else(Vec::new);
 
+        // AIP: needs fix that in java kernel
         if code.is_empty() {
             ext.set_special_empty_flag();
             return vec![ExecutionResult {
@@ -171,7 +176,7 @@ impl Factory for FastVMFactory {
         }
 
         vec![ExecutionResult {
-            gas_left: gas_left,
+            gas_left,
             status_code: status_code.into(),
             return_data: ReturnData::new(return_data, 0, return_data_length),
             exception: match status_code {

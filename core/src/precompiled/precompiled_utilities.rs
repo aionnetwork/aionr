@@ -19,7 +19,7 @@
  *
  ******************************************************************************/
 
-use bytes::Bytes;
+use acore_bytes::Bytes;
 
 pub const WORD_LENGTH: usize = 32;
 pub const HALF_WORD_LENGTH: usize = 16;
@@ -39,7 +39,7 @@ pub fn pad(input: Bytes, length: usize) -> Option<Bytes> {
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
+    use acore_bytes::Bytes;
     use super::pad;
 
     #[test]

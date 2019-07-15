@@ -62,12 +62,12 @@ impl BuiltinContract for TxHashContract {
 mod tests {
     use super::TxHashContract;
     use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
-    use tests::helpers::get_temp_state;
+    use helpers::get_temp_state;
     use state::Substate;
-    use vms::ExecStatus;
     use aion_types::{H256, Address};
+    use vms::ExecStatus;
     use rustc_hex::ToHex;
-    use bytes::to_hex;
+    use acore_bytes::to_hex;
 
     #[test]
     fn test_txhash_contract() {

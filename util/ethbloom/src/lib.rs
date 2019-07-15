@@ -20,34 +20,22 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 #[cfg(feature = "std")]
 extern crate core;
-
 extern crate blake2b;
 #[macro_use]
-extern crate crunchy;
-
-#[macro_use]
 extern crate fixed_hash;
-
 #[cfg(feature = "serialize")]
 extern crate ethereum_types_serialize;
-
 #[cfg(feature = "serialize")]
 extern crate serde;
-
-#[cfg(test)]
 #[macro_use]
-extern crate hex_literal;
-
-#[cfg(test)]
-extern crate rand;
-
+extern crate crunchy;
 #[cfg(feature = "serialize")]
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
-
 use core::{ops, mem};
 use blake2b::blake2b;
 
@@ -246,237 +234,5 @@ impl<'de> Deserialize<'de> for Bloom {
             ethereum_types_serialize::ExpectedLen::Exact(&mut bytes),
         )?;
         Ok(Bloom(bytes))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::time::Instant;
-    use rand::Rng;
-    use fixed_hash::rustc_hex::FromHex;
-    use blake2b::blake2b;
-    use {Bloom, Input};
-
-    fn random_data() -> [u8; 256] {
-        let mut res = [0u8; 256];
-        rand::thread_rng().fill_bytes(&mut res);
-        res
-    }
-
-    fn test_bloom() -> Bloom {
-        "00000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000002020000000000000000000000000000000000000000000008000000001000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".into()
-    }
-
-    fn test_topic() -> Vec<u8> {
-        "02c69be41d0b7e40352fc85be1cd65eb03d40ef8427a0ca4596b1ead9a00e9fc"
-            .from_hex()
-            .unwrap()
-    }
-
-    fn test_address() -> Vec<u8> {
-        "ef2d6d194084c2de36e0dabfce45d046b37d1106"
-            .from_hex()
-            .unwrap()
-    }
-
-    fn test_dummy() -> Vec<u8> { b"123456".to_vec() }
-
-    fn test_dummy2() -> Vec<u8> { b"654321".to_vec() }
-
-    #[test]
-    fn it_works() {
-        let bloom: Bloom = "0x00000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".into();
-        let address = hex!("ef2d6d194084c2de36e0dabfce45d046b37d1106");
-        let topic = hex!("02c69be41d0b7e40352fc85be1cd65eb03d40ef8427a0ca4596b1ead9a00e9fc");
-
-        let mut my_bloom = Bloom::default();
-        assert!(!my_bloom.contains_input(Input::Raw(&address)));
-        assert!(!my_bloom.contains_input(Input::Raw(&topic)));
-
-        my_bloom.accrue(Input::Raw(&address));
-        assert!(my_bloom.contains_input(Input::Raw(&address)));
-        assert!(!my_bloom.contains_input(Input::Raw(&topic)));
-
-        my_bloom.accrue(Input::Raw(&topic));
-        assert!(my_bloom.contains_input(Input::Raw(&address)));
-        assert!(my_bloom.contains_input(Input::Raw(&topic)));
-        assert_eq!(my_bloom, bloom);
-    }
-
-    #[test]
-    fn benchtest_forwards_with_crunchy() {
-        let mut data = random_data();
-
-        let count = 1000;
-        let time = Instant::now();
-
-        for _ in 0..count {
-            let other_data = random_data();
-            unroll! {
-                for i in 0..255 {
-                    data[i] |= other_data[i];
-                }
-            }
-        }
-
-        let took = time.elapsed();
-        println!(
-            "[benchtest_forwards_with_crunchy] forwards with crunchy (ns/call): {}",
-            (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
-        );
-    }
-
-    #[test]
-    fn benchtest_backwards_with_crunchy() {
-        let mut data = random_data();
-        let count = 1000;
-        let time = Instant::now();
-
-        for _ in 0..count {
-            let other_data = random_data();
-            unroll! {
-                for i in 0..255 {
-                    data[255-i] |= other_data[255-i];
-                }
-            }
-        }
-
-        let took = time.elapsed();
-        println!(
-            "[benchtest_backwards_with_crunchy] backwards with crunchy (ns/call): {}",
-            (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
-        );
-    }
-
-    #[test]
-    fn benchtest_forwards_without_crunchy() {
-        let mut data = random_data();
-        let count = 1000;
-        let time = Instant::now();
-
-        for _ in 0..count {
-            let other_data = random_data();
-            for i in 0..255 {
-                data[i] |= other_data[i];
-            }
-        }
-
-        let took = time.elapsed();
-        println!(
-            "[benchtest_forwards_without_crunchy] forwards without crunchy (ns/call): {}",
-            (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
-        );
-    }
-
-    #[test]
-    fn benchtest_backwards_without_crunchy() {
-        let mut data = random_data();
-        let count = 1000;
-        let time = Instant::now();
-
-        for _ in 0..count {
-            let other_data = random_data();
-            for i in 0..255 {
-                data[255 - i] |= other_data[255 - i];
-            }
-        }
-
-        let took = time.elapsed();
-        println!(
-            "[benchtest_backwards_without_crunchy] backwards without crunchy (ns/call): {}",
-            (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
-        );
-    }
-
-    #[test]
-    fn benchtest_accrue_raw() {
-        let mut bloom = Bloom::default();
-        let topic = test_topic();
-        let address = test_address();
-        let count = 1000;
-        let time = Instant::now();
-
-        for _ in 0..count {
-            bloom.accrue(Input::Raw(&topic));
-            bloom.accrue(Input::Raw(&address));
-        }
-
-        let took = time.elapsed();
-        println!(
-            "[benchtest_accrue_raw] accure raw (ns/call): {}",
-            (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
-        );
-    }
-
-    #[test]
-    fn benchtest_accrue_hash() {
-        let mut bloom = Bloom::default();
-        let topic = blake2b(&test_topic());
-        let address = blake2b(&test_address());
-        let count = 1000;
-        let time = Instant::now();
-        for _ in 0..count {
-            bloom.accrue(Input::Hash(&topic.0));
-            bloom.accrue(Input::Hash(&address.0));
-        }
-        let took = time.elapsed();
-        println!(
-            "[benchtest_accrue_hash] accure hash (ns/call): {}",
-            (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
-        );
-    }
-
-    #[test]
-    fn benchtest_does_not_contain_raw() {
-        let bloom = test_bloom();
-        let dummy = test_dummy();
-        let dummy2 = test_dummy2();
-        let count = 1000;
-        let time = Instant::now();
-        for _ in 0..count {
-            assert!(!bloom.contains_input(Input::Raw(&dummy)));
-            assert!(!bloom.contains_input(Input::Raw(&dummy2)));
-        }
-        let took = time.elapsed();
-        println!(
-            "[benchtest_does_not_contain_raw] does not contain raw (ns/call): {}",
-            (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
-        );
-    }
-
-    #[test]
-    fn benchtest_does_not_contain_hash() {
-        let bloom = test_bloom();
-        let dummy = blake2b(&test_dummy());
-        let dummy2 = blake2b(&test_dummy2());
-        let count = 1000;
-        let time = Instant::now();
-        for _ in 0..count {
-            assert!(!bloom.contains_input(Input::Hash(&dummy.0)));
-            assert!(!bloom.contains_input(Input::Hash(&dummy2.0)));
-        }
-        let took = time.elapsed();
-        println!(
-            "[benchtest_does_not_contain_input_hash] does not contain hash (ns/call): {}",
-            (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
-        );
-    }
-
-    #[test]
-    fn benchtest_does_not_contain_random_hash() {
-        let bloom = test_bloom();
-        let dummy: Vec<_> = (0..255u8).into_iter().map(|i| blake2b(&[i])).collect();
-        let count = 1000;
-        let time = Instant::now();
-        for _ in 0..count {
-            for d in &dummy {
-                assert!(!bloom.contains_input(Input::Hash(&d.0)));
-            }
-        }
-        let took = time.elapsed();
-        println!(
-            "[benchtest_does_not_contain_random_hash] does not contain random hash (ns/call): {}",
-            (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
-        );
     }
 }

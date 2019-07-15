@@ -20,6 +20,7 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 //! Queue-like datastructure including notion of usage.
 
 /// Special queue-like datastructure that includes the notion of

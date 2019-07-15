@@ -26,7 +26,7 @@ use std::fmt::Debug;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use acore::account_provider::AccountProvider;
+use acore::account_provider::{AccountProvider, AccountToken};
 use acore::client::MiningBlockChainClient;
 use acore::miner::MinerService;
 use acore::transaction::{Action, PendingTransaction, SignedTransaction, Transaction};
@@ -40,8 +40,8 @@ use helpers::{errors, nonce, ConfirmationPayload, FilledTransactionRequest, Tran
 use jsonrpc_core::futures::{future, Async, Future, Poll};
 use jsonrpc_core::{BoxFuture, Error, Result};
 use types::{
-    ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse, H256 as RpcH256,
-    H768 as RpcH768, RichRawTransaction as RpcRichRawTransaction, SignRequest as RpcSignRequest,
+    ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse,
+    RichRawTransaction as RpcRichRawTransaction, SignRequest as RpcSignRequest,
 };
 
 pub use self::nonce::{Ready as NonceReady, Reservations};
@@ -133,7 +133,7 @@ impl<C: MiningBlockChainClient, M: MinerService> FullDispatcher<C, M> {
         signed_transaction: PendingTransaction,
     ) -> Result<H256>
     {
-        let hash = signed_transaction.transaction.hash();
+        let hash = signed_transaction.transaction.hash().clone();
 
         miner
             .import_own_transaction(client, signed_transaction)
@@ -187,8 +187,8 @@ impl<C: MiningBlockChainClient, M: MinerService> Dispatcher for FullDispatcher<C
             )));
         }
 
-        let state = self.state_nonce(&filled.from);
-        let reserved = self.nonces.lock().reserve(filled.from, state);
+        let state_nonce = self.state_nonce(&filled.from);
+        let reserved = self.nonces.lock().reserve(filled.from, state_nonce);
 
         Box::new(ProspectiveSigner::new(
             accounts, filled, None, reserved, password,
@@ -361,9 +361,6 @@ impl Future for ProspectiveSigner {
     }
 }
 
-/// Single-use account token.
-pub type AccountToken = String;
-
 /// Values used to unlock accounts for signing.
 #[derive(Debug, Clone, PartialEq)]
 pub enum SignWith {
@@ -497,7 +494,6 @@ pub fn execute<D: Dispatcher + 'static>(
                     .and_then(|(tx, tok, nonce, dispatcher)| {
                         dispatcher
                             .dispatch_transaction(tx)
-                            .map(RpcH256::from)
                             .map(ConfirmationResponse::SendTransaction)
                             .map(move |h| {
                                 nonce.map(move |nonce| nonce.mark_used());
@@ -524,7 +520,6 @@ pub fn execute<D: Dispatcher + 'static>(
                 result
                     //.map(|rsv| H768::from(rsv.into()))
                     .map(|rsv| H768(rsv.into()))
-                    .map(RpcH768::from)
                     .map(ConfirmationResponse::SignatureEd25519)
             });
             Box::new(future::done(res))

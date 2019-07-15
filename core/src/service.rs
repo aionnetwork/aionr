@@ -22,13 +22,19 @@
 
 //! Creates and registers client and network services.
 
+use std::time::{Instant, Duration};
 use std::path::Path;
 use std::sync::Arc;
+
+use futures::sync::oneshot;
+use tokio::runtime::TaskExecutor;
+use tokio::timer::Interval;
+use tokio::prelude::{Future, Stream};
 use ansi_term::Colour;
-use bytes::Bytes;
-use client::{ChainNotify, Client, ClientConfig};
+use acore_bytes::Bytes;
+use client::{ChainNotify, Client, ClientConfig, MiningBlockChainClient};
 use db;
-use error::*;
+use types::error::*;
 use io::*;
 use kvdb::KeyValueDB;
 use kvdb::{DatabaseConfig, RepositoryConfig, DbRepository, DBTransaction, Error as DbError};
@@ -43,12 +49,47 @@ use rlp::*;
 pub enum ClientIoMessage {
     /// Best Block Hash in chain has been changed
     NewChainHead,
-    /// A block is ready
+    /// An external block is verified and ready to be imported
     BlockVerified,
     /// New transaction RLPs are ready to be imported
     NewTransactions(Vec<Bytes>, usize),
     /// New consensus message received.
     NewMessage(Bytes),
+}
+
+/// Run the miner
+pub fn run_miner(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
+    let (close, shutdown_signal) = oneshot::channel();
+    let seal_block_task = Interval::new(Instant::now(), client.prepare_block_interval())
+        // let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(5))
+        .for_each(move |_| {
+            let client: Arc<Client> = client.clone();
+            client.miner().try_prepare_block(&*client, false);
+            Ok(())
+        })
+        .map_err(|e| panic!("interval err: {:?}", e))
+        .select(shutdown_signal.map_err(|_| {}))
+        .map(|_| ())
+        .map_err(|_| ());
+    executor.spawn(seal_block_task);
+    close
+}
+
+/// Run the transaction pool
+pub fn run_transaction_pool(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
+    let (close, shutdown_signal) = oneshot::channel();
+    let update_transaction_pool_task = Interval::new(Instant::now(), Duration::from_secs(1))
+        .for_each(move |_| {
+            let client: Arc<Client> = client.clone();
+            client.miner().update_transaction_pool(&*client, false);
+            Ok(())
+        })
+        .map_err(|e| panic!("interval err: {:?}", e))
+        .select(shutdown_signal.map_err(|_| {}))
+        .map(|_| ())
+        .map_err(|_| ());
+    executor.spawn(update_transaction_pool_task);
+    close
 }
 
 /// Client service setup. Creates and registers client and network services with the IO subsystem.
@@ -73,9 +114,8 @@ impl ClientService {
 
         info!(
             target:"run",
-            "Configured for {} using {} engine",
+            "     network: {}",
             Colour::White.bold().paint(spec.name.clone()),
-            Colour::Yellow.bold().paint(spec.engine.name())
         );
 
         let mut db_config = DatabaseConfig::default();
@@ -105,13 +145,11 @@ impl ClientService {
         });
         io_service.register_handler(client_io)?;
 
-        spec.engine.register_client(Arc::downgrade(&client) as _);
-
         let stop_guard = StopGuard::new();
 
         Ok(ClientService {
             io_service: Arc::new(io_service),
-            client: client,
+            client,
             database: dbs,
             _stop_guard: stop_guard,
         })
@@ -141,7 +179,7 @@ impl ClientService {
     /// check db if correct
     fn correct_db(dbs: Arc<KeyValueDB>) -> Result<(), String> {
         use db::Readable;
-        use blockchain::BlockDetails;
+        use types::blockchain::extra::BlockDetails;
         // get best block hash
         let best_block_hash = dbs.get(db::COL_EXTRA, b"best").expect("EXTRA db not found");
         match best_block_hash {
@@ -245,10 +283,11 @@ impl IoHandler<ClientIoMessage> for ClientIoHandler {
             ClientIoMessage::BlockVerified => {
                 self.client.import_verified_blocks();
             }
-            ClientIoMessage::NewMessage(ref message) => {
-                if let Err(e) = self.client.engine().handle_message(message) {
-                    trace!(target: "io", "Invalid message received: {}", e);
-                }
+            ClientIoMessage::NewChainHead => {
+                debug!(target: "block", "ClientIoMessage::NewChainHead");
+                let client: Arc<Client> = self.client.clone();
+                client.miner().update_transaction_pool(&*client, true);
+                client.miner().try_prepare_block(&*client, true);
             }
             _ => {} // ignore other messages
         }

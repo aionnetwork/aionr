@@ -23,7 +23,7 @@
 //! Block header.
 
 use blake2b::{blake2b, BLAKE2B_NULL_RLP};
-use bytes::{u64_to_bytes, Bytes};
+use acore_bytes::{u64_to_bytes, Bytes};
 use ethbloom::Bloom;
 use aion_types::{Address, H256, U128, U256, to_u256};
 use heapsize::HeapSizeOf;
@@ -74,48 +74,38 @@ pub const V1: HeaderVersion = 1;
 /// Doesn't do all that much on its own.
 #[derive(Debug, Clone, Eq)]
 pub struct Header {
-    /// Version rlp order 0
+    /// Version
     version: HeaderVersion,
-    /// Parent hash. rlp order 2
-    parent_hash: H256,
-    /// Block timestamp. rlp order 12
-    timestamp: u64,
-    /// Block number. rlp order 1
+    /// Block number
     number: BlockNumber,
-    /// Block author. rlp order 3
+    /// Parent hash
+    parent_hash: H256,
+    /// Block author
     author: Address,
-    /// Transactions root. rlp order 5
-    transactions_root: H256,
-    /// Block extra data. rlp order 9
-    extra_data: Bytes,
-    /// State root. rlp order 4
+    /// State root
     state_root: H256,
-    /// Block receipts root. rlp order 6
+    /// Transactions root
+    transactions_root: H256,
+    /// Block receipts root
     receipts_root: H256,
-    /// Block bloom. rlp order 7
+    /// Block bloom
     log_bloom: Bloom,
-    /// Gas used for contracts execution. rlp order 10
-    gas_used: U256,
-    /// Block gas limit. rlp order 11
-    gas_limit: U256,
-
-    /// Block difficulty. rlp order 8
+    /// Block difficulty
     difficulty: U256,
-    /// Vector of post-RLP-encoded fields.
-    // nonce rlp order 13
-    // solution rlp order 14
+    /// Block extra data
+    extra_data: Bytes,
+    /// Gas used for contracts execution
+    gas_used: U256,
+    /// Block gas limit
+    gas_limit: U256,
+    /// Block timestamp
+    timestamp: u64,
+    /// Vector of post-RLP-encoded fields. It includes nonce and solution for a PoW seal.
     seal: Vec<Bytes>,
     /// The memoized hash of the RLP representation *including* the seal fields.
     hash: RefCell<Option<H256>>,
     /// The memoized hash of the RLP representation *without* the seal fields.
     bare_hash: RefCell<Option<H256>>,
-    // [FZH] Put reward and transaction fee in the header to help miners to get this information.
-    // Transaction fee is calculated when a transaction is pushed into a block. In the original
-    // rust version, it is not stored after altered the state balance.
-    // Reward is calculated when closing a block. It is stored in the block trace if tracing
-    // option is activated (but by default it is not).
-    // To keep these two values availble for miners, put them here in the header of a block. They
-    // are not part of the header's rlp so will not be communicated with other nodes on syncing.
     /// transaction fee
     transaction_fee: U256,
     /// reward
@@ -171,20 +161,25 @@ impl Default for Header {
 impl Header {
     /// Create a new, default-valued, header.
     pub fn new() -> Self { Self::default() }
+
     /// Get version field of the header
     pub fn version(&self) -> HeaderVersion { self.version }
 
     /// Get the parent_hash field of the header.
     pub fn parent_hash(&self) -> &H256 { &self.parent_hash }
+
     /// Get the timestamp field of the header.
     pub fn timestamp(&self) -> u64 { self.timestamp }
+
     /// Get the number field of the header.
     pub fn number(&self) -> BlockNumber { self.number }
+
     /// Get the author field of the header.
     pub fn author(&self) -> &Address { &self.author }
 
     /// Get the extra data field of the header.
     pub fn extra_data(&self) -> &Bytes { &self.extra_data }
+
     /// Get a mutable reference to extra_data
     pub fn extra_data_mut(&mut self) -> &mut Bytes {
         self.note_dirty();
@@ -193,14 +188,19 @@ impl Header {
 
     /// Get the state root field of the header.
     pub fn state_root(&self) -> &H256 { &self.state_root }
+
     /// Get the receipts root field of the header.
     pub fn receipts_root(&self) -> &H256 { &self.receipts_root }
+
     /// Get the log bloom field of the header.
     pub fn log_bloom(&self) -> &Bloom { &self.log_bloom }
+
     /// Get the transactions root field of the header.
     pub fn transactions_root(&self) -> &H256 { &self.transactions_root }
+
     /// Get the gas used field of the header.
     pub fn gas_used(&self) -> &U256 { &self.gas_used }
+
     /// Get the gas limit field of the header.
     pub fn gas_limit(&self) -> &U256 { &self.gas_limit }
 
@@ -237,41 +237,49 @@ impl Header {
         self.parent_hash = a;
         self.note_dirty();
     }
+
     /// Set the state root field of the header.
     pub fn set_state_root(&mut self, a: H256) {
         self.state_root = a;
         self.note_dirty();
     }
+
     /// Set the transactions root field of the header.
     pub fn set_transactions_root(&mut self, a: H256) {
         self.transactions_root = a;
         self.note_dirty()
     }
+
     /// Set the receipts root field of the header.
     pub fn set_receipts_root(&mut self, a: H256) {
         self.receipts_root = a;
         self.note_dirty()
     }
+
     /// Set the log bloom field of the header.
     pub fn set_log_bloom(&mut self, a: Bloom) {
         self.log_bloom = a;
         self.note_dirty()
     }
+
     /// Set the timestamp field of the header.
     pub fn set_timestamp(&mut self, a: u64) {
         self.timestamp = a;
         self.note_dirty();
     }
+
     /// Set the timestamp field of the header to the current time.
     pub fn set_timestamp_now(&mut self, but_later_than: u64) {
         self.timestamp = cmp::max(get_time().sec as u64, but_later_than + 1);
         self.note_dirty();
     }
+
     /// Set the number field of the header.
     pub fn set_number(&mut self, a: BlockNumber) {
         self.number = a;
         self.note_dirty();
     }
+
     /// Set the author field of the header.
     pub fn set_author(&mut self, a: Address) {
         if a != self.author {
@@ -293,6 +301,7 @@ impl Header {
         self.gas_used = a;
         self.note_dirty();
     }
+
     /// Set the gas limit field of the header.
     pub fn set_gas_limit(&mut self, a: U256) {
         self.gas_limit = a;
@@ -482,9 +491,4 @@ impl ::aion_machine::Header for Header {
     fn author(&self) -> &Address { Header::author(self) }
 
     fn number(&self) -> BlockNumber { Header::number(self) }
-}
-
-impl ::aion_machine::ScoredHeader for Header {
-    fn score(&self) -> &U256 { self.difficulty() }
-    fn set_score(&mut self, score: U256) { self.set_difficulty(score) }
 }

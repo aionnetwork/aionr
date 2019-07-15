@@ -28,8 +28,10 @@ use ajson;
 use blake2b::blake2b;
 use heapsize::HeapSizeOf;
 use key::{
-    self, public_to_address_ed25519, recover_ed25519, sign_ed25519, Ed25519Secret, Ed25519Signature,
+    self, public_to_address_ed25519, recover_ed25519, Ed25519Signature,
 };
+#[cfg(test)]
+use key::{sign_ed25519, Ed25519Secret};
 use rlp::{self, DecoderError, Encodable, RlpStream, UntrustedRlp};
 use std::ops::Deref;
 use vms::constants::{
@@ -37,7 +39,9 @@ use vms::constants::{
     GAS_TX_DATA_ZERO,
 };
 
-use bytes::i64_to_bytes;
+#[cfg(test)]
+use acore_bytes::i64_to_bytes;
+#[cfg(test)]
 use trace_time::to_epoch_micro;
 
 type Bytes = Vec<u8>;
@@ -57,11 +61,9 @@ pub const AVM_TRANSACTION_TYPE: U256 = U256([2, 0, 0, 0]);
 
 struct TransactionEnergyRule;
 impl TransactionEnergyRule {
-    pub fn is_valid_gas_create(gas: U256) -> bool {
-        (gas >= GAS_CREATE_MIN) && (gas <= GAS_CREATE_MAX)
-    }
+    fn is_valid_gas_create(gas: U256) -> bool { (gas >= GAS_CREATE_MIN) && (gas <= GAS_CREATE_MAX) }
 
-    pub fn is_valid_gas_call(gas: U256) -> bool { gas >= GAS_CALL_MIN && gas <= GAS_CALL_MAX }
+    fn is_valid_gas_call(gas: U256) -> bool { gas >= GAS_CALL_MIN && gas <= GAS_CALL_MAX }
 }
 
 /// Transaction action type.
@@ -237,6 +239,7 @@ impl Transaction {
         blake2b(stream.as_raw())
     }
 
+    #[cfg(test)]
     pub fn sign(self, key: &[u8], chain_id: Option<u64>) -> SignedTransaction {
         let timestamp = i64_to_bytes(to_epoch_micro());
         //        let sig = sign_with_secret(secret_from_slice(key), &self.hash(chain_id, &timestamp))
@@ -288,21 +291,6 @@ impl Transaction {
             }
             .compute_hash(),
             sender: from,
-            public: None,
-        }
-    }
-
-    /// Add EIP-86 compatible empty signature.
-    pub fn null_sign(self, _chain_id: u64) -> SignedTransaction {
-        SignedTransaction {
-            transaction: UnverifiedTransaction {
-                unsigned: self,
-                timestamp: vec![0x00; 8],
-                sig: vec![0u8; 96],
-                hash: 0.into(),
-            }
-            .compute_hash(),
-            sender: UNSIGNED_SENDER,
             public: None,
         }
     }
@@ -456,7 +444,7 @@ impl UnverifiedTransaction {
     pub fn signature(&self) -> Ed25519Signature { Ed25519Signature::from(self.sig.clone()) }
 
     /// Get the hash of this header (blake2b of the RLP).
-    pub fn hash(&self) -> H256 { self.hash }
+    pub fn hash(&self) -> &H256 { &self.hash }
 
     /// Get the timestamp
     pub fn timestamp(&self) -> &Bytes { &self.timestamp }
@@ -599,21 +587,16 @@ impl SignedTransaction {
     }
 
     /// Returns transaction type.
-    pub fn tx_type(&self) -> U256 { self.transaction.unsigned.transaction_type }
+    pub fn tx_type(&self) -> U256 { self.transaction_type }
 
     /// Returns transaction sender.
-    pub fn sender(&self) -> Address { self.sender }
+    pub fn sender(&self) -> &Address { &self.sender }
 
     /// Returns a public key of the sender.
     pub fn public_key(&self) -> Option<Ed25519Public> { self.public }
 
     /// Checks is signature is empty.
     pub fn is_unsigned(&self) -> bool { self.transaction.is_unsigned() }
-
-    /// Deconstructs this transaction back into `UnverifiedTransaction`
-    pub fn deconstruct(self) -> (UnverifiedTransaction, Address, Option<Ed25519Public>) {
-        (self.transaction, self.sender, self.public)
-    }
 }
 
 /// Signed Transaction that is a part of canon blockchain.
@@ -1101,7 +1084,7 @@ mod tests {
         .sign(&key.secret(), None);
         let mut slice = blake2b(key.public());
         slice[0] = 0xA0;
-        assert_eq!(Address::from(slice), t.sender());
+        assert_eq!(Address::from(slice), *t.sender());
         assert_eq!(t.chain_id(), None);
     }
 
@@ -1123,11 +1106,11 @@ mod tests {
             transaction_type: U256::from(1),
         }
         .fake_sign(Address::from(0x69));
-        assert_eq!(Address::from(0x69), t.sender());
+        assert_eq!(Address::from(0x69), *t.sender());
         assert_eq!(t.chain_id(), None);
 
         let t = t.clone();
-        assert_eq!(Address::from(0x69), t.sender());
+        assert_eq!(Address::from(0x69), *t.sender());
         assert_eq!(t.chain_id(), None);
 
         println!("{:?}", t.rlp_bytes().to_hex());
@@ -1140,7 +1123,7 @@ mod tests {
         let test_vector = |tx_data: &str, address: &'static str| {
             let signed = rlp::decode(&FromHex::from_hex(tx_data).unwrap());
             let signed = SignedTransaction::new(signed).unwrap();
-            assert_eq!(signed.sender(), address.into());
+            assert_eq!(signed.sender().clone(), address.into());
             println!("chainid: {:?}", signed.chain_id());
         };
 

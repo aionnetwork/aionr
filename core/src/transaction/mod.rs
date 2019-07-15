@@ -20,10 +20,12 @@
  *
  ******************************************************************************/
 
-pub mod error;
-pub mod transaction;
+mod error;
+mod transaction;
+// miner
 pub mod banning_queue;
 pub mod local_transactions;
+pub mod transaction_pool;
 pub mod transaction_queue;
 
 pub use self::error::Error;

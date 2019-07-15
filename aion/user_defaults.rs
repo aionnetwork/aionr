@@ -89,8 +89,8 @@ impl<'a> Visitor<'a> for UserDefaultsVisitor {
 
         let user_defaults = UserDefaults {
             is_first_launch: false,
-            pruning: pruning,
-            fat_db: fat_db,
+            pruning,
+            fat_db,
         };
 
         Ok(user_defaults)

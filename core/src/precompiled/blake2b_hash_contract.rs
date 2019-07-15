@@ -88,19 +88,18 @@ impl BuiltinContract for Blake2bHashContract {
 
 #[cfg(test)]
 mod tests {
-
     use super::Blake2bHashContract;
     use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
     use state::{State, Substate};
-    use tests::helpers::get_temp_state;
-    use vms::ExecStatus;
-    use bytes::to_hex;
+    use helpers::get_temp_state;
+    use acore_bytes::to_hex;
     use aion_types::{Address, H256};
+    use vms::ExecStatus;
 
     fn get_ext_default<'a>(
-        state: &'a mut State<::state_db::StateDB>,
+        state: &'a mut State<::db::StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::state_db::StateDB>
+    ) -> BuiltinExtImpl<'a, ::db::StateDB>
     {
         BuiltinExtImpl::new(
             state,
@@ -196,4 +195,5 @@ mod tests {
     //        let result = contract.execute(&mut ext, input.as_ref());
     //        assert!(result.status_code == ExecStatus::Failure);
     //    }
+
 }

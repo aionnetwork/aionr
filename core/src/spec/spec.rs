@@ -24,22 +24,20 @@
 
 use std::collections::BTreeMap;
 use std::io::Read;
-use std::path::Path;
 use std::sync::Arc;
 
 use aion_types::{Address, H256, U256};
 use ajson;
 use blake2b::{blake2b, BLAKE2B_NULL_RLP};
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use ethbloom::Bloom;
-use kvdb::{MemoryDB, MemoryDBRepository};
+use kvdb::{MemoryDB, MockDbRepository};
 use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
 use types::BlockNumber;
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
-
-use engines::{EthEngine, POWEquihashEngine};
-use error::Error;
+use engine::POWEquihashEngine;
+use types::error::Error;
 use executive::Executive;
 use factory::Factories;
 use header::Header;
@@ -50,7 +48,6 @@ use spec::seal::Generic as GenericSeal;
 use spec::Genesis;
 use state::backend::Basic as BasicBackend;
 use state::{Backend, State, Substate};
-use transaction::DEFAULT_TRANSACTION_TYPE;
 
 // helper for formatting errors.
 fn fmt_err<F: ::std::fmt::Display>(f: F) -> String { format!("Spec json is invalid: {}", f) }
@@ -65,8 +62,6 @@ pub struct CommonParams {
     pub min_gas_limit: U256,
     /// Gas limit bound divisor (how much gas limit can change per block)
     pub gas_limit_bound_divisor: U256,
-    /// Registrar contract address.
-    pub registrar: Address,
     /// monetary policy update block number.
     pub monetary_policy_update: Option<BlockNumber>,
     /// Transaction permission managing contract address.
@@ -80,39 +75,10 @@ impl From<ajson::spec::Params> for CommonParams {
             maximum_extra_data_size: if data_size > 0 { data_size } else { 32usize },
             min_gas_limit: p.min_gas_limit.into(),
             gas_limit_bound_divisor: p.gas_limit_bound_divisor.into(),
-            registrar: p.registrar.map_or_else(Address::new, Into::into),
             monetary_policy_update: p.monetary_policy_update.map(Into::into),
             transaction_permission_contract: p.transaction_permission_contract.map(Into::into),
         }
     }
-}
-
-/// Runtime parameters for the spec that are related to how the software should run the chain,
-/// rather than integral properties of the chain itself.
-#[derive(Debug, Clone, Copy)]
-pub struct SpecParams<'a> {
-    /// The path to the folder used to cache nodes. This is typically /tmp/ on Unix-like systems
-    pub cache_dir: &'a Path,
-}
-
-impl<'a> SpecParams<'a> {
-    /// Create from a cache path, with null values for the other fields
-    pub fn from_path(path: &'a Path) -> Self {
-        SpecParams {
-            cache_dir: path,
-        }
-    }
-
-    /// Create from a cache path and an optimization setting
-    pub fn new(path: &'a Path) -> Self {
-        SpecParams {
-            cache_dir: path,
-        }
-    }
-}
-
-impl<'a, T: AsRef<Path>> From<&'a T> for SpecParams<'a> {
-    fn from(path: &'a T) -> Self { Self::from_path(path.as_ref()) }
 }
 
 /// Parameters for a block chain; includes both those intrinsic to the design of the
@@ -121,7 +87,7 @@ pub struct Spec {
     /// User friendly spec name
     pub name: String,
     /// What engine are we using for this?
-    pub engine: Arc<EthEngine>,
+    pub engine: Arc<POWEquihashEngine>,
     /// Name of the subdir inside the main data dir to use for chain data and settings.
     pub data_dir: String,
     /// The genesis block's parent hash field.
@@ -153,6 +119,14 @@ pub struct Spec {
 
     /// Genesis state as plain old data.
     genesis_state: PodState,
+}
+
+#[cfg(test)]
+macro_rules! load_bundled {
+    ($e:expr) => {
+        Spec::load(include_bytes!(concat!("../../../resources/", $e, ".json")) as &[u8])
+            .expect(concat!("Chain spec ", $e, " is invalid."))
+    };
 }
 
 #[cfg(test)]
@@ -188,11 +162,11 @@ fn load_machine_from(s: ajson::spec::Spec) -> EthereumMachine {
         .collect();
     let params = CommonParams::from(s.params);
 
-    Spec::machine(&s.engine, params, builtins, s.accounts.premine())
+    Spec::machine(params, builtins, s.accounts.premine())
 }
 
 /// Load from JSON object.
-fn load_from(spec_params: SpecParams, s: ajson::spec::Spec) -> Result<Spec, Error> {
+fn load_from(s: ajson::spec::Spec) -> Result<Spec, Error> {
     let builtins = s
         .accounts
         .builtins()
@@ -205,13 +179,7 @@ fn load_from(spec_params: SpecParams, s: ajson::spec::Spec) -> Result<Spec, Erro
 
     let mut s = Spec {
         name: s.name.clone().into(),
-        engine: Spec::engine(
-            spec_params,
-            s.engine,
-            params,
-            builtins,
-            s.accounts.premine(),
-        ),
+        engine: Spec::engine(s.engine, params, builtins, s.accounts.premine()),
         data_dir: s.data_dir.unwrap_or(s.name).into(),
         parent_hash: g.parent_hash,
         transactions_root: g.transactions_root,
@@ -245,9 +213,18 @@ fn load_from(spec_params: SpecParams, s: ajson::spec::Spec) -> Result<Spec, Erro
 }
 
 impl Spec {
+    #[cfg(test)]
+    /// Create a new Spec which conforms to the Frontier-era Morden chain except that it's a
+    /// NullEngine consensus.
+    pub fn new_test() -> Spec { load_bundled!("null_morden") }
+
+    #[cfg(test)]
+    /// Create a new Spec which is a NullEngine consensus with a premine of address whose
+    /// secret is blake2b('').
+    pub fn new_null() -> Spec { load_bundled!("null") }
+
     // create an instance of an Ethereum state machine, minus consensus logic.
     fn machine(
-        _engine_spec: &ajson::spec::Engine,
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
         premine: U256,
@@ -259,14 +236,13 @@ impl Spec {
     /// Convert engine spec into a arc'd Engine of the right underlying type.
     /// TODO avoid this hard-coded nastiness - use dynamic-linked plugin framework instead.
     fn engine(
-        _spec_params: SpecParams,
         engine_spec: ajson::spec::Engine,
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
         premine: U256,
-    ) -> Arc<EthEngine>
+    ) -> Arc<POWEquihashEngine>
     {
-        let machine = Self::machine(&engine_spec, params, builtins, premine);
+        let machine = Self::machine(params, builtins, premine);
 
         match engine_spec {
             ajson::spec::Engine::POWEquihashEngine(pow_equihash_engine) => {
@@ -301,15 +277,13 @@ impl Spec {
             );
         }
 
-        let start_nonce = self.engine.account_start_nonce(0);
-
         let (root, db) = {
             let mut state = State::from_existing(
                 db,
                 root,
-                start_nonce,
+                U256::zero(),
                 factories.clone(),
-                Arc::new(MemoryDBRepository::new()),
+                Arc::new(MockDbRepository::init(vec![String::new()])),
             )?;
 
             // Execute contract constructors.
@@ -374,9 +348,6 @@ impl Spec {
     /// Return the state root for the genesis state, memoising accordingly.
     pub fn state_root(&self) -> H256 { self.state_root_memo.read().clone() }
 
-    /// Get common blockchain parameters.
-    pub fn params(&self) -> &CommonParams { &self.engine.params() }
-
     /// Get the header of the genesis block.
     pub fn genesis_header(&self) -> Header {
         let mut header: Header = Default::default();
@@ -410,35 +381,12 @@ impl Spec {
         ret.out()
     }
 
-    /// Overwrite the genesis components.
-    pub fn overwrite_genesis_params(&mut self, g: Genesis) {
-        let GenericSeal(seal_rlp) = g.seal.into();
-        self.parent_hash = g.parent_hash;
-        self.transactions_root = g.transactions_root;
-        self.receipts_root = g.receipts_root;
-        self.author = g.author;
-        self.difficulty = g.difficulty;
-        self.gas_limit = g.gas_limit;
-        self.gas_used = g.gas_used;
-        self.timestamp = g.timestamp;
-        self.extra_data = g.extra_data;
-        self.seal_rlp = seal_rlp;
-    }
-
     /// Alter the value of the genesis state.
     pub fn set_genesis_state(&mut self, s: PodState) -> Result<(), Error> {
         self.genesis_state = s;
         let _ = self.run_constructors(&Default::default(), BasicBackend(MemoryDB::new()))?;
 
         Ok(())
-    }
-
-    /// Returns `false` if the memoized state root is invalid. `true` otherwise.
-    pub fn is_state_root_valid(&self) -> bool {
-        // TODO: get rid of this function and ensure state root always is valid.
-        // we're mostly there, but `self.genesis_state.root()` doesn't encompass
-        // post-constructor state.
-        *self.state_root_memo.read() == self.genesis_state.root()
     }
 
     /// Ensure that the given state DB has the trie nodes in for the genesis state.
@@ -462,82 +410,21 @@ impl Spec {
 
     /// Loads spec from json file. Provide factories for executing contracts and ensuring
     /// storage goes to the right place.
-    pub fn load<'a, T: Into<SpecParams<'a>>, R>(params: T, reader: R) -> Result<Self, String>
+    pub fn load<'a, R>(reader: R) -> Result<Self, String>
     where R: Read {
         ajson::spec::Spec::load(reader)
             .map_err(fmt_err)
-            .and_then(|x| load_from(params.into(), x).map_err(fmt_err))
-    }
-
-    /// initialize genesis epoch data, using in-memory database for
-    /// constructor.
-    pub fn genesis_epoch_data(&self) -> Result<Vec<u8>, String> {
-        use journaldb;
-        use kvdb::MockDbRepository;
-        use transaction::{Action, Transaction};
-
-        let genesis = self.genesis_header();
-        let db_configs = vec!["epoch".into()];
-        let factories = Default::default();
-        let mut db = journaldb::new(
-            Arc::new(MockDbRepository::init(db_configs)),
-            journaldb::Algorithm::Archive,
-            "epoch",
-        );
-
-        self.ensure_db_good(BasicBackend(db.as_hashstore_mut()), &factories)
-            .map_err(|e| format!("Unable to initialize genesis state: {}", e))?;
-
-        let call = |a, d| {
-            let mut db = db.boxed_clone();
-            let env_info = ::vms::EnvInfo {
-                number: 0,
-                author: *genesis.author(),
-                timestamp: genesis.timestamp(),
-                difficulty: *genesis.difficulty(),
-                gas_limit: *genesis.gas_limit(),
-                last_hashes: Arc::new(Vec::new()),
-                gas_used: 0.into(),
-            };
-
-            let from = Address::default();
-            let tx = Transaction::new(
-                self.engine.account_start_nonce(0),
-                U256::default(),
-                U256::from(50_000_000), // TODO: share with client.
-                Action::Call(a),
-                U256::default(),
-                d,
-                DEFAULT_TRANSACTION_TYPE,
-            )
-            .fake_sign(from);
-
-            let res = ::state::prove_transaction(
-                db.as_hashstore_mut(),
-                *genesis.state_root(),
-                &tx,
-                self.engine.machine(),
-                &env_info,
-                factories.clone(),
-                true,
-                Arc::new(MemoryDBRepository::new()),
-            );
-
-            res.map(|(out, proof)| (out, proof.into_iter().map(|x| x.into_vec()).collect()))
-                .ok_or_else(|| "Failed to prove call: insufficient state".into())
-        };
-
-        self.engine.genesis_epoch_data(&genesis, &call)
+            .and_then(|x| load_from(x).map_err(fmt_err))
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::Spec;
     use views::BlockView;
     #[test]
     fn test_load_empty() {
-        assert!(Spec::load(&::std::env::temp_dir(), &[] as &[u8]).is_err());
+        assert!(Spec::load(&[] as &[u8]).is_err());
     }
 
     #[test]

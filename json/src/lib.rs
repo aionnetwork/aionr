@@ -19,7 +19,7 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
+#![warn(unused_extern_crates)]
 extern crate rustc_hex;
 extern crate serde;
 extern crate serde_json;
@@ -39,4 +39,7 @@ pub mod maybe;
 pub mod state;
 pub mod transaction;
 pub mod misc;
-pub mod test;
+#[cfg(test)]
+mod tests;
+#[cfg(test)]
+use bytes::Bytes;

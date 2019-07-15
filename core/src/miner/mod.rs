@@ -21,24 +21,24 @@
  ******************************************************************************/
 
 mod miner;
-mod stratum;
 pub mod external;
 
 pub use self::miner::{Miner, MinerOptions, Banning, PendingSet};
-pub use self::stratum::{Stratum, Error as StratumError, Options as StratumOptions, NotifyWork};
 pub use transaction::local_transactions::Status as LocalTransactionStatus;
-use std::collections::BTreeMap;
-use aion_types::{H256, U256, Address};
-use bytes::Bytes;
 
+use std::collections::BTreeMap;
+
+use aion_types::{H256, U256, Address};
+use acore_bytes::Bytes;
 use block::ClosedBlock;
 use client::{MiningBlockChainClient};
-use error::{Error};
+use types::error::{Error};
 use header::BlockNumber;
-use receipt::{RichReceipt, Receipt};
-use transaction::{UnverifiedTransaction, PendingTransaction, ImportResult as TransactionImportResult};
+use receipt::Receipt;
+use transaction::{UnverifiedTransaction, PendingTransaction};
 
-/// Miner client API
+/// Miner client API, this trait is somewhat related to multiple kinds of miner
+/// however, only one kind of miner now
 pub trait MinerService: Send + Sync {
     /// Returns miner's status.
     fn status(&self) -> MinerStatus;
@@ -71,7 +71,7 @@ pub trait MinerService: Send + Sync {
     fn local_maximal_gas_price(&self) -> U256;
 
     /// Set maximum gas price of new local transaction to be accepted for mining when using dynamic gas price.
-    fn set_local_maximal_gas_price(&mut self, default_max_gas_price: U256);
+    //    fn set_local_maximal_gas_price(&mut self, default_max_gas_price: U256);
 
     /// Get the lower bound of the gas limit we wish to target when sealing a new block.
     fn gas_floor_target(&self) -> U256;
@@ -87,7 +87,7 @@ pub trait MinerService: Send + Sync {
     fn set_gas_ceil_target(&self, target: U256);
 
     /// Set maximum amount of gas allowed for any single transaction to mine.
-    fn set_tx_gas_limit(&mut self, limit: U256);
+    //    fn set_tx_gas_limit(&mut self, limit: U256);
 
     /// Get maximum amount of gas allowed for any single transaction to mine.
     fn tx_gas_limit(&self) -> U256;
@@ -97,14 +97,14 @@ pub trait MinerService: Send + Sync {
         &self,
         chain: &MiningBlockChainClient,
         transactions: Vec<UnverifiedTransaction>,
-    ) -> Vec<Result<TransactionImportResult, Error>>;
+    ) -> Vec<Result<(), Error>>;
 
     /// Imports own (node owner) transaction to queue.
     fn import_own_transaction(
         &self,
         chain: &MiningBlockChainClient,
         transaction: PendingTransaction,
-    ) -> Result<TransactionImportResult, Error>;
+    ) -> Result<(), Error>;
 
     /// Returns hashes of transactions currently in pending
     fn pending_transactions_hashes(&self, best_block: BlockNumber) -> Vec<H256>;
@@ -121,9 +121,6 @@ pub trait MinerService: Send + Sync {
         enacted: &[H256],
         retracted: &[H256],
     );
-
-    /// PoW chain - can produce work package
-    fn can_produce_work_package(&self) -> bool;
 
     /// New chain head event. Restart mining operation.
     fn update_sealing(&self, chain: &MiningBlockChainClient);
@@ -148,11 +145,7 @@ pub trait MinerService: Send + Sync {
 
     /// Removes transaction from the queue.
     /// NOTE: The transaction is not removed from pending block if mining.
-    fn remove_pending_transaction(
-        &self,
-        chain: &MiningBlockChainClient,
-        hash: &H256,
-    ) -> Option<PendingTransaction>;
+    //    fn remove_pending_transaction(&self, hash: H256);
 
     /// Get a list of all pending transactions in the queue.
     fn pending_transactions(&self) -> Vec<PendingTransaction>;
@@ -168,27 +161,19 @@ pub trait MinerService: Send + Sync {
     fn future_transactions(&self) -> Vec<PendingTransaction>;
 
     /// Get a list of local transactions with statuses.
-    fn local_transactions(&self) -> BTreeMap<H256, LocalTransactionStatus>;
+    //    fn local_transactions(&self) -> HashMap<H256, LocalTransactionStatus>;
 
     /// Get a list of all pending receipts.
     fn pending_receipts(&self, best_block: BlockNumber) -> BTreeMap<H256, Receipt>;
 
     /// Get a particular receipt.
-    fn pending_receipt(&self, best_block: BlockNumber, hash: &H256) -> Option<RichReceipt>;
+    //    fn pending_receipt(&self, best_block: BlockNumber, hash: &H256) -> Option<RichReceipt>;
 
     /// Returns highest transaction nonce for given address.
     fn last_nonce(&self, address: &Address) -> Option<U256>;
 
     /// Is it currently sealing?
     fn is_currently_sealing(&self) -> bool;
-    /*
-    
-        /// Suggested gas price.
-        fn sensible_gas_price(&self) -> U256;
-    
-        /// Sensible suggested gas limit.
-        fn sensible_gas_limit(&self) -> U256;
-    */
 
     /// Default suggested gas limit.
     fn default_gas_limit(&self) -> U256;

@@ -28,10 +28,10 @@ use std::collections::{HashMap, LinkedList};
 use rustc_hex::FromHex;
 use rustc_hex::ToHex;
 
-use sync::sync::SyncProvider;
 use jsonrpc_macros::Trailing;
 use aion_types::{H256, U256};
 use acore::block::IsBlock;
+use acore::sync::SyncProvider;
 use acore::client::{MiningBlockChainClient, BlockId};
 use acore::miner::MinerService;
 use acore::account_provider::AccountProvider;
@@ -102,11 +102,6 @@ where
 {
     /// Returns the work of current block
     fn work(&self, _tpl_param: Trailing<TemplateParam>) -> Result<Work> {
-        if !self.miner.can_produce_work_package() {
-            warn!(target: "miner", "Cannot give work package - engine seals internally.");
-            return Err(errors::no_work_required());
-        }
-
         // check if we're still syncing and return empty strings in that case
         {
             //TODO: check if initial sync is complete here
@@ -201,11 +196,6 @@ where
             .parse()
             .map_err(|_e| Error::invalid_params("invalid pow_hash"))?;
 
-        if !self.miner.can_produce_work_package() {
-            warn!(target: "miner", "Cannot submit work - engine seals internally.");
-            return Err(errors::no_work_required());
-        }
-
         trace!(target: "miner", "submit_work: Decoded: nonce={}, pow_hash={}, solution={:?}", nonce, pow_hash, solution);
 
         let seal = vec![nonce.to_vec(), solution.0];
@@ -232,7 +222,7 @@ where
     fn validate_address(&self, address: H256) -> Result<AddressValidation> {
         let isvalid: bool = address.0[0] == 0xa0 as u8;
         let account_provider = self.account_provider()?;
-        let ismine = match account_provider.has_account(address) {
+        let ismine = match account_provider.has_account(&address) {
             Ok(true) => true,
             _ => false,
         };

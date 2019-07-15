@@ -9,30 +9,23 @@ authors = ["Aion Foundation <admin@aion.network>"]
 [dependencies]
 ansi_term = "0.10"
 bloomchain = { path = "../util/bloomchain" }
-bn = { git = "https://github.com/paritytech/bn" }
 byteorder = "1.0"
-common-types = { path = "../types" }
+bytes = "0.4"
+state = "0.4.1"
+p2p = { path = "../p2p" }
 crossbeam = "0.3"
 acore-bloom-journal = { path = "../util/bloom" }
 acore-bytes = { path = "../util/bytes" }
 patricia-trie = { path = "../util/patricia_trie" }
 acore-io = { path = "../util/io" }
-logger = { path = "../util/logger" }
-acore-stratum = { path = "../stratum" }
 aion-types = { path = "../util/aion-types"}
 ethbloom = { path = "../util/ethbloom"}
 memory-cache = { path = "../util/memory_cache" }
-abi = { path = "../util/abi" }
-abi-contract = { path = "../util/abi/contract" }
-abi-derive = { path = "../util/abi/derive" }
-avm_abi = { path = "../util/avm_abi" }
 ajson = { path = "../json" }
 key = { path = "../keystore/key" }
 crypto = { path = "../util/crypto" }
 keychain = { path = "../keystore/keychain" }
 vms = { path =  "../vms" }
-futures-cpupool = "0.1"
-futures = "0.1.6"
 heapsize = "0.4"
 itertools = "0.5"
 lazy_static = "1.0"
@@ -43,13 +36,11 @@ num_cpus = "1.2"
 aion-machine = { path = "../machine" }
 parking_lot = "0.5"
 rayon = "0.8"
-rand = "0.4"
 rlp = { path = "../util/rlp" }
 rlp_compress = { path = "../util/rlp_compress" }
 rlp_derive = { path = "../util/rlp_derive" }
 util-error = { path = "../util/error" }
 stop-guard = { path = "../util/stop-guard" }
-macros = { path = "../util/macros" }
 rustc-hex = "1.0"
 stats = { path = "../util/stats" }
 time = "0.1"
@@ -59,25 +50,31 @@ table = { path = "../util/table" }
 triehash = { path = "../util/triehash" }
 unexpected = { path = "../util/unexpected" }
 journaldb = { path = "../db/journaldb" }
-tempdir = "0.3"
 db = { path = "../db/core" }
 equihash = { path = "../util/equihash" }
 blake2b = { path = "../util/blake2b" }
-dir = { path = "../util/dir" }
 tiny-keccak = "1.4.2"
 num-bigint = "0.2"
-bincode = "1.0.0"
 bytebuffer = "0.2.1"
 transient-hashmap = "0.4"
-linked-hash-map = "0.5"
+macros = { path = "../util/macros" }
+futures = "0.1.6"
 tokio = "0.1.11"
 
 [dev-dependencies]
+tempdir = "*"
+log = "0.3"
+macros =           { path = "../util/macros" }
 trie-standardmap = { path = "../util/trie-standardmap" }
-fastvm = {path = "../vms/fastvm"}
+fastvm =           { path = "../vms/fastvm" }
+vms =              { path = "../vms" }
+logger =           { path = "../util/logger" }
+aion-types =       { path = "../util/aion-types" }
+db =               { path = "../db/core" }
+avm_abi =   { path = "../util/avm_abi" }
+
 
 [features]
-evm-debug = ["slow-blocks"]
 slow-blocks = [] # Use SLOW_TX_DURATION="50" (compile time!) to track transactions over 50ms
 json-tests = []
 test-heavy = []

@@ -20,17 +20,18 @@
  *
  ******************************************************************************/
 
-use types::{Log, H256, H2048, U256, Bytes};
-use aion_types::{Address};
 use acore::receipt::{Receipt as EthReceipt, RichReceipt, LocalizedReceipt};
 use serde::ser::{Serialize, Serializer, SerializeStruct};
 use rustc_hex::ToHex;
-use aion_types::{H256 as AH256};
+use aion_types::{H256, U256, Address};
+use ethbloom::Bloom;
+
+use types::{Log, Bytes};
 
 #[derive(Debug, Clone)]
 pub struct SimpleReceiptLog {
-    pub address: AH256,
-    pub topics: Vec<AH256>,
+    pub address: Address,
+    pub topics: Vec<H256>,
     pub data: Bytes,
 }
 
@@ -80,7 +81,7 @@ pub struct Receipt {
     /// State Root
     pub state_root: Option<H256>,
     /// Logs bloom
-    pub logs_bloom: H2048,
+    pub logs_bloom: Bloom,
     /// gas price
     pub gas_price: Option<U256>,
     /// gas limit
@@ -143,20 +144,20 @@ impl Serialize for Receipt {
 impl From<LocalizedReceipt> for Receipt {
     fn from(r: LocalizedReceipt) -> Self {
         Receipt {
-            transaction_hash: Some(r.transaction_hash.into()),
+            transaction_hash: Some(r.transaction_hash),
             transaction_index: Some(r.transaction_index.into()),
-            block_hash: Some(r.block_hash.into()),
+            block_hash: Some(r.block_hash),
             block_number: Some(r.block_number.into()),
-            cumulative_gas_used: r.cumulative_gas_used.into(),
-            gas_used: Some(r.gas_used.into()),
-            contract_address: r.contract_address.map(Into::into),
+            cumulative_gas_used: r.cumulative_gas_used,
+            gas_used: Some(r.gas_used),
+            contract_address: r.contract_address,
             logs: r.logs.into_iter().map(Into::into).collect(),
-            state_root: Some(r.state_root.into()),
-            logs_bloom: r.log_bloom.into(),
-            gas_price: Some(r.gas_price.into()),
-            gas_limit: Some(r.gas_limit.into()),
-            from: r.from.into(),
-            to: r.to.into(),
+            state_root: Some(r.state_root),
+            logs_bloom: r.log_bloom,
+            gas_price: Some(r.gas_price),
+            gas_limit: Some(r.gas_limit),
+            from: r.from,
+            to: r.to,
             output: Some(r.output.into()),
             status: match r.error_message.as_str() {
                 "" => Some(String::from("0x1")),
@@ -169,16 +170,16 @@ impl From<LocalizedReceipt> for Receipt {
 impl From<RichReceipt> for Receipt {
     fn from(r: RichReceipt) -> Self {
         Receipt {
-            transaction_hash: Some(r.transaction_hash.into()),
+            transaction_hash: Some(r.transaction_hash),
             transaction_index: Some(r.transaction_index.into()),
             block_hash: None,
             block_number: None,
-            cumulative_gas_used: r.cumulative_gas_used.into(),
-            gas_used: Some(r.gas_used.into()),
-            contract_address: r.contract_address.map(Into::into),
+            cumulative_gas_used: r.cumulative_gas_used,
+            gas_used: Some(r.gas_used),
+            contract_address: r.contract_address,
             logs: r.logs.into_iter().map(Into::into).collect(),
-            state_root: Some(r.state_root.into()),
-            logs_bloom: r.log_bloom.into(),
+            state_root: Some(r.state_root),
+            logs_bloom: r.log_bloom,
             gas_price: None,
             gas_limit: None,
             from: None,
@@ -196,12 +197,12 @@ impl From<EthReceipt> for Receipt {
             transaction_index: None,
             block_hash: None,
             block_number: None,
-            cumulative_gas_used: r.gas_used.into(),
+            cumulative_gas_used: r.gas_used,
             gas_used: None,
             contract_address: None,
             logs: r.logs().clone().into_iter().map(Into::into).collect(),
-            state_root: Some(r.state_root().clone().into()),
-            logs_bloom: r.log_bloom().clone().into(),
+            state_root: Some(r.state_root().clone()),
+            logs_bloom: r.log_bloom().clone(),
             gas_price: None,
             gas_limit: None,
             from: None,

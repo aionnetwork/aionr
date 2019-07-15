@@ -2,10 +2,9 @@
 chain = "mainnet/mainnet.json"
 
 [network]
-sync_from_boot_nodes_only = false
 max_peers = 64
 net_id = 256
-local_node = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"
+local_node = "p2p://b6d30e40-8405-4f4f-a17d-bc15f5b83a49@0.0.0.0:30303"
 boot_nodes = [
 "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:30303",
 "p2p://c33d302f-216b-47d4-ac44-5d8181b56e7e@52.231.187.227:30303",
@@ -18,10 +17,16 @@ boot_nodes = [
 ip_black_list = []
 
 [http]
+disable = false
 port = 8545
-interface = "0.0.0.0"
 
+[websockets]
+disable = true
+
+[ipc]
+disable = true
 
 [stratum]
+disable = true
 port = 8008
 interface = "0.0.0.0"

@@ -30,7 +30,7 @@ use bytes::ToPretty;
 use rlp::PayloadInfo;
 use acore::service::ClientService;
 use acore::client::{DatabaseCompactionProfile, VMType, BlockImportError, BlockChainClient, BlockId};
-use acore::error::ImportError;
+use acore::ImportError;
 use acore::miner::Miner;
 use acore::verification::queue::VerifierSettings;
 use cache::CacheConfig;
@@ -150,7 +150,7 @@ pub fn execute(cmd: BlockchainCmd) -> Result<(), String> {
 fn execute_import(cmd: ImportBlockchain) -> Result<(), String> {
     let timer = Instant::now();
     // load spec file
-    let spec = cmd.spec.spec(&cmd.dirs.cache)?;
+    let spec = cmd.spec.spec()?;
 
     // load genesis hash
     let genesis_hash = spec.genesis_header().hash();
@@ -332,7 +332,7 @@ fn start_client(
 ) -> Result<ClientService, String>
 {
     // load spec file
-    let spec = spec.spec(&dirs.cache)?;
+    let spec = spec.spec()?;
 
     // load genesis hash
     let genesis_hash = spec.genesis_header().hash();
@@ -457,7 +457,7 @@ fn execute_export(cmd: ExportBlockchain) -> Result<(), String> {
 }
 
 pub fn kill_db(cmd: KillBlockchain) -> Result<(), String> {
-    let spec = cmd.spec.spec(&cmd.dirs.cache)?;
+    let spec = cmd.spec.spec()?;
     let genesis_hash = spec.genesis_header().hash();
     let db_dirs = cmd.dirs.database(genesis_hash, None, spec.data_dir);
     let user_defaults_path = db_dirs.user_defaults_path();

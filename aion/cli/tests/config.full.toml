@@ -8,7 +8,6 @@ keys_path = "keys"
 unlock = ["0xdeadbeefcafe0000000000000000000000000000"]
 password = ["~/.safe/password.file"]
 keys_iterations = 10240
-fast_unlock = true
 refresh_time = 2
 
 [network]
@@ -58,9 +57,7 @@ zmq_key_path= "zmq"
 [mining]
 author = "0xdeadbeefcafe0000000000000000000000000001"
 force_sealing = true
-reseal_on_txs = "all"
 reseal_min_period = 4000
-reseal_max_period = 60000
 work_queue_size = 20
 relay_set = "cheap"
 min_gas_price = 10000000000

@@ -21,15 +21,13 @@
 
 use std::time::Duration;
 use cli::{Args, ArgsError};
-use blake2b::blake2b;
-use aion_types::{U256, H256, Address};
+use aion_types::{U256, Address};
 use bytes::Bytes;
-use sync::p2p::NetworkConfig;
+use p2p::NetworkConfig;
 use acore::client::{VMType};
-use acore::miner::{MinerOptions, Banning, StratumOptions};
+use acore::miner::{MinerOptions, Banning};
 use acore::verification::queue::VerifierSettings;
 
-use pb::WalletApiConfiguration;
 use rpc::{IpcConfiguration, HttpConfiguration, WsConfiguration};
 use aion_rpc::dispatch::DynamicGasPrice;
 use cache::CacheConfig;
@@ -38,7 +36,7 @@ use helpers::{
     to_address, to_queue_strategy, validate_log_level,
 };
 use dir::helpers::{replace_home, replace_home_and_local, absolute};
-use params::{ResealPolicy, AccountsConfig, MinerExtras, SpecType};
+use params::{AccountsConfig, MinerExtras, SpecType};
 use logger::{LogConfig};
 use dir::{self, Directories, default_local_path, default_data_path};
 use run::RunCmd;
@@ -87,7 +85,6 @@ impl Configuration {
         let ws_conf = self.ws_config()?;
         let http_conf = self.http_config()?;
         let ipc_conf = self.ipc_config()?;
-        let wallet_api_conf = self.wallet_api_config()?;
         let net_conf = self.net_config()?;
         let cache_config = self.cache_config();
         let fat_db = self.args.arg_fat_db.parse()?;
@@ -230,11 +227,9 @@ impl Configuration {
                 ws_conf,
                 http_conf,
                 ipc_conf,
-                wallet_api_conf,
                 net_conf,
                 acc_conf: self.accounts_config()?,
                 miner_extras: self.miner_extras()?,
-                stratum: self.stratum_options()?,
                 fat_db,
                 compaction,
                 wal,
@@ -334,33 +329,15 @@ impl Configuration {
                 .map(|s| replace_home(&self.directories().base, s))
                 .collect(),
             unlocked_accounts: to_addresses(&self.args.arg_unlock)?,
-            enable_fast_unlock: self.args.flag_fast_unlock,
+            enable_fast_signing: self.args.flag_fast_signing,
         };
 
         Ok(cfg)
     }
 
-    fn stratum_options(&self) -> Result<StratumOptions, String> {
-        Ok(StratumOptions {
-            enable: !self.args.flag_no_stratum,
-            io_path: self.directories().db,
-            listen_addr: self.stratum_interface(),
-            port: self.args.arg_stratum_port,
-            secret: self
-                .args
-                .arg_stratum_secret
-                .as_ref()
-                .map(|s| s.parse::<H256>().unwrap_or_else(|_| blake2b(s))),
-        })
-    }
-
     fn miner_options(&self) -> Result<MinerOptions, String> {
-        let reseal = self.args.arg_reseal_on_txs.parse::<ResealPolicy>()?;
-
         let options = MinerOptions {
             force_sealing: self.args.flag_force_sealing,
-            reseal_on_external_tx: reseal.external,
-            reseal_on_own_tx: reseal.own,
             tx_gas_limit: match self.args.arg_tx_gas_limit {
                 Some(ref d) => to_u256(d)?,
                 None => U256::max_value(),
@@ -373,7 +350,6 @@ impl Configuration {
             tx_queue_strategy: to_queue_strategy(&self.args.arg_tx_queue_strategy)?,
             pending_set: to_pending_set(&self.args.arg_relay_set)?,
             reseal_min_period: Duration::from_millis(self.args.arg_reseal_min_period),
-            reseal_max_period: Duration::from_millis(self.args.arg_reseal_max_period),
             prepare_block_interval: Duration::from_millis(self.args.arg_reseal_min_period),
             work_queue_size: self.args.arg_work_queue_size,
             enable_resubmission: !self.args.flag_remove_solved,
@@ -483,18 +459,6 @@ impl Configuration {
             enabled: !self.args.flag_no_ipc,
             socket_addr: self.ipc_path(),
             apis: self.args.arg_ipc_apis.join(",").parse()?,
-        };
-
-        Ok(conf)
-    }
-
-    fn wallet_api_config(&self) -> Result<WalletApiConfiguration, String> {
-        let conf = WalletApiConfiguration {
-            enabled: self.args.flag_enable_wallet,
-            interface: self.wallet_api_interface(),
-            port: self.args.arg_wallet_port,
-            secure_connect_enabled: self.args.flag_secure_connect,
-            zmq_key_path: self.directories().zmq,
         };
 
         Ok(conf)
@@ -624,19 +588,12 @@ impl Configuration {
         .into()
     }
 
-    fn wallet_api_interface(&self) -> String {
-        let wallet_api_interface = self.args.arg_wallet_interface.clone();
-        self.interface(&wallet_api_interface)
-    }
-
     fn rpc_interface(&self) -> String {
         let rpc_interface = self.args.arg_http_interface.clone();
         self.interface(&rpc_interface)
     }
 
     fn ws_interface(&self) -> String { self.interface(&self.args.arg_ws_interface) }
-
-    fn stratum_interface(&self) -> String { self.interface(&self.args.arg_stratum_interface) }
 
     fn rpc_enabled(&self) -> bool { !self.args.flag_no_http }
 
@@ -656,18 +613,13 @@ impl Configuration {
 #[cfg(test)]
 mod tests {
     use acore::client::{BlockId};
-    use acore::miner::MinerOptions;
     use acore::transaction::transaction_queue::PrioritizationStrategy;
     use account::{AccountCmd, NewAccount, ImportAccounts, ListAccounts};
     use blockchain::{BlockchainCmd, ImportBlockchain, ExportBlockchain, DataFormat};
     use cli::Args;
     use dir::Directories;
-    use helpers::{default_network_config};
-    use params::SpecType;
     use run::RunCmd;
-
-    extern crate ipnetwork;
-
+    use p2p::NetworkConfig;
     use super::*;
 
     #[derive(Debug, PartialEq)]
@@ -676,6 +628,25 @@ mod tests {
     fn parse(args: &[&str]) -> Configuration {
         Configuration {
             args: Args::parse_without_config(args).unwrap(),
+        }
+    }
+
+    pub fn default_network_config() -> NetworkConfig {
+        NetworkConfig {
+            boot_nodes: vec![
+                "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:30303".into(),
+                "p2p://c33d302f-216b-47d4-ac44-5d8181b56e7e@52.231.187.227:30303".into(),
+                "p2p://c33d4c07-6a29-4ca6-8b06-b2781ba7f9bf@191.232.164.119:30303".into(),
+                "p2p://c39d0a10-20d8-49d9-97d6-284f88da5c25@13.92.157.19:30303".into(),
+                "p2p://c38d2a32-20d8-49d9-97d6-284f88da5c83@40.78.84.78:30303".into(),
+                "p2p://c37d6b45-20d8-49d9-97d6-284f88da5c51@104.40.182.54:30303".into(),
+                "p2p://c36d4208-fe4b-41fa-989b-c7eeafdffe72@35.208.215.219:30303".into(),
+            ],
+            max_peers: 64,
+            local_node: "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303".to_string(),
+            net_id: 256,
+            sync_from_boot_nodes_only: false,
+            ip_black_list: Vec::new(),
         }
     }
 
@@ -696,7 +667,7 @@ mod tests {
                 iterations: 10240,
                 path: Directories::default().keys,
                 password_file: None,
-                spec: SpecType::default(),
+                spec: Default::default(),
             }))
         );
     }
@@ -709,7 +680,7 @@ mod tests {
             conf.into_command().unwrap().cmd,
             Cmd::Account(AccountCmd::List(ListAccounts {
                 path: Directories::default().keys,
-                spec: SpecType::default(),
+                spec: Default::default(),
             }))
         );
     }
@@ -723,7 +694,7 @@ mod tests {
             Cmd::Account(AccountCmd::Import(ImportAccounts {
                 from: vec!["my_dir".into(), "another_dir".into()],
                 to: Directories::default().keys,
-                spec: SpecType::default(),
+                spec: Default::default(),
             }))
         );
     }
@@ -820,14 +791,12 @@ mod tests {
             http_conf: Default::default(),
             ipc_conf: Default::default(),
             net_conf: default_network_config(),
-            wallet_api_conf: Default::default(),
             acc_conf: Default::default(),
             miner_extras: Default::default(),
             compaction: Default::default(),
             wal: true,
             vm_type: Default::default(),
             fat_db: Default::default(),
-            stratum: Default::default(),
             verifier_settings: Default::default(),
             no_persistent_txqueue: false,
         };
@@ -837,7 +806,7 @@ mod tests {
     #[test]
     fn should_parse_mining_options() {
         // given
-        let mut mining_options = MinerOptions::default();
+        let mut mining_options = Default::default();
 
         // when
         let conf0 = parse(&["aion"]);

@@ -19,15 +19,14 @@
  *
  ******************************************************************************/
 
-use callback::register_callbacks;
-use codec::NativeDecoder;
-use codec::NativeEncoder;
-use rjni::{Classpath, JavaVM, Options, Type, Value, Version};
-use rjni::ffi;
 use std::io::Error;
 use std::{fs, ptr, thread, env, path::Path, path::PathBuf};
 use std::sync::atomic::{AtomicPtr, Ordering};
-use types::{TransactionContext, TransactionResult};
+use callback::register_callbacks;
+use types::avm::{NativeDecoder, NativeEncoder};
+use rjni::{Classpath, JavaVM, Options, Type, Value, Version};
+use rjni::ffi;
+use types::avm::{TransactionContext, TransactionResult};
 
 /// We keep a single JVM instance in the background, which will be shared
 /// among multiple threads. Before invoking any JNI methods, the executing
@@ -48,7 +47,7 @@ pub fn launch_jvm() {
                 let mut libs;
                 if default_var.is_err() {
                     libs = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-                    warn!("AIONR_HOME is not set, use default path: {:?}", libs);
+                //warn!("AIONR_HOME is not set, use default path: {:?}", libs);
                 } else {
                     libs = PathBuf::from(default_var.unwrap());
                 }
@@ -156,8 +155,6 @@ impl AVM {
         unsafe {
             let vm = JVM_SINGLETON.load(Ordering::Relaxed);
             let env: *mut ffi::JNIEnv = ptr::null_mut();
-
-            //((**vm).AttachCurrentThread)(vm, &mut env, ptr::null_mut());
 
             AVM {
                 jvm: JavaVM {

@@ -213,7 +213,7 @@ mod tests {
     use precompiled::builtin::{BuiltinParams, BuiltinContract, BuiltinExt, BuiltinContext};
     use key::{sign_ed25519, Ed25519Secret, Ed25519KeyPair};
     use std::str::FromStr;
-    use bytes::to_hex;
+    use acore_bytes::to_hex;
     use log_entry::LogEntry;
 
     struct TestBuiltinExt {

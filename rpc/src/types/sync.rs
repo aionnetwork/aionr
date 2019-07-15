@@ -22,7 +22,7 @@
 
 use std::collections::BTreeMap;
 use serde::{Serialize, Serializer};
-use types::{U256, H512};
+use aion_types::{U256, H512};
 
 /// Sync info
 #[derive(Default, Debug, Serialize, PartialEq)]

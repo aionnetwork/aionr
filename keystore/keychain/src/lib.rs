@@ -20,14 +20,10 @@
  *
  ******************************************************************************/
 
-//! Ethereum key-management.
+#![warn(unused_extern_crates)]
 
-#![warn(missing_docs)]
-
-extern crate byteorder;
 extern crate blake2b;
 extern crate crypto;
-extern crate dir;
 extern crate itertools;
 extern crate libc;
 extern crate parking_lot;
@@ -38,7 +34,6 @@ extern crate serde_json;
 extern crate smallvec;
 extern crate subtle;
 extern crate time;
-extern crate tempdir;
 extern crate aion_types;
 extern crate key;
 extern crate rlp;
@@ -50,6 +45,7 @@ extern crate serde_derive;
 
 pub mod accounts_dir;
 pub mod ethkey;
+pub mod secret_store;
 
 mod account;
 mod json;
@@ -58,7 +54,6 @@ mod error;
 mod ethstore;
 mod import;
 mod random;
-mod secret_store;
 
 pub use self::account::{SafeAccount, Crypto};
 pub use self::error::Error;

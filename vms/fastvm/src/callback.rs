@@ -21,11 +21,14 @@
 
 use std::{mem, slice};
 use std::ops::Deref;
+use std::convert::Into;
+use std::clone::Clone;
 use libc;
 use basetypes::{EvmMessage, constants};
 use ffi::{EvmResult, EvmStatusCode};
+use types::CallType;
+use types::traits::Ext;
 use aion_types::{U128, H256, U256, Address};
-use vm_common::{CallType, Ext};
 
 #[derive(Debug)]
 #[repr(C)]

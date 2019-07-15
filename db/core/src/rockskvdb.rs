@@ -51,7 +51,6 @@ pub struct Rockskvdb {
     db: DB,
     write_options: WriteOptions,
     read_options: ReadOptions,
-    block_cache_options: BlockBasedOptions,
     overlay: HashMap<Key, KeyState>,
 }
 impl Rockskvdb {
@@ -61,7 +60,6 @@ impl Rockskvdb {
             db: DB::open_default("./temp/testdb").expect("open default rocksdb failed"),
             write_options: WriteOptions::new(),
             read_options: ReadOptions::new(),
-            block_cache_options: BlockBasedOptions::new(),
             overlay: HashMap::new(),
         }
     }
@@ -93,7 +91,6 @@ impl Rockskvdb {
                             db: t,
                             write_options: write_opts,
                             read_options: read_opts,
-                            block_cache_options: block_opts,
                             overlay: HashMap::new(),
                         })
                     }
@@ -109,7 +106,6 @@ impl Rockskvdb {
                             db: DB::open(&opts, path)?,
                             write_options: write_opts,
                             read_options: read_opts,
-                            block_cache_options: block_opts,
                             overlay: HashMap::new(),
                         })
                     }
@@ -285,51 +281,4 @@ impl KeyValueDAO for Rockskvdb {
 }
 impl Drop for Rockskvdb {
     fn drop(&mut self) { let _ = self.flush(); }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::fs;
-
-    #[test]
-    fn crud_test() {
-        {
-            let mut db = Rockskvdb::new_default();
-
-            let key1: Vec<u8> = vec![1];
-            let value1: Vec<u8> = vec![1];
-            let key2: Vec<u8> = vec![2];
-            let value2: Vec<u8> = vec![2];
-            let value3: Vec<u8> = vec![3];
-
-            db.put(&key1, &DBValue::from_vec(value1.clone()));
-            assert_eq!(db.get(&key1).unwrap(), value1);
-
-            db.put(&key2, &DBValue::from_vec(value2.clone()));
-            assert_eq!(db.get(&key2).unwrap(), value2);
-
-            db.put(&key1, &DBValue::from_vec(value3.clone()));
-            assert_eq!(db.get(&key1).unwrap(), value3);
-
-            db.delete(&key1);
-            db.delete(&key2);
-
-            assert_eq!(db.get(&key1), None);
-        }
-
-        let _ = fs::remove_dir_all("./temp/testdb");
-    }
-
-    #[test]
-    fn open_test() {
-        {
-            Rockskvdb::open(&DatabaseConfig::default(), "./temp/testdb_open").unwrap();
-        }
-        assert_eq!(
-            Rockskvdb::open(&DatabaseConfig::default(), "./temp/testdb_open").is_ok(),
-            true
-        );
-        let _ = fs::remove_dir_all("./temp/testdb_open");
-    }
 }

@@ -20,8 +20,7 @@
  ******************************************************************************/
 
 use aion_types::{Address, H256, U256};
-use vms::{ExecStatus, ReturnData};
-use vms::ExecutionResult;
+use vms::{ExecStatus, ReturnData, ExecutionResult};
 use precompiled::builtin::{BuiltinContract, BuiltinExt, BuiltinParams};
 use super::bridge_controller::BridgeController;
 use super::bridge_deserializer::{
@@ -358,7 +357,7 @@ mod test {
     use rustc_hex::FromHex;
     use state::{State, Substate};
     use super::{*};
-    use tests::helpers::get_temp_state;
+    use helpers::get_temp_state;
 
     lazy_static! {
         static ref OWNER_ADDRESS: Address =
@@ -395,9 +394,9 @@ mod test {
     fn get_contract() -> TokenBridgeContract { TokenBridgeContract::new(builtin_params()) }
 
     fn get_ext<'a>(
-        state: &'a mut State<::state_db::StateDB>,
+        state: &'a mut State<::db::StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::state_db::StateDB>
+    ) -> BuiltinExtImpl<'a, ::db::StateDB>
     {
         let ext = BuiltinExtImpl::new(
             state,
@@ -458,9 +457,9 @@ mod test {
     }
 
     fn get_ext_zero_sender<'a>(
-        state: &'a mut State<::state_db::StateDB>,
+        state: &'a mut State<::db::StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::state_db::StateDB>
+    ) -> BuiltinExtImpl<'a, ::db::StateDB>
     {
         let ext = BuiltinExtImpl::new(
             state,
@@ -476,9 +475,9 @@ mod test {
     }
 
     fn get_ext_default<'a>(
-        state: &'a mut State<::state_db::StateDB>,
+        state: &'a mut State<::db::StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::state_db::StateDB>
+    ) -> BuiltinExtImpl<'a, ::db::StateDB>
     {
         let ext = BuiltinExtImpl::new(
             state,

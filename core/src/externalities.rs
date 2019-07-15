@@ -25,14 +25,12 @@ use std::cmp;
 use std::sync::{Arc, Mutex};
 use std::sync::mpsc::Sender;
 use aion_types::{H256, U256, H128, Address};
-use bytes::Bytes;
+use vms::{ActionParams, ActionValue, EnvInfo, CallType, ExecutionResult, ExecStatus, ReturnData, ParamsType};
+use vms::traits::Ext;
+use acore_bytes::Bytes;
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use executive::*;
-use vms::{
-    ActionParams, ActionValue, Ext, EnvInfo, CallType, ExecutionResult, ExecStatus, ReturnData,
-    ParamsType,
-};
 use kvdb::KeyValueDB;
 use db::{self, Readable};
 
@@ -46,6 +44,18 @@ pub struct OriginInfo {
 }
 
 impl OriginInfo {
+    /// build a OriginInfo for test
+    #[cfg(test)]
+    pub fn get_test_origin() -> OriginInfo {
+        OriginInfo {
+            address: Address::zero(),
+            origin: Address::zero(),
+            gas_price: U256::zero(),
+            value: U256::zero(),
+            origin_tx_hash: H256::default(),
+        }
+    }
+
     /// Populates origin info from action params.
     pub fn from(params: &[&ActionParams]) -> Vec<Self> {
         params
@@ -66,7 +76,7 @@ impl OriginInfo {
 }
 
 /// Implementation of evm Externalities.
-#[allow(dead_code)]
+#[allow(unused)]
 pub struct AVMExternalities<'a, B: 'a>
 where B: StateBackend
 {
@@ -573,13 +583,12 @@ where B: StateBackend
     fn remove_storage(&mut self, _address: &Address, _data: Bytes) { unimplemented!() }
 }
 
-#[allow(unused)]
 impl<'a, B: 'a> Ext for AVMExternalities<'a, B>
 where B: StateBackend
 {
     fn storage_at(&self, _key: &H128) -> H128 { unimplemented!() }
 
-    fn set_storage(&mut self, _key: H128, value: H128) { unimplemented!() }
+    fn set_storage(&mut self, _key: H128, _value: H128) { unimplemented!() }
 
     fn storage_at_dword(&self, _key: &H128) -> H256 { unimplemented!() }
 
@@ -652,21 +661,21 @@ where B: StateBackend
     }
 
     /// Create new contract account
-    fn create(&mut self, gas: &U256, value: &U256, code: &[u8]) -> ExecutionResult {
+    fn create(&mut self, _gas: &U256, _value: &U256, _code: &[u8]) -> ExecutionResult {
         unimplemented!()
     }
 
     /// Call contract
     fn call(
         &mut self,
-        gas: &U256,
-        sender_address: &Address,
-        receive_address: &Address,
-        value: Option<U256>,
-        data: &[u8],
-        code_address: &Address,
-        call_type: CallType,
-        static_flag: bool,
+        _gas: &U256,
+        _sender_address: &Address,
+        _receive_address: &Address,
+        _value: Option<U256>,
+        _data: &[u8],
+        _code_address: &Address,
+        _call_type: CallType,
+        _static_flag: bool,
     ) -> ExecutionResult
     {
         unimplemented!()
@@ -690,9 +699,9 @@ where B: StateBackend
             .unwrap_or(0)
     }
 
-    fn log(&mut self, topics: Vec<H256>, data: &[u8]) { unimplemented!() }
+    fn log(&mut self, _topics: Vec<H256>, _data: &[u8]) { unimplemented!() }
 
-    fn suicide(&mut self, refund_address: &Address) { unimplemented!() }
+    fn suicide(&mut self, _refund_address: &Address) { unimplemented!() }
 
     fn env_info(&self) -> &EnvInfo { self.env_info }
 
@@ -700,7 +709,7 @@ where B: StateBackend
 
     fn inc_sstore_clears(&mut self) { unimplemented!() }
 
-    fn save_code(&mut self, code: Bytes) { unimplemented!() }
+    fn save_code(&mut self, _code: Bytes) { unimplemented!() }
 
     fn save_code_at(&mut self, address: &Address, code: Bytes) {
         debug!(target: "vm", "AVM save code at: {:?}", address);
@@ -853,195 +862,5 @@ where B: StateBackend
             .unwrap()
             .set_objectgraph(address, data)
             .expect("save avm object graph should not fail");
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use aion_types::{U256, Address};
-    use vms::{EnvInfo, Ext, CallType};
-    use state::{State, Substate};
-    use tests::helpers::*;
-    use super::*;
-    use kvdb::MemoryDBRepository;
-
-    fn get_test_origin() -> OriginInfo {
-        OriginInfo {
-            address: Address::zero(),
-            origin: Address::zero(),
-            gas_price: U256::zero(),
-            value: U256::zero(),
-            origin_tx_hash: H256::default(),
-        }
-    }
-
-    fn get_test_env_info() -> EnvInfo {
-        EnvInfo {
-            number: 100,
-            author: 0.into(),
-            timestamp: 0,
-            difficulty: 0.into(),
-            last_hashes: Arc::new(vec![]),
-            gas_used: 0.into(),
-            gas_limit: 0.into(),
-        }
-    }
-
-    struct TestSetup {
-        state: State<::state_db::StateDB>,
-        machine: ::machine::EthereumMachine,
-        sub_state: Substate,
-        env_info: EnvInfo,
-    }
-
-    impl Default for TestSetup {
-        fn default() -> Self { TestSetup::new() }
-    }
-
-    impl TestSetup {
-        fn new() -> Self {
-            TestSetup {
-                state: get_temp_state(),
-                machine: ::spec::Spec::new_test_machine(),
-                sub_state: Substate::new(),
-                env_info: get_test_env_info(),
-            }
-        }
-    }
-
-    #[test]
-    fn can_be_created() {
-        let mut setup = TestSetup::new();
-        let state = &mut setup.state;
-        let ext = Externalities::new(
-            state,
-            &setup.env_info,
-            &setup.machine,
-            0,
-            vec![get_test_origin()],
-            &mut setup.sub_state,
-            Arc::new(MemoryDBRepository::new()),
-        );
-
-        assert_eq!(ext.env_info().number, 100);
-    }
-
-    #[test]
-    fn can_return_block_hash() {
-        let test_hash =
-            H256::from("afafafafafafafafafafafbcbcbcbcbcbcbcbcbcbeeeeeeeeeeeeedddddddddd");
-        let test_env_number = 0x120001;
-
-        let mut setup = TestSetup::new();
-        {
-            let env_info = &mut setup.env_info;
-            env_info.number = test_env_number;
-            let mut last_hashes = (*env_info.last_hashes).clone();
-            last_hashes.push(test_hash.clone());
-            env_info.last_hashes = Arc::new(last_hashes);
-        }
-        let state = &mut setup.state;
-
-        let mut ext = Externalities::new(
-            state,
-            &setup.env_info,
-            &setup.machine,
-            0,
-            vec![get_test_origin()],
-            &mut setup.sub_state,
-            Arc::new(MemoryDBRepository::new()),
-        );
-
-        let hash = ext.blockhash(
-            &"0000000000000000000000000000000000000000000000000000000000120000"
-                .parse::<U256>()
-                .unwrap(),
-        );
-
-        assert_eq!(test_hash, hash);
-    }
-
-    #[test]
-    #[should_panic]
-    fn can_call_fail_empty() {
-        let mut setup = TestSetup::new();
-        let state = &mut setup.state;
-
-        let mut ext = Externalities::new(
-            state,
-            &setup.env_info,
-            &setup.machine,
-            0,
-            vec![get_test_origin()],
-            &mut setup.sub_state,
-            Arc::new(MemoryDBRepository::new()),
-        );
-
-        // this should panic because we have no balance on any account
-        ext.call(
-            &"0000000000000000000000000000000000000000000000000000000000120000"
-                .parse::<U256>()
-                .unwrap(),
-            &Address::new(),
-            &Address::new(),
-            Some(
-                "0000000000000000000000000000000000000000000000000000000000150000"
-                    .parse::<U256>()
-                    .unwrap(),
-            ),
-            &[],
-            &Address::new(),
-            CallType::Call,
-            false,
-        );
-    }
-
-    #[test]
-    fn can_log() {
-        let log_data = vec![120u8, 110u8];
-        let log_topics = vec![H256::from(
-            "af0fa234a6af46afa23faf23bcbc1c1cb4bcb7bcbe7e7e7ee3ee2edddddddddd",
-        )];
-
-        let mut setup = TestSetup::new();
-        let state = &mut setup.state;
-
-        {
-            let mut ext = Externalities::new(
-                state,
-                &setup.env_info,
-                &setup.machine,
-                0,
-                vec![get_test_origin()],
-                &mut setup.sub_state,
-                Arc::new(MemoryDBRepository::new()),
-            );
-            ext.log(log_topics, &log_data);
-        }
-
-        assert_eq!(setup.sub_state.logs.len(), 1);
-    }
-
-    #[test]
-    fn can_suicide() {
-        let refund_account = &Address::new();
-
-        let mut setup = TestSetup::new();
-        let state = &mut setup.state;
-
-        {
-            let mut ext = Externalities::new(
-                state,
-                &setup.env_info,
-                &setup.machine,
-                0,
-                vec![get_test_origin()],
-                &mut setup.sub_state,
-                Arc::new(MemoryDBRepository::new()),
-            );
-            ext.suicide(refund_account);
-        }
-
-        assert_eq!(setup.sub_state.suicides.len(), 1);
     }
 }

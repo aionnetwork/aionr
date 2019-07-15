@@ -22,7 +22,7 @@
 
 //! View onto block header rlp
 
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use aion_types::{H256, U256, Address, to_u256};
 use ethbloom::Bloom;
 use blake2b::blake2b;
@@ -103,12 +103,4 @@ impl<'a> HeaderView<'a> {
         }
         seal
     }
-
-    //    /// Returns a vector of seal fields (RLP-decoded).
-    //    pub fn decode_seal(&self) -> Result<Vec<Bytes>, rlp::DecoderError> {
-    //        let seal = self.seal();
-    //        seal.into_iter()
-    //            .map(|s| rlp::UntrustedRlp::new(&s).data().map(|x| x.to_vec()))
-    //            .collect()
-    //    }
 }

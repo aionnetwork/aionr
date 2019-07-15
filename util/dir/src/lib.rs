@@ -20,7 +20,7 @@
  *
  ******************************************************************************/
 
-#![warn(missing_docs)]
+#![warn(unused_extern_crates)]
 
 //! Dir utilities for platform-specific operations
 extern crate aion_types;

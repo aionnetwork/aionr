@@ -22,19 +22,18 @@
 
 //! Ethereum-like state machine definition.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::cmp;
 use std::sync::Arc;
 
 use block::{ExecutedBlock, IsBlock};
 use precompiled::builtin::BuiltinContract;
-use error::Error;
+use types::error::Error;
 use executive::{Executive};
 use header::{BlockNumber, Header};
 use spec::CommonParams;
 use state::{CleanupMode, Substate};
 use transaction::{SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
-
 use aion_types::{U256, H256, Address};
 use vms::{ActionParams, ActionValue, CallType, ParamsType};
 
@@ -119,7 +118,6 @@ impl EthereumMachine {
     /// Logic to perform on a new block: updating last hashes.
     pub fn on_new_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
         self.push_last_hash(block)?;
-
         Ok(())
     }
 
@@ -156,6 +154,11 @@ impl EthereumMachine {
 
     /// Get the general parameters of the chain.
     pub fn params(&self) -> &CommonParams { &self.params }
+
+    /// set monetary policy
+    pub fn set_monetary(&mut self, block_number: u64) {
+        self.params.monetary_policy_update = Some(block_number);
+    }
 
     /// Builtin-contracts for the chain..
     pub fn builtins(&self) -> &BTreeMap<Address, Box<BuiltinContract>> { &*self.builtins }
@@ -200,13 +203,6 @@ impl EthereumMachine {
         t.verify_basic(None)?;
 
         Ok(())
-    }
-
-    /// Additional params.
-    pub fn additional_params(&self) -> HashMap<String, String> {
-        hash_map![
-            "registrar".to_owned() => format!("{:x}", self.params.registrar)
-        ]
     }
 }
 

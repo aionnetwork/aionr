@@ -20,10 +20,6 @@
  *
  ******************************************************************************/
 
-//! Utils common types and macros global reexport.
-
-use std::io;
-
 #[macro_export]
 macro_rules! vec_into {
     ( $( $x:expr ),* ) => {
@@ -84,27 +80,4 @@ macro_rules! map_into {
         )*
         x
     }}
-}
-
-#[macro_export]
-macro_rules! flush {
-    ($arg:expr) => ($crate::flush($arg.into()));
-    ($($arg:tt)*) => ($crate::flush(format!("{}", format_args!($($arg)*))));
-}
-
-#[macro_export]
-macro_rules! flushln {
-    ($fmt:expr) => (flush!(concat!($fmt, "\n")));
-    ($fmt:expr, $($arg:tt)*) => (flush!(concat!($fmt, "\n"), $($arg)*));
-}
-
-#[doc(hidden)]
-pub fn flush(s: String) {
-    let _ = io::Write::write(&mut io::stdout(), s.as_bytes());
-    let _ = io::Write::flush(&mut io::stdout());
-}
-
-#[test]
-fn test_flush() {
-    flushln!("hello_world {:?}", 1);
 }

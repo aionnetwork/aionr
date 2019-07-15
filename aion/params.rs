@@ -22,7 +22,7 @@
 use std::{str, fs, fmt};
 use aion_types::{U256, Address};
 use journaldb::Algorithm;
-use acore::spec::{Spec, SpecParams};
+use acore::spec::{Spec};
 use user_defaults::UserDefaults;
 
 #[derive(Debug, PartialEq)]
@@ -57,8 +57,7 @@ impl fmt::Display for SpecType {
 }
 
 impl SpecType {
-    pub fn spec<'a, T: Into<SpecParams<'a>>>(&self, params: T) -> Result<Spec, String> {
-        let params = params.into();
+    pub fn spec<'a>(&self) -> Result<Spec, String> {
         let file;
         match *self {
             SpecType::Default => {
@@ -73,7 +72,7 @@ impl SpecType {
                 })?;
             }
         }
-        Spec::load(params, file)
+        Spec::load(file)
     }
 }
 
@@ -108,48 +107,12 @@ impl Pruning {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct ResealPolicy {
-    pub own: bool,
-    pub external: bool,
-}
-
-impl Default for ResealPolicy {
-    fn default() -> Self {
-        ResealPolicy {
-            own: true,
-            external: true,
-        }
-    }
-}
-
-impl str::FromStr for ResealPolicy {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let (own, external) = match s {
-            "none" => (false, false),
-            "own" => (true, false),
-            "ext" => (false, true),
-            "all" => (true, true),
-            x => return Err(format!("Invalid reseal value: {}", x)),
-        };
-
-        let reseal = ResealPolicy {
-            own: own,
-            external: external,
-        };
-
-        Ok(reseal)
-    }
-}
-
-#[derive(Debug, PartialEq)]
 pub struct AccountsConfig {
     pub iterations: u32,
     pub refresh_time: u64,
     pub password_files: Vec<String>,
     pub unlocked_accounts: Vec<Address>,
-    pub enable_fast_unlock: bool,
+    pub enable_fast_signing: bool,
 }
 
 impl Default for AccountsConfig {
@@ -159,7 +122,7 @@ impl Default for AccountsConfig {
             refresh_time: 5,
             password_files: Vec::new(),
             unlocked_accounts: Vec::new(),
-            enable_fast_unlock: false,
+            enable_fast_signing: false,
         }
     }
 }
@@ -229,22 +192,21 @@ pub fn fatdb_switch_to_bool(
 #[cfg(test)]
 mod tests {
     use journaldb::Algorithm;
-    use super::{SpecType, Pruning, ResealPolicy, Switch};
+    use super::{SpecType, Pruning, Switch};
 
     #[test]
     fn test_spec_type_parsing() {
-        assert_eq!(SpecType::Foundation, "mainnet".parse().unwrap());
-        assert_eq!(SpecType::Foundation, "foundation".parse().unwrap());
+        assert_eq!(SpecType::Default, "mainnet".parse().unwrap());
     }
 
     #[test]
     fn test_spec_type_default() {
-        assert_eq!(SpecType::Foundation, SpecType::default());
+        assert_eq!(SpecType::Default, SpecType::default());
     }
 
     #[test]
     fn test_spec_type_display() {
-        assert_eq!(format!("{}", SpecType::Foundation), "mainnet");
+        assert_eq!(format!("{}", SpecType::Default), "mainnet");
         assert_eq!(format!("{}", SpecType::Custom("foo/bar".into())), "foo/bar");
     }
 
@@ -264,39 +226,6 @@ mod tests {
     #[test]
     fn test_pruning_default() {
         assert_eq!(Pruning::Specific(Algorithm::Archive), Pruning::default());
-    }
-
-    #[test]
-    fn test_reseal_policy_parsing() {
-        let none = ResealPolicy {
-            own: false,
-            external: false,
-        };
-        let own = ResealPolicy {
-            own: true,
-            external: false,
-        };
-        let ext = ResealPolicy {
-            own: false,
-            external: true,
-        };
-        let all = ResealPolicy {
-            own: true,
-            external: true,
-        };
-        assert_eq!(none, "none".parse().unwrap());
-        assert_eq!(own, "own".parse().unwrap());
-        assert_eq!(ext, "ext".parse().unwrap());
-        assert_eq!(all, "all".parse().unwrap());
-    }
-
-    #[test]
-    fn test_reseal_policy_default() {
-        let all = ResealPolicy {
-            own: true,
-            external: true,
-        };
-        assert_eq!(all, ResealPolicy::default());
     }
 
     #[test]

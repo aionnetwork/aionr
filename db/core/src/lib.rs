@@ -19,12 +19,9 @@
  *
  ******************************************************************************/
 
-#![allow(dead_code)]
-#![allow(non_snake_case)]
 #[macro_use]
 extern crate log;
 extern crate elastic_array;
-extern crate acore_bytes;
 extern crate aion_types;
 extern crate multimap;
 extern crate num_cpus;
@@ -36,22 +33,26 @@ extern crate parking_lot;
 extern crate interleaved_ordered;
 extern crate heapsize;
 extern crate plain_hasher;
-extern crate rand;
+
+mod mockkvdb;
+mod traits;
 mod dbrepository;
 mod dbtransaction;
-mod mockkvdb;
 mod rockskvdb;
 mod memorydb;
-mod traits;
 mod error;
 mod dbconfigs;
+#[cfg(test)]
+mod tests;
 
 use elastic_array::{ElasticArray32, ElasticArray128};
-pub use dbrepository::{DbRepository, MockDbRepository, MemoryDBRepository};
+pub use dbrepository::{DbRepository, MockDbRepository};
 pub use dbtransaction::{DBOp, DBTransaction};
 pub use mockkvdb::Mockkvdb;
 pub use rockskvdb::Rockskvdb;
-pub use traits::{HashStore, AsHashStore, KeyValueDB};
+pub use traits::{ HashStore, AsHashStore, KeyValueDB };
+#[cfg(test)]
+use traits::KeyValueDAO;
 pub use memorydb::MemoryDB;
 pub use error::Error;
 pub use dbconfigs::{DatabaseConfig, CompactionProfile, RepositoryConfig};

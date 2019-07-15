@@ -20,14 +20,10 @@
  *
  ******************************************************************************/
 
-//! General error types for use in ethcore.
-
-#![allow(missing_docs)]
-#![allow(unknown_lints)]
+#![warn(unused_extern_crates)]
 
 #[macro_use]
 extern crate error_chain;
-
 extern crate aion_types;
 extern crate rlp;
 extern crate rustc_hex;

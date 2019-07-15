@@ -84,7 +84,7 @@ pub fn execute(cmd: AccountCmd) -> Result<String, String> {
 }
 
 fn keys_dir(path: String, spec: SpecType) -> Result<RootDiskDirectory, String> {
-    let spec = spec.spec(&::std::env::temp_dir())?;
+    let spec = spec.spec()?;
     let mut path = PathBuf::from(&path);
     path.push(spec.data_dir);
     RootDiskDirectory::create(path).map_err(|e| format!("Could not open keys directory: {}", e))
@@ -164,7 +164,7 @@ fn import_by_private_key(i: ImportAccount) -> Result<String, String> {
     let password = password_prompt()?;
     let address = key_pair.address();
     if acc_provider
-        .has_account(address)
+        .has_account(&address)
         .map_err(|_| "other error!!".to_owned())?
     {
         return Err("Failed to import the private key. Already exists?".to_owned());

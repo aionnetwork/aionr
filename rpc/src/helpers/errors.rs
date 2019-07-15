@@ -26,7 +26,7 @@
 use std::fmt;
 
 use acore::account_provider::{SignError as AccountError};
-use acore::error::{Error as EthcoreError, CallError};
+use acore::{Error as EthcoreError, CallError};
 use jsonrpc_core::{futures, Error, ErrorCode, Value};
 use rlp::DecoderError;
 use acore::transaction::Error as TransactionError;
@@ -362,8 +362,8 @@ pub fn transaction_message(error: TransactionError) -> String {
             got,
         } => {
             format!(
-                "Transaction cost exceeds current block gas limit. Limit: {}, got: {}. Try to \
-                 decrease supplied gas.",
+                "Transaction gas limit exceeded the gas limit set in configuration. Limit: {}, \
+                 got: {}. Try to decrease supplied gas or increase gas limit configuration.",
                 limit, got
             )
         }

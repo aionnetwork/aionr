@@ -20,14 +20,16 @@
  *
  ******************************************************************************/
 
-use types::{U256, H256, Transaction, Block, AcitvePeerInfo, PbSyncInfo, Receipt, Bytes, SimpleReceipt};
+use aion_types::{H256, U256, Address};
+
+use types::{Transaction, Block, AcitvePeerInfo, PbSyncInfo, Receipt, Bytes, SimpleReceipt};
 
 pub trait Pb: Sync + Send {
-    fn balance(&self, address: H256) -> U256;
+    fn balance(&self, address: Address) -> U256;
 
     fn transaction_by_hash(&self, txhash: H256) -> Option<Transaction>;
 
-    fn nonce(&self, address: H256) -> U256;
+    fn nonce(&self, address: Address) -> U256;
 
     fn blocknumber(&self) -> U256;
 

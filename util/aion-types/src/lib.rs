@@ -20,6 +20,7 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 #![cfg_attr(not(feature = "std"), no_std)]
 #![cfg_attr(asm_available, feature(asm))]
 
@@ -40,7 +41,7 @@ extern crate serde;
 mod hash;
 mod uint;
 
-pub use uint::{U128, U256, U512};
+pub use uint::{U64, U128, U256, U512};
 pub use hash::{H32, H64, H128, H160, H256, H264, H512, H520, H768, H1024};
 pub use fixed_hash::clean_0x;
 
