@@ -11,7 +11,7 @@
  *
  *     The aion network project is distributed in the hope that it will
  *     be useful, but WITHOUT ANY WARRANTY; without even the implied
- *     warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *     warranty of <EthereumMachine as Machine>ERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
  *     See the GNU General Public License for more details.
  *
  *     You should have received a copy of the GNU General Public License
@@ -21,8 +21,9 @@
  ******************************************************************************/
 
 use aion_types::U256;
-use aion_machine::{Header, LiveBlock, WithBalances};
+use aion_machine::{LiveBlock, WithBalances, Machine};
 use engine::Engine;
+use machine::{EthereumMachine};
 
 /// Params for a null engine.
 #[derive(Clone, Default)]
@@ -40,14 +41,14 @@ impl From<::ajson::spec::NullEngineParams> for NullEngineParams {
 }
 
 /// An engine which does not provide any consensus mechanism and does not seal blocks.
-pub struct NullEngine<M> {
+pub struct NullEngine {
     params: NullEngineParams,
-    machine: M,
+    machine: EthereumMachine,
 }
 
-impl<M> NullEngine<M> {
-    /// Returns new instance of NullEngine with default VM Factory
-    pub fn new(params: NullEngineParams, machine: M) -> Self {
+impl NullEngine {
+    /// Returns new instance of NullEngine with default V<EthereumMachine as Machine> Factory
+    pub fn new(params: NullEngineParams, machine: EthereumMachine) -> Self {
         NullEngine {
             params: params,
             machine: machine,
@@ -55,16 +56,20 @@ impl<M> NullEngine<M> {
     }
 }
 
-impl<M: Default> Default for NullEngine<M> {
+impl Default for NullEngine {
     fn default() -> Self { Self::new(Default::default(), Default::default()) }
 }
 
-impl<M: WithBalances> Engine<M> for NullEngine<M> {
+impl Engine for NullEngine {
     fn name(&self) -> &str { "NullEngine" }
 
-    fn machine(&self) -> &M { &self.machine }
+    fn machine(&self) -> &EthereumMachine { &self.machine }
 
-    fn on_close_block(&self, block: &mut M::LiveBlock) -> Result<(), M::Error> {
+    fn on_close_block(
+        &self,
+        block: &mut <EthereumMachine as Machine>::LiveBlock,
+    ) -> Result<(), <EthereumMachine as Machine>::Error>
+    {
         let author = *LiveBlock::header(&*block).author();
 
         let reward = self.params.block_reward;
@@ -82,5 +87,11 @@ impl<M: WithBalances> Engine<M> for NullEngine<M> {
             .note_rewards(block, &[(author, result_block_reward)])
     }
 
-    fn verify_local_seal(&self, _header: &M::Header) -> Result<(), M::Error> { Ok(()) }
+    fn verify_local_seal(
+        &self,
+        _header: &<EthereumMachine as Machine>::Header,
+    ) -> Result<(), <EthereumMachine as Machine>::Error>
+    {
+        Ok(())
+    }
 }
