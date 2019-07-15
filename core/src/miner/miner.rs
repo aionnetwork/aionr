@@ -1122,7 +1122,6 @@ impl MinerService for Miner {
 mod tests {
     use aion_types::U256;
     use block::IsBlock;
-    use client::BlockChainClient;
     use io::IoChannel;
     use keychain;
     use miner::{Miner, MinerService};
@@ -1131,12 +1130,11 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use super::{Banning, MinerOptions, PendingSet};
-    use tests::common::{EachBlockWith, helpers::generate_dummy_client, TestBlockChainClient};
+    use tests::common::{EachBlockWith, TestBlockChainClient};
     use transaction::{PendingTransaction, SignedTransaction};
     use transaction::Action;
     use transaction::Transaction;
     use transaction::transaction_queue::PrioritizationStrategy;
-    use types::BlockNumber;
 
     #[test]
     fn should_prepare_block_to_seal() {

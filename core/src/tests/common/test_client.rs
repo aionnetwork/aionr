@@ -22,49 +22,49 @@
 
 //! Test client.
 
-use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrder};
-use std::sync::Arc;
-use std::collections::{HashMap};
-use std::mem;
-use std::time::Duration;
-use itertools::Itertools;
-use rustc_hex::FromHex;
-use blake2b::blake2b;
-use aion_types::{H256, H128, U256, Address};
-use parking_lot::RwLock;
-use journaldb;
-use kvdb::{RepositoryConfig, DatabaseConfig, DbRepository};
 use acore_bytes::Bytes;
-use rlp::*;
-use key::{generate_keypair, public_to_address_ed25519};
-use tempdir::TempDir;
-use transaction::{Transaction, LocalizedTransaction, PendingTransaction, SignedTransaction, Action, DEFAULT_TRANSACTION_TYPE};
-use blockchain::{TreeRoute, BlockReceipts};
+use aion_types::{Address, H128, H256, U256};
+use blake2b::blake2b;
+use block::{ClosedBlock, OpenBlock, SealedBlock};
+use blockchain::{BlockReceipts, TreeRoute};
 use client::{
-    BlockChainClient, MiningBlockChainClient, BlockChainInfo, BlockStatus, BlockId,
-    TransactionId, LastHashes, CallAnalytics, BlockImportError,
-    ProvingBlockChainClient,
+    BlockChainClient, BlockChainInfo, BlockId, BlockImportError, BlockStatus,
+    CallAnalytics, LastHashes, MiningBlockChainClient, ProvingBlockChainClient,
+    TransactionId,
 };
 use db::{COL_STATE, DB_NAMES};
-use header::{Header as BlockHeader, BlockNumber};
-use filter::Filter;
-use log_entry::LocalizedLogEntry;
-use receipt::{Receipt, LocalizedReceipt};
-use types::error::{ImportResult, CallError};
-use factory::VmFactory;
-use miner::{Miner, MinerService};
-use spec::Spec;
-use state::BasicAccount;
-use types::pruning_info::PruningInfo;
-
-use verification::queue::QueueInfo;
-use block::{OpenBlock, SealedBlock, ClosedBlock};
-use executive::Executed;
 use db::StateDB;
 use encoded;
+use executive::Executed;
+use factory::VmFactory;
+use filter::Filter;
+use header::{BlockNumber, Header as BlockHeader};
+use itertools::Itertools;
+use journaldb;
+//use key::{generate_keypair, public_to_address_ed25519};
+use kvdb::{DatabaseConfig, DbRepository, RepositoryConfig};
 use kvdb::{KeyValueDB, MockDbRepository};
-
+use log_entry::LocalizedLogEntry;
+use miner::{Miner, MinerService};
+use parking_lot::RwLock;
+use receipt::{LocalizedReceipt, Receipt};
+use rlp::*;
+//use rustc_hex::FromHex;
+use spec::Spec;
+use state::BasicAccount;
+use std::collections::HashMap;
+use std::mem;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrder};
+use std::time::Duration;
+use tempdir::TempDir;
+use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction,
+/*Transaction, Action, DEFAULT_TRANSACTION_TYPE*/
+};
 use transaction::UnverifiedTransaction;
+use types::error::{CallError, ImportResult};
+use types::pruning_info::PruningInfo;
+use verification::queue::QueueInfo;
 
 /// Test client.
 pub struct TestBlockChainClient {
@@ -119,8 +119,8 @@ pub struct TestBlockChainClient {
 pub enum EachBlockWith {
     /// Plain block.
     Nothing,
-    /// Block with a transaction.
-    Transaction,
+    //    /// Block with a transaction.
+    //    Transaction,
 }
 
 impl Default for TestBlockChainClient {
@@ -136,11 +136,11 @@ impl TestBlockChainClient {
         let spec = Spec::new_test();
         TestBlockChainClient::new_with_spec_and_extra(spec, extra_data)
     }
-
-    /// Create test client with custom spec.
-    pub fn new_with_spec(spec: Spec) -> Self {
-        TestBlockChainClient::new_with_spec_and_extra(spec, Bytes::new())
-    }
+    //
+    //    /// Create test client with custom spec.
+    //    pub fn new_with_spec(spec: Spec) -> Self {
+    //        TestBlockChainClient::new_with_spec_and_extra(spec, Bytes::new())
+    //    }
 
     /// Create test client with custom spec and extra data.
     pub fn new_with_spec_and_extra(spec: Spec, extra_data: Bytes) -> Self {
@@ -179,45 +179,45 @@ impl TestBlockChainClient {
         client.genesis_hash = genesis_hash;
         client
     }
-
-    /// Set the transaction receipt result
-    pub fn set_transaction_receipt(&self, id: TransactionId, receipt: LocalizedReceipt) {
-        self.receipts.write().insert(id, receipt);
-    }
-
-    /// Set the execution result.
-    pub fn set_execution_result(&self, result: Result<Executed, CallError>) {
-        *self.execution_result.write() = Some(result);
-    }
-
-    /// Set the balance of account `address` to `balance`.
-    pub fn set_balance(&self, address: Address, balance: U256) {
-        self.balances.write().insert(address, balance);
-    }
-
-    /// Set nonce of account `address` to `nonce`.
-    pub fn set_nonce(&self, address: Address, nonce: U256) {
-        self.nonces.write().insert(address, nonce);
-    }
-
-    /// Set `code` at `address`.
-    pub fn set_code(&self, address: Address, code: Bytes) {
-        self.code.write().insert(address, code);
-    }
-
-    /// Set storage `position` to `value` for account `address`.
-    pub fn set_storage(&self, address: Address, position: H128, value: H128) {
-        self.storage.write().insert((address, position), value);
-    }
-
-    /// Set block queue size for testing
-    pub fn set_queue_size(&self, size: usize) { self.queue_size.store(size, AtomicOrder::Relaxed); }
-
-    /// Set timestamp assigned to latest sealed block
-    pub fn set_latest_block_timestamp(&self, ts: u64) { *self.latest_block_timestamp.write() = ts; }
-
-    /// Set logs to return for each logs call.
-    pub fn set_logs(&self, logs: Vec<LocalizedLogEntry>) { *self.logs.write() = logs; }
+    //
+    //    /// Set the transaction receipt result
+    //    pub fn set_transaction_receipt(&self, id: TransactionId, receipt: LocalizedReceipt) {
+    //        self.receipts.write().insert(id, receipt);
+    //    }
+    //
+    //    /// Set the execution result.
+    //    pub fn set_execution_result(&self, result: Result<Executed, CallError>) {
+    //        *self.execution_result.write() = Some(result);
+    //    }
+    //
+    //    /// Set the balance of account `address` to `balance`.
+    //    pub fn set_balance(&self, address: Address, balance: U256) {
+    //        self.balances.write().insert(address, balance);
+    //    }
+    //
+    //    /// Set nonce of account `address` to `nonce`.
+    //    pub fn set_nonce(&self, address: Address, nonce: U256) {
+    //        self.nonces.write().insert(address, nonce);
+    //    }
+    //
+    //    /// Set `code` at `address`.
+    //    pub fn set_code(&self, address: Address, code: Bytes) {
+    //        self.code.write().insert(address, code);
+    //    }
+    //
+    //    /// Set storage `position` to `value` for account `address`.
+    //    pub fn set_storage(&self, address: Address, position: H128, value: H128) {
+    //        self.storage.write().insert((address, position), value);
+    //    }
+    //
+    //    /// Set block queue size for testing
+    //    pub fn set_queue_size(&self, size: usize) { self.queue_size.store(size, AtomicOrder::Relaxed); }
+    //
+    //    /// Set timestamp assigned to latest sealed block
+    //    pub fn set_latest_block_timestamp(&self, ts: u64) { *self.latest_block_timestamp.write() = ts; }
+    //
+    //    /// Set logs to return for each logs call.
+    //    pub fn set_logs(&self, logs: Vec<LocalizedLogEntry>) { *self.logs.write() = logs; }
 
     /// Add blocks to test client.
     pub fn add_blocks(&self, count: usize, with: EachBlockWith) {
@@ -230,30 +230,30 @@ impl TestBlockChainClient {
             header.set_gas_limit(U256::from(1_000_000));
             header.set_extra_data(self.extra_data.clone());
             let txs = match with {
-                EachBlockWith::Transaction => {
-                    let mut txs = RlpStream::new_list(1);
-                    let keypair = generate_keypair();
-                    // Update nonces value
-                    self.nonces
-                        .write()
-                        .insert(public_to_address_ed25519(&keypair.public()), U256::one());
-                    let tx = Transaction {
-                        action: Action::Create,
-                        value: U256::from(100),
-                        value_bytes: Vec::new(),
-                        data: "3331600055".from_hex().unwrap(),
-                        gas: U256::from(100_000),
-                        gas_bytes: Vec::new(),
-                        gas_price: U256::from(200_000_000_000u64),
-                        gas_price_bytes: Vec::new(),
-                        nonce: U256::zero(),
-                        nonce_bytes: Vec::new(),
-                        transaction_type: DEFAULT_TRANSACTION_TYPE,
-                    };
-                    let signed_tx = tx.sign(&keypair.secret().0, None);
-                    txs.append(&signed_tx);
-                    txs.out()
-                }
+                //                EachBlockWith::Transaction => {
+                //                    let mut txs = RlpStream::new_list(1);
+                //                    let keypair = generate_keypair();
+                //                    // Update nonces value
+                //                    self.nonces
+                //                        .write()
+                //                        .insert(public_to_address_ed25519(&keypair.public()), U256::one());
+                //                    let tx = Transaction {
+                //                        action: Action::Create,
+                //                        value: U256::from(100),
+                //                        value_bytes: Vec::new(),
+                //                        data: "3331600055".from_hex().unwrap(),
+                //                        gas: U256::from(100_000),
+                //                        gas_bytes: Vec::new(),
+                //                        gas_price: U256::from(200_000_000_000u64),
+                //                        gas_price_bytes: Vec::new(),
+                //                        nonce: U256::zero(),
+                //                        nonce_bytes: Vec::new(),
+                //                        transaction_type: DEFAULT_TRANSACTION_TYPE,
+                //                    };
+                //                    let signed_tx = tx.sign(&keypair.secret().0, None);
+                //                    txs.append(&signed_tx);
+                //                    txs.out()
+                //                }
                 _ => ::rlp::EMPTY_LIST_RLP.to_vec(),
             };
 
@@ -263,37 +263,37 @@ impl TestBlockChainClient {
             self.import_block(rlp.as_raw().to_vec()).unwrap();
         }
     }
-
-    /// Make a bad block by setting invalid extra data.
-    pub fn corrupt_block(&self, n: BlockNumber) {
-        let hash = self.block_hash(BlockId::Number(n)).unwrap();
-        let mut header: BlockHeader = self.block_header(BlockId::Number(n)).unwrap().decode();
-        header.set_extra_data(b"This extra data is way too long to be considered valid".to_vec());
-        let mut rlp = RlpStream::new_list(3);
-        rlp.append(&header);
-        rlp.append_raw(&::rlp::NULL_RLP, 1);
-        rlp.append_raw(&::rlp::NULL_RLP, 1);
-        self.blocks.write().insert(hash, rlp.out());
-    }
-
-    /// Make a bad block by setting invalid parent hash.
-    pub fn corrupt_block_parent(&self, n: BlockNumber) {
-        let hash = self.block_hash(BlockId::Number(n)).unwrap();
-        let mut header: BlockHeader = self.block_header(BlockId::Number(n)).unwrap().decode();
-        header.set_parent_hash(H256::from(42));
-        let mut rlp = RlpStream::new_list(3);
-        rlp.append(&header);
-        rlp.append_raw(&::rlp::NULL_RLP, 1);
-        rlp.append_raw(&::rlp::NULL_RLP, 1);
-        self.blocks.write().insert(hash, rlp.out());
-    }
-
-    /// TODO:
-    pub fn block_hash_delta_minus(&mut self, delta: usize) -> H256 {
-        let blocks_read = self.numbers.read();
-        let index = blocks_read.len() - delta;
-        blocks_read[&index].clone()
-    }
+    //
+    //    /// Make a bad block by setting invalid extra data.
+    //    pub fn corrupt_block(&self, n: BlockNumber) {
+    //        let hash = self.block_hash(BlockId::Number(n)).unwrap();
+    //        let mut header: BlockHeader = self.block_header(BlockId::Number(n)).unwrap().decode();
+    //        header.set_extra_data(b"This extra data is way too long to be considered valid".to_vec());
+    //        let mut rlp = RlpStream::new_list(3);
+    //        rlp.append(&header);
+    //        rlp.append_raw(&::rlp::NULL_RLP, 1);
+    //        rlp.append_raw(&::rlp::NULL_RLP, 1);
+    //        self.blocks.write().insert(hash, rlp.out());
+    //    }
+    //
+    //    /// Make a bad block by setting invalid parent hash.
+    //    pub fn corrupt_block_parent(&self, n: BlockNumber) {
+    //        let hash = self.block_hash(BlockId::Number(n)).unwrap();
+    //        let mut header: BlockHeader = self.block_header(BlockId::Number(n)).unwrap().decode();
+    //        header.set_parent_hash(H256::from(42));
+    //        let mut rlp = RlpStream::new_list(3);
+    //        rlp.append(&header);
+    //        rlp.append_raw(&::rlp::NULL_RLP, 1);
+    //        rlp.append_raw(&::rlp::NULL_RLP, 1);
+    //        self.blocks.write().insert(hash, rlp.out());
+    //    }
+    //
+    //    /// TODO:
+    //    pub fn block_hash_delta_minus(&mut self, delta: usize) -> H256 {
+    //        let blocks_read = self.numbers.read();
+    //        let index = blocks_read.len() - delta;
+    //        blocks_read[&index].clone()
+    //    }
 
     fn block_hash(&self, id: BlockId) -> Option<H256> {
         match id {
@@ -308,43 +308,43 @@ impl TestBlockChainClient {
             }
         }
     }
-
-    /// Inserts a transaction with given gas price to miners transactions queue.
-    pub fn insert_transaction_with_gas_price_to_queue(&self, gas_price: U256) -> H256 {
-        let keypair = generate_keypair();
-        let tx = Transaction {
-            action: Action::Create,
-            value: U256::from(100),
-            value_bytes: Vec::new(),
-            data: "3331600055".from_hex().unwrap(),
-            gas: U256::from(100_000),
-            gas_bytes: Vec::new(),
-            gas_price: gas_price,
-            gas_price_bytes: Vec::new(),
-            nonce: U256::zero(),
-            nonce_bytes: Vec::new(),
-            transaction_type: DEFAULT_TRANSACTION_TYPE,
-        };
-        let signed_tx = tx.sign(&keypair.secret().0, None);
-        self.set_balance(
-            signed_tx.sender().clone(),
-            10_000_000_000_000_000_000u64.into(),
-        );
-        let hash = signed_tx.hash().clone();
-        let res = self
-            .miner
-            .import_external_transactions(self, vec![signed_tx.into()]);
-        res.into_iter().next().unwrap().expect("Successful import");
-        hash
-    }
-
-    /// Inserts a transaction to miners transactions queue.
-    pub fn insert_transaction_to_queue(&self) -> H256 {
-        self.insert_transaction_with_gas_price_to_queue(U256::from(20_000_000_000u64))
-    }
-
-    /// Set reported history size.
-    pub fn set_history(&self, h: Option<u64>) { *self.history.write() = h; }
+    //
+    //    /// Inserts a transaction with given gas price to miners transactions queue.
+    //    pub fn insert_transaction_with_gas_price_to_queue(&self, gas_price: U256) -> H256 {
+    //        let keypair = generate_keypair();
+    //        let tx = Transaction {
+    //            action: Action::Create,
+    //            value: U256::from(100),
+    //            value_bytes: Vec::new(),
+    //            data: "3331600055".from_hex().unwrap(),
+    //            gas: U256::from(100_000),
+    //            gas_bytes: Vec::new(),
+    //            gas_price: gas_price,
+    //            gas_price_bytes: Vec::new(),
+    //            nonce: U256::zero(),
+    //            nonce_bytes: Vec::new(),
+    //            transaction_type: DEFAULT_TRANSACTION_TYPE,
+    //        };
+    //        let signed_tx = tx.sign(&keypair.secret().0, None);
+    //        self.set_balance(
+    //            signed_tx.sender().clone(),
+    //            10_000_000_000_000_000_000u64.into(),
+    //        );
+    //        let hash = signed_tx.hash().clone();
+    //        let res = self
+    //            .miner
+    //            .import_external_transactions(self, vec![signed_tx.into()]);
+    //        res.into_iter().next().unwrap().expect("Successful import");
+    //        hash
+    //    }
+    //
+    //    /// Inserts a transaction to miners transactions queue.
+    //    pub fn insert_transaction_to_queue(&self) -> H256 {
+    //        self.insert_transaction_with_gas_price_to_queue(U256::from(20_000_000_000u64))
+    //    }
+    //
+    //    /// Set reported history size.
+    //    pub fn set_history(&self, h: Option<u64>) { *self.history.write() = h; }
 }
 
 pub fn get_temp_state_db() -> (StateDB, TempDir) {
