@@ -32,7 +32,7 @@ use aion_types::{H256, U256, Address};
 use acore_bytes::Bytes;
 use block::ClosedBlock;
 use client::{MiningBlockChainClient};
-use error::{Error};
+use types::error::{Error};
 use header::BlockNumber;
 use receipt::Receipt;
 use transaction::{UnverifiedTransaction, PendingTransaction};

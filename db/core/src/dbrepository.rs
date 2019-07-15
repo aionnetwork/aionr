@@ -29,7 +29,6 @@ use traits::{KeyValueDAO, KeyValueDB};
 use dbconfigs::RepositoryConfig;
 use dbtransaction::{DBTransaction, DBOp};
 use error::Error;
-use MemoryDB;
 
 type DB = rockskvdb::Rockskvdb;
 type DbName = String;
@@ -54,24 +53,24 @@ pub struct MockDbRepository {
     configs: Vec<String>,
 }
 
-pub struct MemoryDBRepository {
-    dbs: HashMap<DbName, RwLock<MemoryDB>>,
-}
+//pub struct MemoryDBRepository {
+//    dbs: HashMap<DbName, RwLock<MemoryDB>>,
+//}
 
-impl MemoryDBRepository {
-    pub fn new() -> Self {
-        MemoryDBRepository {
-            dbs: HashMap::new(),
-        }
-    }
-    fn flush(&self) -> Result<()> { Ok(()) }
-
-    #[cfg(test)]
-    fn close_all(&mut self) {}
-
-    #[cfg(test)]
-    fn open_all(&mut self) {}
-}
+//impl MemoryDBRepository {
+//    pub fn new() -> Self {
+//        MemoryDBRepository {
+//            dbs: HashMap::new(),
+//        }
+//    }
+//    fn flush(&self) -> Result<()> { Ok(()) }
+//
+//    #[cfg(test)]
+//    fn close_all(&mut self) {}
+//
+//    #[cfg(test)]
+//    fn open_all(&mut self) {}
+//}
 
 impl DbRepository {
     /// insert a db to the repository
@@ -180,6 +179,9 @@ impl MockDbRepository {
             let mut db = mockkvdb::Mockkvdb::new_default();
             self.dbs.insert(db_name, RwLock::new(db));
         }
+    }
+    pub fn get_db(&mut self, db_name: &str) -> &mut RwLock<MockDb> {
+        self.dbs.get_mut(db_name).unwrap()
     }
 }
 
@@ -295,4 +297,4 @@ macro_rules! impl_keyvaluedb {
 }
 impl_keyvaluedb!(DbRepository);
 impl_keyvaluedb!(MockDbRepository);
-impl_keyvaluedb!(MemoryDBRepository);
+//impl_keyvaluedb!(MemoryDBRepository);

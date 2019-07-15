@@ -31,12 +31,12 @@ use time::precise_time_ns;
 use blake2b::blake2b;
 use acore_bytes::Bytes;
 use journaldb;
-use kvdb::{DBTransaction, DBValue, KeyValueDB};
+use kvdb::{DBTransaction, KeyValueDB};
 use trie::{Trie, TrieFactory, TrieSpec};
 
 // other
 use aion_types::{Address, H128, H256, H264, U256};
-use account::BasicAccount;
+use state::BasicAccount;
 use block::*;
 use blockchain::{BlockChain, BlockProvider, TreeRoute};
 use types::blockchain::import_route::ImportRoute;
@@ -47,8 +47,8 @@ use client::{
     MiningBlockChainClient, ProvingBlockChainClient, PruningInfo, TransactionId,
 };
 use encoded;
-use engines::{POWEquihashEngine};
-use error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
+use engine::AionEngine;
+use types::error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
 use executive::{contract_address, Executed, Executive};
 use factory::{Factories, VmFactory};
 use header::{BlockNumber, Header, Seal, SealType};
@@ -60,8 +60,8 @@ use receipt::{LocalizedReceipt, Receipt};
 use rlp::*;
 use service::ClientIoMessage;
 use spec::Spec;
-use state::{self, State};
-use state_db::StateDB;
+use state::{State};
+use db::StateDB;
 use transaction::{
     Action, LocalizedTransaction, PendingTransaction, SignedTransaction, AVM_TRANSACTION_TYPE
 };
@@ -77,7 +77,7 @@ use views::BlockView;
 
 // re-export
 #[cfg(test)]
-use blockchain::CacheSize as BlockChainCacheSize;
+use types::blockchain::cache::CacheSize as BlockChainCacheSize;
 pub use types::block::status::BlockStatus;
 pub use types::blockchain::info::BlockChainInfo;
 pub use verification::queue::QueueInfo as BlockQueueInfo;
@@ -127,7 +127,7 @@ impl<'a> ::std::ops::Sub<&'a ClientReport> for ClientReport {
 pub struct Client {
     enabled: AtomicBool,
     chain: RwLock<Arc<BlockChain>>,
-    engine: Arc<POWEquihashEngine>,
+    engine: Arc<AionEngine>,
     config: ClientConfig,
     db: RwLock<Arc<KeyValueDB>>,
     state_db: RwLock<StateDB>,
@@ -151,7 +151,7 @@ impl Client {
         db: Arc<KeyValueDB>,
         miner: Arc<Miner>,
         message_channel: IoChannel<ClientIoMessage>,
-    ) -> Result<Arc<Client>, ::error::Error>
+    ) -> Result<Arc<Client>, ::types::error::Error>
     {
         let trie_spec = match config.fat_db {
             true => TrieSpec::Fat,
@@ -250,7 +250,7 @@ impl Client {
     }
 
     /// Returns engine reference.
-    pub fn engine(&self) -> &POWEquihashEngine { &*self.engine }
+    pub fn engine(&self) -> &AionEngine { &*self.engine }
 
     fn notify<F>(&self, f: F)
     where F: Fn(&ChainNotify) {
@@ -577,6 +577,7 @@ impl Client {
         // prune all ancient eras until we're below the memory target,
         // but have at least the minimum number of states.
         loop {
+            // true for OverlayRecentDB, false for ArchiveDB
             let needs_pruning = state_db.journal_db().is_pruned()
                 && state_db.journal_db().journal_size() >= self.config.history_mem;
 
@@ -1614,32 +1615,6 @@ impl MiningBlockChainClient for Client {
     fn prepare_block_interval(&self) -> Duration { self.miner.prepare_block_interval() }
 }
 
-impl super::traits::EngineClient for Client {
-    fn update_sealing(&self) { self.miner.update_sealing(self) }
-
-    fn submit_seal(&self, block_hash: H256, seal: Vec<Bytes>) {
-        if self.miner.submit_seal(self, block_hash, seal).is_err() {
-            warn!(target: "poa", "Wrong internal seal submission!")
-        }
-    }
-
-    fn broadcast_consensus_message(&self, message: Bytes) {
-        self.notify(|notify| notify.broadcast(message.clone()));
-    }
-
-    fn chain_info(&self) -> BlockChainInfo { BlockChainClient::chain_info(self) }
-
-    fn as_full_client(&self) -> Option<&BlockChainClient> { Some(self) }
-
-    fn block_number(&self, id: BlockId) -> Option<BlockNumber> {
-        BlockChainClient::block_number(self, id)
-    }
-
-    fn block_header(&self, id: BlockId) -> Option<::encoded::Header> {
-        BlockChainClient::block_header(self, id)
-    }
-}
-
 impl ProvingBlockChainClient for Client {
     fn prove_storage(&self, key1: H256, key2: H256, id: BlockId) -> Option<(Vec<Bytes>, H256)> {
         self.state_at(id)
@@ -1649,32 +1624,6 @@ impl ProvingBlockChainClient for Client {
     fn prove_account(&self, key1: H256, id: BlockId) -> Option<(Vec<Bytes>, BasicAccount)> {
         self.state_at(id)
             .and_then(move |state| state.prove_account(key1).ok())
-    }
-
-    fn prove_transaction(
-        &self,
-        transaction: SignedTransaction,
-        id: BlockId,
-    ) -> Option<(Bytes, Vec<DBValue>)>
-    {
-        let (header, mut env_info) = match (self.block_header(id), self.env_info(id)) {
-            (Some(s), Some(e)) => (s, e),
-            _ => return None,
-        };
-
-        env_info.gas_limit = transaction.gas.clone();
-        let mut jdb = self.state_db.read().journal_db().boxed_clone();
-
-        state::prove_transaction(
-            jdb.as_hashstore_mut(),
-            header.state_root().clone(),
-            &transaction,
-            self.engine.machine(),
-            &env_info,
-            self.factories.clone(),
-            false,
-            self.db.read().clone(),
-        )
     }
 }
 
@@ -1744,13 +1693,13 @@ fn transaction_receipt(
     }
 }
 
-/*#[cfg(test)]
+#[cfg(test)]
 mod tests {
 
     #[test]
     fn should_not_cache_details_before_commit() {
         use client::BlockChainClient;
-        use tests::helpers::*;
+        use helpers::{generate_dummy_client,get_good_dummy_block_hash};
 
         use std::thread;
         use std::time::Duration;
@@ -1784,4 +1733,4 @@ mod tests {
 
         assert!(client.tree_route(&genesis, &new_hash).is_none());
     }
-}*/
+}

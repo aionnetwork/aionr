@@ -34,7 +34,7 @@ use ansi_term::Colour;
 use acore_bytes::Bytes;
 use client::{ChainNotify, Client, ClientConfig};
 use db;
-use error::*;
+use types::error::*;
 use io::*;
 use kvdb::KeyValueDB;
 use kvdb::{DatabaseConfig, RepositoryConfig, DbRepository, DBTransaction, Error as DbError};
