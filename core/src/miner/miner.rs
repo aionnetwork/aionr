@@ -257,22 +257,20 @@ impl Miner {
                 }
                 None => Bytes::new(),
             };
-            let key_pair: [u8; 64] = self
+            let staker: Ed25519KeyPair = self
                 .staker()
                 .to_owned()
-                .expect("Internal staker is null. Should have checked before.")
-                .secret()
-                .0;
-            let seed = self.sign(&key_pair, &seal_parent_seed);
-            // TODO-Unity: tmp solution to be align with Java kernel. Java kernel's current signature is 64 length.
-            // let signature = self.sign(&key_pair, &bare_hash.0);
-            let mut signature: [u8; 64] = [0u8; 64];
-            signature.copy_from_slice(&self.sign(&key_pair, &bare_hash.0)[32..96]);
+                .expect("Internal staker is null. Should have checked before.");
+            let sk: [u8; 64] = staker.secret().0;
+            let pk: [u8; 32] = staker.public().0;
+            let seed = ed25519::signature(&seal_parent_seed, &sk);
+            let signature = ed25519::signature(&bare_hash.0, &sk);
 
             // 3. Seal the block
             let mut seal: Vec<Bytes> = Vec::new();
             seal.push(signature.to_vec());
             seal.push(seed.to_vec());
+            seal.push(pk.to_vec());
             let sealed_block: SealedBlock = raw_block
                 .lock()
                 .try_seal_pos(
@@ -300,19 +298,6 @@ impl Miner {
                 Colour::White.bold().paint(format!("{:x}", h)));
         }
         Ok(())
-    }
-
-    // TOREMOVE: Unity MS1 use only
-    // ed25519 sign
-    fn sign(&self, keypair: &[u8; 64], message: &[u8]) -> [u8; 96] {
-        let pk = &keypair[32..64];
-        let signature = ed25519::signature(message, keypair);
-
-        let mut result = [0u8; 96];
-        result[0..32].copy_from_slice(pk);
-        result[32..96].copy_from_slice(&signature);
-
-        result
     }
 
     /// Update transaction pool

@@ -372,11 +372,13 @@ impl Spec {
         //     let r = Rlp::new(&self.seal_rlp);
         //     r.iter().map(|f| f.as_val::<Bytes>()).collect()
         // });
-        let seed: Bytes = [0; 96].to_vec();
         let signature: Bytes = [0; 64].to_vec();
+        let seed: Bytes = [0; 64].to_vec();
+        let pk: Bytes = [0; 32].to_vec();
         let mut seal: Vec<Bytes> = Vec::new();
         seal.push(signature);
         seal.push(seed);
+        seal.push(pk);
         header.set_seal(seal);
         trace!(target: "spec", "Header hash is {}", header.hash());
         header

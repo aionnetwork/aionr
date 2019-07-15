@@ -365,7 +365,12 @@ impl POWEquihashEngine {
 
     pub fn machine(&self) -> &EthereumMachine { &self.machine }
 
-    pub fn seal_fields(&self, _header: &Header) -> usize { 2 }
+    pub fn seal_fields(&self, header: &Header) -> usize {
+        match header.seal_type() {
+            Some(SealType::PoS) => 3,
+            _ => 2,
+        }
+    }
 
     pub fn verify_block_basic(&self, header: &Header) -> Result<(), Error> {
         let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(2);
