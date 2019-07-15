@@ -39,7 +39,7 @@ use unexpected::{Mismatch, OutOfBounds};
 
 use blockchain::*;
 use client::BlockChainClient;
-use engine::AionEngine;
+use engine::Engine;
 use types::error::{BlockError, Error};
 use header::{BlockNumber, Header};
 use transaction::{SignedTransaction, UnverifiedTransaction};
@@ -64,7 +64,7 @@ impl HeapSizeOf for PreverifiedBlock {
 }
 
 /// Phase 1 quick block verification. Only does checks that are cheap. Operates on a single block
-pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &AionEngine) -> Result<(), Error> {
+pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &Engine) -> Result<(), Error> {
     verify_header_params(&header, engine, true)?;
     verify_block_integrity(bytes, &header.transactions_root())?;
     engine.verify_block_basic(&header)?;
@@ -85,7 +85,7 @@ pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &AionEngine) ->
 pub fn verify_block_unordered(
     header: Header,
     bytes: Bytes,
-    engine: &AionEngine,
+    engine: &Engine,
 ) -> Result<PreverifiedBlock, Error>
 {
     engine.verify_block_unordered(&header)?;
@@ -117,7 +117,7 @@ pub fn verify_block_family(
     header: &Header,
     parent: &Header,
     grant_parent: Option<&Header>,
-    engine: &AionEngine,
+    engine: &Engine,
     do_full: Option<FullFamilyParams>,
 ) -> Result<(), Error>
 {
@@ -162,12 +162,7 @@ pub fn verify_block_final(expected: &Header, got: &Header) -> Result<(), Error> 
 }
 
 /// Check basic header parameters.
-pub fn verify_header_params(
-    header: &Header,
-    engine: &AionEngine,
-    is_full: bool,
-) -> Result<(), Error>
-{
+pub fn verify_header_params(header: &Header, engine: &Engine, is_full: bool) -> Result<(), Error> {
     let expected_seal_fields = engine.seal_fields(header);
     if header.seal().len() != expected_seal_fields {
         return Err(From::from(BlockError::InvalidSealArity(Mismatch {
@@ -442,12 +437,12 @@ mod tests {
         }
     }
 
-    fn basic_test(bytes: &[u8], engine: &AionEngine) -> Result<(), Error> {
+    fn basic_test(bytes: &[u8], engine: &Engine) -> Result<(), Error> {
         let header = BlockView::new(bytes).header();
         verify_block_basic(&header, bytes, engine)
     }
 
-    fn family_test<BC>(bytes: &[u8], engine: &AionEngine, bc: &BC) -> Result<(), Error>
+    fn family_test<BC>(bytes: &[u8], engine: &Engine, bc: &BC) -> Result<(), Error>
     where BC: BlockProvider {
         let view = BlockView::new(bytes);
         let header = view.header();

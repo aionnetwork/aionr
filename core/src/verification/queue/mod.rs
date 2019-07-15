@@ -32,7 +32,7 @@ use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
 use parking_lot::{Condvar, Mutex, RwLock};
 use io::*;
-use engine::AionEngine;
+use engine::Engine;
 use types::error::*;
 use service::*;
 
@@ -144,7 +144,7 @@ struct Sizes {
 /// A queue of items to be verified. Sits between network or other I/O and the `BlockChain`.
 /// Keeps them in the same order as inserted, minus invalid items.
 pub struct VerificationQueue<K: Kind> {
-    engine: Arc<AionEngine>,
+    engine: Arc<Engine>,
     more_to_verify: Arc<SCondvar>,
     verification: Arc<Verification<K>>,
     deleting: Arc<AtomicBool>,
@@ -220,7 +220,7 @@ impl<K: Kind> VerificationQueue<K> {
     /// Creates a new queue instance.
     pub fn new(
         config: Config,
-        engine: Arc<AionEngine>,
+        engine: Arc<Engine>,
         message_channel: IoChannel<ClientIoMessage>,
     ) -> Self
     {
@@ -298,7 +298,7 @@ impl<K: Kind> VerificationQueue<K> {
 
     fn verify(
         verification: Arc<Verification<K>>,
-        engine: Arc<AionEngine>,
+        engine: Arc<Engine>,
         wait: Arc<SCondvar>,
         ready: Arc<QueueSignal>,
         empty: Arc<SCondvar>,
