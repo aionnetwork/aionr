@@ -52,6 +52,7 @@ pub use mockkvdb::Mockkvdb;
 pub use rockskvdb::Rockskvdb;
 pub use traits::{ HashStore, AsHashStore, KeyValueDB };
 #[cfg(test)]
+#[allow(unused)]
 use traits::KeyValueDAO;
 pub use memorydb::MemoryDB;
 pub use error::Error;

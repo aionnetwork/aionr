@@ -40,8 +40,8 @@ pub struct Block {
 }
 
 impl Block {
-    #[inline]
-    pub fn header(&self) -> Header { self.header.clone() }
+    //    #[inline]
+    //    pub fn header(&self) -> Header { self.header.clone() }
 
     #[inline]
     pub fn hash(&self) -> H256 { BlockView::new(&self.encoded()).header_view().hash() }

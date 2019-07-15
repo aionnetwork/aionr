@@ -25,6 +25,8 @@ mod grant_parent_header_validators;
 #[cfg(test)]
 mod test;
 
+use std::sync::Arc;
+use super::Engine;
 use ajson;
 use machine::EthereumMachine;
 use aion_types::{U256, U512};
@@ -34,7 +36,6 @@ use types::error::Error;
 use std::cmp;
 use std::sync::Mutex;
 use types::BlockNumber;
-use aion_machine::{LiveBlock, WithBalances};
 use equihash::EquihashValidator;
 use self::dependent_header_validators::{
     DependentHeaderValidator,
@@ -310,18 +311,18 @@ pub struct POWEquihashEngine {
 }
 
 impl POWEquihashEngine {
-    pub fn new(params: POWEquihashEngineParams, machine: EthereumMachine) -> POWEquihashEngine {
+    pub fn new(params: POWEquihashEngineParams, machine: EthereumMachine) -> Arc<Self> {
         let rewards_calculator = RewardsCalculator::new(
             &params,
             machine.params().monetary_policy_update,
             machine.premine(),
         );
         let difficulty_calc = DifficultyCalc::new(&params);
-        POWEquihashEngine {
+        Arc::new(POWEquihashEngine {
             machine,
             rewards_calculator,
             difficulty_calc,
-        }
+        })
     }
 
     fn calculate_difficulty(
@@ -351,10 +352,53 @@ impl POWEquihashEngine {
 
         Ok(())
     }
+}
 
-    pub fn name(&self) -> &str { "POWEquihashEngine" }
+impl Engine<EthereumMachine> for Arc<POWEquihashEngine> {
+    fn name(&self) -> &str { "POWEquihashEngine" }
 
-    pub fn verify_block_basic(&self, header: &Header) -> Result<(), Error> {
+    fn machine(&self) -> &EthereumMachine { &self.machine }
+
+    fn seal_fields(&self, _header: &Header) -> usize {
+        // we don't add nonce and solution in header, continue to encapsulate them in seal field.
+        // nonce and solution.
+        2
+    }
+
+    fn populate_from_parent(
+        &self,
+        header: &mut Header,
+        parent: &Header,
+        grant_parent: Option<&Header>,
+    )
+    {
+        let difficulty = self.calculate_difficulty(header, parent, grant_parent);
+        header.set_difficulty(difficulty);
+    }
+
+    fn on_close_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
+        use aion_machine::{LiveBlock, WithBalances};
+
+        let result_block_reward;
+        let author;
+        {
+            let header = LiveBlock::header(&*block);
+            result_block_reward = self.calculate_reward(&header);
+            author = *header.author();
+        }
+        block.header_mut().set_reward(result_block_reward.clone());
+        self.machine
+            .add_balance(block, &author, &result_block_reward)?;
+        self.machine
+            .note_rewards(block, &[(author, result_block_reward)])
+    }
+
+    fn verify_local_seal(&self, header: &Header) -> Result<(), Error> {
+        self.verify_block_basic(header)
+            .and_then(|_| self.verify_block_unordered(header))
+    }
+
+    fn verify_block_basic(&self, header: &Header) -> Result<(), Error> {
         let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(4);
         cheap_validators.push(Box::new(VersionValidator {}));
         cheap_validators.push(Box::new(EnergyConsumedValidator {}));
@@ -367,7 +411,7 @@ impl POWEquihashEngine {
         Ok(())
     }
 
-    pub fn verify_block_unordered(&self, header: &Header) -> Result<(), Error> {
+    fn verify_block_unordered(&self, header: &Header) -> Result<(), Error> {
         let mut costly_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(1);
         costly_validators.push(Box::new(EquihashSolutionValidator {
             solution_validator: EquihashValidator::new(210, 9),
@@ -378,16 +422,7 @@ impl POWEquihashEngine {
         Ok(())
     }
 
-    pub fn verify_local_seal(&self, header: &Header) -> Result<(), Error> {
-        self.verify_block_basic(header)
-            .and_then(|_| self.verify_block_unordered(header))
-    }
-
-    pub fn machine(&self) -> &EthereumMachine { &self.machine }
-
-    pub fn seal_fields(&self, _header: &Header) -> usize { 2 }
-
-    pub fn verify_block_family(
+    fn verify_block_family(
         &self,
         header: &Header,
         parent: &Header,
@@ -413,33 +448,4 @@ impl POWEquihashEngine {
 
         Ok(())
     }
-
-    pub fn populate_from_parent(
-        &self,
-        header: &mut Header,
-        parent: &Header,
-        grant_parent: Option<&Header>,
-    )
-    {
-        let difficulty = self.calculate_difficulty(header, parent, grant_parent);
-        header.set_difficulty(difficulty);
-    }
-
-    pub fn on_close_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
-        let result_block_reward;
-        let author;
-        {
-            let header = LiveBlock::header(&*block);
-            result_block_reward = self.calculate_reward(&header);
-            debug!(target: "cons", "verify number: {}, reward: {} ", header.number(),  result_block_reward);
-            author = *header.author();
-        }
-        block.header_mut().set_reward(result_block_reward.clone());
-        self.machine
-            .add_balance(block, &author, &result_block_reward)?;
-        self.machine
-            .note_rewards(block, &[(author, result_block_reward)])
-    }
-
-    pub fn seals_internally(&self) -> Option<bool> { None }
 }

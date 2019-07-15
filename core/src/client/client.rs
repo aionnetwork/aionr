@@ -47,7 +47,7 @@ use client::{
     MiningBlockChainClient, ProvingBlockChainClient, PruningInfo, TransactionId,
 };
 use encoded;
-use engine::{POWEquihashEngine};
+use engine::AionEngine;
 use types::error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
 use executive::{contract_address, Executed, Executive};
 use factory::{Factories, VmFactory};
@@ -127,7 +127,7 @@ impl<'a> ::std::ops::Sub<&'a ClientReport> for ClientReport {
 pub struct Client {
     enabled: AtomicBool,
     chain: RwLock<Arc<BlockChain>>,
-    engine: Arc<POWEquihashEngine>,
+    engine: Arc<AionEngine>,
     config: ClientConfig,
     db: RwLock<Arc<KeyValueDB>>,
     state_db: RwLock<StateDB>,
@@ -251,7 +251,7 @@ impl Client {
     }
 
     /// Returns engine reference.
-    pub fn engine(&self) -> &POWEquihashEngine { &*self.engine }
+    pub fn engine(&self) -> &AionEngine { &*self.engine }
 
     fn notify<F>(&self, f: F)
     where F: Fn(&ChainNotify) {
