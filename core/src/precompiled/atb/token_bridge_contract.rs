@@ -394,9 +394,9 @@ mod test {
     fn get_contract() -> TokenBridgeContract { TokenBridgeContract::new(builtin_params()) }
 
     fn get_ext<'a>(
-        state: &'a mut State<::state_db::StateDB>,
+        state: &'a mut State<::db::StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::state_db::StateDB>
+    ) -> BuiltinExtImpl<'a, ::db::StateDB>
     {
         let ext = BuiltinExtImpl::new(
             state,
@@ -457,9 +457,9 @@ mod test {
     }
 
     fn get_ext_zero_sender<'a>(
-        state: &'a mut State<::state_db::StateDB>,
+        state: &'a mut State<::db::StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::state_db::StateDB>
+    ) -> BuiltinExtImpl<'a, ::db::StateDB>
     {
         let ext = BuiltinExtImpl::new(
             state,
@@ -475,9 +475,9 @@ mod test {
     }
 
     fn get_ext_default<'a>(
-        state: &'a mut State<::state_db::StateDB>,
+        state: &'a mut State<::db::StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::state_db::StateDB>
+    ) -> BuiltinExtImpl<'a, ::db::StateDB>
     {
         let ext = BuiltinExtImpl::new(
             state,

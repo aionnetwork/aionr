@@ -1,6 +1,6 @@
 use client::{BlockChainClient, BlockId, ChainNotify, Client, ClientConfig};
 use aion_types::H256;
-use p2p::{P2pMgr,NetworkConfig,NetManager};
+use p2p::{P2pMgr,NetworkConfig};
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime};

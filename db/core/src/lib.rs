@@ -46,12 +46,13 @@ mod dbconfigs;
 mod tests;
 
 use elastic_array::{ElasticArray32, ElasticArray128};
-pub use dbrepository::{DbRepository, MockDbRepository, MemoryDBRepository};
+pub use dbrepository::{DbRepository, MockDbRepository};
 pub use dbtransaction::{DBOp, DBTransaction};
 pub use mockkvdb::Mockkvdb;
 pub use rockskvdb::Rockskvdb;
 pub use traits::{ HashStore, AsHashStore, KeyValueDB };
 #[cfg(test)]
+#[allow(unused)]
 use traits::KeyValueDAO;
 pub use memorydb::MemoryDB;
 pub use error::Error;

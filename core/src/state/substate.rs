@@ -66,6 +66,3 @@ impl Substate {
         CleanupMode::TrackTouched(&mut self.touched)
     }
 }
-
-#[cfg(test)]
-mod tests {}

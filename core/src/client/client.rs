@@ -31,7 +31,7 @@ use time::precise_time_ns;
 use blake2b::blake2b;
 use acore_bytes::Bytes;
 use journaldb;
-use kvdb::{DBTransaction, DBValue, KeyValueDB};
+use kvdb::{DBTransaction, KeyValueDB};
 use trie::{Trie, TrieFactory, TrieSpec};
 
 // other
@@ -47,7 +47,7 @@ use client::{
     MiningBlockChainClient, ProvingBlockChainClient, PruningInfo, TransactionId,
 };
 use encoded;
-use engine::{POWEquihashEngine};
+use engine::AionEngine;
 use types::error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
 use executive::{contract_address, Executed, Executive};
 use factory::{Factories, VmFactory};
@@ -60,7 +60,7 @@ use receipt::{LocalizedReceipt, Receipt};
 use rlp::*;
 use service::ClientIoMessage;
 use spec::Spec;
-use state::{self, State};
+use state::{State};
 use db::StateDB;
 use transaction::{
     Action, LocalizedTransaction, PendingTransaction, SignedTransaction, AVM_TRANSACTION_TYPE
@@ -127,7 +127,7 @@ impl<'a> ::std::ops::Sub<&'a ClientReport> for ClientReport {
 pub struct Client {
     enabled: AtomicBool,
     chain: RwLock<Arc<BlockChain>>,
-    engine: Arc<POWEquihashEngine>,
+    engine: Arc<AionEngine>,
     config: ClientConfig,
     db: RwLock<Arc<KeyValueDB>>,
     state_db: RwLock<StateDB>,
@@ -251,7 +251,7 @@ impl Client {
     }
 
     /// Returns engine reference.
-    pub fn engine(&self) -> &POWEquihashEngine { &*self.engine }
+    pub fn engine(&self) -> &AionEngine { &*self.engine }
 
     fn notify<F>(&self, f: F)
     where F: Fn(&ChainNotify) {
@@ -1584,33 +1584,6 @@ impl MiningBlockChainClient for Client {
     fn prepare_block_interval(&self) -> Duration { self.miner.prepare_block_interval() }
 }
 
-#[cfg(test)]
-impl super::traits::EngineClient for Client {
-    fn update_sealing(&self) { self.miner.update_sealing(self) }
-
-    fn submit_seal(&self, block_hash: H256, seal: Vec<Bytes>) {
-        if self.miner.submit_seal(self, block_hash, seal).is_err() {
-            warn!(target: "poa", "Wrong internal seal submission!")
-        }
-    }
-
-    fn broadcast_consensus_message(&self, message: Bytes) {
-        self.notify(|notify| notify.broadcast(message.clone()));
-    }
-
-    fn chain_info(&self) -> BlockChainInfo { BlockChainClient::chain_info(self) }
-
-    fn as_full_client(&self) -> Option<&BlockChainClient> { Some(self) }
-
-    fn block_number(&self, id: BlockId) -> Option<BlockNumber> {
-        BlockChainClient::block_number(self, id)
-    }
-
-    fn block_header(&self, id: BlockId) -> Option<::encoded::Header> {
-        BlockChainClient::block_header(self, id)
-    }
-}
-
 impl ProvingBlockChainClient for Client {
     fn prove_storage(&self, key1: H256, key2: H256, id: BlockId) -> Option<(Vec<Bytes>, H256)> {
         self.state_at(id)
@@ -1620,32 +1593,6 @@ impl ProvingBlockChainClient for Client {
     fn prove_account(&self, key1: H256, id: BlockId) -> Option<(Vec<Bytes>, BasicAccount)> {
         self.state_at(id)
             .and_then(move |state| state.prove_account(key1).ok())
-    }
-
-    fn prove_transaction(
-        &self,
-        transaction: SignedTransaction,
-        id: BlockId,
-    ) -> Option<(Bytes, Vec<DBValue>)>
-    {
-        let (header, mut env_info) = match (self.block_header(id), self.env_info(id)) {
-            (Some(s), Some(e)) => (s, e),
-            _ => return None,
-        };
-
-        env_info.gas_limit = transaction.gas.clone();
-        let mut jdb = self.state_db.read().journal_db().boxed_clone();
-
-        state::prove_transaction(
-            jdb.as_hashstore_mut(),
-            header.state_root().clone(),
-            &transaction,
-            self.engine.machine(),
-            &env_info,
-            self.factories.clone(),
-            false,
-            self.db.read().clone(),
-        )
     }
 }
 

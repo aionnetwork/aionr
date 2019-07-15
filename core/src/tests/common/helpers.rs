@@ -36,10 +36,10 @@ use miner::{Miner, MinerService};
 use parking_lot::RwLock;
 use rlp::{self, RlpStream};
 use spec::*;
-use state_db::StateDB;
+use db::StateDB;
 use state::*;
 use std::sync::Arc;
-use kvdb::{MockDbRepository, DBTransaction, KeyValueDB, MemoryDBRepository};
+use kvdb::{MockDbRepository, DBTransaction, KeyValueDB};
 use machine::EthereumMachine;
 use std::collections::BTreeMap;
 use db;
@@ -139,16 +139,6 @@ where
     )
 }
 
-pub fn generate_dummy_client_with_spec_and_accounts<F>(
-    get_test_spec: F,
-    accounts: Option<Arc<AccountProvider>>,
-) -> Arc<Client>
-where
-    F: Fn() -> Spec,
-{
-    generate_dummy_client_with_spec_accounts_and_data(get_test_spec, accounts, 0, 0, &[])
-} /**/
-
 pub fn generate_dummy_client_with_spec_accounts_and_data<F>(
     get_test_spec: F,
     accounts: Option<Arc<AccountProvider>>,
@@ -202,7 +192,7 @@ where
             author.clone(),
             (3141562.into(), 31415620.into()),
             vec![],
-            Arc::new(MemoryDBRepository::new()),
+            Arc::new(MockDbRepository::init(vec![String::new()])),
         )
         .unwrap();
         b.set_difficulty(U256::from(0x20000));
@@ -370,23 +360,25 @@ pub fn generate_dummy_empty_blockchain() -> BlockChain {
     bc
 }
 
-pub fn get_temp_state() -> State<::state_db::StateDB> {
+pub fn get_temp_state() -> State<::db::StateDB> {
     let journal_db = get_temp_state_db();
     State::new(
         journal_db,
         U256::from(0),
         Default::default(),
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![String::from(
+            ::db::COL_AVM_GRAPH,
+        )])),
     )
 }
 
-pub fn get_temp_state_with_nonce() -> State<::state_db::StateDB> {
+pub fn get_temp_state_with_nonce() -> State<::db::StateDB> {
     let journal_db = get_temp_state_db();
     State::new(
         journal_db,
         U256::from(1),
         Default::default(),
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![String::new()])),
     )
 }
 

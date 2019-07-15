@@ -48,7 +48,7 @@ use vms::EnvInfo;
 
 use aion_types::{Address, H256, U256};
 use acore_bytes::Bytes;
-use kvdb::{KeyValueDB, AsHashStore, DBValue};
+use kvdb::{KeyValueDB};
 
 use trie;
 use trie::recorder::Recorder;
@@ -84,46 +84,6 @@ pub struct ApplyOutcome {
 
 /// Result type for the execution ("application") of a transaction.
 pub type ApplyResult = Result<ApplyOutcome, Error>;
-
-/// Prove a transaction on the given state.
-/// Returns `None` when the transacion could not be proved,
-/// and a proof otherwise.
-pub fn prove_transaction<H: AsHashStore + Send + Sync>(
-    db: H,
-    root: H256,
-    transaction: &SignedTransaction,
-    machine: &Machine,
-    env_info: &EnvInfo,
-    factories: Factories,
-    virt: bool,
-    kvdb: Arc<KeyValueDB>,
-) -> Option<(Bytes, Vec<DBValue>)>
-{
-    use self::backend::Proving;
-
-    let backend = Proving::new(db);
-    let res = State::from_existing(
-        backend,
-        root,
-        machine.account_start_nonce(env_info.number),
-        factories,
-        kvdb,
-    );
-
-    let mut state = match res {
-        Ok(state) => state,
-        Err(_) => return None,
-    };
-
-    match state.execute(env_info, machine, transaction, false, virt) {
-        Err(ExecutionError::Internal(_)) => None,
-        Err(e) => {
-            trace!(target: "state", "Proved call failed: {}", e);
-            Some((Vec::new(), state.drop().1.extract_proof()))
-        }
-        Ok(res) => Some((res.output, state.drop().1.extract_proof())),
-    }
-}
 
 /// Representation of the entire state of all accounts in the system.
 ///
@@ -739,6 +699,9 @@ impl<B: Backend> State<B> {
     ) -> Vec<ApplyResult>
     {
         let exec_results = self.execute_bulk(env_info, machine, txs, false, false);
+        if !exec_results.is_empty() && !exec_results[0].is_ok() {
+            return vec![Err(From::from(exec_results[0].clone().unwrap_err()))];
+        }
 
         let mut receipts = Vec::new();
         for result in exec_results {

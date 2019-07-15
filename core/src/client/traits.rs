@@ -38,7 +38,6 @@ use verification::queue::QueueInfo as BlockQueueInfo;
 use aion_types::{H256, H128, U256, Address};
 use vms::LastHashes;
 use acore_bytes::Bytes;
-use kvdb::DBValue;
 
 use types::ids::*;
 use types::call_analytics::CallAnalytics;
@@ -356,16 +355,4 @@ pub trait ProvingBlockChainClient: BlockChainClient {
     /// The key is the blake2b hash of the account's address.
     /// Returns a vector of raw trie nodes (in order from the root) proving the query.
     fn prove_account(&self, key1: H256, id: BlockId) -> Option<(Vec<Bytes>, BasicAccount)>;
-
-    /// Prove execution of a transaction at the given block.
-    /// Returns the output of the call and a vector of database items necessary
-    /// to reproduce it.
-    fn prove_transaction(
-        &self,
-        transaction: SignedTransaction,
-        id: BlockId,
-    ) -> Option<(Bytes, Vec<DBValue>)>;
-
-    // Get an epoch change signal by block hash.
-    // fn epoch_signal(&self, hash: H256) -> Option<Vec<u8>>;
 }

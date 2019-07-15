@@ -124,9 +124,9 @@ mod tests {
     }
 
     fn get_ext_default<'a>(
-        state: &'a mut State<::state_db::StateDB>,
+        state: &'a mut State<::db::StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::state_db::StateDB>
+    ) -> BuiltinExtImpl<'a, ::db::StateDB>
     {
         BuiltinExtImpl::new(
             state,

@@ -164,8 +164,8 @@ macro_rules! usage {
 
         const MAX_TERM_WIDTH: usize = 120;
 
-//        #[cfg(test)]
-//        use regex::Regex;
+        #[cfg(test)]
+        use regex::Regex;
 
         #[derive(Debug)]
         pub enum ArgsError {
@@ -847,34 +847,34 @@ macro_rules! usage {
 
         }
 
-//        #[test]
-//        fn usages_valid() {
-//            let re = Regex::new(r"^(?:(-[a-zA-Z-]+, )?--[a-z-]+(=\[[a-zA-Z]+\](\.\.\.)?|=<[a-zA-Z]+>(\.\.\.)?)?)|(?:\[[a-zA-Z-]+\])(\.\.\.)?|(?:<[a-zA-Z-]+>)(\.\.\.)?$").unwrap();
-//
-//            let usages = vec![
-//                $(
-//                    $(
-//                        $(
-//                            $subc_subc_arg_usage,
-//                        )*
-//                    )*
-//                    $(
-//                        $subc_arg_usage,
-//                    )*
-//                )*
-//                $(
-//                    $(
-//                        $flag_usage,
-//                    )*
-//                    $(
-//                        $arg_usage,
-//                    )*
-//                )*
-//            ];
-//
-//            for usage in &usages {
-//                assert!(re.is_match(usage));
-//            }
-//        }
+        #[test]
+        fn usages_valid() {
+            let re = Regex::new(r"^(?:(-[a-zA-Z-]+, )?--[a-z-]+(=\[[a-zA-Z]+\](\.\.\.)?|=<[a-zA-Z]+>(\.\.\.)?)?)|(?:\[[a-zA-Z-]+\])(\.\.\.)?|(?:<[a-zA-Z-]+>)(\.\.\.)?$").unwrap();
+
+            let usages = vec![
+                $(
+                    $(
+                        $(
+                            $subc_subc_arg_usage,
+                        )*
+                    )*
+                    $(
+                        $subc_arg_usage,
+                    )*
+                )*
+                $(
+                    $(
+                        $flag_usage,
+                    )*
+                    $(
+                        $arg_usage,
+                    )*
+                )*
+            ];
+
+            for usage in &usages {
+                assert!(re.is_match(usage));
+            }
+        }
     }
 }

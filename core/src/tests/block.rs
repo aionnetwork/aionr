@@ -23,15 +23,15 @@
 use log;
 use std::sync::Arc;
 use block::{OpenBlock, LockedBlock, SealedBlock, Drain};
-use engine::POWEquihashEngine;
+use engine::AionEngine;
 use types::error::Error;
 use header::Header;
 use factory::Factories;
-use state_db::StateDB;
+use db::StateDB;
 use state::State;
 use views::BlockView;
 use transaction::SignedTransaction;
-use kvdb::MemoryDBRepository;
+use kvdb::MockDbRepository;
 use aion_types::Address;
 use vms::LastHashes;
 use tests::common::helpers::get_temp_state_db;
@@ -40,7 +40,7 @@ use spec::Spec;
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 fn enact_bytes(
     block_bytes: &[u8],
-    engine: &POWEquihashEngine,
+    engine: &AionEngine,
     db: StateDB,
     parent: &Header,
     _grant_parent: Option<&Header>,
@@ -63,9 +63,9 @@ fn enact_bytes(
             let s = State::from_existing(
                 db.boxed_clone(),
                 parent.state_root().clone(),
-                engine.machine().account_start_nonce(parent.number() + 1),
+                engine.account_start_nonce(parent.number() + 1),
                 factories.clone(),
-                Arc::new(MemoryDBRepository::new()),
+                Arc::new(MockDbRepository::init(vec![])),
             )?;
             trace!(target: "enact", "num={}, root={}, author={}, author_balance={}\n",
                    header.number(), s.root(), header.author(), s.balance(&header.author())?);
@@ -82,7 +82,7 @@ fn enact_bytes(
         Address::new(),
         (3141562.into(), 31415620.into()),
         vec![],
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )?;
 
     b.populate_from(&header);
@@ -95,7 +95,7 @@ fn enact_bytes(
 fn enact_and_seal(
     block_bytes: &[u8],
     //    engine: &EthEngine,
-    engine: &POWEquihashEngine,
+    engine: &AionEngine,
     db: StateDB,
     parent: &Header,
     last_hashes: Arc<LastHashes>,
@@ -133,7 +133,7 @@ fn open_block() {
         Address::zero(),
         (3141562.into(), 31415620.into()),
         vec![],
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )
     .unwrap();
     let b = b.close_and_lock();
@@ -162,7 +162,7 @@ fn enact_block() {
         Address::zero(),
         (3141562.into(), 31415620.into()),
         vec![],
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )
     .unwrap()
     .close_and_lock()

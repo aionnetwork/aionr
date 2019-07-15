@@ -42,6 +42,8 @@ extern crate uuid;
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
+#[cfg(test)]
+extern crate tempdir;
 
 pub mod accounts_dir;
 pub mod ethkey;
@@ -54,6 +56,9 @@ mod error;
 mod ethstore;
 mod import;
 mod random;
+
+#[cfg(test)]
+mod tests;
 
 pub use self::account::{SafeAccount, Crypto};
 pub use self::error::Error;

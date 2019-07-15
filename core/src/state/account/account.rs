@@ -843,7 +843,7 @@ impl AionVMAccount {
             concatenated_root.extend_from_slice(&self.object_graph_hash[..]);
             debug!(target: "vm", "concatenated root = {:?}", concatenated_root);
             self.delta_root = blake2b(&concatenated_root);
-            debug!(target: "vm", "updated storage root = {:?}, delta_root = {:?}, code hash = {:?}", 
+            debug!(target: "vm", "updated storage root = {:?}, delta_root = {:?}, code hash = {:?}",
                 self.storage_root, self.delta_root, self.code_hash);
             // save object graph
             debug!(target: "vm", "hash for object graph = {:?}", self.object_graph_hash);
