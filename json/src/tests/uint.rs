@@ -2,8 +2,6 @@ use serde_json;
 use aion_types::U256;
 use uint::Uint;
 
-use super::*;
-
 #[test]
 fn uint_deserialization() {
     let s = r#"["0xa", "10", "", "0x", 0]"#;

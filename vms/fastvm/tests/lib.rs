@@ -150,7 +150,7 @@ struct TestEnv<'a> {
     storage: HashMap<H128, H128>,
     storage_dword: HashMap<H128, H256>,
     accounts: HashMap<H256, bool>,
-    balance: HashMap<Address, H128>,
+    _balance: HashMap<Address, H128>,
     log_topics: Vec<Vec<H256>>,
     log_data: Vec<u8>,
 }
@@ -167,7 +167,7 @@ impl<'a> Ext for TestEnv<'a> {
         self.storage_dword.insert(key, value);
     }
 
-    fn remove_storage(&mut self, a: &Address, key: Vec<u8>) {}
+    fn remove_storage(&mut self, _a: &Address, _key: Vec<u8>) {}
 
     /// Determine whether an account exists.
     fn exists(&self, address: &Address) -> bool { return *self.accounts.get(address).unwrap(); }
@@ -268,43 +268,43 @@ impl<'a> Ext for TestEnv<'a> {
 
     fn set_special_empty_flag(&mut self) {}
 
-    fn code(&self, address: &Address) -> Option<Arc<Bytes>> { None }
+    fn code(&self, _address: &Address) -> Option<Arc<Bytes>> { None }
 
-    fn sstore(&mut self, address: &Address, key: Bytes, value: Bytes) {}
+    fn sstore(&mut self, _address: &Address, _key: Bytes, _value: Bytes) {}
 
-    fn sload(&self, address: &Address, key: &Bytes) -> Option<Bytes> { None }
+    fn sload(&self, _address: &Address, _key: &Bytes) -> Option<Bytes> { None }
 
-    fn create_account(&mut self, address: &Address) {}
+    fn create_account(&mut self, _address: &Address) {}
 
-    fn kill_account(&mut self, address: &Address) {}
+    fn kill_account(&mut self, _address: &Address) {}
 
-    fn inc_balance(&mut self, address: &Address, inc: &U256) {}
+    fn inc_balance(&mut self, _address: &Address, _inc: &U256) {}
 
-    fn dec_balance(&mut self, address: &Address, dec: &U256) {}
+    fn dec_balance(&mut self, _address: &Address, _dec: &U256) {}
 
-    fn nonce(&self, address: &Address) -> u64 { 0 }
+    fn nonce(&self, _address: &Address) -> u64 { 0 }
 
-    fn inc_nonce(&mut self, address: &Address) {}
+    fn inc_nonce(&mut self, _address: &Address) {}
 
-    fn save_code_at(&mut self, address: &Address, code: Bytes) {}
+    fn save_code_at(&mut self, _address: &Address, _code: Bytes) {}
 
-    fn touch_account(&mut self, address: &Address, index: i32) {}
+    fn touch_account(&mut self, _address: &Address, _index: i32) {}
 
-    fn send_signal(&mut self, signal: i32) {}
+    fn send_signal(&mut self, _signal: i32) {}
 
     fn commit(&mut self) {}
 
     fn root(&self) -> H256 { H256::default() }
 
-    fn avm_log(&mut self, address: &Address, topics: Vec<H256>, data: Bytes, idx: i32) {}
+    fn avm_log(&mut self, _address: &Address, _topics: Vec<H256>, _data: Bytes, _idx: i32) {}
 
-    fn get_transformed_code(&self, address: &Address) -> Option<Arc<Bytes>> { None }
+    fn get_transformed_code(&self, _address: &Address) -> Option<Arc<Bytes>> { None }
 
-    fn save_transformed_code(&mut self, address: &Address, code: Bytes) {}
+    fn save_transformed_code(&mut self, _address: &Address, _code: Bytes) {}
 
-    fn get_objectgraph(&self, address: &Address) -> Option<Arc<Bytes>> { None }
+    fn get_objectgraph(&self, _address: &Address) -> Option<Arc<Bytes>> { None }
 
-    fn set_objectgraph(&mut self, address: &Address, data: Bytes) {}
+    fn set_objectgraph(&mut self, _address: &Address, _data: Bytes) {}
 }
 
 impl<'a> EvmJit<::libc::c_void> for TestEnv<'a> {
@@ -321,7 +321,7 @@ fn fastvm_env() {
     let ext = TestEnv {
         env_info: &EnvInfo::default(),
         accounts: HashMap::new(),
-        balance: HashMap::new(),
+        _balance: HashMap::new(),
         storage: HashMap::new(),
         storage_dword: HashMap::new(),
         log_topics: Vec::new(),
@@ -343,7 +343,7 @@ fn operation_underflow() {
     let ext = TestEnv {
         env_info: &EnvInfo::default(),
         accounts: HashMap::new(),
-        balance: HashMap::new(),
+        _balance: HashMap::new(),
         storage: HashMap::new(),
         storage_dword: HashMap::new(),
         log_topics: Vec::new(),
@@ -365,7 +365,7 @@ fn evm_storage() {
     let ext = TestEnv {
         env_info: &EnvInfo::default(),
         accounts: HashMap::new(),
-        balance: HashMap::new(),
+        _balance: HashMap::new(),
         storage: HashMap::new(),
         storage_dword: HashMap::new(),
         log_topics: Vec::new(),
@@ -391,7 +391,7 @@ fn evm_mstore() {
     let ext = TestEnv {
         env_info: &EnvInfo::default(),
         accounts: HashMap::new(),
-        balance: HashMap::new(),
+        _balance: HashMap::new(),
         storage: HashMap::new(),
         storage_dword: HashMap::new(),
         log_topics: Vec::new(),
@@ -419,7 +419,7 @@ fn evm_log() {
     let mut ext = TestEnv {
         env_info: &EnvInfo::default(),
         accounts: HashMap::new(),
-        balance: HashMap::new(),
+        _balance: HashMap::new(),
         storage: HashMap::new(),
         storage_dword: HashMap::new(),
         log_topics: Vec::new(),
@@ -430,7 +430,7 @@ fn evm_log() {
 
     // LOG0
     let code = vec![0x60, 0x01, 0x60, 0x02, 0xa0];
-    let res = instance.run(&code, &mut context.clone().into());
+    let _res = instance.run(&code, &mut context.clone().into());
     println!("UT: evm_log, topics = {:?}", ext.log_topics);
     assert_eq!(ext.log_topics.len(), 1);
     assert!(ext.log_topics[0].is_empty());
@@ -445,7 +445,7 @@ fn evm_log() {
         0x60, 0xaf, 0x60, 0x02, 0x52, 0x60, 0x03, 0x60, 0x00, 0x60, 0x1, 0x60, 0x11, 0xa1,
     ];
     // let code = vec![0x60, 0x01, 0x60, 0x02, 0xa0];
-    let res = instance.run(&code, &mut context.clone().into());
+    let _res = instance.run(&code, &mut context.clone().into());
 
     println!("topics = {:?}, data = {:?}", ext.log_topics, ext.log_data);
     assert_eq!(ext.log_topics.len(), 1);
@@ -462,10 +462,10 @@ fn evm_log() {
 fn blockhash() {
     let context = FastVMTest::new();
     let mut instance = FastVM::new();
-    let mut ext = TestEnv {
+    let ext = TestEnv {
         env_info: &EnvInfo::default(),
         accounts: HashMap::new(),
-        balance: HashMap::new(),
+        _balance: HashMap::new(),
         storage: HashMap::new(),
         storage_dword: HashMap::new(),
         log_topics: Vec::new(),
@@ -492,10 +492,10 @@ fn blockhash() {
 fn sha3() {
     let context = FastVMTest::new();
     let mut instance = FastVM::new();
-    let mut ext = TestEnv {
+    let ext = TestEnv {
         env_info: &EnvInfo::default(),
         accounts: HashMap::new(),
-        balance: HashMap::new(),
+        _balance: HashMap::new(),
         storage: HashMap::new(),
         storage_dword: HashMap::new(),
         log_topics: Vec::new(),
@@ -526,10 +526,10 @@ fn invalid_gas() {
     let mut context = FastVMTest::new();
     context.nrg_limit = 0; //9223372036854775808;
     let mut instance = FastVM::new();
-    let mut ext = TestEnv {
+    let ext = TestEnv {
         env_info: &EnvInfo::default(),
         accounts: HashMap::new(),
-        balance: HashMap::new(),
+        _balance: HashMap::new(),
         storage: HashMap::new(),
         storage_dword: HashMap::new(),
         log_topics: Vec::new(),

@@ -139,16 +139,6 @@ where
     )
 }
 
-pub fn generate_dummy_client_with_spec_and_accounts<F>(
-    get_test_spec: F,
-    accounts: Option<Arc<AccountProvider>>,
-) -> Arc<Client>
-where
-    F: Fn() -> Spec,
-{
-    generate_dummy_client_with_spec_accounts_and_data(get_test_spec, accounts, 0, 0, &[])
-} /**/
-
 pub fn generate_dummy_client_with_spec_accounts_and_data<F>(
     get_test_spec: F,
     accounts: Option<Arc<AccountProvider>>,

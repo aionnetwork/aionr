@@ -81,18 +81,18 @@ pub trait Backend: Send {
 // usage.
 #[derive(Clone, PartialEq)]
 pub struct ProofCheck(MemoryDB);
-
-impl ProofCheck {
-    /// Create a new `ProofCheck` backend from the given state items.
-    #[cfg(test)]
-    pub fn new(proof: &[DBValue]) -> Self {
-        let mut db = MemoryDB::new();
-        for item in proof {
-            db.insert(item);
-        }
-        ProofCheck(db)
-    }
-}
+//
+//impl ProofCheck {
+//    /// Create a new `ProofCheck` backend from the given state items.
+//    #[cfg(test)]
+//    pub fn new(proof: &[DBValue]) -> Self {
+//        let mut db = MemoryDB::new();
+//        for item in proof {
+//            db.insert(item);
+//        }
+//        ProofCheck(db)
+//    }
+//}
 
 impl HashStore for ProofCheck {
     fn keys(&self) -> HashMap<H256, i32> { self.0.keys() }

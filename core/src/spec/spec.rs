@@ -153,6 +153,7 @@ impl Clone for Spec {
     }
 }
 
+#[cfg(test)]
 fn load_machine_from(s: ajson::spec::Spec) -> EthereumMachine {
     let builtins = s
         .accounts
@@ -405,6 +406,7 @@ impl Spec {
     }
 
     /// Loads just the state machine from a json file.
+    #[cfg(test)]
     pub fn load_machine<R: Read>(reader: R) -> Result<EthereumMachine, String> {
         ajson::spec::Spec::load(reader)
             .map_err(fmt_err)

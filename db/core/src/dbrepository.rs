@@ -24,7 +24,7 @@ use mockkvdb;
 use std::collections::{HashMap, BTreeMap};
 use parking_lot::RwLock;
 
-use super::{Result, DBValue, HashStore};
+use super::{Result, DBValue};
 use traits::{KeyValueDAO, KeyValueDB};
 use dbconfigs::RepositoryConfig;
 use dbtransaction::{DBTransaction, DBOp};
