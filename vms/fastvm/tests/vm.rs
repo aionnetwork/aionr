@@ -23,12 +23,12 @@
 
 extern crate fastvm;
 extern crate aion_types;
-extern crate types;
 extern crate rlp;
+extern crate vm_common;
 
 use std::convert::Into;
 use aion_types::U256;
-use vms::CallType;
+use vm_common::CallType;
 use fastvm::vm::CostType;
 use rlp::RlpStream;
 

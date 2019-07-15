@@ -31,13 +31,13 @@ use ajson;
 use blake2b::{blake2b, BLAKE2B_NULL_RLP};
 use acore_bytes::Bytes;
 use ethbloom::Bloom;
-use kvdb::{MemoryDB, MemoryDBRepository};
+use kvdb::{MemoryDB, MockDbRepository};
 use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
 use types::BlockNumber;
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
-use engines::POWEquihashEngine;
-use error::Error;
+use engine::{NullEngine,AionEngine,POWEquihashEngine};
+use types::error::Error;
 use executive::Executive;
 use factory::Factories;
 use header::Header;
@@ -87,7 +87,7 @@ pub struct Spec {
     /// User friendly spec name
     pub name: String,
     /// What engine are we using for this?
-    pub engine: Arc<POWEquihashEngine>,
+    pub engine: Arc<AionEngine>,
     /// Name of the subdir inside the main data dir to use for chain data and settings.
     pub data_dir: String,
     /// The genesis block's parent hash field.
@@ -153,6 +153,7 @@ impl Clone for Spec {
     }
 }
 
+#[cfg(test)]
 fn load_machine_from(s: ajson::spec::Spec) -> EthereumMachine {
     let builtins = s
         .accounts
@@ -240,7 +241,7 @@ impl Spec {
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
         premine: U256,
-    ) -> Arc<POWEquihashEngine>
+    ) -> Arc<AionEngine>
     {
         let machine = Self::machine(params, builtins, premine);
 
@@ -250,6 +251,9 @@ impl Spec {
                     pow_equihash_engine.params.into(),
                     machine,
                 ))
+            }
+            ajson::spec::Engine::Null(null_engine) => {
+                Arc::new(NullEngine::new(null_engine.params.into(), machine))
             }
         }
     }
@@ -283,7 +287,7 @@ impl Spec {
                 root,
                 U256::zero(),
                 factories.clone(),
-                Arc::new(MemoryDBRepository::new()),
+                Arc::new(MockDbRepository::init(vec![String::new()])),
             )?;
 
             // Execute contract constructors.
@@ -402,6 +406,7 @@ impl Spec {
     }
 
     /// Loads just the state machine from a json file.
+    #[cfg(test)]
     pub fn load_machine<R: Read>(reader: R) -> Result<EthereumMachine, String> {
         ajson::spec::Spec::load(reader)
             .map_err(fmt_err)
@@ -420,26 +425,26 @@ impl Spec {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::Spec;
     use views::BlockView;
     #[test]
     fn test_load_empty() {
         assert!(Spec::load(&[] as &[u8]).is_err());
     }
 
-    //    #[test]
-    //    fn test_chain() {
-    //        let test_spec = Spec::new_test();
-    //
-    //        assert_eq!(
-    //            test_spec.state_root(),
-    //            "b3fd94094ccb910e058c00d6763b61472e7bf1b8a9cb2549a83a4d5a397e194e".into()
-    //        );
-    //        let genesis = test_spec.genesis_block();
-    //        assert_eq!(
-    //            BlockView::new(&genesis).header_view().hash(),
-    //            "0b10f11ef884982ebeba4e34eb4ee15126ff7f513f6d3dc55528e92c6cb86ab4".into()
-    //        );
-    //    }
+    #[test]
+    fn test_chain() {
+        let test_spec = Spec::new_test();
+
+        assert_eq!(
+            test_spec.state_root(),
+            "b3fd94094ccb910e058c00d6763b61472e7bf1b8a9cb2549a83a4d5a397e194e".into()
+        );
+        let genesis = test_spec.genesis_block();
+        assert_eq!(
+            BlockView::new(&genesis).header_view().hash(),
+            "579aed812b43f18210ff9e5406ae76b00dffbfba5f6f7ef2eda650780a119a55".into()
+        );
+    }
 
 }

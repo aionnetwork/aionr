@@ -212,6 +212,3 @@ impl JournalDB for ArchiveDB {
 
     fn consolidate(&mut self, with: MemoryDB) { self.overlay.consolidate(with); }
 }
-
-#[cfg(test)]
-mod tests {}

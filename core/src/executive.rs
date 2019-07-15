@@ -31,14 +31,14 @@ use aion_types::{H256, U256, U512, Address};
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ExecutionResult, ExecStatus, ReturnData, ParamsType};
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
-use error::ExecutionError;
+use types::error::ExecutionError;
 use vms::VMType;
 use vms::constants::{MAX_CALL_DEPTH, GAS_CALL_MAX, GAS_CREATE_MAX};
 
 use externalities::*;
 use transaction::{Action, SignedTransaction};
 use crossbeam;
-pub use executed::Executed;
+pub use types::executed::Executed;
 use precompiled::builtin::{BuiltinExtImpl, BuiltinContext};
 
 #[cfg(debug_assertions)]
@@ -185,6 +185,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     {
         let _vm_lock = AVM_LOCK.lock().unwrap();
         let mut vm_params = Vec::new();
+
         for t in txs {
             let sender = t.sender();
             let nonce = t.nonce;
@@ -202,6 +203,15 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                             .add_balance(&sender, &(needed_balance), CleanupMode::NoEmpty);
                 }
                 debug!(target: "vm", "sender: {:?}, balance: {:?}", sender, self.state.balance(&sender).unwrap_or(0.into()));
+            } else {
+                // check gas limit
+                if self.info.gas_used + t.gas > self.info.gas_limit {
+                    return vec![Err(From::from(ExecutionError::BlockGasLimitReached {
+                        gas_limit: self.info.gas_limit,
+                        gas_used: self.info.gas_used,
+                        gas: t.gas,
+                    }))];
+                }
             }
 
             // Transactions are now handled in different ways depending on whether it's
@@ -258,8 +268,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         let mut substates = vec![Substate::new(); vm_params.len()];
         let results = self.exec_avm(vm_params, &mut substates.as_mut_slice(), is_local_call);
-
-        // enact results and update state separately
 
         self.avm_finalize(txs, substates.as_slice(), results)
     }

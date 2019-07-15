@@ -23,6 +23,8 @@ mod event;
 mod handler;
 mod route;
 mod storage;
+#[cfg(test)]
+mod test;
 
 use std::collections::BTreeMap;
 use std::ops::Index;

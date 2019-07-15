@@ -23,7 +23,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime};
 use client::{BlockChainClient, BlockId, BlockImportError};
-use error::{BlockError, ImportError};
+use types::error::{BlockError, ImportError};
 use header::Header;
 use transaction::UnverifiedTransaction;
 use aion_types::H256;

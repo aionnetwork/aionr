@@ -26,7 +26,7 @@
 use std::fmt;
 
 use acore::account_provider::{SignError as AccountError};
-use acore::error::{Error as EthcoreError, CallError};
+use acore::{Error as EthcoreError, CallError};
 use jsonrpc_core::{futures, Error, ErrorCode, Value};
 use rlp::DecoderError;
 use acore::transaction::Error as TransactionError;

@@ -77,13 +77,13 @@ pub const TRANSFER_SIZE: usize = 80; // 32 + 32 + 16
 
 #[cfg(test)]
 mod test {
-    use num_bigint::{BigInt, ToBigInt, Sign};
+    use num_bigint::{BigInt, Sign};
     use super::get_instance;
     use aion_types::H256;
 
     #[test]
     fn bridge_transfer_instance() {
-        let tx_value = 100i32.to_bigint().unwrap();
+        let tx_value = BigInt::from(100);
         let recipient: H256 = [0xffu8; 32].into();
         let tx_hash: H256 = [0xfdu8; 32].into();
         assert_ne!(

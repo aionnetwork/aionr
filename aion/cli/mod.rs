@@ -799,7 +799,7 @@ mod tests {
         assert_eq!(args.arg_pruning_history, 128);
     }
 
-    //#[test]
+    #[test]
     fn should_parse_full_config() {
         // given
         let config = toml::from_str(include_str!("./tests/config.full.toml")).unwrap();

@@ -20,25 +20,25 @@
  *
  ******************************************************************************/
 
-use std::collections::{BTreeMap, HashSet};
-use std::sync::Arc;
-use std::time::{self, Duration, Instant};
-use std::thread;
-
 use account_provider::AccountProvider;
+use acore_bytes::Bytes;
 use aion_types::{Address, H256, U256};
 use ansi_term::Colour;
-use acore_bytes::Bytes;
-use engines::POWEquihashEngine;
-use error::*;
+use block::{Block, ClosedBlock, IsBlock};
+use client::{BlockId, MiningBlockChainClient, TransactionId};
+use engine::AionEngine;
+use header::{BlockNumber, Header};
+use types::error::*;
+use io::IoChannel;
 use miner::{MinerService, MinerStatus};
 use parking_lot::{Mutex, RwLock};
-use transaction::transaction_pool::TransactionPool;
-use transaction::banning_queue::{BanningTransactionQueue, Threshold};
-use transaction::local_transactions::TxIoMessage;
-use transaction::transaction_queue::{
-    AccountDetails, PrioritizationStrategy, RemovalReason, TransactionOrigin, TransactionQueue,
-};
+use receipt::Receipt;
+use spec::Spec;
+use state::State;
+use std::collections::{BTreeMap, HashSet};
+use std::sync::Arc;
+use std::thread;
+use std::time::{self, Duration, Instant};
 use transaction::{
     Condition as TransactionCondition,
     Error as TransactionError,
@@ -46,14 +46,13 @@ use transaction::{
     SignedTransaction,
     UnverifiedTransaction,
 };
+use transaction::banning_queue::{BanningTransactionQueue, Threshold};
+use transaction::local_transactions::TxIoMessage;
+use transaction::transaction_pool::TransactionPool;
+use transaction::transaction_queue::{
+    AccountDetails, PrioritizationStrategy, RemovalReason, TransactionOrigin, TransactionQueue,
+};
 use using_queue::{GetAction, UsingQueue};
-use block::{ClosedBlock, IsBlock, Block};
-use client::{MiningBlockChainClient, BlockId, TransactionId};
-use header::{Header, BlockNumber};
-use io::IoChannel;
-use receipt::Receipt;
-use spec::Spec;
-use state::State;
 
 /// Different possible definitions for pending transaction set.
 #[derive(Debug, PartialEq)]
@@ -157,7 +156,7 @@ pub struct Miner {
     gas_range_target: RwLock<(U256, U256)>,
     author: RwLock<Address>,
     extra_data: RwLock<Bytes>,
-    engine: Arc<POWEquihashEngine>,
+    engine: Arc<AionEngine>,
     accounts: Option<Arc<AccountProvider>>,
     tx_message: Mutex<IoChannel<TxIoMessage>>,
     transaction_pool_update_lock: Mutex<bool>,
@@ -187,11 +186,7 @@ impl Miner {
     pub fn clear(&self) { self.sealing_work.lock().queue.reset(); }
 
     /// Get `Some` `clone()` of the current pending block's state or `None` if we're not sealing.
-    pub fn pending_state(
-        &self,
-        latest_block_number: BlockNumber,
-    ) -> Option<State<::state_db::StateDB>>
-    {
+    pub fn pending_state(&self, latest_block_number: BlockNumber) -> Option<State<::db::StateDB>> {
         self.map_pending_block(|b| b.state().clone(), latest_block_number)
     }
 
@@ -1120,5 +1115,184 @@ impl MinerService for Miner {
 
         self.transaction_pool.record_transaction_sealed();
         client.new_block_chained();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use aion_types::U256;
+    use block::IsBlock;
+    use io::IoChannel;
+    use keychain;
+    use miner::{Miner, MinerService};
+    use rustc_hex::FromHex;
+    use spec::Spec;
+    use std::sync::Arc;
+    use std::time::Duration;
+    use super::{Banning, MinerOptions, PendingSet};
+    use tests::common::{EachBlockWith, TestBlockChainClient};
+    use transaction::{PendingTransaction, SignedTransaction};
+    use transaction::Action;
+    use transaction::Transaction;
+    use transaction::transaction_queue::PrioritizationStrategy;
+
+    #[test]
+    fn should_prepare_block_to_seal() {
+        // given
+        let client = TestBlockChainClient::default();
+        let miner = Miner::with_spec(&Spec::new_test());
+
+        // when
+        let sealing_work = miner.map_sealing_work(&client, |_| ());
+        assert!(sealing_work.is_some(), "Expected closed block");
+    }
+
+    #[test]
+    fn should_still_work_after_a_couple_of_blocks() {
+        // given
+        let client = TestBlockChainClient::default();
+        let miner = Miner::with_spec(&Spec::new_test());
+
+        let res = miner.map_sealing_work(&client, |b| b.block().header().mine_hash());
+        assert!(res.is_some());
+        assert!(miner.submit_seal(&client, res.unwrap(), vec![]).is_ok());
+
+        // two more blocks mined, work requested.
+        client.add_blocks(1, EachBlockWith::Nothing);
+        miner.map_sealing_work(&client, |b| b.block().header().mine_hash());
+
+        client.add_blocks(1, EachBlockWith::Nothing);
+        miner.map_sealing_work(&client, |b| b.block().header().mine_hash());
+
+        // solution to original work submitted.
+        assert!(miner.submit_seal(&client, res.unwrap(), vec![]).is_ok());
+    }
+
+    fn miner() -> Miner {
+        Arc::try_unwrap(Miner::new(
+            MinerOptions {
+                force_sealing: false,
+                reseal_min_period: Duration::from_secs(5),
+                prepare_block_interval: Duration::from_secs(5),
+                tx_gas_limit: !U256::zero(),
+                tx_queue_memory_limit: None,
+                tx_queue_strategy: PrioritizationStrategy::GasFactorAndGasPrice,
+                pending_set: PendingSet::AlwaysSealing,
+                work_queue_size: 5,
+                enable_resubmission: true,
+                tx_queue_banning: Banning::Disabled,
+                infinite_pending_block: false,
+                minimal_gas_price: 0u64.into(),
+                maximal_gas_price: 9_000_000_000_000_000_000u64.into(),
+                local_max_gas_price: 100_000_000_000u64.into(),
+            },
+            &Spec::new_test(),
+            None, // accounts provider
+            IoChannel::disconnected(),
+        ))
+        .ok()
+        .expect("Miner was just created.")
+    }
+
+    fn transaction() -> SignedTransaction {
+        let keypair = keychain::ethkey::generate_keypair();
+        Transaction {
+            action: Action::Create,
+            value: U256::zero(),
+            data: "3331600055".from_hex().unwrap(),
+            gas: U256::from(300_000),
+            gas_price: default_gas_price(),
+            nonce: U256::zero(),
+            transaction_type: ::transaction::DEFAULT_TRANSACTION_TYPE,
+            nonce_bytes: Vec::new(),
+            gas_price_bytes: Vec::new(),
+            gas_bytes: Vec::new(),
+            value_bytes: Vec::new(),
+        }
+        .sign(keypair.secret(), None)
+    }
+
+    fn default_gas_price() -> U256 { 0u64.into() }
+
+    #[test]
+    fn should_make_pending_block_when_importing_own_transaction() {
+        // given
+        let client = TestBlockChainClient::default();
+        let miner = miner();
+        let transaction = transaction();
+        let best_block = 0;
+        // when
+        let res = miner.import_own_transaction(&client, PendingTransaction::new(transaction, None));
+        // then
+        assert!(res.is_ok());
+        miner.update_transaction_pool(&client, true);
+        miner.prepare_work_sealing(&client);
+        assert_eq!(miner.pending_transactions().len(), 1);
+        assert_eq!(miner.ready_transactions(best_block, 0).len(), 1);
+        assert_eq!(miner.pending_transactions_hashes(best_block).len(), 1);
+        assert_eq!(miner.pending_receipts(best_block).len(), 1);
+        // This method will let us know if pending block was created (before calling that method)
+        assert!(!miner.prepare_work_sealing(&client));
+    }
+
+    #[test]
+    fn should_not_use_pending_block_if_best_block_is_higher() {
+        // given
+        let client = TestBlockChainClient::default();
+        let miner = miner();
+        let transaction = transaction();
+        let best_block = 10;
+        // when
+        let res = miner.import_own_transaction(&client, PendingTransaction::new(transaction, None));
+        // then
+        assert!(res.is_ok());
+        miner.update_transaction_pool(&client, true);
+        miner.prepare_work_sealing(&client);
+        assert_eq!(miner.pending_transactions().len(), 1);
+        assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
+        assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
+        assert_eq!(miner.pending_receipts(best_block).len(), 0);
+    }
+
+    //
+    #[test]
+    fn should_import_external_transaction() {
+        // given
+        let client = TestBlockChainClient::default();
+        let miner = miner();
+        let transaction = transaction().into();
+        let best_block = 0;
+        // when
+        let res = miner
+            .import_external_transactions(&client, vec![transaction])
+            .pop()
+            .unwrap();
+        // then
+        assert!(res.is_ok());
+        miner.update_transaction_pool(&client, true);
+        // miner.prepare_work_sealing(&client);
+        assert_eq!(miner.pending_transactions().len(), 1);
+        assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
+        assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
+        assert_eq!(miner.pending_receipts(best_block).len(), 0);
+        // This method will let us know if pending block was created (before calling that method)
+        assert!(miner.prepare_work_sealing(&client));
+    }
+
+    #[test]
+    fn should_not_seal_unless_enabled() {
+        let miner = miner();
+        let client = TestBlockChainClient::default();
+        // By default resealing is not required.
+        assert!(!miner.requires_reseal(1u8.into()));
+
+        miner
+            .import_external_transactions(&client, vec![transaction().into()])
+            .pop()
+            .unwrap()
+            .unwrap();
+        assert!(miner.prepare_work_sealing(&client));
+        // Unless asked to prepare work.
+        assert!(miner.requires_reseal(1u8.into()));
     }
 }

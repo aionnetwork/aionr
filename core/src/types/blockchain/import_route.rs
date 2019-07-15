@@ -78,8 +78,8 @@ impl From<BlockInfo> for ImportRoute {
 #[cfg(test)]
 mod tests {
     use aion_types::{H256, U256};
-    use blockchain::block_info::{BlockInfo, BlockLocation, BranchBecomingCanonChainData};
-    use blockchain::ImportRoute;
+    use types::block::info::{BlockInfo, BlockLocation, BranchBecomingCanonChainData};
+    use types::blockchain::import_route::ImportRoute;
 
     #[test]
     fn import_route_none() {

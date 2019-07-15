@@ -21,10 +21,36 @@
  ******************************************************************************/
 
 //! Engine deserialization.
-use super::POWEquihashEngine;
+use super::{POWEquihashEngine};
+use super::{NullEngine};
 
 /// Engine deserialization.
 #[derive(Debug, PartialEq, Deserialize)]
 pub enum Engine {
     POWEquihashEngine(POWEquihashEngine),
+    #[serde(rename = "null")]
+    Null(NullEngine),
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json;
+    use spec::Engine;
+
+    #[test]
+    fn engine_deserialization() {
+        let s = r#"{
+            "null": {
+                "params": {
+                    "blockReward": "0x0d"
+                }
+            }
+        }"#;
+
+        let deserialized: Engine = serde_json::from_str(s).unwrap();
+        match deserialized {
+            Engine::Null(_) => {} // unit test in its own file.
+            _ => panic!(),
+        }
+    }
 }
