@@ -699,6 +699,9 @@ impl<B: Backend> State<B> {
     ) -> Vec<ApplyResult>
     {
         let exec_results = self.execute_bulk(env_info, machine, txs, false, false);
+        if !exec_results.is_empty() && !exec_results[0].is_ok() {
+            return vec![Err(From::from(exec_results[0].clone().unwrap_err()))];
+        }
 
         let mut receipts = Vec::new();
         for result in exec_results {
