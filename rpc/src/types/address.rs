@@ -89,9 +89,9 @@ impl<'a> Visitor<'a> for AddressVisitor {
 
 #[cfg(test)]
 mod tests {
-    use super::Address;
-    use serde_json;
-    use rustc_hex::FromHex;
+    //    use super::Address;
+    //    use serde_json;
+    //    use rustc_hex::FromHex;
 
     #[test]
     fn test() {

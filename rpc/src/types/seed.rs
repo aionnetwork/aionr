@@ -93,9 +93,9 @@ impl<'a> Visitor<'a> for SeedVisitor {
 
 #[cfg(test)]
 mod tests {
-    use super::Seed;
-    use serde_json;
-    use rustc_hex::FromHex;
+    //    use super::Seed;
+    //    use serde_json;
+    //    use rustc_hex::FromHex;
 
     #[test]
     fn test() {

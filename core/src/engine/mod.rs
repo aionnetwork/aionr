@@ -22,8 +22,6 @@
 
 //! Consensus engine specification and basic implementations.
 pub mod pow_equihash_engine;
-#[cfg(test)]
-use tests::common::null_engine::NullEngine;
 pub use self::pow_equihash_engine::POWEquihashEngine;
 
 use std::fmt;

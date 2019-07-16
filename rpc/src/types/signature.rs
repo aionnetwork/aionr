@@ -93,9 +93,9 @@ impl<'a> Visitor<'a> for SignatureVisitor {
 
 #[cfg(test)]
 mod tests {
-    use super::Signature;
-    use serde_json;
-    use rustc_hex::FromHex;
+    //    use super::Signature;
+    //    use serde_json;
+    //    use rustc_hex::FromHex;
 
     #[test]
     fn test() {

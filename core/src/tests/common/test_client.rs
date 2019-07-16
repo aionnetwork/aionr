@@ -392,6 +392,7 @@ impl MiningBlockChainClient for TestBlockChainClient {
             &genesis_header,
             seal_type.unwrap_or_default(),
             None,
+            None,
             Arc::new(last_hashes),
             author,
             gas_range_target,
@@ -597,8 +598,11 @@ impl BlockChainClient for TestBlockChainClient {
     }
 
     fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header> {
-        let chain = self.chain.read();
-        chain.block_header_data(hash)
+        self.blocks
+            .read()
+            .get(&hash)
+            .map(|r| Rlp::new(r).at(0).as_raw().to_vec())
+            .map(encoded::Header::new)
     }
 
     fn seal_parent_header(
@@ -607,8 +611,13 @@ impl BlockChainClient for TestBlockChainClient {
         seal_type: &Option<SealType>,
     ) -> Option<::encoded::Header>
     {
-        let chain = self.chain.read();
-        chain.seal_parent_header(parent_hash, seal_type)
+        self.blocks
+            .read()
+            .get(&parent_hash)
+            .map(|r| Rlp::new(r).at(0).as_raw().to_vec())
+            .map(encoded::Header::new)
+            .filter(|h| h.seal_type() == *seal_type)
+        // TODO-UNITY-TEST: handle this better
     }
 
     fn block_number(&self, _id: BlockId) -> Option<BlockNumber> { unimplemented!() }

@@ -1339,6 +1339,7 @@ mod tests {
                 minimal_gas_price: 0u64.into(),
                 maximal_gas_price: 9_000_000_000_000_000_000u64.into(),
                 local_max_gas_price: 100_000_000_000u64.into(),
+                staker_private_key: None,
             },
             &Spec::new_test(),
             None, // accounts provider
@@ -1380,13 +1381,13 @@ mod tests {
         // then
         assert!(res.is_ok());
         miner.update_transaction_pool(&client, true);
-        miner.prepare_work_sealing(&client);
+        miner.prepare_work_sealing(&client, &None);
         assert_eq!(miner.pending_transactions().len(), 1);
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 1);
         assert_eq!(miner.pending_transactions_hashes(best_block).len(), 1);
         assert_eq!(miner.pending_receipts(best_block).len(), 1);
         // This method will let us know if pending block was created (before calling that method)
-        assert!(!miner.prepare_work_sealing(&client));
+        assert!(!miner.prepare_work_sealing(&client, &None));
     }
 
     #[test]
@@ -1401,7 +1402,7 @@ mod tests {
         // then
         assert!(res.is_ok());
         miner.update_transaction_pool(&client, true);
-        miner.prepare_work_sealing(&client);
+        miner.prepare_work_sealing(&client, &None);
         assert_eq!(miner.pending_transactions().len(), 1);
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
         assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
@@ -1430,7 +1431,7 @@ mod tests {
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
         assert_eq!(miner.pending_receipts(best_block).len(), 0);
         // This method will let us know if pending block was created (before calling that method)
-        assert!(miner.prepare_work_sealing(&client));
+        assert!(miner.prepare_work_sealing(&client, &None));
     }
 
     #[test]
@@ -1445,7 +1446,7 @@ mod tests {
             .pop()
             .unwrap()
             .unwrap();
-        assert!(miner.prepare_work_sealing(&client));
+        assert!(miner.prepare_work_sealing(&client, &None));
         // Unless asked to prepare work.
         assert!(miner.requires_reseal(1u8.into()));
     }

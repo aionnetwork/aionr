@@ -922,6 +922,7 @@ mod tests {
             arg_blk_price_window: 20usize,
             flag_dynamic_gas_price: true,
             arg_local_max_gas_price: 100000000000u64,
+            arg_staker_private_key: Some("staker_private_key".into()),
 
             // -- Stratum Options
             flag_no_stratum: true,
@@ -1074,6 +1075,7 @@ mod tests {
                     dynamic_gas_price: None,
                     max_blk_traverse: None,
                     local_max_gas_price: None,
+                    staker_private_key: None
                 }),
                 db: Some(Database {
                     no_persistent_txqueue: None,

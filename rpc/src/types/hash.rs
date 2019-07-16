@@ -89,9 +89,9 @@ impl<'a> Visitor<'a> for HashVisitor {
 
 #[cfg(test)]
 mod tests {
-    use super::Hash;
-    use serde_json;
-    use rustc_hex::FromHex;
+    //    use super::Hash;
+    //    use serde_json;
+    //    use rustc_hex::FromHex;
 
     #[test]
     fn test() {
