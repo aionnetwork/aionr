@@ -38,7 +38,7 @@ use rlp::{
 RlpStream};
 use types::BlockNumber;
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
-use engine::{NullEngine, AionEngine, POWEquihashEngine};
+use engine::{Engine, POWEquihashEngine};
 use types::error::Error;
 use executive::Executive;
 use factory::Factories;
@@ -50,6 +50,9 @@ use spec::seal::Generic as GenericSeal;
 use spec::Genesis;
 use state::backend::Basic as BasicBackend;
 use state::{Backend, State, Substate};
+
+#[cfg(test)]
+use tests::common::null_engine::NullEngine;
 
 // helper for formatting errors.
 fn fmt_err<F: ::std::fmt::Display>(f: F) -> String { format!("Spec json is invalid: {}", f) }
@@ -89,7 +92,7 @@ pub struct Spec {
     /// User friendly spec name
     pub name: String,
     /// What engine are we using for this?
-    pub engine: Arc<AionEngine>,
+    pub engine: Arc<Engine>,
     /// Name of the subdir inside the main data dir to use for chain data and settings.
     pub data_dir: String,
     /// The genesis block's parent hash field.
@@ -243,7 +246,7 @@ impl Spec {
         params: CommonParams,
         builtins: BTreeMap<Address, Box<BuiltinContract>>,
         premine: U256,
-    ) -> Arc<AionEngine>
+    ) -> Arc<Engine>
     {
         let machine = Self::machine(params, builtins, premine);
 
@@ -254,8 +257,15 @@ impl Spec {
                     machine,
                 ))
             }
-            ajson::spec::Engine::Null(null_engine) => {
-                Arc::new(NullEngine::new(null_engine.params.into(), machine))
+            ajson::spec::Engine::Null(_null_engine) => {
+                #[cfg(test)]
+                {
+                    Arc::new(NullEngine::new(_null_engine.params.into(), machine))
+                }
+                #[cfg(not(test))]
+                {
+                    panic!("NullEngine Should not be used in normal builds");
+                }
             }
         }
     }

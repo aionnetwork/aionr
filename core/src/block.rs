@@ -34,7 +34,7 @@ use aion_types::{H256, U256, Address};
 use ethbloom::Bloom;
 use acore_bytes::Bytes;
 use unexpected::Mismatch;
-use engine::{AionEngine};
+use engine::{Engine};
 use types::error::{Error, BlockError};
 use factory::Factories;
 use header::{Header, Seal, SealType};
@@ -186,7 +186,7 @@ impl ::aion_machine::LiveBlock for ExecutedBlock {
 /// maintain the system `state()`. We also archive execution receipts in preparation for later block creation.
 pub struct OpenBlock<'x> {
     block: ExecutedBlock,
-    engine: &'x AionEngine,
+    engine: &'x Engine,
 }
 
 /// Just like `OpenBlock`, except that we've applied `Engine::on_close_block`, finished up the non-seal header fields,
@@ -217,7 +217,7 @@ pub struct SealedBlock {
 impl<'x> OpenBlock<'x> {
     /// Create a new `OpenBlock` ready for transaction pushing.
     pub fn new(
-        engine: &'x AionEngine,
+        engine: &'x Engine,
         factories: Factories,
         db: StateDB,
         parent: &Header,
@@ -548,7 +548,7 @@ impl ClosedBlock {
     }
 
     /// Given an engine reference, reopen the `ClosedBlock` into an `OpenBlock`.
-    pub fn reopen(self, engine: &AionEngine) -> OpenBlock {
+    pub fn reopen(self, engine: &Engine) -> OpenBlock {
         // revert rewards (i.e. set state back at last transaction's state).
         let mut block = self.block;
         block.state = self.unclosed_state;
@@ -566,7 +566,7 @@ impl LockedBlock {
     /// Provide a valid seal in order to turn this into a `SealedBlock`.
     ///
     /// NOTE: This does not check the validity of `seal` with the engine.
-    pub fn seal(self, engine: &AionEngine, seal: Vec<Bytes>) -> Result<SealedBlock, BlockError> {
+    pub fn seal(self, engine: &Engine, seal: Vec<Bytes>) -> Result<SealedBlock, BlockError> {
         let expected_seal_fields = engine.seal_fields(self.header());
         let mut s = self;
         if seal.len() != expected_seal_fields {
@@ -586,7 +586,7 @@ impl LockedBlock {
     /// Returns the `LockedBlock` back again if the seal is no good.
     pub fn try_seal_pow(
         self,
-        engine: &AionEngine,
+        engine: &Engine,
         seal: Vec<Bytes>,
     ) -> Result<SealedBlock, (Error, LockedBlock)>
     {
@@ -608,7 +608,7 @@ impl LockedBlock {
     /// Returns the `LockedBlock` back again if the seal is no good.
     pub fn try_seal_pos(
         self,
-        engine: &AionEngine,
+        engine: &Engine,
         seal: Vec<Bytes>,
         seal_parent: Option<&Header>,
     ) -> Result<SealedBlock, (Error, LockedBlock)>
@@ -655,7 +655,7 @@ impl IsBlock for SealedBlock {
 fn enact(
     header: &Header,
     transactions: &[SignedTransaction],
-    engine: &AionEngine,
+    engine: &Engine,
     db: StateDB,
     parent: &Header,
     seal_parent: Option<&Header>,
@@ -813,7 +813,7 @@ fn push_transactions(
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 pub fn enact_verified(
     block: &PreverifiedBlock,
-    engine: &AionEngine,
+    engine: &Engine,
     db: StateDB,
     parent: &Header,
     seal_parent: Option<&Header>,

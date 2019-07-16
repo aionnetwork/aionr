@@ -363,7 +363,7 @@ impl POWEquihashEngine {
     }
 }
 
-impl Engine<EthereumMachine> for Arc<POWEquihashEngine> {
+impl Engine for Arc<POWEquihashEngine> {
     fn name(&self) -> &str { "POWEquihashEngine" }
 
     fn machine(&self) -> &EthereumMachine { &self.machine }

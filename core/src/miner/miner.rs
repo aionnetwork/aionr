@@ -32,7 +32,7 @@ use aion_types::{Address, H256, U256};
 use ansi_term::Colour;
 use block::{Block, ClosedBlock, IsBlock, SealedBlock};
 use client::{BlockId, MiningBlockChainClient, TransactionId};
-use engine::AionEngine;
+use engine::Engine;
 use header::{BlockNumber, Header, SealType};
 use types::error::*;
 use io::IoChannel;
@@ -165,7 +165,7 @@ pub struct Miner {
     // TOREMOVE: Unity MS1 use only.
     staker: Option<Ed25519KeyPair>,
     extra_data: RwLock<Bytes>,
-    engine: Arc<AionEngine>,
+    engine: Arc<Engine>,
     accounts: Option<Arc<AccountProvider>>,
     tx_message: Mutex<IoChannel<TxIoMessage>>,
     transaction_pool_update_lock: Mutex<bool>,
