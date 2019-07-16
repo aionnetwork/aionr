@@ -1,7 +1,8 @@
 package org.aion.avm.jni;
 
 import org.aion.avm.core.IExternalCapabilities;
-import org.aion.types.Address;
+import org.aion.types.AionAddress;
+import org.aion.types.Transaction;
 import org.aion.vm.api.interfaces.TransactionContext;
 import org.aion.vm.api.interfaces.TransactionInterface;
 
@@ -28,10 +29,10 @@ public class AionCapabilities implements IExternalCapabilities {
     }
 
     @Override
-    public Address generateContractAddress(TransactionInterface txMessage) {
-        byte[] sender = txMessage.getSenderAddress().toBytes();
-        byte[] nonce = txMessage.getNonce();
-        Address new_contract = new Address(NativeKernelInterface.contract_address(sender, nonce));
+    public AionAddress generateContractAddress(Transaction tx) {
+        byte[] sender = tx.senderAddress.toByteArray();
+        byte[] nonce = tx.nonce.toByteArray();
+        AionAddress new_contract = new AionAddress(NativeKernelInterface.contract_address(sender, nonce));
         if (Constants.DEBUG)
             System.out.println(new_contract);
         return new_contract;
