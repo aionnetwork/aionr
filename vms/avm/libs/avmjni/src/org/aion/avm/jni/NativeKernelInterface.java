@@ -1,7 +1,9 @@
 package org.aion.avm.jni;
 
 import org.aion.vm.api.interfaces.KernelInterface;
-import org.aion.types.Address;
+import org.aion.types.AionAddress;
+
+import org.aion.avm.core.IExternalState;
 import org.aion.avm.core.NodeEnvironment;
 import java.math.BigInteger;
 
@@ -10,7 +12,7 @@ import java.util.Set;
 /**
  * JNI binding of the kernel interface.
  */
-public class NativeKernelInterface implements KernelInterface {
+public class NativeKernelInterface implements IExternalState {
 
     private static final String libraryName = "avmjni";
     private boolean isLocalCall;
@@ -40,6 +42,11 @@ public class NativeKernelInterface implements KernelInterface {
         this.isLocalCall = isLocal;
     }
 
+    @Override
+    public NativeKernelInterface newChildExternalState() {
+        return new NativeKernelInterface(this.handle, this.isLocalCall);
+    }
+
     public void touchAccount(byte[] addr, int index_of_substate) {
         touchAccount(handle, addr, index_of_substate);
     }
@@ -53,75 +60,75 @@ public class NativeKernelInterface implements KernelInterface {
     }
 
     @Override
-    public void createAccount(Address address) {
-        createAccount(handle, address.toBytes());
+    public void createAccount(AionAddress address) {
+        createAccount(handle, address.toByteArray());
     }
 
     @Override
-    public boolean hasAccountState(Address address) {
-        return hasAccountState(handle, address.toBytes());
+    public boolean hasAccountState(AionAddress address) {
+        return hasAccountState(handle, address.toByteArray());
     }
 
     @Override
-    public void putCode(Address address, byte[] code) {
-        putCode(handle, address.toBytes(), code);
+    public void putCode(AionAddress address, byte[] code) {
+        putCode(handle, address.toByteArray(), code);
     }
 
     @Override
-    public byte[] getCode(Address address) {
-        return getCode(handle, address.toBytes());
+    public byte[] getCode(AionAddress address) {
+        return getCode(handle, address.toByteArray());
     }
 
     @Override
-    public void putStorage(Address address, byte[] key, byte[] value) {
-        putStorage(handle, address.toBytes(), key, value);
+    public void putStorage(AionAddress address, byte[] key, byte[] value) {
+        putStorage(handle, address.toByteArray(), key, value);
     }
 
     @Override
-    public byte[] getStorage(Address address, byte[] key) {
-        return getStorage(handle, address.toBytes(), key);
+    public byte[] getStorage(AionAddress address, byte[] key) {
+        return getStorage(handle, address.toByteArray(), key);
     }
 
     @Override
-    public void deleteAccount(Address address) {
+    public void deleteAccount(AionAddress address) {
         if (!this.isLocalCall) {
-            deleteAccount(handle, address.toBytes());
+            deleteAccount(handle, address.toByteArray());
         }
     }
 
     @Override
-    public boolean accountNonceEquals(Address address, BigInteger nonce) {
+    public boolean accountNonceEquals(AionAddress address, BigInteger nonce) {
         return this.isLocalCall || nonce.compareTo(this.getNonce(address)) == 0;
     }
 
     @Override
-    public BigInteger getBalance(Address address) {
-        byte[] balance = getBalance(handle, address.toBytes());
+    public BigInteger getBalance(AionAddress address) {
+        byte[] balance = getBalance(handle, address.toByteArray());
         return new BigInteger(1, balance);
     }
 
     @Override
-    public void adjustBalance(Address address, BigInteger delta) {
+    public void adjustBalance(AionAddress address, BigInteger delta) {
         // System.out.println(String.format("Native: avm adjust balance: %d", delta.longValue()));
         if (delta.signum() > 0) {
-            increaseBalance(handle, address.toBytes(), delta.toByteArray());
+            increaseBalance(handle, address.toByteArray(), delta.toByteArray());
         } else if (delta.signum() < 0) {
-            decreaseBalance(handle, address.toBytes(), delta.negate().toByteArray());
+            decreaseBalance(handle, address.toByteArray(), delta.negate().toByteArray());
         }
     }
 
     @Override
-    public BigInteger getNonce(Address address) {
-        return BigInteger.valueOf(getNonce(handle, address.toBytes()));
+    public BigInteger getNonce(AionAddress address) {
+        return BigInteger.valueOf(getNonce(handle, address.toByteArray()));
     }
 
     @Override
-    public void incrementNonce(Address address) {
-        incrementNonce(handle, address.toBytes());
+    public void incrementNonce(AionAddress address) {
+        incrementNonce(handle, address.toByteArray());
     }
 
     @Override
-    public boolean accountBalanceIsAtLeast(Address address, BigInteger amount) {
+    public boolean accountBalanceIsAtLeast(AionAddress address, BigInteger amount) {
         return this.isLocalCall || getBalance(address).compareTo(amount) >= 0;
     }
     
@@ -136,7 +143,7 @@ public class NativeKernelInterface implements KernelInterface {
     }
 
     @Override
-    public boolean destinationAddressIsSafeForThisVM(Address address) {
+    public boolean destinationAddressIsSafeForThisVM(AionAddress address) {
         byte[] code = getCode(address);
         return (code == null) || (code.length == 0) || !(code[0] == 0x60 && code[1] == 0x50);
     }
@@ -147,49 +154,44 @@ public class NativeKernelInterface implements KernelInterface {
     }
 
     @Override
-    public void payMiningFee(Address address, BigInteger fee) {
+    public void payMiningFee(AionAddress address, BigInteger fee) {
         // System.out.println("Native: avm trys to pay mining fee");
         // This method may have special logic in the kernel. Here it is just adjustBalance.
         adjustBalance(address, fee);
     }
 
     @Override
-    public void refundAccount(Address address, BigInteger amount) {
+    public void refundAccount(AionAddress address, BigInteger amount) {
         // This method may have special logic in the kernel. Here it is just adjustBalance.
         adjustBalance(address, amount);
     }
 
     @Override
-    public void deductEnergyCost(Address address, BigInteger cost) {
+    public void deductEnergyCost(AionAddress address, BigInteger cost) {
         // This method may have special logic in the kernel. Here it is just adjustBalance.
         adjustBalance(address, cost);
     }
 
     @Override
-    public void removeStorage(Address address, byte[] key) {
+    public void removeStorage(AionAddress address, byte[] key) {
         // System.out.println("Native: remove storage");
         //putStorage(address, key, new byte[0]);
-        removeStorage(handle, address.toBytes(), key);
+        removeStorage(handle, address.toByteArray(), key);
     }
 
     @Override
-    public KernelInterface makeChildKernelInterface() {
-        return new NativeKernelInterface(handle, isLocalCall);
+    public byte[] getObjectGraph(AionAddress a) {
+        return getObjectGraph(handle, a.toByteArray());
     }
 
     @Override
-    public byte[] getObjectGraph(Address a) {
-        return getObjectGraph(handle, a.toBytes());
-    }
-
-    @Override
-    public void putObjectGraph(Address a, byte[] data) {
-        setObjectGraph(handle, a.toBytes(), data);
+    public void putObjectGraph(AionAddress a, byte[] data) {
+        setObjectGraph(handle, a.toByteArray(), data);
     }
 
     // Camus: this should not be in kernel interface
     @Override
-    public Address getMinerAddress() {
+    public AionAddress getMinerAddress() {
         throw new AssertionError("Did not expect this to be called.");
     }
 
@@ -223,19 +225,20 @@ public class NativeKernelInterface implements KernelInterface {
     // }
 
     @Override
-    public void commitTo(KernelInterface target) { }
+    public void commitTo(IExternalState target) { }
 
     @Override
     public void commit() { }
 
     @Override
-    public void setTransformedCode(Address address, byte[] code) {
-        setTransformedCode(handle, address.toBytes(), code);
+    public void setTransformedCode(AionAddress address, byte[] code) {
+        setTransformedCode(handle, address.toByteArray(), code);
+
     }
 
     @Override
-    public byte[] getTransformedCode(Address address) {
-        return getTransformedCode(handle, address.toBytes());
+    public byte[] getTransformedCode(AionAddress address) {
+        return getTransformedCode(handle, address.toByteArray());
     }
 
     public static native void createAccount(long handle, byte[] address);
