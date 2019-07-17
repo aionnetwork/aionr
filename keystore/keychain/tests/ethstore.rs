@@ -90,22 +90,22 @@ fn should_remove_account() {
     assert_eq!(store.accounts().unwrap().len(), 0, "Should remove account.");
 }
 
-//#[test]
-//fn should_return_true_if_password_is_correct() {
-//    // given
-//    let store = store();
-//    let keypair = keypair();
-//    let address = store
-//        .insert_account_ed25519(keypair.secret().clone(), "test")
-//        .unwrap();
-//
-//    // when
-//    let res1 = store.test_password(&address, "x").unwrap();
-//    let res2 = store.test_password(&address, "test").unwrap();
-//
-//    assert!(!res1, "First password should be invalid.");
-//    assert!(res2, "Second password should be correct.");
-//}
+#[test]
+fn should_return_true_if_password_is_correct() {
+    // given
+    let store = store();
+    let keypair = keypair();
+    let address = store
+        .insert_account_ed25519(keypair.secret().clone(), "test")
+        .unwrap();
+
+    // when
+    let res1 = store.test_password(&address, "x").unwrap();
+    let res2 = store.test_password(&address, "test").unwrap();
+
+    assert!(!res1, "First password should be invalid.");
+    assert!(res2, "Second password should be correct.");
+}
 
 #[test]
 fn should_not_remove_account_when_moving_to_self() {

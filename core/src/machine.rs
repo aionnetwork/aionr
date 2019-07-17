@@ -28,7 +28,7 @@ use std::sync::Arc;
 
 use block::{ExecutedBlock, IsBlock};
 use precompiled::builtin::BuiltinContract;
-use error::Error;
+use types::error::Error;
 use executive::{Executive};
 use header::{BlockNumber, Header};
 use spec::CommonParams;
@@ -38,6 +38,7 @@ use aion_types::{U256, H256, Address};
 use vms::{ActionParams, ActionValue, CallType, ParamsType};
 
 /// An ethereum-like state machine.
+#[cfg_attr(test, derive(Default))]
 pub struct EthereumMachine {
     params: CommonParams,
     builtins: Arc<BTreeMap<Address, Box<BuiltinContract>>>,

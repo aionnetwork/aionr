@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use client::{BlockId, BlockImportError, BlockStatus};
-use error::{BlockError, ImportError};
+use types::error::{BlockError, ImportError};
 use header::Seal;
 use views::BlockView;
 use aion_types::{H256, U256};
@@ -64,7 +64,6 @@ impl ImportHandler {
                         }
                     }
                 }
-                SyncStorage::remove_staged_block_hash(hash);
             }
         }
     }

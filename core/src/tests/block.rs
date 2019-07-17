@@ -20,37 +20,31 @@
  *
  ******************************************************************************/
 
-#![warn(unused_extern_crates)]
-
-extern crate acore;
-extern crate aion_types;
-extern crate types;
-extern crate vms;
-extern crate db;
-#[macro_use]
-extern crate log;
-
+use log;
 use std::sync::Arc;
-use acore::block::{OpenBlock, LockedBlock};
-use acore::engines::POWEquihashEngine;
-use acore::error::Error;
-use acore::header::Header;
-use acore::factory::Factories;
-use acore::state_db::StateDB;
-use acore::state::State;
-use acore::views::BlockView;
-use acore::transaction::SignedTransaction;
-use db::MemoryDBRepository;
+use block::{OpenBlock, LockedBlock, SealedBlock, Drain};
+use engine::Engine;
+use types::error::Error;
+use header::Header;
+use factory::Factories;
+use db::StateDB;
+use state::State;
+use views::BlockView;
+use transaction::SignedTransaction;
+use kvdb::MockDbRepository;
 use aion_types::Address;
 use vms::LastHashes;
+use tests::common::helpers::get_temp_state_db;
+use spec::Spec;
 
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 fn enact_bytes(
     block_bytes: &[u8],
-    engine: &POWEquihashEngine,
+    engine: &Engine,
     db: StateDB,
     parent: &Header,
-    _grant_parent: Option<&Header>,
+    seal_parent: Option<&Header>,
+    seal_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
 ) -> Result<LockedBlock, Error>
@@ -64,15 +58,16 @@ fn enact_bytes(
         .map(|r| r.map_err(Into::into))
         .collect();
     let transactions = transactions?;
+    let seal_type = header.seal_type().clone();
 
     {
         if log::max_log_level() >= log::LogLevel::Trace {
             let s = State::from_existing(
                 db.boxed_clone(),
                 parent.state_root().clone(),
-                engine.machine().account_start_nonce(parent.number() + 1),
+                engine.account_start_nonce(parent.number() + 1),
                 factories.clone(),
-                Arc::new(MemoryDBRepository::new()),
+                Arc::new(MockDbRepository::init(vec![])),
             )?;
             trace!(target: "enact", "num={}, root={}, author={}, author_balance={}\n",
                    header.number(), s.root(), header.author(), s.balance(&header.author())?);
@@ -84,12 +79,14 @@ fn enact_bytes(
         factories,
         db,
         parent,
-        None,
+        seal_type.unwrap_or_default(),
+        seal_parent,
+        seal_grand_parent,
         last_hashes,
         Address::new(),
         (3141562.into(), 31415620.into()),
         vec![],
-        Arc::new(MemoryDBRepository::new()),
+        Arc::new(MockDbRepository::init(vec![])),
     )?;
 
     b.populate_from(&header);
@@ -98,27 +95,120 @@ fn enact_bytes(
     Ok(b.close_and_lock())
 }
 
-//#[test]
-//fn open_block() {
-//    let spec = Spec::new_test();
-//    let genesis_header = spec.genesis_header();
-//    let db = spec
-//        .ensure_db_good(get_temp_state_db(), &Default::default())
-//        .unwrap();
-//    let last_hashes = Arc::new(vec![genesis_header.hash()]);
-//    let b = OpenBlock::new(
-//        &*spec.engine,
-//        Default::default(),
-//        db,
-//        &genesis_header,
-//        None,
-//        last_hashes,
-//        Address::zero(),
-//        (3141562.into(), 31415620.into()),
-//        vec![],
-//        Arc::new(MemoryDBRepository::new()),
-//    )
-//        .unwrap();
-//    let b = b.close_and_lock();
-//    let _ = b.seal(&*spec.engine, vec![]);
-//}
+/// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header. Seal the block afterwards
+fn enact_and_seal(
+    block_bytes: &[u8],
+    engine: &Engine,
+    db: StateDB,
+    parent: &Header,
+    seal_parent: Option<&Header>,
+    seal_grand_parent: Option<&Header>,
+    last_hashes: Arc<LastHashes>,
+    factories: Factories,
+) -> Result<SealedBlock, Error>
+{
+    let header = BlockView::new(block_bytes).header_view();
+    Ok(enact_bytes(
+        block_bytes,
+        engine,
+        db,
+        parent,
+        seal_parent,
+        seal_grand_parent,
+        last_hashes,
+        factories,
+    )?
+    .seal(engine, header.seal())?)
+}
+
+#[test]
+fn open_block() {
+    let spec = Spec::new_test();
+    let genesis_header = spec.genesis_header();
+    let db = spec
+        .ensure_db_good(get_temp_state_db(), &Default::default())
+        .unwrap();
+    let last_hashes = Arc::new(vec![genesis_header.hash()]);
+    let b = OpenBlock::new(
+        &*spec.engine,
+        Default::default(),
+        db,
+        &genesis_header,
+        Default::default(),
+        None,
+        None,
+        last_hashes,
+        Address::zero(),
+        (3141562.into(), 31415620.into()),
+        vec![],
+        Arc::new(MockDbRepository::init(vec![])),
+    )
+    .unwrap();
+    let b = b.close_and_lock();
+    let res = b.seal(&*spec.engine, vec![]);
+    assert!(res.is_ok());
+}
+
+#[test]
+fn enact_block() {
+    use spec::*;
+    let spec = Spec::new_test();
+    let engine = &*spec.engine;
+    let genesis_header = spec.genesis_header();
+
+    let db = spec
+        .ensure_db_good(get_temp_state_db(), &Default::default())
+        .unwrap();
+    let last_hashes = Arc::new(vec![genesis_header.hash()]);
+    let b = OpenBlock::new(
+        engine,
+        Default::default(),
+        db,
+        &genesis_header,
+        Default::default(),
+        None,
+        None,
+        last_hashes.clone(),
+        Address::zero(),
+        (3141562.into(), 31415620.into()),
+        vec![],
+        Arc::new(MockDbRepository::init(vec![])),
+    )
+    .unwrap()
+    .close_and_lock()
+    .seal(engine, vec![])
+    .unwrap();
+    let orig_bytes = b.rlp_bytes();
+    let orig_db = b.drain();
+
+    let db = spec
+        .ensure_db_good(get_temp_state_db(), &Default::default())
+        .unwrap();
+    let e = enact_and_seal(
+        &orig_bytes,
+        engine,
+        db,
+        &genesis_header,
+        None,
+        None,
+        last_hashes,
+        Default::default(),
+    )
+    .unwrap();
+
+    assert_eq!(e.rlp_bytes(), orig_bytes);
+
+    let db = e.drain();
+    assert_eq!(orig_db.journal_db().keys(), db.journal_db().keys());
+    assert!(
+        orig_db
+            .journal_db()
+            .keys()
+            .iter()
+            .filter(|k| orig_db.journal_db().get(k.0) != db.journal_db().get(k.0))
+            .next()
+            .is_none()
+    );
+}
+
+// TODO-UNITY: Add some block tests about seal_parent and seal_grand_parent

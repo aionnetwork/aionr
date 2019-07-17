@@ -30,7 +30,7 @@ use bytes::ToPretty;
 use rlp::PayloadInfo;
 use acore::service::ClientService;
 use acore::client::{DatabaseCompactionProfile, VMType, BlockImportError, BlockChainClient, BlockId};
-use acore::error::ImportError;
+use acore::ImportError;
 use acore::miner::Miner;
 use acore::verification::queue::VerifierSettings;
 use cache::CacheConfig;

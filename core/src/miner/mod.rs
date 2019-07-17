@@ -32,10 +32,11 @@ use aion_types::{H256, U256, Address};
 use acore_bytes::Bytes;
 use block::ClosedBlock;
 use client::{MiningBlockChainClient};
-use error::{Error};
+use types::error::{Error};
 use header::BlockNumber;
 use receipt::Receipt;
 use transaction::{UnverifiedTransaction, PendingTransaction};
+use key::Ed25519KeyPair;
 
 /// Miner client API, this trait is somewhat related to multiple kinds of miner
 /// however, only one kind of miner now
@@ -46,8 +47,14 @@ pub trait MinerService: Send + Sync {
     /// Get the author that we will seal blocks as.
     fn author(&self) -> Address;
 
+    /// Get the PoS staker that will seal PoS blocks.
+    fn staker(&self) -> &Option<Ed25519KeyPair>;
+
     /// Set the author that we will seal blocks as.
     fn set_author(&self, author: Address);
+
+    /// Set the PoS author that will seal PoS blocks.
+    fn set_staker(&mut self, staker: Ed25519KeyPair);
 
     /// Get the extra_data that we will seal blocks with.
     fn extra_data(&self) -> Bytes;

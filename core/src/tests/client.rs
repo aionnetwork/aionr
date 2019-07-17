@@ -24,10 +24,8 @@ use std::str::FromStr;
 use std::sync::Arc;
 use io::IoChannel;
 use client::{BlockChainClient, MiningBlockChainClient, Client, ClientConfig, BlockId};
-use state::{self, State, CleanupMode};
-use executive::Executive;
+use state::{CleanupMode};
 use block::IsBlock;
-use super::*;
 use types::filter::Filter;
 use aion_types::{Address, U256};
 use kvdb::{DatabaseConfig, DbRepository, RepositoryConfig};
@@ -38,7 +36,7 @@ use key::Ed25519Secret;
 use transaction::{PendingTransaction, Transaction, Action, Condition};
 use miner::MinerService;
 use tempdir::TempDir;
-use kvdb::MemoryDBRepository;
+use helpers::{get_test_spec,generate_dummy_client,get_good_dummy_block,get_bad_state_dummy_block,get_test_client_with_blocks,push_blocks_to_client,get_good_dummy_block_seq,generate_dummy_client_with_data};
 
 #[test]
 fn imports_from_empty() {
@@ -177,6 +175,7 @@ fn returns_logs_with_limit() {
         to_block: BlockId::Latest,
         address: None,
         topics: vec![],
+        // TODO: with limit
         limit: None,
     });
     assert_eq!(logs.len(), 0);
@@ -232,6 +231,7 @@ fn can_handle_long_fork() {
     for _ in 0..400 {
         client.import_verified_blocks();
     }
+    // TODO: how to judge the first two
     assert_eq!(2000, client.chain_info().best_block_number);
 }
 
@@ -245,6 +245,7 @@ fn can_mine() {
             Address::default(),
             (3141562.into(), 31415620.into()),
             vec![],
+            None,
         )
         .close();
 
@@ -278,7 +279,7 @@ fn change_history_size() {
 
     {
         let client = Client::new(
-            ClientConfig::default(),
+            config, //ClientConfig::default(),
             &test_spec,
             client_db.clone(),
             Arc::new(Miner::with_spec(&test_spec)),
@@ -290,6 +291,7 @@ fn change_history_size() {
                 Address::default(),
                 (3141562.into(), 31415620.into()),
                 vec![],
+                None,
             );
             b.set_difficulty(U256::from(1));
             b.block_mut()
@@ -368,72 +370,4 @@ fn does_not_propagate_delayed_transactions() {
     client.flush_queue();
     assert_eq!(2, client.ready_transactions().len());
     assert_eq!(2, client.miner().pending_transactions().len());
-}
-
-#[test]
-fn transaction_proof() {
-    use client::ProvingBlockChainClient;
-
-    let client = generate_dummy_client(0);
-    let address = Address::random();
-    let test_spec = Spec::new_test();
-    for _ in 0..20 {
-        let mut b = client.prepare_open_block(
-            Address::default(),
-            (3141562.into(), 31415620.into()),
-            vec![],
-        );
-        b.block_mut()
-            .state_mut()
-            .add_balance(&address, &5.into(), CleanupMode::NoEmpty)
-            .unwrap();
-        b.set_difficulty(U256::from(1));
-        b.block_mut().state_mut().commit().unwrap();
-        let b = b.close_and_lock().seal(&*test_spec.engine, vec![]).unwrap();
-        client.import_sealed_block(b).unwrap(); // account change is in the journal overlay
-    }
-
-    let transaction = Transaction {
-        nonce: 0.into(),
-        gas_price: 0.into(),
-        gas: 21000.into(),
-        action: Action::Call(Address::default()),
-        value: 5.into(),
-        data: Vec::new(),
-        nonce_bytes: Vec::new(),
-        gas_price_bytes: Vec::new(),
-        gas_bytes: Vec::new(),
-        value_bytes: Vec::new(),
-        transaction_type: 0x01.into(),
-    }
-    .fake_sign(address);
-
-    let proof = client
-        .prove_transaction(transaction.clone(), BlockId::Latest)
-        .unwrap()
-        .1;
-    let backend = state::backend::ProofCheck::new(&proof);
-
-    let mut factories = ::factory::Factories::default();
-    factories.accountdb = ::account_db::Factory::Plain; // raw state values, no mangled keys.
-    let root = client.best_block_header().state_root();
-
-    let mut state = State::from_existing(
-        backend,
-        root,
-        0.into(),
-        factories.clone(),
-        Arc::new(MemoryDBRepository::new()),
-    )
-    .unwrap();
-    Executive::new(
-        &mut state,
-        &client.latest_env_info(),
-        test_spec.engine.machine(),
-    )
-    .transact(&transaction, false, false)
-    .unwrap();
-
-    assert_eq!(state.balance(&Address::default()).unwrap(), 5.into());
-    assert_eq!(state.balance(&address).unwrap(), 95.into());
 }

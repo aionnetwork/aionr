@@ -23,7 +23,7 @@
 //! Blockchain DB extras.
 
 use std::ops;
-use blooms::{GroupPosition, BloomGroup};
+use types::blooms::{GroupPosition, BloomGroup};
 use db::Key;
 use header::BlockNumber;
 use receipt::Receipt;
@@ -127,6 +127,8 @@ pub struct BlockDetails {
     pub parent: H256,
     /// List of children block hashes
     pub children: Vec<H256>,
+    /// The anti seal parent hash
+    pub anti_seal_parent: H256,
 }
 
 impl HeapSizeOf for BlockDetails {
@@ -163,6 +165,3 @@ impl BlockReceipts {
 impl HeapSizeOf for BlockReceipts {
     fn heap_size_of_children(&self) -> usize { self.receipts.heap_size_of_children() }
 }
-
-#[cfg(test)]
-mod tests {}

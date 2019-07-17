@@ -22,15 +22,15 @@
 
 use std::time::Duration;
 
-use account::BasicAccount;
+use state::BasicAccount;
 use block::{OpenBlock, SealedBlock, ClosedBlock};
 use blockchain::TreeRoute;
 use encoded;
-use error::{ImportResult, CallError, BlockImportError};
+use types::error::{ImportResult, CallError, BlockImportError};
 use factory::VmFactory;
 use executive::Executed;
 use filter::Filter;
-use header::{BlockNumber};
+use header::{BlockNumber, SealType};
 use log_entry::LocalizedLogEntry;
 use receipt::LocalizedReceipt;
 use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction};
@@ -38,7 +38,6 @@ use verification::queue::QueueInfo as BlockQueueInfo;
 use aion_types::{H256, H128, U256, Address};
 use vms::LastHashes;
 use acore_bytes::Bytes;
-use kvdb::DBValue;
 
 use types::ids::*;
 use types::call_analytics::CallAnalytics;
@@ -52,6 +51,19 @@ use super::super::transaction::UnverifiedTransaction;
 pub trait BlockChainClient: Sync + Send {
     /// Get raw block header data by block id.
     fn block_header(&self, id: BlockId) -> Option<encoded::Header>;
+
+    /// Get raw block header data by block hash.
+    fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header>;
+
+    /// Get the header RLP of the seal parent of the given block.
+    /// Parameters:
+    ///   parent_hash: parent hash of the given block
+    ///   seal_type: seal type of the given block
+    fn seal_parent_header(
+        &self,
+        parent_hash: &H256,
+        seal_type: &Option<SealType>,
+    ) -> Option<::encoded::Header>;
 
     /// Look up the block number for the given block ID.
     fn block_number(&self, id: BlockId) -> Option<BlockNumber>;
@@ -296,6 +308,7 @@ pub trait MiningBlockChainClient: BlockChainClient {
         author: Address,
         gas_range_target: (U256, U256),
         extra_data: Bytes,
+        seal_type: Option<SealType>,
     ) -> OpenBlock;
 
     /// Reopens an OpenBlock and updates uncles.
@@ -356,16 +369,4 @@ pub trait ProvingBlockChainClient: BlockChainClient {
     /// The key is the blake2b hash of the account's address.
     /// Returns a vector of raw trie nodes (in order from the root) proving the query.
     fn prove_account(&self, key1: H256, id: BlockId) -> Option<(Vec<Bytes>, BasicAccount)>;
-
-    /// Prove execution of a transaction at the given block.
-    /// Returns the output of the call and a vector of database items necessary
-    /// to reproduce it.
-    fn prove_transaction(
-        &self,
-        transaction: SignedTransaction,
-        id: BlockId,
-    ) -> Option<(Bytes, Vec<DBValue>)>;
-
-    // Get an epoch change signal by block hash.
-    // fn epoch_signal(&self, hash: H256) -> Option<Vec<u8>>;
 }

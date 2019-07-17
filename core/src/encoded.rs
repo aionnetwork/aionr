@@ -31,7 +31,7 @@
 
 use block::Block as FullBlock;
 
-use header::{BlockNumber, HeaderVersion, Header as FullHeader};
+use header::{BlockNumber, SealType, Header as FullHeader};
 use transaction::UnverifiedTransaction;
 use views;
 
@@ -75,8 +75,8 @@ impl Header {
     /// Returns the header hash.
     pub fn hash(&self) -> H256 { blake2b(&self.0) }
 
-    /// Returns the version.
-    pub fn version(&self) -> HeaderVersion { self.view().version() }
+    /// Returns the seal type.
+    pub fn seal_type(&self) -> Option<SealType> { self.view().seal_type() }
 
     /// Returns the parent hash.
     pub fn parent_hash(&self) -> H256 { self.view().parent_hash() }
@@ -199,8 +199,8 @@ impl Block {
 
 // forwarders to borrowed header view.
 impl Block {
-    /// Returns version.
-    pub fn version(&self) -> HeaderVersion { self.header_view().version() }
+    /// Returns seal type.
+    pub fn seal_type(&self) -> Option<SealType> { self.header_view().seal_type() }
 
     /// Returns the header hash.
     pub fn hash(&self) -> H256 { self.header_view().hash() }

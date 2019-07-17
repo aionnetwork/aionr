@@ -86,8 +86,6 @@ extern crate tempdir;
 #[cfg(test)]
 extern crate avm_abi;
 #[cfg(test)]
-pub mod helpers;
-#[cfg(test)]
 #[macro_use]
 extern crate macros;
 extern crate p2p;
@@ -103,8 +101,8 @@ pub mod client;
 // unverified transaction
 pub mod transaction;
 // PoW Engine
-pub mod engines;
-pub mod error;
+pub mod engine;
+//pub mod error;
 pub mod header;
 pub mod views;
 pub mod sync;
@@ -115,17 +113,14 @@ pub mod spec;
 pub mod verification;
 
 mod machine;
-mod executed;
 mod pod_state;
 mod pod_account;
 mod state;
-mod state_db;
+// mod state_db;
 mod db;
 mod factory;
-mod account;
 mod cache_manager;
-mod blooms;
-mod account_db;
+// mod account_db;
 mod precompiled;
 mod executive;
 mod externalities;
@@ -139,6 +134,13 @@ pub use types::{
     state::log_entry,
     state::receipt,
     state::state_diff,
-    block::status as block_status
+    block::status as block_status,
+    error::Error,
+    error::CallError,
+    error::ImportError
 };
+
 pub use executive::contract_address;
+
+#[cfg(test)]
+use tests::common::helpers;

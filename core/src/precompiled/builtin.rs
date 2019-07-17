@@ -263,6 +263,3 @@ where B: StateBackend
             .expect("Fatal error occurred when getting balance.")
     }
 }
-
-#[cfg(test)]
-mod tests {}
