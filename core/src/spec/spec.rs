@@ -434,28 +434,28 @@ impl Spec {
     }
 }
 
-//#[cfg(test)]
-//mod tests {
-//    use super::Spec;
-//    use views::BlockView;
-//    #[test]
-//    fn test_load_empty() {
-//        assert!(Spec::load(&[] as &[u8]).is_err());
-//    }
-//
-//    #[test]
-//    fn test_chain() {
-//        let test_spec = Spec::new_test();
-//
-//        assert_eq!(
-//            test_spec.state_root(),
-//            "b3fd94094ccb910e058c00d6763b61472e7bf1b8a9cb2549a83a4d5a397e194e".into()
-//        );
-//        let genesis = test_spec.genesis_block();
-//        assert_eq!(
-//            BlockView::new(&genesis).header_view().hash(),
-//            "579aed812b43f18210ff9e5406ae76b00dffbfba5f6f7ef2eda650780a119a55".into()
-//        );
-//    }
-//
-//}
+#[cfg(test)]
+mod tests {
+    use super::Spec;
+    use views::BlockView;
+    #[test]
+    fn test_load_empty() {
+        assert!(Spec::load(&[] as &[u8]).is_err());
+    }
+
+    #[test]
+    fn test_chain() {
+        let test_spec = Spec::new_test();
+
+        assert_eq!(
+            test_spec.state_root(),
+            "b3fd94094ccb910e058c00d6763b61472e7bf1b8a9cb2549a83a4d5a397e194e".into()
+        );
+        let genesis = test_spec.genesis_block();
+        assert_eq!(
+            BlockView::new(&genesis).header_view().hash(),
+            "579aed812b43f18210ff9e5406ae76b00dffbfba5f6f7ef2eda650780a119a55".into()
+        );
+    }
+
+}
