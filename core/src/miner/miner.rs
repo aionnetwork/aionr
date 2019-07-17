@@ -471,7 +471,7 @@ impl Miner {
         for tx in transactions {
             let hash = tx.hash().clone();
             let start = Instant::now();
-            let result = open_block.push_transaction(tx, None);
+            let result = open_block.push_transaction(tx, None, true);
             let took = start.elapsed();
 
             // Check for heavy transactions

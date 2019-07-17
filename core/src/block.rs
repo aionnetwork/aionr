@@ -361,6 +361,7 @@ impl<'x> OpenBlock<'x> {
         &mut self,
         t: SignedTransaction,
         h: Option<H256>,
+        check_gas: bool,
     ) -> Result<&Receipt, Error>
     {
         if self.block.transactions_set.contains(&t.hash()) {
@@ -385,10 +386,19 @@ impl<'x> OpenBlock<'x> {
                     &[t.clone()],
                 ));
             } else {
-                result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
+                result.push(self.block.state.apply(
+                    &env_info,
+                    self.engine.machine(),
+                    &t,
+                    check_gas,
+                ));
             }
         } else {
-            result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
+            result.push(
+                self.block
+                    .state
+                    .apply(&env_info, self.engine.machine(), &t, check_gas),
+            );
         }
 
         match result.pop().unwrap() {
@@ -756,7 +766,7 @@ fn push_transactions(
                     block.apply_batch_txs(tx_batch.as_slice(), None);
                     tx_batch.clear();
                 }
-                block.push_transaction(tx.clone(), None)?;
+                block.push_transaction(tx.clone(), None, false)?;
             } else {
                 trace!(target: "vm", "found avm transaction");
                 tx_batch.push(tx.clone())
@@ -769,7 +779,7 @@ fn push_transactions(
         }
     } else {
         for t in transactions {
-            block.push_transaction(t.clone(), None)?;
+            block.push_transaction(t.clone(), None, false)?;
         }
     }
 
