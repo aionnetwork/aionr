@@ -119,6 +119,16 @@ pub trait BlockProvider {
     /// Get the header RLP of a block.
     fn block_header_data(&self, hash: &H256) -> Option<encoded::Header>;
 
+    /// Get the header RLP of the seal parent of the given block.
+    /// Parameters:
+    ///   parent_hash: parent hash of the given block
+    ///   seal_type: seal type of the given block
+    fn seal_parent_header(
+        &self,
+        parent_hash: &H256,
+        seal_type: &Option<SealType>,
+    ) -> Option<::encoded::Header>;
+
     /// Get the block body (uncles and transactions).
     fn block_body(&self, hash: &H256) -> Option<encoded::Body>;
 
@@ -315,6 +325,37 @@ impl BlockProvider for BlockChain {
 
         self.cache_man.lock().note_used(CacheId::BlockHeader(*hash));
         result
+    }
+
+    /// Get the header RLP of the seal parent of the given block.
+    /// Parameters:
+    ///   parent_hash: parent hash of the given block
+    ///   seal_type: seal type of the given block
+    fn seal_parent_header(
+        &self,
+        parent_hash: &H256,
+        seal_type: &Option<SealType>,
+    ) -> Option<::encoded::Header>
+    {
+        // Get parent header
+        let parent_header: ::encoded::Header = match self.block_header_data(parent_hash) {
+            Some(header) => header,
+            None => return None,
+        };
+        let parent_seal_type: Option<SealType> = parent_header.seal_type();
+        // If parent's seal type is the same as the current, return parent
+        if seal_type == &parent_seal_type {
+            Some(parent_header)
+        }
+        // Else return the anti seal parent of the parent
+        else {
+            let parent_details: BlockDetails = match self.block_details(parent_hash) {
+                Some(details) => details,
+                None => return None,
+            };
+            let anti_seal_parent: H256 = parent_details.anti_seal_parent;
+            self.block_header_data(&anti_seal_parent)
+        }
     }
 
     /// Get block body data
@@ -569,6 +610,7 @@ impl BlockChain {
                     total_difficulty: header.difficulty(),
                     parent: header.parent_hash(),
                     children: vec![],
+                    anti_seal_parent: H256::default(),
                 };
 
                 let mut batch = DBTransaction::new();
@@ -873,6 +915,7 @@ impl BlockChain {
                 total_difficulty: info.total_difficulty,
                 parent: header.parent_hash(),
                 children: Vec::new(),
+                anti_seal_parent: H256::default(),
             };
 
             let mut update = HashMap::new();
@@ -1205,12 +1248,25 @@ impl BlockChain {
             .unwrap_or_else(|| panic!("Invalid parent hash: {:?}", parent_hash));
         parent_details.children.push(info.hash);
 
+        // Set anti seal parent
+        let seal_type = header.seal_type().to_owned().unwrap_or_default();
+        let parent_header = self
+            .block_header_data(&parent_hash)
+            .expect("block's should always have a parent.");
+        let parent_seal_type: SealType = parent_header.seal_type().to_owned().unwrap_or_default();
+        let anti_seal_parent_hash: H256 = if seal_type == parent_seal_type {
+            parent_details.anti_seal_parent.to_owned()
+        } else {
+            parent_hash
+        };
+
         // create current block details.
         let details = BlockDetails {
             number: header.number(),
             total_difficulty: info.total_difficulty,
             parent: parent_hash,
             children: vec![],
+            anti_seal_parent: anti_seal_parent_hash,
         };
 
         // write to batch

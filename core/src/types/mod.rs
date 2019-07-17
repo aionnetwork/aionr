@@ -38,5 +38,3 @@ mod test;
 
 /// Type for block number.
 pub type BlockNumber = u64;
-/// Type for header version.
-pub type HeaderVersion = u8;

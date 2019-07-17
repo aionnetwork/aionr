@@ -42,7 +42,7 @@ use helpers::accounts::unwrap_provider;
 use traits::Stratum;
 use types::{
     Work, Info, AddressValidation, MiningInfo, MinerStats, TemplateParam, Bytes, StratumHeader,
-    SimpleHeader, BlockNumber,
+    SimpleHeader, BlockNumber, Seed, BLANK_SEED, Hash, BLANK_HASH, Address, Signature
 };
 use aion_types::clean_0x;
 
@@ -342,9 +342,34 @@ where
         }
 
         Ok(MinerStats {
-            miner_hashrate_share: miner_hashrate_share,
-            miner_hashrate: miner_hashrate,
-            network_hashrate: network_hashrate,
+            miner_hashrate_share,
+            miner_hashrate,
+            network_hashrate,
         })
+    }
+
+    /// Pos get seed
+    fn pos_get_seed(&self) -> Result<Seed> {
+        // TODO: implement logic
+        Ok(Seed(BLANK_SEED))
+    }
+
+    /// Pos submit seed
+    fn pos_submit_seed(&self, _seed: Seed, _address: Address) -> Result<Hash> {
+        // TODO: implement logic
+        Ok(Hash::new(BLANK_HASH))
+    }
+
+    /// Pos submit work
+    fn pos_submit_work(
+        &self,
+        _seed: Seed,
+        _address: Address,
+        _signature: Signature,
+        _hash: Hash,
+    ) -> Result<bool>
+    {
+        // TODO: implement logic
+        Ok(true)
     }
 }

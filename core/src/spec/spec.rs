@@ -36,13 +36,11 @@ use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
 use types::BlockNumber;
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
-#[cfg(test)]
-use tests::common::null_engine::NullEngine;
-use engine::{Engine,POWEquihashEngine};
+use engine::{Engine, POWEquihashEngine};
 use types::error::Error;
 use executive::Executive;
 use factory::Factories;
-use header::Header;
+use header::{Header, SealType};
 use machine::EthereumMachine;
 use pod_state::PodState;
 use precompiled::builtin::{builtin_contract, BuiltinContract};
@@ -50,6 +48,9 @@ use spec::seal::Generic as GenericSeal;
 use spec::Genesis;
 use state::backend::Basic as BasicBackend;
 use state::{Backend, State, Substate};
+
+#[cfg(test)]
+use tests::common::null_engine::NullEngine;
 
 // helper for formatting errors.
 fn fmt_err<F: ::std::fmt::Display>(f: F) -> String { format!("Spec json is invalid: {}", f) }
@@ -376,6 +377,7 @@ impl Spec {
         header.set_gas_used(self.gas_used.clone());
         header.set_gas_limit(self.gas_limit.clone());
         header.set_difficulty(self.difficulty.clone());
+        header.set_seal_type(SealType::PoW);
         header.set_seal({
             let r = Rlp::new(&self.seal_rlp);
             r.iter().map(|f| f.as_val::<Bytes>()).collect()

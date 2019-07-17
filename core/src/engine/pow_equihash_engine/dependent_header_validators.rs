@@ -22,6 +22,9 @@
 use header::Header;
 use types::error::{BlockError, Error};
 use unexpected::{Mismatch, OutOfBounds};
+use key::public_to_address_ed25519;
+use rcrypto::ed25519::verify;
+use aion_types::{H256, Address};
 
 pub trait DependentHeaderValidator {
     fn validate(&self, header: &Header, dependent_header: &Header) -> Result<(), Error>;
@@ -59,6 +62,52 @@ impl DependentHeaderValidator for TimestampValidator {
             })
             .into());
         }
+        Ok(())
+    }
+}
+
+pub struct PoSValidator;
+impl DependentHeaderValidator for PoSValidator {
+    fn validate(&self, header: &Header, dependent_header: &Header) -> Result<(), Error> {
+        // Get seal, check seal length
+        let seal = header.seal();
+        if seal.len() != 3 {
+            error!(target: "pos", "seal length != 3");
+            return Err(BlockError::InvalidSealArity(Mismatch {
+                expected: 3,
+                found: seal.len(),
+            })
+            .into());
+        }
+
+        // Get seed and signature
+        let signature = &seal[0];
+        let seed = &seal[1];
+        let pk = &seal[2];
+        let parent_seed = dependent_header
+            .seal()
+            .get(1)
+            .expect("parent pos block should have a seed");
+
+        // Verify seed
+        if !verify(&parent_seed, pk, seed) {
+            return Err(BlockError::InvalidSeal.into());
+        }
+
+        // Verify block signature
+        if !verify(&header.bare_hash().0, pk, signature) {
+            return Err(BlockError::InvalidSeal.into());
+        }
+
+        // Verify the signer of the seed and the signature are the same as the block producer
+        let signer: Address = public_to_address_ed25519(&H256::from(pk.as_slice()));
+        if &signer != header.author() {
+            return Err(BlockError::InvalidSeal.into());
+        }
+
+        // Verify timestamp
+        // TODO-Unity: To verify the timestamp with (stake, seed, difficulty, parent_timestamp)
+
         Ok(())
     }
 }

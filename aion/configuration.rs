@@ -367,6 +367,7 @@ impl Configuration {
             minimal_gas_price: U256::from(self.args.arg_min_gas_price),
             maximal_gas_price: U256::from(self.args.arg_max_gas_price),
             local_max_gas_price: U256::from(self.args.arg_local_max_gas_price),
+            staker_private_key: self.args.arg_staker_private_key.to_owned(),
         };
 
         Ok(options)

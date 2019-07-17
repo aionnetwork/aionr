@@ -21,7 +21,7 @@
 
 mod header_validators;
 mod dependent_header_validators;
-mod grant_parent_header_validators;
+mod grand_parent_header_validators;
 #[cfg(test)]
 mod test;
 
@@ -29,8 +29,9 @@ use std::sync::Arc;
 use super::Engine;
 use ajson;
 use machine::EthereumMachine;
+use aion_machine::{LiveBlock, WithBalances};
 use aion_types::{U256, U512};
-use header::Header;
+use header::{Header, SealType};
 use block::ExecutedBlock;
 use types::error::Error;
 use std::cmp;
@@ -41,17 +42,16 @@ use self::dependent_header_validators::{
     DependentHeaderValidator,
     NumberValidator,
     TimestampValidator,
-//    EnergyLimitValidator
+    PoSValidator,
 };
 use self::header_validators::{
-    VersionValidator,
 //    ExtraDataValidator,
     HeaderValidator,
     POWValidator,
     EnergyConsumedValidator,
     EquihashSolutionValidator,
 };
-use self::grant_parent_header_validators::{GrantParentHeaderValidator, DifficultyValidator};
+use self::grand_parent_header_validators::{GrandParentHeaderValidator, DifficultyValidator};
 
 const ANNUAL_BLOCK_MOUNT: u64 = 3110400;
 const COMPOUND_YEAR_MAX: u64 = 128;
@@ -117,19 +117,26 @@ impl DifficultyCalc {
     pub fn calculate_difficulty(
         &self,
         header: &Header,
-        parent: &Header,
-        grant_parent: Option<&Header>,
+        parent: Option<&Header>,
+        grand_parent: Option<&Header>,
     ) -> U256
     {
         if header.number() == 0 {
             panic!("Can't calculate genesis block difficulty.");
         }
-        if parent.number() == 0 {
-            return parent.difficulty().clone();
+
+        // If no seal parent (eg. first PoS block)
+        // Hard code to 16. TODO-Unity: handle this better
+        if parent.is_none() {
+            return U256::from(16);
         }
-        if header.number() != 2 && grant_parent.is_none() {
-            panic!("grant_parent must exist.");
+        let parent: &Header = parent.expect("none parent tested before.");
+
+        // If no seal grand parent, return the difficulty of the parent
+        if grand_parent.is_none() {
+            return parent.difficulty().to_owned();
         }
+        let grand_parent: &Header = grand_parent.expect("none grand parent tested before.");
 
         let parent_difficulty = *parent.difficulty();
 
@@ -141,7 +148,7 @@ impl DifficultyCalc {
         }
 
         let current_timestamp = parent.timestamp();
-        let parent_timestamp = grant_parent.unwrap().timestamp();
+        let parent_timestamp = grand_parent.timestamp();
 
         let delta = current_timestamp - parent_timestamp;
         let bound_domain = 10;
@@ -328,25 +335,27 @@ impl POWEquihashEngine {
     fn calculate_difficulty(
         &self,
         header: &Header,
-        parent: &Header,
-        grant_parent: Option<&Header>,
+        parent: Option<&Header>,
+        grand_parent: Option<&Header>,
     ) -> U256
     {
         self.difficulty_calc
-            .calculate_difficulty(header, parent, grant_parent)
+            .calculate_difficulty(header, parent, grand_parent)
     }
 
     fn calculate_reward(&self, header: &Header) -> U256 {
         self.rewards_calculator.calculate_reward(header)
     }
 
+    // TODO-Unity: duplcation of verify_block_basic. Handle this better. Some functions in trait EthereumMachine do not need *self*.
     pub fn validate_block_header(header: &Header) -> Result<(), Error> {
-        let mut block_header_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(4);
-        block_header_validators.push(Box::new(VersionValidator {}));
-        block_header_validators.push(Box::new(EnergyConsumedValidator {}));
-        block_header_validators.push(Box::new(POWValidator {}));
+        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(2);
+        cheap_validators.push(Box::new(EnergyConsumedValidator {}));
+        if header.seal_type() == &Some(SealType::PoW) {
+            cheap_validators.push(Box::new(POWValidator {}));
+        }
 
-        for v in block_header_validators.iter() {
+        for v in cheap_validators.iter() {
             v.validate(header)?;
         }
 
@@ -359,50 +368,19 @@ impl Engine for Arc<POWEquihashEngine> {
 
     fn machine(&self) -> &EthereumMachine { &self.machine }
 
-    fn seal_fields(&self, _header: &Header) -> usize {
-        // we don't add nonce and solution in header, continue to encapsulate them in seal field.
-        // nonce and solution.
-        2
-    }
-
-    fn populate_from_parent(
-        &self,
-        header: &mut Header,
-        parent: &Header,
-        grant_parent: Option<&Header>,
-    )
-    {
-        let difficulty = self.calculate_difficulty(header, parent, grant_parent);
-        header.set_difficulty(difficulty);
-    }
-
-    fn on_close_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
-        use aion_machine::{LiveBlock, WithBalances};
-
-        let result_block_reward;
-        let author;
-        {
-            let header = LiveBlock::header(&*block);
-            result_block_reward = self.calculate_reward(&header);
-            author = *header.author();
+    fn seal_fields(&self, header: &Header) -> usize {
+        match header.seal_type() {
+            Some(SealType::PoS) => 3,
+            _ => 2,
         }
-        block.header_mut().set_reward(result_block_reward.clone());
-        self.machine
-            .add_balance(block, &author, &result_block_reward)?;
-        self.machine
-            .note_rewards(block, &[(author, result_block_reward)])
-    }
-
-    fn verify_local_seal(&self, header: &Header) -> Result<(), Error> {
-        self.verify_block_basic(header)
-            .and_then(|_| self.verify_block_unordered(header))
     }
 
     fn verify_block_basic(&self, header: &Header) -> Result<(), Error> {
-        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(4);
-        cheap_validators.push(Box::new(VersionValidator {}));
+        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(2);
         cheap_validators.push(Box::new(EnergyConsumedValidator {}));
-        cheap_validators.push(Box::new(POWValidator {}));
+        if header.seal_type() == &Some(SealType::PoW) {
+            cheap_validators.push(Box::new(POWValidator {}));
+        }
 
         for v in cheap_validators.iter() {
             v.validate(header)?;
@@ -413,11 +391,36 @@ impl Engine for Arc<POWEquihashEngine> {
 
     fn verify_block_unordered(&self, header: &Header) -> Result<(), Error> {
         let mut costly_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(1);
-        costly_validators.push(Box::new(EquihashSolutionValidator {
-            solution_validator: EquihashValidator::new(210, 9),
-        }));
+        if header.seal_type() == &Some(SealType::PoW) {
+            costly_validators.push(Box::new(EquihashSolutionValidator {
+                solution_validator: EquihashValidator::new(210, 9),
+            }));
+        }
         for v in costly_validators.iter() {
             v.validate(header)?;
+        }
+        Ok(())
+    }
+
+    fn verify_local_seal_pow(&self, header: &Header) -> Result<(), Error> {
+        self.verify_block_basic(header)
+            .and_then(|_| self.verify_block_unordered(header))
+    }
+
+    /// Verify the seal of locally produced PoS block
+    fn verify_local_seal_pos(
+        &self,
+        header: &Header,
+        seal_parent: Option<&Header>,
+    ) -> Result<(), Error>
+    {
+        if header.seal_type() == &Some(SealType::PoS) && seal_parent.is_some() {
+            // TODO-Unity: handle none seal parent better
+            let pos_seal_validator = PoSValidator {};
+            pos_seal_validator.validate(
+                header,
+                seal_parent.expect("none seal parent checked before."),
+            )?;
         }
         Ok(())
     }
@@ -426,26 +429,67 @@ impl Engine for Arc<POWEquihashEngine> {
         &self,
         header: &Header,
         parent: &Header,
-        grant_parent: Option<&Header>,
+        seal_parent: Option<&Header>,
+        seal_grand_parent: Option<&Header>,
     ) -> Result<(), Error>
     {
-        // verify parent
-        let mut parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(3);
+        // Verifications related to direct parent
+        let mut parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(2);
         parent_validators.push(Box::new(NumberValidator {}));
         parent_validators.push(Box::new(TimestampValidator {}));
         for v in parent_validators.iter() {
             v.validate(header, parent)?;
         }
 
-        // verify grant parent
-        let mut grant_validators: Vec<Box<GrantParentHeaderValidator>> = Vec::with_capacity(1);
-        grant_validators.push(Box::new(DifficultyValidator {
+        // Verifications related to seal parent
+        let mut seal_parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(1);
+        if header.seal_type() == &Some(SealType::PoS) && seal_parent.is_some() {
+            // TODO-Unity: handle none seal parent better
+            seal_parent_validators.push(Box::new(PoSValidator {}));
+        }
+        for v in seal_parent_validators.iter() {
+            v.validate(
+                header,
+                seal_parent.expect("none seal parent checked before."),
+            )?;
+        }
+
+        // Verifications related to seal parent and seal grand parent
+        let mut grand_validators: Vec<Box<GrandParentHeaderValidator>> = Vec::with_capacity(1);
+        grand_validators.push(Box::new(DifficultyValidator {
             difficulty_calc: &self.difficulty_calc,
         }));
-        for v in grant_validators.iter() {
-            v.validate(header, parent, grant_parent)?;
+        for v in grand_validators.iter() {
+            v.validate(header, seal_parent, seal_grand_parent)?;
         }
 
         Ok(())
+    }
+
+    fn populate_from_parent(
+        &self,
+        header: &mut Header,
+        parent: Option<&Header>,
+        grand_parent: Option<&Header>,
+    )
+    {
+        let difficulty = self.calculate_difficulty(header, parent, grand_parent);
+        header.set_difficulty(difficulty);
+    }
+
+    fn on_close_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
+        let result_block_reward;
+        let author;
+        {
+            let header = LiveBlock::header(&*block);
+            result_block_reward = self.calculate_reward(&header);
+            debug!(target: "cons", "verify number: {}, reward: {} ", header.number(),  result_block_reward);
+            author = *header.author();
+        }
+        block.header_mut().set_reward(result_block_reward.clone());
+        self.machine
+            .add_balance(block, &author, &result_block_reward)?;
+        self.machine
+            .note_rewards(block, &[(author, result_block_reward)])
     }
 }

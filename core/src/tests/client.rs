@@ -245,6 +245,7 @@ fn can_mine() {
             Address::default(),
             (3141562.into(), 31415620.into()),
             vec![],
+            None,
         )
         .close();
 
@@ -290,6 +291,7 @@ fn change_history_size() {
                 Address::default(),
                 (3141562.into(), 31415620.into()),
                 vec![],
+                None,
             );
             b.set_difficulty(U256::from(1));
             b.block_mut()

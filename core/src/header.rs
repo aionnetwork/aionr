@@ -33,7 +33,6 @@ use std::cmp;
 use time::get_time;
 
 pub use types::BlockNumber;
-pub use types::HeaderVersion;
 
 // TODO: better location?
 pub fn u256_to_u128(value: U256) -> U128 {
@@ -62,9 +61,66 @@ pub enum Seal {
     Without,
 }
 
-// define more versions here.
-/// header version v1
-pub const V1: HeaderVersion = 1;
+/// Seal type of a block header
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum SealType {
+    /// Proof of Work header type
+    PoW,
+    /// Proof of Stake header type
+    PoS,
+}
+
+/// Implement default for SealType
+impl Default for SealType {
+    /// Default SealType is PoW
+    fn default() -> Self { SealType::PoW }
+}
+
+/// Implement display for SealType
+impl ::std::fmt::Display for SealType {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        f.write_str(match *self {
+            SealType::PoW => "PoW",
+            SealType::PoS => "PoS",
+        })
+    }
+}
+
+/// Implement from u8. 1 for PoW and 2 for PoS.
+impl From<u8> for SealType {
+    fn from(v: u8) -> Self {
+        match v {
+            1u8 => SealType::PoW,
+            2u8 => SealType::PoS,
+            _ => SealType::PoW, // Question: consider other numbers as PoW too?
+        }
+    }
+}
+
+/// Implement into u8. 1 for PoW and 2 for PoS.
+impl Into<u8> for SealType {
+    fn into(self) -> u8 {
+        match self {
+            SealType::PoW => 1u8,
+            SealType::PoS => 2u8,
+        }
+    }
+}
+
+/// Implement Encodable for SealType to get included in header's rlp
+impl Encodable for SealType {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        let v: u8 = self.to_owned().into();
+        Encodable::rlp_append(&v, s);
+    }
+}
+
+/// Implement Dencodable for SealType to get parsed from header's rlp
+impl Decodable for SealType {
+    fn decode(rlp: &UntrustedRlp) -> ::std::result::Result<Self, DecoderError> {
+        rlp.as_val().and_then(|v: u8| Ok(SealType::from(v)))
+    }
+}
 
 /// A block header.
 ///
@@ -74,8 +130,8 @@ pub const V1: HeaderVersion = 1;
 /// Doesn't do all that much on its own.
 #[derive(Debug, Clone, Eq)]
 pub struct Header {
-    /// Version
-    version: HeaderVersion,
+    /// Seal Type
+    seal_type: Option<SealType>,
     /// Block number
     number: BlockNumber,
     /// Parent hash
@@ -114,7 +170,7 @@ pub struct Header {
 
 impl PartialEq for Header {
     fn eq(&self, c: &Header) -> bool {
-        self.version == c.version
+        self.seal_type == c.seal_type
             && self.parent_hash == c.parent_hash
             && self.timestamp == c.timestamp
             && self.number == c.number
@@ -136,7 +192,7 @@ impl PartialEq for Header {
 impl Default for Header {
     fn default() -> Self {
         Header {
-            version: V1,
+            seal_type: Some(SealType::PoW),
             parent_hash: H256::default(),
             timestamp: 0,
             number: 0,
@@ -162,8 +218,8 @@ impl Header {
     /// Create a new, default-valued, header.
     pub fn new() -> Self { Self::default() }
 
-    /// Get version field of the header
-    pub fn version(&self) -> HeaderVersion { self.version }
+    /// Get seal type of the header
+    pub fn seal_type(&self) -> &Option<SealType> { &self.seal_type }
 
     /// Get the parent_hash field of the header.
     pub fn parent_hash(&self) -> &H256 { &self.parent_hash }
@@ -224,11 +280,9 @@ impl Header {
     /// Get the reward
     pub fn reward(&self) -> &U256 { &self.reward }
 
-    // TODO: seal_at, set_seal_at &c.
-
-    /// Set the version field of the header.
-    pub fn set_version(&mut self, a: HeaderVersion) {
-        self.version = a;
+    /// Set the seal type of the header.
+    pub fn set_seal_type(&mut self, seal_type: SealType) {
+        self.seal_type = Some(seal_type);
         self.note_dirty();
     }
 
@@ -355,7 +409,7 @@ impl Header {
 
     pub fn mine_hash(&self) -> H256 {
         let mut mine_hash_bytes: Vec<u8> = Vec::with_capacity(256);
-        mine_hash_bytes.push(self.version);
+        mine_hash_bytes.push(self.seal_type.to_owned().unwrap_or_default().into());
         mine_hash_bytes.extend(u64_to_bytes(self.number).iter());
         mine_hash_bytes.extend_from_slice(self.parent_hash.as_ref());
         mine_hash_bytes.extend_from_slice(self.author.as_ref());
@@ -388,7 +442,8 @@ impl Header {
                 _ => 0,
             },
         );
-        s.append(&self.version);
+
+        s.append(&self.seal_type.clone().unwrap_or_default());
         s.append(&self.number);
         s.append(&self.parent_hash);
         s.append(&self.author);
@@ -435,15 +490,7 @@ impl Header {
 impl Decodable for Header {
     fn decode(r: &UntrustedRlp) -> Result<Self, DecoderError> {
         let mut blockheader = Header {
-            version: {
-                // consistent with java's impl
-                let version_vec = r.val_at::<Vec<u8>>(0)?;
-                if version_vec.len() != 1 {
-                    1
-                } else {
-                    version_vec[0]
-                }
-            },
+            seal_type: Some(r.val_at(0)?),
             number: r.val_at::<U256>(1)?.low_u64(),
             parent_hash: r.val_at(2)?,
             author: r.val_at(3)?,

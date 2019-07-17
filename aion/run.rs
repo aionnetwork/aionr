@@ -27,7 +27,8 @@ use acore::account_provider::{AccountProvider, AccountProviderSettings};
 use acore::client::{Client, DatabaseCompactionProfile, VMType, ChainNotify};
 use acore::miner::external::ExternalMiner;
 use acore::miner::{Miner, MinerOptions, MinerService};
-use acore::service::{ClientService, run_miner, run_transaction_pool};
+use acore::service::{ClientService, /*run_miner,*/
+run_staker, run_transaction_pool};
 use acore::verification::queue::VerifierSettings;
 use acore::sync::Sync;
 use aion_rpc::{dispatch::DynamicGasPrice, informant};
@@ -279,13 +280,22 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         run_transaction_pool(executor_transaction_pool.clone(), client.clone());
 
     // start miner module
-    let runtime_miner = tokio::runtime::Builder::new()
+    // let runtime_miner = tokio::runtime::Builder::new()
+    //     .core_threads(1)
+    //     .name_prefix("seal-block-loop #")
+    //     .build()
+    //     .expect("seal block runtime loop init failed");
+    // let executor_miner = runtime_miner.executor();
+    // let close_miner = run_miner(executor_miner.clone(), client.clone());
+
+    // start internal staker module
+    let runtime_staker = tokio::runtime::Builder::new()
         .core_threads(1)
         .name_prefix("seal-block-loop #")
         .build()
-        .expect("seal block runtime loop init failed");
-    let executor_miner = runtime_miner.executor();
-    let close_miner = run_miner(executor_miner.clone(), client.clone());
+        .expect("internal staker runtime loop init failed");
+    let executor_staker = runtime_staker.executor();
+    let close_staker = run_staker(executor_staker.clone(), client.clone());
 
     if let Some(config_path) = cmd.dirs.config {
         let local_node = P2pMgr::get_local_node();
@@ -309,7 +319,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // close pool
     let _ = close_transaction_pool.send(());
-    let _ = close_miner.send(());
+    // let _ = close_miner.send(());
+    let _ = close_staker.send(());
 
     // close rpc
     if ws_server.is_some() {
@@ -342,10 +353,14 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .shutdown_now()
         .wait()
         .expect("Failed to shutdown transaction pool runtime instance!");
-    runtime_miner
+    // runtime_miner
+    //     .shutdown_now()
+    //     .wait()
+    //     .expect("Failed to shutdown miner runtime instance!");
+    runtime_staker
         .shutdown_now()
         .wait()
-        .expect("Failed to shutdown miner runtime instance!");
+        .expect("Failed to shutdown internal staker runtime instance!");
 
     info!(target: "run","Shutdown.");
 

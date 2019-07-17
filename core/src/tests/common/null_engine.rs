@@ -87,9 +87,18 @@ impl Engine for NullEngine {
             .note_rewards(block, &[(author, result_block_reward)])
     }
 
-    fn verify_local_seal(
+    fn verify_local_seal_pow(
         &self,
         _header: &<EthereumMachine as Machine>::Header,
+    ) -> Result<(), <EthereumMachine as Machine>::Error>
+    {
+        Ok(())
+    }
+
+    fn verify_local_seal_pos(
+        &self,
+        _header: &<EthereumMachine as Machine>::Header,
+        _seal_type: Option<&<EthereumMachine as Machine>::Header>,
     ) -> Result<(), <EthereumMachine as Machine>::Error>
     {
         Ok(())

@@ -51,7 +51,7 @@ use engine::Engine;
 use types::error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
 use executive::{contract_address, Executed, Executive};
 use factory::{Factories, VmFactory};
-use header::{BlockNumber, Header, Seal};
+use header::{BlockNumber, Header, Seal, SealType};
 use io::*;
 use log_entry::LocalizedLogEntry;
 use miner::{Miner, MinerService};
@@ -134,7 +134,6 @@ pub struct Client {
     block_queue: BlockQueue,
     report: RwLock<ClientReport>,
     import_lock: Mutex<()>,
-    //verifier: Box<Verifier>,
     miner: Arc<Miner>,
     io_channel: Mutex<IoChannel<ClientIoMessage>>,
     notify: RwLock<Vec<Weak<ChainNotify>>>,
@@ -331,7 +330,6 @@ impl Client {
 
         // Check if parent is in chain
         let parent_hash = header.parent_hash().clone();
-
         let parent = match chain.block_header(&parent_hash) {
             Some(h) => h,
             None => {
@@ -340,15 +338,24 @@ impl Client {
             }
         };
 
-        let grant_parent = chain.block_header(parent.parent_hash());
-        let grant_parent_header = grant_parent.as_ref();
+        // Get seal parent and seal grand parent
+        let seal_type: Option<SealType> = header.seal_type().to_owned();
+        let seal_parent: Option<::encoded::Header> =
+            self.seal_parent_header(&parent_hash, &seal_type);
+        let seal_grand_parent: Option<::encoded::Header> = match &seal_parent {
+            Some(header) => self.seal_parent_header(&header.parent_hash(), &header.seal_type()),
+            None => None,
+        };
 
         // Verify Block Family
         let verify_family_result = verify_block_family(
-            //let verify_family_result = self.verifier.verify_block_family(
             header,
             &parent,
-            grant_parent_header,
+            seal_parent.clone().map(|header| header.decode()).as_ref(),
+            seal_grand_parent
+                .clone()
+                .map(|header| header.decode())
+                .as_ref(),
             engine,
             Some((&block.bytes, &block.transactions, &**chain, self)),
         );
@@ -367,7 +374,8 @@ impl Client {
             engine,
             db,
             &parent,
-            grant_parent_header,
+            seal_parent.map(|header| header.decode()).as_ref(),
+            seal_grand_parent.map(|header| header.decode()).as_ref(),
             last_hashes,
             self.factories.clone(),
             self.db.read().clone(),
@@ -1097,6 +1105,21 @@ impl BlockChainClient for Client {
         Self::block_hash(&chain, &self.miner, id).and_then(|hash| chain.block_header_data(&hash))
     }
 
+    fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header> {
+        let chain = self.chain.read();
+        chain.block_header_data(hash)
+    }
+
+    fn seal_parent_header(
+        &self,
+        parent_hash: &H256,
+        seal_type: &Option<SealType>,
+    ) -> Option<::encoded::Header>
+    {
+        let chain = self.chain.read();
+        chain.seal_parent_header(parent_hash, seal_type)
+    }
+
     fn block_number(&self, id: BlockId) -> Option<BlockNumber> { self.block_number_ref(&id) }
 
     fn block_body(&self, id: BlockId) -> Option<encoded::Body> {
@@ -1485,6 +1508,7 @@ impl MiningBlockChainClient for Client {
         author: Address,
         gas_range_target: (U256, U256),
         extra_data: Bytes,
+        seal_type: Option<SealType>,
     ) -> OpenBlock
     {
         let engine = &*self.engine;
@@ -1493,15 +1517,22 @@ impl MiningBlockChainClient for Client {
         let best_header = &chain
             .block_header(&h)
             .expect("h is best block hash: so its header must exist: qed");
-        let grant_parent = chain.block_header(best_header.parent_hash());
-        let grant_parent_header = grant_parent.as_ref();
+
+        let seal_parent: Option<::encoded::Header> =
+            self.seal_parent_header(&best_header.hash(), &seal_type);
+        let seal_grand_parent: Option<::encoded::Header> = match &seal_parent {
+            Some(header) => self.seal_parent_header(&header.parent_hash(), &header.seal_type()),
+            None => None,
+        };
 
         let open_block = OpenBlock::new(
             engine,
             self.factories.clone(),
             self.state_db.read().boxed_clone_canon(&h),
             best_header,
-            grant_parent_header,
+            seal_type.unwrap_or_default(),
+            seal_parent.map(|header| header.decode()).as_ref(),
+            seal_grand_parent.map(|header| header.decode()).as_ref(),
             self.build_last_hashes(h.clone()),
             author,
             gas_range_target,

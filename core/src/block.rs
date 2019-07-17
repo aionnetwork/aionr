@@ -37,7 +37,7 @@ use unexpected::Mismatch;
 use engine::{Engine};
 use types::error::{Error, BlockError};
 use factory::Factories;
-use header::{Header, Seal};
+use header::{Header, Seal, SealType};
 use receipt::Receipt;
 use state::State;
 use db::StateDB;
@@ -221,7 +221,9 @@ impl<'x> OpenBlock<'x> {
         factories: Factories,
         db: StateDB,
         parent: &Header,
-        grant_parent: Option<&Header>,
+        seal_type: SealType,
+        seal_parent: Option<&Header>,
+        seal_grand_parent: Option<&Header>,
         last_hashes: Arc<LastHashes>,
         author: Address,
         gas_range_target: (U256, U256),
@@ -246,7 +248,8 @@ impl<'x> OpenBlock<'x> {
         r.block.header.set_parent_hash(parent.hash());
         r.block.header.set_number(number);
         r.block.header.set_author(author);
-        r.block.header.set_timestamp_now(parent.timestamp());
+        r.block.header.set_timestamp_now(parent.timestamp()); // TODO-Unity: handle PoS block timestamp
+        r.block.header.set_seal_type(seal_type);
         r.set_extra_data(extra_data);
         r.block.header.note_dirty();
 
@@ -260,7 +263,8 @@ impl<'x> OpenBlock<'x> {
             gas_floor_target,
             gas_ceil_target,
         );
-        engine.populate_from_parent(&mut r.block.header, parent, grant_parent);
+        // Set difficulty
+        engine.populate_from_parent(&mut r.block.header, seal_parent, seal_grand_parent);
 
         engine.machine().on_new_block(&mut r.block)?;
 
@@ -577,10 +581,10 @@ impl LockedBlock {
         })
     }
 
-    /// Provide a valid seal in order to turn this into a `SealedBlock`.
+    /// Provide a valid PoW seal in order to turn this into a `SealedBlock`.
     /// This does check the validity of `seal` with the engine.
-    /// Returns the `ClosedBlock` back again if the seal is no good.
-    pub fn try_seal(
+    /// Returns the `LockedBlock` back again if the seal is no good.
+    pub fn try_seal_pow(
         self,
         engine: &Engine,
         seal: Vec<Bytes>,
@@ -589,8 +593,30 @@ impl LockedBlock {
         let mut s = self;
         s.block.header.set_seal(seal);
 
-        // TODO: passing state context to avoid engines owning it?
-        match engine.verify_local_seal(&s.block.header) {
+        match engine.verify_local_seal_pow(&s.block.header) {
+            Err(e) => Err((e, s)),
+            _ => {
+                Ok(SealedBlock {
+                    block: s.block,
+                })
+            }
+        }
+    }
+
+    /// Provide a valid PoS seal in order to turn this into a `SealedBlock`.
+    /// This does check the validity of `seal` with the engine.
+    /// Returns the `LockedBlock` back again if the seal is no good.
+    pub fn try_seal_pos(
+        self,
+        engine: &Engine,
+        seal: Vec<Bytes>,
+        seal_parent: Option<&Header>,
+    ) -> Result<SealedBlock, (Error, LockedBlock)>
+    {
+        let mut s = self;
+        s.block.header.set_seal(seal);
+
+        match engine.verify_local_seal_pos(&s.block.header, seal_parent) {
             Err(e) => Err((e, s)),
             _ => {
                 Ok(SealedBlock {
@@ -632,7 +658,8 @@ fn enact(
     engine: &Engine,
     db: StateDB,
     parent: &Header,
-    grant_parent: Option<&Header>,
+    seal_parent: Option<&Header>,
+    seal_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
     kvdb: Arc<KeyValueDB>,
@@ -657,7 +684,9 @@ fn enact(
         factories,
         db,
         parent,
-        grant_parent,
+        header.seal_type().to_owned().unwrap_or_default(),
+        seal_parent,
+        seal_grand_parent,
         last_hashes,
         Address::new(),
         (3141562.into(), 31415620.into()),
@@ -787,7 +816,8 @@ pub fn enact_verified(
     engine: &Engine,
     db: StateDB,
     parent: &Header,
-    grant_parent: Option<&Header>,
+    seal_parent: Option<&Header>,
+    seal_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
     kvdb: Arc<KeyValueDB>,
@@ -799,7 +829,8 @@ pub fn enact_verified(
         engine,
         db,
         parent,
-        grant_parent,
+        seal_parent,
+        seal_grand_parent,
         last_hashes,
         factories,
         kvdb,

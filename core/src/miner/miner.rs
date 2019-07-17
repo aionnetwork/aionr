@@ -20,14 +20,20 @@
  *
  ******************************************************************************/
 
+use std::collections::{BTreeMap, HashSet};
+use std::sync::Arc;
+use std::time::{self, Duration, Instant};
+use std::thread;
+
+use rustc_hex::FromHex;
 use account_provider::AccountProvider;
 use acore_bytes::Bytes;
 use aion_types::{Address, H256, U256};
 use ansi_term::Colour;
-use block::{Block, ClosedBlock, IsBlock};
+use block::{Block, ClosedBlock, IsBlock, SealedBlock};
 use client::{BlockId, MiningBlockChainClient, TransactionId};
 use engine::Engine;
-use header::{BlockNumber, Header};
+use header::{BlockNumber, Header, SealType};
 use types::error::*;
 use io::IoChannel;
 use miner::{MinerService, MinerStatus};
@@ -35,10 +41,6 @@ use parking_lot::{Mutex, RwLock};
 use receipt::Receipt;
 use spec::Spec;
 use state::State;
-use std::collections::{BTreeMap, HashSet};
-use std::sync::Arc;
-use std::thread;
-use std::time::{self, Duration, Instant};
 use transaction::{
     Condition as TransactionCondition,
     Error as TransactionError,
@@ -53,6 +55,8 @@ use transaction::transaction_queue::{
     AccountDetails, PrioritizationStrategy, RemovalReason, TransactionOrigin, TransactionQueue,
 };
 use using_queue::{GetAction, UsingQueue};
+use rcrypto::ed25519;
+use key::Ed25519KeyPair;
 
 /// Different possible definitions for pending transaction set.
 #[derive(Debug, PartialEq)]
@@ -115,6 +119,8 @@ pub struct MinerOptions {
     pub maximal_gas_price: U256,
     /// maximal gas price of a new local transaction to be accepted by the miner/transaction queue when using dynamic gas price
     pub local_max_gas_price: U256,
+    /// Staker private key
+    pub staker_private_key: Option<String>,
 }
 
 impl Default for MinerOptions {
@@ -134,6 +140,7 @@ impl Default for MinerOptions {
             minimal_gas_price: 10_000_000_000u64.into(),
             maximal_gas_price: 9_000_000_000_000_000_000u64.into(),
             local_max_gas_price: 100_000_000_000u64.into(),
+            staker_private_key: None,
         }
     }
 }
@@ -155,6 +162,8 @@ pub struct Miner {
     options: MinerOptions,
     gas_range_target: RwLock<(U256, U256)>,
     author: RwLock<Address>,
+    // TOREMOVE: Unity MS1 use only.
+    staker: Option<Ed25519KeyPair>,
     extra_data: RwLock<Bytes>,
     engine: Arc<Engine>,
     accounts: Option<Arc<AccountProvider>>,
@@ -208,6 +217,83 @@ impl Miner {
             *self.next_allowed_reseal.lock() = Instant::now() + self.options.reseal_min_period;
             self.update_sealing(client);
         }
+    }
+
+    // TOREMOVE: Unity MS1 use only
+    /// Try to generate PoS block if minimum resealing duration is met
+    pub fn try_prepare_block_pos(
+        &self,
+        client: &MiningBlockChainClient,
+        is_forced: bool,
+    ) -> Result<(), Error>
+    {
+        if (is_forced || self.tx_reseal_allowed()) && self.staker.is_some() {
+            trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
+            // Set minimal next reseal time
+            *self.next_allowed_reseal.lock() = Instant::now() + self.options.reseal_min_period;
+
+            // 1. Create a block with transactions
+            let (raw_block, _): (ClosedBlock, Option<H256>) =
+                self.prepare_block(client, &Some(SealType::PoS));
+
+            // 2. Generate seed and signature
+            let bare_hash: H256 = raw_block.header().bare_hash();
+            let seal_parent = client.seal_parent_header(
+                raw_block.header().parent_hash(),
+                raw_block.header().seal_type(),
+            );
+            let seal_parent_seed: Bytes = match &seal_parent {
+                Some(header) => {
+                    let seed: Bytes = header
+                        .seal()
+                        .get(1)
+                        .expect("A pos block has to contain a seed")
+                        .to_owned();
+                    seed
+                }
+                None => Bytes::new(),
+            };
+            let staker: Ed25519KeyPair = self
+                .staker()
+                .to_owned()
+                .expect("Internal staker is null. Should have checked before.");
+            let sk: [u8; 64] = staker.secret().0;
+            let pk: [u8; 32] = staker.public().0;
+            let seed = ed25519::signature(&seal_parent_seed, &sk);
+            let signature = ed25519::signature(&bare_hash.0, &sk);
+
+            // 3. Seal the block
+            let mut seal: Vec<Bytes> = Vec::new();
+            seal.push(signature.to_vec());
+            seal.push(seed.to_vec());
+            seal.push(pk.to_vec());
+            let sealed_block: SealedBlock = raw_block
+                .lock()
+                .try_seal_pos(
+                    &*self.engine,
+                    seal,
+                    seal_parent.map(|header| header.decode()).as_ref(),
+                )
+                .or_else(|(e, _)| {
+                    warn!(target: "miner", "Staking seal rejected: {}", e);
+                    Err(Error::PosInvalid)
+                })?;
+
+            // Log
+            let n = sealed_block.header().number();
+            let d = sealed_block.header().difficulty().clone();
+            let h = sealed_block.header().hash();
+
+            // 4. Import block
+            client.import_sealed_block(sealed_block)?;
+
+            // Log
+            info!(target: "miner", "PoS block imported OK. #{}: {}, {}",
+                Colour::White.bold().paint(format!("{}", n)),
+                Colour::White.bold().paint(format!("{}", d)),
+                Colour::White.bold().paint(format!("{:x}", h)));
+        }
+        Ok(())
     }
 
     /// Update transaction pool
@@ -267,6 +353,12 @@ impl Miner {
         let transaction_pool: TransactionPool =
             TransactionPool::new(RwLock::new(transaction_queue));
 
+        // TOREMOVE: Unity MS1 use only
+        let staker: Option<Ed25519KeyPair> = match options.staker_private_key.to_owned() {
+            Some(key) => parse_staker(key).ok(),
+            None => None,
+        };
+
         Miner {
             transaction_pool,
             next_allowed_reseal: Mutex::new(Instant::now()),
@@ -277,6 +369,7 @@ impl Miner {
             }),
             gas_range_target: RwLock::new((U256::zero(), U256::zero())),
             author: RwLock::new(Address::default()),
+            staker: staker,
             extra_data: RwLock::new(Vec::new()),
             options,
             accounts,
@@ -294,7 +387,12 @@ impl Miner {
     }
 
     /// Prepares new block for sealing including top transactions from queue.
-    fn prepare_block(&self, client: &MiningBlockChainClient) -> (ClosedBlock, Option<H256>) {
+    fn prepare_block(
+        &self,
+        client: &MiningBlockChainClient,
+        seal_type: &Option<SealType>,
+    ) -> (ClosedBlock, Option<H256>)
+    {
         trace_time!("prepare_block");
         let chain_info = client.chain_info();
         let (transactions, mut open_block, original_work_hash) = {
@@ -304,6 +402,7 @@ impl Miner {
                     chain_info.best_block_timestamp,
                 )
             };
+
             let mut sealing_work = self.sealing_work.lock();
             let last_work_hash = sealing_work
                 .queue
@@ -311,23 +410,45 @@ impl Miner {
                 .map(|pb| pb.block().header().hash());
             let best_hash = chain_info.best_block_hash;
 
-            let mut open_block = match sealing_work
-                .queue
-                .pop_if(|b| b.block().header().parent_hash() == &best_hash)
-            {
-                Some(old_block) => {
-                    trace!(target: "block", "prepare_block: Already have previous work; updating and returning");
-                    // add transactions to old_block
-                    client.reopen_block(old_block)
-                }
-                None => {
-                    // block not found - create it.
-                    trace!(target: "block", "prepare_block: No existing work - making new block");
+            let mut open_block = match seal_type {
+                Some(SealType::PoS) => {
+                    let author: Address = self
+                        .staker()
+                        .to_owned()
+                        .expect(
+                            "staker key not specified in configuration. Should have checked \
+                             before.",
+                        )
+                        .address();
                     client.prepare_open_block(
-                        self.author(),
+                        author,
                         (self.gas_floor_target(), self.gas_ceil_target()),
                         self.extra_data(),
+                        seal_type.to_owned(),
                     )
+                }
+                _ => {
+                    match sealing_work
+                        .queue
+                        .pop_if(|b| b.block().header().parent_hash() == &best_hash)
+                    {
+                        Some(old_block) => {
+                            trace!(target: "block", "prepare_block: Already have previous work; updating and returning");
+                            // add transactions to old_block
+                            client.reopen_block(old_block)
+                        }
+                        None => {
+                            // block not found - create it.
+                            trace!(target: "block", "prepare_block: No existing work - making new block");
+                            let author: Address = self.author();
+                            client.prepare_open_block(
+                                author,
+                                (self.gas_floor_target(), self.gas_ceil_target()),
+                                self.extra_data(),
+                                seal_type.to_owned(),
+                            )
+                        }
+                    }
                 }
             };
 
@@ -500,7 +621,12 @@ impl Miner {
     }
 
     /// Returns true if we had to prepare new pending block.
-    fn prepare_work_sealing(&self, client: &MiningBlockChainClient) -> bool {
+    fn prepare_work_sealing(
+        &self,
+        client: &MiningBlockChainClient,
+        seal_type: &Option<SealType>,
+    ) -> bool
+    {
         trace!(target: "block", "prepare_work_sealing: entering");
         let prepare_new = {
             let mut sealing_work = self.sealing_work.lock();
@@ -514,7 +640,7 @@ impl Miner {
             }
         };
         if prepare_new {
-            let (block, original_work_hash) = self.prepare_block(client);
+            let (block, original_work_hash) = self.prepare_block(client, seal_type);
             self.prepare_work(block, original_work_hash);
         }
         let mut sealing_block_last_request = self.sealing_block_last_request.lock();
@@ -722,6 +848,8 @@ impl MinerService for Miner {
 
     fn set_author(&self, author: Address) { *self.author.write() = author; }
 
+    fn set_staker(&mut self, staker: Ed25519KeyPair) { self.staker = Some(staker); }
+
     fn set_extra_data(&self, extra_data: Bytes) { *self.extra_data.write() = extra_data; }
 
     /// Set the gas limit we wish to target when sealing a new block.
@@ -749,6 +877,9 @@ impl MinerService for Miner {
 
     /// Get the author that we will seal blocks as.
     fn author(&self) -> Address { *self.author.read() }
+
+    /// Get the PoS staker that we will seal PoS blocks.
+    fn staker(&self) -> &Option<Ed25519KeyPair> { &self.staker }
 
     /// Get the extra_data that we will seal blocks with.
     fn extra_data(&self) -> Bytes { self.extra_data.read().clone() }
@@ -1021,7 +1152,7 @@ impl MinerService for Miner {
         trace!(target: "block", "update_sealing: best_block: {:?}", client.chain_info().best_block_number);
         if self.requires_reseal(client.chain_info().best_block_number) {
             trace!(target: "block", "update_sealing: preparing a block");
-            let (block, original_work_hash) = self.prepare_block(client);
+            let (block, original_work_hash) = self.prepare_block(client, &Some(SealType::PoW));
             self.prepare_work(block, original_work_hash)
         }
     }
@@ -1033,7 +1164,7 @@ impl MinerService for Miner {
     fn map_sealing_work<F, T>(&self, client: &MiningBlockChainClient, f: F) -> Option<T>
     where F: FnOnce(&ClosedBlock) -> T {
         trace!(target: "miner", "map_sealing_work: entering");
-        self.prepare_work_sealing(client);
+        self.prepare_work_sealing(client, &None); // TODO-Unity-Rpc staking: handle PoW and PoS better
         trace!(target: "miner", "map_sealing_work: sealing prepared");
         let mut sealing_work = self.sealing_work.lock();
         let ret = sealing_work.queue.use_last_ref();
@@ -1061,7 +1192,7 @@ impl MinerService for Miner {
             },
         ) {
             trace!(target: "miner", "Submitted block {}={} with seal {:?}", block_hash, b.header().mine_hash(), seal);
-            b.lock().try_seal(&*self.engine, seal).or_else(|(e, _)| {
+            b.lock().try_seal_pow(&*self.engine, seal).or_else(|(e, _)| {
                 warn!(target: "miner", "Mined solution rejected: {}", e);
                 Err(Error::PowInvalid)
             })
@@ -1116,6 +1247,29 @@ impl MinerService for Miner {
         self.transaction_pool.record_transaction_sealed();
         client.new_block_chained();
     }
+}
+
+// TOREMOVE: Unity MS1 use only
+fn parse_staker(key: String) -> Result<Ed25519KeyPair, String> {
+    let bytes: Vec<u8>;
+    if key.starts_with("0x") {
+        bytes = String::from(&key[2..])
+            .from_hex()
+            .map_err(|_| "Private key is not hex string.")?;
+    } else {
+        bytes = key
+            .from_hex()
+            .map_err(|_| "Private key is not hex string.")?;
+    }
+    if bytes.len() != 32 {
+        return Err("Private key length is not 32.".to_owned());
+    }
+    let mut sk = [0; 32];
+    sk.copy_from_slice(&bytes[..]);
+    let (secret, public): ([u8; 64], [u8; 32]) = ed25519::keypair(&sk);
+    let mut keypair: Vec<u8> = secret.to_vec();
+    keypair.extend(public.to_vec());
+    Ok(keypair.into())
 }
 
 #[cfg(test)]
@@ -1185,6 +1339,7 @@ mod tests {
                 minimal_gas_price: 0u64.into(),
                 maximal_gas_price: 9_000_000_000_000_000_000u64.into(),
                 local_max_gas_price: 100_000_000_000u64.into(),
+                staker_private_key: None,
             },
             &Spec::new_test(),
             None, // accounts provider
@@ -1226,13 +1381,13 @@ mod tests {
         // then
         assert!(res.is_ok());
         miner.update_transaction_pool(&client, true);
-        miner.prepare_work_sealing(&client);
+        miner.prepare_work_sealing(&client, &None);
         assert_eq!(miner.pending_transactions().len(), 1);
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 1);
         assert_eq!(miner.pending_transactions_hashes(best_block).len(), 1);
         assert_eq!(miner.pending_receipts(best_block).len(), 1);
         // This method will let us know if pending block was created (before calling that method)
-        assert!(!miner.prepare_work_sealing(&client));
+        assert!(!miner.prepare_work_sealing(&client, &None));
     }
 
     #[test]
@@ -1247,7 +1402,7 @@ mod tests {
         // then
         assert!(res.is_ok());
         miner.update_transaction_pool(&client, true);
-        miner.prepare_work_sealing(&client);
+        miner.prepare_work_sealing(&client, &None);
         assert_eq!(miner.pending_transactions().len(), 1);
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
         assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
@@ -1276,7 +1431,7 @@ mod tests {
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
         assert_eq!(miner.pending_receipts(best_block).len(), 0);
         // This method will let us know if pending block was created (before calling that method)
-        assert!(miner.prepare_work_sealing(&client));
+        assert!(miner.prepare_work_sealing(&client, &None));
     }
 
     #[test]
@@ -1291,7 +1446,7 @@ mod tests {
             .pop()
             .unwrap()
             .unwrap();
-        assert!(miner.prepare_work_sealing(&client));
+        assert!(miner.prepare_work_sealing(&client, &None));
         // Unless asked to prepare work.
         assert!(miner.requires_reseal(1u8.into()));
     }

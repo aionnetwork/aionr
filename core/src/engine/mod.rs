@@ -22,8 +22,6 @@
 
 //! Consensus engine specification and basic implementations.
 pub mod pow_equihash_engine;
-#[cfg(test)]
-use tests::common::null_engine::NullEngine;
 pub use self::pow_equihash_engine::POWEquihashEngine;
 
 use std::fmt;
@@ -85,7 +83,7 @@ impl fmt::Display for EngineError {
 /// Proof dependent on state.
 pub trait StateDependentProof<M: Machine>: Send + Sync {
     /// Generate a proof, given the state.
-    // TODO: make this into an &M::StateContext
+    // TODO: make this into an &<EthereumMachine as Machine>::StateContext
     fn generate_proof<'a>(
         &self,
         state: &<M as Localized<'a>>::StateContext,
@@ -138,9 +136,15 @@ pub trait Engine: Sync + Send {
     ///
     /// It is fine to require access to state or a full client for this function, since
     /// light clients do not generate seals.
-    fn verify_local_seal(
+    fn verify_local_seal_pow(
         &self,
         header: &<EthereumMachine as Machine>::Header,
+    ) -> Result<(), <EthereumMachine as Machine>::Error>;
+
+    fn verify_local_seal_pos(
+        &self,
+        header: &<EthereumMachine as Machine>::Header,
+        seal_pos: Option<&<EthereumMachine as Machine>::Header>,
     ) -> Result<(), <EthereumMachine as Machine>::Error>;
 
     /// Phase 1 quick block verification. Only does checks that are cheap. Returns either a null `Ok` or a general error detailing the problem with import.
@@ -166,7 +170,8 @@ pub trait Engine: Sync + Send {
         &self,
         _header: &<EthereumMachine as Machine>::Header,
         _parent: &<EthereumMachine as Machine>::Header,
-        _grant_parent: Option<&<EthereumMachine as Machine>::Header>,
+        _seal_parent: Option<&<EthereumMachine as Machine>::Header>,
+        _seal_grand_parent: Option<&<EthereumMachine as Machine>::Header>,
     ) -> Result<(), Error>
     {
         Ok(())
@@ -177,8 +182,8 @@ pub trait Engine: Sync + Send {
     fn populate_from_parent(
         &self,
         _header: &mut <EthereumMachine as Machine>::Header,
-        _parent: &<EthereumMachine as Machine>::Header,
-        _grant_parent: Option<&<EthereumMachine as Machine>::Header>,
+        _parent: Option<&<EthereumMachine as Machine>::Header>,
+        _grand_parent: Option<&<EthereumMachine as Machine>::Header>,
     )
     {
     }

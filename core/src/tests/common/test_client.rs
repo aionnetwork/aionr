@@ -38,7 +38,7 @@ use encoded;
 use executive::Executed;
 use factory::VmFactory;
 use filter::Filter;
-use header::{BlockNumber, Header as BlockHeader};
+use header::{BlockNumber, Header as BlockHeader, SealType};
 use itertools::Itertools;
 use journaldb;
 //use key::{generate_keypair, public_to_address_ed25519};
@@ -373,6 +373,7 @@ impl MiningBlockChainClient for TestBlockChainClient {
         author: Address,
         gas_range_target: (U256, U256),
         extra_data: Bytes,
+        seal_type: Option<SealType>,
     ) -> OpenBlock
     {
         let engine = &*self.spec.engine;
@@ -389,6 +390,8 @@ impl MiningBlockChainClient for TestBlockChainClient {
             Default::default(),
             db,
             &genesis_header,
+            seal_type.unwrap_or_default(),
+            None,
             None,
             Arc::new(last_hashes),
             author,
@@ -592,6 +595,29 @@ impl BlockChainClient for TestBlockChainClient {
                     .map(|r| Rlp::new(r).at(0).as_raw().to_vec())
             })
             .map(encoded::Header::new)
+    }
+
+    fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header> {
+        self.blocks
+            .read()
+            .get(&hash)
+            .map(|r| Rlp::new(r).at(0).as_raw().to_vec())
+            .map(encoded::Header::new)
+    }
+
+    fn seal_parent_header(
+        &self,
+        parent_hash: &H256,
+        seal_type: &Option<SealType>,
+    ) -> Option<::encoded::Header>
+    {
+        self.blocks
+            .read()
+            .get(&parent_hash)
+            .map(|r| Rlp::new(r).at(0).as_raw().to_vec())
+            .map(encoded::Header::new)
+            .filter(|h| h.seal_type() == *seal_type)
+        // TODO-UNITY-TEST: handle this better
     }
 
     fn block_number(&self, _id: BlockId) -> Option<BlockNumber> { unimplemented!() }
