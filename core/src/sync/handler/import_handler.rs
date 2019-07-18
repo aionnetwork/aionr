@@ -182,13 +182,14 @@ impl ImportHandler {
                     for block in blocks_to_import.iter() {
                         offset += 1;
                         let block_view = BlockView::new(block);
-                        let (hash, number, parent, difficulty) = {
+                        let (hash, number, parent, difficulty, seal_type) = {
                             let header_view = block_view.header_view();
                             (
                                 header_view.hash(),
                                 header_view.number(),
                                 header_view.parent_hash(),
                                 header_view.difficulty(),
+                                header_view.seal_type().unwrap_or_default(),
                             )
                         };
 
@@ -207,6 +208,7 @@ impl ImportHandler {
                                 //     continue;
                                 // }
 
+                                // TODO-UNITY-DIFFICULTY
                                 node.current_total_difficulty =
                                     node.current_total_difficulty + difficulty;
 

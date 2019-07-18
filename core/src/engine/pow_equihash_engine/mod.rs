@@ -116,15 +116,10 @@ impl DifficultyCalc {
     }
     pub fn calculate_difficulty(
         &self,
-        header: &Header,
         parent: Option<&Header>,
         grand_parent: Option<&Header>,
     ) -> U256
     {
-        if header.number() == 0 {
-            panic!("Can't calculate genesis block difficulty.");
-        }
-
         // If no seal parent (eg. first PoS block)
         // Hard code to 16. TODO-Unity: handle this better
         if parent.is_none() {
@@ -332,15 +327,9 @@ impl POWEquihashEngine {
         })
     }
 
-    fn calculate_difficulty(
-        &self,
-        header: &Header,
-        parent: Option<&Header>,
-        grand_parent: Option<&Header>,
-    ) -> U256
-    {
+    fn calculate_difficulty(&self, parent: Option<&Header>, grand_parent: Option<&Header>) -> U256 {
         self.difficulty_calc
-            .calculate_difficulty(header, parent, grand_parent)
+            .calculate_difficulty(parent, grand_parent)
     }
 
     fn calculate_reward(&self, header: &Header) -> U256 {
@@ -466,14 +455,18 @@ impl Engine for Arc<POWEquihashEngine> {
         Ok(())
     }
 
-    fn populate_from_parent(
+    fn set_difficulty_from_parent(
         &self,
         header: &mut Header,
         parent: Option<&Header>,
         grand_parent: Option<&Header>,
     )
     {
-        let difficulty = self.calculate_difficulty(header, parent, grand_parent);
+        if header.number() == 0 {
+            panic!("Can't calculate genesis block difficulty.");
+        }
+
+        let difficulty = self.calculate_difficulty(parent, grand_parent);
         header.set_difficulty(difficulty);
     }
 

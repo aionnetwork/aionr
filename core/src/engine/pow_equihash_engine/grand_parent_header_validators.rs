@@ -45,10 +45,14 @@ impl<'a> GrandParentHeaderValidator for DifficultyValidator<'a> {
         grand_parent_header: Option<&Header>,
     ) -> Result<(), Error>
     {
+        if header.number() == 0 {
+            panic!("Genesis block should never be validated here");
+        }
+
         let difficulty = header.difficulty().to_owned();
-        let calc_difficulty =
-            self.difficulty_calc
-                .calculate_difficulty(header, parent_header, grand_parent_header);
+        let calc_difficulty = self
+            .difficulty_calc
+            .calculate_difficulty(parent_header, grand_parent_header);
         if difficulty != calc_difficulty {
             Err(BlockError::InvalidDifficulty(Mismatch {
                 expected: calc_difficulty,

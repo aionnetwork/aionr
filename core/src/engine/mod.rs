@@ -177,9 +177,9 @@ pub trait Engine: Sync + Send {
         Ok(())
     }
 
-    /// Populate a header's fields based on its parent's header.
+    /// Populate a header's difficulty based on its parent's header.
     /// Usually implements the chain scoring rule based on weight.
-    fn populate_from_parent(
+    fn set_difficulty_from_parent(
         &self,
         _header: &mut <EthereumMachine as Machine>::Header,
         _parent: Option<&<EthereumMachine as Machine>::Header>,
