@@ -36,7 +36,7 @@ use helpers::{
     to_address, to_queue_strategy, validate_log_level,
 };
 use dir::helpers::{replace_home, replace_home_and_local, absolute};
-use params::{AccountsConfig, MinerExtras, SpecType};
+use params::{AccountsConfig, StakeConfig, MinerExtras, SpecType};
 use logger::{LogConfig};
 use dir::{self, Directories, default_local_path, default_data_path};
 use run::RunCmd;
@@ -229,6 +229,7 @@ impl Configuration {
                 ipc_conf,
                 net_conf,
                 acc_conf: self.accounts_config()?,
+                stake_conf: self.stake_config()?,
                 miner_extras: self.miner_extras()?,
                 fat_db,
                 compaction,
@@ -316,6 +317,14 @@ impl Configuration {
     fn max_peers(&self) -> u32 {
         let peers = self.args.arg_max_peers;
         peers
+    }
+
+    fn stake_config(&self) -> Result<StakeConfig, String> {
+        let cfg = StakeConfig {
+            contract: to_address(self.args.arg_stake_contract.clone())?,
+        };
+
+        Ok(cfg)
     }
 
     fn accounts_config(&self) -> Result<AccountsConfig, String> {

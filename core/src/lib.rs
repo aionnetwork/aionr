@@ -77,14 +77,14 @@ extern crate state as crate_state;
 extern crate tiny_keccak;
 extern crate num_bigint;
 extern crate bytebuffer;
+extern crate avm_abi;
+
 #[cfg(test)]
 extern crate fastvm;
 #[cfg(test)]
 extern crate logger;
 #[cfg(test)]
 extern crate tempdir;
-#[cfg(test)]
-extern crate avm_abi;
 #[cfg(test)]
 #[macro_use]
 extern crate macros;

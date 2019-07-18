@@ -195,6 +195,11 @@ usage! {
             "--password=[FILE]...",
             "Provide a list of files containing passwords for unlocking accounts. Leading and trailing whitespace is trimmed.",
 
+            // NOTE: for MS2 test
+            ARG arg_stake_contract: (Option<String>) = None, or |c: &Config| c.account.as_ref()?.unlock.clone()?.pop(),
+            "--stake-contract=[ADDRESS]",
+            "Specify the PoS staking contract address",
+
         ["Network Options"]
             FLAG flag_sync_from_boot_nodes_only: (bool) = false, or |c: &Config| c.network.as_ref()?.sync_from_boot_nodes_only.clone(),
             "--sync-boot-nodes-only",
@@ -428,6 +433,8 @@ usage! {
             ARG arg_staker_private_key: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.staker_private_key.clone(),
             "--staker-private-key=[ADDRESS]",
             "Specify the PoS block author's private key for sending block rewards from sealed blocks. NOTE: INTERNAL STAKING WILL NOT WORK WITHOUT THIS OPTION.",
+
+
 
             ARG arg_tx_gas_limit: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.tx_gas_limit.clone(),
             "--tx-gas-limit=[GAS]",

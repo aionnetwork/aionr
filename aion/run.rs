@@ -43,7 +43,7 @@ use dir::helpers::absolute;
 use io::IoChannel;
 use logger::LogConfig;
 use num_cpus;
-use params::{fatdb_switch_to_bool, AccountsConfig, MinerExtras, Pruning, SpecType, Switch};
+use params::{fatdb_switch_to_bool, AccountsConfig, StakeConfig, MinerExtras, Pruning, SpecType, Switch};
 use parking_lot::{Condvar, Mutex};
 use rpc;
 use rpc_apis;
@@ -74,6 +74,7 @@ pub struct RunCmd {
     pub ipc_conf: rpc::IpcConfiguration,
     pub net_conf: NetworkConfig,
     pub acc_conf: AccountsConfig,
+    pub stake_conf: StakeConfig,
     pub miner_extras: MinerExtras,
     pub fat_db: Switch,
     pub compaction: DatabaseCompactionProfile,
