@@ -790,7 +790,8 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false).unwrap_err()
+        ex.transact(&signed_transaction, true, false, true)
+            .unwrap_err()
     };
     assert_eq!(
         error,
@@ -815,7 +816,8 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false).unwrap_err()
+        ex.transact(&signed_transaction, true, false, true)
+            .unwrap_err()
     };
     assert_eq!(
         error,
@@ -838,7 +840,8 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false).unwrap_err()
+        ex.transact(&signed_transaction, true, false, true)
+            .unwrap_err()
     };
     assert_eq!(
         error,
@@ -862,7 +865,7 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let result = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false)
+        ex.transact(&signed_transaction, true, false, true)
     };
     // assert_eq!(
     //     error,
@@ -887,7 +890,7 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let result = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false)
+        ex.transact(&signed_transaction, true, false, true)
     };
     // assert_eq!(
     //     error,
@@ -911,7 +914,8 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false).unwrap_err()
+        ex.transact(&signed_transaction, true, false, true)
+            .unwrap_err()
     };
     assert_eq!(
         error,
@@ -934,7 +938,8 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false).unwrap_err()
+        ex.transact(&signed_transaction, true, false, true)
+            .unwrap_err()
     };
     assert_eq!(
         error,
