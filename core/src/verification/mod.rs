@@ -433,6 +433,8 @@ mod tests {
                 BlockDetails {
                     number: header.number(),
                     total_difficulty: header.difficulty().clone(),
+                    pow_total_difficulty: header.difficulty().clone(),
+                    pos_total_difficulty: U256::from(1),
                     parent: header.parent_hash().clone(),
                     children: Vec::new(),
                     anti_seal_parent: H256::zero(),

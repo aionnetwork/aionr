@@ -393,6 +393,62 @@ impl Client {
         Ok(locked_block)
     }
 
+    fn block_difficulties(&self, id: BlockId) -> Option<(U256, U256, U256)> {
+        let chain = self.chain.read();
+        if let BlockId::Pending = id {
+            let (latest_difficulty, latest_pow_difficulty, latest_pos_difficulty) = self
+                .block_difficulties(BlockId::Latest)
+                .expect("blocks in chain have details; qed");
+            let pending = self
+                .miner
+                .pending_block_header(chain.best_block_number())
+                .map(|header| {
+                    (
+                        header.seal_type().clone().unwrap_or_default(),
+                        *header.difficulty(),
+                    )
+                });
+            if let Some((seal_type, difficulty)) = pending {
+                match seal_type {
+                    SealType::PoW => {
+                        let pow_difficulty = latest_pow_difficulty + difficulty;
+                        return Some((
+                            // TODO-UNITY: add overflow check
+                            pow_difficulty * latest_pos_difficulty,
+                            pow_difficulty,
+                            latest_pos_difficulty,
+                        ));
+                    }
+                    SealType::PoS => {
+                        let pos_difficulty = latest_pos_difficulty + difficulty;
+                        return Some((
+                            // TODO-UNITY: add overflow check
+                            latest_pow_difficulty * pos_difficulty,
+                            latest_pow_difficulty,
+                            pos_difficulty,
+                        ));
+                    }
+                }
+            }
+            // fall back to latest
+            return Some((
+                latest_difficulty,
+                latest_pow_difficulty,
+                latest_pos_difficulty,
+            ));
+        }
+
+        Self::block_hash(&chain, &self.miner, id)
+            .and_then(|hash| chain.block_details(&hash))
+            .map(|d| {
+                (
+                    d.total_difficulty,
+                    d.pow_total_difficulty,
+                    d.pos_total_difficulty,
+                )
+            })
+    }
+
     fn calculate_enacted_retracted(
         &self,
         import_results: &[ImportRoute],
@@ -1165,26 +1221,9 @@ impl BlockChainClient for Client {
         }
     }
 
-    fn block_total_difficulty(&self, id: BlockId) -> Option<U256> {
-        let chain = self.chain.read();
-        if let BlockId::Pending = id {
-            let latest_difficulty = self
-                .block_total_difficulty(BlockId::Latest)
-                .expect("blocks in chain have details; qed");
-            let pending_difficulty = self
-                .miner
-                .pending_block_header(chain.best_block_number())
-                .map(|header| *header.difficulty());
-            if let Some(difficulty) = pending_difficulty {
-                return Some(difficulty + latest_difficulty);
-            }
-            // fall back to latest
-            return Some(latest_difficulty);
-        }
-
-        Self::block_hash(&chain, &self.miner, id)
-            .and_then(|hash| chain.block_details(&hash))
-            .map(|d| d.total_difficulty)
+    // TODO-UNITY: change back after finishing sync rf
+    fn block_total_difficulty(&self, id: BlockId) -> Option<(U256, U256, U256)> {
+        self.block_difficulties(id)
     }
 
     fn nonce(&self, address: &Address, id: BlockId) -> Option<U256> {
@@ -1432,8 +1471,11 @@ impl BlockChainClient for Client {
 
     fn chain_info(&self) -> BlockChainInfo {
         let mut chain_info = self.chain.read().chain_info();
-        chain_info.pending_total_difficulty =
-            chain_info.total_difficulty + self.block_queue.total_difficulty();
+
+        // TODO-UNITY: add overflow check
+        chain_info.pending_total_difficulty = (chain_info.pow_total_difficulty
+            + self.block_queue.pow_total_difficulty())
+            * (chain_info.pos_total_difficulty + self.block_queue.pos_total_difficulty());
         chain_info
     }
 

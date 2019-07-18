@@ -259,6 +259,8 @@ impl ClientService {
                     let new_parent_block_detail = BlockDetails {
                         number: parnet_number,
                         total_difficulty: U256::from(*parent_header.difficulty()),
+                        pow_total_difficulty: U256::from(*parent_header.difficulty()),
+                        pos_total_difficulty: U256::from(1),
                         parent: H256::from(*parent_header.parent_hash()),
                         children: vec![],
                         anti_seal_parent: H256::default(), // TODO-Unity: implement calculation of anti_seal_parent

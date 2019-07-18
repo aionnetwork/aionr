@@ -21,7 +21,7 @@
 
 use client::{BlockId, BlockImportError, BlockStatus};
 use types::error::{BlockError, ImportError};
-use header::Seal;
+use header::{Seal,SealType};
 use views::BlockView;
 use aion_types::{H256, U256};
 
@@ -208,17 +208,35 @@ impl ImportHandler {
                                 //     continue;
                                 // }
 
-                                // TODO-UNITY-DIFFICULTY
-                                node.current_total_difficulty =
-                                    node.current_total_difficulty + difficulty;
+                                match seal_type {
+                                    SealType::PoW => {
+                                        node.current_pow_total_difficulty =
+                                            node.current_pow_total_difficulty + difficulty;
+                                    }
+                                    SealType::PoS => {
+                                        node.current_pos_total_difficulty =
+                                            node.current_pos_total_difficulty + difficulty;
+                                    }
+                                }
+                                // TODO-UNITY: add overflow check
+                                node.current_total_difficulty = node.current_pow_total_difficulty
+                                    * node.current_pos_total_difficulty;
 
                                 node.synced_block_num = number;
                                 if result.is_err() {
                                     if status == BlockStatus::InChain {
-                                        if let Some(current_total_difficulty) =
-                                            client.block_total_difficulty(block_id)
+                                        if let Some((
+                                            current_total_difficulty,
+                                            current_pow_total_difficulty,
+                                            current_pos_total_difficulty,
+                                        )) = client.block_total_difficulty(block_id)
                                         {
-                                            node.current_total_difficulty = current_total_difficulty
+                                            node.current_total_difficulty =
+                                                current_total_difficulty;
+                                            node.current_pow_total_difficulty =
+                                                current_pow_total_difficulty;
+                                            node.current_pos_total_difficulty =
+                                                current_pos_total_difficulty;
                                         }
                                     }
                                     info!(target: "sync", "AlreadyStored block #{}, {:?} received from node {}", number, hash, node.get_node_id());
@@ -338,6 +356,8 @@ impl ImportHandler {
                                     }
                                 } else {
                                     node.current_total_difficulty = U256::from(0);
+                                    node.current_pow_total_difficulty = U256::from(0);
+                                    node.current_pos_total_difficulty = U256::from(0);
                                     node.synced_block_num = number;
 
                                     if node.target_total_difficulty
