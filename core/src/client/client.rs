@@ -1147,6 +1147,22 @@ impl BlockChainClient for Client {
 
     fn best_block_header(&self) -> encoded::Header { self.chain.read().best_block_header() }
 
+    fn best_block_header_with_seal_type(&self, seal_type: &SealType) -> Option<encoded::Header> {
+        self.chain
+            .read()
+            .best_block_header_with_seal_type(seal_type)
+    }
+
+    fn calculate_difficulty(
+        &self,
+        parent_header: Option<&Header>,
+        grand_parent_header: Option<&Header>,
+    ) -> U256
+    {
+        let engine = &*self.engine;
+        engine.calculate_difficulty(parent_header, grand_parent_header)
+    }
+
     fn block_header(&self, id: BlockId) -> Option<::encoded::Header> {
         let chain = self.chain.read();
 
@@ -1551,6 +1567,7 @@ impl MiningBlockChainClient for Client {
         gas_range_target: (U256, U256),
         extra_data: Bytes,
         seal_type: Option<SealType>,
+        timestamp: Option<u64>,
     ) -> OpenBlock
     {
         let engine = &*self.engine;
@@ -1580,6 +1597,7 @@ impl MiningBlockChainClient for Client {
             gas_range_target,
             extra_data,
             self.db.read().clone(),
+            timestamp,
         )
         .expect(
             "OpenBlock::new only fails if parent state root invalid; state root of best block's \

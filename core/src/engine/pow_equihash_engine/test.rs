@@ -111,8 +111,6 @@ fn test_calculate_difficulty() {
         minimum_difficulty: U256::from(16),
     };
     let calculator = DifficultyCalc::new(&params);
-    let mut header = Header::default();
-    header.set_number(3);
     let mut parent_header = Header::default();
     parent_header.set_timestamp(1524538000u64);
     parent_header.set_difficulty(U256::from(1));
@@ -140,8 +138,6 @@ fn test_calculate_difficulty2() {
         minimum_difficulty: U256::from(16),
     };
     let calculator = DifficultyCalc::new(&params);
-    let mut header = Header::default();
-    header.set_number(3);
     let mut parent_header = Header::default();
     parent_header.set_timestamp(1524528005u64);
     parent_header.set_number(2);
@@ -169,8 +165,6 @@ fn test_calculate_difficulty3() {
         minimum_difficulty: U256::from(16),
     };
     let calculator = DifficultyCalc::new(&params);
-    let mut header = Header::default();
-    header.set_number(3);
     let mut parent_header = Header::default();
     parent_header.set_timestamp(1524528010u64);
     parent_header.set_difficulty(U256::from(3000));
@@ -198,8 +192,6 @@ fn test_calculate_difficulty4() {
         minimum_difficulty: U256::from(16),
     };
     let calculator = DifficultyCalc::new(&params);
-    let mut header = Header::default();
-    header.set_number(3);
     let mut parent_header = Header::default();
     parent_header.set_timestamp(1524528020u64);
     parent_header.set_difficulty(U256::from(3000));

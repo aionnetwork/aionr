@@ -114,6 +114,16 @@ pub trait Engine: Sync + Send {
     // TODO: decouple.
     fn machine(&self) -> &EthereumMachine;
 
+    /// Calculate the difficulty of
+    fn calculate_difficulty(
+        &self,
+        _parent: Option<&Header>,
+        _grand_parent: Option<&Header>,
+    ) -> U256
+    {
+        U256::from(0)
+    }
+
     /// The number of additional header fields required for this engine.
     fn seal_fields(&self, _header: &<EthereumMachine as Machine>::Header) -> usize { 0 }
 

@@ -19,12 +19,16 @@
  *
  ******************************************************************************/
 
+use std::cmp::max;
+
 use header::Header;
 use types::error::{BlockError, Error};
 use unexpected::{Mismatch, OutOfBounds};
 use key::public_to_address_ed25519;
 use rcrypto::ed25519::verify;
 use aion_types::{H256, Address};
+use blake2b::blake2b;
+use num_bigint::BigUint;
 
 pub trait DependentHeaderValidator {
     fn validate(&self, header: &Header, dependent_header: &Header) -> Result<(), Error>;
@@ -107,7 +111,40 @@ impl DependentHeaderValidator for PoSValidator {
 
         // Verify timestamp
         // TODO-Unity: To verify the timestamp with (stake, seed, difficulty, parent_timestamp)
-
-        Ok(())
+        let difficulty = header.difficulty();
+        let timestamp = header.timestamp();
+        let parent_timestamp = dependent_header.timestamp();
+        let stake: u64 = 1_000_000u64; // TODO-Unity: fake stake for tests. To use a real stake later. Remember to deal with stake 0
+        let hash_of_seed = blake2b(&seed[..]);
+        let a = BigUint::parse_bytes(
+            b"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            16,
+        )
+        .unwrap();
+        let b = BigUint::from_bytes_be(&hash_of_seed[..]);
+        let u = ln(&a).unwrap() - ln(&b).unwrap();
+        let delta = (difficulty.as_u64() as f64) * u / (stake as f64);
+        let delta_uint: u64 = max(1u64, delta as u64);
+        if timestamp - parent_timestamp < delta_uint {
+            Err(BlockError::InvalidPoSTimestamp(timestamp, parent_timestamp, delta_uint).into())
+        } else {
+            Ok(())
+        }
     }
+}
+
+// TODO-Unity: to do this better
+fn ln(x: &BigUint) -> Result<f64, String> {
+    let x: Vec<u8> = x.to_bytes_le();
+
+    const BYTES: usize = 12;
+    let start = if x.len() < BYTES { 0 } else { x.len() - BYTES };
+
+    let mut n: f64 = 0.0;
+    for i in start..x.len() {
+        n = n / 256f64 + (x[i] as f64);
+    }
+    let ln_256: f64 = (256f64).ln();
+
+    Ok(n.ln() + ln_256 * ((x.len() - 1) as f64))
 }

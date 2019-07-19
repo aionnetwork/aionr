@@ -82,7 +82,7 @@ pub fn run_staker(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sende
             let client: Arc<Client> = client.clone();
             client
                 .miner()
-                .try_prepare_block_pos(&*client, false)
+                .try_prepare_block_pos(&*client)
                 .map_err(|e| panic!("pos block generation err: {:?}", e))?;
             Ok(())
         })
