@@ -157,6 +157,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     );
 
     client_config.queue.verifier_settings = cmd.verifier_settings;
+    client_config.stake_contract = cmd.stake_conf.contract;
 
     // set up bootnodes
     let net_conf = cmd.net_conf;
