@@ -99,6 +99,8 @@ mod tests {
             hash: H256::from(U256::from(1)),
             number: 0,
             total_difficulty: U256::from(0),
+            pow_total_difficulty: U256::from(0),
+            pos_total_difficulty: U256::from(0),
             location: BlockLocation::Branch,
         };
 
@@ -118,6 +120,8 @@ mod tests {
             hash: H256::from(U256::from(1)),
             number: 0,
             total_difficulty: U256::from(0),
+            pow_total_difficulty: U256::from(0),
+            pos_total_difficulty: U256::from(0),
             location: BlockLocation::CanonChain,
         };
 
@@ -137,6 +141,8 @@ mod tests {
             hash: H256::from(U256::from(2)),
             number: 0,
             total_difficulty: U256::from(0),
+            pow_total_difficulty: U256::from(0),
+            pos_total_difficulty: U256::from(0),
             location: BlockLocation::BranchBecomingCanonChain(BranchBecomingCanonChainData {
                 ancestor: H256::from(U256::from(0)),
                 enacted: vec![H256::from(U256::from(1))],

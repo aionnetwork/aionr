@@ -241,6 +241,7 @@ impl<'x> OpenBlock<'x> {
             factories,
             kvdb.clone(),
         )?;
+
         let mut r = OpenBlock {
             block: ExecutedBlock::new(state, last_hashes),
             engine,
@@ -265,14 +266,15 @@ impl<'x> OpenBlock<'x> {
             cmp::max(gas_range_target.0, engine.machine().params().min_gas_limit);
         let gas_ceil_target = cmp::max(gas_range_target.1, gas_floor_target);
 
-        engine.machine().populate_from_parent(
+        // Set gas_limit
+        engine.machine().set_gas_limit_from_parent(
             &mut r.block.header,
             parent,
             gas_floor_target,
             gas_ceil_target,
         );
         // Set difficulty
-        engine.populate_from_parent(&mut r.block.header, seal_parent, seal_grand_parent);
+        engine.set_difficulty_from_parent(&mut r.block.header, seal_parent, seal_grand_parent);
 
         engine.machine().on_new_block(&mut r.block)?;
 

@@ -130,6 +130,8 @@ pub struct Node {
     pub best_hash: H256,
     pub genesis_hash: H256,
     pub target_total_difficulty: U256,
+    pub current_pow_total_difficulty: U256,
+    pub current_pos_total_difficulty: U256,
     pub current_total_difficulty: U256,
     pub mode: Mode,
     pub last_request_timestamp: SystemTime,
@@ -155,6 +157,8 @@ impl Node {
             best_hash: H256::default(),
             genesis_hash: H256::default(),
             target_total_difficulty: U256::default(),
+            current_pow_total_difficulty: U256::default(),
+            current_pos_total_difficulty: U256::default(),
             current_total_difficulty: U256::default(),
             mode: Mode::NORMAL,
             last_request_timestamp: SystemTime::now(),
@@ -231,6 +235,8 @@ impl Node {
         self.best_hash = node_new.best_hash;
         self.genesis_hash = node_new.genesis_hash;
         self.target_total_difficulty = node_new.target_total_difficulty;
+        self.current_pow_total_difficulty = node_new.current_pow_total_difficulty;
+        self.current_pos_total_difficulty = node_new.current_pos_total_difficulty;
         self.current_total_difficulty = node_new.current_total_difficulty;
         self.mode = node_new.mode.clone();
         self.last_request_timestamp = node_new.last_request_timestamp;
@@ -301,6 +307,16 @@ impl fmt::Display for Node {
             f,
             "    total difficulty: {}\n",
             self.target_total_difficulty
+        )?;
+        write!(
+            f,
+            "    current pow total difficulty: {}\n",
+            self.current_pow_total_difficulty
+        )?;
+        write!(
+            f,
+            "    current pos total difficulty: {}\n",
+            self.current_pos_total_difficulty
         )?;
         write!(
             f,

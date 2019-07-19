@@ -135,7 +135,7 @@ impl DifficultyCalc {
             res if res > 0f64 => {
                 cmp::min(
                     parent_difficulty.as_u64() - 1,
-                    (parent_difficulty.as_u64() as f64 / (1f64 + alpha)) as u64,
+                    (parent_difficulty.as_u64() as f64 * (1f64 - alpha)) as u64,
                 )
             }
             res if res < 0f64 => {
@@ -435,13 +435,17 @@ impl Engine for Arc<POWEquihashEngine> {
         Ok(())
     }
 
-    fn populate_from_parent(
+    fn set_difficulty_from_parent(
         &self,
         header: &mut Header,
         parent: Option<&Header>,
         grand_parent: Option<&Header>,
     )
     {
+        if header.number() == 0 {
+            panic!("Can't calculate genesis block difficulty.");
+        }
+
         let difficulty = self.calculate_difficulty(parent, grand_parent);
         header.set_difficulty(difficulty);
     }

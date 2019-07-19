@@ -141,7 +141,7 @@ fn test_calculate_difficulty2() {
     grand_parent_header.set_number(1);
     let difficulty =
         calculator.calculate_difficulty(Some(&parent_header), Some(&grand_parent_header));
-    assert_eq!(difficulty, U256::from(1904));
+    assert_eq!(difficulty, U256::from(1900));
 }
 
 #[test]

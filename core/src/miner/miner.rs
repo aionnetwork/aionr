@@ -236,11 +236,18 @@ impl Miner {
             .expect("Internal staker is null. Should have checked before.");
         let sk: [u8; 64] = staker.secret().0;
         let pk: [u8; 32] = staker.public().0;
+        let address: Address = staker.address();
 
-        // 1. Get the current best PoS block
+        // 1. Get the stake. Stop proceeding if stake is 0.
+        let stake: u64 = match client.get_stake(&address) {
+            Ok(stake) if stake > 0 => stake,
+            _ => return Ok(()),
+        };
+
+        // 2. Get the current best PoS block
         let best_block_header = client.best_block_header_with_seal_type(&SealType::PoS);
 
-        // 2. Get the timestamp, the seed and the seal parent of the best PoS block
+        // 3. Get the timestamp, the seed and the seal parent of the best PoS block
         let timestamp_now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -261,7 +268,7 @@ impl Miner {
             None => (timestamp_now - 1u64, Vec::new(), None), // TODO-Unity: To handle the first PoS block better
         };
 
-        // 3. Calculate difficulty
+        // 4. Calculate difficulty
         let difficulty = client.calculate_difficulty(
             best_block_header
                 .clone()
@@ -269,9 +276,6 @@ impl Miner {
                 .as_ref(),
             seal_parent.map(|header| header.decode()).as_ref(),
         );
-
-        // 4. Get the stake
-        let stake: u64 = 1_000_000u64; // TODO-Unity: fake stake for tests. To use a real stake later. Remember to deal with stake 0
 
         // 5. Calcualte timestamp for the new PoS block
         // TODO-Unity: don't use floating number to calculate this
