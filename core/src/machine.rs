@@ -122,10 +122,10 @@ impl EthereumMachine {
         Ok(())
     }
 
-    /// Populate a header's fields based on its parent's header.
+    /// Populate a header's gas limit based on its parent's header.
     /// Usually implements the chain scoring rule based on weight.
     /// The gas floor target must not be lower than the engine's minimum gas limit.
-    pub fn populate_from_parent(
+    pub fn set_gas_limit_from_parent(
         &self,
         header: &mut Header,
         parent: &Header,
@@ -133,8 +133,6 @@ impl EthereumMachine {
         gas_ceil_target: U256,
     )
     {
-        header.set_difficulty(parent.difficulty().clone());
-
         // clamped-decay
         header.set_gas_limit({
             let gas_limit = parent.gas_limit().clone();

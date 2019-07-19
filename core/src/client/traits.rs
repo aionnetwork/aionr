@@ -78,8 +78,9 @@ pub trait BlockChainClient: Sync + Send {
     /// Get block status by block header hash.
     fn block_status(&self, id: BlockId) -> BlockStatus;
 
+    // TODO-UNITY: change back after finishing sync rf
     /// Get block total difficulty.
-    fn block_total_difficulty(&self, id: BlockId) -> Option<U256>;
+    fn block_total_difficulty(&self, id: BlockId) -> Option<(U256, U256, U256)>;
 
     /// Attempt to get address nonce at given block.
     /// May not fail on BlockId::Latest.

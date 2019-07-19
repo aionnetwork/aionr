@@ -111,7 +111,8 @@ where
     fn block(&self, id: BlockId, include_txs: bool) -> Result<Option<Block>> {
         let client = &self.client;
         match (client.block(id.clone()), client.block_total_difficulty(id)) {
-            (Some(block), Some(total_difficulty)) => {
+            // TODO-UNITY: change back after finishing sync rf
+            (Some(block), Some((total_difficulty, _, _))) => {
                 let view = block.header_view();
                 let seal_fields: Vec<Bytes> = view.seal().into_iter().map(Into::into).collect();
                 // Pending block do not yet has nonce and solution. Return empty value in this case.

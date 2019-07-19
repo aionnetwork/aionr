@@ -435,13 +435,17 @@ impl Engine for Arc<POWEquihashEngine> {
         Ok(())
     }
 
-    fn populate_from_parent(
+    fn set_difficulty_from_parent(
         &self,
         header: &mut Header,
         parent: Option<&Header>,
         grand_parent: Option<&Header>,
     )
     {
+        if header.number() == 0 {
+            panic!("Can't calculate genesis block difficulty.");
+        }
+
         let difficulty = self.calculate_difficulty(parent, grand_parent);
         header.set_difficulty(difficulty);
     }
