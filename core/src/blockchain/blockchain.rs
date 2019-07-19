@@ -129,6 +129,9 @@ pub trait BlockProvider {
         seal_type: &Option<SealType>,
     ) -> Option<::encoded::Header>;
 
+    /// Get the current best block with specified seal type
+    fn best_block_header_with_seal_type(&self, seal_type: &SealType) -> Option<encoded::Header>;
+
     /// Get the block body (uncles and transactions).
     fn block_body(&self, hash: &H256) -> Option<encoded::Body>;
 
@@ -354,6 +357,24 @@ impl BlockProvider for BlockChain {
                 None => return None,
             };
             let anti_seal_parent: H256 = parent_details.anti_seal_parent;
+            self.block_header_data(&anti_seal_parent)
+        }
+    }
+
+    /// Get the current best block with specified seal type
+    fn best_block_header_with_seal_type(&self, seal_type: &SealType) -> Option<encoded::Header> {
+        let best_block_header = self.best_block_header();
+        // If the best block's seal type corresponds to the given seal type, return the current best block
+        if seal_type == &best_block_header.seal_type().unwrap_or_default() {
+            Some(best_block_header)
+        }
+        // Else, return the anti seal parent of the current best block
+        else {
+            let block_details: BlockDetails = match self.block_details(&best_block_header.hash()) {
+                Some(details) => details,
+                None => return None,
+            };
+            let anti_seal_parent: H256 = block_details.anti_seal_parent;
             self.block_header_data(&anti_seal_parent)
         }
     }
