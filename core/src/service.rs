@@ -256,11 +256,12 @@ impl ClientService {
                     let parent_header = ::encoded::Header::new(parent_header_bytes).decode();
                     let parnet_number = parent_header.number();
                     batch.put(db::COL_EXTRA, b"best", &parent);
+                    // TODO-UNITY: to fix wrong total difficulties filling in new parent block details.
                     let new_parent_block_detail = BlockDetails {
                         number: parnet_number,
                         total_difficulty: U256::from(*parent_header.difficulty()),
                         pow_total_difficulty: U256::from(*parent_header.difficulty()),
-                        pos_total_difficulty: U256::from(1),
+                        pos_total_difficulty: U256::from(*parent_header.difficulty()),
                         parent: H256::from(*parent_header.parent_hash()),
                         children: vec![],
                         anti_seal_parent: H256::default(), // TODO-Unity: implement calculation of anti_seal_parent
