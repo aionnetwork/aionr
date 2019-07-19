@@ -30,7 +30,7 @@ use types::error::{ImportResult, CallError, BlockImportError};
 use factory::VmFactory;
 use executive::Executed;
 use filter::Filter;
-use header::{BlockNumber, SealType};
+use header::{BlockNumber, SealType, Header};
 use log_entry::LocalizedLogEntry;
 use receipt::LocalizedReceipt;
 use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction};
@@ -195,6 +195,16 @@ pub trait BlockChainClient: Sync + Send {
     /// Get the best block header.
     fn best_block_header(&self) -> encoded::Header;
 
+    /// Get the best block header with given seal type
+    fn best_block_header_with_seal_type(&self, seal_type: &SealType) -> Option<encoded::Header>;
+
+    /// Calculate difficulty
+    fn calculate_difficulty(
+        &self,
+        parent_header: Option<&Header>,
+        grand_parent_header: Option<&Header>,
+    ) -> U256;
+
     /// Returns logs matching given filter.
     fn logs(&self, filter: Filter) -> Vec<LocalizedLogEntry>;
 
@@ -309,6 +319,7 @@ pub trait MiningBlockChainClient: BlockChainClient {
         gas_range_target: (U256, U256),
         extra_data: Bytes,
         seal_type: Option<SealType>,
+        timestamp: Option<u64>,
     ) -> OpenBlock;
 
     /// Reopens an OpenBlock and updates uncles.
