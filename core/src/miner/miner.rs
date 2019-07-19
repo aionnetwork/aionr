@@ -22,8 +22,9 @@
 
 use std::collections::{BTreeMap, HashSet};
 use std::sync::Arc;
-use std::time::{self, Duration, Instant};
+use std::time::{self, Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::thread;
+use std::cmp::max;
 
 use rustc_hex::FromHex;
 use account_provider::AccountProvider;
@@ -57,6 +58,8 @@ use transaction::transaction_queue::{
 use using_queue::{GetAction, UsingQueue};
 use rcrypto::ed25519;
 use key::Ed25519KeyPair;
+use num_bigint::BigUint;
+use blake2b::blake2b;
 
 /// Different possible definitions for pending transaction set.
 #[derive(Debug, PartialEq)]
@@ -219,80 +222,138 @@ impl Miner {
         }
     }
 
-    // TOREMOVE: Unity MS1 use only
+    // TOREMOVE-Unity: Unity MS1 use only
     /// Try to generate PoS block if minimum resealing duration is met
-    pub fn try_prepare_block_pos(
+    pub fn try_prepare_block_pos(&self, client: &MiningBlockChainClient) -> Result<(), Error> {
+        if self.staker.is_none() {
+            return Ok(());
+        }
+
+        // Staker
+        let staker: Ed25519KeyPair = self
+            .staker()
+            .to_owned()
+            .expect("Internal staker is null. Should have checked before.");
+        let sk: [u8; 64] = staker.secret().0;
+        let pk: [u8; 32] = staker.public().0;
+
+        // 1. Get the current best PoS block
+        let best_block_header = client.best_block_header_with_seal_type(&SealType::PoS);
+
+        // 2. Get the timestamp, the seed and the seal parent of the best PoS block
+        let timestamp_now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        let (timestamp, seed, seal_parent) = match &best_block_header {
+            Some(header) => {
+                let seed: Bytes = header
+                    .seal()
+                    .get(1)
+                    .expect("A pos block has to contain a seed")
+                    .to_owned();
+                (
+                    header.timestamp(),
+                    seed,
+                    client.seal_parent_header(&header.parent_hash(), &header.seal_type()),
+                )
+            }
+            None => (timestamp_now - 1u64, Vec::new(), None), // TODO-Unity: To handle the first PoS block better
+        };
+
+        // 3. Calculate difficulty
+        let difficulty = client.calculate_difficulty(
+            best_block_header
+                .clone()
+                .map(|header| header.decode())
+                .as_ref(),
+            seal_parent.map(|header| header.decode()).as_ref(),
+        );
+
+        // 4. Get the stake
+        let stake: u64 = 1_000_000u64; // TODO-Unity: fake stake for tests. To use a real stake later. Remember to deal with stake 0
+
+        // 5. Calcualte timestamp for the new PoS block
+        // TODO-Unity: don't use floating number to calculate this
+        // \Delta = \frac{d_s \cdot ln({2^{256}}/{hash(seed)})}{V}.
+        let new_seed = ed25519::signature(&seed, &sk);
+        let hash_of_seed = blake2b(&new_seed[..]);
+        let a = BigUint::parse_bytes(
+            b"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            16,
+        )
+        .unwrap();
+        let b = BigUint::from_bytes_be(&hash_of_seed[..]);
+        let u = ln(&a).unwrap() - ln(&b).unwrap();
+        let delta = (difficulty.as_u64() as f64) * u / (stake as f64);
+
+        trace!(target: "staker", "Staking...difficulty: {}, u: {}, stake: {}, delta: {}",
+               difficulty.as_u64(), u, stake, delta);
+        let new_timestamp = timestamp + max(1u64, delta as u64);
+
+        // 6. Determine if we can produce a new PoS block or not
+        if timestamp_now >= new_timestamp {
+            self.prepare_block_pos(
+                client,
+                new_timestamp,
+                new_seed,
+                &sk,
+                &pk,
+                best_block_header.map(|header| header.decode()).as_ref(),
+            )
+        } else {
+            Ok(())
+        }
+    }
+
+    // TOREMOVE-Unity: Unity MS1 use only
+    /// Generate PoS block
+    pub fn prepare_block_pos(
         &self,
         client: &MiningBlockChainClient,
-        is_forced: bool,
+        timestamp: u64,
+        seed: [u8; 64],
+        sk: &[u8; 64],
+        pk: &[u8; 32],
+        seal_parent: Option<&Header>,
     ) -> Result<(), Error>
     {
-        if (is_forced || self.tx_reseal_allowed()) && self.staker.is_some() {
-            trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
-            // Set minimal next reseal time
-            *self.next_allowed_reseal.lock() = Instant::now() + self.options.reseal_min_period;
+        trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
 
-            // 1. Create a block with transactions
-            let (raw_block, _): (ClosedBlock, Option<H256>) =
-                self.prepare_block(client, &Some(SealType::PoS));
+        // 1. Create a block with transactions
+        let (raw_block, _): (ClosedBlock, Option<H256>) =
+            self.prepare_block(client, &Some(SealType::PoS), Some(timestamp));
 
-            // 2. Generate seed and signature
-            let bare_hash: H256 = raw_block.header().bare_hash();
-            let seal_parent = client.seal_parent_header(
-                raw_block.header().parent_hash(),
-                raw_block.header().seal_type(),
-            );
-            let seal_parent_seed: Bytes = match &seal_parent {
-                Some(header) => {
-                    let seed: Bytes = header
-                        .seal()
-                        .get(1)
-                        .expect("A pos block has to contain a seed")
-                        .to_owned();
-                    seed
-                }
-                None => Bytes::new(),
-            };
-            let staker: Ed25519KeyPair = self
-                .staker()
-                .to_owned()
-                .expect("Internal staker is null. Should have checked before.");
-            let sk: [u8; 64] = staker.secret().0;
-            let pk: [u8; 32] = staker.public().0;
-            let seed = ed25519::signature(&seal_parent_seed, &sk);
-            let signature = ed25519::signature(&bare_hash.0, &sk);
+        // 2. Generate signature
+        let bare_hash: H256 = raw_block.header().bare_hash();
+        let signature = ed25519::signature(&bare_hash.0, sk);
 
-            // 3. Seal the block
-            let mut seal: Vec<Bytes> = Vec::new();
-            seal.push(signature.to_vec());
-            seal.push(seed.to_vec());
-            seal.push(pk.to_vec());
-            let sealed_block: SealedBlock = raw_block
-                .lock()
-                .try_seal_pos(
-                    &*self.engine,
-                    seal,
-                    seal_parent.map(|header| header.decode()).as_ref(),
-                )
-                .or_else(|(e, _)| {
-                    warn!(target: "miner", "Staking seal rejected: {}", e);
-                    Err(Error::PosInvalid)
-                })?;
+        // 3. Seal the block
+        let mut seal: Vec<Bytes> = Vec::new();
+        seal.push(signature.to_vec());
+        seal.push(seed.to_vec());
+        seal.push(pk.to_vec());
+        let sealed_block: SealedBlock = raw_block
+            .lock()
+            .try_seal_pos(&*self.engine, seal, seal_parent)
+            .or_else(|(e, _)| {
+                warn!(target: "miner", "Staking seal rejected: {}", e);
+                Err(Error::PosInvalid)
+            })?;
 
-            // Log
-            let n = sealed_block.header().number();
-            let d = sealed_block.header().difficulty().clone();
-            let h = sealed_block.header().hash();
+        // Log
+        let n = sealed_block.header().number();
+        let d = sealed_block.header().difficulty().clone();
+        let h = sealed_block.header().hash();
 
-            // 4. Import block
-            client.import_sealed_block(sealed_block)?;
+        // 4. Import block
+        client.import_sealed_block(sealed_block)?;
 
-            // Log
-            info!(target: "miner", "PoS block imported OK. #{}: {}, {}",
-                Colour::White.bold().paint(format!("{}", n)),
-                Colour::White.bold().paint(format!("{}", d)),
-                Colour::White.bold().paint(format!("{:x}", h)));
-        }
+        // Log
+        info!(target: "miner", "PoS block imported OK. #{}: diff: {}, hash: {}",
+            Colour::White.bold().paint(format!("{}", n)),
+            Colour::White.bold().paint(format!("{}", d)),
+            Colour::White.bold().paint(format!("{:x}", h)));
         Ok(())
     }
 
@@ -391,6 +452,7 @@ impl Miner {
         &self,
         client: &MiningBlockChainClient,
         seal_type: &Option<SealType>,
+        timestamp: Option<u64>,
     ) -> (ClosedBlock, Option<H256>)
     {
         trace_time!("prepare_block");
@@ -425,6 +487,7 @@ impl Miner {
                         (self.gas_floor_target(), self.gas_ceil_target()),
                         self.extra_data(),
                         seal_type.to_owned(),
+                        timestamp,
                     )
                 }
                 _ => {
@@ -446,6 +509,7 @@ impl Miner {
                                 (self.gas_floor_target(), self.gas_ceil_target()),
                                 self.extra_data(),
                                 seal_type.to_owned(),
+                                timestamp,
                             )
                         }
                     }
@@ -640,7 +704,7 @@ impl Miner {
             }
         };
         if prepare_new {
-            let (block, original_work_hash) = self.prepare_block(client, seal_type);
+            let (block, original_work_hash) = self.prepare_block(client, seal_type, None);
             self.prepare_work(block, original_work_hash);
         }
         let mut sealing_block_last_request = self.sealing_block_last_request.lock();
@@ -1152,7 +1216,8 @@ impl MinerService for Miner {
         trace!(target: "block", "update_sealing: best_block: {:?}", client.chain_info().best_block_number);
         if self.requires_reseal(client.chain_info().best_block_number) {
             trace!(target: "block", "update_sealing: preparing a block");
-            let (block, original_work_hash) = self.prepare_block(client, &Some(SealType::PoW));
+            let (block, original_work_hash) =
+                self.prepare_block(client, &Some(SealType::PoW), None);
             self.prepare_work(block, original_work_hash)
         }
     }
@@ -1249,7 +1314,7 @@ impl MinerService for Miner {
     }
 }
 
-// TOREMOVE: Unity MS1 use only
+// TOREMOVE-Unity: Unity MS1 use only
 fn parse_staker(key: String) -> Result<Ed25519KeyPair, String> {
     let bytes: Vec<u8>;
     if key.starts_with("0x") {
@@ -1270,6 +1335,22 @@ fn parse_staker(key: String) -> Result<Ed25519KeyPair, String> {
     let mut keypair: Vec<u8> = secret.to_vec();
     keypair.extend(public.to_vec());
     Ok(keypair.into())
+}
+
+// TODO-Unity: To do this better
+fn ln(x: &BigUint) -> Result<f64, String> {
+    let x: Vec<u8> = x.to_bytes_le();
+
+    const BYTES: usize = 12;
+    let start = if x.len() < BYTES { 0 } else { x.len() - BYTES };
+
+    let mut n: f64 = 0.0;
+    for i in start..x.len() {
+        n = n / 256f64 + (x[i] as f64);
+    }
+    let ln_256: f64 = (256f64).ln();
+
+    Ok(n.ln() + ln_256 * ((x.len() - 1) as f64))
 }
 
 #[cfg(test)]

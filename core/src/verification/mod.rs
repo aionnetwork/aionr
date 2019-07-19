@@ -418,6 +418,15 @@ mod tests {
             }
         }
 
+        /// Get the current best block with specified seal type
+        fn best_block_header_with_seal_type(
+            &self,
+            _seal_type: &SealType,
+        ) -> Option<encoded::Header>
+        {
+            unimplemented!()
+        }
+
         fn block_body(&self, hash: &H256) -> Option<encoded::Body> {
             self.block(hash)
                 .map(|b| BlockChain::block_to_body(&b.into_inner()))

@@ -374,6 +374,7 @@ impl MiningBlockChainClient for TestBlockChainClient {
         gas_range_target: (U256, U256),
         extra_data: Bytes,
         seal_type: Option<SealType>,
+        _timestamp: Option<u64>,
     ) -> OpenBlock
     {
         let engine = &*self.spec.engine;
@@ -398,6 +399,7 @@ impl MiningBlockChainClient for TestBlockChainClient {
             gas_range_target,
             extra_data,
             self.db.clone(),
+            None,
         )
         .expect("Opening block for tests will not fail.");
         // TODO [todr] Override timestamp for predictability (set_timestamp_now kind of sucks)
@@ -586,6 +588,20 @@ impl BlockChainClient for TestBlockChainClient {
     fn best_block_header(&self) -> encoded::Header {
         self.block_header(BlockId::Hash(self.chain_info().best_block_hash))
             .expect("Best block always has header.")
+    }
+
+    fn best_block_header_with_seal_type(&self, _seal_type: &SealType) -> Option<encoded::Header> {
+        unimplemented!()
+    }
+
+    fn calculate_difficulty(
+        &self,
+        parent_header: Option<&BlockHeader>,
+        grand_parent_header: Option<&BlockHeader>,
+    ) -> U256
+    {
+        let engine = &*self.spec.engine;
+        engine.calculate_difficulty(parent_header, grand_parent_header)
     }
 
     fn block_header(&self, id: BlockId) -> Option<encoded::Header> {

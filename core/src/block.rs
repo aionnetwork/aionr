@@ -229,6 +229,7 @@ impl<'x> OpenBlock<'x> {
         gas_range_target: (U256, U256),
         extra_data: Bytes,
         kvdb: Arc<KeyValueDB>,
+        timestamp: Option<u64>,
     ) -> Result<Self, Error>
     {
         let number = parent.number() + 1;
@@ -248,7 +249,14 @@ impl<'x> OpenBlock<'x> {
         r.block.header.set_parent_hash(parent.hash());
         r.block.header.set_number(number);
         r.block.header.set_author(author);
-        r.block.header.set_timestamp_now(parent.timestamp()); // TODO-Unity: handle PoS block timestamp
+        match timestamp {
+            Some(timestamp) => {
+                r.block.header.set_timestamp(timestamp);
+            }
+            None => {
+                r.block.header.set_timestamp_now(parent.timestamp());
+            }
+        };
         r.block.header.set_seal_type(seal_type);
         r.set_extra_data(extra_data);
         r.block.header.note_dirty();
@@ -702,6 +710,7 @@ fn enact(
         (3141562.into(), 31415620.into()),
         vec![],
         kvdb,
+        None,
     )?;
 
     b.populate_from(header);
