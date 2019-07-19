@@ -45,6 +45,10 @@ impl<'a> GrandParentHeaderValidator for DifficultyValidator<'a> {
         grand_parent_header: Option<&Header>,
     ) -> Result<(), Error>
     {
+        if header.number() == 0 {
+            panic!("Genesis block should never be validated here");
+        }
+
         let difficulty = header.difficulty().to_owned();
         let calc_difficulty = self
             .difficulty_calc

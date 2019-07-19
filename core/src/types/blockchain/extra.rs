@@ -123,6 +123,10 @@ pub struct BlockDetails {
     pub number: BlockNumber,
     /// Total difficulty of the block and all its parents
     pub total_difficulty: U256,
+    /// PoW total difficulty of all the PoW block till this block
+    pub pow_total_difficulty: U256,
+    /// PoS total difficulty of all the PoS block till this block
+    pub pos_total_difficulty: U256,
     /// Parent block hash
     pub parent: H256,
     /// List of children block hashes
