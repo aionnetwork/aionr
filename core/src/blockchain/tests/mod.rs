@@ -848,8 +848,10 @@ fn test_insert_unordered() {
         false,
         false,
     );
+    db.write_buffered(batch.clone());
     bc.commit();
     bc.insert_unordered_block(&mut batch, &b3.last().encoded(), vec![], None, true, false);
+    db.write_buffered(batch.clone());
     bc.commit();
     bc.insert_unordered_block(&mut batch, &b1.last().encoded(), vec![], None, false, false);
     bc.commit();

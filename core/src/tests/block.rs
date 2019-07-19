@@ -23,7 +23,7 @@
 use log;
 use std::sync::Arc;
 use block::{OpenBlock, LockedBlock, SealedBlock, Drain};
-use engine::AionEngine;
+use engine::Engine;
 use types::error::Error;
 use header::Header;
 use factory::Factories;
@@ -40,10 +40,11 @@ use spec::Spec;
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 fn enact_bytes(
     block_bytes: &[u8],
-    engine: &AionEngine,
+    engine: &Engine,
     db: StateDB,
     parent: &Header,
-    _grant_parent: Option<&Header>,
+    seal_parent: Option<&Header>,
+    seal_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
 ) -> Result<LockedBlock, Error>
@@ -57,6 +58,7 @@ fn enact_bytes(
         .map(|r| r.map_err(Into::into))
         .collect();
     let transactions = transactions?;
+    let seal_type = header.seal_type().clone();
 
     {
         if log::max_log_level() >= log::LogLevel::Trace {
@@ -77,7 +79,9 @@ fn enact_bytes(
         factories,
         db,
         parent,
-        None,
+        seal_type.unwrap_or_default(),
+        seal_parent,
+        seal_grand_parent,
         last_hashes,
         Address::new(),
         (3141562.into(), 31415620.into()),
@@ -94,10 +98,11 @@ fn enact_bytes(
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header. Seal the block afterwards
 fn enact_and_seal(
     block_bytes: &[u8],
-    //    engine: &EthEngine,
-    engine: &AionEngine,
+    engine: &Engine,
     db: StateDB,
     parent: &Header,
+    seal_parent: Option<&Header>,
+    seal_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
 ) -> Result<SealedBlock, Error>
@@ -108,7 +113,8 @@ fn enact_and_seal(
         engine,
         db,
         parent,
-        None,
+        seal_parent,
+        seal_grand_parent,
         last_hashes,
         factories,
     )?
@@ -128,6 +134,8 @@ fn open_block() {
         Default::default(),
         db,
         &genesis_header,
+        Default::default(),
+        None,
         None,
         last_hashes,
         Address::zero(),
@@ -157,6 +165,8 @@ fn enact_block() {
         Default::default(),
         db,
         &genesis_header,
+        Default::default(),
+        None,
         None,
         last_hashes.clone(),
         Address::zero(),
@@ -179,6 +189,8 @@ fn enact_block() {
         engine,
         db,
         &genesis_header,
+        None,
+        None,
         last_hashes,
         Default::default(),
     )
@@ -198,3 +210,5 @@ fn enact_block() {
             .is_none()
     );
 }
+
+// TODO-UNITY: Add some block tests about seal_parent and seal_grand_parent

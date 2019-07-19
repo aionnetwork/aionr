@@ -42,8 +42,6 @@ pub use types::executed::{ExecutionError, CallError};
 #[derive(Debug, PartialEq, Clone, Copy, Eq)]
 /// Errors concerning block processing.
 pub enum BlockError {
-    /// Header version is invalid.
-    InvalidHeaderVersion(Mismatch<u8>),
     /// Solution is invalid.
     InvalidSolution,
     /// result is of an invalid length.
@@ -103,7 +101,6 @@ impl fmt::Display for BlockError {
         use self::BlockError::*;
 
         let msg = match *self {
-            InvalidHeaderVersion(ref mis) => format!("Invalid header version. {}", mis),
             InvalidSolution => format!("Invalid solution. "),
             ResultOutOfBounds(ref oob) => {
                 format!("Computed output violates boundary condition. {}", oob)
@@ -227,8 +224,10 @@ pub enum Error {
     Import(ImportError),
     /// PoW hash is invalid or out of date.
     PowHashInvalid,
-    /// The value of the nonce or mishash is invalid.
+    /// The pow seal is invalid.
     PowInvalid,
+    /// The pos seal is invalid
+    PosInvalid,
     /// Error concerning TrieDBs
     Trie(TrieError),
     /// Io crate error.
@@ -258,7 +257,8 @@ impl fmt::Display for Error {
                 f.write_fmt(format_args!("Unknown engine name ({})", name))
             }
             Error::PowHashInvalid => f.write_str("Invalid or out of date PoW hash."),
-            Error::PowInvalid => f.write_str("Invalid nonce or mishash"),
+            Error::PowInvalid => f.write_str("Invalid PoW nonce or mishash"),
+            Error::PosInvalid => f.write_str("Invalid PoS seal"),
             Error::Trie(ref err) => err.fmt(f),
             Error::StdIo(ref err) => err.fmt(f),
             Error::Engine(ref err) => err.fmt(f),

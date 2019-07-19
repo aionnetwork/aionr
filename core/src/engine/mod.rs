@@ -22,8 +22,6 @@
 
 //! Consensus engine specification and basic implementations.
 pub mod pow_equihash_engine;
-mod null_engine;
-pub use self::null_engine::NullEngine;
 pub use self::pow_equihash_engine::POWEquihashEngine;
 
 use std::fmt;
@@ -35,6 +33,7 @@ use std::collections::{BTreeMap};
 use precompiled::builtin::BuiltinContract;
 use transaction::{UnverifiedTransaction, SignedTransaction};
 use aion_types::{U256, Address};
+use machine::EthereumMachine;
 
 use aion_machine::{Machine, LocalizedMachine as Localized};
 use unexpected::{Mismatch, OutOfBounds};
@@ -84,7 +83,7 @@ impl fmt::Display for EngineError {
 /// Proof dependent on state.
 pub trait StateDependentProof<M: Machine>: Send + Sync {
     /// Generate a proof, given the state.
-    // TODO: make this into an &M::StateContext
+    // TODO: make this into an &<EthereumMachine as Machine>::StateContext
     fn generate_proof<'a>(
         &self,
         state: &<M as Localized<'a>>::StateContext,
@@ -103,21 +102,29 @@ pub enum Proof<M: Machine> {
     WithState(Arc<StateDependentProof<M>>),
 }
 
-/// A consensus mechanism for the chain. Generally either proof-of-work or proof-of-stake-based.
-/// Provides hooks into each of the major parts of block import.
-pub trait Engine<M: Machine>: Sync + Send {
+/// Common type alias for an engine coupled with an Ethereum-like state machine.
+// TODO: make this a _trait_ alias when those exist.
+// fortunately the effect is largely the same since engines are mostly used
+// via trait objects.
+pub trait Engine: Sync + Send {
     /// The name of this engine.
     fn name(&self) -> &str;
 
     /// Get access to the underlying state machine.
     // TODO: decouple.
-    fn machine(&self) -> &M;
+    fn machine(&self) -> &EthereumMachine;
 
     /// The number of additional header fields required for this engine.
-    fn seal_fields(&self, _header: &M::Header) -> usize { 0 }
+    fn seal_fields(&self, _header: &<EthereumMachine as Machine>::Header) -> usize { 0 }
 
     /// Block transformation functions, after the transactions.
-    fn on_close_block(&self, _block: &mut M::LiveBlock) -> Result<(), M::Error> { Ok(()) }
+    fn on_close_block(
+        &self,
+        _block: &mut <EthereumMachine as Machine>::LiveBlock,
+    ) -> Result<(), <EthereumMachine as Machine>::Error>
+    {
+        Ok(())
+    }
 
     /// Verify a locally-generated seal of a header.
     ///
@@ -129,20 +136,42 @@ pub trait Engine<M: Machine>: Sync + Send {
     ///
     /// It is fine to require access to state or a full client for this function, since
     /// light clients do not generate seals.
-    fn verify_local_seal(&self, header: &M::Header) -> Result<(), M::Error>;
+    fn verify_local_seal_pow(
+        &self,
+        header: &<EthereumMachine as Machine>::Header,
+    ) -> Result<(), <EthereumMachine as Machine>::Error>;
+
+    fn verify_local_seal_pos(
+        &self,
+        header: &<EthereumMachine as Machine>::Header,
+        seal_pos: Option<&<EthereumMachine as Machine>::Header>,
+    ) -> Result<(), <EthereumMachine as Machine>::Error>;
 
     /// Phase 1 quick block verification. Only does checks that are cheap. Returns either a null `Ok` or a general error detailing the problem with import.
-    fn verify_block_basic(&self, _header: &M::Header) -> Result<(), M::Error> { Ok(()) }
+    fn verify_block_basic(
+        &self,
+        _header: &<EthereumMachine as Machine>::Header,
+    ) -> Result<(), <EthereumMachine as Machine>::Error>
+    {
+        Ok(())
+    }
 
     /// Phase 2 verification. Perform costly checks such as transaction signatures. Returns either a null `Ok` or a general error detailing the problem with import.
-    fn verify_block_unordered(&self, _header: &M::Header) -> Result<(), M::Error> { Ok(()) }
+    fn verify_block_unordered(
+        &self,
+        _header: &<EthereumMachine as Machine>::Header,
+    ) -> Result<(), <EthereumMachine as Machine>::Error>
+    {
+        Ok(())
+    }
 
     /// Phase 3 verification. Check block information against parent. Returns either a null `Ok` or a general error detailing the problem with import.
     fn verify_block_family(
         &self,
-        _header: &M::Header,
-        _parent: &M::Header,
-        _grant_parent: Option<&M::Header>,
+        _header: &<EthereumMachine as Machine>::Header,
+        _parent: &<EthereumMachine as Machine>::Header,
+        _seal_parent: Option<&<EthereumMachine as Machine>::Header>,
+        _seal_grand_parent: Option<&<EthereumMachine as Machine>::Header>,
     ) -> Result<(), Error>
     {
         Ok(())
@@ -152,9 +181,9 @@ pub trait Engine<M: Machine>: Sync + Send {
     /// Usually implements the chain scoring rule based on weight.
     fn populate_from_parent(
         &self,
-        _header: &mut M::Header,
-        _parent: &M::Header,
-        _grant_parent: Option<&M::Header>,
+        _header: &mut <EthereumMachine as Machine>::Header,
+        _parent: Option<&<EthereumMachine as Machine>::Header>,
+        _grand_parent: Option<&<EthereumMachine as Machine>::Header>,
     )
     {
     }
@@ -164,13 +193,7 @@ pub trait Engine<M: Machine>: Sync + Send {
     //
     /// Stops any services that the may hold the Engine and makes it safe to drop.
     fn stop(&self) {}
-}
 
-/// Common type alias for an engine coupled with an Ethereum-like state machine.
-// TODO: make this a _trait_ alias when those exist.
-// fortunately the effect is largely the same since engines are mostly used
-// via trait objects.
-pub trait AionEngine: Engine<::machine::EthereumMachine> {
     /// Get the general parameters of the chain.
     fn params(&self) -> &CommonParams { self.machine().params() }
 
@@ -208,6 +231,3 @@ pub trait AionEngine: Engine<::machine::EthereumMachine> {
         self.machine().verify_transaction_basic(t)
     }
 }
-
-// convenience wrappers for existing functions.
-impl<T> AionEngine for T where T: Engine<::machine::EthereumMachine> {}

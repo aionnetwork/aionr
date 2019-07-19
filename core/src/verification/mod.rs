@@ -39,7 +39,7 @@ use unexpected::{Mismatch, OutOfBounds};
 
 use blockchain::*;
 use client::BlockChainClient;
-use engine::AionEngine;
+use engine::Engine;
 use types::error::{BlockError, Error};
 use header::{BlockNumber, Header};
 use transaction::{SignedTransaction, UnverifiedTransaction};
@@ -64,7 +64,7 @@ impl HeapSizeOf for PreverifiedBlock {
 }
 
 /// Phase 1 quick block verification. Only does checks that are cheap. Operates on a single block
-pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &AionEngine) -> Result<(), Error> {
+pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &Engine) -> Result<(), Error> {
     verify_header_params(&header, engine, true)?;
     verify_block_integrity(bytes, &header.transactions_root())?;
     engine.verify_block_basic(&header)?;
@@ -85,7 +85,7 @@ pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &AionEngine) ->
 pub fn verify_block_unordered(
     header: Header,
     bytes: Bytes,
-    engine: &AionEngine,
+    engine: &Engine,
 ) -> Result<PreverifiedBlock, Error>
 {
     engine.verify_block_unordered(&header)?;
@@ -116,13 +116,18 @@ pub type FullFamilyParams<'a> = (
 pub fn verify_block_family(
     header: &Header,
     parent: &Header,
-    grant_parent: Option<&Header>,
-    engine: &AionEngine,
+    seal_parent: Option<&Header>,
+    seal_grand_parent: Option<&Header>,
+    engine: &Engine,
     do_full: Option<FullFamilyParams>,
 ) -> Result<(), Error>
 {
-    verify_parent(&header, &parent, engine.params().gas_limit_bound_divisor)?;
-    engine.verify_block_family(&header, &parent, grant_parent)?;
+    verify_parent(
+        &header,
+        &parent,
+        engine.machine().params().gas_limit_bound_divisor,
+    )?;
+    engine.verify_block_family(&header, &parent, seal_parent, seal_grand_parent)?;
 
     let (_bytes, _txs, _bc, _client) = match do_full {
         Some(x) => x,
@@ -162,12 +167,7 @@ pub fn verify_block_final(expected: &Header, got: &Header) -> Result<(), Error> 
 }
 
 /// Check basic header parameters.
-pub fn verify_header_params(
-    header: &Header,
-    engine: &AionEngine,
-    is_full: bool,
-) -> Result<(), Error>
-{
+pub fn verify_header_params(header: &Header, engine: &Engine, is_full: bool) -> Result<(), Error> {
     let expected_seal_fields = engine.seal_fields(header);
     if header.seal().len() != expected_seal_fields {
         return Err(From::from(BlockError::InvalidSealArity(Mismatch {
@@ -307,6 +307,7 @@ mod tests {
     use transaction::{SignedTransaction, Transaction, UnverifiedTransaction, Action};
     use types::state::log_entry::{LogEntry, LocalizedLogEntry};
     use rlp;
+    use header::SealType;
     use keychain;
 
     fn check_ok(result: Result<(), Error>) {
@@ -386,6 +387,37 @@ mod tests {
                 .map(encoded::Header::new)
         }
 
+        /// Get the header RLP of the seal parent of the given block.
+        /// Parameters:
+        ///   parent_hash: parent hash of the given block
+        ///   seal_type: seal type of the given block
+        fn seal_parent_header(
+            &self,
+            parent_hash: &H256,
+            seal_type: &Option<SealType>,
+        ) -> Option<::encoded::Header>
+        {
+            // Get parent header
+            let parent_header: ::encoded::Header = match self.block_header_data(parent_hash) {
+                Some(header) => header,
+                None => return None,
+            };
+            let parent_seal_type: Option<SealType> = parent_header.seal_type();
+            // If parent's seal type is the same as the current, return parent
+            if seal_type == &parent_seal_type {
+                Some(parent_header)
+            }
+            // Else return the anti seal parent of the parent
+            else {
+                let parent_details: BlockDetails = match self.block_details(parent_hash) {
+                    Some(details) => details,
+                    None => return None,
+                };
+                let anti_seal_parent: H256 = parent_details.anti_seal_parent;
+                self.block_header_data(&anti_seal_parent)
+            }
+        }
+
         fn block_body(&self, hash: &H256) -> Option<encoded::Body> {
             self.block(hash)
                 .map(|b| BlockChain::block_to_body(&b.into_inner()))
@@ -403,6 +435,7 @@ mod tests {
                     total_difficulty: header.difficulty().clone(),
                     parent: header.parent_hash().clone(),
                     children: Vec::new(),
+                    anti_seal_parent: H256::zero(),
                 }
             })
         }
@@ -442,12 +475,12 @@ mod tests {
         }
     }
 
-    fn basic_test(bytes: &[u8], engine: &AionEngine) -> Result<(), Error> {
+    fn basic_test(bytes: &[u8], engine: &Engine) -> Result<(), Error> {
         let header = BlockView::new(bytes).header();
         verify_block_basic(&header, bytes, engine)
     }
 
-    fn family_test<BC>(bytes: &[u8], engine: &AionEngine, bc: &BC) -> Result<(), Error>
+    fn family_test<BC>(bytes: &[u8], engine: &Engine, bc: &BC) -> Result<(), Error>
     where BC: BlockProvider {
         let view = BlockView::new(bytes);
         let header = view.header();
@@ -473,7 +506,7 @@ mod tests {
             bc as &BlockProvider,
             &client as &::client::BlockChainClient,
         );
-        verify_block_family(&header, &parent, None, engine, Some(full_params))?;
+        verify_block_family(&header, &parent, None, None, engine, Some(full_params))?;
         Ok(())
     }
 

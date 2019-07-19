@@ -173,12 +173,13 @@ where
     let mut rolling_timestamp = 40;
     let mut last_hashes = vec![];
     let mut last_header = genesis_header.clone();
+    let mut second_last_header = Header::new();
     let secret = Ed25519Secret::from("7ea8af7d0982509cd815096d35bc3a295f57b2a078e4e25731e3ea977b9544626702b86f33072a55f46003b1e3e242eb18556be54c5ab12044c3c20829e0abb5");
     let kp = Ed25519KeyPair::from_secret(secret).unwrap();
     let author = kp.address();
 
     let mut n = 0;
-    for _ in 0..block_number {
+    for i in 0..block_number {
         last_hashes.push(last_header.hash());
 
         // forge block.
@@ -187,7 +188,13 @@ where
             Default::default(),
             db,
             &last_header,
-            None,
+            Default::default(),
+            Some(&last_header),
+            if i == 0 {
+                None
+            } else {
+                Some(&second_last_header)
+            },
             Arc::new(last_hashes.clone()),
             author.clone(),
             (3141562.into(), 31415620.into()),
@@ -230,7 +237,7 @@ where
                 e
             );
         }
-
+        second_last_header = last_header.clone();
         last_header = BlockView::new(&b.rlp_bytes()).header();
         db = b.drain();
     }

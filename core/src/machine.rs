@@ -38,6 +38,7 @@ use aion_types::{U256, H256, Address};
 use vms::{ActionParams, ActionValue, CallType, ParamsType};
 
 /// An ethereum-like state machine.
+#[cfg_attr(test, derive(Default))]
 pub struct EthereumMachine {
     params: CommonParams,
     builtins: Arc<BTreeMap<Address, Box<BuiltinContract>>>,
