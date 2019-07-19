@@ -46,9 +46,9 @@ impl<'a> GrandParentHeaderValidator for DifficultyValidator<'a> {
     ) -> Result<(), Error>
     {
         let difficulty = header.difficulty().to_owned();
-        let calc_difficulty =
-            self.difficulty_calc
-                .calculate_difficulty(header, parent_header, grand_parent_header);
+        let calc_difficulty = self
+            .difficulty_calc
+            .calculate_difficulty(parent_header, grand_parent_header);
         if difficulty != calc_difficulty {
             Err(BlockError::InvalidDifficulty(Mismatch {
                 expected: calc_difficulty,

@@ -200,6 +200,7 @@ where
             (3141562.into(), 31415620.into()),
             vec![],
             Arc::new(MockDbRepository::init(vec![String::new()])),
+            None,
         )
         .unwrap();
         b.set_difficulty(U256::from(0x20000));
