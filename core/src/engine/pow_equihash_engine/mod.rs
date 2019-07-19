@@ -135,7 +135,7 @@ impl DifficultyCalc {
             res if res > 0f64 => {
                 cmp::min(
                     parent_difficulty.as_u64() - 1,
-                    (parent_difficulty.as_u64() as f64 / (1f64 + alpha)) as u64,
+                    (parent_difficulty.as_u64() as f64 * (1f64 - alpha)) as u64,
                 )
             }
             res if res < 0f64 => {
