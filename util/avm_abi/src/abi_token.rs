@@ -230,6 +230,7 @@ impl AVMDecoder {
             offset: 0,
         }
     }
+
     fn eat(&mut self, num: usize) -> Result<(), DecodeError> {
         if self.offset + num >= self.bytes.len() {
             return Err(DecodeError::NoEnoughBytes);
@@ -237,8 +238,12 @@ impl AVMDecoder {
         self.offset += num;
         Ok(())
     }
+
+    fn require(&self, num: usize) -> Result<(), DecodeError> { Ok(()) }
+
     pub fn decode_ulong(&mut self) -> Result<u64, DecodeError> {
         self.eat(1)?;
+        self.require(8)?;
         let mut ret = 0;
         for i in self.offset..self.offset + 8 {
             ret = ret | (self.bytes[i] as u64) << (7 + self.offset - i) * 8;
