@@ -89,7 +89,7 @@ fn client_check_vote() {
     )
     .unwrap();
 
-    assert_eq!(client.get_stake(&Address::default()), Ok(0));
+    assert!(client.get_stake(&Address::default()).is_err());
 }
 
 #[test]
