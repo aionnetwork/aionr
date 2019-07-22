@@ -1020,6 +1020,7 @@ mod tests {
                     keys_iterations: None,
                     refresh_time: None,
                     fast_signing: None,
+                    stake_contract: None,
                 }),
                 network: Some(Network {
                     max_peers: Some(20),
