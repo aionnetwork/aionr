@@ -1066,13 +1066,12 @@ impl BlockChainClient for Client {
         )
         .fake_sign(Address::default());
 
-        println!("staking contract = {:?}", self.config.stake_contract);
         match Self::do_virtual_call(machine, &env_info, &mut state, &tx, Default::default()) {
             Ok(executed) => {
                 let mut ret: u64 = 0;
                 let offset = executed.output.len();
-                for i in 0..offset {
-                    ret = ret | (executed.output[i] as u64) << (offset - i) * 8;
+                for i in 3..offset {
+                    ret = ret | (executed.output[i] as u64) << (offset - i - 1) * 8;
                 }
                 Ok(ret)
             }

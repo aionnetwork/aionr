@@ -299,7 +299,7 @@ impl Miner {
         if timestamp_now >= new_timestamp {
             self.prepare_block_pos(
                 client,
-                new_timestamp,
+                timestamp_now, // TODO-Unity: Or use new_timestamp?
                 new_seed,
                 &sk,
                 &pk,
@@ -349,15 +349,17 @@ impl Miner {
         let n = sealed_block.header().number();
         let d = sealed_block.header().difficulty().clone();
         let h = sealed_block.header().hash();
+        let t = sealed_block.header().timestamp();
 
         // 4. Import block
         client.import_sealed_block(sealed_block)?;
 
         // Log
-        info!(target: "miner", "PoS block imported OK. #{}: diff: {}, hash: {}",
+        info!(target: "miner", "PoS block imported OK. #{}: diff: {}, hash: {}, timestamp: {}",
             Colour::White.bold().paint(format!("{}", n)),
             Colour::White.bold().paint(format!("{}", d)),
-            Colour::White.bold().paint(format!("{:x}", h)));
+            Colour::White.bold().paint(format!("{:x}", h)),
+            Colour::White.bold().paint(format!("{:x}", t)));
         Ok(())
     }
 
