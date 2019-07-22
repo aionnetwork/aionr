@@ -802,6 +802,7 @@ mod tests {
             ipc_conf: Default::default(),
             net_conf: default_network_config(),
             acc_conf: Default::default(),
+            stake_conf: Default::default(),
             miner_extras: Default::default(),
             compaction: Default::default(),
             wal: true,

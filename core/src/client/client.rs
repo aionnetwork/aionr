@@ -80,7 +80,7 @@ use verification::{
     verify_block_final
 };
 use views::BlockView;
-use avm_abi::{AbiToken, AVMEncoder};
+use avm_abi::{AbiToken, AVMEncoder, AVMDecoder};
 
 // re-export
 #[cfg(test)]
@@ -1042,8 +1042,8 @@ impl BlockChainClient for Client {
     // a: staker address
     fn get_stake(&self, a: &Address) -> Result<u64, CallError> {
         let machine = self.engine.machine();
-        // get the latest block
         let mut env_info = self
+            // get the latest block
             .env_info(BlockId::Latest)
             .ok_or(CallError::StatePruned)?;
         env_info.gas_limit = U256::max_value();
@@ -1068,12 +1068,9 @@ impl BlockChainClient for Client {
 
         match Self::do_virtual_call(machine, &env_info, &mut state, &tx, Default::default()) {
             Ok(executed) => {
-                let mut ret: u64 = 0;
-                let offset = executed.output.len();
-                for i in 3..offset {
-                    ret = ret | (executed.output[i] as u64) << (offset - i - 1) * 8;
-                }
-                Ok(ret)
+                let mut decoder = AVMDecoder::new(executed.output);
+                // assume staking contract returns a long value
+                Ok(decoder.decode_ulong()?)
             }
             _ => Err(CallError::StateCorrupt),
         }

@@ -30,6 +30,7 @@ use state_diff::StateDiff;
 
 use std::fmt;
 use std::collections::HashSet;
+use avm_abi::DecodeError;
 
 /// Transaction execution receipt.
 #[derive(Debug, PartialEq, Clone)]
@@ -204,10 +205,16 @@ pub enum CallError {
     StateCorrupt,
     /// Error executing.
     Execution(ExecutionError),
+    /// avm decode error
+    AVMDecoder(DecodeError),
 }
 
 impl From<ExecutionError> for CallError {
     fn from(error: ExecutionError) -> Self { CallError::Execution(error) }
+}
+
+impl From<DecodeError> for CallError {
+    fn from(error: DecodeError) -> Self { CallError::AVMDecoder(error) }
 }
 
 impl fmt::Display for CallError {
@@ -220,6 +227,7 @@ impl fmt::Display for CallError {
             Exceptional => "An exception happened in the execution".into(),
             StateCorrupt => "Stored state found to be corrupted.".into(),
             Execution(ref e) => format!("{}", e),
+            AVMDecoder(ref e) => format!("{}", e),
         };
 
         f.write_fmt(format_args!("Transaction execution error ({}).", msg))
