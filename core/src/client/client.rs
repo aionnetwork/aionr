@@ -63,7 +63,13 @@ use spec::Spec;
 use state::{State};
 use db::StateDB;
 use transaction::{
-    Action, LocalizedTransaction, PendingTransaction, SignedTransaction, AVM_TRANSACTION_TYPE
+    Transaction,
+    Action,
+    LocalizedTransaction,
+    PendingTransaction,
+    SignedTransaction,
+    AVM_TRANSACTION_TYPE,
+    DEFAULT_TRANSACTION_TYPE
 };
 use types::filter::Filter;
 use vms::{EnvInfo, LastHashes};
@@ -74,6 +80,7 @@ use verification::{
     verify_block_final
 };
 use views::BlockView;
+use avm_abi::{AbiToken, AVMEncoder, AVMDecoder};
 
 // re-export
 #[cfg(test)]
@@ -1029,6 +1036,44 @@ impl BlockChainClient for Client {
         }
 
         Ok(results)
+    }
+
+    // get the staker's vote
+    // a: staker address
+    fn get_stake(&self, a: &Address) -> Result<u64, CallError> {
+        let machine = self.engine.machine();
+        let mut env_info = self
+            // get the latest block
+            .env_info(BlockId::Latest)
+            .ok_or(CallError::StatePruned)?;
+        env_info.gas_limit = U256::max_value();
+        let mut state = self
+            .state_at(BlockId::Latest)
+            .ok_or(CallError::StatePruned)?;
+        // construct fake transaction
+        let mut call_data = Vec::new();
+        call_data.append(&mut AbiToken::STRING(String::from("getVote")).encode());
+        call_data.append(&mut AbiToken::ADDRESS(a.to_owned().into()).encode());
+        let tx = Transaction::new(
+            0.into(),
+            1.into(),
+            100_000.into(),
+            Action::Call(self.config.stake_contract),
+            0.into(),
+            // signature of getVote(Address)
+            call_data,
+            DEFAULT_TRANSACTION_TYPE,
+        )
+        .fake_sign(Address::default());
+
+        match Self::do_virtual_call(machine, &env_info, &mut state, &tx, Default::default()) {
+            Ok(executed) => {
+                let mut decoder = AVMDecoder::new(executed.output);
+                // assume staking contract returns a long value
+                Ok(decoder.decode_ulong()?)
+            }
+            _ => Err(CallError::StateCorrupt),
+        }
     }
 
     fn estimate_gas(&self, t: &SignedTransaction, block: BlockId) -> Result<U256, CallError> {

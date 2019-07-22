@@ -195,6 +195,11 @@ usage! {
             "--password=[FILE]...",
             "Provide a list of files containing passwords for unlocking accounts. Leading and trailing whitespace is trimmed.",
 
+            // NOTE: for MS2 test
+            ARG arg_stake_contract: (Option<String>) = None, or |c: &Config| c.account.as_ref()?.stake_contract.clone(),
+            "--stake-contract=[ADDRESS]",
+            "Specify the PoS staking contract address",
+
         ["Network Options"]
             FLAG flag_sync_from_boot_nodes_only: (bool) = false, or |c: &Config| c.network.as_ref()?.sync_from_boot_nodes_only.clone(),
             "--sync-boot-nodes-only",
@@ -429,6 +434,8 @@ usage! {
             "--staker-private-key=[ADDRESS]",
             "Specify the PoS block author's private key for sending block rewards from sealed blocks. NOTE: INTERNAL STAKING WILL NOT WORK WITHOUT THIS OPTION.",
 
+
+
             ARG arg_tx_gas_limit: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.tx_gas_limit.clone(),
             "--tx-gas-limit=[GAS]",
             "Apply a limit of GAS as the maximum amount of gas a single transaction may have for it to be mined.",
@@ -553,6 +560,7 @@ struct Account {
     keys_iterations: Option<u32>,
     refresh_time: Option<u64>,
     fast_signing: Option<bool>,
+    stake_contract: Option<String>,
 }
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
@@ -852,6 +860,7 @@ mod tests {
             arg_keys_iterations: 10240u32,
             arg_refresh_time: 2,
             flag_fast_signing: true,
+            arg_stake_contract: None,
 
             // -- Networking Options
             arg_max_peers: 50u32,

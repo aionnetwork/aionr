@@ -53,6 +53,7 @@ journaldb = { path = "../db/journaldb" }
 db = { path = "../db/core" }
 equihash = { path = "../util/equihash" }
 blake2b = { path = "../util/blake2b" }
+avm_abi =   { path = "../util/avm_abi" }
 tiny-keccak = "1.4.2"
 num-bigint = "0.2"
 bytebuffer = "0.2.1"
@@ -71,7 +72,6 @@ vms =              { path = "../vms" }
 logger =           { path = "../util/logger" }
 aion-types =       { path = "../util/aion-types" }
 db =               { path = "../db/core" }
-avm_abi =   { path = "../util/avm_abi" }
 
 
 [features]

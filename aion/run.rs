@@ -43,7 +43,7 @@ use dir::helpers::absolute;
 use io::IoChannel;
 use logger::LogConfig;
 use num_cpus;
-use params::{fatdb_switch_to_bool, AccountsConfig, MinerExtras, Pruning, SpecType, Switch};
+use params::{fatdb_switch_to_bool, AccountsConfig, StakeConfig, MinerExtras, Pruning, SpecType, Switch};
 use parking_lot::{Condvar, Mutex};
 use rpc;
 use rpc_apis;
@@ -74,6 +74,7 @@ pub struct RunCmd {
     pub ipc_conf: rpc::IpcConfiguration,
     pub net_conf: NetworkConfig,
     pub acc_conf: AccountsConfig,
+    pub stake_conf: StakeConfig,
     pub miner_extras: MinerExtras,
     pub fat_db: Switch,
     pub compaction: DatabaseCompactionProfile,
@@ -156,6 +157,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     );
 
     client_config.queue.verifier_settings = cmd.verifier_settings;
+    client_config.stake_contract = cmd.stake_conf.contract;
 
     // set up bootnodes
     let net_conf = cmd.net_conf;

@@ -163,7 +163,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 .add_balance(&sender, &(needed_balance - balance), CleanupMode::NoEmpty)?;
         }
 
-        self.transact(t, check_nonce, true)
+        self.transact(t, check_nonce, true, false)
     }
 
     pub fn transact_virtual_bulk(
@@ -338,6 +338,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         t: &SignedTransaction,
         check_nonce: bool,
         is_local_call: bool,
+        check_gas_limit: bool,
     ) -> Result<Executed, ExecutionError>
     {
         let _vm_lock = VM_LOCK.lock().unwrap();
@@ -373,7 +374,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         };
         // Don't check max gas limit for local call.
         // Local node has the right (and is free) to execute "big" calls with its own resources.
-        if !is_local_call && t.gas > max_gas_limit {
+        // NOTE check gas limit during mining, always try vm execution on import
+        if !is_local_call && check_gas_limit && t.gas > max_gas_limit {
             return Err(From::from(ExecutionError::ExceedMaxGasLimit {
                 max: max_gas_limit,
                 got: t.gas,
@@ -381,7 +383,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         }
 
         // 2.3 Gas limit should not exceed the remaining gas limit of the current block
-        if self.info.gas_used + t.gas > self.info.gas_limit {
+        if check_gas_limit && self.info.gas_used + t.gas > self.info.gas_limit {
             return Err(From::from(ExecutionError::BlockGasLimitReached {
                 gas_limit: self.info.gas_limit,
                 gas_used: self.info.gas_used,
@@ -420,6 +422,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         // Transactions are now handled in different ways depending on whether it's
         // action type is Create or Call.
+        self.state.checkpoint();
         let result = match t.action {
             Action::Create => {
                 let (new_address, code_hash) = contract_address(&sender, &nonce);
@@ -851,6 +854,9 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     }
 
     /// Finalizes the transaction (does refunds and suicides).
+    /// behavior of rejected transaction(gas_used > block gas remaining):
+    /// 1. pay mining fee
+    /// 2. remove logs and accounts created
     fn finalize(
         &mut self,
         t: &SignedTransaction,
@@ -865,58 +871,89 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             ExecStatus::Success | ExecStatus::Revert => result.gas_left,
             _ => 0.into(),
         };
-        let gas_used = t.gas - gas_left;
-        let refund_value = gas_left * t.gas_price;
-        let fees_value = gas_used * t.gas_price;
-        trace!(
-            target: "executive",
-            "exec::finalize: t.gas={}, gas_left={}, gas_used={}, refund_value={}, fees_value={}\n",
-            t.gas,
-            gas_left,
-            gas_used,
-            refund_value,
-            fees_value
-        );
 
-        // Transfer refund and transaction fee.
-        let sender = t.sender();
-        trace!(
-            target: "executive",
-            "exec::finalize: Refunding refund_value={}, sender={}\n",
-            refund_value,
-            sender
-        );
-        // Below: NoEmpty is safe since the sender must already be non-null to have sent this transaction
-        self.state
-            .add_balance(&sender, &refund_value, CleanupMode::NoEmpty)?;
-        trace!(
-            target: "executive",
-            "exec::finalize: Compensating author: fees_value={}, author={}\n",
-            fees_value,
-            &self.info.author
-        );
-        self.state
-            .add_balance(&self.info.author, &fees_value, substate.to_cleanup_mode())?;
+        let rejected = t.gas - gas_left + self.info.gas_used > self.info.gas_limit;
 
-        // perform suicides
-        for address in &substate.suicides {
-            self.state.kill_account(address);
+        if rejected {
+            self.state.revert_to_checkpoint();
+            Ok(Executed {
+                exception: result.exception,
+                gas: t.gas,
+                gas_used: t.gas,
+                refunded: 0.into(),
+                cumulative_gas_used: self.info.gas_used + t.gas,
+                logs: substate.logs,
+                contracts_created: vec![],
+                output: vec![],
+                state_diff: None,
+                transaction_fee: t.gas * t.gas_price,
+                touched: HashSet::new(),
+                state_root: H256::default(),
+            })
+        } else {
+            let gas_used = t.gas - gas_left;
+
+            let refund_value = gas_left * t.gas_price;
+            let fees_value = gas_used * t.gas_price;
+            trace!(
+                target: "executive",
+                "exec::finalize: t.gas={}, gas_left={}, gas_used={}, refund_value={}, fees_value={}\n",
+                t.gas,
+                gas_left,
+                gas_used,
+                refund_value,
+                fees_value
+            );
+
+            // Transfer refund and transaction fee.
+            let sender = t.sender();
+            trace!(
+                target: "executive",
+                "exec::finalize: Refunding refund_value={}, sender={}\n",
+                refund_value,
+                sender
+            );
+            // Below: NoEmpty is safe since the sender must already be non-null to have sent this transaction
+            self.state
+                .add_balance(&sender, &refund_value, CleanupMode::NoEmpty)?;
+            trace!(
+                target: "executive",
+                "exec::finalize: Compensating author: fees_value={}, author={}\n",
+                fees_value,
+                &self.info.author
+            );
+            self.state
+                .add_balance(&self.info.author, &fees_value, substate.to_cleanup_mode())?;
+
+            // perform suicides
+            for address in &substate.suicides {
+                self.state.kill_account(address);
+            }
+
+            self.state.discard_checkpoint();
+            Ok(Executed {
+                exception: result.exception,
+                gas: t.gas,
+                gas_used: gas_used,
+                refunded: gas_left,
+                cumulative_gas_used: self.info.gas_used + gas_used,
+                logs: if rejected { vec![] } else { substate.logs },
+                contracts_created: if rejected {
+                    vec![]
+                } else {
+                    substate.contracts_created
+                },
+                output: if rejected {
+                    vec![]
+                } else {
+                    result.return_data.to_vec()
+                },
+                state_diff: None,
+                transaction_fee: fees_value,
+                touched: HashSet::new(),
+                state_root: H256::default(),
+            })
         }
-
-        Ok(Executed {
-            exception: result.exception,
-            gas: t.gas,
-            gas_used: gas_used,
-            refunded: gas_left,
-            cumulative_gas_used: self.info.gas_used + gas_used,
-            logs: substate.logs,
-            contracts_created: substate.contracts_created,
-            output: result.return_data.to_vec(),
-            state_diff: None,
-            transaction_fee: fees_value,
-            touched: HashSet::new(),
-            state_root: H256::default(),
-        })
     }
 
     /// Commit or rollback state changes based on return status code.

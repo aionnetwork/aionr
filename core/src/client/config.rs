@@ -26,6 +26,7 @@ use std::path::Path;
 use verification::queue::Config as QueueConfig;
 use journaldb;
 use kvdb::CompactionProfile;
+use aion_types::Address;
 
 pub use std::time::Duration;
 pub use types::blockchain::config::Config as BlockChainConfig;
@@ -99,6 +100,8 @@ pub struct ClientConfig {
     pub history: u64,
     /// Ideal memory usage for state pruning history.
     pub history_mem: usize,
+    /// stake contract
+    pub stake_contract: Address,
 }
 
 #[cfg(test)]

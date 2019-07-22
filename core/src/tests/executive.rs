@@ -790,7 +790,8 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false).unwrap_err()
+        ex.transact(&signed_transaction, true, false, true)
+            .unwrap_err()
     };
     assert_eq!(
         error,
@@ -815,7 +816,8 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false).unwrap_err()
+        ex.transact(&signed_transaction, true, false, true)
+            .unwrap_err()
     };
     assert_eq!(
         error,
@@ -838,7 +840,8 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false).unwrap_err()
+        ex.transact(&signed_transaction, true, false, true)
+            .unwrap_err()
     };
     assert_eq!(
         error,
@@ -862,7 +865,7 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let result = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false)
+        ex.transact(&signed_transaction, true, false, true)
     };
     // assert_eq!(
     //     error,
@@ -887,7 +890,7 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let result = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false)
+        ex.transact(&signed_transaction, true, false, true)
     };
     // assert_eq!(
     //     error,
@@ -911,7 +914,8 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false).unwrap_err()
+        ex.transact(&signed_transaction, true, false, true)
+            .unwrap_err()
     };
     assert_eq!(
         error,
@@ -934,7 +938,8 @@ fn error_cases_rejected() {
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
         let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact(&signed_transaction, true, false).unwrap_err()
+        ex.transact(&signed_transaction, true, false, true)
+            .unwrap_err()
     };
     assert_eq!(
         error,
@@ -1524,6 +1529,143 @@ fn avm_recursive() {
 
         println!("gas left = {:?}", gas_left);
         assert_eq!(status_code, ExecStatus::Success);
+    }
+}
+
+#[test]
+fn get_vote() {
+    let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // NOTE: tested with avm v1.3
+    file.push("src/tests/avmjars/unity-staking.jar");
+    let file_str = file
+        .to_str()
+        .expect("Failed to locate the unity-staking.jar");
+    let mut code = read_file(file_str).expect("unable to open avm dapp");
+    let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
+    let address = contract_address(&sender, &U256::zero()).0;
+    let mut params = ActionParams::default();
+    params.address = address.clone();
+    params.sender = sender.clone();
+    params.origin = sender.clone();
+    params.gas = U256::from(5_000_000);
+    let mut avm_code: Vec<u8> = (code.len() as u32).to_vm_bytes();
+    println!("code of hello_avm = {:?}", code.len());
+    avm_code.append(&mut code);
+    params.code = Some(Arc::new(avm_code.clone()));
+    params.value = ActionValue::Transfer(0.into());
+    params.call_type = CallType::None;
+    params.gas_price = 1.into();
+    let mut state = get_temp_state();
+    state
+        .add_balance(&sender, &U256::from(200_000_000), CleanupMode::NoEmpty)
+        .unwrap();
+    let info = EnvInfo::default();
+    let machine = make_aion_machine();
+    let substate = Substate::new();
+    let execution_results = {
+        let mut ex = Executive::new(&mut state, &info, &machine);
+        ex.call_avm(vec![params.clone()], &mut [substate])
+    };
+
+    for r in execution_results {
+        let ExecutionResult {
+            status_code,
+            gas_left: _,
+            return_data,
+            exception: _,
+            state_root: _,
+        } = r;
+
+        assert_eq!(status_code, ExecStatus::Success);
+
+        params.address = (*return_data).into();
+        println!("return data = {:?}", return_data);
+    }
+
+    assert!(state.code(&params.address).unwrap().is_some());
+
+    // register
+    params.call_type = CallType::Call;
+    let mut call_data = AbiToken::STRING(String::from("register")).encode();
+    call_data.append(&mut AbiToken::ADDRESS(params.sender.into()).encode());
+    params.data = Some(call_data);
+    params.nonce += 1;
+    params.gas = U256::from(2_000_000);
+    params.value = ActionValue::Transfer(0.into());
+    println!("call data = {:?}", params.data);
+    let substate = Substate::new();
+    let execution_results = {
+        let mut ex = Executive::new(&mut state, &info, &machine);
+        ex.call_avm(vec![params.clone()], &mut [substate.clone()])
+    };
+
+    for r in execution_results {
+        let ExecutionResult {
+            status_code,
+            gas_left,
+            return_data,
+            exception: _,
+            state_root: _,
+        } = r;
+
+        println!("gas left = {:?}, output = {:?}", gas_left, return_data);
+        assert_eq!(status_code, ExecStatus::Success);
+    }
+
+    // Vote
+    params.call_type = CallType::Call;
+    let mut call_data = AbiToken::STRING(String::from("vote")).encode();
+    call_data.append(&mut AbiToken::ADDRESS(params.sender.into()).encode());
+    params.data = Some(call_data);
+    params.nonce += 1;
+    params.gas = U256::from(2_000_000);
+    params.value = ActionValue::Transfer(999.into());
+    println!("call data = {:?}", params.data);
+    let substate = Substate::new();
+    let execution_results = {
+        let mut ex = Executive::new(&mut state, &info, &machine);
+        ex.call_avm(vec![params.clone()], &mut [substate.clone()])
+    };
+
+    for r in execution_results {
+        let ExecutionResult {
+            status_code,
+            gas_left,
+            return_data,
+            exception: _,
+            state_root: _,
+        } = r;
+
+        println!("gas left = {:?}, output = {:?}", gas_left, return_data);
+        assert_eq!(status_code, ExecStatus::Success);
+    }
+
+    params.call_type = CallType::Call;
+    let mut call_data = AbiToken::STRING(String::from("getVote")).encode();
+    call_data.append(&mut AbiToken::ADDRESS(params.sender.into()).encode());
+    params.data = Some(call_data);
+    params.nonce += 1;
+    params.gas = U256::from(2_000_000);
+    params.value = ActionValue::Transfer(0.into());
+    println!("call data = {:?}", params.data);
+    let substate = Substate::new();
+    let execution_results = {
+        let mut ex = Executive::new(&mut state, &info, &machine);
+        ex.call_avm(vec![params.clone()], &mut [substate.clone()])
+    };
+
+    for r in execution_results {
+        let ExecutionResult {
+            status_code,
+            gas_left,
+            return_data,
+            exception: _,
+            state_root: _,
+        } = r;
+
+        println!("gas left = {:?}, output = {:?}", gas_left, return_data);
+        assert_eq!(status_code, ExecStatus::Success);
+        assert_eq!(return_data.to_vec(), vec![3, 231]);
     }
 }
 
