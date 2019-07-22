@@ -66,7 +66,7 @@ fn imports_from_empty() {
 }
 
 #[test]
-fn client_get_vote() {
+fn client_check_vote() {
     let tempdir = TempDir::new("").unwrap();
     let spec = get_test_spec();
     let db_config = DatabaseConfig::default();

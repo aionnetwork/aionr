@@ -859,6 +859,7 @@ mod tests {
             arg_keys_iterations: 10240u32,
             arg_refresh_time: 2,
             flag_fast_signing: true,
+            arg_stake_contract: None,
 
             // -- Networking Options
             arg_max_peers: 50u32,

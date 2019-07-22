@@ -1,6 +1,7 @@
 #![allow(unused)]
 
 use std::mem;
+use std::fmt::{Display, Formatter, Error as FmtError};
 
 pub trait ToBytes {
     fn to_vm_bytes(&self) -> Vec<u8>;
@@ -202,6 +203,51 @@ impl<'a> AVMEncoder for AbiToken<'a> {
     }
 }
 
+pub struct AVMDecoder {
+    bytes: Vec<u8>,
+    offset: usize,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum DecodeError {
+    NoEnoughBytes,
+    UnknownFormat,
+}
+
+impl Display for DecodeError {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), FmtError> {
+        match *self {
+            DecodeError::NoEnoughBytes => write!(f, "{}", "NoEnoughBytes"),
+            DecodeError::UnknownFormat => write!(f, "{}", "UnknownTargetFormat"),
+        }
+    }
+}
+
+impl AVMDecoder {
+    pub fn new(input: Vec<u8>) -> Self {
+        AVMDecoder {
+            bytes: input,
+            offset: 0,
+        }
+    }
+    fn eat(&mut self, num: usize) -> Result<(), DecodeError> {
+        if self.offset + num >= self.bytes.len() {
+            return Err(DecodeError::NoEnoughBytes);
+        }
+        self.offset += num;
+        Ok(())
+    }
+    pub fn decode_ulong(&mut self) -> Result<u64, DecodeError> {
+        self.eat(1)?;
+        let mut ret = 0;
+        for i in self.offset..self.offset + 8 {
+            ret = ret | (self.bytes[i] as u64) << (7 + self.offset - i) * 8;
+        }
+
+        Ok(ret)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -245,5 +291,8 @@ mod tests {
     fn decode() {
         let raw = [0x1u8, 0, 0, 0];
         assert_eq!(raw.to_u32(), 16777216);
+        // decode u64
+        let mut decoder = AVMDecoder::new(vec![0x11, 0, 0, 0, 0, 0, 0, 0, 99]);
+        assert_eq!(decoder.decode_ulong(), Ok(99));
     }
 }
