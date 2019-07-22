@@ -196,7 +196,7 @@ usage! {
             "Provide a list of files containing passwords for unlocking accounts. Leading and trailing whitespace is trimmed.",
 
             // NOTE: for MS2 test
-            ARG arg_stake_contract: (Option<String>) = None, or |c: &Config| c.account.as_ref()?.unlock.clone()?.pop(),
+            ARG arg_stake_contract: (Option<String>) = None, or |c: &Config| c.account.as_ref()?.stake_contract.clone(),
             "--stake-contract=[ADDRESS]",
             "Specify the PoS staking contract address",
 
@@ -560,6 +560,7 @@ struct Account {
     keys_iterations: Option<u32>,
     refresh_time: Option<u64>,
     fast_signing: Option<bool>,
+    stake_contract: Option<String>,
 }
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
