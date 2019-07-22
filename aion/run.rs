@@ -320,13 +320,19 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // Handle exit
     wait_for_exit();
 
-    // let _ = close.send(());
-
     info!(target: "run","Finishing work, please wait...");
 
-    ws_server.expect("Invalid WS server instance!").close();
-    http_server.expect("Invalid HTTP server instance!").close();
-    ipc_server.expect("Invalid IPC server instance!").close();
+    if ws_server.is_some() {
+        ws_server.expect("Invalid WS server instance!").close();
+    }
+
+    if http_server.is_some() {
+        http_server.expect("Invalid HTTP server instance!").close();
+    }
+
+    if ipc_server.is_some() {
+        ipc_server.expect("Invalid IPC server instance!").close();
+    }
 
     network_manager.stop_network();
 
