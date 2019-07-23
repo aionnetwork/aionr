@@ -240,7 +240,7 @@ impl Miner {
 
         // 1. Get the stake. Stop proceeding if stake is 0.
         let stake: u64 = match client.get_stake(&address) {
-            Ok(stake) if stake > 0 => stake,
+            Some(stake) if stake > 0 => stake,
             _ => return Ok(()),
         };
 

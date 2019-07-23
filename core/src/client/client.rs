@@ -1040,16 +1040,21 @@ impl BlockChainClient for Client {
 
     // get the staker's vote
     // a: staker address
-    fn get_stake(&self, a: &Address) -> Result<u64, CallError> {
+    fn get_stake(&self, a: &Address) -> Option<u64> {
         let machine = self.engine.machine();
-        let mut env_info = self
+        let mut env_info = match self
             // get the latest block
-            .env_info(BlockId::Latest)
-            .ok_or(CallError::StatePruned)?;
+            .env_info(BlockId::Latest) {
+                Some(info) => info,
+                None => return None,
+            };
+            
         env_info.gas_limit = U256::max_value();
-        let mut state = self
-            .state_at(BlockId::Latest)
-            .ok_or(CallError::StatePruned)?;
+        let mut state = match self
+            .state_at(BlockId::Latest) {
+                Some(s) => s,
+                None => return None,
+            };
         // construct fake transaction
         let mut call_data = Vec::new();
         call_data.append(&mut AbiToken::STRING(String::from("getVote")).encode());
@@ -1070,9 +1075,12 @@ impl BlockChainClient for Client {
             Ok(executed) => {
                 let mut decoder = AVMDecoder::new(executed.output);
                 // assume staking contract returns a long value
-                Ok(decoder.decode_ulong()?)
+                match decoder.decode_ulong() {
+                    Ok(v) => Some(v),
+                    _ => None,
+                }
             }
-            _ => Err(CallError::StateCorrupt),
+            _ => None,
         }
     }
 
