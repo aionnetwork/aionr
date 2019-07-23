@@ -128,14 +128,14 @@ impl DifficultyCalc {
         let delta_time = parent_timestamp - grand_parent_timestamp;
         assert!(delta_time > 0);
 
-        // TODO-Unity: To avoid using floating value
+        // TODO-Unity: To refine floating calculation
         let alpha = 1f64 / (self.difficulty_bound_divisor as f64);
         let lambda = 1f64 / (2f64 * self.block_time as f64);
         let diff = match (delta_time as f64) - (-0.5f64.ln() / lambda) {
             res if res > 0f64 => {
                 cmp::min(
                     parent_difficulty.as_u64() - 1,
-                    (parent_difficulty.as_u64() as f64 * (1f64 - alpha)) as u64,
+                    (parent_difficulty.as_u64() as f64 / (1f64 + alpha)) as u64,
                 )
             }
             res if res < 0f64 => {
