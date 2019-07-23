@@ -450,7 +450,7 @@ impl BlockChainClient for TestBlockChainClient {
         Ok(res)
     }
 
-    fn get_stake(&self, _a: &Address) -> Result<u64, CallError> { Ok(0) }
+    fn get_stake(&self, _a: &Address) -> Option<u64> { Some(0) }
 
     fn estimate_gas(&self, _t: &SignedTransaction, _block: BlockId) -> Result<U256, CallError> {
         Ok(21000.into())
