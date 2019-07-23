@@ -22,6 +22,7 @@
 mod header_validators;
 mod dependent_header_validators;
 mod grand_parent_header_validators;
+mod pos_validator;
 #[cfg(test)]
 mod test;
 
@@ -42,7 +43,6 @@ use self::dependent_header_validators::{
     DependentHeaderValidator,
     NumberValidator,
     TimestampValidator,
-    PoSValidator,
 };
 use self::header_validators::{
 //    ExtraDataValidator,
@@ -52,6 +52,7 @@ use self::header_validators::{
     EquihashSolutionValidator,
 };
 use self::grand_parent_header_validators::{GrandParentHeaderValidator, DifficultyValidator};
+use self::pos_validator::PoSValidator;
 
 const ANNUAL_BLOCK_MOUNT: u64 = 3110400;
 const COMPOUND_YEAR_MAX: u64 = 128;
@@ -377,20 +378,14 @@ impl Engine for Arc<POWEquihashEngine> {
     }
 
     /// Verify the seal of locally produced PoS block
-    fn verify_local_seal_pos(
+    fn verify_seal_pos(
         &self,
         header: &Header,
         seal_parent: Option<&Header>,
+        stake: Option<u64>,
     ) -> Result<(), Error>
     {
-        if header.seal_type() == &Some(SealType::PoS) && seal_parent.is_some() {
-            // TODO-Unity: handle none seal parent better
-            let pos_seal_validator = PoSValidator {};
-            pos_seal_validator.validate(
-                header,
-                seal_parent.expect("none seal parent checked before."),
-            )?;
-        }
+        PoSValidator::validate(header, seal_parent, stake)?;
         Ok(())
     }
 
@@ -408,19 +403,6 @@ impl Engine for Arc<POWEquihashEngine> {
         parent_validators.push(Box::new(TimestampValidator {}));
         for v in parent_validators.iter() {
             v.validate(header, parent)?;
-        }
-
-        // Verifications related to seal parent
-        let mut seal_parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(1);
-        if header.seal_type() == &Some(SealType::PoS) && seal_parent.is_some() {
-            // TODO-Unity: handle none seal parent better
-            seal_parent_validators.push(Box::new(PoSValidator {}));
-        }
-        for v in seal_parent_validators.iter() {
-            v.validate(
-                header,
-                seal_parent.expect("none seal parent checked before."),
-            )?;
         }
 
         // Verifications related to seal parent and seal grand parent

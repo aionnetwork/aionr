@@ -95,10 +95,11 @@ impl Engine for NullEngine {
         Ok(())
     }
 
-    fn verify_local_seal_pos(
+    fn verify_seal_pos(
         &self,
         _header: &<EthereumMachine as Machine>::Header,
         _seal_type: Option<&<EthereumMachine as Machine>::Header>,
+        _stake: Option<u64>,
     ) -> Result<(), <EthereumMachine as Machine>::Error>
     {
         Ok(())

@@ -304,6 +304,7 @@ impl Miner {
                 &sk,
                 &pk,
                 best_block_header.map(|header| header.decode()).as_ref(),
+                stake,
             )
         } else {
             Ok(())
@@ -320,6 +321,7 @@ impl Miner {
         sk: &[u8; 64],
         pk: &[u8; 32],
         seal_parent: Option<&Header>,
+        stake: u64,
     ) -> Result<(), Error>
     {
         trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
@@ -339,7 +341,7 @@ impl Miner {
         seal.push(pk.to_vec());
         let sealed_block: SealedBlock = raw_block
             .lock()
-            .try_seal_pos(&*self.engine, seal, seal_parent)
+            .try_seal_pos(&*self.engine, seal, seal_parent, Some(stake))
             .or_else(|(e, _)| {
                 warn!(target: "miner", "Staking seal rejected: {}", e);
                 Err(Error::PosInvalid)

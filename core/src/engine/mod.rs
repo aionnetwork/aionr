@@ -151,10 +151,11 @@ pub trait Engine: Sync + Send {
         header: &<EthereumMachine as Machine>::Header,
     ) -> Result<(), <EthereumMachine as Machine>::Error>;
 
-    fn verify_local_seal_pos(
+    fn verify_seal_pos(
         &self,
         header: &<EthereumMachine as Machine>::Header,
         seal_pos: Option<&<EthereumMachine as Machine>::Header>,
+        stake: Option<u64>,
     ) -> Result<(), <EthereumMachine as Machine>::Error>;
 
     /// Phase 1 quick block verification. Only does checks that are cheap. Returns either a null `Ok` or a general error detailing the problem with import.
