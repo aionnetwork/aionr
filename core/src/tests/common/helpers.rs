@@ -225,6 +225,7 @@ where
                 }
                 .sign(kp.secret(), None),
                 None,
+                true,
             )
             .unwrap();
             n += 1;

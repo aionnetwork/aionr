@@ -137,6 +137,7 @@ pub fn to_client_config(
     client_config.db_wal = wal;
     client_config.vm_type = vm_type;
     client_config.spec_name = spec_name;
+    client_config.stake_contract = Address::default();
     client_config
 }
 

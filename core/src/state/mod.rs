@@ -669,9 +669,10 @@ impl<B: Backend> State<B> {
         env_info: &EnvInfo,
         machine: &Machine,
         t: &SignedTransaction,
+        check_gas_limit: bool,
     ) -> ApplyResult
     {
-        let e = self.execute(env_info, machine, t, true, false)?;
+        let e = self.execute(env_info, machine, t, true, false, check_gas_limit)?;
 
         self.commit()?;
         let state_root = self.root().clone();
@@ -759,13 +760,14 @@ impl<B: Backend> State<B> {
         t: &SignedTransaction,
         check_nonce: bool,
         virt: bool,
+        check_gas_limit: bool,
     ) -> Result<Executed, ExecutionError>
     {
         let mut e = Executive::new(self, env_info, machine);
 
         match virt {
             true => e.transact_virtual(t, check_nonce),
-            false => e.transact(t, check_nonce, false),
+            false => e.transact(t, check_nonce, false, check_gas_limit),
         }
     }
 

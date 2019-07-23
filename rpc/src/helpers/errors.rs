@@ -437,6 +437,7 @@ pub fn call(error: CallError) -> Error {
                 CallError::TransactionNotFound,
             )
         }
+        CallError::AVMDecoder(e) => execution(e),
     }
 }
 

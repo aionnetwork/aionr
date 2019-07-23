@@ -236,11 +236,18 @@ impl Miner {
             .expect("Internal staker is null. Should have checked before.");
         let sk: [u8; 64] = staker.secret().0;
         let pk: [u8; 32] = staker.public().0;
+        let address: Address = staker.address();
 
-        // 1. Get the current best PoS block
+        // 1. Get the stake. Stop proceeding if stake is 0.
+        let stake: u64 = match client.get_stake(&address) {
+            Ok(stake) if stake > 0 => stake,
+            _ => return Ok(()),
+        };
+
+        // 2. Get the current best PoS block
         let best_block_header = client.best_block_header_with_seal_type(&SealType::PoS);
 
-        // 2. Get the timestamp, the seed and the seal parent of the best PoS block
+        // 3. Get the timestamp, the seed and the seal parent of the best PoS block
         let timestamp_now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -261,7 +268,7 @@ impl Miner {
             None => (timestamp_now - 1u64, Vec::new(), None), // TODO-Unity: To handle the first PoS block better
         };
 
-        // 3. Calculate difficulty
+        // 4. Calculate difficulty
         let difficulty = client.calculate_difficulty(
             best_block_header
                 .clone()
@@ -269,9 +276,6 @@ impl Miner {
                 .as_ref(),
             seal_parent.map(|header| header.decode()).as_ref(),
         );
-
-        // 4. Get the stake
-        let stake: u64 = 1_000_000u64; // TODO-Unity: fake stake for tests. To use a real stake later. Remember to deal with stake 0
 
         // 5. Calcualte timestamp for the new PoS block
         // TODO-Unity: don't use floating number to calculate this
@@ -295,7 +299,7 @@ impl Miner {
         if timestamp_now >= new_timestamp {
             self.prepare_block_pos(
                 client,
-                new_timestamp,
+                timestamp_now, // TODO-Unity: Or use new_timestamp?
                 new_seed,
                 &sk,
                 &pk,
@@ -345,15 +349,17 @@ impl Miner {
         let n = sealed_block.header().number();
         let d = sealed_block.header().difficulty().clone();
         let h = sealed_block.header().hash();
+        let t = sealed_block.header().timestamp();
 
         // 4. Import block
         client.import_sealed_block(sealed_block)?;
 
         // Log
-        info!(target: "miner", "PoS block imported OK. #{}: diff: {}, hash: {}",
+        info!(target: "miner", "PoS block imported OK. #{}: diff: {}, hash: {}, timestamp: {}",
             Colour::White.bold().paint(format!("{}", n)),
             Colour::White.bold().paint(format!("{}", d)),
-            Colour::White.bold().paint(format!("{:x}", h)));
+            Colour::White.bold().paint(format!("{:x}", h)),
+            Colour::White.bold().paint(format!("{:x}", t)));
         Ok(())
     }
 
@@ -535,7 +541,7 @@ impl Miner {
         for tx in transactions {
             let hash = tx.hash().clone();
             let start = Instant::now();
-            let result = open_block.push_transaction(tx, None);
+            let result = open_block.push_transaction(tx, None, true);
             let took = start.elapsed();
 
             // Check for heavy transactions

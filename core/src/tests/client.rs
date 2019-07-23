@@ -66,6 +66,33 @@ fn imports_from_empty() {
 }
 
 #[test]
+fn client_check_vote() {
+    let tempdir = TempDir::new("").unwrap();
+    let spec = get_test_spec();
+    let db_config = DatabaseConfig::default();
+    let mut db_configs = Vec::new();
+    for db_name in ::db::DB_NAMES.to_vec() {
+        db_configs.push(RepositoryConfig {
+            db_name: db_name.into(),
+            db_config: db_config.clone(),
+            db_path: tempdir.path().join(db_name).to_str().unwrap().to_string(),
+        });
+    }
+    let client_db = Arc::new(DbRepository::init(db_configs).unwrap());
+
+    let client = Client::new(
+        ClientConfig::default(),
+        &spec,
+        client_db,
+        Arc::new(Miner::with_spec(&spec)),
+        IoChannel::disconnected(),
+    )
+    .unwrap();
+
+    assert!(client.get_stake(&Address::default()).is_err());
+}
+
+#[test]
 fn returns_state_root_basic() {
     let client = generate_dummy_client(6);
     let test_spec = get_test_spec();
