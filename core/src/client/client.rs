@@ -354,7 +354,7 @@ impl Client {
             None => None,
         };
 
-        // Verify Block Family
+        // Verify block family
         let verify_family_result = verify_block_family(
             header,
             &parent,
@@ -371,6 +371,19 @@ impl Client {
             warn!(target: "client", "Stage 3 block verification failed for #{} ({})\nError: {:?}", header.number(), header.hash(), e);
             return Err(());
         };
+
+        // Verify pos block seal
+        if header.seal_type() == &Some(SealType::PoS) {
+            let verify_pos_result = engine.verify_seal_pos(
+                header,
+                seal_parent.clone().map(|header| header.decode()).as_ref(),
+                self.get_stake(header.author()),
+            );
+            if let Err(e) = verify_pos_result {
+                warn!(target: "client", "Stage 4 block verification failed for #{} ({})\nError: {:?}", header.number(), header.hash(), e);
+                return Err(());
+            };
+        }
 
         // Enact Verified Block
         let last_hashes = self.build_last_hashes(header.parent_hash().clone());
@@ -1040,16 +1053,21 @@ impl BlockChainClient for Client {
 
     // get the staker's vote
     // a: staker address
-    fn get_stake(&self, a: &Address) -> Result<u64, CallError> {
+    fn get_stake(&self, a: &Address) -> Option<u64> {
         let machine = self.engine.machine();
-        let mut env_info = self
+        let mut env_info = match self
             // get the latest block
             .env_info(BlockId::Latest)
-            .ok_or(CallError::StatePruned)?;
+        {
+            Some(info) => info,
+            None => return None,
+        };
+
         env_info.gas_limit = U256::max_value();
-        let mut state = self
-            .state_at(BlockId::Latest)
-            .ok_or(CallError::StatePruned)?;
+        let mut state = match self.state_at(BlockId::Latest) {
+            Some(s) => s,
+            None => return None,
+        };
         // construct fake transaction
         let mut call_data = Vec::new();
         call_data.append(&mut AbiToken::STRING(String::from("getVote")).encode());
@@ -1070,9 +1088,12 @@ impl BlockChainClient for Client {
             Ok(executed) => {
                 let mut decoder = AVMDecoder::new(executed.output);
                 // assume staking contract returns a long value
-                Ok(decoder.decode_ulong()?)
+                match decoder.decode_ulong() {
+                    Ok(v) => Some(v),
+                    _ => None,
+                }
             }
-            _ => Err(CallError::StateCorrupt),
+            _ => None,
         }
     }
 

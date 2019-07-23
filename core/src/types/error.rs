@@ -96,6 +96,8 @@ pub enum BlockError {
     UnknownEpochTransition(u64),
     /// Invalid pos timestamp
     InvalidPoSTimestamp(u64, u64, u64),
+    /// PoS block producer's stake is null or 0
+    NullStake,
 }
 
 impl fmt::Display for BlockError {
@@ -142,6 +144,7 @@ impl fmt::Display for BlockError {
                     timestamp, parent_timestamp, delta
                 )
             }
+            NullStake => "PoS block producer's stake is null or 0.".into(),
         };
 
         f.write_fmt(format_args!("Block error ({})", msg))

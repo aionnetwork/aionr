@@ -631,12 +631,13 @@ impl LockedBlock {
         engine: &Engine,
         seal: Vec<Bytes>,
         seal_parent: Option<&Header>,
+        stake: Option<u64>,
     ) -> Result<SealedBlock, (Error, LockedBlock)>
     {
         let mut s = self;
         s.block.header.set_seal(seal);
 
-        match engine.verify_local_seal_pos(&s.block.header, seal_parent) {
+        match engine.verify_seal_pos(&s.block.header, seal_parent, stake) {
             Err(e) => Err((e, s)),
             _ => {
                 Ok(SealedBlock {
