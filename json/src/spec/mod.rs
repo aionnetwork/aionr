@@ -30,7 +30,7 @@ pub mod spec;
 pub mod seal;
 pub mod engine;
 pub mod state;
-pub mod pow_equihash_engine;
+pub mod unity_engine;
 pub mod null_engine;
 
 pub use self::account::Account;
@@ -41,5 +41,5 @@ pub use self::spec::Spec;
 pub use self::seal::{Seal, POWEquihash};
 pub use self::engine::Engine;
 pub use self::state::State;
-pub use self::pow_equihash_engine::{POWEquihashEngineParams, POWEquihashEngine};
+pub use self::unity_engine::{UnityEngineParams, UnityEngine};
 pub use self::null_engine::{NullEngine,NullEngineParams};

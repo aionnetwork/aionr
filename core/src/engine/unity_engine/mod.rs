@@ -58,7 +58,7 @@ const ANNUAL_BLOCK_MOUNT: u64 = 3110400;
 const COMPOUND_YEAR_MAX: u64 = 128;
 
 #[derive(Debug, PartialEq)]
-pub struct POWEquihashEngineParams {
+pub struct UnityEngineParams {
     pub rampup_upper_bound: U256,
     pub rampup_lower_bound: U256,
     pub rampup_start_value: U256,
@@ -70,9 +70,9 @@ pub struct POWEquihashEngineParams {
     pub minimum_difficulty: U256,
 }
 
-impl From<ajson::spec::POWEquihashEngineParams> for POWEquihashEngineParams {
-    fn from(p: ajson::spec::POWEquihashEngineParams) -> Self {
-        POWEquihashEngineParams {
+impl From<ajson::spec::UnityEngineParams> for UnityEngineParams {
+    fn from(p: ajson::spec::UnityEngineParams) -> Self {
+        UnityEngineParams {
             rampup_upper_bound: p.rampup_upper_bound.map_or(U256::from(259200), Into::into),
             rampup_lower_bound: p.rampup_lower_bound.map_or(U256::zero(), Into::into),
             rampup_start_value: p
@@ -102,7 +102,7 @@ pub struct DifficultyCalc {
 }
 
 impl DifficultyCalc {
-    pub fn new(params: &POWEquihashEngineParams) -> DifficultyCalc {
+    pub fn new(params: &UnityEngineParams) -> DifficultyCalc {
         DifficultyCalc {
             difficulty_bound_divisor: params.difficulty_bound_divisor,
             block_time: params.block_time,
@@ -177,7 +177,7 @@ pub struct RewardsCalculator {
 
 impl RewardsCalculator {
     fn new(
-        params: &POWEquihashEngineParams,
+        params: &UnityEngineParams,
         monetary_policy_update: Option<BlockNumber>,
         premine: U256,
     ) -> RewardsCalculator
@@ -230,7 +230,7 @@ impl RewardsCalculator {
     fn calculate_total_supply_before_monetary_update(
         initial_supply: U256,
         monetary_change_block_num: u64,
-        params: &POWEquihashEngineParams,
+        params: &UnityEngineParams,
     ) -> U256
     {
         if monetary_change_block_num < 1 {
@@ -279,7 +279,7 @@ impl RewardsCalculator {
 
     fn calculate_reward_before_monetary_update(
         number: u64,
-        params: &POWEquihashEngineParams,
+        params: &UnityEngineParams,
         m: U256,
     ) -> U256
     {
@@ -296,21 +296,21 @@ impl RewardsCalculator {
 }
 
 /// Engine using Equihash proof-of-work concensus algorithm.
-pub struct POWEquihashEngine {
+pub struct UnityEngine {
     machine: EthereumMachine,
     rewards_calculator: RewardsCalculator,
     difficulty_calc: DifficultyCalc,
 }
 
-impl POWEquihashEngine {
-    pub fn new(params: POWEquihashEngineParams, machine: EthereumMachine) -> Arc<Self> {
+impl UnityEngine {
+    pub fn new(params: UnityEngineParams, machine: EthereumMachine) -> Arc<Self> {
         let rewards_calculator = RewardsCalculator::new(
             &params,
             machine.params().monetary_policy_update,
             machine.premine(),
         );
         let difficulty_calc = DifficultyCalc::new(&params);
-        Arc::new(POWEquihashEngine {
+        Arc::new(UnityEngine {
             machine,
             rewards_calculator,
             difficulty_calc,
@@ -337,8 +337,8 @@ impl POWEquihashEngine {
     }
 }
 
-impl Engine for Arc<POWEquihashEngine> {
-    fn name(&self) -> &str { "POWEquihashEngine" }
+impl Engine for Arc<UnityEngine> {
+    fn name(&self) -> &str { "UnityEngine" }
 
     fn machine(&self) -> &EthereumMachine { &self.machine }
 

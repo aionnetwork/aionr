@@ -2,7 +2,7 @@
   "name": "Custom",
   "dataDir": "custom",
   "engine": {
-    "POWEquihashEngine": {
+    "UnityEngine": {
       "params": {
 
       }

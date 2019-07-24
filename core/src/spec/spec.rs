@@ -36,7 +36,7 @@ use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
 use types::BlockNumber;
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
-use engine::{Engine, POWEquihashEngine};
+use engine::{Engine, UnityEngine};
 use types::error::Error;
 use executive::Executive;
 use factory::Factories;
@@ -249,11 +249,8 @@ impl Spec {
         let machine = Self::machine(params, builtins, premine);
 
         match engine_spec {
-            ajson::spec::Engine::POWEquihashEngine(pow_equihash_engine) => {
-                Arc::new(POWEquihashEngine::new(
-                    pow_equihash_engine.params.into(),
-                    machine,
-                ))
+            ajson::spec::Engine::UnityEngine(unity_engine) => {
+                Arc::new(UnityEngine::new(unity_engine.params.into(), machine))
             }
             ajson::spec::Engine::Null(_null_engine) => {
                 #[cfg(test)]

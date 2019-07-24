@@ -1,12 +1,12 @@
 use super::Header;
 use super::U256;
 use super::RewardsCalculator;
-use super::POWEquihashEngineParams;
+use super::UnityEngineParams;
 use super::DifficultyCalc;
 
 #[test]
 fn test_calculate_rewards_number1() {
-    let params = POWEquihashEngineParams {
+    let params = UnityEngineParams {
         rampup_upper_bound: U256::from(259200),
         rampup_lower_bound: U256::zero(),
         rampup_start_value: U256::from(748994641621655092u64),
@@ -28,7 +28,7 @@ fn test_calculate_rewards_number1() {
 
 #[test]
 fn test_calculate_rewards_number10000() {
-    let params = POWEquihashEngineParams {
+    let params = UnityEngineParams {
         rampup_upper_bound: U256::from(259200),
         rampup_lower_bound: U256::zero(),
         rampup_start_value: U256::from(748994641621655092u64),
@@ -50,7 +50,7 @@ fn test_calculate_rewards_number10000() {
 
 #[test]
 fn test_calculate_rewards_number259200() {
-    let params = POWEquihashEngineParams {
+    let params = UnityEngineParams {
         rampup_upper_bound: U256::from(259200),
         rampup_lower_bound: U256::zero(),
         rampup_start_value: U256::from(748994641621655092u64),
@@ -72,7 +72,7 @@ fn test_calculate_rewards_number259200() {
 
 #[test]
 fn test_calculate_rewards_number300000() {
-    let params = POWEquihashEngineParams {
+    let params = UnityEngineParams {
         rampup_upper_bound: U256::from(259200),
         rampup_lower_bound: U256::zero(),
         rampup_start_value: U256::from(748994641621655092u64),
@@ -94,7 +94,7 @@ fn test_calculate_rewards_number300000() {
 
 #[test]
 fn test_calculate_difficulty() {
-    let params = POWEquihashEngineParams {
+    let params = UnityEngineParams {
         rampup_upper_bound: U256::zero(),
         rampup_lower_bound: U256::zero(),
         rampup_start_value: U256::zero(),
@@ -120,7 +120,7 @@ fn test_calculate_difficulty() {
 
 #[test]
 fn test_calculate_difficulty2() {
-    let params = POWEquihashEngineParams {
+    let params = UnityEngineParams {
         rampup_upper_bound: U256::zero(),
         rampup_lower_bound: U256::zero(),
         rampup_start_value: U256::zero(),
@@ -146,7 +146,7 @@ fn test_calculate_difficulty2() {
 
 #[test]
 fn test_calculate_difficulty3() {
-    let params = POWEquihashEngineParams {
+    let params = UnityEngineParams {
         rampup_upper_bound: U256::zero(),
         rampup_lower_bound: U256::zero(),
         rampup_start_value: U256::zero(),
@@ -172,7 +172,7 @@ fn test_calculate_difficulty3() {
 
 #[test]
 fn test_calculate_difficulty4() {
-    let params = POWEquihashEngineParams {
+    let params = UnityEngineParams {
         rampup_upper_bound: U256::zero(),
         rampup_lower_bound: U256::zero(),
         rampup_start_value: U256::zero(),
