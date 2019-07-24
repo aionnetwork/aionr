@@ -127,20 +127,20 @@ impl SyncMgr {
 
         let statics_task = Interval::new(Instant::now(), Duration::from_secs(STATICS_INTERVAL))
             .for_each(move |_| {
-                let connected_nodes = P2pMgr::get_nodes(CONNECTED.value());
-                for node in connected_nodes.iter() {
-                    if node.mode == Mode::BACKWARD || node.mode == Mode::FORWARD {
-                        if node.target_total_difficulty < SyncStorage::get_network_total_diff() {
-                            P2pMgr::remove_peer(node.node_hash);
-                        }
-                    } else if node.last_request_timestamp
-                        + Duration::from_secs(STATICS_INTERVAL * 12)
-                        < SystemTime::now()
-                    {
-                        info!(target: "sync", "Disconnect with idle node: {}@{}.", node.get_node_id(), node.get_ip_addr());
-                        P2pMgr::remove_peer(node.node_hash);
-                    }
-                }
+                // let connected_nodes = P2pMgr::get_nodes(CONNECTED.value());
+                // for node in connected_nodes.iter() {
+                //     if node.mode == Mode::BACKWARD || node.mode == Mode::FORWARD {
+                //         if node.target_total_difficulty < SyncStorage::get_network_total_diff() {
+                //             P2pMgr::remove_peer(node.node_hash);
+                //         }
+                //     } else if node.last_request_timestamp
+                //         + Duration::from_secs(STATICS_INTERVAL * 12)
+                //         < SystemTime::now()
+                //     {
+                //         info!(target: "sync", "Disconnect with idle node: {}@{}.", node.get_node_id(), node.get_ip_addr());
+                //         P2pMgr::remove_peer(node.node_hash);
+                //     }
+                // }
 
                 let chain_info = SyncStorage::get_chain_info();
                 let block_number_last_time = SyncStorage::get_synced_block_number_last_time();
@@ -150,13 +150,13 @@ impl SyncMgr {
                 let active_nodes_count = active_nodes.len();
 
                 info!(target: "sync", "");
-                info!(target: "sync", "{:=^127}", " Sync Statics ");
-                info!(target: "sync", "Best block number: {}, hash: {}", chain_info.best_block_number, chain_info.best_block_hash);
-                info!(target: "sync", "Network Best block number: {}, hash: {}", SyncStorage::get_network_best_block_number(), SyncStorage::get_network_best_block_hash());
-                info!(target: "sync", "Max staged block number: {}", SyncStorage::get_max_staged_block_number());
-                info!(target: "sync", "Sync speed: {} blks/sec", sync_speed);
+                info!(target: "sync", "{:=^127}", "  sync  ");
+                info!(target: "sync", "  local num:{:>11}, hash:{:>20}", chain_info.best_block_number, chain_info.best_block_hash);
+                info!(target: "sync", "network num:{:>11}, hash:{:>20}", SyncStorage::get_network_best_block_number(), SyncStorage::get_network_best_block_hash());
+                info!(target: "sync", " staged num:{:>11}", SyncStorage::get_max_staged_block_number());
+                info!(target: "sync", "       sync:{:>11} blks/sec", sync_speed);
                 info!(target: "sync",
-                    "Total/Connected/Active peers: {}/{}/{}",
+                    "total/connected/active peers: {}/{}/{}",
                     P2pMgr::get_all_nodes_count(),
                     P2pMgr::get_nodes_count(CONNECTED.value()),
                     active_nodes_count,
@@ -164,7 +164,7 @@ impl SyncMgr {
 
                 if active_nodes_count > 0 {
                     info!(target: "sync", "{:-^127}","");
-                    info!(target: "sync","      Total Diff    Blk No.    Blk Hash                 Address                 Revision      Conn  Seed  LstReq No.       Mode");
+                    info!(target: "sync","              td         bn          bh                         addr                 rev      conn  seed  lst-req       m");
                     info!(target: "sync", "{:-^127}","");
                     active_nodes.sort_by(|a, b| {
                         if a.target_total_difficulty != b.target_total_difficulty {
@@ -216,19 +216,19 @@ impl SyncMgr {
                     SyncStorage::set_synced_block_number(
                         SyncStorage::get_chain_info().best_block_number,
                     );
-                    let abnormal_mode_nodes_count =
-                        P2pMgr::get_nodes_count_with_mode(Mode::BACKWARD)
-                            + P2pMgr::get_nodes_count_with_mode(Mode::FORWARD);
-                    if abnormal_mode_nodes_count > (active_nodes_count / 5)
-                        || active_nodes_count == 0
-                    {
-                        info!(target: "sync", "Abnormal status, reseting network...");
-                        P2pMgr::reset();
+                    // let abnormal_mode_nodes_count =
+                    //     P2pMgr::get_nodes_count_with_mode(Mode::BACKWARD)
+                    //         + P2pMgr::get_nodes_count_with_mode(Mode::FORWARD);
+                    // if abnormal_mode_nodes_count > (active_nodes_count / 5)
+                    //     || active_nodes_count == 0
+                    // {
+                    //     info!(target: "sync", "Abnormal status, reseting network...");
+                    //     P2pMgr::reset();
 
-                        SyncStorage::clear_imported_block_hashes();
-                        SyncStorage::clear_staged_blocks();
-                        SyncStorage::set_max_staged_block_number(0);
-                    }
+                    //     SyncStorage::clear_imported_block_hashes();
+                    //     SyncStorage::clear_staged_blocks();
+                    //     SyncStorage::set_max_staged_block_number(0);
+                    // }
                 }
 
                 // if block_number_now + 8 < SyncStorage::get_network_best_block_number()
@@ -336,7 +336,6 @@ impl SyncMgr {
     fn disable() { SyncStorage::reset(); }
 }
 
-/// Sync
 pub struct Sync {
     /// Network service
     config: NetworkConfig,
