@@ -202,9 +202,9 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // log apis
     info!(target: "run", "        apis: rpc-http({}) rpc-ws({}) rpc-ipc({})",
-          if cmd.http_conf.enabled { "enable" } else { "disable" },
-          if cmd.ws_conf.enabled { "enable" } else { "disable" },
-          if cmd.ipc_conf.enabled { "enable" } else { "disable" },
+          if cmd.http_conf.enabled { "y" } else { "n" },
+          if cmd.ws_conf.enabled { "y" } else { "n" },
+          if cmd.ipc_conf.enabled { "y" } else { "n" },
     );
 
     // start sync
