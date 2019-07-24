@@ -166,10 +166,6 @@ usage! {
             "--default-config",
             "Print DEFAULT configuration to $HOME/.aion/default_config.toml.",
 
-            FLAG flag_no_seal_check: (bool) = false, or |_| None,
-            "--no-seal-check",
-            "Skip block seal check. Used to make import and export blocks faster, if checking seal is not necessary.",
-
             ARG arg_config: (String) = "$HOME/.aion/config.toml", or |_| None,
             "-c, --config=[CONFIG]",
             "Specify a configuration. CONFIG may be a configuration file .",
@@ -947,7 +943,6 @@ mod tests {
             arg_num_verifiers: Some(6),
 
             // -- Miscellaneous Options
-            flag_no_seal_check: false,
             flag_no_config: false,
             flag_version: false,
             flag_default_config: false,
