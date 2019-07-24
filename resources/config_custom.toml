@@ -6,6 +6,7 @@ keys_iterations = 10240
 refresh_time = 5
 unlock = []
 password = []
+stake_contract = "0xa056337bb14e818f3f53e13ab0d93b6539aa570cba91ce65c716058241989be9"
 
 [network]
 sync_from_boot_nodes_only = false
@@ -57,7 +58,7 @@ port = 8008
 remove_solved = false
 infinite_pending_block = false
 dynamic_gas_price = false
-reseal_min_period = 4000
+reseal_min_period = 5000
 work_queue_size = 20
 relay_set = "cheap"
 gas_floor_target = "15000000"
@@ -72,7 +73,8 @@ local_max_gas_price = 100000000000
 blk_price_window = 20
 max_blk_traverse = 64
 gas_price_percentile = 60
-#author = None
+author = "0xa07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137"
+#staker_private_key = "0xcc76648ce8798bc18130bc9d637995e5c42a922ebeab78795fac58081b9cf9d4"
 #tx_gas_limit = None
 #tx_time_limit = None
 #extra_data = None
