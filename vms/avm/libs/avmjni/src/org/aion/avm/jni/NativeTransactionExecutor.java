@@ -1,18 +1,25 @@
 package org.aion.avm.jni;
 
+import java.util.List;
+
 import org.aion.vm.api.interfaces.KernelInterface;
 import org.aion.vm.api.interfaces.SimpleFuture;
 import org.aion.vm.api.interfaces.TransactionInterface;
-import org.aion.vm.api.interfaces.TransactionResult;
+// import org.aion.vm.api.interfaces.TransactionResult;
 import org.aion.vm.api.interfaces.IExecutionLog;
 import org.aion.vm.api.interfaces.TransactionSideEffects;
 import org.aion.avm.core.AvmImpl;
 import org.aion.avm.core.CommonAvmFactory;
 import org.aion.avm.core.IExternalCapabilities;
 import org.aion.avm.core.AvmConfiguration;
-import org.aion.avm.tooling.StandardCapabilities;
-import org.aion.kernel.AvmTransactionResult;
-import org.aion.kernel.TransactionalKernel;
+import org.aion.avm.core.ExecutionType;
+import org.aion.avm.core.IExternalState;
+import org.aion.avm.core.FutureResult;
+import org.aion.types.Transaction;
+import org.aion.types.TransactionResult;
+import org.aion.types.Log;
+//import org.aion.kernel.AvmTransactionResult;
+// import org.aion.kernel.TransactionalKernel;
 
 import java.util.Set;
 
@@ -26,6 +33,7 @@ public class NativeTransactionExecutor {
      * @return serialized list of transaction result, using the Native Codec
      */
     public static byte[] execute(long handle, byte[] txs, boolean is_local) {
+        long blockNumber = 0;
         try {
             // deserialize the transaction contexts
             // the paralleled transactions should have the same block info
@@ -35,11 +43,12 @@ public class NativeTransactionExecutor {
             Substate substate = new Substate(kernel, is_local);
 
             NativeDecoder decoder = new NativeDecoder(txs);
-            TransactionInterface[] contexts = new TransactionInterface[decoder.decodeInt()];
+            Transaction[] contexts = new Transaction[decoder.decodeInt()];
             for (int i = 0; i < contexts.length; i++) {
                 Message msg = new Message(decoder.decodeBytes());
                 substate.updateEnvInfo(msg);
-                contexts[i] = msg; 
+                contexts[i] = msg.toAvmTransaction(); 
+                blockNumber = msg.blockNumber;
                 if (Constants.DEBUG)
                     System.out.println(contexts[i]);
             }
@@ -48,19 +57,19 @@ public class NativeTransactionExecutor {
             if (Constants.DEBUG)
                 config.enableVerboseConcurrentExecutor = true;
             AvmImpl avm = CommonAvmFactory.buildAvmInstanceForConfiguration(new AionCapabilities(), config);
-            SimpleFuture<TransactionResult>[] futures = avm.run(substate, contexts);
+            FutureResult[] futures = avm.run(substate, contexts, ExecutionType.ASSUME_MAINCHAIN, blockNumber-1);
 
             // wait for the transaction results and serialize them into bytes
             NativeEncoder encoder = new NativeEncoder();
             encoder.encodeInt(futures.length);
             for (int i = 0; i < futures.length; i++) {
-                TransactionResult r = futures[i].get();
+                TransactionResult r = futures[i].getResult();
                 encoder.encodeBytes(TransactionResultHelper.encodeTransactionResult(r));
                 if (Constants.DEBUG) {
                     System.out.println(futures[i]);
                 }
                 //TODO: get VM kernel interface generated during execution; then update substates
-                KernelInterface transactionKernel = r.getKernelInterface();
+                IExternalState transactionKernel = futures[i].getExternalState();
                 // for (byte[] addr: transactionKernel.getTouchedAccounts()) {
                 //     kernel.touchAccount(addr, i);
                 // }
@@ -69,15 +78,15 @@ public class NativeTransactionExecutor {
                 if (is_local) {
                     state_root = kernel.sendSignal(1);
                 } else {
-                    TransactionSideEffects sideEffects = r.getSideEffects();
-                    for (IExecutionLog log: sideEffects.getExecutionLogs()) {
+                    for (Log log: r.logs) {
                         NativeEncoder logEncoder = new NativeEncoder();
-                        logEncoder.encodeBytes(log.getSourceAddress().toBytes());
-                        logEncoder.encodeInt(log.getTopics().size());
-                        for (byte[] topic: log.getTopics()) {
+                        logEncoder.encodeBytes(log.copyOfAddress());
+                        List<byte[]> topics = log.copyOfTopics();
+                        logEncoder.encodeInt(topics.size());
+                        for (byte[] topic: topics) {
                             logEncoder.encodeBytes(topic);
                         }
-                        logEncoder.encodeBytes(log.getData());
+                        logEncoder.encodeBytes(log.copyOfData());
                         kernel.addLog(logEncoder.toByteArray(), i);
                     }
                     transactionKernel.commitTo(kernel);

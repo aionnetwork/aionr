@@ -307,19 +307,16 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     info!(target: "run","Finishing work, please wait...");
 
-    // close pool
-    let _ = close_transaction_pool.send(());
-    let _ = close_miner.send(());
-
-    // close rpc
     if ws_server.is_some() {
-        ws_server.unwrap().close();
+        ws_server.expect("Invalid WS server instance!").close();
     }
+
     if http_server.is_some() {
-        http_server.unwrap().close();
+        http_server.expect("Invalid HTTP server instance!").close();
     }
+
     if ipc_server.is_some() {
-        ipc_server.unwrap().close();
+        ipc_server.expect("Invalid IPC server instance!").close();
     }
 
     // close p2p
