@@ -347,7 +347,7 @@ impl BlockProvider for BlockChain {
         };
         let parent_seal_type: Option<SealType> = parent_header.seal_type();
         // If parent's seal type is the same as the current, return parent
-        if seal_type == &parent_seal_type {
+        if seal_type.to_owned().unwrap_or_default() == parent_seal_type.unwrap_or_default() {
             Some(parent_header)
         }
         // Else return the anti seal parent of the parent

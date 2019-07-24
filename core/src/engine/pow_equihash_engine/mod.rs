@@ -116,12 +116,21 @@ impl DifficultyCalc {
         grand_parent: Option<&Header>,
     ) -> U256
     {
-        // If no parent block, return the minimum difficulty. TODO-Unity: To communicate with Java kernel and handle this better.
-        if parent.is_none() || grand_parent.is_none() {
-            return self.minimum_difficulty;
-        }
-        let parent = parent.expect("Parent unwrap tested before");
-        let grand_parent = grand_parent.expect("Grand parent unwrap tested before");
+        // First PoS block does not have seal parent.
+        let parent = match parent {
+            Some(header) => header,
+            None => {
+                return U256::from(2_000_000_000u64); // TODO-Unity: test setup to be comparable to the initial 1*10^9 stake. Change it in real setup or make it configurable in engine paremeter.
+            }
+        };
+
+        // If no seal grand parent, return the difficulty of the seal parent
+        let grand_parent = match grand_parent {
+            Some(header) => header,
+            None => {
+                return parent.difficulty().to_owned();
+            }
+        };
 
         let parent_difficulty = parent.difficulty();
         let parent_timestamp = parent.timestamp();
