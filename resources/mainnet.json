@@ -2,7 +2,7 @@
 	"name": "Mainnet",
 	"dataDir": "mainnet",
 	"engine": {
-		"POWEquihashEngine": {
+		"UnityEngine": {
 			"params": {
 
 			}

@@ -140,7 +140,7 @@ impl fmt::Display for BlockError {
             TooManyTransactions(ref address) => format!("Too many transactions from: {}", address),
             InvalidPoSTimestamp(ref timestamp, ref parent_timestamp, ref delta) => {
                 format!(
-                    "Valid pos block timestamp {}, parent timestamp {}, expected delta: {}",
+                    "Invalid pos block timestamp {}, parent timestamp {}, expected delta: {}",
                     timestamp, parent_timestamp, delta
                 )
             }

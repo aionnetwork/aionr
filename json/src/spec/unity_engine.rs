@@ -22,7 +22,7 @@
 use uint::Uint;
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]
-pub struct POWEquihashEngineParams {
+pub struct UnityEngineParams {
     #[serde(rename = "rampupUpperBound")]
     pub rampup_upper_bound: Option<Uint>,
     #[serde(rename = "rampupLowerBound")]
@@ -45,7 +45,7 @@ pub struct POWEquihashEngineParams {
 
 /// pow equihash engine deserialization
 #[derive(Debug, PartialEq, Deserialize)]
-pub struct POWEquihashEngine {
+pub struct UnityEngine {
     /// pow equihash engine params.
-    pub params: POWEquihashEngineParams,
+    pub params: UnityEngineParams,
 }

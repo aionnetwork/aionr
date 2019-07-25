@@ -145,7 +145,7 @@ $ ./aion
 >
 >
 > 2019-01-23 09:12:40 Starting Aion(R)/v0.1.1.f9610e1/x86_64-linux-gnu/rustc-1.28.0
-> 2019-01-23 09:12:40 Configured for Mainnet using POWEquihashEngine engine
+> 2019-01-23 09:12:40 Configured for Mainnet using UnityEngine engine
 > 2019-01-23 09:12:41 Genesis hash: 30793b4ea012c6d3a58c85c5b049962669369807a98e36807c1b02116417f823
 > 2019-01-23 09:12:41 State DB configuration: archive
 > 2019-01-23 09:12:41 Wallet API is disabled.

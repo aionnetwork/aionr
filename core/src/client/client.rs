@@ -1830,7 +1830,7 @@ mod tests {
     #[test]
     fn should_not_cache_details_before_commit() {
         use client::BlockChainClient;
-        use helpers::{generate_dummy_client,get_good_dummy_block_hash};
+        use helpers::{generate_dummy_client, get_good_dummy_block_hash};
 
         use std::thread;
         use std::time::Duration;
@@ -1840,7 +1840,7 @@ mod tests {
 
         let client = generate_dummy_client(0);
         let genesis = client.chain_info().best_block_hash;
-        let (new_hash, new_block) = get_good_dummy_block_hash();
+        let (new_hash, new_block) = get_good_dummy_block_hash(None);
 
         let go = {
             // Separate thread uncommited transaction

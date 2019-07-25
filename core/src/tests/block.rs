@@ -213,5 +213,3 @@ fn enact_block() {
             .is_none()
     );
 }
-
-// TODO-UNITY: Add some block tests about seal_parent and seal_grand_parent

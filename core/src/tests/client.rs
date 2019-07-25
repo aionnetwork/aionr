@@ -36,7 +36,8 @@ use key::Ed25519Secret;
 use transaction::{PendingTransaction, Transaction, Action, Condition};
 use miner::MinerService;
 use tempdir::TempDir;
-use helpers::{get_test_spec,generate_dummy_client,get_good_dummy_block,get_bad_state_dummy_block,get_test_client_with_blocks,push_blocks_to_client,get_good_dummy_block_seq,generate_dummy_client_with_data};
+use helpers::{get_test_spec, generate_dummy_client, get_good_dummy_block, get_good_dummy_pos_block, get_bad_state_dummy_block, get_test_client_with_blocks, push_blocks_to_client, get_good_dummy_block_seq, generate_dummy_client_with_data};
+use header::SealType;
 
 #[test]
 fn imports_from_empty() {
@@ -399,4 +400,52 @@ fn does_not_propagate_delayed_transactions() {
     client.flush_queue();
     assert_eq!(2, client.ready_transactions().len());
     assert_eq!(2, client.miner().pending_transactions().len());
+}
+
+#[test]
+fn test_seal_parent() {
+    let tempdir = TempDir::new("").unwrap();
+    let spec = get_test_spec();
+    let db_config = DatabaseConfig::default();
+    let mut db_configs = Vec::new();
+    for db_name in ::db::DB_NAMES.to_vec() {
+        db_configs.push(RepositoryConfig {
+            db_name: db_name.into(),
+            db_config: db_config.clone(),
+            db_path: tempdir.path().join(db_name).to_str().unwrap().to_string(),
+        });
+    }
+    let client_db = Arc::new(DbRepository::init(db_configs).unwrap());
+
+    let client = Client::new(
+        ClientConfig::default(),
+        &spec,
+        client_db,
+        Arc::new(Miner::with_spec(&spec)),
+        IoChannel::disconnected(),
+    )
+    .unwrap();
+    let good_block = get_good_dummy_pos_block();
+    if client.import_block(good_block).is_err() {
+        panic!("error importing block being good by definition");
+    }
+    client.flush_queue();
+    client.import_verified_blocks();
+
+    let block = client.block_header(BlockId::Number(1)).unwrap();
+
+    let seal_parent = client.seal_parent_header(&block.parent_hash(), &Some(SealType::PoW));
+    assert!(seal_parent.is_some());
+    assert_eq!(seal_parent.unwrap().hash(), spec.genesis_header().hash());
+
+    let seal_parent = client.seal_parent_header(&block.parent_hash(), &Some(SealType::PoS));
+    assert!(seal_parent.is_none());
+
+    let seal_parent = client.seal_parent_header(&block.hash(), &Some(SealType::PoW));
+    assert!(seal_parent.is_some());
+    assert_eq!(seal_parent.unwrap().hash(), spec.genesis_header().hash());
+
+    let seal_parent = client.seal_parent_header(&block.hash(), &Some(SealType::PoS));
+    assert!(seal_parent.is_some());
+    assert_eq!(seal_parent.unwrap().hash(), block.hash());
 }

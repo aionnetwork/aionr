@@ -21,13 +21,13 @@
  ******************************************************************************/
 
 //! Engine deserialization.
-use super::{POWEquihashEngine};
+use super::{UnityEngine};
 use super::{NullEngine};
 
 /// Engine deserialization.
 #[derive(Debug, PartialEq, Deserialize)]
 pub enum Engine {
-    POWEquihashEngine(POWEquihashEngine),
+    UnityEngine(UnityEngine),
     #[serde(rename = "null")]
     Null(NullEngine),
 }

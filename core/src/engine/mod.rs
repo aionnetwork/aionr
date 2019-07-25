@@ -21,8 +21,8 @@
  ******************************************************************************/
 
 //! Consensus engine specification and basic implementations.
-pub mod pow_equihash_engine;
-pub use self::pow_equihash_engine::POWEquihashEngine;
+pub mod unity_engine;
+pub use self::unity_engine::UnityEngine;
 
 use std::fmt;
 use std::sync::Arc;
