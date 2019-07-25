@@ -36,7 +36,7 @@ use key::Ed25519Secret;
 use transaction::{PendingTransaction, Transaction, Action, Condition};
 use miner::MinerService;
 use tempdir::TempDir;
-use helpers::{get_test_spec,generate_dummy_client,get_good_dummy_block,get_bad_state_dummy_block,get_test_client_with_blocks,push_blocks_to_client,get_good_dummy_block_seq,generate_dummy_client_with_data};
+use helpers::{get_test_spec, generate_dummy_client, get_good_dummy_block, get_good_dummy_pos_block, get_bad_state_dummy_block, get_test_client_with_blocks, push_blocks_to_client, get_good_dummy_block_seq, generate_dummy_client_with_data};
 use header::SealType;
 
 #[test]
@@ -425,7 +425,7 @@ fn test_seal_parent() {
         IoChannel::disconnected(),
     )
     .unwrap();
-    let good_block = get_good_dummy_block();
+    let good_block = get_good_dummy_pos_block();
     if client.import_block(good_block).is_err() {
         panic!("error importing block being good by definition");
     }
@@ -434,14 +434,18 @@ fn test_seal_parent() {
 
     let block = client.block_header(BlockId::Number(1)).unwrap();
 
-    let seal_parent = client.seal_parent_header(&block.hash(), &Some(SealType::PoW));
-    assert!(seal_parent.is_some());
-    assert_eq!(seal_parent.unwrap().hash(), block.hash());
-
     let seal_parent = client.seal_parent_header(&block.parent_hash(), &Some(SealType::PoW));
     assert!(seal_parent.is_some());
     assert_eq!(seal_parent.unwrap().hash(), spec.genesis_header().hash());
 
-    let seal_parent = client.seal_parent_header(&block.hash(), &Some(SealType::PoS));
+    let seal_parent = client.seal_parent_header(&block.parent_hash(), &Some(SealType::PoS));
     assert!(seal_parent.is_none());
+
+    let seal_parent = client.seal_parent_header(&block.hash(), &Some(SealType::PoW));
+    assert!(seal_parent.is_some());
+    assert_eq!(seal_parent.unwrap().hash(), spec.genesis_header().hash());
+
+    let seal_parent = client.seal_parent_header(&block.hash(), &Some(SealType::PoS));
+    assert!(seal_parent.is_some());
+    assert_eq!(seal_parent.unwrap().hash(), block.hash());
 }

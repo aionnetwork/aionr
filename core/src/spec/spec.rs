@@ -451,7 +451,7 @@ mod tests {
         let genesis = test_spec.genesis_block();
         assert_eq!(
             BlockView::new(&genesis).header_view().hash(),
-            "579aed812b43f18210ff9e5406ae76b00dffbfba5f6f7ef2eda650780a119a55".into()
+            "6b1db4a3d0482aa864e8f0ee27870c6c03db9ff8649b8dce8b78db7f23967bc5".into()
         );
     }
 
