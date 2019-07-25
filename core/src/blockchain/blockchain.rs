@@ -1080,7 +1080,7 @@ impl BlockChain {
         };
 
         // TODO-UNITY: add overflow check
-        let td = pow_td * pos_td;
+        let td = pow_td * ::std::cmp::max(pos_td, U256::from(1u64));
 
         let is_new_best = td > self.best_block_total_difficulty();
 
