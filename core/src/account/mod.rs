@@ -217,7 +217,7 @@ impl AionVMAccount {
         }
 
         if account_type == AccType::AVM {
-            for k in self.storage_removable.drain() {
+            for k in self.storage_removable.clone() {
                 debug!(target: "vm", "remove avm key: {:?}", k);
                 t.remove(&k)?;
                 self.storage_cache.borrow_mut().remove(&k);
@@ -283,8 +283,13 @@ impl AionVMAccount {
         for (k, v) in other.storage_cache.into_inner() {
             cache.insert(k.clone(), v.clone()); //TODO: cloning should not be required here
         }
+
         self.storage_changes = other.storage_changes;
         self.storage_removable = other.storage_removable;
+
+        for k in self.storage_removable.drain() {
+            cache.remove(&k);
+        }
     }
 
     /// Clone account data, dirty storage keys and cached storage keys.
