@@ -41,6 +41,7 @@ extern crate aion_version as version;
 extern crate bytes;
 extern crate byteorder;
 
+mod config;
 mod route;
 pub mod states;
 mod msg;
@@ -83,10 +84,11 @@ use states::STATE::DISCONNECTED;
 use states::STATE::ISSERVER;
 use states::STATE::CONNECTED;
 pub use node::*;
+pub use config::Config;
 
 lazy_static! {
     static ref LOCAL_NODE: Storage<Node> = Storage::new();
-    static ref NETWORK_CONFIG: Storage<NetworkConfig> = Storage::new();
+    static ref NETWORK_CONFIG: Storage<Config> = Storage::new();
     static ref SOCKETS_MAP: Storage<Mutex<HashMap<u64, TcpStream>>> = Storage::new();
     static ref GLOBAL_NODES_MAP: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
     static ref ENABLED: Storage<AtomicBool> = Storage::new();
@@ -94,11 +96,12 @@ lazy_static! {
     static ref DEFAULT_HANDLER: Storage<DefaultHandler> = Storage::new();
 }
 
-#[derive(Clone, Copy)]
-pub struct P2pMgr;
+pub struct P2pMgr {
+    local: Node,
+}
 
 impl P2pMgr {
-    pub fn enable(cfg: NetworkConfig) {
+    pub fn enable(cfg: Config) {
         let sockets_map: HashMap<u64, TcpStream> = HashMap::new();
         SOCKETS_MAP.set(Mutex::new(sockets_map));
 
@@ -124,7 +127,8 @@ impl P2pMgr {
         executor: &TaskExecutor,
         local_addr: &String,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    ) {
+    )
+    {
         if let Ok(addr) = local_addr.parse() {
             let listener = TcpListener::bind(&addr).expect("Failed to bind");
             let server = listener
@@ -175,7 +179,7 @@ impl P2pMgr {
 
     pub fn get_thread_pool() -> &'static ThreadPool { TP.get() }
 
-    pub fn get_network_config() -> &'static NetworkConfig { NETWORK_CONFIG.get() }
+    pub fn get_network_config() -> &'static Config { NETWORK_CONFIG.get() }
 
     pub fn load_boot_nodes(boot_nodes_str: Vec<String>) -> Vec<Node> {
         let mut boot_nodes = Vec::new();
@@ -818,37 +822,6 @@ impl Decoder for P2pCodec {
                 debug!(target: "net", "len = {}, {}", len, to_hex(src));
             }
             Ok(None)
-        }
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-/// Network service configuration
-pub struct NetworkConfig {
-    /// List of initial node addresses
-    pub boot_nodes: Vec<String>,
-    /// Max number of connected peers to maintain
-    pub max_peers: u32,
-    /// net id
-    pub net_id: u32,
-    /// local node
-    pub local_node: String,
-    /// if only sync from boot nodes
-    pub sync_from_boot_nodes_only: bool,
-    /// IP black list
-    pub ip_black_list: Vec<String>,
-}
-
-impl NetworkConfig {
-    /// Create a new instance of default settings.
-    pub fn new() -> Self {
-        NetworkConfig {
-            boot_nodes: Vec::new(),
-            max_peers: 64,
-            local_node: String::from("p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"),
-            net_id: 0,
-            sync_from_boot_nodes_only: false,
-            ip_black_list: Vec::new(),
         }
     }
 }

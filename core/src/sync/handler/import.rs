@@ -109,9 +109,7 @@ pub fn import_blocks() {
                             if SyncStorage::get_synced_block_number_last_time()
                                 == SyncStorage::get_synced_block_number()
                             {
-                                SyncStorage::set_synced_block_number_last_time(
-                                    max_block_number,
-                                );
+                                SyncStorage::set_synced_block_number_last_time(max_block_number);
                                 SyncStorage::set_synced_block_number(max_block_number);
                             } else {
                                 // } else {
@@ -271,8 +269,7 @@ pub fn import_blocks() {
                                         {
                                             // attempt to jump
                                             node.mode = Mode::LIGHTNING;
-                                        } else if thunder_nodes_count < normal_nodes_count * 10
-                                        {
+                                        } else if thunder_nodes_count < normal_nodes_count * 10 {
                                             node.mode = Mode::THUNDER;
                                         } else {
                                             node.mode = Mode::NORMAL;

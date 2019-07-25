@@ -89,8 +89,7 @@ pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
     let node_hash = node.node_hash;
     let (mut best_block_num, req_body_rest) = req.body.split_at(mem::size_of::<u64>());
     let best_block_num = best_block_num.read_u64::<BigEndian>().unwrap_or(0);
-    let (mut total_difficulty_len, req_body_rest) =
-        req_body_rest.split_at(mem::size_of::<u8>());
+    let (mut total_difficulty_len, req_body_rest) = req_body_rest.split_at(mem::size_of::<u8>());
     let total_difficulty_len = total_difficulty_len.read_u8().unwrap_or(0) as usize;
     let (total_difficulty, req_body_rest) = req_body_rest.split_at(total_difficulty_len);
     let (best_hash, req_body_rest) = req_body_rest.split_at(HASH_LENGTH);

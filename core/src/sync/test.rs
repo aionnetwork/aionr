@@ -1,7 +1,8 @@
 use client::{BlockChainClient, BlockId, ChainNotify,
 Client, ClientConfig};
 use aion_types::H256;
-use p2p::{P2pMgr,NetworkConfig};
+use p2p::P2pMgr;
+use p2p::Config;
 use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime};
@@ -25,8 +26,8 @@ fn new_db() -> Arc<KeyValueDB> {
     Arc::new(MockDbRepository::init(db_configs))
 }
 
-pub fn get_network_config() -> NetworkConfig {
-    let mut net_config = NetworkConfig::new();
+pub fn get_network_config() -> Config {
+    let mut net_config = Config::new();
     net_config.boot_nodes.push(String::from(
         "p2p://c33d1066-8c7e-496c-9c4e-c89318280274@13.92.155.115:30303",
     ));

@@ -47,7 +47,7 @@ impl STATE {
             4 => STATE::HANDSHAKEDONE,
             8 => STATE::ALIVE,
             16 => STATE::DISCONNECTED,
-            _  => STATE::CONNECTED,
+            _ => STATE::CONNECTED,
         }
     }
 }

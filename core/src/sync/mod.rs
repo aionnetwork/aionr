@@ -48,9 +48,8 @@ use p2p::handler::external::DefaultHandler;
 use p2p::P2pMgr;
 use p2p::NetManager;
 use p2p::Node;
-use p2p::Mode;
 use p2p::ChannelBuffer;
-use p2p::NetworkConfig;
+use p2p::Config;
 use p2p::states::STATE::HANDSHAKEDONE;
 use p2p::states::STATE::CONNECTED;
 use p2p::states::STATE::ALIVE;
@@ -338,13 +337,13 @@ impl SyncMgr {
 
 pub struct Sync {
     /// Network service
-    config: NetworkConfig,
+    config: Config,
     /// starting block number.
     starting_block_number: u64,
 }
 
 impl Sync {
-    pub fn new(client: Arc<BlockChainClient>, config: NetworkConfig) -> Arc<Sync> {
+    pub fn new(client: Arc<BlockChainClient>, config: Config) -> Arc<Sync> {
         let chain_info = client.chain_info();
         // starting block number is the local best block number during kernel startup.
         let starting_block_number = chain_info.best_block_number;
@@ -521,10 +520,7 @@ impl ChainNotify for Sync {
         if !sealed.is_empty() {
             debug!(target: "sync", "Propagating blocks...");
             SyncStorage::insert_imported_block_hashes(sealed.clone());
-            broadcast::propagate_blocks(
-                sealed.index(0),
-                SyncStorage::get_block_chain(),
-            );
+            broadcast::propagate_blocks(sealed.index(0), SyncStorage::get_block_chain());
         }
     }
 

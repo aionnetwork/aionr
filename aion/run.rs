@@ -42,14 +42,15 @@ use helpers::{passwords_from_files, to_client_config};
 use dir::helpers::absolute;
 use io::IoChannel;
 use logger::LogConfig;
+use tokio;
+use tokio::prelude::*;
 use num_cpus;
 use params::{fatdb_switch_to_bool, AccountsConfig, MinerExtras, Pruning, SpecType, Switch};
 use parking_lot::{Condvar, Mutex};
 use rpc;
 use rpc_apis;
-use p2p::{NetworkConfig, P2pMgr};
-use tokio;
-use tokio::prelude::*;
+use p2p::P2pMgr;
+use p2p::Config;
 use user_defaults::UserDefaults;
 
 // Pops along with error messages when a password is missing or invalid.
@@ -72,7 +73,7 @@ pub struct RunCmd {
     pub ws_conf: rpc::WsConfiguration,
     pub http_conf: rpc::HttpConfiguration,
     pub ipc_conf: rpc::IpcConfiguration,
-    pub net_conf: NetworkConfig,
+    pub net_conf: Config,
     pub acc_conf: AccountsConfig,
     pub miner_extras: MinerExtras,
     pub fat_db: Switch,

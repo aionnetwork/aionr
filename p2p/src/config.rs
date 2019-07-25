@@ -19,8 +19,26 @@
  *
  ******************************************************************************/
 
-pub mod status;
-pub mod headers;
-pub mod bodies;
-pub mod broadcast;
-pub mod import;
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Config {
+    pub boot_nodes: Vec<String>,
+    pub max_peers: u32,
+    pub net_id: u32,
+    pub local_node: String,
+    pub sync_from_boot_nodes_only: bool,
+    pub ip_black_list: Vec<String>,
+}
+
+impl Config {
+    /// Create a new instance of default settings.
+    pub fn new() -> Self {
+        Config {
+            boot_nodes: Vec::new(),
+            max_peers: 64,
+            local_node: String::from("p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"),
+            net_id: 0,
+            sync_from_boot_nodes_only: false,
+            ip_black_list: Vec::new(),
+        }
+    }
+}

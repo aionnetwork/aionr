@@ -108,8 +108,7 @@ pub fn propagate_blocks(block_hash: &H256, client: Arc<BlockChainClient>) {
 pub fn receive_block(node: &mut Node, req: ChannelBuffer) {
     trace!(target: "sync", "BROADCASTBLOCK received.");
 
-    if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number()
-    {
+    if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number() {
         // Ignore BROADCASTBLOCK message until full synced
         trace!(target: "sync", "Syncing..., ignore BROADCASTBLOCK message.");
         return;
@@ -183,8 +182,7 @@ pub fn receive_tx(node: &mut Node, req: ChannelBuffer) {
         return;
     }
 
-    if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number()
-    {
+    if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number() {
         // Ignore BROADCASTTX message until full synced
         trace!(target: "sync", "Syncing..., ignore BROADCASTTX message.");
         return;
@@ -201,9 +199,7 @@ pub fn receive_tx(node: &mut Node, req: ChannelBuffer) {
                     if !transaction_hashes.contains_key(&hash) {
                         transactions.push(tx);
                         transaction_hashes.insert(hash, 0);
-                        SyncStorage::insert_received_transaction(
-                            transaction_rlp.as_raw().to_vec(),
-                        );
+                        SyncStorage::insert_received_transaction(transaction_rlp.as_raw().to_vec());
                     }
                 }
             }
