@@ -845,7 +845,7 @@ fn test_insert_unordered() {
         &b2.last().encoded(),
         vec![],
         Some(b1_pow_total_difficulty),
-        Some(U256::from(1)),
+        Some(U256::from(0)),
         false,
         false,
     );

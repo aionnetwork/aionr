@@ -798,7 +798,7 @@ impl BlockChainClient for TestBlockChainClient {
 
                 *pow_difficulty = pow_td;
                 *pos_difficulty = pos_td;
-                *difficulty = *difficulty + header.difficulty().clone();
+                *difficulty = pow_td * ::std::cmp::max(pos_td, U256::from(1u64));
             }
             mem::replace(&mut *self.last_hash.write(), h.clone());
             self.blocks.write().insert(h.clone(), b);

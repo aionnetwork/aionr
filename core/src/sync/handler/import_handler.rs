@@ -220,7 +220,10 @@ impl ImportHandler {
                                 }
                                 // TODO-UNITY: add overflow check
                                 node.current_total_difficulty = node.current_pow_total_difficulty
-                                    * node.current_pos_total_difficulty;
+                                    * ::std::cmp::max(
+                                        node.current_pos_total_difficulty,
+                                        U256::from(1u64),
+                                    );
 
                                 node.synced_block_num = number;
                                 if result.is_err() {

@@ -434,7 +434,8 @@ impl Client {
                         let pow_difficulty = latest_pow_difficulty + difficulty;
                         return Some((
                             // TODO-UNITY: add overflow check
-                            pow_difficulty * latest_pos_difficulty,
+                            pow_difficulty
+                                * ::std::cmp::max(latest_pos_difficulty, U256::from(1u64)),
                             pow_difficulty,
                             latest_pos_difficulty,
                         ));
@@ -443,7 +444,8 @@ impl Client {
                         let pos_difficulty = latest_pos_difficulty + difficulty;
                         return Some((
                             // TODO-UNITY: add overflow check
-                            latest_pow_difficulty * pos_difficulty,
+                            latest_pow_difficulty
+                                * ::std::cmp::max(pos_difficulty, U256::from(1u64)),
                             latest_pow_difficulty,
                             pos_difficulty,
                         ));
@@ -1557,7 +1559,10 @@ impl BlockChainClient for Client {
         // TODO-UNITY: add overflow check
         chain_info.pending_total_difficulty = (chain_info.pow_total_difficulty
             + self.block_queue.pow_total_difficulty())
-            * (chain_info.pos_total_difficulty + self.block_queue.pos_total_difficulty());
+            * ::std::cmp::max(
+                chain_info.pos_total_difficulty + self.block_queue.pos_total_difficulty(),
+                U256::from(1u64),
+            );
         chain_info
     }
 

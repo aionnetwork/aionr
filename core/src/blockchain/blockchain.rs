@@ -630,7 +630,7 @@ impl BlockChain {
                     number: header.number(),
                     total_difficulty: header.difficulty(),
                     pow_total_difficulty: header.difficulty(),
-                    pos_total_difficulty: U256::from(1),
+                    pos_total_difficulty: Default::default(),
                     parent: header.parent_hash(),
                     children: vec![],
                     anti_seal_parent: H256::default(),
@@ -904,7 +904,7 @@ impl BlockChain {
                 hash: hash,
                 number: header.number(),
                 // TODO-UNITY: add overflow check
-                total_difficulty: pow_td * pos_td,
+                total_difficulty: pow_td * ::std::cmp::max(pos_td, U256::from(1u64)),
                 pow_total_difficulty: pow_td,
                 pos_total_difficulty: pos_td,
                 location: BlockLocation::CanonChain,
@@ -961,7 +961,7 @@ impl BlockChain {
                 hash: hash,
                 number: header.number(),
                 // TODO-UNITY: add overflow check
-                total_difficulty: pow_td * pos_td,
+                total_difficulty: pow_td * ::std::cmp::max(pos_td, U256::from(1u64)),
                 pow_total_difficulty: pow_td,
                 pos_total_difficulty: pos_td,
                 location: BlockLocation::CanonChain,
