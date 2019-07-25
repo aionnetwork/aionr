@@ -812,7 +812,9 @@ impl VMAccount for AionVMAccount {
 
 impl AionVMAccount {
     pub fn storage_at(&self, db: &HashStore, key: &Bytes) -> trie::Result<Option<Bytes>> {
+        debug!(target: "vm", "strg: account type = {:?}", self.acc_type());
         if let Some(value) = self.cached_storage_at(key) {
+            debug!(target: "vm", "strg: found cached key");
             return Ok(Some(value));
         }
 
@@ -822,6 +824,7 @@ impl AionVMAccount {
             return Ok(None);
         }
 
+        debug!(target: "vm", "strg: got from local db");
         let item: Bytes = db.get_with(key, ::rlp::decode)?.unwrap_or_else(|| vec![]);
         self.storage_cache
             .borrow_mut()
