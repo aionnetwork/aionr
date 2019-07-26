@@ -30,7 +30,6 @@ pub struct Config {
 }
 
 impl Config {
-    /// Create a new instance of default settings.
     pub fn new() -> Self {
         Config {
             boot_nodes: Vec::new(),

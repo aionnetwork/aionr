@@ -163,7 +163,7 @@ impl SyncMgr {
 
                 if active_nodes_count > 0 {
                     info!(target: "sync", "{:-^127}","");
-                    info!(target: "sync","              td         bn          bh                         addr                 rev      conn  seed  lst-req       m");
+                    info!(target: "sync","              td         bn          bh                         addr                 rev      conn  seed      lst-req          m");
                     info!(target: "sync", "{:-^127}","");
                     active_nodes.sort_by(|a, b| {
                         if a.target_total_difficulty != b.target_total_difficulty {
