@@ -76,7 +76,7 @@ impl BatchResult {
     pub fn unwrap(&self) -> Vec<Result<Executed, ExecutionError>> {
         match *self {
             BatchResult::Executed(ref x) => x.clone(),
-            BatchResult::Error(_) => vec![],
+            BatchResult::Error(ref e) => vec![Err(e.clone())],
         }
     }
 }
