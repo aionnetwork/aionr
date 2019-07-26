@@ -49,7 +49,7 @@ use client::{
 use encoded;
 use engines::{EpochTransition, EthEngine};
 use error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
-use executive::{contract_address, Executed, Executive};
+use executive::{contract_address, Executed, Executive, BatchResult};
 use factory::{Factories, VmFactory};
 use header::{BlockNumber, Header, Seal};
 use io::*;
@@ -1096,9 +1096,9 @@ impl Client {
             if aion040fork && for_local_avm(state, transaction) {
                 let avm_result = Executive::new(state, env_info, machine)
                     .transact_virtual_bulk(&[transaction.clone()], false);
-                match avm_result[0].clone() {
-                    Err(x) => return Err(x.into()),
-                    Ok(_) => ret = avm_result[0].clone().unwrap(),
+                match avm_result {
+                    BatchResult::Error(x) => return Err(From::from(x)).into(),
+                    BatchResult::Executed(r) => ret = r[0].clone().unwrap(),
                 }
             } else {
                 ret = Executive::new(state, env_info, machine)
