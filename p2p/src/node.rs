@@ -31,7 +31,6 @@ use states::STATE::CONNECTED;
 use states::STATE::DISCONNECTED;
 pub use super::msg::*;
 
-pub type Tx = mpsc::Sender<ChannelBuffer>;
 pub const HEADER_LENGTH: usize = 8;
 pub const NODE_ID_LENGTH: usize = 36;
 pub const PROTOCOL_LENGTH: usize = 6;
@@ -132,7 +131,7 @@ pub struct Node {
     pub last_request_num: u64,
     pub last_broadcast_timestamp: SystemTime,
     pub last_sent_transactions: HashSet<H256>,
-    pub tx: Option<Tx>,
+    pub tx: Option<mpsc::Sender<ChannelBuffer>>,
     pub is_from_boot_list: bool,
     pub repeated: u8,
     pub revision: [u8; MAX_REVISION_LENGTH],

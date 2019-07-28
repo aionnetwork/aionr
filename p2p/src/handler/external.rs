@@ -26,11 +26,11 @@ use Node;
 pub type Callback = fn(node: &mut Node, cb: ChannelBuffer);
 
 #[derive(Clone, Copy)]
-pub struct DefaultHandler {
+pub struct Handler {
     pub callback: Callback,
 }
 
-impl DefaultHandler {
+impl Handler {
     pub fn set_callback(&mut self, c: Callback) { self.callback = c; }
     pub fn handle(&self, node: &mut Node, cb: ChannelBuffer) { (self.callback)(node, cb); }
 }

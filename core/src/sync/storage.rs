@@ -338,11 +338,11 @@ impl SyncStorage {
         }
     }
 
-    pub fn clear_imported_block_hashes() {
-        if let Ok(ref mut imported_block_hashes) = IMPORTED_BLOCK_HASHES.get().lock() {
-            imported_block_hashes.clear();
-        }
-    }
+    // pub fn clear_imported_block_hashes() {
+    //     if let Ok(ref mut imported_block_hashes) = IMPORTED_BLOCK_HASHES.get().lock() {
+    //         imported_block_hashes.clear();
+    //     }
+    // }
 
     pub fn insert_imported_block_hashes(imported: Vec<H256>) {
         if let Ok(ref mut imported_block_hashes) = IMPORTED_BLOCK_HASHES.get().lock() {

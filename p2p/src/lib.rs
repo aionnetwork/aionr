@@ -56,7 +56,7 @@ use std::hash::{Hash, Hasher};
 use std::io;
 use std::net::Shutdown;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Mutex, RwLock};
+use std::sync::{Arc,Mutex,RwLock};
 use std::thread;
 use std::time::{Duration, Instant};
 use acore_bytes::to_hex;
@@ -68,7 +68,7 @@ use futures::sync::mpsc;
 use futures::{Future, Stream};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::prelude::*;
-use tokio::runtime::TaskExecutor;
+use tokio::runtime::{Runtime,TaskExecutor};
 use tokio::timer::Interval;
 use tokio_codec::{Decoder, Encoder, Framed};
 use tokio_threadpool::{Builder, ThreadPool};
@@ -77,7 +77,7 @@ use route::MODULE;
 use route::ACTION;
 use handler::handshake;
 use handler::active_nodes;
-use handler::external::DefaultHandler;
+use handler::external::Handler;
 use states::STATE::HANDSHAKEDONE;
 use states::STATE::ALIVE;
 use states::STATE::DISCONNECTED;
@@ -87,21 +87,87 @@ pub use node::*;
 pub use config::Config;
 
 lazy_static! {
+    static ref WORKERS: Storage<RwLock<Arc<Runtime>>> = Storage::new();
     static ref LOCAL_NODE: Storage<Node> = Storage::new();
     static ref NETWORK_CONFIG: Storage<Config> = Storage::new();
     static ref SOCKETS_MAP: Storage<Mutex<HashMap<u64, TcpStream>>> = Storage::new();
     static ref GLOBAL_NODES_MAP: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
     static ref ENABLED: Storage<AtomicBool> = Storage::new();
     static ref TP: Storage<ThreadPool> = Storage::new();
-    static ref DEFAULT_HANDLER: Storage<DefaultHandler> = Storage::new();
+    static ref HANDLERS: Storage<Handler> = Storage::new();
 }
 
 pub struct P2pMgr {
-    local: Node,
+    
 }
 
 impl P2pMgr {
+
+    pub fn register(handler: Handler){
+        HANDLERS.set(handler);
+    }
+
+    fn connect_peer(peer_node: Node) {
+        trace!(target: "net", "Try to connect to node {}", peer_node.get_ip_addr());
+        let node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
+        P2pMgr::remove_peer(node_hash);
+        P2pMgr::create_client(peer_node, Self::handle);
+    }
+
+    /// messages with module code other than p2p module
+    /// should flow into external handlers
+    fn handle(node: &mut Node, req: ChannelBuffer) {
+        match VERSION::from(req.head.ver) {
+            VERSION::V0 => {
+                match MODULE::from(req.head.ctrl) {
+                    MODULE::P2P => {
+                        match ACTION::from(req.head.action) {
+                            ACTION::DISCONNECT => {
+                                trace!(target: "net", "DISCONNECT received.");
+                            }
+                            ACTION::HANDSHAKEREQ => {
+                                handshake::receive_req(node, req);
+                            }
+                            ACTION::HANDSHAKERES => {
+                                handshake::receive_res(node, req);
+                            }
+                            ACTION::PING => {
+                                // ignore
+                            }
+                            ACTION::PONG => {
+                                // ignore
+                            }
+                            ACTION::ACTIVENODESREQ => {
+                                active_nodes::receive_req(node);
+                            }
+                            ACTION::ACTIVENODESRES => {
+                                active_nodes::receive_res(node, req);
+                            }
+                            _ => {
+                                error!(target: "net", "Invalid action {} received.", req.head.action);
+                            }
+                        };
+                    }
+                    MODULE::EXTERNAL => {
+                        trace!(target: "net", "P2P SYNC message received.");
+                        let handler = HANDLERS.get();
+                        handler.handle(node, req);
+                    }
+                }
+            }
+            VERSION::V1 => {
+                handshake::send(node);
+            }
+            _ => {
+                error!(target: "net", "invalid version code");
+            }
+        };
+    }
+
     pub fn enable(cfg: Config) {
+        
+        WORKERS.set(RwLock::new(Arc::new(Runtime::new().expect("Tokio Runtime"))));
+
         let sockets_map: HashMap<u64, TcpStream> = HashMap::new();
         SOCKETS_MAP.set(Mutex::new(sockets_map));
 
@@ -121,14 +187,87 @@ impl P2pMgr {
         );
 
         NETWORK_CONFIG.set(cfg);
+
+        thread::sleep(Duration::from_secs(5));
+        let rt = &WORKERS
+            .get()
+            .read()
+            .expect("get_executor")
+            .clone();
+        let executor = rt.executor();
+        let local_addr = P2pMgr::get_local_node().get_ip_addr();
+        P2pMgr::create_server(&executor, &local_addr, Self::handle);
+
+        let local_node = P2pMgr::get_local_node();
+        let local_node_id_hash = P2pMgr::calculate_hash(&local_node.get_node_id());
+        let network_config = P2pMgr::get_network_config();
+        let boot_nodes = P2pMgr::load_boot_nodes(network_config.boot_nodes.clone());
+        let max_peers_num = network_config.max_peers as usize;
+        let client_ip_black_list = network_config.ip_black_list.clone();
+        let sync_from_boot_nodes_only = network_config.sync_from_boot_nodes_only;
+
+        let connect_boot_nodes_task = Interval::new(
+            Instant::now(),
+            Duration::from_secs(RECONNECT_BOOT_NOEDS_INTERVAL),
+        ).for_each(move |_| {
+            for boot_node in boot_nodes.iter() {
+                let node_hash = P2pMgr::calculate_hash(&boot_node.get_node_id());
+                if let Some(node) = P2pMgr::get_node(node_hash) {
+                    if node.state_code == DISCONNECTED.value() {
+                        trace!(target: "net", "boot node reconnected: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
+                        Self::connect_peer(boot_node.clone());
+                    }
+                } else {
+                    trace!(target: "net", "boot node loaded: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
+                    Self::connect_peer(boot_node.clone());
+                }
+            }
+
+            Ok(())
+        }).map_err(|e| error!("interval errored; err={:?}", e));
+        executor.spawn(connect_boot_nodes_task);
+
+        let connect_normal_nodes_task = Interval::new(
+            Instant::now(),
+            Duration::from_secs(RECONNECT_NORMAL_NOEDS_INTERVAL),
+        )
+        .for_each(move |_| {
+            let active_nodes_count = P2pMgr::get_nodes_count(ALIVE.value());
+            if !sync_from_boot_nodes_only && active_nodes_count < max_peers_num {
+                if let Some(peer_node) = P2pMgr::get_an_inactive_node() {
+                    let peer_node_id_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
+                    if peer_node_id_hash != local_node_id_hash {
+                        let peer_ip = peer_node.ip_addr.get_ip();
+                        if !client_ip_black_list.contains(&peer_ip) {
+                            Self::connect_peer(peer_node);
+                        }
+                    }
+                };
+            }
+
+            Ok(())
+        })
+        .map_err(|e| error!("interval errored; err={:?}", e));
+        executor.spawn(connect_normal_nodes_task);
+
+        let activenodes_req_task = Interval::new(
+            Instant::now(),
+            Duration::from_secs(NODE_ACTIVE_REQ_INTERVAL),
+        )
+        .for_each(move |_| {
+            active_nodes::send();
+            Ok(())
+        })
+        .map_err(|e| error!("interval errored; err={:?}", e));
+        executor.spawn(activenodes_req_task);
+
     }
 
     pub fn create_server(
         executor: &TaskExecutor,
         local_addr: &String,
         handle: fn(node: &mut Node, req: ChannelBuffer),
-    )
-    {
+    ){
         if let Ok(addr) = local_addr.parse() {
             let listener = TcpListener::bind(&addr).expect("Failed to bind");
             let server = listener
@@ -291,7 +430,7 @@ impl P2pMgr {
         }
     }
 
-    fn get_tx(node_hash: u64) -> Option<Tx> {
+    fn get_tx(node_hash: u64) -> Option<mpsc::Sender<ChannelBuffer>> {
         if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
             if let Some(node) = nodes_map.get(&node_hash) {
                 return node.tx.clone();
@@ -601,169 +740,6 @@ impl P2pMgr {
 const RECONNECT_BOOT_NOEDS_INTERVAL: u64 = 10;
 const RECONNECT_NORMAL_NOEDS_INTERVAL: u64 = 1;
 const NODE_ACTIVE_REQ_INTERVAL: u64 = 10;
-
-#[derive(Clone, Copy)]
-pub struct NetManager;
-
-impl NetManager {
-    pub fn enable(executor: &TaskExecutor, handler: DefaultHandler) {
-        DEFAULT_HANDLER.set(handler);
-        Self::enable_p2p_server(executor);
-        Self::enable_p2p_clients(executor);
-        Self::enable_active_nodes_req_task(executor);
-    }
-
-    fn enable_p2p_server(executor: &TaskExecutor) {
-        thread::sleep(Duration::from_secs(5));
-        let local_addr = P2pMgr::get_local_node().get_ip_addr();
-        P2pMgr::create_server(&executor, &local_addr, Self::handle);
-    }
-
-    fn enable_p2p_clients(executor: &TaskExecutor) {
-        let local_node = P2pMgr::get_local_node();
-        let local_node_id_hash = P2pMgr::calculate_hash(&local_node.get_node_id());
-        let network_config = P2pMgr::get_network_config();
-        let boot_nodes = P2pMgr::load_boot_nodes(network_config.boot_nodes.clone());
-        let max_peers_num = network_config.max_peers as usize;
-        let client_ip_black_list = network_config.ip_black_list.clone();
-        let sync_from_boot_nodes_only = network_config.sync_from_boot_nodes_only;
-
-        Self::enable_clients_for_boot_nodes(executor, boot_nodes);
-        Self::enable_clients_for_normal_nodes(
-            executor,
-            local_node_id_hash,
-            max_peers_num,
-            client_ip_black_list,
-            sync_from_boot_nodes_only,
-        );
-    }
-
-    fn enable_clients_for_boot_nodes(executor: &TaskExecutor, boot_nodes: Vec<Node>) {
-        let connect_boot_nodes_task = Interval::new(
-            Instant::now(),
-            Duration::from_secs(RECONNECT_BOOT_NOEDS_INTERVAL),
-        ).for_each(move |_| {
-            for boot_node in boot_nodes.iter() {
-                let node_hash = P2pMgr::calculate_hash(&boot_node.get_node_id());
-                if let Some(node) = P2pMgr::get_node(node_hash) {
-                    if node.state_code == DISCONNECTED.value() {
-                        trace!(target: "net", "boot node reconnected: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
-                        Self::connect_peer(boot_node.clone());
-                    }
-                } else {
-                    trace!(target: "net", "boot node loaded: {}@{}", boot_node.get_node_id(), boot_node.get_ip_addr());
-                    Self::connect_peer(boot_node.clone());
-                }
-            }
-
-            Ok(())
-        })
-            .map_err(|e| error!("interval errored; err={:?}", e));
-        executor.spawn(connect_boot_nodes_task);
-    }
-
-    fn enable_clients_for_normal_nodes(
-        executor: &TaskExecutor,
-        local_node_id_hash: u64,
-        max_peers_num: usize,
-        client_ip_black_list: Vec<String>,
-        sync_from_boot_nodes_only: bool,
-    )
-    {
-        let connect_normal_nodes_task = Interval::new(
-            Instant::now(),
-            Duration::from_secs(RECONNECT_NORMAL_NOEDS_INTERVAL),
-        )
-        .for_each(move |_| {
-            let active_nodes_count = P2pMgr::get_nodes_count(ALIVE.value());
-            if !sync_from_boot_nodes_only && active_nodes_count < max_peers_num {
-                if let Some(peer_node) = P2pMgr::get_an_inactive_node() {
-                    let peer_node_id_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
-                    if peer_node_id_hash != local_node_id_hash {
-                        let peer_ip = peer_node.ip_addr.get_ip();
-                        if !client_ip_black_list.contains(&peer_ip) {
-                            Self::connect_peer(peer_node);
-                        }
-                    }
-                };
-            }
-
-            Ok(())
-        })
-        .map_err(|e| error!("interval errored; err={:?}", e));
-        executor.spawn(connect_normal_nodes_task);
-    }
-
-    fn connect_peer(peer_node: Node) {
-        trace!(target: "net", "Try to connect to node {}", peer_node.get_ip_addr());
-        let node_hash = P2pMgr::calculate_hash(&peer_node.get_node_id());
-        P2pMgr::remove_peer(node_hash);
-        P2pMgr::create_client(peer_node, Self::handle);
-    }
-
-    fn enable_active_nodes_req_task(executor: &TaskExecutor) {
-        let activenodes_req_task = Interval::new(
-            Instant::now(),
-            Duration::from_secs(NODE_ACTIVE_REQ_INTERVAL),
-        )
-        .for_each(move |_| {
-            active_nodes::send();
-            Ok(())
-        })
-        .map_err(|e| error!("interval errored; err={:?}", e));
-        executor.spawn(activenodes_req_task);
-    }
-
-    /// messages with module code other than p2p module
-    /// should flow into external handlers
-    fn handle(node: &mut Node, req: ChannelBuffer) {
-        match VERSION::from(req.head.ver) {
-            VERSION::V0 => {
-                match MODULE::from(req.head.ctrl) {
-                    MODULE::P2P => {
-                        match ACTION::from(req.head.action) {
-                            ACTION::DISCONNECT => {
-                                trace!(target: "net", "DISCONNECT received.");
-                            }
-                            ACTION::HANDSHAKEREQ => {
-                                handshake::receive_req(node, req);
-                            }
-                            ACTION::HANDSHAKERES => {
-                                handshake::receive_res(node, req);
-                            }
-                            ACTION::PING => {
-                                // ignore
-                            }
-                            ACTION::PONG => {
-                                // ignore
-                            }
-                            ACTION::ACTIVENODESREQ => {
-                                active_nodes::receive_req(node);
-                            }
-                            ACTION::ACTIVENODESRES => {
-                                active_nodes::receive_res(node, req);
-                            }
-                            _ => {
-                                error!(target: "net", "Invalid action {} received.", req.head.action);
-                            }
-                        };
-                    }
-                    MODULE::EXTERNAL => {
-                        trace!(target: "net", "P2P SYNC message received.");
-                        let handler = DEFAULT_HANDLER.get();
-                        handler.handle(node, req);
-                    }
-                }
-            }
-            VERSION::V1 => {
-                handshake::send(node);
-            }
-            _ => {
-                error!(target: "net", "invalid version code");
-            }
-        };
-    }
-}
 
 pub struct P2pCodec;
 

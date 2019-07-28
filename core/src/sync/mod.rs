@@ -44,9 +44,8 @@ use futures::Stream;
 use rlp::UntrustedRlp;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
-use p2p::handler::external::DefaultHandler;
+use p2p::handler::external::Handler;
 use p2p::P2pMgr;
-use p2p::NetManager;
 use p2p::Node;
 use p2p::ChannelBuffer;
 use p2p::Config;
@@ -357,15 +356,11 @@ impl Sync {
 
     pub fn start_network(&self) {
         let executor = SyncStorage::get_executor();
-        let sync_handler = DefaultHandler {
+        P2pMgr::register(Handler {
             callback: SyncMgr::handle,
-        };
-
+        });
         P2pMgr::enable(self.config.clone());
         debug!(target: "sync", "###### P2P enabled... ######");
-
-        NetManager::enable(&executor, sync_handler);
-        debug!(target: "sync", "###### network enabled... ######");
 
         SyncMgr::enable(&executor, self.config.max_peers);
         debug!(target: "sync", "###### sync enabled... ######");
