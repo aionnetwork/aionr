@@ -25,17 +25,23 @@ use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use rand::random;
 use byteorder::ReadBytesExt;
-use P2pMgr;
 use ChannelBuffer;
 use Node;
-use Event;
 use IP_LENGTH;
 use NODE_ID_LENGTH;
+use event::Event;
 use route::VERSION;
 use route::MODULE;
 use route::ACTION;
 use states::STATE::HANDSHAKEDONE;
 use states::STATE::DISCONNECTED;
+use super::super::send as p2p_send;
+use super::super::get_nodes;
+use super::super::get_node;
+use super::super::get_local_node;
+use super::super::add_node;
+use super::super::update_node;
+use super::super::calculate_hash;
 
 pub fn send() {
     let mut req = ChannelBuffer::new();
@@ -43,12 +49,12 @@ pub fn send() {
     req.head.ctrl = MODULE::P2P.value();
     req.head.action = ACTION::ACTIVENODESREQ.value();
     req.head.len = 0;
-    let handshaked_nodes = P2pMgr::get_nodes(HANDSHAKEDONE.value());
+    let handshaked_nodes = get_nodes(HANDSHAKEDONE.value());
     let handshaked_nodes_count = handshaked_nodes.len();
     if handshaked_nodes_count > 0 {
         let random_index = random::<usize>() % handshaked_nodes_count;
         let node = &handshaked_nodes[random_index];
-        P2pMgr::send(node.node_hash, req.clone());
+        p2p_send(node.node_hash, req.clone());
         trace!(target: "net", "send active nodes req");
     } else {
         trace!(target: "net", "Net no active node...");
@@ -65,7 +71,7 @@ pub fn receive_req(peer_node: &mut Node) {
     res.head.ctrl = MODULE::P2P.value();
     res.head.action = ACTION::ACTIVENODESRES.value();
 
-    let active_nodes = P2pMgr::get_nodes(HANDSHAKEDONE.value());
+    let active_nodes = get_nodes(HANDSHAKEDONE.value());
     let mut res_body = Vec::new();
     let active_nodes_count = active_nodes.len();
 
@@ -95,8 +101,8 @@ pub fn receive_req(peer_node: &mut Node) {
     res.head.len = res.body.len() as u32;
 
     Event::update_node_state(peer_node, Event::OnActiveNodesReq);
-    P2pMgr::update_node(peer_node_hash, peer_node);
-    P2pMgr::send(peer_node_hash, res);
+    update_node(peer_node_hash, peer_node);
+    p2p_send(peer_node_hash, res);
 }
 
 pub fn receive_res(peer_node: &mut Node, req: ChannelBuffer) {
@@ -118,12 +124,12 @@ pub fn receive_res(peer_node: &mut Node, req: ChannelBuffer) {
             node.ip_addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
             node.node_id.copy_from_slice(node_id);
             node.state_code = DISCONNECTED as u32;
-            node.node_hash = P2pMgr::calculate_hash(&node.get_node_id());
+            node.node_hash = calculate_hash(&node.get_node_id());
 
-            let local_node_ip = P2pMgr::get_local_node().ip_addr.ip;
-            let local_node_ip_hash = P2pMgr::calculate_hash(&local_node_ip);
-            let peer_node_ip_hash = P2pMgr::calculate_hash(&peer_node.ip_addr.ip);
-            let node_ip_hash = P2pMgr::calculate_hash(&node.ip_addr.ip);
+            let local_node_ip = get_local_node().ip_addr.ip;
+            let local_node_ip_hash = calculate_hash(&local_node_ip);
+            let peer_node_ip_hash = calculate_hash(&peer_node.ip_addr.ip);
+            let node_ip_hash = calculate_hash(&node.ip_addr.ip);
 
             if local_node_ip_hash != node_ip_hash && peer_node_ip_hash != node_ip_hash {
                 node_list.push(node);
@@ -134,13 +140,13 @@ pub fn receive_res(peer_node: &mut Node, req: ChannelBuffer) {
     }
 
     for n in node_list.iter() {
-        match P2pMgr::get_node(n.node_hash) {
+        match get_node(n.node_hash) {
             Some(_) => {}
             None => {
-                P2pMgr::add_node(n.clone());
+                add_node(n.clone());
             }
         }
     }
     Event::update_node_state(peer_node, Event::OnActiveNodesRes);
-    P2pMgr::update_node(peer_node_hash, peer_node);
+    update_node(peer_node_hash, peer_node);
 }

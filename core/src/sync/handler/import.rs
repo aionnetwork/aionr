@@ -24,8 +24,11 @@ use types::error::{BlockError, ImportError};
 use header::Seal;
 use views::BlockView;
 use aion_types::{H256, U256};
+use p2p::update_node_with_mode;
+use p2p::get_node;
+use p2p::get_nodes_count_all_modes;
+use p2p::remove_peer;
 use p2p::Mode;
-use p2p::P2pMgr;
 use sync::storage::SyncStorage;
 use sync::handler::headers;
 
@@ -80,7 +83,7 @@ pub fn import_blocks() {
     }
 
     for bw in bws.iter() {
-        if let Some(mut node) = P2pMgr::get_node(bw.node_id_hash) {
+        if let Some(mut node) = get_node(bw.node_id_hash) {
             blocks_to_import.clear();
             let mut max_block_number = 1;
             for block in bw.blocks.iter() {
@@ -90,14 +93,14 @@ pub fn import_blocks() {
                 } else if status == BlockStatus::Bad {
                     warn!(target: "sync", "Bad block {}, {:?}, got from node: {}@{}, mode: {}", block.header.number(), block.header.hash(), node.get_node_id(), node.get_ip_addr(), node.mode);
                     // node.mode = Mode::BACKWARD;
-                    // P2pMgr::update_node_with_mode(node.node_hash, &node);
+                    // update_node_with_mode(node.node_hash, &node);
                     break;
                 } else if max_block_number < block.header.number() {
                     max_block_number = block.header.number();
                 }
             }
 
-            if let Some(mut node) = P2pMgr::get_node(bw.node_id_hash) {
+            if let Some(mut node) = get_node(bw.node_id_hash) {
                 if blocks_to_import.is_empty() {
                     match node.mode {
                         Mode::BACKWARD => {
@@ -141,7 +144,7 @@ pub fn import_blocks() {
                                         _,
                                         lightning_nodes_count,
                                         thunder_nodes_count,
-                                    ) = P2pMgr::get_nodes_count_all_modes();
+                                    ) = get_nodes_count_all_modes();
                                     if normal_nodes_count == 0 {
                                         node.mode = Mode::NORMAL;
                                     } else if node.target_total_difficulty
@@ -163,7 +166,7 @@ pub fn import_blocks() {
                             }
                         }
                     }
-                    P2pMgr::update_node_with_mode(node.node_hash, &node);
+                    update_node_with_mode(node.node_hash, &node);
                     if node.mode == Mode::NORMAL || node.mode == Mode::THUNDER {
                         if SyncStorage::get_synced_block_number() + 8
                             < SyncStorage::get_network_best_block_number()
@@ -226,7 +229,7 @@ pub fn import_blocks() {
                                 Mode::BACKWARD => {
                                     info!(target: "sync", "Node: {}, found the fork point #{}, with status {:?}, switched to FORWARD mode", node.get_node_id(), number, status);
                                     node.mode = Mode::FORWARD;
-                                    P2pMgr::update_node_with_mode(node.node_hash, &node);
+                                    update_node_with_mode(node.node_hash, &node);
                                     // break;
                                 }
                                 Mode::FORWARD => {
@@ -241,7 +244,7 @@ pub fn import_blocks() {
                                     //   info!(target: "sync", "Node: {}, found the best block #{} with status {:?}, switched to NORMAL mode", node.get_node_id(), number, status);
                                     //   node.mode = Mode::NORMAL;
                                     // }
-                                    P2pMgr::update_node_with_mode(node.node_hash, &node);
+                                    update_node_with_mode(node.node_hash, &node);
                                     // break;
                                 }
                                 _ => {
@@ -256,7 +259,7 @@ pub fn import_blocks() {
                                             _,
                                             lightning_nodes_count,
                                             thunder_nodes_count,
-                                        ) = P2pMgr::get_nodes_count_all_modes();
+                                        ) = get_nodes_count_all_modes();
                                         if normal_nodes_count == 0 {
                                             node.mode = Mode::NORMAL;
                                         } else if node.target_total_difficulty
@@ -275,7 +278,7 @@ pub fn import_blocks() {
                                             node.mode = Mode::NORMAL;
                                         }
                                     }
-                                    P2pMgr::update_node_with_mode(node.node_hash, &node);
+                                    update_node_with_mode(node.node_hash, &node);
                                 }
                             }
                         }
@@ -325,7 +328,7 @@ pub fn import_blocks() {
                                         node.synced_block_num =
                                             client.chain_info().best_block_number;
                                         node.mode = Mode::THUNDER;
-                                        P2pMgr::update_node_with_mode(node.node_hash, &node);
+                                        update_node_with_mode(node.node_hash, &node);
                                     }
                                     break;
                                 }
@@ -336,7 +339,7 @@ pub fn import_blocks() {
                                 if node.target_total_difficulty
                                     < SyncStorage::get_network_total_diff()
                                 {
-                                    P2pMgr::remove_peer(node.node_hash);
+                                    remove_peer(node.node_hash);
                                 }
                                 match node.mode {
                                     Mode::LIGHTNING | Mode::THUNDER => {
@@ -352,7 +355,7 @@ pub fn import_blocks() {
                                         warn!(target: "sync", "Unknown block: #{}, node {} run in BACKWARD mode.", number, node.get_node_id());
                                     }
                                 }
-                                P2pMgr::update_node_with_mode(node.node_hash, &node);
+                                update_node_with_mode(node.node_hash, &node);
                                 break;
                             }
                         }
@@ -363,10 +366,10 @@ pub fn import_blocks() {
                                 node.mode = Mode::BACKWARD;
                                 client.clear_bad();
                                 node.inc_repeated();
-                                P2pMgr::update_node_with_mode(node.node_hash, &node);
+                                update_node_with_mode(node.node_hash, &node);
                             } else {
                                 warn!(target: "sync", "Bad block {:?} {:?}, remove peer node: {}@{}", hash, e, node.get_node_id(), node.get_ip_addr());
-                                P2pMgr::remove_peer(node.node_hash);
+                                remove_peer(node.node_hash);
                             }
                             break;
                         }

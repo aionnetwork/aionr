@@ -45,10 +45,17 @@ use rlp::UntrustedRlp;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use p2p::handler::external::Handler;
-use p2p::P2pMgr;
 use p2p::Node;
 use p2p::ChannelBuffer;
 use p2p::Config;
+use p2p::enable;
+use p2p::disable;
+use p2p::register;
+use p2p::get_nodes;
+use p2p::get_nodes_count;
+use p2p::get_all_nodes;
+use p2p::get_all_nodes_count;
+use p2p::get_local_node;
 use p2p::states::STATE::HANDSHAKEDONE;
 use p2p::states::STATE::CONNECTED;
 use p2p::states::STATE::ALIVE;
@@ -80,7 +87,7 @@ impl SyncMgr {
         let status_req_task =
             Interval::new(Instant::now(), Duration::from_secs(STATUS_REQ_INTERVAL))
                 .for_each(move |_| {
-                    let active_nodes = P2pMgr::get_nodes(ALIVE.value());
+                    let active_nodes = get_nodes(ALIVE.value());
                     for node in active_nodes.iter() {
                         trace!(target: "sync", "Sync status req sent...");
                         status::send(node.node_hash);
@@ -125,18 +132,18 @@ impl SyncMgr {
 
         let statics_task = Interval::new(Instant::now(), Duration::from_secs(STATICS_INTERVAL))
             .for_each(move |_| {
-                // let connected_nodes = P2pMgr::get_nodes(CONNECTED.value());
+                // let connected_nodes = get_nodes(CONNECTED.value());
                 // for node in connected_nodes.iter() {
                 //     if node.mode == Mode::BACKWARD || node.mode == Mode::FORWARD {
                 //         if node.target_total_difficulty < SyncStorage::get_network_total_diff() {
-                //             P2pMgr::remove_peer(node.node_hash);
+                //             remove_peer(node.node_hash);
                 //         }
                 //     } else if node.last_request_timestamp
                 //         + Duration::from_secs(STATICS_INTERVAL * 12)
                 //         < SystemTime::now()
                 //     {
                 //         info!(target: "sync", "Disconnect with idle node: {}@{}.", node.get_node_id(), node.get_ip_addr());
-                //         P2pMgr::remove_peer(node.node_hash);
+                //         remove_peer(node.node_hash);
                 //     }
                 // }
 
@@ -144,7 +151,7 @@ impl SyncMgr {
                 let block_number_last_time = SyncStorage::get_synced_block_number_last_time();
                 let block_number_now = chain_info.best_block_number;
                 let sync_speed = (block_number_now - block_number_last_time) / STATICS_INTERVAL;
-                let mut active_nodes = P2pMgr::get_nodes(ALIVE.value());
+                let mut active_nodes = get_nodes(ALIVE.value());
                 let active_nodes_count = active_nodes.len();
 
                 info!(target: "sync", "");
@@ -155,8 +162,8 @@ impl SyncMgr {
                 info!(target: "sync", "       sync:{:>11} blks/sec", sync_speed);
                 info!(target: "sync",
                     "total/connected/active peers: {}/{}/{}",
-                    P2pMgr::get_all_nodes_count(),
-                    P2pMgr::get_nodes_count(CONNECTED.value()),
+                    get_all_nodes_count(),
+                    get_nodes_count(CONNECTED.value()),
                     active_nodes_count,
                 );
 
@@ -215,13 +222,13 @@ impl SyncMgr {
                         SyncStorage::get_chain_info().best_block_number,
                     );
                     // let abnormal_mode_nodes_count =
-                    //     P2pMgr::get_nodes_count_with_mode(Mode::BACKWARD)
-                    //         + P2pMgr::get_nodes_count_with_mode(Mode::FORWARD);
+                    //     get_nodes_count_with_mode(Mode::BACKWARD)
+                    //         + get_nodes_count_with_mode(Mode::FORWARD);
                     // if abnormal_mode_nodes_count > (active_nodes_count / 5)
                     //     || active_nodes_count == 0
                     // {
                     //     info!(target: "sync", "Abnormal status, reseting network...");
-                    //     P2pMgr::reset();
+                    //     reset();
 
                     //     SyncStorage::clear_imported_block_hashes();
                     //     SyncStorage::clear_staged_blocks();
@@ -243,13 +250,13 @@ impl SyncMgr {
                 //         SyncStorage::get_chain_info().best_block_number,
                 //     );
                 //     let abnormal_mode_nodes_count =
-                //         P2pMgr::get_nodes_count_with_mode(Mode::BACKWARD)
-                //             + P2pMgr::get_nodes_count_with_mode(Mode::FORWARD);
+                //         get_nodes_count_with_mode(Mode::BACKWARD)
+                //             + get_nodes_count_with_mode(Mode::FORWARD);
                 //     if abnormal_mode_nodes_count > (active_nodes_count / 5)
                 //         || active_nodes_count == 0
                 //     {
                 //         info!(target: "sync", "Abnormal status, reseting network...");
-                //         P2pMgr::reset();
+                //         reset();
 
                 //         SyncStorage::clear_imported_block_hashes();
                 //         SyncStorage::clear_staged_blocks();
@@ -356,10 +363,10 @@ impl Sync {
 
     pub fn start_network(&self) {
         let executor = SyncStorage::get_executor();
-        P2pMgr::register(Handler {
+        register(Handler {
             callback: SyncMgr::handle,
         });
-        P2pMgr::enable(self.config.clone());
+        enable(self.config.clone());
         debug!(target: "sync", "###### P2P enabled... ######");
 
         SyncMgr::enable(&executor, self.config.max_peers);
@@ -368,7 +375,7 @@ impl Sync {
 
     pub fn stop_network(&self) {
         SyncMgr::disable();
-        P2pMgr::disable();
+        disable();
     }
 }
 
@@ -402,7 +409,7 @@ impl SyncProvider for Sync {
             highest_block_number: { Some(SyncStorage::get_network_best_block_number()) },
             blocks_received: 0,
             blocks_total: 0,
-            num_peers: { P2pMgr::get_nodes_count(ALIVE.value()) },
+            num_peers: { get_nodes_count(ALIVE.value()) },
             num_active_peers: 0,
         }
     }
@@ -410,7 +417,7 @@ impl SyncProvider for Sync {
     /// Get sync peers
     fn peers(&self) -> Vec<PeerInfo> {
         let mut peer_info_list = Vec::new();
-        let peer_nodes = P2pMgr::get_all_nodes();
+        let peer_nodes = get_all_nodes();
         for peer in peer_nodes.iter() {
             let peer_info = PeerInfo {
                 id: Some(peer.get_node_id()),
@@ -420,12 +427,12 @@ impl SyncProvider for Sync {
         peer_info_list
     }
 
-    fn enode(&self) -> Option<String> { Some(P2pMgr::get_local_node().get_node_id()) }
+    fn enode(&self) -> Option<String> { Some(get_local_node().get_node_id()) }
 
     fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats> { BTreeMap::new() }
 
     fn active(&self) -> Vec<ActivePeerInfo> {
-        let ac_nodes = P2pMgr::get_nodes(ALIVE.value());
+        let ac_nodes = get_nodes(ALIVE.value());
         ac_nodes
             .into_iter()
             .map(|node| {
@@ -451,7 +458,7 @@ impl ChainNotify for Sync {
         _duration: u64,
     )
     {
-        if P2pMgr::get_all_nodes_count() == 0 {
+        if get_all_nodes_count() == 0 {
             return;
         }
 

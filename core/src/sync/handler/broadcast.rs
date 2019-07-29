@@ -29,7 +29,11 @@ use transaction::UnverifiedTransaction;
 use aion_types::H256;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
-use p2p::*;
+use p2p::ChannelBuffer;
+use p2p::Node;
+use p2p::get_nodes;
+use p2p::update_node;
+use p2p::send;
 use p2p::states::STATE::ALIVE;
 use sync::route::VERSION;
 use sync::route::MODULE;
@@ -53,7 +57,7 @@ pub fn propagate_transactions() {
         return;
     }
 
-    let active_nodes = P2pMgr::get_nodes(ALIVE.value());
+    let active_nodes = get_nodes(ALIVE.value());
 
     if active_nodes.len() > 0 {
         let mut req = ChannelBuffer::new();
@@ -69,7 +73,7 @@ pub fn propagate_transactions() {
 
         let mut node_count = 0;
         for node in active_nodes.iter() {
-            P2pMgr::send(node.node_hash, req.clone());
+            send(node.node_hash, req.clone());
             trace!(target: "sync", "Sync broadcast new transactions sent...");
             node_count += 1;
             if node_count > 10 {
@@ -84,7 +88,7 @@ pub fn propagate_transactions() {
 
 pub fn propagate_blocks(block_hash: &H256, client: Arc<BlockChainClient>) {
     // broadcast new blocks
-    let active_nodes = P2pMgr::get_nodes(ALIVE.value());
+    let active_nodes = get_nodes(ALIVE.value());
 
     if active_nodes.len() > 0 {
         let mut req = ChannelBuffer::new();
@@ -98,7 +102,7 @@ pub fn propagate_blocks(block_hash: &H256, client: Arc<BlockChainClient>) {
             req.head.len = req.body.len() as u32;
 
             for node in active_nodes.iter() {
-                P2pMgr::send(node.node_hash, req.clone());
+                send(node.node_hash, req.clone());
                 trace!(target: "sync", "Sync broadcast new block sent...");
             }
         }
@@ -142,11 +146,11 @@ pub fn receive_block(node: &mut Node, req: ChannelBuffer) {
                                 Ok(_) => {
                                     trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
                                     imported_block_hashes.insert(hash, 0);
-                                    let active_nodes = P2pMgr::get_nodes(ALIVE.value());
+                                    let active_nodes = get_nodes(ALIVE.value());
                                     for n in active_nodes.iter() {
                                         // broadcast new block
                                         trace!(target: "sync", "Sync broadcast new block sent...");
-                                        P2pMgr::send(n.node_hash, req.clone());
+                                        send(n.node_hash, req.clone());
                                     }
                                 }
                                 Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
@@ -213,5 +217,5 @@ pub fn receive_tx(node: &mut Node, req: ChannelBuffer) {
     }
 
     SyncEvent::update_node_state(node, SyncEvent::OnBroadCastTx);
-    P2pMgr::update_node(node.node_hash, node);
+    update_node(node.node_hash, node);
 }

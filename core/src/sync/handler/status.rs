@@ -30,8 +30,11 @@ use sync::route::ACTION;
 use sync::event::SyncEvent;
 use sync::storage::SyncStorage;
 use sync::handler::headers;
-use p2p::P2pMgr;
+use p2p::send as p2p_send;
+use p2p::update_node;
 use p2p::ChannelBuffer;
+use p2p::get_network_config;
+use p2p::get_an_active_node;
 use p2p::Node;
 use p2p::Mode;
 
@@ -43,7 +46,7 @@ pub fn send(node_hash: u64) {
     req.head.ctrl = MODULE::SYNC.value();
     req.head.action = ACTION::STATUSREQ.value();
     req.head.len = 0;
-    P2pMgr::send(node_hash, req);
+    p2p_send(node_hash, req);
 }
 
 pub fn receive_req(node: &mut Node) {
@@ -79,8 +82,8 @@ pub fn receive_req(node: &mut Node) {
     res.body.put_slice(res_body.as_slice());
     res.head.len = res.body.len() as u32;
     SyncEvent::update_node_state(node, SyncEvent::OnStatusReq);
-    P2pMgr::update_node(node_hash, node);
-    P2pMgr::send(node_hash, res);
+    update_node(node_hash, node);
+    p2p_send(node_hash, res);
 }
 
 pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
@@ -104,7 +107,7 @@ pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
     }
     node.target_total_difficulty = U256::from(total_difficulty);
     SyncEvent::update_node_state(node, SyncEvent::OnStatusRes);
-    P2pMgr::update_node(node_hash, node);
+    update_node(node_hash, node);
 
     SyncStorage::update_network_status(
         node.best_block_num,
@@ -112,7 +115,7 @@ pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
         node.target_total_difficulty,
     );
 
-    let sync_from_boot_nodes_only = P2pMgr::get_network_config().sync_from_boot_nodes_only;
+    let sync_from_boot_nodes_only = get_network_config().sync_from_boot_nodes_only;
     if sync_from_boot_nodes_only {
         if !node.is_from_boot_list {
             return;
@@ -121,9 +124,9 @@ pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
 
     if SyncStorage::get_network_best_block_number() <= SyncStorage::get_synced_block_number() {
         node.last_request_timestamp = SystemTime::now();
-        P2pMgr::update_node(node.node_hash, node);
+        update_node(node.node_hash, node);
     } else {
-        if let Some(mut node) = P2pMgr::get_an_active_node() {
+        if let Some(mut node) = get_an_active_node() {
             if node.synced_block_num == 0 {
                 node.synced_block_num = SyncStorage::get_synced_block_number() + 1;
             }
@@ -133,7 +136,7 @@ pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
 
     // if SyncStorage::get_network_best_block_number() <= SyncStorage::get_synced_block_number() {
     //     node.last_request_timestamp = SystemTime::now();
-    //     P2pMgr::update_node(node.node_hash, node);
+    //     update_node(node.node_hash, node);
     // } else {
     //     BlockHeadersHandler::get_headers_from_random_node();
     // }
@@ -142,7 +145,7 @@ pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
     // ------
     // if node.target_total_difficulty <= node.current_total_difficulty {
     //     node.last_request_timestamp = SystemTime::now();
-    //     P2pMgr::update_node(node.node_hash, node);
+    //     update_node(node.node_hash, node);
     // } else {
     //     BlockHeadersHandler::get_headers_from_node(node);
     // }

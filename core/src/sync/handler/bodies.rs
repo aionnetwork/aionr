@@ -26,10 +26,11 @@ use aion_types::H256;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use std::time::SystemTime;
-use p2p::P2pMgr;
 use p2p::ChannelBuffer;
 use p2p::Node;
 use p2p::Mode;
+use p2p::send as p2p_send;
+use p2p::update_node;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
@@ -77,7 +78,7 @@ pub fn send() {
                 if !headers_with_bodies_requested.contains_key(&hw.node_hash) {
                     req.head.len = body_len as u32;
 
-                    P2pMgr::send(hw.node_hash, req);
+                    p2p_send(hw.node_hash, req);
 
                     trace!(target: "sync", "Sync blocks bodies req sent...");
                     let mut hw = hw.clone();
@@ -131,8 +132,8 @@ pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
     res.head.len = res.body.len() as u32;
 
     SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
-    P2pMgr::update_node(node_hash, node);
-    P2pMgr::send(node_hash, res);
+    update_node(node_hash, node);
+    p2p_send(node_hash, res);
 }
 
 pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
@@ -261,5 +262,5 @@ pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
     }
 
     SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesRes);
-    P2pMgr::update_node(node_hash, node);
+    update_node(node_hash, node);
 }

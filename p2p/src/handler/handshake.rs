@@ -25,23 +25,31 @@ use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
 use version::short_version;
-use P2pMgr;
 use ChannelBuffer;
 use Node;
-use Event;
 use MAX_REVISION_LENGTH;
 use IP_LENGTH;
 use NODE_ID_LENGTH;
 use REVISION_PREFIX;
+use event::Event;
 use route::VERSION;
 use route::MODULE;
 use route::ACTION;
+use super::super::send as p2p_send;
+use super::super::get_local_node;
+use super::super::get_network_config;
+use super::super::update_node;
+use super::super::calculate_hash;
+use super::super::is_connected;
+use super::super::get_peer;
+use super::super::add_peer;
+use super::super::remove_peer;
 
 //TODO: remove it
 const VERSION: &str = "02";
 
 pub fn send(node: &mut Node) {
-    let local_node = P2pMgr::get_local_node();
+    let local_node = get_local_node();
     let mut req = ChannelBuffer::new();
     req.head.ver = VERSION::V0.value();
     req.head.ctrl = MODULE::P2P.value();
@@ -64,15 +72,13 @@ pub fn send(node: &mut Node) {
     req.body.put_slice(revision.as_bytes());
     req.body.push((VERSION.len() / 2) as u8);
     req.body.put_slice(VERSION.as_bytes());
-
     req.head.len = req.body.len() as u32;
 
     // handshake req
     trace!(target: "net", "Net handshake req sent...");
-    P2pMgr::send(node.node_hash, req.clone());
+    p2p_send(node.node_hash, req.clone());
     node.inc_repeated();
-
-    P2pMgr::update_node(node.node_hash, node);
+    update_node(node.node_hash, node);
 }
 
 pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
@@ -81,7 +87,7 @@ pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
     let (node_id, req_body_rest) = req.body.split_at(NODE_ID_LENGTH);
     let (mut net_id, req_body_rest) = req_body_rest.split_at(mem::size_of::<i32>());
     let peer_net_id = net_id.read_u32::<BigEndian>().unwrap_or(0);
-    let local_net_id = P2pMgr::get_network_config().net_id;
+    let local_net_id = get_network_config().net_id;
     if peer_net_id != local_net_id {
         warn!(target: "net", "Invalid net id {}, should be {}.", peer_net_id, local_net_id);
         return;
@@ -119,19 +125,19 @@ pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
     res.head.len = res.body.len() as u32;
 
     let old_node_hash = node.node_hash;
-    let node_id_hash = P2pMgr::calculate_hash(&node.get_node_id());
+    let node_id_hash = calculate_hash(&node.get_node_id());
     node.node_hash = node_id_hash;
-    if P2pMgr::is_connected(node_id_hash) {
+    if is_connected(node_id_hash) {
         trace!(target: "net", "known node {}@{} ...", node.get_node_id(), node.get_ip_addr());
     } else {
         Event::update_node_state(node, Event::OnHandshakeReq);
-        if let Some(socket) = P2pMgr::get_peer(old_node_hash) {
-            P2pMgr::add_peer(node.clone(), &socket);
+        if let Some(socket) = get_peer(old_node_hash) {
+            add_peer(node.clone(), &socket);
         }
     }
 
-    P2pMgr::send(node.node_hash, res);
-    P2pMgr::remove_peer(old_node_hash);
+    p2p_send(node.node_hash, res);
+    remove_peer(old_node_hash);
 }
 
 pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
@@ -148,5 +154,5 @@ pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
     }
 
     Event::update_node_state(node, Event::OnHandshakeRes);
-    P2pMgr::update_node(node.node_hash, node);
+    update_node(node.node_hash, node);
 }

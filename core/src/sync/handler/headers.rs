@@ -28,10 +28,12 @@ use acore_bytes::to_hex;
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
-use p2p::P2pMgr;
 use p2p::ChannelBuffer;
 use p2p::Node;
 use p2p::Mode;
+use p2p::get_network_config;
+use p2p::send;
+use p2p::update_node;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
@@ -45,7 +47,7 @@ const LARGE_REQUEST_SIZE: u64 = 48;
 pub fn get_headers_from_node(node: &mut Node) {
     trace!(target: "sync", "get_headers_from_node, node id: {}", node.get_node_id());
 
-    if P2pMgr::get_network_config().sync_from_boot_nodes_only && !node.is_from_boot_list {
+    if get_network_config().sync_from_boot_nodes_only && !node.is_from_boot_list {
         return;
     }
 
@@ -129,7 +131,7 @@ pub fn get_headers_from_node(node: &mut Node) {
         debug!(target: "sync", "request headers: from number: {}, node: {}, sn: {}, mode: {}.", from, node.get_ip_addr(), node.synced_block_num, node.mode);
 
         send_blocks_headers_req(node.node_hash, from, size as u32);
-        P2pMgr::update_node(node.node_hash, node);
+        update_node(node.node_hash, node);
     }
 }
 
@@ -149,7 +151,7 @@ fn send_blocks_headers_req(node_hash: u64, from: u64, size: u32) {
 
     req.head.len = req.body.len() as u32;
 
-    P2pMgr::send(node_hash, req);
+    send(node_hash, req);
 }
 
 pub fn handle_blocks_headers_req(node: &mut Node, req: ChannelBuffer) {
@@ -197,8 +199,8 @@ pub fn handle_blocks_headers_req(node: &mut Node, req: ChannelBuffer) {
     res.head.len = res.body.len() as u32;
 
     SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersReq);
-    P2pMgr::update_node(node_hash, node);
-    P2pMgr::send(node_hash, res);
+    update_node(node_hash, node);
+    send(node_hash, res);
 }
 
 pub fn handle_blocks_headers_res(node: &mut Node, req: ChannelBuffer) {
@@ -268,5 +270,5 @@ pub fn handle_blocks_headers_res(node: &mut Node, req: ChannelBuffer) {
     }
 
     SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
-    P2pMgr::update_node(node_hash, node);
+    update_node(node_hash, node);
 }

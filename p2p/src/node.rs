@@ -127,6 +127,8 @@ pub struct Node {
     pub target_total_difficulty: U256,
     pub current_total_difficulty: U256,
     pub mode: Mode,
+
+    // TODO: move to sync
     pub last_request_timestamp: SystemTime,
     pub last_request_num: u64,
     pub last_broadcast_timestamp: SystemTime,
