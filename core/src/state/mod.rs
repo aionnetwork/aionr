@@ -34,7 +34,7 @@ use std::sync::Arc;
 
 use error::Error;
 use executed::{Executed, ExecutionError};
-use executive::Executive;
+use executive::{Executive, BatchResult};
 use factory::Factories;
 use factory::VmFactory;
 use machine::EthereumMachine as Machine;
@@ -780,7 +780,9 @@ impl<B: Backend> State<B> {
         txs: &[SignedTransaction],
     ) -> Vec<ApplyResult>
     {
-        let exec_results = self.execute_bulk(env_info, machine, txs, false, false);
+        let exec_results = self
+            .execute_bulk(env_info, machine, txs, false, false)
+            .unwrap();
 
         let mut receipts = Vec::new();
         for result in exec_results {
@@ -817,7 +819,7 @@ impl<B: Backend> State<B> {
         txs: &[SignedTransaction],
         check_nonce: bool,
         virt: bool,
-    ) -> Vec<Result<Executed, ExecutionError>>
+    ) -> BatchResult
     {
         let mut e = Executive::new(self, env_info, machine);
 

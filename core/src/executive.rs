@@ -67,6 +67,20 @@ lazy_static! {
     static ref AVM_LOCK: Mutex<bool> = Mutex::new(false);
 }
 
+pub enum BatchResult {
+    Executed(Vec<Result<Executed, ExecutionError>>),
+    Error(ExecutionError),
+}
+
+impl BatchResult {
+    pub fn unwrap(&self) -> Vec<Result<Executed, ExecutionError>> {
+        match *self {
+            BatchResult::Executed(ref x) => x.clone(),
+            BatchResult::Error(ref e) => vec![Err(e.clone())],
+        }
+    }
+}
+
 /// Returns new address created from address, nonce
 pub fn contract_address(sender: &Address, nonce: &U256) -> (Address, Option<H256>) {
     use rlp::RlpStream;
@@ -174,7 +188,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         &'a mut self,
         txs: &[SignedTransaction],
         check_nonce: bool,
-    ) -> Vec<Result<Executed, ExecutionError>>
+    ) -> BatchResult
     {
         self.transact_bulk(txs, check_nonce, true)
     }
@@ -185,7 +199,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         txs: &[SignedTransaction],
         _check_nonce: bool,
         is_local_call: bool,
-    ) -> Vec<Result<Executed, ExecutionError>>
+    ) -> BatchResult
     {
         let _vm_lock = AVM_LOCK.lock().unwrap();
         let mut vm_params = Vec::new();
@@ -206,6 +220,15 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                             .add_balance(&sender, &(needed_balance), CleanupMode::NoEmpty);
                 }
                 debug!(target: "vm", "sender: {:?}, balance: {:?}", sender, self.state.balance(&sender).unwrap_or(0.into()));
+            } else {
+                // check gas limit
+                if self.info.gas_used + t.gas > self.info.gas_limit {
+                    return BatchResult::Error(ExecutionError::BlockGasLimitReached {
+                        gas_limit: self.info.gas_limit,
+                        gas_used: self.info.gas_used,
+                        gas: t.gas,
+                    });
+                }
             }
 
             // Transactions are now handled in different ways depending on whether it's
@@ -800,7 +823,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         txs: &[SignedTransaction],
         substates: &[Substate],
         results: Vec<ExecutionResult>,
-    ) -> Vec<Result<Executed, ExecutionError>>
+    ) -> BatchResult
     {
         assert_eq!(txs.len(), results.len());
 
@@ -844,7 +867,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             }))
         }
 
-        return final_results;
+        return BatchResult::Executed(final_results);
     }
 
     /// Finalizes the transaction (does refunds and suicides).
