@@ -88,10 +88,10 @@ pub use config::Config;
 
 lazy_static! {
     static ref WORKERS: Storage<RwLock<Arc<Runtime>>> = Storage::new();
-    static ref LOCAL_NODE: Storage<Node> = Storage::new();
-    static ref NETWORK_CONFIG: Storage<Config> = Storage::new();
-    static ref SOCKETS_MAP: Storage<Mutex<HashMap<u64, TcpStream>>> = Storage::new();
-    static ref GLOBAL_NODES_MAP: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
+    static ref LOCAL: Storage<Node> = Storage::new();
+    static ref CONFIG: Storage<Config> = Storage::new();
+    static ref SOCKETS: Storage<Mutex<HashMap<u64, TcpStream>>> = Storage::new();
+    static ref NODES: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
     static ref ENABLED: Storage<AtomicBool> = Storage::new();
     static ref TP: Storage<ThreadPool> = Storage::new();
     static ref HANDLERS: Storage<Handler> = Storage::new();
@@ -161,12 +161,14 @@ fn handle(node: &mut Node, req: ChannelBuffer) {
 }
 
 pub fn enable(cfg: Config) {
+
     WORKERS.set(RwLock::new(Arc::new(
         Runtime::new().expect("Tokio Runtime"),
     )));
 
-    let sockets_map: HashMap<u64, TcpStream> = HashMap::new();
-    SOCKETS_MAP.set(Mutex::new(sockets_map));
+    SOCKETS.set(Mutex::new(
+        HashMap::new()
+    ));
 
     let local_node_str = cfg.local_node.clone();
     let mut local_node = Node::new_with_node_str(local_node_str);
@@ -174,7 +176,7 @@ pub fn enable(cfg: Config) {
     local_node.net_id = cfg.net_id;
     info!(target: "net", "        node: {}@{}", local_node.get_node_id(), local_node.get_ip_addr());
 
-    LOCAL_NODE.set(local_node.clone());
+    LOCAL.set(local_node.clone());
     ENABLED.set(AtomicBool::new(true));
 
     TP.set(
@@ -183,7 +185,7 @@ pub fn enable(cfg: Config) {
             .build(),
     );
 
-    NETWORK_CONFIG.set(cfg);
+    CONFIG.set(cfg);
 
     thread::sleep(Duration::from_secs(5));
     let rt = &WORKERS.get().read().expect("get_executor").clone();
@@ -193,11 +195,11 @@ pub fn enable(cfg: Config) {
 
     let local_node = get_local_node();
     let local_node_id_hash = calculate_hash(&local_node.get_node_id());
-    let network_config = get_network_config();
-    let boot_nodes = load_boot_nodes(network_config.boot_nodes.clone());
-    let max_peers_num = network_config.max_peers as usize;
-    let client_ip_black_list = network_config.ip_black_list.clone();
-    let sync_from_boot_nodes_only = network_config.sync_from_boot_nodes_only;
+    let config = get_config();
+    let boot_nodes = load_boot_nodes(config.boot_nodes.clone());
+    let max_peers_num = config.max_peers as usize;
+    let client_ip_black_list = config.ip_black_list.clone();
+    let sync_from_boot_nodes_only = config.sync_from_boot_nodes_only;
 
     let connect_boot_nodes_task = Interval::new(
         Instant::now(),
@@ -311,7 +313,7 @@ pub fn create_client(peer_node: Node, handle: fn(node: &mut Node, req: ChannelBu
 
 pub fn get_thread_pool() -> &'static ThreadPool { TP.get() }
 
-pub fn get_network_config() -> &'static Config { NETWORK_CONFIG.get() }
+pub fn get_config() -> &'static Config { CONFIG.get() }
 
 pub fn load_boot_nodes(boot_nodes_str: Vec<String>) -> Vec<Node> {
     let mut boot_nodes = Vec::new();
@@ -325,7 +327,7 @@ pub fn load_boot_nodes(boot_nodes_str: Vec<String>) -> Vec<Node> {
     boot_nodes
 }
 
-pub fn get_local_node() -> &'static Node { LOCAL_NODE.get() }
+pub fn get_local_node() -> &'static Node { LOCAL.get() }
 
 pub fn disable() {
     ENABLED.get().store(false, Ordering::SeqCst);
@@ -333,43 +335,43 @@ pub fn disable() {
 }
 
 pub fn reset() {
-    if let Ok(mut sockets_map) = SOCKETS_MAP.get().lock() {
-        for (_, socket) in sockets_map.iter_mut() {
+    if let Ok(mut sockets) = SOCKETS.get().lock() {
+        for (_, socket) in sockets.iter_mut() {
             if let Err(e) = socket.shutdown() {
                 error!(target: "net", "Invalid socket， {}", e);
             }
         }
     }
-    if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
+    if let Ok(mut nodes_map) = NODES.write() {
         nodes_map.clear();
     }
 }
 
 pub fn get_peer(node_hash: u64) -> Option<TcpStream> {
-    if let Ok(mut socktes_map) = SOCKETS_MAP.get().lock() {
+    if let Ok(mut socktes_map) = SOCKETS.get().lock() {
         return socktes_map.remove(&node_hash);
     }
 
     None
 }
 
-pub fn add_peer(node: Node, ref_socket: &TcpStream) {
-    if let Ok(socket) = ref_socket.try_clone() {
-        if let Ok(mut sockets_map) = SOCKETS_MAP.get().lock() {
-            match sockets_map.get(&node.node_hash) {
+pub fn add_peer(node: Node, socket: &TcpStream) {
+    if let Ok(socket) = socket.try_clone() {
+        if let Ok(mut sockets) = SOCKETS.get().lock() {
+            match sockets.get(&node.node_hash) {
                 Some(_) => {
                     warn!(target: "net", "Known node, ...");
                 }
                 None => {
-                    if let Ok(mut peer_nodes) = GLOBAL_NODES_MAP.write() {
-                        let max_peers_num = NETWORK_CONFIG.get().max_peers as usize;
+                    if let Ok(mut peer_nodes) = NODES.write() {
+                        let max_peers_num = CONFIG.get().max_peers as usize;
                         if peer_nodes.len() < max_peers_num {
                             match peer_nodes.get(&node.node_hash) {
                                 Some(_) => {
                                     warn!(target: "net", "Known node...");
                                 }
                                 None => {
-                                    sockets_map.insert(node.node_hash, socket);
+                                    sockets.insert(node.node_hash, socket);
                                     peer_nodes.insert(node.node_hash, node);
                                     return;
                                 }
@@ -381,20 +383,20 @@ pub fn add_peer(node: Node, ref_socket: &TcpStream) {
         }
     }
 
-    if let Err(e) = ref_socket.shutdown(Shutdown::Both) {
+    if let Err(e) = socket.shutdown(Shutdown::Both) {
         error!(target: "net", "{}", e);
     }
 }
 
 pub fn remove_peer(node_hash: u64) -> Option<Node> {
-    if let Ok(mut sockets_map) = SOCKETS_MAP.get().lock() {
-        if let Some(socket) = sockets_map.remove(&node_hash) {
+    if let Ok(mut sockets) = SOCKETS.get().lock() {
+        if let Some(socket) = sockets.remove(&node_hash) {
             if let Err(e) = socket.shutdown(Shutdown::Both) {
                 trace!(target: "net", "remove_peer， invalid socket， {}", e);
             }
         }
     }
-    if let Ok(mut peer_nodes) = GLOBAL_NODES_MAP.write() {
+    if let Ok(mut peer_nodes) = NODES.write() {
         // if let Some(node) = peer_nodes.remove(&node_hash) {
         //     info!(target: "p2p", "Node {}@{} removed.", node.get_node_id(), node.get_ip_addr());
         //     return Some(node);
@@ -407,8 +409,8 @@ pub fn remove_peer(node_hash: u64) -> Option<Node> {
 }
 
 pub fn add_node(node: Node) {
-    let max_peers_num = NETWORK_CONFIG.get().max_peers as usize;
-    if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
+    let max_peers_num = CONFIG.get().max_peers as usize;
+    if let Ok(mut nodes_map) = NODES.write() {
         if nodes_map.len() < max_peers_num {
             match nodes_map.get(&node.node_hash) {
                 Some(_) => {
@@ -423,15 +425,6 @@ pub fn add_node(node: Node) {
     }
 }
 
-fn get_tx(node_hash: u64) -> Option<mpsc::Sender<ChannelBuffer>> {
-    if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
-        if let Some(node) = nodes_map.get(&node_hash) {
-            return node.tx.clone();
-        }
-    }
-    None
-}
-
 pub fn is_connected(node_id_hash: u64) -> bool {
     let all_nodes = get_all_nodes();
     for node in all_nodes.iter() {
@@ -444,7 +437,7 @@ pub fn is_connected(node_id_hash: u64) -> bool {
 
 pub fn get_nodes_count(state_code: u32) -> usize {
     let mut nodes_count = 0;
-    if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
+    if let Ok(nodes_map) = NODES.read() {
         for val in nodes_map.values() {
             if val.state_code & state_code == state_code {
                 nodes_count += 1;
@@ -456,7 +449,7 @@ pub fn get_nodes_count(state_code: u32) -> usize {
 
 pub fn get_nodes_count_with_mode(mode: Mode) -> usize {
     let mut nodes_count = 0;
-    if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
+    if let Ok(nodes_map) = NODES.read() {
         for val in nodes_map.values() {
             if val.state_code & ALIVE.value() == ALIVE.value() && val.mode == mode {
                 nodes_count += 1;
@@ -472,7 +465,7 @@ pub fn get_nodes_count_all_modes() -> (usize, usize, usize, usize, usize) {
     let mut forward_nodes_count = 0;
     let mut lightning_nodes_count = 0;
     let mut thunder_nodes_count = 0;
-    if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
+    if let Ok(nodes_map) = NODES.read() {
         for val in nodes_map.values() {
             if val.state_code & ALIVE.value() == ALIVE.value() {
                 match val.mode {
@@ -496,7 +489,7 @@ pub fn get_nodes_count_all_modes() -> (usize, usize, usize, usize, usize) {
 
 pub fn get_all_nodes_count() -> u16 {
     let mut count = 0;
-    if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
+    if let Ok(nodes_map) = NODES.read() {
         for _ in nodes_map.values() {
             count += 1;
         }
@@ -506,7 +499,7 @@ pub fn get_all_nodes_count() -> u16 {
 
 pub fn get_all_nodes() -> Vec<Node> {
     let mut nodes = Vec::new();
-    if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
+    if let Ok(nodes_map) = NODES.read() {
         for val in nodes_map.values() {
             let node = val.clone();
             nodes.push(node);
@@ -517,7 +510,7 @@ pub fn get_all_nodes() -> Vec<Node> {
 
 pub fn get_nodes(state_code_mask: u32) -> Vec<Node> {
     let mut nodes = Vec::new();
-    if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
+    if let Ok(nodes_map) = NODES.read() {
         for val in nodes_map.values() {
             let node = val.clone();
             if node.state_code & state_code_mask == state_code_mask {
@@ -562,7 +555,7 @@ pub fn get_an_active_node() -> Option<Node> {
 }
 
 pub fn get_node(node_hash: u64) -> Option<Node> {
-    if let Ok(nodes_map) = GLOBAL_NODES_MAP.read() {
+    if let Ok(nodes_map) = NODES.read() {
         if let Some(node) = nodes_map.get(&node_hash) {
             return Some(node.clone());
         }
@@ -571,7 +564,7 @@ pub fn get_node(node_hash: u64) -> Option<Node> {
 }
 
 pub fn update_node_with_mode(node_hash: u64, node: &Node) {
-    if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
+    if let Ok(mut nodes_map) = NODES.write() {
         if let Some(n) = nodes_map.get_mut(&node_hash) {
             n.update(node);
         }
@@ -579,7 +572,7 @@ pub fn update_node_with_mode(node_hash: u64, node: &Node) {
 }
 
 pub fn update_node(node_hash: u64, node: &mut Node) {
-    if let Ok(mut nodes_map) = GLOBAL_NODES_MAP.write() {
+    if let Ok(mut nodes_map) = NODES.write() {
         if let Some(n) = nodes_map.get_mut(&node_hash) {
             node.mode = n.mode.clone();
             n.update(node);
@@ -592,9 +585,9 @@ pub fn process_inbounds(socket: TcpStream, handle: fn(node: &mut Node, req: Chan
         let mut peer_node = Node::new_with_addr(peer_addr);
         let peer_ip = peer_node.ip_addr.get_ip();
         let local_ip = get_local_node().ip_addr.get_ip();
-        let network_config = get_network_config();
-        if get_nodes_count(ALIVE.value()) < network_config.max_peers as usize
-            && !network_config.ip_black_list.contains(&peer_ip)
+        let config = get_config();
+        if get_nodes_count(ALIVE.value()) < config.max_peers as usize
+            && !config.ip_black_list.contains(&peer_ip)
         {
             let mut value = peer_node.ip_addr.get_addr();
             value.push_str(&local_ip);
@@ -698,19 +691,32 @@ fn process_outbounds(
 }
 
 pub fn send(node_hash: u64, msg: ChannelBuffer) {
-    match get_tx(node_hash) {
-        Some(mut tx) => {
-            match tx.try_send(msg) {
-                Ok(()) => {}
-                Err(e) => {
+    match NODES.read() {
+        Ok(nodes) => {
+            match nodes.get(&node_hash) {
+                Some(ref node) => {
+                    let tx = node.tx.clone();
+                    // tx should be contructed at begin lifecycle of any node in NODES
+                    if tx.is_some() {
+                        match tx.unwrap().try_send(msg) {
+                            Ok(_) => {},
+                            Err(err) => {
+                                // TODO: dispatch node not found event for upper modules
+                                remove_peer(node_hash);
+                                trace!(target: "p2p", "fail sending msg, {}", err);
+                            }
+                        }
+                    }
+                }, 
+                None => {
+                    // TODO: dispatch node not found event for upper modules
                     remove_peer(node_hash);
-                    trace!(target: "net", "Failed to send the msg, Err: {}", e);
+                    trace!(target: "p2p", "peer not found, {}", node_hash);
                 }
             }
-        }
-        None => {
-            remove_peer(node_hash);
-            trace!(target: "net", "Invalid peer !, node_hash: {}", node_hash);
+        },
+        Err(_err) => {
+            // TODO: dispatch node not found event for upper modules
         }
     }
 }

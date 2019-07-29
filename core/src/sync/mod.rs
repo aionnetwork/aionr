@@ -48,9 +48,9 @@ use p2p::handler::external::Handler;
 use p2p::Node;
 use p2p::ChannelBuffer;
 use p2p::Config;
-use p2p::enable;
-use p2p::disable;
 use p2p::register;
+use p2p::enable as p2p_start;
+use p2p::disable as p2p_shutdown;
 use p2p::get_nodes;
 use p2p::get_nodes_count;
 use p2p::get_all_nodes;
@@ -366,7 +366,7 @@ impl Sync {
         register(Handler {
             callback: SyncMgr::handle,
         });
-        enable(self.config.clone());
+        p2p_start(self.config.clone());
         debug!(target: "sync", "###### P2P enabled... ######");
 
         SyncMgr::enable(&executor, self.config.max_peers);
@@ -375,7 +375,7 @@ impl Sync {
 
     pub fn stop_network(&self) {
         SyncMgr::disable();
-        disable();
+        p2p_shutdown();
     }
 }
 

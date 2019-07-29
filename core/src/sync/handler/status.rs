@@ -20,7 +20,6 @@
  ******************************************************************************/
 
 use std::mem;
-use std::time::SystemTime;
 use aion_types::{H256, U256};
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
@@ -33,8 +32,6 @@ use sync::handler::headers;
 use p2p::send as p2p_send;
 use p2p::update_node;
 use p2p::ChannelBuffer;
-use p2p::get_network_config;
-use p2p::get_an_active_node;
 use p2p::Node;
 use p2p::Mode;
 

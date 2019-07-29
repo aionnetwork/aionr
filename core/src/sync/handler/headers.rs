@@ -31,7 +31,7 @@ use rlp::{RlpStream, UntrustedRlp};
 use p2p::ChannelBuffer;
 use p2p::Node;
 use p2p::Mode;
-use p2p::get_network_config;
+use p2p::get_config;
 use p2p::send;
 use p2p::update_node;
 use sync::route::VERSION;
@@ -47,7 +47,7 @@ const LARGE_REQUEST_SIZE: u64 = 48;
 pub fn get_headers_from_node(node: &mut Node) {
     trace!(target: "sync", "get_headers_from_node, node id: {}", node.get_node_id());
 
-    if get_network_config().sync_from_boot_nodes_only && !node.is_from_boot_list {
+    if get_config().sync_from_boot_nodes_only && !node.is_from_boot_list {
         return;
     }
 
