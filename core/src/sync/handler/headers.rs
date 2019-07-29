@@ -22,7 +22,7 @@
 use std::mem;
 use std::time::{Duration, SystemTime};
 use client::BlockId;
-use engine::pow_equihash_engine::POWEquihashEngine;
+use engine::unity_engine::UnityEngine;
 use header::Header as BlockHeader;
 use acore_bytes::to_hex;
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
@@ -213,7 +213,7 @@ pub fn handle_blocks_headers_res(node: &mut Node, req: ChannelBuffer) {
 
     for header_rlp in rlp.iter() {
         if let Ok(header) = header_rlp.as_val() {
-            let result = POWEquihashEngine::validate_block_header(&header);
+            let result = UnityEngine::validate_block_header(&header);
             match result {
                 Ok(()) => {
                     // break if not consisting

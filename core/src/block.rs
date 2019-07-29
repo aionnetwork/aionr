@@ -229,6 +229,7 @@ impl<'x> OpenBlock<'x> {
         gas_range_target: (U256, U256),
         extra_data: Bytes,
         kvdb: Arc<KeyValueDB>,
+        timestamp: Option<u64>,
     ) -> Result<Self, Error>
     {
         let number = parent.number() + 1;
@@ -240,6 +241,7 @@ impl<'x> OpenBlock<'x> {
             factories,
             kvdb.clone(),
         )?;
+
         let mut r = OpenBlock {
             block: ExecutedBlock::new(state, last_hashes),
             engine,
@@ -248,7 +250,14 @@ impl<'x> OpenBlock<'x> {
         r.block.header.set_parent_hash(parent.hash());
         r.block.header.set_number(number);
         r.block.header.set_author(author);
-        r.block.header.set_timestamp_now(parent.timestamp()); // TODO-Unity: handle PoS block timestamp
+        match timestamp {
+            Some(timestamp) => {
+                r.block.header.set_timestamp(timestamp);
+            }
+            None => {
+                r.block.header.set_timestamp_now(parent.timestamp());
+            }
+        };
         r.block.header.set_seal_type(seal_type);
         r.set_extra_data(extra_data);
         r.block.header.note_dirty();
@@ -257,14 +266,15 @@ impl<'x> OpenBlock<'x> {
             cmp::max(gas_range_target.0, engine.machine().params().min_gas_limit);
         let gas_ceil_target = cmp::max(gas_range_target.1, gas_floor_target);
 
-        engine.machine().populate_from_parent(
+        // Set gas_limit
+        engine.machine().set_gas_limit_from_parent(
             &mut r.block.header,
             parent,
             gas_floor_target,
             gas_ceil_target,
         );
         // Set difficulty
-        engine.populate_from_parent(&mut r.block.header, seal_parent, seal_grand_parent);
+        engine.set_difficulty_from_parent(&mut r.block.header, seal_parent, seal_grand_parent);
 
         engine.machine().on_new_block(&mut r.block)?;
 
@@ -361,6 +371,7 @@ impl<'x> OpenBlock<'x> {
         &mut self,
         t: SignedTransaction,
         h: Option<H256>,
+        check_gas: bool,
     ) -> Result<&Receipt, Error>
     {
         if self.block.transactions_set.contains(&t.hash()) {
@@ -385,10 +396,19 @@ impl<'x> OpenBlock<'x> {
                     &[t.clone()],
                 ));
             } else {
-                result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
+                result.push(self.block.state.apply(
+                    &env_info,
+                    self.engine.machine(),
+                    &t,
+                    check_gas,
+                ));
             }
         } else {
-            result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
+            result.push(
+                self.block
+                    .state
+                    .apply(&env_info, self.engine.machine(), &t, check_gas),
+            );
         }
 
         match result.pop().unwrap() {
@@ -611,12 +631,13 @@ impl LockedBlock {
         engine: &Engine,
         seal: Vec<Bytes>,
         seal_parent: Option<&Header>,
+        stake: Option<u64>,
     ) -> Result<SealedBlock, (Error, LockedBlock)>
     {
         let mut s = self;
         s.block.header.set_seal(seal);
 
-        match engine.verify_local_seal_pos(&s.block.header, seal_parent) {
+        match engine.verify_seal_pos(&s.block.header, seal_parent, stake) {
             Err(e) => Err((e, s)),
             _ => {
                 Ok(SealedBlock {
@@ -692,6 +713,7 @@ fn enact(
         (3141562.into(), 31415620.into()),
         vec![],
         kvdb,
+        None,
     )?;
 
     b.populate_from(header);
@@ -756,7 +778,7 @@ fn push_transactions(
                     block.apply_batch_txs(tx_batch.as_slice(), None);
                     tx_batch.clear();
                 }
-                block.push_transaction(tx.clone(), None)?;
+                block.push_transaction(tx.clone(), None, false)?;
             } else {
                 trace!(target: "vm", "found avm transaction");
                 tx_batch.push(tx.clone())
@@ -769,7 +791,7 @@ fn push_transactions(
         }
     } else {
         for t in transactions {
-            block.push_transaction(t.clone(), None)?;
+            block.push_transaction(t.clone(), None, false)?;
         }
     }
 

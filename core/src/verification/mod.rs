@@ -418,6 +418,15 @@ mod tests {
             }
         }
 
+        /// Get the current best block with specified seal type
+        fn best_block_header_with_seal_type(
+            &self,
+            _seal_type: &SealType,
+        ) -> Option<encoded::Header>
+        {
+            unimplemented!()
+        }
+
         fn block_body(&self, hash: &H256) -> Option<encoded::Body> {
             self.block(hash)
                 .map(|b| BlockChain::block_to_body(&b.into_inner()))
@@ -430,9 +439,12 @@ mod tests {
         fn block_details(&self, hash: &H256) -> Option<BlockDetails> {
             self.blocks.get(hash).map(|bytes| {
                 let header = BlockView::new(bytes).header();
+                // TODO-UNITY: to fix difficulties if needed
                 BlockDetails {
                     number: header.number(),
                     total_difficulty: header.difficulty().clone(),
+                    pow_total_difficulty: header.difficulty().clone(),
+                    pos_total_difficulty: header.difficulty().clone(),
                     parent: header.parent_hash().clone(),
                     children: Vec::new(),
                     anti_seal_parent: H256::zero(),

@@ -23,6 +23,7 @@
 //! Definition of valid items for the verification queue.
 use engine::Engine;
 use types::error::Error;
+use header::SealType;
 
 use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
@@ -40,6 +41,9 @@ pub trait BlockLike {
 
     /// Get the difficulty of this item.
     fn difficulty(&self) -> U256;
+
+    /// Get the seal_type of this item.
+    fn seal_type(&self) -> &Option<SealType>;
 }
 
 /// Defines transitions between stages of verification.
@@ -75,7 +79,7 @@ pub mod blocks {
 
     use engine::Engine;
     use types::error::{Error, BlockError};
-    use header::Header;
+    use header::{Header,SealType};
     use verification::{PreverifiedBlock, verify_block_basic, verify_block_unordered};
 
     use heapsize::HeapSizeOf;
@@ -147,6 +151,8 @@ pub mod blocks {
         fn parent_hash(&self) -> H256 { self.header.parent_hash().clone() }
 
         fn difficulty(&self) -> U256 { self.header.difficulty().clone() }
+
+        fn seal_type(&self) -> &Option<SealType> { self.header.seal_type() }
     }
 
     impl BlockLike for PreverifiedBlock {
@@ -155,6 +161,8 @@ pub mod blocks {
         fn parent_hash(&self) -> H256 { self.header.parent_hash().clone() }
 
         fn difficulty(&self) -> U256 { self.header.difficulty().clone() }
+
+        fn seal_type(&self) -> &Option<SealType> { self.header.seal_type() }
     }
 }
 
@@ -164,7 +172,7 @@ pub mod headers {
 
     use engine::Engine;
     use types::error::Error;
-    use header::Header;
+    use header::{Header,SealType};
     use verification::verify_header_params;
 
     use aion_types::{H256, U256};
@@ -173,6 +181,7 @@ pub mod headers {
         fn hash(&self) -> H256 { self.hash() }
         fn parent_hash(&self) -> H256 { self.parent_hash().clone() }
         fn difficulty(&self) -> U256 { self.difficulty().clone() }
+        fn seal_type(&self) -> &Option<SealType> { self.seal_type() }
     }
 
     /// A mode for verifying headers.

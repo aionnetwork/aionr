@@ -373,7 +373,7 @@ impl Sync {
 
     pub fn stop_network(&self) {
         SyncMgr::disable();
-        // original is p2p::disable which internally calls reset() with unuse atomic boolean 
+        // original is p2p::disable which internally calls reset() with unuse atomic boolean
         // TODO: update proper ways to clear up threads and connections on p2p layer
         p2p_shutdown();
     }

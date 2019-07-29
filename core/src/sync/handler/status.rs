@@ -111,7 +111,7 @@ pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
         node.best_hash,
         node.target_total_difficulty,
     );
-    
+
     // immediately send request when incoming response indicates node td > local chain td
     // even headers::get_headers_from_node has condition check internally
     // TODO: leave condition check in one place

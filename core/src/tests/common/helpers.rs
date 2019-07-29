@@ -28,7 +28,7 @@ use types::blockchain::config::Config as BlockChainConfig;
 use acore_bytes::Bytes;
 use client::{BlockChainClient, ChainNotify, Client, ClientConfig};
 use key::{Ed25519Secret, Ed25519KeyPair};
-use header::Header;
+use header::{Header, SealType};
 use transaction::{Action, Transaction, SignedTransaction};
 use views::BlockView;
 use io::*;
@@ -200,6 +200,7 @@ where
             (3141562.into(), 31415620.into()),
             vec![],
             Arc::new(MockDbRepository::init(vec![String::new()])),
+            None,
         )
         .unwrap();
         b.set_difficulty(U256::from(0x20000));
@@ -224,6 +225,7 @@ where
                 }
                 .sign(kp.secret(), None),
                 None,
+                true,
             )
             .unwrap();
             n += 1;
@@ -428,7 +430,7 @@ pub fn get_good_dummy_block_fork_seq(
     r
 }
 
-pub fn get_good_dummy_block_hash() -> (H256, Bytes) {
+pub fn get_good_dummy_block_hash(seal_type: Option<SealType>) -> (H256, Bytes) {
     let mut block_header = Header::new();
     let test_spec = get_test_spec();
     let genesis_gas = test_spec.genesis_header().gas_limit().clone();
@@ -438,12 +440,18 @@ pub fn get_good_dummy_block_hash() -> (H256, Bytes) {
     block_header.set_number(1);
     block_header.set_parent_hash(test_spec.genesis_header().hash());
     block_header.set_state_root(test_spec.genesis_header().state_root().clone());
+    block_header.set_seal_type(seal_type.unwrap_or_default());
 
     (block_header.hash(), create_test_block(&block_header))
 }
 
 pub fn get_good_dummy_block() -> Bytes {
-    let (_, bytes) = get_good_dummy_block_hash();
+    let (_, bytes) = get_good_dummy_block_hash(None);
+    bytes
+}
+
+pub fn get_good_dummy_pos_block() -> Bytes {
+    let (_, bytes) = get_good_dummy_block_hash(Some(SealType::PoS));
     bytes
 }
 

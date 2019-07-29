@@ -128,6 +128,19 @@ impl Default for AccountsConfig {
 }
 
 #[derive(Debug, PartialEq)]
+pub struct StakeConfig {
+    pub contract: Address,
+}
+
+impl Default for StakeConfig {
+    fn default() -> Self {
+        StakeConfig {
+            contract: Address::default(),
+        }
+    }
+}
+
+#[derive(Debug, PartialEq)]
 pub struct MinerExtras {
     pub author: Address,
     pub extra_data: Vec<u8>,

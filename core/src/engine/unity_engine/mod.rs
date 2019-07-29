@@ -22,6 +22,7 @@
 mod header_validators;
 mod dependent_header_validators;
 mod grand_parent_header_validators;
+mod pos_validator;
 #[cfg(test)]
 mod test;
 
@@ -42,7 +43,6 @@ use self::dependent_header_validators::{
     DependentHeaderValidator,
     NumberValidator,
     TimestampValidator,
-    PoSValidator,
 };
 use self::header_validators::{
 //    ExtraDataValidator,
@@ -52,27 +52,27 @@ use self::header_validators::{
     EquihashSolutionValidator,
 };
 use self::grand_parent_header_validators::{GrandParentHeaderValidator, DifficultyValidator};
+use self::pos_validator::PoSValidator;
 
 const ANNUAL_BLOCK_MOUNT: u64 = 3110400;
 const COMPOUND_YEAR_MAX: u64 = 128;
 
 #[derive(Debug, PartialEq)]
-pub struct POWEquihashEngineParams {
+pub struct UnityEngineParams {
     pub rampup_upper_bound: U256,
     pub rampup_lower_bound: U256,
     pub rampup_start_value: U256,
     pub rampup_end_value: U256,
     pub upper_block_reward: U256,
     pub lower_block_reward: U256,
-    pub difficulty_bound_divisor: U256,
-    pub block_time_lower_bound: u64,
-    pub block_time_upper_bound: u64,
+    pub difficulty_bound_divisor: u64,
+    pub block_time: u64,
     pub minimum_difficulty: U256,
 }
 
-impl From<ajson::spec::POWEquihashEngineParams> for POWEquihashEngineParams {
-    fn from(p: ajson::spec::POWEquihashEngineParams) -> Self {
-        POWEquihashEngineParams {
+impl From<ajson::spec::UnityEngineParams> for UnityEngineParams {
+    fn from(p: ajson::spec::UnityEngineParams) -> Self {
+        UnityEngineParams {
             rampup_upper_bound: p.rampup_upper_bound.map_or(U256::from(259200), Into::into),
             rampup_lower_bound: p.rampup_lower_bound.map_or(U256::zero(), Into::into),
             rampup_start_value: p
@@ -87,11 +87,8 @@ impl From<ajson::spec::POWEquihashEngineParams> for POWEquihashEngineParams {
             lower_block_reward: p
                 .lower_block_reward
                 .map_or(U256::from(748994641621655092u64), Into::into),
-            difficulty_bound_divisor: p
-                .difficulty_bound_divisor
-                .map_or(U256::from(2048), Into::into),
-            block_time_lower_bound: p.block_time_lower_bound.map_or(5u64, Into::into),
-            block_time_upper_bound: p.block_time_upper_bound.map_or(15u64, Into::into),
+            difficulty_bound_divisor: p.difficulty_bound_divisor.map_or(20u64, Into::into),
+            block_time: p.block_time.map_or(10u64, Into::into),
             minimum_difficulty: p.minimum_difficulty.map_or(U256::from(16), Into::into),
         }
     }
@@ -99,80 +96,68 @@ impl From<ajson::spec::POWEquihashEngineParams> for POWEquihashEngineParams {
 
 /// Difficulty calculator. TODO: impl mfc trait.
 pub struct DifficultyCalc {
-    difficulty_bound_divisor: U256,
-    block_time_lower_bound: u64,
-    block_time_upper_bound: u64,
+    difficulty_bound_divisor: u64,
+    block_time: u64,
     minimum_difficulty: U256,
 }
 
 impl DifficultyCalc {
-    pub fn new(params: &POWEquihashEngineParams) -> DifficultyCalc {
+    pub fn new(params: &UnityEngineParams) -> DifficultyCalc {
         DifficultyCalc {
             difficulty_bound_divisor: params.difficulty_bound_divisor,
-            block_time_lower_bound: params.block_time_lower_bound,
-            block_time_upper_bound: params.block_time_upper_bound,
+            block_time: params.block_time,
             minimum_difficulty: params.minimum_difficulty,
         }
     }
+
     pub fn calculate_difficulty(
         &self,
-        header: &Header,
         parent: Option<&Header>,
         grand_parent: Option<&Header>,
     ) -> U256
     {
-        if header.number() == 0 {
-            panic!("Can't calculate genesis block difficulty.");
-        }
-
-        // If no seal parent (eg. first PoS block)
-        // Hard code to 16. TODO-Unity: handle this better
-        if parent.is_none() {
-            return U256::from(16);
-        }
-        let parent: &Header = parent.expect("none parent tested before.");
-
-        // If no seal grand parent, return the difficulty of the parent
-        if grand_parent.is_none() {
-            return parent.difficulty().to_owned();
-        }
-        let grand_parent: &Header = grand_parent.expect("none grand parent tested before.");
-
-        let parent_difficulty = *parent.difficulty();
-
-        let mut diff_base = parent_difficulty / self.difficulty_bound_divisor;
-
-        // if smaller than our bound divisor, always round up
-        if diff_base.is_zero() {
-            diff_base = U256::one();
-        }
-
-        let current_timestamp = parent.timestamp();
-        let parent_timestamp = grand_parent.timestamp();
-
-        let delta = current_timestamp - parent_timestamp;
-        let bound_domain = 10;
-
-        // split into our ranges 0 <= x <= min_block_time, min_block_time < x <
-        // max_block_time, max_block_time < x
-        let mut output_difficulty: U256;
-        if delta <= self.block_time_lower_bound {
-            output_difficulty = parent_difficulty + diff_base;
-        } else if self.block_time_lower_bound < delta && delta < self.block_time_upper_bound {
-            output_difficulty = parent_difficulty;
-        } else {
-            let bound_quotient =
-                U256::from(((delta - self.block_time_upper_bound) / bound_domain) + 1);
-            let lower_bound = U256::from(99);
-            let multiplier = cmp::min(bound_quotient, lower_bound);
-            if parent_difficulty > multiplier * diff_base {
-                output_difficulty = parent_difficulty - multiplier * diff_base;
-            } else {
-                output_difficulty = self.minimum_difficulty;
+        // First PoS block does not have seal parent.
+        let parent = match parent {
+            Some(header) => header,
+            None => {
+                return U256::from(2_000_000_000u64); // TODO-Unity: test setup to be comparable to the initial 1*10^9 stake. Change it in real setup or make it configurable in engine paremeter.
             }
-        }
-        output_difficulty = cmp::max(output_difficulty, self.minimum_difficulty);
-        output_difficulty
+        };
+
+        // If no seal grand parent, return the difficulty of the seal parent
+        let grand_parent = match grand_parent {
+            Some(header) => header,
+            None => {
+                return parent.difficulty().to_owned();
+            }
+        };
+
+        let parent_difficulty = parent.difficulty();
+        let parent_timestamp = parent.timestamp();
+        let grand_parent_timestamp = grand_parent.timestamp();
+        let delta_time = parent_timestamp - grand_parent_timestamp;
+        assert!(delta_time > 0);
+
+        // TODO-Unity: To refine floating calculation
+        let alpha = 1f64 / (self.difficulty_bound_divisor as f64);
+        let lambda = 1f64 / (2f64 * self.block_time as f64);
+        let diff = match (delta_time as f64) - (-0.5f64.ln() / lambda) {
+            res if res > 0f64 => {
+                cmp::min(
+                    parent_difficulty.as_u64() - 1,
+                    (parent_difficulty.as_u64() as f64 / (1f64 + alpha)) as u64,
+                )
+            }
+            res if res < 0f64 => {
+                cmp::max(
+                    parent_difficulty.as_u64() + 1,
+                    (parent_difficulty.as_u64() as f64 * (1f64 + alpha)) as u64,
+                )
+            }
+            _ => parent_difficulty.as_u64(),
+        };
+
+        cmp::max(self.minimum_difficulty, U256::from(diff))
     }
 }
 
@@ -192,7 +177,7 @@ pub struct RewardsCalculator {
 
 impl RewardsCalculator {
     fn new(
-        params: &POWEquihashEngineParams,
+        params: &UnityEngineParams,
         monetary_policy_update: Option<BlockNumber>,
         premine: U256,
     ) -> RewardsCalculator
@@ -245,7 +230,7 @@ impl RewardsCalculator {
     fn calculate_total_supply_before_monetary_update(
         initial_supply: U256,
         monetary_change_block_num: u64,
-        params: &POWEquihashEngineParams,
+        params: &UnityEngineParams,
     ) -> U256
     {
         if monetary_change_block_num < 1 {
@@ -294,7 +279,7 @@ impl RewardsCalculator {
 
     fn calculate_reward_before_monetary_update(
         number: u64,
-        params: &POWEquihashEngineParams,
+        params: &UnityEngineParams,
         m: U256,
     ) -> U256
     {
@@ -311,36 +296,25 @@ impl RewardsCalculator {
 }
 
 /// Engine using Equihash proof-of-work concensus algorithm.
-pub struct POWEquihashEngine {
+pub struct UnityEngine {
     machine: EthereumMachine,
     rewards_calculator: RewardsCalculator,
     difficulty_calc: DifficultyCalc,
 }
 
-impl POWEquihashEngine {
-    pub fn new(params: POWEquihashEngineParams, machine: EthereumMachine) -> Arc<Self> {
+impl UnityEngine {
+    pub fn new(params: UnityEngineParams, machine: EthereumMachine) -> Arc<Self> {
         let rewards_calculator = RewardsCalculator::new(
             &params,
             machine.params().monetary_policy_update,
             machine.premine(),
         );
         let difficulty_calc = DifficultyCalc::new(&params);
-        Arc::new(POWEquihashEngine {
+        Arc::new(UnityEngine {
             machine,
             rewards_calculator,
             difficulty_calc,
         })
-    }
-
-    fn calculate_difficulty(
-        &self,
-        header: &Header,
-        parent: Option<&Header>,
-        grand_parent: Option<&Header>,
-    ) -> U256
-    {
-        self.difficulty_calc
-            .calculate_difficulty(header, parent, grand_parent)
     }
 
     fn calculate_reward(&self, header: &Header) -> U256 {
@@ -363,10 +337,15 @@ impl POWEquihashEngine {
     }
 }
 
-impl Engine for Arc<POWEquihashEngine> {
-    fn name(&self) -> &str { "POWEquihashEngine" }
+impl Engine for Arc<UnityEngine> {
+    fn name(&self) -> &str { "UnityEngine" }
 
     fn machine(&self) -> &EthereumMachine { &self.machine }
+
+    fn calculate_difficulty(&self, parent: Option<&Header>, grand_parent: Option<&Header>) -> U256 {
+        self.difficulty_calc
+            .calculate_difficulty(parent, grand_parent)
+    }
 
     fn seal_fields(&self, header: &Header) -> usize {
         match header.seal_type() {
@@ -408,20 +387,14 @@ impl Engine for Arc<POWEquihashEngine> {
     }
 
     /// Verify the seal of locally produced PoS block
-    fn verify_local_seal_pos(
+    fn verify_seal_pos(
         &self,
         header: &Header,
         seal_parent: Option<&Header>,
+        stake: Option<u64>,
     ) -> Result<(), Error>
     {
-        if header.seal_type() == &Some(SealType::PoS) && seal_parent.is_some() {
-            // TODO-Unity: handle none seal parent better
-            let pos_seal_validator = PoSValidator {};
-            pos_seal_validator.validate(
-                header,
-                seal_parent.expect("none seal parent checked before."),
-            )?;
-        }
+        PoSValidator::validate(header, seal_parent, stake)?;
         Ok(())
     }
 
@@ -441,19 +414,6 @@ impl Engine for Arc<POWEquihashEngine> {
             v.validate(header, parent)?;
         }
 
-        // Verifications related to seal parent
-        let mut seal_parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(1);
-        if header.seal_type() == &Some(SealType::PoS) && seal_parent.is_some() {
-            // TODO-Unity: handle none seal parent better
-            seal_parent_validators.push(Box::new(PoSValidator {}));
-        }
-        for v in seal_parent_validators.iter() {
-            v.validate(
-                header,
-                seal_parent.expect("none seal parent checked before."),
-            )?;
-        }
-
         // Verifications related to seal parent and seal grand parent
         let mut grand_validators: Vec<Box<GrandParentHeaderValidator>> = Vec::with_capacity(1);
         grand_validators.push(Box::new(DifficultyValidator {
@@ -466,14 +426,18 @@ impl Engine for Arc<POWEquihashEngine> {
         Ok(())
     }
 
-    fn populate_from_parent(
+    fn set_difficulty_from_parent(
         &self,
         header: &mut Header,
         parent: Option<&Header>,
         grand_parent: Option<&Header>,
     )
     {
-        let difficulty = self.calculate_difficulty(header, parent, grand_parent);
+        if header.number() == 0 {
+            panic!("Can't calculate genesis block difficulty.");
+        }
+
+        let difficulty = self.calculate_difficulty(parent, grand_parent);
         header.set_difficulty(difficulty);
     }
 

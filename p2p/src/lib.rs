@@ -87,7 +87,7 @@ lazy_static! {
     static ref LOCAL: Storage<Node> = Storage::new();
     static ref CONFIG: Storage<Config> = Storage::new();
     static ref SOCKETS: Storage<Mutex<HashMap<u64, TcpStream>>> = Storage::new();
-    static ref NODES: RwLock<HashMap<u64, Node>> = {RwLock::new(HashMap::new())};
+    static ref NODES: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
     static ref HANDLERS: Storage<Handler> = Storage::new();
 }
 
@@ -155,7 +155,6 @@ fn handle(node: &mut Node, req: ChannelBuffer) {
 }
 
 pub fn enable(cfg: Config) {
-
     WORKERS.set(Runtime::new().expect("tokio runtime"));
     SOCKETS.set(Mutex::new(HashMap::new()));
     let local_node_str = cfg.local_node.clone();
@@ -164,7 +163,7 @@ pub fn enable(cfg: Config) {
     info!(target: "p2p", "        node: {}@{}", local_node.get_node_id(), local_node.get_ip_addr());
     CONFIG.set(cfg);
     LOCAL.set(local_node.clone());
-    
+
     let executor = WORKERS.get().executor();
     let local_addr = get_local_node().get_ip_addr();
     create_server(&executor, &local_addr, handle);
@@ -197,45 +196,50 @@ pub fn enable(cfg: Config) {
     }).map_err(|e| error!("interval errored; err={:?}", e)));
 
     // task: reconnect
-    executor.spawn(Interval::new(
-        Instant::now(),
-        Duration::from_secs(RECONNECT_NORMAL_NOEDS_INTERVAL),
-    )
-    .for_each(move |_| {
-        let active_nodes_count = get_nodes_count(ALIVE.value());
-        if !sync_from_boot_nodes_only && active_nodes_count < max_peers_num {
-            if let Some(peer_node) = get_an_inactive_node() {
-                let peer_node_id_hash = calculate_hash(&peer_node.get_node_id());
-                if peer_node_id_hash != local_node_id_hash {
-                    let peer_ip = peer_node.ip_addr.get_ip();
-                    if !client_ip_black_list.contains(&peer_ip) {
-                        connect_peer(peer_node);
+    executor.spawn(
+        Interval::new(
+            Instant::now(),
+            Duration::from_secs(RECONNECT_NORMAL_NOEDS_INTERVAL),
+        )
+        .for_each(move |_| {
+            let active_nodes_count = get_nodes_count(ALIVE.value());
+            if !sync_from_boot_nodes_only && active_nodes_count < max_peers_num {
+                if let Some(peer_node) = get_an_inactive_node() {
+                    let peer_node_id_hash = calculate_hash(&peer_node.get_node_id());
+                    if peer_node_id_hash != local_node_id_hash {
+                        let peer_ip = peer_node.ip_addr.get_ip();
+                        if !client_ip_black_list.contains(&peer_ip) {
+                            connect_peer(peer_node);
+                        }
                     }
-                }
-            };
-        }
+                };
+            }
 
-        Ok(())
-    })
-    .map_err(|e| error!("interval errored; err={:?}", e)));
+            Ok(())
+        })
+        .map_err(|e| error!("interval errored; err={:?}", e)),
+    );
 
     // task: fetch active nodes
-    executor.spawn(Interval::new(
-        Instant::now(),
-        Duration::from_secs(NODE_ACTIVE_REQ_INTERVAL),
-    )
-    .for_each(move |_| {
-        active_nodes::send();
-        Ok(())
-    })
-    .map_err(|e| error!("interval errored; err={:?}", e)));
+    executor.spawn(
+        Interval::new(
+            Instant::now(),
+            Duration::from_secs(NODE_ACTIVE_REQ_INTERVAL),
+        )
+        .for_each(move |_| {
+            active_nodes::send();
+            Ok(())
+        })
+        .map_err(|e| error!("interval errored; err={:?}", e)),
+    );
 }
 
 pub fn create_server(
     executor: &TaskExecutor,
     local_addr: &String,
     handle: fn(node: &mut Node, req: ChannelBuffer),
-){
+)
+{
     if let Ok(addr) = local_addr.parse() {
         let listener = TcpListener::bind(&addr).expect("Failed to bind");
         let server = listener
@@ -265,19 +269,21 @@ pub fn create_client(peer_node: Node, handle: fn(node: &mut Node, req: ChannelBu
     if let Ok(addr) = node_ip_addr.parse() {
         let executor = WORKERS.get().executor();
         let node_id = peer_node.get_node_id();
-        executor.spawn(TcpStream::connect(&addr)
-        .map(move |socket| {
-            socket
-                .set_recv_buffer_size(1 << 24)
-                .expect("set_recv_buffer_size failed");
-            socket
-                .set_keepalive(Some(Duration::from_secs(30)))
-                .expect("set_keepalive failed");
-            process_outbounds(socket, peer_node, handle);
-        })
-        .map_err(
-            move |e| error!(target: "p2p", "    node: {}@{}, {}", node_ip_addr, node_id, e),
-        ));
+        executor.spawn(
+            TcpStream::connect(&addr)
+                .map(move |socket| {
+                    socket
+                        .set_recv_buffer_size(1 << 24)
+                        .expect("set_recv_buffer_size failed");
+                    socket
+                        .set_keepalive(Some(Duration::from_secs(30)))
+                        .expect("set_keepalive failed");
+                    process_outbounds(socket, peer_node, handle);
+                })
+                .map_err(
+                    move |e| error!(target: "p2p", "    node: {}@{}, {}", node_ip_addr, node_id, e),
+                ),
+        );
     }
 }
 
@@ -550,7 +556,8 @@ pub fn process_inbounds(socket: TcpStream, handle: fn(node: &mut Node, req: Chan
         let local_ip = get_local_node().ip_addr.get_ip();
         let config = get_config();
         if get_nodes_count(ALIVE.value()) < config.max_peers as usize
-            && !config.ip_black_list.contains(&peer_ip){
+            && !config.ip_black_list.contains(&peer_ip)
+        {
             let mut value = peer_node.ip_addr.get_addr();
             value.push_str(&local_ip);
             peer_node.node_hash = calculate_hash(&value);
@@ -569,7 +576,6 @@ pub fn process_inbounds(socket: TcpStream, handle: fn(node: &mut Node, req: Chan
             let mut node_hash = peer_node.node_hash;
             add_peer(peer_node, &socket);
 
-            
             let (sink, stream) = split_frame(socket);
             // inbound stream
             let read = stream.for_each(move |msg| {
@@ -579,7 +585,7 @@ pub fn process_inbounds(socket: TcpStream, handle: fn(node: &mut Node, req: Chan
                 }
 
                 Ok(())
-            });            
+            });
             executor.spawn(read.then(|_| Ok(())));
             // outbound stream
             let write =
@@ -600,7 +606,8 @@ fn process_outbounds(
     socket: TcpStream,
     peer_node: Node,
     handle: fn(node: &mut Node, req: ChannelBuffer),
-){
+)
+{
     let mut peer_node = peer_node.clone();
     peer_node.node_hash = calculate_hash(&peer_node.get_node_id());
     let node_hash = peer_node.node_hash;
@@ -656,7 +663,7 @@ pub fn send(node_hash: u64, msg: ChannelBuffer) {
                     // tx should be contructed at begin lifecycle of any node in NODES
                     if tx.is_some() {
                         match tx.unwrap().try_send(msg) {
-                            Ok(_) => {},
+                            Ok(_) => {}
                             Err(err) => {
                                 // TODO: dispatch node not found event for upper modules
                                 remove_peer(node_hash);
@@ -664,14 +671,14 @@ pub fn send(node_hash: u64, msg: ChannelBuffer) {
                             }
                         }
                     }
-                }, 
+                }
                 None => {
                     // TODO: dispatch node not found event for upper modules
                     remove_peer(node_hash);
                     trace!(target: "p2p", "peer not found, {}", node_hash);
                 }
             }
-        },
+        }
         Err(_err) => {
             // TODO: dispatch node not found event for upper modules
         }

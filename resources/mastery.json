@@ -2,7 +2,7 @@
 	"name": "Mastery",
 	"dataDir": "mastery",
 	"engine": {
-		"POWEquihashEngine": {
+		"UnityEngine": {
 			"params": {
 
 			}

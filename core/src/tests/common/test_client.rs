@@ -80,6 +80,10 @@ pub struct TestBlockChainClient {
     pub extra_data: Bytes,
     /// Difficulty.
     pub difficulty: RwLock<U256>,
+    /// PoW Difficulty
+    pub pow_difficulty: RwLock<U256>,
+    /// PoS Difficulty
+    pub pos_difficulty: RwLock<U256>,
     /// Balances.
     pub balances: RwLock<HashMap<Address, U256>>,
     /// Nonces.
@@ -154,6 +158,8 @@ impl TestBlockChainClient {
             extra_data: extra_data,
             last_hash: RwLock::new(H256::new()),
             difficulty: RwLock::new(spec.genesis_header().difficulty().clone()),
+            pow_difficulty: RwLock::new(spec.genesis_header().difficulty().clone()),
+            pos_difficulty: RwLock::new(U256::from(1)),
             balances: RwLock::new(HashMap::new()),
             nonces: RwLock::new(HashMap::new()),
             storage: RwLock::new(HashMap::new()),
@@ -374,6 +380,7 @@ impl MiningBlockChainClient for TestBlockChainClient {
         gas_range_target: (U256, U256),
         extra_data: Bytes,
         seal_type: Option<SealType>,
+        _timestamp: Option<u64>,
     ) -> OpenBlock
     {
         let engine = &*self.spec.engine;
@@ -398,6 +405,7 @@ impl MiningBlockChainClient for TestBlockChainClient {
             gas_range_target,
             extra_data,
             self.db.clone(),
+            None,
         )
         .expect("Opening block for tests will not fail.");
         // TODO [todr] Override timestamp for predictability (set_timestamp_now kind of sucks)
@@ -442,6 +450,8 @@ impl BlockChainClient for TestBlockChainClient {
         Ok(res)
     }
 
+    fn get_stake(&self, _a: &Address) -> Option<u64> { Some(0) }
+
     fn estimate_gas(&self, _t: &SignedTransaction, _block: BlockId) -> Result<U256, CallError> {
         Ok(21000.into())
     }
@@ -461,7 +471,10 @@ impl BlockChainClient for TestBlockChainClient {
         ))
     }
 
-    fn block_total_difficulty(&self, _id: BlockId) -> Option<U256> { Some(U256::zero()) }
+    // TODO-UNITY: change back after finishing sync rf
+    fn block_total_difficulty(&self, _id: BlockId) -> Option<(U256, U256, U256)> {
+        Some((U256::zero(), U256::zero(), U256::zero()))
+    }
 
     fn block_hash(&self, id: BlockId) -> Option<H256> { Self::block_hash(self, id) }
 
@@ -584,6 +597,20 @@ impl BlockChainClient for TestBlockChainClient {
     fn best_block_header(&self) -> encoded::Header {
         self.block_header(BlockId::Hash(self.chain_info().best_block_hash))
             .expect("Best block always has header.")
+    }
+
+    fn best_block_header_with_seal_type(&self, _seal_type: &SealType) -> Option<encoded::Header> {
+        unimplemented!()
+    }
+
+    fn calculate_difficulty(
+        &self,
+        parent_header: Option<&BlockHeader>,
+        grand_parent_header: Option<&BlockHeader>,
+    ) -> U256
+    {
+        let engine = &*self.spec.engine;
+        engine.calculate_difficulty(parent_header, grand_parent_header)
     }
 
     fn block_header(&self, id: BlockId) -> Option<encoded::Header> {
@@ -751,7 +778,27 @@ impl BlockChainClient for TestBlockChainClient {
         if number == len {
             {
                 let mut difficulty = self.difficulty.write();
-                *difficulty = *difficulty + header.difficulty().clone();
+                let mut pow_difficulty = self.pow_difficulty.write();
+                let mut pos_difficulty = self.pos_difficulty.write();
+
+                let (pow_td, pos_td) = match header.seal_type().clone().unwrap_or_default() {
+                    SealType::PoW => {
+                        (
+                            *pow_difficulty + header.difficulty().clone(),
+                            *pos_difficulty,
+                        )
+                    }
+                    SealType::PoS => {
+                        (
+                            *pow_difficulty,
+                            *pos_difficulty + header.difficulty().clone(),
+                        )
+                    }
+                };
+
+                *pow_difficulty = pow_td;
+                *pos_difficulty = pos_td;
+                *difficulty = pow_td * ::std::cmp::max(pos_td, U256::from(1u64));
             }
             mem::replace(&mut *self.last_hash.write(), h.clone());
             self.blocks.write().insert(h.clone(), b);
@@ -799,6 +846,8 @@ impl BlockChainClient for TestBlockChainClient {
         let number = self.blocks.read().len() as BlockNumber - 1;
         BlockChainInfo {
             total_difficulty: *self.difficulty.read(),
+            pow_total_difficulty: *self.pow_difficulty.read(),
+            pos_total_difficulty: *self.pos_difficulty.read(),
             pending_total_difficulty: *self.difficulty.read(),
             genesis_hash: self.genesis_hash.clone(),
             best_block_hash: self.last_hash.read().clone(),

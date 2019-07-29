@@ -63,7 +63,13 @@ use spec::Spec;
 use state::{State};
 use db::StateDB;
 use transaction::{
-    Action, LocalizedTransaction, PendingTransaction, SignedTransaction, AVM_TRANSACTION_TYPE
+    Transaction,
+    Action,
+    LocalizedTransaction,
+    PendingTransaction,
+    SignedTransaction,
+    AVM_TRANSACTION_TYPE,
+    DEFAULT_TRANSACTION_TYPE
 };
 use types::filter::Filter;
 use vms::{EnvInfo, LastHashes};
@@ -74,6 +80,7 @@ use verification::{
     verify_block_final
 };
 use views::BlockView;
+use avm_abi::{AbiToken, AVMEncoder, AVMDecoder};
 
 // re-export
 #[cfg(test)]
@@ -347,7 +354,7 @@ impl Client {
             None => None,
         };
 
-        // Verify Block Family
+        // Verify block family
         let verify_family_result = verify_block_family(
             header,
             &parent,
@@ -364,6 +371,19 @@ impl Client {
             warn!(target: "client", "Stage 3 block verification failed for #{} ({})\nError: {:?}", header.number(), header.hash(), e);
             return Err(());
         };
+
+        // Verify pos block seal
+        if header.seal_type() == &Some(SealType::PoS) {
+            let verify_pos_result = engine.verify_seal_pos(
+                header,
+                seal_parent.clone().map(|header| header.decode()).as_ref(),
+                self.get_stake(header.author()),
+            );
+            if let Err(e) = verify_pos_result {
+                warn!(target: "client", "Stage 4 block verification failed for #{} ({})\nError: {:?}", header.number(), header.hash(), e);
+                return Err(());
+            };
+        }
 
         // Enact Verified Block
         let last_hashes = self.build_last_hashes(header.parent_hash().clone());
@@ -391,6 +411,64 @@ impl Client {
         }
 
         Ok(locked_block)
+    }
+
+    fn block_difficulties(&self, id: BlockId) -> Option<(U256, U256, U256)> {
+        let chain = self.chain.read();
+        if let BlockId::Pending = id {
+            let (latest_difficulty, latest_pow_difficulty, latest_pos_difficulty) = self
+                .block_difficulties(BlockId::Latest)
+                .expect("blocks in chain have details; qed");
+            let pending = self
+                .miner
+                .pending_block_header(chain.best_block_number())
+                .map(|header| {
+                    (
+                        header.seal_type().clone().unwrap_or_default(),
+                        *header.difficulty(),
+                    )
+                });
+            if let Some((seal_type, difficulty)) = pending {
+                match seal_type {
+                    SealType::PoW => {
+                        let pow_difficulty = latest_pow_difficulty + difficulty;
+                        return Some((
+                            // TODO-UNITY: add overflow check
+                            pow_difficulty
+                                * ::std::cmp::max(latest_pos_difficulty, U256::from(1u64)),
+                            pow_difficulty,
+                            latest_pos_difficulty,
+                        ));
+                    }
+                    SealType::PoS => {
+                        let pos_difficulty = latest_pos_difficulty + difficulty;
+                        return Some((
+                            // TODO-UNITY: add overflow check
+                            latest_pow_difficulty
+                                * ::std::cmp::max(pos_difficulty, U256::from(1u64)),
+                            latest_pow_difficulty,
+                            pos_difficulty,
+                        ));
+                    }
+                }
+            }
+            // fall back to latest
+            return Some((
+                latest_difficulty,
+                latest_pow_difficulty,
+                latest_pos_difficulty,
+            ));
+        }
+
+        Self::block_hash(&chain, &self.miner, id)
+            .and_then(|hash| chain.block_details(&hash))
+            .map(|d| {
+                (
+                    d.total_difficulty,
+                    d.pow_total_difficulty,
+                    d.pos_total_difficulty,
+                )
+            })
     }
 
     fn calculate_enacted_retracted(
@@ -975,6 +1053,52 @@ impl BlockChainClient for Client {
         Ok(results)
     }
 
+    // get the staker's vote
+    // a: staker address
+    fn get_stake(&self, a: &Address) -> Option<u64> {
+        let machine = self.engine.machine();
+        let mut env_info = match self
+            // get the latest block
+            .env_info(BlockId::Latest)
+        {
+            Some(info) => info,
+            None => return None,
+        };
+
+        env_info.gas_limit = U256::max_value();
+        let mut state = match self.state_at(BlockId::Latest) {
+            Some(s) => s,
+            None => return None,
+        };
+        // construct fake transaction
+        let mut call_data = Vec::new();
+        call_data.append(&mut AbiToken::STRING(String::from("getVote")).encode());
+        call_data.append(&mut AbiToken::ADDRESS(a.to_owned().into()).encode());
+        let tx = Transaction::new(
+            0.into(),
+            1.into(),
+            100_000.into(),
+            Action::Call(self.config.stake_contract),
+            0.into(),
+            // signature of getVote(Address)
+            call_data,
+            DEFAULT_TRANSACTION_TYPE,
+        )
+        .fake_sign(Address::default());
+
+        match Self::do_virtual_call(machine, &env_info, &mut state, &tx, Default::default()) {
+            Ok(executed) => {
+                let mut decoder = AVMDecoder::new(executed.output);
+                // assume staking contract returns a long value
+                match decoder.decode_ulong() {
+                    Ok(v) => Some(v),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
     fn estimate_gas(&self, t: &SignedTransaction, block: BlockId) -> Result<U256, CallError> {
         let (mut upper, max_upper, env_info) = {
             let mut env_info = self.env_info(block).ok_or(CallError::StatePruned)?;
@@ -1091,6 +1215,22 @@ impl BlockChainClient for Client {
 
     fn best_block_header(&self) -> encoded::Header { self.chain.read().best_block_header() }
 
+    fn best_block_header_with_seal_type(&self, seal_type: &SealType) -> Option<encoded::Header> {
+        self.chain
+            .read()
+            .best_block_header_with_seal_type(seal_type)
+    }
+
+    fn calculate_difficulty(
+        &self,
+        parent_header: Option<&Header>,
+        grand_parent_header: Option<&Header>,
+    ) -> U256
+    {
+        let engine = &*self.engine;
+        engine.calculate_difficulty(parent_header, grand_parent_header)
+    }
+
     fn block_header(&self, id: BlockId) -> Option<::encoded::Header> {
         let chain = self.chain.read();
 
@@ -1165,26 +1305,9 @@ impl BlockChainClient for Client {
         }
     }
 
-    fn block_total_difficulty(&self, id: BlockId) -> Option<U256> {
-        let chain = self.chain.read();
-        if let BlockId::Pending = id {
-            let latest_difficulty = self
-                .block_total_difficulty(BlockId::Latest)
-                .expect("blocks in chain have details; qed");
-            let pending_difficulty = self
-                .miner
-                .pending_block_header(chain.best_block_number())
-                .map(|header| *header.difficulty());
-            if let Some(difficulty) = pending_difficulty {
-                return Some(difficulty + latest_difficulty);
-            }
-            // fall back to latest
-            return Some(latest_difficulty);
-        }
-
-        Self::block_hash(&chain, &self.miner, id)
-            .and_then(|hash| chain.block_details(&hash))
-            .map(|d| d.total_difficulty)
+    // TODO-UNITY: change back after finishing sync rf
+    fn block_total_difficulty(&self, id: BlockId) -> Option<(U256, U256, U256)> {
+        self.block_difficulties(id)
     }
 
     fn nonce(&self, address: &Address, id: BlockId) -> Option<U256> {
@@ -1432,8 +1555,14 @@ impl BlockChainClient for Client {
 
     fn chain_info(&self) -> BlockChainInfo {
         let mut chain_info = self.chain.read().chain_info();
-        chain_info.pending_total_difficulty =
-            chain_info.total_difficulty + self.block_queue.total_difficulty();
+
+        // TODO-UNITY: add overflow check
+        chain_info.pending_total_difficulty = (chain_info.pow_total_difficulty
+            + self.block_queue.pow_total_difficulty())
+            * ::std::cmp::max(
+                chain_info.pos_total_difficulty + self.block_queue.pos_total_difficulty(),
+                U256::from(1u64),
+            );
         chain_info
     }
 
@@ -1509,6 +1638,7 @@ impl MiningBlockChainClient for Client {
         gas_range_target: (U256, U256),
         extra_data: Bytes,
         seal_type: Option<SealType>,
+        timestamp: Option<u64>,
     ) -> OpenBlock
     {
         let engine = &*self.engine;
@@ -1538,6 +1668,7 @@ impl MiningBlockChainClient for Client {
             gas_range_target,
             extra_data,
             self.db.read().clone(),
+            timestamp,
         )
         .expect(
             "OpenBlock::new only fails if parent state root invalid; state root of best block's \
@@ -1699,7 +1830,7 @@ mod tests {
     #[test]
     fn should_not_cache_details_before_commit() {
         use client::BlockChainClient;
-        use helpers::{generate_dummy_client,get_good_dummy_block_hash};
+        use helpers::{generate_dummy_client, get_good_dummy_block_hash};
 
         use std::thread;
         use std::time::Duration;
@@ -1709,7 +1840,7 @@ mod tests {
 
         let client = generate_dummy_client(0);
         let genesis = client.chain_info().best_block_hash;
-        let (new_hash, new_block) = get_good_dummy_block_hash();
+        let (new_hash, new_block) = get_good_dummy_block_hash(None);
 
         let go = {
             // Separate thread uncommited transaction

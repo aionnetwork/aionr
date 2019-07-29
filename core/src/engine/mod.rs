@@ -21,8 +21,8 @@
  ******************************************************************************/
 
 //! Consensus engine specification and basic implementations.
-pub mod pow_equihash_engine;
-pub use self::pow_equihash_engine::POWEquihashEngine;
+pub mod unity_engine;
+pub use self::unity_engine::UnityEngine;
 
 use std::fmt;
 use std::sync::Arc;
@@ -114,6 +114,16 @@ pub trait Engine: Sync + Send {
     // TODO: decouple.
     fn machine(&self) -> &EthereumMachine;
 
+    /// Calculate the difficulty of
+    fn calculate_difficulty(
+        &self,
+        _parent: Option<&Header>,
+        _grand_parent: Option<&Header>,
+    ) -> U256
+    {
+        U256::from(0)
+    }
+
     /// The number of additional header fields required for this engine.
     fn seal_fields(&self, _header: &<EthereumMachine as Machine>::Header) -> usize { 0 }
 
@@ -141,10 +151,11 @@ pub trait Engine: Sync + Send {
         header: &<EthereumMachine as Machine>::Header,
     ) -> Result<(), <EthereumMachine as Machine>::Error>;
 
-    fn verify_local_seal_pos(
+    fn verify_seal_pos(
         &self,
         header: &<EthereumMachine as Machine>::Header,
         seal_pos: Option<&<EthereumMachine as Machine>::Header>,
+        stake: Option<u64>,
     ) -> Result<(), <EthereumMachine as Machine>::Error>;
 
     /// Phase 1 quick block verification. Only does checks that are cheap. Returns either a null `Ok` or a general error detailing the problem with import.
@@ -177,9 +188,9 @@ pub trait Engine: Sync + Send {
         Ok(())
     }
 
-    /// Populate a header's fields based on its parent's header.
+    /// Populate a header's difficulty based on its parent's header.
     /// Usually implements the chain scoring rule based on weight.
-    fn populate_from_parent(
+    fn set_difficulty_from_parent(
         &self,
         _header: &mut <EthereumMachine as Machine>::Header,
         _parent: Option<&<EthereumMachine as Machine>::Header>,

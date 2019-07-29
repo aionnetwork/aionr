@@ -19,9 +19,13 @@
  *
  ******************************************************************************/
 
-use client::{BlockId, BlockImportError, BlockStatus};
-use types::error::{BlockError, ImportError};
+use client::BlockId;
+use client::BlockImportError;
+use client::BlockStatus;
+use types::error::BlockError;
+use types::error::ImportError;
 use header::Seal;
+use header::SealType;
 use views::BlockView;
 use aion_types::{H256, U256};
 use p2p::update_node_with_mode;
@@ -181,13 +185,14 @@ pub fn import_blocks() {
                 for block in blocks_to_import.iter() {
                     offset += 1;
                     let block_view = BlockView::new(block);
-                    let (hash, number, parent, difficulty) = {
+                    let (hash, number, parent, difficulty, seal_type) = {
                         let header_view = block_view.header_view();
                         (
                             header_view.hash(),
                             header_view.number(),
                             header_view.parent_hash(),
                             header_view.difficulty(),
+                            header_view.seal_type().unwrap_or_default(),
                         )
                     };
 
@@ -206,16 +211,37 @@ pub fn import_blocks() {
                             //     continue;
                             // }
 
-                            node.current_total_difficulty =
-                                node.current_total_difficulty + difficulty;
+                            match seal_type {
+                                SealType::PoW => {
+                                    node.current_pow_total_difficulty =
+                                        node.current_pow_total_difficulty + difficulty;
+                                }
+                                SealType::PoS => {
+                                    node.current_pos_total_difficulty =
+                                        node.current_pos_total_difficulty + difficulty;
+                                }
+                            }
+                            // TODO-UNITY: add overflow check
+                            node.current_total_difficulty = node.current_pow_total_difficulty
+                                * ::std::cmp::max(
+                                    node.current_pos_total_difficulty,
+                                    U256::from(1u64),
+                                );
 
                             node.synced_block_num = number;
                             if result.is_err() {
                                 if status == BlockStatus::InChain {
-                                    if let Some(current_total_difficulty) =
-                                        client.block_total_difficulty(block_id)
+                                    if let Some((
+                                        current_total_difficulty,
+                                        current_pow_total_difficulty,
+                                        current_pos_total_difficulty,
+                                    )) = client.block_total_difficulty(block_id)
                                     {
-                                        node.current_total_difficulty = current_total_difficulty
+                                        node.current_total_difficulty = current_total_difficulty;
+                                        node.current_pow_total_difficulty =
+                                            current_pow_total_difficulty;
+                                        node.current_pos_total_difficulty =
+                                            current_pos_total_difficulty;
                                     }
                                 }
                                 info!(target: "sync", "AlreadyStored block #{}, {:?} received from node {}", number, hash, node.get_node_id());
@@ -285,6 +311,7 @@ pub fn import_blocks() {
                         Err(BlockImportError::Block(BlockError::UnknownParent(_))) => {
                             if number == 1 {
                                 error!(target: "sync", "Invalid genesis !!!");
+
                                 break;
                             }
 
@@ -333,6 +360,8 @@ pub fn import_blocks() {
                                 }
                             } else {
                                 node.current_total_difficulty = U256::from(0);
+                                node.current_pow_total_difficulty = U256::from(0);
+                                node.current_pos_total_difficulty = U256::from(0);
                                 node.synced_block_num = number;
 
                                 if node.target_total_difficulty

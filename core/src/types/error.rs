@@ -94,6 +94,10 @@ pub enum BlockError {
     UnknownParent(H256),
     /// No transition to epoch number.
     UnknownEpochTransition(u64),
+    /// Invalid pos timestamp
+    InvalidPoSTimestamp(u64, u64, u64),
+    /// PoS block producer's stake is null or 0
+    NullStake,
 }
 
 impl fmt::Display for BlockError {
@@ -134,6 +138,13 @@ impl fmt::Display for BlockError {
                 format!("Unknown transition to epoch number: {}", num)
             }
             TooManyTransactions(ref address) => format!("Too many transactions from: {}", address),
+            InvalidPoSTimestamp(ref timestamp, ref parent_timestamp, ref delta) => {
+                format!(
+                    "Invalid pos block timestamp {}, parent timestamp {}, expected delta: {}",
+                    timestamp, parent_timestamp, delta
+                )
+            }
+            NullStake => "PoS block producer's stake is null or 0.".into(),
         };
 
         f.write_fmt(format_args!("Block error ({})", msg))
