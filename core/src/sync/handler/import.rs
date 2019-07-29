@@ -285,7 +285,6 @@ pub fn import_blocks() {
                         Err(BlockImportError::Block(BlockError::UnknownParent(_))) => {
                             if number == 1 {
                                 error!(target: "sync", "Invalid genesis !!!");
-
                                 break;
                             }
 

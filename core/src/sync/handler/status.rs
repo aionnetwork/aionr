@@ -89,7 +89,6 @@ pub fn receive_req(node: &mut Node) {
 pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
     trace!(target: "sync", "STATUSRES received.");
 
-    let node_hash = node.node_hash;
     let (mut best_block_num, req_body_rest) = req.body.split_at(mem::size_of::<u64>());
     let best_block_num = best_block_num.read_u64::<BigEndian>().unwrap_or(0);
     let (mut total_difficulty_len, req_body_rest) = req_body_rest.split_at(mem::size_of::<u8>());
@@ -107,46 +106,19 @@ pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
     }
     node.target_total_difficulty = U256::from(total_difficulty);
     SyncEvent::update_node_state(node, SyncEvent::OnStatusRes);
-    update_node(node_hash, node);
+    update_node(node.node_hash, node);
 
+    // internal comparing node td vs current network status td
     SyncStorage::update_network_status(
         node.best_block_num,
         node.best_hash,
         node.target_total_difficulty,
     );
-
-    let sync_from_boot_nodes_only = get_network_config().sync_from_boot_nodes_only;
-    if sync_from_boot_nodes_only {
-        if !node.is_from_boot_list {
-            return;
-        }
+    
+    // immediately send request when incoming response indicates node td > local chain td
+    // even headers::get_headers_from_node has condition check internally
+    // TODO: leave condition check in one place
+    if node.target_total_difficulty >= SyncStorage::get_chain_info().total_difficulty {
+        headers::get_headers_from_node(node);
     }
-
-    if SyncStorage::get_network_best_block_number() <= SyncStorage::get_synced_block_number() {
-        node.last_request_timestamp = SystemTime::now();
-        update_node(node.node_hash, node);
-    } else {
-        if let Some(mut node) = get_an_active_node() {
-            if node.synced_block_num == 0 {
-                node.synced_block_num = SyncStorage::get_synced_block_number() + 1;
-            }
-            headers::get_headers_from_node(&mut node);
-        }
-    }
-
-    // if SyncStorage::get_network_best_block_number() <= SyncStorage::get_synced_block_number() {
-    //     node.last_request_timestamp = SystemTime::now();
-    //     update_node(node.node_hash, node);
-    // } else {
-    //     BlockHeadersHandler::get_headers_from_random_node();
-    // }
-    // ------
-    // FIX: syncing should be determined by difficuly but not block number
-    // ------
-    // if node.target_total_difficulty <= node.current_total_difficulty {
-    //     node.last_request_timestamp = SystemTime::now();
-    //     update_node(node.node_hash, node);
-    // } else {
-    //     BlockHeadersHandler::get_headers_from_node(node);
-    // }
 }
