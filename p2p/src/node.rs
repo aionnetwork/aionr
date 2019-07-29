@@ -119,24 +119,24 @@ pub struct Node {
     pub net_id: u32,
     pub ip_addr: IpAddr,
     pub node_hash: u64,
-    pub state_code: u32,
     pub best_block_num: u64,
-    pub synced_block_num: u64,
     pub best_hash: H256,
     pub genesis_hash: H256,
+    pub is_from_boot_list: bool,
+    pub revision: [u8; MAX_REVISION_LENGTH],
+    pub tx: Option<mpsc::Sender<ChannelBuffer>>,
+
+    // TODO: move to sync
+    pub synced_block_num: u64,
     pub target_total_difficulty: U256,
     pub current_total_difficulty: U256,
     pub mode: Mode,
-
-    // TODO: move to sync
+    pub state_code: u32,
     pub last_request_timestamp: SystemTime,
     pub last_request_num: u64,
     pub last_broadcast_timestamp: SystemTime,
     pub last_sent_transactions: HashSet<H256>,
-    pub tx: Option<mpsc::Sender<ChannelBuffer>>,
-    pub is_from_boot_list: bool,
     pub repeated: u8,
-    pub revision: [u8; MAX_REVISION_LENGTH],
 }
 
 impl Node {
