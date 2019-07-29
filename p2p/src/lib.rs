@@ -56,7 +56,6 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use std::io;
 use std::net::Shutdown;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex,RwLock};
 use std::time::{Duration, Instant};
 use rand::{thread_rng, Rng};
@@ -88,8 +87,7 @@ lazy_static! {
     static ref LOCAL: Storage<Node> = Storage::new();
     static ref CONFIG: Storage<Config> = Storage::new();
     static ref SOCKETS: Storage<Mutex<HashMap<u64, TcpStream>>> = Storage::new();
-    static ref NODES: RwLock<HashMap<u64, Node>> = { RwLock::new(HashMap::new()) };
-    static ref ENABLED: Storage<AtomicBool> = Storage::new();
+    static ref NODES: RwLock<HashMap<u64, Node>> = {RwLock::new(HashMap::new())};
     static ref HANDLERS: Storage<Handler> = Storage::new();
 }
 
@@ -166,7 +164,6 @@ pub fn enable(cfg: Config) {
     info!(target: "p2p", "        node: {}@{}", local_node.get_node_id(), local_node.get_ip_addr());
     CONFIG.set(cfg);
     LOCAL.set(local_node.clone());
-    ENABLED.set(AtomicBool::new(true));
     
     let executor = WORKERS.get().executor();
     let local_addr = get_local_node().get_ip_addr();
@@ -299,11 +296,6 @@ pub fn load_boot_nodes(boot_nodes_str: Vec<String>) -> Vec<Node> {
 }
 
 pub fn get_local_node() -> &'static Node { LOCAL.get() }
-
-pub fn disable() {
-    ENABLED.get().store(false, Ordering::SeqCst);
-    reset();
-}
 
 pub fn reset() {
     if let Ok(mut sockets) = SOCKETS.get().lock() {

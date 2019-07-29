@@ -50,7 +50,7 @@ use p2p::ChannelBuffer;
 use p2p::Config;
 use p2p::register;
 use p2p::enable as p2p_start;
-use p2p::disable as p2p_shutdown;
+use p2p::reset as p2p_shutdown;
 use p2p::get_nodes;
 use p2p::get_nodes_count;
 use p2p::get_all_nodes;
@@ -367,14 +367,14 @@ impl Sync {
             callback: SyncMgr::handle,
         });
         p2p_start(self.config.clone());
-        debug!(target: "sync", "###### P2P enabled... ######");
 
         SyncMgr::enable(&executor, self.config.max_peers);
-        debug!(target: "sync", "###### sync enabled... ######");
     }
 
     pub fn stop_network(&self) {
         SyncMgr::disable();
+        // original is p2p::disable which internally calls reset() with unuse atomic boolean 
+        // TODO: update proper ways to clear up threads and connections on p2p layer
         p2p_shutdown();
     }
 }
