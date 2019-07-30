@@ -98,6 +98,8 @@ pub enum BlockError {
     InvalidPoSTimestamp(u64, u64, u64),
     /// PoS block producer's stake is null or 0
     NullStake,
+    /// Invalid PoS block number before the Unity hard fork point
+    InvalidPoSBlockNumber,
 }
 
 impl fmt::Display for BlockError {
@@ -145,6 +147,7 @@ impl fmt::Display for BlockError {
                 )
             }
             NullStake => "PoS block producer's stake is null or 0.".into(),
+            InvalidPoSBlockNumber => "PoS block number is before the unity hard fork point.".into(),
         };
 
         f.write_fmt(format_args!("Block error ({})", msg))

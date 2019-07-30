@@ -1,5 +1,5 @@
 [aion]
-chain = "core/res/aion/ci.json"
+chain = "ci/ci.json"
 
 [network]
 sync_from_boot_nodes_only = true
