@@ -225,6 +225,19 @@ impl Miner {
     // TOREMOVE-Unity: Unity MS1 use only
     /// Try to generate PoS block if minimum resealing duration is met
     pub fn try_prepare_block_pos(&self, client: &MiningBlockChainClient) -> Result<(), Error> {
+        // Not before the Unity fork point
+        if self
+            .engine
+            .machine()
+            .params()
+            .unity_update
+            .map_or(true, |fork_number| {
+                client.chain_info().best_block_number + 1 < fork_number
+            }) {
+            return Ok(());
+        }
+
+        // Return if no internal staker
         if self.staker.is_none() {
             return Ok(());
         }
