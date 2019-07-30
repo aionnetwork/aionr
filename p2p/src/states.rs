@@ -42,7 +42,7 @@ impl STATE {
     }
     pub fn from(value: u32) -> STATE {
         match value {
-            0 => STATE::CONNECTED,
+            1 => STATE::CONNECTED,
             2 => STATE::ISSERVER,
             4 => STATE::HANDSHAKEDONE,
             8 => STATE::ALIVE,
@@ -60,20 +60,30 @@ mod tests {
     #[test]
     fn equal() {
         assert_eq!(STATE::CONNECTED, STATE::CONNECTED);
-        assert_eq!(STATE::ACTIVE, STATE::ACTIVE);
+        assert_eq!(STATE::ISSERVER, STATE::ISSERVER);
+        assert_eq!(STATE::HANDSHAKEDONE, STATE::HANDSHAKEDONE);
+        assert_eq!(STATE::ALIVE, STATE::ALIVE);
+        assert_eq!(STATE::DISCONNECTED, STATE::DISCONNECTED);
     }
 
     #[test]
     fn value() {
-        assert_eq!(STATE::CONNECTED.value(), 0);
-        assert_eq!(STATE::ALIVE.value(), 1);
+        assert_eq!(STATE::CONNECTED.value(), 1);
+        assert_eq!(STATE::ISSERVER.value(), 2);
+        assert_eq!(STATE::HANDSHAKEDONE.value(), 4);
+        assert_eq!(STATE::ALIVE.value(), 8);
+        assert_eq!(STATE::DISCONNECTED.value(), 16);
     }
 
     #[test]
     fn from() {
+        assert_eq!(STATE::CONNECTED, STATE::from(1));
+        assert_eq!(STATE::ISSERVER, STATE::from(2));
+        assert_eq!(STATE::HANDSHAKEDONE, STATE::from(4));
+        assert_eq!(STATE::ALIVE, STATE::from(8));
+        assert_eq!(STATE::DISCONNECTED, STATE::from(16));
         assert_eq!(STATE::CONNECTED, STATE::from(0));
-        assert_eq!(STATE::ALIVE, STATE::from(1));
-        assert_eq!(STATE::CONNECTED, STATE::from(2));
+        assert_eq!(STATE::CONNECTED, STATE::from(17));
         assert_eq!(STATE::CONNECTED, STATE::from(255));
     }
 }
