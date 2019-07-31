@@ -567,6 +567,12 @@ impl ClosedBlock {
         }
     }
 
+    pub fn pre_seal(self, seal: Vec<Bytes>) -> Self {
+        let mut s = self;
+        s.block.header.set_seal(seal);
+        s
+    }
+
     /// Given an engine reference, reopen the `ClosedBlock` into an `OpenBlock`.
     pub fn reopen(self, engine: &Engine) -> OpenBlock {
         // revert rewards (i.e. set state back at last transaction's state).

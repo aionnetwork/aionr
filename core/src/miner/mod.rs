@@ -144,7 +144,7 @@ pub trait MinerService: Send + Sync {
     fn add_sealing_pos(&self, b: ClosedBlock, client: &MiningBlockChainClient)
         -> Result<(), Error>;
 
-    fn get_ready_pos(&self, h: &H256) -> Option<ClosedBlock>;
+    fn get_ready_pos(&self, h: &H256) -> Option<(ClosedBlock, Vec<Bytes>)>;
 
     fn clear_pos_pending(&self);
 
@@ -160,7 +160,6 @@ pub trait MinerService: Send + Sync {
         client: &MiningBlockChainClient,
         seal: Vec<Bytes>,
         block: ClosedBlock,
-        address: Address,
     ) -> Result<(), Error>;
 
     /// Get the sealing work package and if `Some`, apply some transform.

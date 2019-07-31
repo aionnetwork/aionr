@@ -29,7 +29,7 @@ use rustc_hex::FromHex;
 use rustc_hex::ToHex;
 
 use jsonrpc_macros::Trailing;
-use aion_types::{H256, U256};
+use aion_types::{H256, H512, U256};
 use acore::block::IsBlock;
 use acore::sync::SyncProvider;
 use acore::client::{MiningBlockChainClient, BlockId};
@@ -43,9 +43,13 @@ use helpers::accounts::unwrap_provider;
 use traits::Stratum;
 use types::{
     Work, Info, AddressValidation, MiningInfo, MinerStats, TemplateParam, Bytes, StratumHeader,
-    SimpleHeader, BlockNumber, Seed, SEED_SIZE, BLANK_SEED, Hash, BLANK_HASH, Address, Signature
+    SimpleHeader, BlockNumber
 };
 use aion_types::clean_0x;
+
+const MAX_QUEUE_SIZE_TO_MINE_ON: usize = 4;
+const STRATUM_BLKTIME_INCLUDED_COUNT: usize = 32;
+const STRATUM_RECENT_BLK_COUNT: usize = 128;
 
 /// Stratum rpc implementation.
 pub struct StratumClient<C, S: ?Sized, M>
@@ -89,11 +93,26 @@ where
     fn account_provider(&self) -> Result<Arc<AccountProvider>> {
         unwrap_provider(&self.account_provider)
     }
-}
 
-const MAX_QUEUE_SIZE_TO_MINE_ON: usize = 4;
-const STRATUM_BLKTIME_INCLUDED_COUNT: usize = 32;
-const STRATUM_RECENT_BLK_COUNT: usize = 128;
+    fn check_syncing(&self) -> Result<()> {
+        //TODO: check if initial sync is complete here
+        //let sync = self.sync;
+        if
+        /*sync.status().state != SyncState::Idle ||*/
+        self.client.queue_info().total_queue_size() > MAX_QUEUE_SIZE_TO_MINE_ON {
+            trace!(target: "miner", "Syncing. Cannot give any work.");
+            return Err(errors::no_work());
+        }
+
+        // Otherwise spin until our submitted block has been included.
+        let timeout = Instant::now() + Duration::from_millis(1000);
+        while Instant::now() < timeout && self.client.queue_info().total_queue_size() > 0 {
+            thread::sleep(Duration::from_millis(1));
+        }
+
+        Ok(())
+    }
+}
 
 impl<C, S: ?Sized, M> Stratum for StratumClient<C, S, M>
 where
@@ -104,22 +123,7 @@ where
     /// Returns the work of current block
     fn work(&self, _tpl_param: Trailing<TemplateParam>) -> Result<Work> {
         // check if we're still syncing and return empty strings in that case
-        {
-            //TODO: check if initial sync is complete here
-            //let sync = self.sync;
-            if
-            /*sync.status().state != SyncState::Idle ||*/
-            self.client.queue_info().total_queue_size() > MAX_QUEUE_SIZE_TO_MINE_ON {
-                trace!(target: "miner", "Syncing. Cannot give any work.");
-                return Err(errors::no_work());
-            }
-
-            // Otherwise spin until our submitted block has been included.
-            let timeout = Instant::now() + Duration::from_millis(1000);
-            while Instant::now() < timeout && self.client.queue_info().total_queue_size() > 0 {
-                thread::sleep(Duration::from_millis(1));
-            }
-        }
+        self.check_syncing()?;
 
         if self.miner.author().is_zero() {
             warn!(target: "miner", "Cannot give work package - no author is configured. Use --author to configure!");
@@ -351,57 +355,44 @@ where
     }
 
     /// PoS get seed
-    fn pos_get_seed(&self) -> Result<Seed> {
+    fn pos_get_seed(&self) -> Result<H512> {
         // seal map:
         // 64 bytes signature + 64 bytes seed + 32 public key
         match self.client.best_block_header_with_seal_type(&SealType::PoS) {
             Some(h) => {
                 // seal length must be 3, since it is already validated
                 let seal = h.seal();
-                let mut s = [0u8; SEED_SIZE];
+                let mut s = [0u8; 64];
                 println!("seal = {:?}, len = {}", seal, seal.len());
                 s.copy_from_slice(seal[1].as_slice());
-                Ok(Seed(s))
+                Ok(s.into())
             }
-            _ => Ok(Seed(BLANK_SEED)),
+            _ => Ok(H512::zero()),
         }
     }
 
     /// PoS submit seed
-    fn pos_submit_seed(&self, seed: Seed, address: Address) -> Result<Hash> {
+    fn pos_submit_seed(&self, seed: H512, staker: H256) -> Result<H256> {
         // block template is generated each 20 secs
         // try to get block hash
 
         let template = self
             .miner
-            .get_pos_template(&*self.client, seed.0, address.0.into());
+            .get_pos_template(&*self.client, seed.into(), staker);
 
         if template.is_some() {
-            return Ok(Hash(template.unwrap().into()));
+            return Ok(template.unwrap().into());
         } else {
-            return Ok(Hash(BLANK_HASH));
+            return Ok(H256::zero());
         }
     }
 
     /// PoS submit work
-    fn pos_submit_work(
-        &self,
-        seed: Seed,
-        address: Address,
-        signature: Signature,
-        hash: Hash,
-    ) -> Result<bool>
-    {
-        let mut seal = Vec::new();
-        seal.push(signature.0[32..].to_vec());
-        seal.push(seed.0.to_vec());
-        seal.push(signature.0[0..32].to_vec());
-
-        if let Some(block) = self.miner.get_ready_pos(&hash.0.into()) {
+    fn pos_submit_work(&self, sig: H512, hash: H256) -> Result<bool> {
+        if let Some((block, mut seal)) = self.miner.get_ready_pos(&hash) {
             debug!(target: "miner", "got PoS block template");
-            let result = self
-                .miner
-                .try_seal_pos(&*self.client, seal, block, address.0.into());
+            seal[1] = sig.to_vec();
+            let result = self.miner.try_seal_pos(&*self.client, seal, block);
             Ok(result.is_ok())
         } else {
             Ok(false)

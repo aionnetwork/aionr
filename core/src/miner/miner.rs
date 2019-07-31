@@ -57,7 +57,7 @@ use transaction::transaction_queue::{
 };
 use using_queue::{GetAction, UsingQueue};
 use rcrypto::ed25519;
-use key::Ed25519KeyPair;
+use key::{Ed25519KeyPair, public_to_address_ed25519};
 use num_bigint::BigUint;
 use blake2b::blake2b;
 
@@ -1289,13 +1289,16 @@ impl MinerService for Miner {
         _client: &MiningBlockChainClient,
     ) -> Result<(), Error>
     {
-        self.maybe_work.lock().insert(b.header().hash(), b);
+        self.maybe_work.lock().insert(b.header().bare_hash(), b);
         Ok(())
     }
 
-    fn get_ready_pos(&self, hash: &H256) -> Option<ClosedBlock> {
+    fn get_ready_pos(&self, hash: &H256) -> Option<(ClosedBlock, Vec<Bytes>)> {
         match self.maybe_work.lock().get(hash) {
-            Some(b) => Some(b.clone()),
+            Some(b) => {
+                let seal = b.header().seal();
+                Some((b.clone(), seal.clone().to_vec()))
+            }
             _ => None,
         }
     }
@@ -1311,10 +1314,11 @@ impl MinerService for Miner {
         &self,
         client: &MiningBlockChainClient,
         seed: [u8; 64],
-        address: Address,
+        pk: H256,
     ) -> Option<H256>
     {
-        let stake = client.get_stake(&address.0.into()).unwrap_or(0);
+        let address = public_to_address_ed25519(&pk);
+        let stake = client.get_stake(&address).unwrap_or(0);
         if stake == 0 {
             return None;
         }
@@ -1343,7 +1347,7 @@ impl MinerService for Miner {
             seal_parent.map(|header| header.decode()).as_ref(),
         );
 
-        println!("new block difficulty = {:?}", difficulty);
+        debug!(target: "miner", "new block difficulty = {:?}", difficulty);
 
         let hash_of_seed = blake2b(&seed[..]);
         let a = BigUint::parse_bytes(
@@ -1360,24 +1364,34 @@ impl MinerService for Miner {
         let new_timestamp = timestamp + max(1u64, delta as u64);
 
         self.set_author(address);
+
         let (raw_block, _): (ClosedBlock, Option<H256>) =
             self.prepare_block(client, &Some(SealType::PoS), Some(new_timestamp));
 
-        let hash = raw_block.header().bare_hash();
-        match self.add_sealing_pos(raw_block, client) {
+        let mut seal = Vec::with_capacity(3);
+        seal.push(seed.to_vec());
+        seal.push(vec![0u8; 64]);
+        seal.push(pk.to_vec());
+
+        let block = raw_block.pre_seal(seal);
+
+        let hash = block.header().bare_hash();
+
+        match self.add_sealing_pos(block, client) {
             Ok(_) => Some(hash),
             _ => None,
         }
     }
 
+    // public key must be in seal[2]
     fn try_seal_pos(
         &self,
         client: &MiningBlockChainClient,
         seal: Vec<Bytes>,
         block: ClosedBlock,
-        address: Address,
     ) -> Result<(), Error>
     {
+        let address = public_to_address_ed25519(&seal[2][..].into());
         let best_block_header = client.best_block_header_with_seal_type(&SealType::PoS);
 
         let mut queue = self.maybe_work.lock();
