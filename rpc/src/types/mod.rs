@@ -51,6 +51,7 @@ mod hash;
 
 pub use self::seed::Seed;
 pub use self::seed::BLANK_SEED;
+pub use self::seed::SEED_SIZE;
 pub use self::signature::Signature;
 pub use self::signature::BLANK_SIGNATURE;
 pub use self::address::Address;

@@ -1091,7 +1091,10 @@ impl BlockChainClient for Client {
                 let mut decoder = AVMDecoder::new(executed.output);
                 // assume staking contract returns a long value
                 match decoder.decode_ulong() {
-                    Ok(v) => Some(v),
+                    Ok(v) => {
+                        debug!(target: "miner", "stake of {:?} = {:?}", a, v);
+                        Some(v)
+                    }
                     _ => None,
                 }
             }

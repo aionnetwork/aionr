@@ -35,6 +35,7 @@ use acore::sync::SyncProvider;
 use acore::client::{MiningBlockChainClient, BlockId};
 use acore::miner::MinerService;
 use acore::account_provider::AccountProvider;
+use acore::header::SealType;
 use jsonrpc_core::{Error, Result};
 
 use helpers::errors;
@@ -42,7 +43,7 @@ use helpers::accounts::unwrap_provider;
 use traits::Stratum;
 use types::{
     Work, Info, AddressValidation, MiningInfo, MinerStats, TemplateParam, Bytes, StratumHeader,
-    SimpleHeader, BlockNumber, Seed, BLANK_SEED, Hash, BLANK_HASH, Address, Signature
+    SimpleHeader, BlockNumber, Seed, SEED_SIZE, BLANK_SEED, Hash, BLANK_HASH, Address, Signature
 };
 use aion_types::clean_0x;
 
@@ -336,6 +337,7 @@ where
             network_hashrate = latest_difficulty.as_u64() as f64 / block_time as f64;
         }
 
+        // hashrate shared by miner: mined blocks / total blocks
         if index > 0 && mined_by_miner > 0 {
             miner_hashrate_share = mined_by_miner as f64 / index as f64;
             miner_hashrate = network_hashrate * miner_hashrate_share;
@@ -348,28 +350,61 @@ where
         })
     }
 
-    /// Pos get seed
+    /// PoS get seed
     fn pos_get_seed(&self) -> Result<Seed> {
-        // TODO: implement logic
-        Ok(Seed(BLANK_SEED))
+        // seal map:
+        // 64 bytes signature + 64 bytes seed + 32 public key
+        match self.client.best_block_header_with_seal_type(&SealType::PoS) {
+            Some(h) => {
+                // seal length must be 3, since it is already validated
+                let seal = h.seal();
+                let mut s = [0u8; SEED_SIZE];
+                println!("seal = {:?}, len = {}", seal, seal.len());
+                s.copy_from_slice(seal[1].as_slice());
+                Ok(Seed(s))
+            }
+            _ => Ok(Seed(BLANK_SEED)),
+        }
     }
 
-    /// Pos submit seed
-    fn pos_submit_seed(&self, _seed: Seed, _address: Address) -> Result<Hash> {
-        // TODO: implement logic
-        Ok(Hash::new(BLANK_HASH))
+    /// PoS submit seed
+    fn pos_submit_seed(&self, seed: Seed, address: Address) -> Result<Hash> {
+        // block template is generated each 20 secs
+        // try to get block hash
+
+        let template = self
+            .miner
+            .get_pos_template(&*self.client, seed.0, address.0.into());
+
+        if template.is_some() {
+            return Ok(Hash(template.unwrap().into()));
+        } else {
+            return Ok(Hash(BLANK_HASH));
+        }
     }
 
-    /// Pos submit work
+    /// PoS submit work
     fn pos_submit_work(
         &self,
-        _seed: Seed,
-        _address: Address,
-        _signature: Signature,
-        _hash: Hash,
+        seed: Seed,
+        address: Address,
+        signature: Signature,
+        hash: Hash,
     ) -> Result<bool>
     {
-        // TODO: implement logic
-        Ok(true)
+        let mut seal = Vec::new();
+        seal.push(signature.0[32..].to_vec());
+        seal.push(seed.0.to_vec());
+        seal.push(signature.0[0..32].to_vec());
+
+        if let Some(block) = self.miner.get_ready_pos(&hash.0.into()) {
+            debug!(target: "miner", "got PoS block template");
+            let result = self
+                .miner
+                .try_seal_pos(&*self.client, seal, block, address.0.into());
+            Ok(result.is_ok())
+        } else {
+            Ok(false)
+        }
     }
 }
