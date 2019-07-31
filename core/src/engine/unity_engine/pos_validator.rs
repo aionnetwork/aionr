@@ -73,12 +73,12 @@ impl PoSValidator {
         }
 
         // Get seed and signature
-        let signature = &seal[0];
-        let seed = &seal[1];
+        let seed = &seal[0];
+        let signature = &seal[1];
         let pk = &seal[2];
         let parent_seed = seal_parent_header
             .seal()
-            .get(1)
+            .get(0)
             .expect("parent pos block should have a seed");
 
         // Verify seed
@@ -87,7 +87,7 @@ impl PoSValidator {
         }
 
         // Verify block signature
-        if !verify(&header.bare_hash().0, pk, signature) {
+        if !verify(&header.mine_hash().0, pk, signature) {
             return Err(BlockError::InvalidPoSSignature.into());
         }
 

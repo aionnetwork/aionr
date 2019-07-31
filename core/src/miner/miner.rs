@@ -269,7 +269,7 @@ impl Miner {
             Some(header) => {
                 let seed: Bytes = header
                     .seal()
-                    .get(1)
+                    .get(0)
                     .expect("A pos block has to contain a seed")
                     .to_owned();
                 (
@@ -344,13 +344,13 @@ impl Miner {
             self.prepare_block(client, &Some(SealType::PoS), Some(timestamp));
 
         // 2. Generate signature
-        let bare_hash: H256 = raw_block.header().bare_hash();
-        let signature = ed25519::signature(&bare_hash.0, sk);
+        let mine_hash: H256 = raw_block.header().mine_hash();
+        let signature = ed25519::signature(&mine_hash.0, sk);
 
         // 3. Seal the block
         let mut seal: Vec<Bytes> = Vec::new();
-        seal.push(signature.to_vec());
         seal.push(seed.to_vec());
+        seal.push(signature.to_vec());
         seal.push(pk.to_vec());
         let sealed_block: SealedBlock = raw_block
             .lock()
