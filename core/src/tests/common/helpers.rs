@@ -323,6 +323,8 @@ pub fn generate_dummy_blockchain(block_number: u32) -> BlockChain {
         BlockChainConfig::default(),
         &create_unverifiable_block(0, H256::zero()),
         db.clone(),
+        None,
+        None,
     );
 
     let mut batch = DBTransaction::new();
@@ -344,6 +346,8 @@ pub fn generate_dummy_blockchain_with_extra(block_number: u32) -> BlockChain {
         BlockChainConfig::default(),
         &create_unverifiable_block(0, H256::zero()),
         db.clone(),
+        None,
+        None,
     );
 
     let mut batch = DBTransaction::new();
@@ -365,6 +369,8 @@ pub fn generate_dummy_empty_blockchain() -> BlockChain {
         BlockChainConfig::default(),
         &create_unverifiable_block(0, H256::zero()),
         db.clone(),
+        None,
+        None,
     );
     bc
 }

@@ -914,7 +914,9 @@ impl BlockChain {
                 }
             };
             pos_td = pos_td + match (self.unity_update, self.unity_base_pos_total_difficulty) {
-                (Some(fork_number), Some(td_pos_base)) if number == fork_number => td_pos_base,
+                (Some(fork_number), Some(td_pos_base)) if header.number() == fork_number => {
+                    td_pos_base
+                }
                 (_, _) => U256::from(0u64),
             };
             let info = BlockInfo {
@@ -975,7 +977,9 @@ impl BlockChain {
             };
 
             pos_td = pos_td + match (self.unity_update, self.unity_base_pos_total_difficulty) {
-                (Some(fork_number), Some(td_pos_base)) if number == fork_number => td_pos_base,
+                (Some(fork_number), Some(td_pos_base)) if header.number() == fork_number => {
+                    td_pos_base
+                }
                 (_, _) => U256::from(0u64),
             };
 

@@ -26,7 +26,7 @@ fn new_db() -> Arc<KeyValueDB> {
 }
 
 fn new_chain(genesis: &[u8], db: Arc<KeyValueDB>) -> BlockChain {
-    BlockChain::new(Default::default(), genesis, db)
+    BlockChain::new(Default::default(), genesis, db, None, None)
 }
 
 #[test]
