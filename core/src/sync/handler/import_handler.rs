@@ -218,7 +218,8 @@ impl ImportHandler {
                                             node.current_pos_total_difficulty + difficulty;
                                     }
                                 }
-                                // TODO-UNITY: add overflow check
+                                // TODO-UNITY(lyj): add overflow check
+                                // TODO-UNITY(lyj): add ut after p2p merge
                                 node.current_total_difficulty = node.current_pow_total_difficulty
                                     * ::std::cmp::max(
                                         node.current_pos_total_difficulty,

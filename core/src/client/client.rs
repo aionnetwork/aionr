@@ -1557,6 +1557,8 @@ impl BlockChainClient for Client {
         let mut chain_info = self.chain.read().chain_info();
 
         // TODO-UNITY: add overflow check
+        // TODO: It will add up the difficulty of all the blocks in the queue, regardless of whether the block can be successfully verified.
+        // TODO: Find a better way to fix it if you want to use pending_total_difficulty.
         chain_info.pending_total_difficulty = (chain_info.pow_total_difficulty
             + self.block_queue.pow_total_difficulty())
             * ::std::cmp::max(
