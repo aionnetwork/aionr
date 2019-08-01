@@ -89,6 +89,12 @@ fn create_unverifiable_block_with_extra(
     create_test_block(&header)
 }
 
+fn create_unverifiable_pos_block(order: u32, parent_hash: H256) -> Bytes {
+    let mut header = create_unverifiable_block_header(order, parent_hash);
+    header.set_seal_type(SealType::PoS);
+    create_test_block(&header)
+}
+
 fn create_unverifiable_block(order: u32, parent_hash: H256) -> Bytes {
     create_test_block(&create_unverifiable_block_header(order, parent_hash))
 }
@@ -323,6 +329,8 @@ pub fn generate_dummy_blockchain(block_number: u32) -> BlockChain {
         BlockChainConfig::default(),
         &create_unverifiable_block(0, H256::zero()),
         db.clone(),
+        None,
+        None,
     );
 
     let mut batch = DBTransaction::new();
@@ -344,6 +352,8 @@ pub fn generate_dummy_blockchain_with_extra(block_number: u32) -> BlockChain {
         BlockChainConfig::default(),
         &create_unverifiable_block(0, H256::zero()),
         db.clone(),
+        None,
+        None,
     );
 
     let mut batch = DBTransaction::new();
@@ -359,12 +369,40 @@ pub fn generate_dummy_blockchain_with_extra(block_number: u32) -> BlockChain {
     bc
 }
 
+pub fn generate_dummy_blockchain_with_pos_block(block_number: u32) -> BlockChain {
+    let db = new_db();
+    let bc = BlockChain::new(
+        BlockChainConfig::default(),
+        &create_unverifiable_block(0, H256::zero()),
+        db.clone(),
+        None,
+        None,
+    );
+
+    let mut batch = DBTransaction::new();
+    for block_order in 1..block_number {
+        // which means pow and pos blocks alternately insert every two
+        // it will be like pow pow pos pos pow pow pos pos ...
+        //                 0   1   2   3   4   5   6   7
+        let next_block = match block_order / 2 % 2 == 0 {
+            true => create_unverifiable_block(block_order, bc.best_block_hash()),
+            false => create_unverifiable_pos_block(block_order, bc.best_block_hash()),
+        };
+        bc.insert_block(&mut batch, &next_block, vec![]);
+        bc.commit();
+    }
+    db.write(batch).unwrap();
+    bc
+}
+
 pub fn generate_dummy_empty_blockchain() -> BlockChain {
     let db = new_db();
     let bc = BlockChain::new(
         BlockChainConfig::default(),
         &create_unverifiable_block(0, H256::zero()),
         db.clone(),
+        None,
+        None,
     );
     bc
 }

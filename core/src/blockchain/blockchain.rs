@@ -256,6 +256,10 @@ pub struct BlockChain {
     pending_block_hashes: RwLock<HashMap<BlockNumber, H256>>,
     pending_block_details: RwLock<HashMap<H256, BlockDetails>>,
     pending_transaction_addresses: RwLock<HashMap<H256, Option<TransactionAddress>>>,
+
+    // Unity hard fork parameters
+    unity_update: Option<u64>,
+    unity_base_pos_total_difficulty: Option<U256>,
 }
 
 impl BlockProvider for BlockChain {
@@ -585,7 +589,14 @@ impl<'a> Iterator for AncestryIter<'a> {
 
 impl BlockChain {
     /// Create new instance of blockchain from given Genesis.
-    pub fn new(config: Config, genesis: &[u8], db: Arc<KeyValueDB>) -> BlockChain {
+    pub fn new(
+        config: Config,
+        genesis: &[u8],
+        db: Arc<KeyValueDB>,
+        unity_update: Option<u64>,
+        unity_base_pos_total_difficulty: Option<U256>,
+    ) -> BlockChain
+    {
         // 400 is the avarage size of the key
         let cache_man = CacheManager::new(config.pref_cache_size, config.max_cache_size, 400);
 
@@ -610,6 +621,8 @@ impl BlockChain {
             pending_block_hashes: RwLock::new(HashMap::new()),
             pending_block_details: RwLock::new(HashMap::new()),
             pending_transaction_addresses: RwLock::new(HashMap::new()),
+            unity_update: unity_update,
+            unity_base_pos_total_difficulty: unity_base_pos_total_difficulty,
         };
 
         // load best block
@@ -886,7 +899,7 @@ impl BlockChain {
 
         if let Some(parent_details) = maybe_parent {
             // parent known to be in chain.
-            let (pow_td, pos_td) = match header.seal_type().unwrap_or_default() {
+            let (pow_td, mut pos_td) = match header.seal_type().unwrap_or_default() {
                 SealType::PoW => {
                     (
                         parent_details.pow_total_difficulty + header.difficulty(),
@@ -899,6 +912,12 @@ impl BlockChain {
                         parent_details.pos_total_difficulty + header.difficulty(),
                     )
                 }
+            };
+            pos_td = pos_td + match (self.unity_update, self.unity_base_pos_total_difficulty) {
+                (Some(fork_number), Some(td_pos_base)) if header.number() == fork_number => {
+                    td_pos_base
+                }
+                (_, _) => U256::from(0u64),
             };
             let info = BlockInfo {
                 hash: hash,
@@ -952,9 +971,16 @@ impl BlockChain {
                  block can have missing parent; qed",
             );
 
-            let (pow_td, pos_td) = match header.seal_type().unwrap_or_default() {
+            let (pow_td, mut pos_td) = match header.seal_type().unwrap_or_default() {
                 SealType::PoW => (pow_d + header.difficulty(), pos_d),
                 SealType::PoS => (pow_d, pos_d + header.difficulty()),
+            };
+
+            pos_td = pos_td + match (self.unity_update, self.unity_base_pos_total_difficulty) {
+                (Some(fork_number), Some(td_pos_base)) if header.number() == fork_number => {
+                    td_pos_base
+                }
+                (_, _) => U256::from(0u64),
             };
 
             let info = BlockInfo {
@@ -1064,7 +1090,7 @@ impl BlockChain {
             .block_details(&parent_hash)
             .unwrap_or_else(|| panic!("Invalid parent hash: {:?}", parent_hash));
 
-        let (pow_td, pos_td) = match header.seal_type().unwrap_or_default() {
+        let (pow_td, mut pos_td) = match header.seal_type().unwrap_or_default() {
             SealType::PoW => {
                 (
                     parent_details.pow_total_difficulty + header.difficulty(),
@@ -1077,6 +1103,11 @@ impl BlockChain {
                     parent_details.pos_total_difficulty + header.difficulty(),
                 )
             }
+        };
+
+        pos_td = pos_td + match (self.unity_update, self.unity_base_pos_total_difficulty) {
+            (Some(fork_number), Some(td_pos_base)) if number == fork_number => td_pos_base,
+            (_, _) => U256::from(0u64),
         };
 
         // TODO-UNITY: add overflow check

@@ -402,15 +402,20 @@ impl Miner {
             self.prepare_block(client, &Some(SealType::PoS), Some(timestamp), Some(staker));
 
         // 2. Generate signature
-        let mine_hash: H256 = raw_block.header().mine_hash();
+        let mut preseal = Vec::with_capacity(3);
+        preseal.push(seed.to_vec());
+        preseal.push(vec![0u8; 64]);
+        preseal.push(pk.to_vec());
+        let presealed_block = raw_block.pre_seal(preseal);
+        let mine_hash: H256 = presealed_block.header().mine_hash();
         let signature = ed25519::signature(&mine_hash.0, sk);
 
         // 3. Seal the block
-        let mut seal: Vec<Bytes> = Vec::new();
+        let mut seal: Vec<Bytes> = Vec::with_capacity(3);
         seal.push(seed.to_vec());
         seal.push(signature.to_vec());
         seal.push(pk.to_vec());
-        let sealed_block: SealedBlock = raw_block
+        let sealed_block: SealedBlock = presealed_block
             .lock()
             .try_seal_pos(&*self.engine, seal, seal_parent, Some(stake))
             .or_else(|(e, _)| {
@@ -556,14 +561,6 @@ impl Miner {
 
             let mut open_block = match seal_type {
                 Some(SealType::PoS) => {
-                    // let author: Address = self
-                    //     .staker()
-                    //     .to_owned()
-                    //     .expect(
-                    //         "staker key not specified in configuration. Should have checked \
-                    //          before.",
-                    //     )
-                    //     .address();
                     client.prepare_open_block(
                         staker.unwrap_or(Address::default()),
                         (self.gas_floor_target(), self.gas_ceil_target()),
