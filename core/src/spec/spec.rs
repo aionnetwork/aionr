@@ -71,6 +71,10 @@ pub struct CommonParams {
     pub transaction_permission_contract: Option<Address>,
     /// unity update block number.
     pub unity_update: Option<BlockNumber>,
+    /// unity pos base total difficulty
+    pub unity_base_pos_total_difficulty: Option<U256>,
+    /// unity pos initial difficulty
+    pub unity_initial_pos_difficulty: Option<U256>,
 }
 
 impl From<ajson::spec::Params> for CommonParams {
@@ -83,6 +87,8 @@ impl From<ajson::spec::Params> for CommonParams {
             monetary_policy_update: p.monetary_policy_update.map(Into::into),
             transaction_permission_contract: p.transaction_permission_contract.map(Into::into),
             unity_update: p.unity_update.map(Into::into),
+            unity_base_pos_total_difficulty: p.unity_base_pos_total_difficulty.map(Into::into),
+            unity_initial_pos_difficulty: p.unity_initial_pos_difficulty.map(Into::into),
         }
     }
 }

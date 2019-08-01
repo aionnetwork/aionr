@@ -137,7 +137,8 @@ pub use types::{
     block::status as block_status,
     error::Error,
     error::CallError,
-    error::ImportError
+    error::ImportError,
+    error::BlockError
 };
 
 pub use executive::contract_address;

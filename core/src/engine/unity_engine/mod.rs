@@ -113,10 +113,16 @@ pub struct DifficultyCalc {
     block_time_unity: u64,
     minimum_difficulty: U256,
     unity_update: Option<BlockNumber>,
+    unity_initial_pos_difficulty: Option<U256>,
 }
 
 impl DifficultyCalc {
-    pub fn new(params: &UnityEngineParams, unity_update: Option<BlockNumber>) -> DifficultyCalc {
+    pub fn new(
+        params: &UnityEngineParams,
+        unity_update: Option<BlockNumber>,
+        unity_initial_pos_difficulty: Option<U256>,
+    ) -> DifficultyCalc
+    {
         DifficultyCalc {
             difficulty_bound_divisor: params.difficulty_bound_divisor,
             difficulty_bound_divisor_unity: params.difficulty_bound_divisor_unity,
@@ -125,6 +131,7 @@ impl DifficultyCalc {
             minimum_difficulty: params.minimum_difficulty,
             block_time_unity: params.block_time_unity,
             unity_update: unity_update,
+            unity_initial_pos_difficulty: unity_initial_pos_difficulty,
         }
     }
 
@@ -134,11 +141,13 @@ impl DifficultyCalc {
         grand_parent: Option<&Header>,
     ) -> U256
     {
-        // First PoS block does not have seal parent. TODO-Unity: handle this better for the genesis (PoW block without parent)
         let parent = match parent {
             Some(header) => header,
+            // First PoS block does not have seal parent.
             None => {
-                return U256::from(2_000_000_000u64); // TODO-Unity: test setup to be comparable to the initial 1*10^9 stake. Change it in real setup or make it configurable in engine paremeter.
+                return self
+                    .unity_initial_pos_difficulty
+                    .unwrap_or(self.minimum_difficulty);
             }
         };
 
@@ -372,7 +381,11 @@ impl UnityEngine {
             machine.params().monetary_policy_update,
             machine.premine(),
         );
-        let difficulty_calc = DifficultyCalc::new(&params, machine.params().unity_update);
+        let difficulty_calc = DifficultyCalc::new(
+            &params,
+            machine.params().unity_update,
+            machine.params().unity_initial_pos_difficulty,
+        );
         Arc::new(UnityEngine {
             machine,
             rewards_calculator,

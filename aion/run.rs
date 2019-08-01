@@ -27,8 +27,7 @@ use acore::account_provider::{AccountProvider, AccountProviderSettings};
 use acore::client::{Client, DatabaseCompactionProfile, VMType, ChainNotify};
 use acore::miner::external::ExternalMiner;
 use acore::miner::{Miner, MinerOptions, MinerService};
-use acore::service::{ClientService, run_miner,
-run_staker, run_transaction_pool};
+use acore::service::{ClientService, run_miner, run_staker, pos_sealing, run_transaction_pool};
 use acore::verification::queue::VerifierSettings;
 use acore::sync::Sync;
 use aion_rpc::{dispatch::DynamicGasPrice, informant};
@@ -299,6 +298,15 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     let executor_staker = runtime_staker.executor();
     let close_staker = run_staker(executor_staker.clone(), client.clone());
 
+    // start PoS invoker
+    let pos_invoker = tokio::runtime::Builder::new()
+        .core_threads(1)
+        .name_prefix("seal-block-loop #")
+        .build()
+        .expect("internal staker runtime loop init failed");
+    let executor_staker = pos_invoker.executor();
+    let close_pos_invoker = pos_sealing(executor_staker.clone(), client.clone());
+
     if let Some(config_path) = cmd.dirs.config {
         let local_node = P2pMgr::get_local_node();
         fill_back_local_node(
@@ -323,6 +331,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     let _ = close_transaction_pool.send(());
     let _ = close_miner.send(());
     let _ = close_staker.send(());
+    let _ = close_pos_invoker.send(());
 
     // close rpc
     if ws_server.is_some() {
@@ -363,6 +372,10 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .shutdown_now()
         .wait()
         .expect("Failed to shutdown internal staker runtime instance!");
+    pos_invoker
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown pos invoker!");
 
     info!(target: "run","Shutdown.");
 

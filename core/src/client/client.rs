@@ -183,7 +183,17 @@ impl Client {
         }
 
         let gb = spec.genesis_block();
-        let chain = Arc::new(BlockChain::new(config.blockchain.clone(), &gb, db.clone()));
+        let engine = spec.engine.clone();
+        let unity_update = engine.machine().params().unity_update;
+        let unity_base_pos_total_difficulty =
+            engine.machine().params().unity_base_pos_total_difficulty;
+        let chain = Arc::new(BlockChain::new(
+            config.blockchain.clone(),
+            &gb,
+            db.clone(),
+            unity_update,
+            unity_base_pos_total_difficulty,
+        ));
 
         trace!(
             target: "client",
@@ -212,8 +222,6 @@ impl Client {
                 chain.best_block_hash()
             );
         }
-
-        let engine = spec.engine.clone();
 
         let block_queue = BlockQueue::new(
             config.queue.clone(),
@@ -434,6 +442,7 @@ impl Client {
                         let pow_difficulty = latest_pow_difficulty + difficulty;
                         return Some((
                             // TODO-UNITY: add overflow check
+                            // TODO-Unity: add unity base pos total difficulty check for pending block if necessary
                             pow_difficulty
                                 * ::std::cmp::max(latest_pos_difficulty, U256::from(1u64)),
                             pow_difficulty,
@@ -444,6 +453,7 @@ impl Client {
                         let pos_difficulty = latest_pos_difficulty + difficulty;
                         return Some((
                             // TODO-UNITY: add overflow check
+                            // TODO-Unity: add unity base pos total difficulty check for pending block if necessary
                             latest_pow_difficulty
                                 * ::std::cmp::max(pos_difficulty, U256::from(1u64)),
                             latest_pow_difficulty,
@@ -1091,7 +1101,10 @@ impl BlockChainClient for Client {
                 let mut decoder = AVMDecoder::new(executed.output);
                 // assume staking contract returns a long value
                 match decoder.decode_ulong() {
-                    Ok(v) => Some(v),
+                    Ok(v) => {
+                        debug!(target: "miner", "stake of {:?} = {:?}", a, v);
+                        Some(v)
+                    }
                     _ => None,
                 }
             }
@@ -1557,8 +1570,9 @@ impl BlockChainClient for Client {
         let mut chain_info = self.chain.read().chain_info();
 
         // TODO-UNITY: add overflow check
+        // TODO-Unity: pending_total_difficulty is not used now. To add unity base pos total difficulty factor if necessary.
         // TODO: It will add up the difficulty of all the blocks in the queue, regardless of whether the block can be successfully verified.
-        // TODO: Find a better way to fix it if you want to use pending_total_difficulty.
+        // TODO: Find a better way to fix it if we want to use pending_total_difficulty.
         chain_info.pending_total_difficulty = (chain_info.pow_total_difficulty
             + self.block_queue.pow_total_difficulty())
             * ::std::cmp::max(

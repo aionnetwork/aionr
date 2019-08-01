@@ -120,7 +120,7 @@ fn test_calculate_difficulty() {
         block_time_upper_bound: 15u64,
         block_time_unity: 10u64,
     };
-    let calculator = DifficultyCalc::new(&params, Some(0u64));
+    let calculator = DifficultyCalc::new(&params, Some(0u64), Some(U256::from(2000000000u64)));
     let mut parent_header = Header::default();
     parent_header.set_timestamp(1524538000u64);
     parent_header.set_difficulty(U256::from(1));
@@ -149,7 +149,7 @@ fn test_calculate_difficulty2() {
         block_time_upper_bound: 15u64,
         block_time_unity: 10u64,
     };
-    let calculator = DifficultyCalc::new(&params, Some(10u64));
+    let calculator = DifficultyCalc::new(&params, Some(10u64), Some(U256::from(2000000000u64)));
     let mut parent_header = Header::default();
     parent_header.set_timestamp(1524528020u64);
     parent_header.set_number(2);
@@ -162,7 +162,7 @@ fn test_calculate_difficulty2() {
     assert_eq!(difficulty, U256::from(1999));
 
     // Unity difficulty rule
-    let calculator = DifficultyCalc::new(&params, Some(0u64));
+    let calculator = DifficultyCalc::new(&params, Some(0u64), Some(U256::from(2000000000u64)));
     let difficulty =
         calculator.calculate_difficulty(Some(&parent_header), Some(&grand_parent_header));
     assert_eq!(difficulty, U256::from(1904));
@@ -184,7 +184,7 @@ fn test_calculate_difficulty3() {
         block_time_upper_bound: 15u64,
         block_time_unity: 10u64,
     };
-    let calculator = DifficultyCalc::new(&params, Some(10u64));
+    let calculator = DifficultyCalc::new(&params, Some(10u64), Some(U256::from(2000000000u64)));
     let mut parent_header = Header::default();
     parent_header.set_timestamp(1524528010u64);
     parent_header.set_difficulty(U256::from(3000));
@@ -197,7 +197,7 @@ fn test_calculate_difficulty3() {
     assert_eq!(difficulty, U256::from(3000));
 
     // Unity difficulty rule
-    let calculator = DifficultyCalc::new(&params, Some(0u64));
+    let calculator = DifficultyCalc::new(&params, Some(0u64), Some(U256::from(2000000000u64)));
     let difficulty =
         calculator.calculate_difficulty(Some(&parent_header), Some(&grand_parent_header));
     assert_eq!(difficulty, U256::from(3150));
@@ -219,7 +219,7 @@ fn test_calculate_difficulty4() {
         block_time_upper_bound: 15u64,
         block_time_unity: 10u64,
     };
-    let calculator = DifficultyCalc::new(&params, Some(10u64));
+    let calculator = DifficultyCalc::new(&params, Some(10u64), Some(U256::from(2000000000u64)));
     let mut parent_header = Header::default();
     parent_header.set_timestamp(1524528010u64);
     parent_header.set_difficulty(U256::from(16));
@@ -232,7 +232,7 @@ fn test_calculate_difficulty4() {
     assert_eq!(difficulty, U256::from(16));
 
     // Unity difficulty rule
-    let calculator = DifficultyCalc::new(&params, Some(0u64));
+    let calculator = DifficultyCalc::new(&params, Some(0u64), Some(U256::from(2000000000u64)));
     let difficulty =
         calculator.calculate_difficulty(Some(&parent_header), Some(&grand_parent_header));
     assert_eq!(difficulty, U256::from(17));
