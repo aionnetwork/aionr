@@ -98,6 +98,16 @@ pub enum BlockError {
     InvalidPoSTimestamp(u64, u64, u64),
     /// PoS block producer's stake is null or 0
     NullStake,
+    /// Invalid PoS block number before the Unity hard fork point
+    InvalidPoSBlockNumber,
+    /// Invalid PoS block seal type
+    InvalidPoSSealType,
+    /// Invalid PoS block seed
+    InvalidPoSSeed,
+    /// Invalid PoS block signature
+    InvalidPoSSignature,
+    /// Invalid PoS block author
+    InvalidPoSAuthor,
 }
 
 impl fmt::Display for BlockError {
@@ -145,6 +155,13 @@ impl fmt::Display for BlockError {
                 )
             }
             NullStake => "PoS block producer's stake is null or 0.".into(),
+            InvalidPoSBlockNumber => "PoS block number is before the unity hard fork point.".into(),
+            InvalidPoSSealType => "PoS block's seal type is not pos.".into(),
+            InvalidPoSSeed => "PoS block's seed verification failed.".into(),
+            InvalidPoSSignature => "PoS block's signature verification failed.".into(),
+            InvalidPoSAuthor => {
+                "PoS block's author does not match the public key provided in the seal.".into()
+            }
         };
 
         f.write_fmt(format_args!("Block error ({})", msg))

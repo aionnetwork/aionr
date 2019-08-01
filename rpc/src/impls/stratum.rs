@@ -364,7 +364,7 @@ where
                 let seal = h.seal();
                 let mut s = [0u8; 64];
                 debug!(target: "miner", "seal = {:?}, len = {}", seal, seal.len());
-                s.copy_from_slice(seal[1].as_slice());
+                s.copy_from_slice(seal[0].as_slice());
                 Ok(s.into())
             }
             _ => Ok(H512::zero()),
@@ -393,7 +393,7 @@ where
     fn pos_submit_work(&self, sig: H512, hash: H256) -> Result<bool> {
         if let Some((block, mut seal)) = self.miner.get_ready_pos(&hash) {
             debug!(target: "miner", "got PoS block template");
-            seal[0] = sig.to_vec();
+            seal[1] = sig.to_vec();
             let result = self.miner.try_seal_pos(&*self.client, seal, block);
             Ok(result.is_ok())
         } else {

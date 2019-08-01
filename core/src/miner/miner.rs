@@ -230,51 +230,71 @@ impl Miner {
         let chain_best_pos_block = client
             .best_block_header_with_seal_type(&SealType::PoS)
             .map(|header| header.decode());
-        let mut pending_best = self.best_pos.lock();
+        
         let mut queue = self.maybe_work.lock();
+        let mut pending_best = self.best_pos.lock();
+        
         let timestamp_now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        if pending_best.is_some() {
-            let b = pending_best.clone().unwrap();
-            if b.header().timestamp() <= timestamp_now {
-                let seal = b.header().seal();
-                let stake = client.get_stake(b.header().author());
-                if let Ok(sealed) = b.clone().lock().try_seal_pos(
-                    &*self.engine,
-                    seal.to_owned(),
-                    chain_best_pos_block.as_ref(),
-                    stake,
-                ) {
-                    if chain_best_pos_block.as_ref().unwrap().hash()
-                        == b.header().parent_hash().to_owned()
-                    {
-                        let n = sealed.header().number();
-                        let d = sealed.header().difficulty().clone();
-                        let h = sealed.header().hash();
-                        let t = sealed.header().timestamp();
+        
+            let block = pending_best.clone();
+            match block {
+                Some(b) => {
+                     if b.header().timestamp() <= timestamp_now {
+                        let seal = b.header().seal();
+                        let stake = client.get_stake(b.header().author());
+                        if let Ok(sealed) = b.clone().lock().try_seal_pos(
+                            &*self.engine,
+                            seal.to_owned(),
+                            chain_best_pos_block.as_ref(),
+                            stake,
+                        ) {
+                            if chain_best_pos_block.as_ref().unwrap().hash()
+                                == b.header().parent_hash().to_owned()
+                            {
+                                let n = sealed.header().number();
+                                let d = sealed.header().difficulty().clone();
+                                let h = sealed.header().hash();
+                                let t = sealed.header().timestamp();
 
-                        // 4. Import block
-                        client.import_sealed_block(sealed)?;
+                                // 4. Import block
+                                client.import_sealed_block(sealed)?;
 
-                        // Log
-                        info!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
-                            Colour::White.bold().paint(format!("{}", n)),
-                            Colour::White.bold().paint(format!("{}", d)),
-                            Colour::White.bold().paint(format!("{:x}", h)),
-                            Colour::White.bold().paint(format!("{:x}", t)));
+                                // Log
+                                info!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
+                                    Colour::White.bold().paint(format!("{}", n)),
+                                    Colour::White.bold().paint(format!("{}", d)),
+                                    Colour::White.bold().paint(format!("{:x}", h)),
+                                    Colour::White.bold().paint(format!("{:x}", t)));
+                            }
+                            queue.clear();
+                            *pending_best = None;
+                        }
                     }
-                    queue.clear();
-                    *pending_best = None;
-                }
+                },
+                None => {},
             }
-        }
+
         Ok(())
     }
 
     /// Try to generate PoS block if minimum resealing duration is met
     pub fn try_prepare_block_pos(&self, client: &MiningBlockChainClient) -> Result<(), Error> {
+        // Not before the Unity fork point
+        if self
+            .engine
+            .machine()
+            .params()
+            .unity_update
+            .map_or(true, |fork_number| {
+                client.chain_info().best_block_number + 1 < fork_number
+            }) {
+            return Ok(());
+        }
+
+        // Return if no internal staker
         if self.staker.is_none() {
             return Ok(());
         }
@@ -306,7 +326,7 @@ impl Miner {
             Some(header) => {
                 let seed: Bytes = header
                     .seal()
-                    .get(1)
+                    .get(0)
                     .expect("A pos block has to contain a seed")
                     .to_owned();
                 (
@@ -381,13 +401,13 @@ impl Miner {
             self.prepare_block(client, &Some(SealType::PoS), Some(timestamp));
 
         // 2. Generate signature
-        let bare_hash: H256 = raw_block.header().bare_hash();
-        let signature = ed25519::signature(&bare_hash.0, sk);
+        let mine_hash: H256 = raw_block.header().mine_hash();
+        let signature = ed25519::signature(&mine_hash.0, sk);
 
         // 3. Seal the block
         let mut seal: Vec<Bytes> = Vec::new();
-        seal.push(signature.to_vec());
         seal.push(seed.to_vec());
+        seal.push(signature.to_vec());
         seal.push(pk.to_vec());
         let sealed_block: SealedBlock = raw_block
             .lock()
@@ -1285,11 +1305,12 @@ impl MinerService for Miner {
 
     fn add_sealing_pos(
         &self,
+        hash: &H256,
         b: ClosedBlock,
         _client: &MiningBlockChainClient,
     ) -> Result<(), Error>
     {
-        self.maybe_work.lock().insert(b.header().bare_hash(), b);
+        self.maybe_work.lock().insert(*hash, b);
         Ok(())
     }
 
@@ -1369,15 +1390,15 @@ impl MinerService for Miner {
             self.prepare_block(client, &Some(SealType::PoS), Some(new_timestamp));
 
         let mut seal = Vec::with_capacity(3);
-        seal.push(vec![0u8; 64]);
         seal.push(seed.to_vec());
+        seal.push(vec![0u8; 64]);
         seal.push(pk.to_vec());
 
         let block = raw_block.pre_seal(seal);
 
-        let hash = block.header().bare_hash();
+        let hash = block.header().mine_hash();
 
-        match self.add_sealing_pos(block, client) {
+        match self.add_sealing_pos(&hash, block, client) {
             Ok(_) => Some(hash),
             _ => None,
         }
@@ -1435,12 +1456,10 @@ impl MinerService for Miner {
                         {
                             *best_pos = Some(block.clone());
                         }
-                        return Err(Error::from(e));
                     }
-                    _ => {
-                        return Err(Error::from(e));
-                    }
+                    _ => { }
                 }
+                return Err(Error::from(e));
             }
         }
     }
