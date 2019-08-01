@@ -230,52 +230,52 @@ impl Miner {
         let chain_best_pos_block = client
             .best_block_header_with_seal_type(&SealType::PoS)
             .map(|header| header.decode());
-        
+
         let mut queue = self.maybe_work.lock();
         let mut pending_best = self.best_pos.lock();
-        
+
         let timestamp_now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        
-            let block = pending_best.clone();
-            match block {
-                Some(b) => {
-                     if b.header().timestamp() <= timestamp_now {
-                        let seal = b.header().seal();
-                        let stake = client.get_stake(b.header().author());
-                        if let Ok(sealed) = b.clone().lock().try_seal_pos(
-                            &*self.engine,
-                            seal.to_owned(),
-                            chain_best_pos_block.as_ref(),
-                            stake,
-                        ) {
-                            if chain_best_pos_block.as_ref().unwrap().hash()
-                                == b.header().parent_hash().to_owned()
-                            {
-                                let n = sealed.header().number();
-                                let d = sealed.header().difficulty().clone();
-                                let h = sealed.header().hash();
-                                let t = sealed.header().timestamp();
 
-                                // 4. Import block
-                                client.import_sealed_block(sealed)?;
+        let block = pending_best.clone();
+        match block {
+            Some(b) => {
+                if b.header().timestamp() <= timestamp_now {
+                    let seal = b.header().seal();
+                    let stake = client.get_stake(b.header().author());
+                    if let Ok(sealed) = b.clone().lock().try_seal_pos(
+                        &*self.engine,
+                        seal.to_owned(),
+                        chain_best_pos_block.as_ref(),
+                        stake,
+                    ) {
+                        if chain_best_pos_block.as_ref().unwrap().hash()
+                            == b.header().parent_hash().to_owned()
+                        {
+                            let n = sealed.header().number();
+                            let d = sealed.header().difficulty().clone();
+                            let h = sealed.header().hash();
+                            let t = sealed.header().timestamp();
 
-                                // Log
-                                info!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
+                            // 4. Import block
+                            client.import_sealed_block(sealed)?;
+
+                            // Log
+                            info!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
                                     Colour::White.bold().paint(format!("{}", n)),
                                     Colour::White.bold().paint(format!("{}", d)),
                                     Colour::White.bold().paint(format!("{:x}", h)),
                                     Colour::White.bold().paint(format!("{:x}", t)));
-                            }
-                            queue.clear();
-                            *pending_best = None;
                         }
+                        queue.clear();
+                        *pending_best = None;
                     }
-                },
-                None => {},
+                }
             }
+            None => {}
+        }
 
         Ok(())
     }
@@ -1457,7 +1457,7 @@ impl MinerService for Miner {
                             *best_pos = Some(block.clone());
                         }
                     }
-                    _ => { }
+                    _ => {}
                 }
                 return Err(Error::from(e));
             }

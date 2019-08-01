@@ -141,8 +141,12 @@ pub trait MinerService: Send + Sync {
         seal: Vec<Bytes>,
     ) -> Result<(), Error>;
 
-    fn add_sealing_pos(&self, hash: &H256, b: ClosedBlock, client: &MiningBlockChainClient)
-        -> Result<(), Error>;
+    fn add_sealing_pos(
+        &self,
+        hash: &H256,
+        b: ClosedBlock,
+        client: &MiningBlockChainClient,
+    ) -> Result<(), Error>;
 
     fn get_ready_pos(&self, h: &H256) -> Option<(ClosedBlock, Vec<Bytes>)>;
 
