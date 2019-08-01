@@ -74,6 +74,25 @@ pub fn run_miner(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender
     close
 }
 
+pub fn pos_sealing(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
+    let (close, shutdown_signal) = oneshot::channel();
+    let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(1))
+        .for_each(move |_| {
+            let client: Arc<Client> = client.clone();
+            client
+                .miner()
+                .invoke_pos_interval(&*client)
+                .map_err(|e| panic!("pos block generation err: {:?}", e))?;
+            Ok(())
+        })
+        .map_err(|e| panic!("interval err: {:?}", e))
+        .select(shutdown_signal.map_err(|_| {}))
+        .map(|_| ())
+        .map_err(|_| ());
+    executor.spawn(seal_block_task);
+    close
+}
+
 /// Run the internal staker to generate PoS block
 pub fn run_staker(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
     let (close, shutdown_signal) = oneshot::channel();

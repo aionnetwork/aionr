@@ -33,7 +33,7 @@ use acore_bytes::Bytes;
 use block::ClosedBlock;
 use client::{MiningBlockChainClient};
 use types::error::{Error};
-use header::BlockNumber;
+use header::{BlockNumber};
 use receipt::Receipt;
 use transaction::{UnverifiedTransaction, PendingTransaction};
 use key::Ed25519KeyPair;
@@ -139,6 +139,31 @@ pub trait MinerService: Send + Sync {
         chain: &MiningBlockChainClient,
         pow_hash: H256,
         seal: Vec<Bytes>,
+    ) -> Result<(), Error>;
+
+    fn add_sealing_pos(
+        &self,
+        hash: &H256,
+        b: ClosedBlock,
+        client: &MiningBlockChainClient,
+    ) -> Result<(), Error>;
+
+    fn get_ready_pos(&self, h: &H256) -> Option<(ClosedBlock, Vec<Bytes>)>;
+
+    fn clear_pos_pending(&self);
+
+    fn get_pos_template(
+        &self,
+        client: &MiningBlockChainClient,
+        seed: [u8; 64],
+        address: Address,
+    ) -> Option<H256>;
+
+    fn try_seal_pos(
+        &self,
+        client: &MiningBlockChainClient,
+        seal: Vec<Bytes>,
+        block: ClosedBlock,
     ) -> Result<(), Error>;
 
     /// Get the sealing work package and if `Some`, apply some transform.
