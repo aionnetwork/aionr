@@ -39,6 +39,15 @@ impl Head {
             len: 0,
         }
     }
+    // temporiy name it for it now
+    pub fn new1(ver: u16, ctrl: u8, action: u8, len: u32) -> Head {
+        Head {
+            ver,
+            ctrl,
+            action,
+            len
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -51,6 +60,13 @@ impl ChannelBuffer {
     pub fn new() -> ChannelBuffer {
         ChannelBuffer {
             head: Head::new(),
+            body: Vec::new(),
+        }
+    }
+    // temporiy name it for it now
+    pub fn new1(ver: u16, ctrl: u8, action: u8, len: u32) -> ChannelBuffer{
+        ChannelBuffer {
+            head: Head::new1(ver, ctrl, action, len),
             body: Vec::new(),
         }
     }

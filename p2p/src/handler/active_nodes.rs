@@ -44,25 +44,26 @@ use super::super::update_node;
 use super::super::calculate_hash;
 
 pub fn send() {
-    let mut req = ChannelBuffer::new();
-    req.head.ver = VERSION::V0.value();
-    req.head.ctrl = MODULE::P2P.value();
-    req.head.action = ACTION::ACTIVENODESREQ.value();
-    req.head.len = 0;
+    debug!(target: "p2p", "active_nodes.rs/send");
     let handshaked_nodes = get_nodes(HANDSHAKEDONE.value());
     let handshaked_nodes_count = handshaked_nodes.len();
     if handshaked_nodes_count > 0 {
         let random_index = random::<usize>() % handshaked_nodes_count;
         let node = &handshaked_nodes[random_index];
-        p2p_send(node.node_hash, req.clone());
-        trace!(target: "net", "send active nodes req");
-    } else {
-        trace!(target: "net", "Net no active node...");
+        p2p_send(
+            node.node_hash, 
+            ChannelBuffer::new1(
+                VERSION::V0.value(), 
+                MODULE::P2P.value(), 
+                ACTION::ACTIVENODESREQ.value(), 
+                0
+            )
+        );
     }
 }
 
 pub fn receive_req(peer_node: &mut Node) {
-    trace!(target: "net", "ACTIVENODESREQ received.");
+    debug!(target: "p2p", "active_nodes/receive_req");
 
     let mut res = ChannelBuffer::new();
     let peer_node_hash = peer_node.node_hash;
@@ -106,7 +107,7 @@ pub fn receive_req(peer_node: &mut Node) {
 }
 
 pub fn receive_res(peer_node: &mut Node, req: ChannelBuffer) {
-    trace!(target: "net", "ACTIVENODESRES received.");
+    debug!(target: "p2p", "active_nodes/receive_res");
 
     let peer_node_hash = peer_node.node_hash;
     let (node_count, rest) = req.body.split_at(1);

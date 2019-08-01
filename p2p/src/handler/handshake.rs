@@ -35,6 +35,7 @@ use event::Event;
 use route::VERSION;
 use route::MODULE;
 use route::ACTION;
+use states::STATE::ALIVE;
 use super::super::send as p2p_send;
 use super::super::get_local_node;
 use super::super::get_config;
@@ -49,8 +50,7 @@ use super::super::remove_peer;
 const VERSION: &str = "02";
 
 pub fn send(node: &mut Node) {
-    trace!(target: "p2p", "handshake.rs/send");
-
+    debug!(target: "p2p", "handshake.rs/send");
     let local_node = get_local_node();
     let mut req = ChannelBuffer::new();
     req.head.ver = VERSION::V0.value();
@@ -82,14 +82,14 @@ pub fn send(node: &mut Node) {
 }
 
 pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
-    trace!(target: "p2p", "handshake.rs/receive_req");
+    debug!(target: "p2p", "handshake.rs/receive_req");
 
     let (node_id, req_body_rest) = req.body.split_at(NODE_ID_LENGTH);
     let (mut net_id, req_body_rest) = req_body_rest.split_at(mem::size_of::<i32>());
     let peer_net_id = net_id.read_u32::<BigEndian>().unwrap_or(0);
     let local_net_id = get_config().net_id;
     if peer_net_id != local_net_id {
-        warn!(target: "p2p", "Invalid net id {}, should be {}.", peer_net_id, local_net_id);
+        warn!(target: "p2p", "invalid net id {}, should be {}.", peer_net_id, local_net_id);
         return;
     }
 
@@ -127,6 +127,7 @@ pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
     let old_node_hash = node.node_hash;
     let node_id_hash = calculate_hash(&node.get_node_id());
     node.node_hash = node_id_hash;
+    node.state_code = ALIVE.value();
     if is_connected(node_id_hash) {
         trace!(target: "p2p", "known node {}@{} ...", node.get_node_id(), node.get_ip_addr());
     } else {
@@ -141,7 +142,7 @@ pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
 }
 
 pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
-    trace!(target: "p2p", "handshake.rs/receive_res");
+    debug!(target: "p2p", "handshake.rs/receive_res");
 
     let (_, revision) = req.body.split_at(1);
     let (revision_len, rest) = revision.split_at(1);

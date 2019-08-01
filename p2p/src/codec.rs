@@ -83,7 +83,7 @@ impl Decoder for Codec {
             }
         } else {
             if len > 0 {
-                debug!(target: "net", "len = {}, {}", len, to_hex(src));
+                debug!(target: "p2p", "len = {}, {}", len, to_hex(src));
             }
             Ok(None)
         }

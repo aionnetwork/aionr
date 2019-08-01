@@ -42,7 +42,7 @@ impl Event {
                 if state_code & HANDSHAKEDONE.value() == HANDSHAKEDONE.value() {
                     node.state_code = state_code | ALIVE.value();
                 } else {
-                    warn!(target: "net", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
+                    warn!(target: "p2p", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
                 }
             }
         }

@@ -140,8 +140,12 @@ fn handle(node: &mut Node, req: ChannelBuffer) {
                 }
                 MODULE::EXTERNAL => {
                     trace!(target: "p2p", "external module message received, ctrl {}, act {}", req.head.ctrl, req.head.action);
-                    let handler = HANDLERS.get();
-                    handler.handle(node, req);
+                    match HANDLERS.try_get() {
+                        Some(handler) => {
+                            handler.handle(node, req);
+                        },
+                        None => {}
+                    }
                 }
             }
         }
@@ -249,13 +253,10 @@ pub fn create_server(
                 socket
                     .set_recv_buffer_size(1 << 24)
                     .expect("set_recv_buffer_size failed");
-
                 socket
                     .set_keepalive(Some(Duration::from_secs(30)))
                     .expect("set_keepalive failed");
-
                 process_inbounds(socket, handle);
-
                 Ok(())
             });
         executor.spawn(server);
@@ -556,8 +557,7 @@ pub fn process_inbounds(socket: TcpStream, handle: fn(node: &mut Node, req: Chan
         let local_ip = get_local_node().ip_addr.get_ip();
         let config = get_config();
         if get_nodes_count(ALIVE.value()) < config.max_peers as usize
-            && !config.ip_black_list.contains(&peer_ip)
-        {
+            && !config.ip_black_list.contains(&peer_ip){
             let mut value = peer_node.ip_addr.get_addr();
             value.push_str(&local_ip);
             peer_node.node_hash = calculate_hash(&value);
