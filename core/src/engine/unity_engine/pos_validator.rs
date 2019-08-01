@@ -40,7 +40,7 @@ impl PoSValidator {
     {
         // Return error if seal type is not PoS
         if header.seal_type() != &Some(SealType::PoS) {
-            error!(target: "pos", "block seal type is not PoS");
+            debug!(target: "miner", "Invalid seal type");
             return Err(BlockError::InvalidSeal.into());
         }
 
@@ -83,17 +83,20 @@ impl PoSValidator {
 
         // Verify seed
         if !verify(&parent_seed, pk, seed) {
+            debug!(target: "miner", "Invalid seed: {:?}, {:?}, {:?}", parent_seed, pk, seed);
             return Err(BlockError::InvalidSeal.into());
         }
 
         // Verify block signature
         if !verify(&header.bare_hash().0, pk, signature) {
+            debug!(target: "miner", "Invalid block signature");
             return Err(BlockError::InvalidSeal.into());
         }
 
         // Verify the signer of the seed and the signature are the same as the block producer
         let signer: Address = public_to_address_ed25519(&H256::from(pk.as_slice()));
         if &signer != header.author() {
+            debug!(target: "miner", "Invalid signer");
             return Err(BlockError::InvalidSeal.into());
         }
 

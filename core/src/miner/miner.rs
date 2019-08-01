@@ -1369,8 +1369,8 @@ impl MinerService for Miner {
             self.prepare_block(client, &Some(SealType::PoS), Some(new_timestamp));
 
         let mut seal = Vec::with_capacity(3);
-        seal.push(seed.to_vec());
         seal.push(vec![0u8; 64]);
+        seal.push(seed.to_vec());
         seal.push(pk.to_vec());
 
         let block = raw_block.pre_seal(seal);
@@ -1428,6 +1428,7 @@ impl MinerService for Miner {
                 return Ok(());
             }
             Err((e, _)) => {
+                debug!(target: "miner", "{:?}", e);
                 match e {
                     Error::Block(BlockError::InvalidPoSTimestamp(t1, _, _)) => {
                         if best_pos.is_some() && best_pos.clone().unwrap().header().timestamp() > t1

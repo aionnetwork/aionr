@@ -363,7 +363,7 @@ where
                 // seal length must be 3, since it is already validated
                 let seal = h.seal();
                 let mut s = [0u8; 64];
-                println!("seal = {:?}, len = {}", seal, seal.len());
+                debug!(target: "miner", "seal = {:?}, len = {}", seal, seal.len());
                 s.copy_from_slice(seal[1].as_slice());
                 Ok(s.into())
             }
@@ -375,6 +375,8 @@ where
     fn pos_submit_seed(&self, seed: H512, staker: H256) -> Result<H256> {
         // block template is generated each 20 secs
         // try to get block hash
+
+        debug!(target: "miner", "submit seed: {:?} - {:?}", seed, staker);
 
         let template = self
             .miner
@@ -391,7 +393,7 @@ where
     fn pos_submit_work(&self, sig: H512, hash: H256) -> Result<bool> {
         if let Some((block, mut seal)) = self.miner.get_ready_pos(&hash) {
             debug!(target: "miner", "got PoS block template");
-            seal[1] = sig.to_vec();
+            seal[0] = sig.to_vec();
             let result = self.miner.try_seal_pos(&*self.client, seal, block);
             Ok(result.is_ok())
         } else {
