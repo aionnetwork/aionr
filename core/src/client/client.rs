@@ -1571,6 +1571,8 @@ impl BlockChainClient for Client {
 
         // TODO-UNITY: add overflow check
         // TODO-Unity: pending_total_difficulty is not used now. To add unity base pos total difficulty factor if necessary.
+        // TODO: It will add up the difficulty of all the blocks in the queue, regardless of whether the block can be successfully verified.
+        // TODO: Find a better way to fix it if we want to use pending_total_difficulty.
         chain_info.pending_total_difficulty = (chain_info.pow_total_difficulty
             + self.block_queue.pow_total_difficulty())
             * ::std::cmp::max(
