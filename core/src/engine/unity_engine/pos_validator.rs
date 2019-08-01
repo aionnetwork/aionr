@@ -41,7 +41,7 @@ impl PoSValidator {
         // Return error if seal type is not PoS
         if header.seal_type() != &Some(SealType::PoS) {
             error!(target: "pos", "block seal type is not PoS");
-            return Err(BlockError::InvalidSeal.into());
+            return Err(BlockError::InvalidPoSSealType.into());
         }
 
         // Return error if stake is none or 0
@@ -73,28 +73,28 @@ impl PoSValidator {
         }
 
         // Get seed and signature
-        let signature = &seal[0];
-        let seed = &seal[1];
+        let seed = &seal[0];
+        let signature = &seal[1];
         let pk = &seal[2];
         let parent_seed = seal_parent_header
             .seal()
-            .get(1)
+            .get(0)
             .expect("parent pos block should have a seed");
 
         // Verify seed
         if !verify(&parent_seed, pk, seed) {
-            return Err(BlockError::InvalidSeal.into());
+            return Err(BlockError::InvalidPoSSeed.into());
         }
 
         // Verify block signature
-        if !verify(&header.bare_hash().0, pk, signature) {
-            return Err(BlockError::InvalidSeal.into());
+        if !verify(&header.mine_hash().0, pk, signature) {
+            return Err(BlockError::InvalidPoSSignature.into());
         }
 
         // Verify the signer of the seed and the signature are the same as the block producer
         let signer: Address = public_to_address_ed25519(&H256::from(pk.as_slice()));
         if &signer != header.author() {
-            return Err(BlockError::InvalidSeal.into());
+            return Err(BlockError::InvalidPoSAuthor.into());
         }
 
         // Verify timestamp
