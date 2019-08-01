@@ -53,14 +53,6 @@ impl PoSValidator {
             }
         };
 
-        // Return ok if seal parent is none (for the first PoS block)
-        let seal_parent_header: &Header = match seal_parent_header {
-            Some(header) => header,
-            None => {
-                return Ok(());
-            }
-        };
-
         // Get seal, check seal length
         let seal = header.seal();
         if seal.len() != 3 {
@@ -76,10 +68,12 @@ impl PoSValidator {
         let seed = &seal[0];
         let signature = &seal[1];
         let pk = &seal[2];
-        let parent_seed = seal_parent_header
-            .seal()
-            .get(0)
-            .expect("parent pos block should have a seed");
+        let parent_seed = seal_parent_header.map_or(vec![0u8; 64], |h| {
+            h.seal()
+                .get(0)
+                .expect("parent pos block should have a seed")
+                .clone()
+        });
 
         // Verify seed
         if !verify(&parent_seed, pk, seed) {
@@ -100,7 +94,7 @@ impl PoSValidator {
         // Verify timestamp
         let difficulty = header.difficulty();
         let timestamp = header.timestamp();
-        let parent_timestamp = seal_parent_header.timestamp();
+        let parent_timestamp = seal_parent_header.map_or(0, |h| h.timestamp());
         let hash_of_seed = blake2b(&seed[..]);
         let a = BigUint::parse_bytes(
             b"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
