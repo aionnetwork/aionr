@@ -307,7 +307,7 @@ mod tests {
             "getVote = {:x?}",
             AbiToken::STRING("getVote".to_string()).encode()
         );
-        assert_eq!(data_0.encode(), vec![10]);
+        assert_eq!(data_0.encode(), vec![33, 0, 4, 118, 111, 116, 101]);
     }
 
     #[test]
