@@ -396,9 +396,10 @@ impl Miner {
     {
         trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
 
+        let staker = public_to_address_ed25519(&pk.clone().into());
         // 1. Create a block with transactions
         let (raw_block, _): (ClosedBlock, Option<H256>) =
-            self.prepare_block(client, &Some(SealType::PoS), Some(timestamp));
+            self.prepare_block(client, &Some(SealType::PoS), Some(timestamp), Some(staker));
 
         // 2. Generate signature
         let mut preseal = Vec::with_capacity(3);
@@ -538,6 +539,7 @@ impl Miner {
         client: &MiningBlockChainClient,
         seal_type: &Option<SealType>,
         timestamp: Option<u64>,
+        staker: Option<Address>,
     ) -> (ClosedBlock, Option<H256>)
     {
         trace_time!("prepare_block");
@@ -559,16 +561,8 @@ impl Miner {
 
             let mut open_block = match seal_type {
                 Some(SealType::PoS) => {
-                    let author: Address = self
-                        .staker()
-                        .to_owned()
-                        .expect(
-                            "staker key not specified in configuration. Should have checked \
-                             before.",
-                        )
-                        .address();
                     client.prepare_open_block(
-                        author,
+                        staker.unwrap_or(Address::default()),
                         (self.gas_floor_target(), self.gas_ceil_target()),
                         self.extra_data(),
                         seal_type.to_owned(),
@@ -789,7 +783,7 @@ impl Miner {
             }
         };
         if prepare_new {
-            let (block, original_work_hash) = self.prepare_block(client, seal_type, None);
+            let (block, original_work_hash) = self.prepare_block(client, seal_type, None, None);
             self.prepare_work(block, original_work_hash);
         }
         let mut sealing_block_last_request = self.sealing_block_last_request.lock();
@@ -1302,7 +1296,7 @@ impl MinerService for Miner {
         if self.requires_reseal(client.chain_info().best_block_number) {
             trace!(target: "block", "update_sealing: preparing a block");
             let (block, original_work_hash) =
-                self.prepare_block(client, &Some(SealType::PoW), None);
+                self.prepare_block(client, &Some(SealType::PoW), None, None);
             self.prepare_work(block, original_work_hash)
         }
     }
@@ -1388,10 +1382,12 @@ impl MinerService for Miner {
                difficulty.as_u64(), u, stake, delta);
         let new_timestamp = timestamp + max(1u64, delta as u64);
 
-        self.set_author(address);
-
-        let (raw_block, _): (ClosedBlock, Option<H256>) =
-            self.prepare_block(client, &Some(SealType::PoS), Some(new_timestamp));
+        let (raw_block, _): (ClosedBlock, Option<H256>) = self.prepare_block(
+            client,
+            &Some(SealType::PoS),
+            Some(new_timestamp),
+            Some(address),
+        );
 
         let mut seal = Vec::with_capacity(3);
         seal.push(seed.to_vec());
