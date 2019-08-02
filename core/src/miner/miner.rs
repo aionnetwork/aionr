@@ -335,7 +335,7 @@ impl Miner {
                     client.seal_parent_header(&header.parent_hash(), &header.seal_type()),
                 )
             }
-            None => (timestamp_now - 1u64, Vec::new(), None), // TODO-Unity: To handle the first PoS block better
+            None => (timestamp_now - 1u64, vec![0u8; 64], None), // TODO-Unity: To handle the first PoS block better
         };
 
         // 4. Calculate difficulty
