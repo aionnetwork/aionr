@@ -231,15 +231,17 @@ impl Miner {
             .best_block_header_with_seal_type(&SealType::PoS)
             .map(|header| header.decode());
 
-        let mut queue = self.maybe_work.lock();
-        let mut pending_best = self.best_pos.lock();
+        // compete with import_lock, if another is imported, block will be None, or else try importing pending_best
+        let block = {
+            let mut pending_best = self.best_pos.lock();
+            pending_best.clone()
+        };
 
         let timestamp_now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
 
-        let block = pending_best.clone();
         match block {
             Some(b) => {
                 if b.header().timestamp() <= timestamp_now {
@@ -251,26 +253,20 @@ impl Miner {
                         chain_best_pos_block.as_ref(),
                         stake,
                     ) {
-                        if chain_best_pos_block.as_ref().unwrap().hash()
-                            == b.header().parent_hash().to_owned()
-                        {
-                            let n = sealed.header().number();
-                            let d = sealed.header().difficulty().clone();
-                            let h = sealed.header().hash();
-                            let t = sealed.header().timestamp();
+                        let n = sealed.header().number();
+                        let d = sealed.header().difficulty().clone();
+                        let h = sealed.header().hash();
+                        let t = sealed.header().timestamp();
 
-                            // 4. Import block
-                            client.import_sealed_block(sealed)?;
+                        // 4. Import block
+                        client.import_sealed_block(sealed)?;
 
-                            // Log
-                            info!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
-                                    Colour::White.bold().paint(format!("{}", n)),
-                                    Colour::White.bold().paint(format!("{}", d)),
-                                    Colour::White.bold().paint(format!("{:x}", h)),
-                                    Colour::White.bold().paint(format!("{:x}", t)));
-                        }
-                        queue.clear();
-                        *pending_best = None;
+                        // Log
+                        info!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
+                                Colour::White.bold().paint(format!("{}", n)),
+                                Colour::White.bold().paint(format!("{}", d)),
+                                Colour::White.bold().paint(format!("{:x}", h)),
+                                Colour::White.bold().paint(format!("{:x}", t)));
                     }
                 }
             }
@@ -1323,10 +1319,10 @@ impl MinerService for Miner {
     }
 
     fn clear_pos_pending(&self) {
-        // let mut queue = self.maybe_work.lock();
-        // let mut best_pos = self.best_pos.lock();
-        // queue.clear();
-        // *best_pos = None;
+        let mut queue = self.maybe_work.lock();
+        let mut best_pos = self.best_pos.lock();
+        queue.clear();
+        *best_pos = None;
     }
 
     fn get_pos_template(
@@ -1415,9 +1411,7 @@ impl MinerService for Miner {
         let address = public_to_address_ed25519(&seal[2][..].into());
         let best_block_header = client.best_block_header_with_seal_type(&SealType::PoS);
 
-        let mut queue = self.maybe_work.lock();
         let stake = client.get_stake(&address);
-        let mut best_pos = self.best_pos.lock();
 
         debug!(target: "miner", "start sealing");
 
@@ -1444,14 +1438,13 @@ impl MinerService for Miner {
                 Colour::White.bold().paint(format!("{:x}", h)),
                 Colour::White.bold().paint(format!("{:x}", t)));
 
-                *best_pos = None;
-                queue.clear();
                 return Ok(());
             }
             Err((e, _)) => {
                 debug!(target: "miner", "{:?}", e);
                 match e {
                     Error::Block(BlockError::InvalidPoSTimestamp(t1, _, _)) => {
+                        let mut best_pos = self.best_pos.lock();
                         if best_pos.is_some() && best_pos.clone().unwrap().header().timestamp() > t1
                         {
                             *best_pos = Some(block.clone());
