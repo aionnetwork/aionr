@@ -322,8 +322,14 @@ impl Header {
         self.note_dirty();
     }
 
-    /// Set the timestamp field of the header to the current time.
-    pub fn set_timestamp_now(&mut self, but_later_than: u64) {
+    /// Set the timestamp field of the header, but later than the specified time.
+    pub fn set_timestamp_later_than(&mut self, a: u64, but_later_than: u64) {
+        self.timestamp = cmp::max(a, but_later_than + 1);
+        self.note_dirty();
+    }
+
+    /// Set the timestamp field of the header to the current time, but later than the specified time.
+    pub fn set_timestamp_now_later_than(&mut self, but_later_than: u64) {
         self.timestamp = cmp::max(get_time().sec as u64, but_later_than + 1);
         self.note_dirty();
     }

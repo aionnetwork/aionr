@@ -252,10 +252,14 @@ impl<'x> OpenBlock<'x> {
         r.block.header.set_author(author);
         match timestamp {
             Some(timestamp) => {
-                r.block.header.set_timestamp(timestamp);
+                r.block
+                    .header
+                    .set_timestamp_later_than(timestamp, parent.timestamp());
             }
             None => {
-                r.block.header.set_timestamp_now(parent.timestamp());
+                r.block
+                    .header
+                    .set_timestamp_now_later_than(parent.timestamp());
             }
         };
         r.block.header.set_seal_type(seal_type);
