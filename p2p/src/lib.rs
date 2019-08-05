@@ -51,10 +51,14 @@ mod codec;
 pub mod states;
 pub mod handler;
 
+// chris
+use std::thread;
+
 use std::collections::{hash_map::DefaultHasher, HashMap};
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::io;
+use std::sync::Arc;
 use std::net::Shutdown;
 use std::sync::{Mutex,RwLock};
 use std::time::{Duration, Instant};
@@ -94,6 +98,66 @@ lazy_static! {
 const RECONNECT_BOOT_NOEDS_INTERVAL: u64 = 10;
 const RECONNECT_NORMAL_NOEDS_INTERVAL: u64 = 1;
 const NODE_ACTIVE_REQ_INTERVAL: u64 = 10;
+
+pub struct Mgr{
+    config: Arc<Config>,
+    runtime: Runtime,
+    local: Arc<Node>,
+}
+
+impl Mgr {
+
+    // construct p2p instance
+    pub fn new(config: Config) -> Mgr{
+        let local_node_str = config.local_node.clone();
+        let mut local_node = Node::new_with_node_str(local_node_str);
+        local_node.net_id = config.net_id;
+        Mgr {
+            config: Arc::new(config),
+            runtime: Runtime::new().expect("tokio runtime"),
+            local: Arc::new(local_node),
+        }
+    }
+
+    // run p2p instance
+    pub fn run(&self){
+        info!(target: "p2p", "run");
+        let executor = &self.runtime.executor();
+        debug!(target: "p2p", "\nlocal\nip: {}", &self.local.get_ip_addr());
+        if let Ok(addr) = &self.local.get_ip_addr().parse() {
+            let listener = TcpListener::bind(&addr).expect("binding failed");
+            let server = listener
+                .incoming()
+                .map_err(|e| error!(target: "p2p", "socket accept failed: {:?}", e))
+                .for_each(move |socket| {
+                    socket
+                        .set_recv_buffer_size(1 << 24)
+                        .expect("set_recv_buffer_size failed");
+                    socket
+                        .set_keepalive(Some(Duration::from_secs(30)))
+                        .expect("set_keepalive failed");
+                    process_inbounds(socket, handle);
+                    Ok(())
+                });
+            executor.spawn(server);
+        } else {
+            error!(target: "p2p", "binding parse failed: {}", &self.local.get_ip_addr());
+        }
+    }
+
+    // shutdown p2p instance
+    pub fn shutdown(self) {
+        info!(target: "p2p", "shutdown");
+        match self.runtime.shutdown_now().wait(){
+            Ok(_) => {
+                info!(target: "p2p", "shutdown");
+            },
+            Err(err) => {
+                error!(target: "p2p", "shutdown failed: {:?}", err);
+            }
+        }
+    }
+}
 
 pub fn register(handler: Handler) { HANDLERS.set(handler); }
 

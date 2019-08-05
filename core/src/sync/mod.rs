@@ -44,6 +44,9 @@ use futures::Stream;
 use rlp::UntrustedRlp;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
+
+// chris
+use std::thread;
 use p2p::handler::external::Handler;
 use p2p::Node;
 use p2p::ChannelBuffer;
@@ -59,6 +62,8 @@ use p2p::get_local_node;
 use p2p::states::STATE::HANDSHAKEDONE;
 use p2p::states::STATE::CONNECTED;
 use p2p::states::STATE::ALIVE;
+use p2p::Mgr;
+
 use sync::route::VERSION;
 use sync::route::ACTION;
 use sync::handler::status;
@@ -363,19 +368,27 @@ impl Sync {
 
     pub fn start_network(&self) {
         let executor = SyncStorage::get_executor();
-        register(Handler {
-            callback: SyncMgr::handle,
-        });
-        p2p_start(self.config.clone());
+        
+        // chris
+        // register(Handler {
+        //     callback: SyncMgr::handle,
+        // });
+        // p2p_start(self.config.clone());
+        let p2p_mgr = Mgr::new(self.config.clone());
+        p2p_mgr.run();
+        thread::sleep(Duration::from_secs(10));
+        p2p_mgr.shutdown(); 
 
         SyncMgr::enable(&executor, self.config.max_peers);
     }
 
     pub fn stop_network(&self) {
         SyncMgr::disable();
+        
+        // chris
         // original is p2p::disable which internally calls reset() with unuse atomic boolean
         // TODO: update proper ways to clear up threads and connections on p2p layer
-        p2p_shutdown();
+        // p2p_shutdown();
     }
 }
 
