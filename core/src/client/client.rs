@@ -388,7 +388,7 @@ impl Client {
                 self.get_stake(header.author()),
             );
             if let Err(e) = verify_pos_result {
-                warn!(target: "client", "Stage 4 block verification failed for #{} ({})\nError: {:?}", header.number(), header.hash(), e);
+                warn!(target: "client", "Stage 4 block verification failed for #{} ({})\nError: {}", header.number(), header.hash(), e);
                 return Err(());
             };
         }
