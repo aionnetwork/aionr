@@ -226,7 +226,7 @@ impl TestBlockChainClient {
     //    pub fn set_logs(&self, logs: Vec<LocalizedLogEntry>) { *self.logs.write() = logs; }
 
     /// Add blocks to test client.
-    pub fn add_blocks(&self, count: usize, with: EachBlockWith) {
+    pub fn add_blocks(&self, count: usize, with: EachBlockWith, seal_type: SealType) {
         let len = self.numbers.read().len();
         for n in len..(len + count) {
             let mut header = BlockHeader::new();
@@ -235,6 +235,7 @@ impl TestBlockChainClient {
             header.set_number(n as BlockNumber);
             header.set_gas_limit(U256::from(1_000_000));
             header.set_extra_data(self.extra_data.clone());
+            header.set_seal_type(seal_type.clone());
             let txs = match with {
                 //                EachBlockWith::Transaction => {
                 //                    let mut txs = RlpStream::new_list(1);
@@ -450,7 +451,7 @@ impl BlockChainClient for TestBlockChainClient {
         Ok(res)
     }
 
-    fn get_stake(&self, _a: &Address) -> Option<u64> { Some(0) }
+    fn get_stake(&self, _a: &Address) -> Option<u64> { Some(10000) }
 
     fn estimate_gas(&self, _t: &SignedTransaction, _block: BlockId) -> Result<U256, CallError> {
         Ok(21000.into())
@@ -599,8 +600,18 @@ impl BlockChainClient for TestBlockChainClient {
             .expect("Best block always has header.")
     }
 
-    fn best_block_header_with_seal_type(&self, _seal_type: &SealType) -> Option<encoded::Header> {
-        unimplemented!()
+    fn best_block_header_with_seal_type(&self, seal_type: &SealType) -> Option<encoded::Header> {
+        let mut result = None;
+        for (h, _) in self.blocks.read().clone().into_iter() {
+            let header = self
+                .block_header(BlockId::Hash(h))
+                .expect("Block always exists");
+            if header.seal_type() == Some(seal_type.clone()) {
+                result = Some(header);
+            }
+        }
+
+        result
     }
 
     fn calculate_difficulty(
