@@ -344,12 +344,3 @@ impl IoHandler<ClientIoMessage> for ClientIoHandler {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::ClientService;
-
-    #[test]
-    fn test_check_db() { ClientService::check_db; }
-
-}
