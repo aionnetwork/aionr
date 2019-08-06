@@ -1601,7 +1601,8 @@ mod tests {
     use spec::Spec;
     use std::sync::Arc;
     use std::time::Duration;
-    use super::{Banning, MinerOptions, PendingSet};
+    use super::{Banning, MinerOptions, PendingSet, SealType};
+    use client::BlockChainClient;
     use tests::common::{EachBlockWith, TestBlockChainClient};
     use transaction::{PendingTransaction, SignedTransaction};
     use transaction::Action;
@@ -1630,10 +1631,10 @@ mod tests {
         assert!(miner.submit_seal(&client, res.unwrap(), vec![]).is_ok());
 
         // two more blocks mined, work requested.
-        client.add_blocks(1, EachBlockWith::Nothing);
+        client.add_blocks(1, EachBlockWith::Nothing, SealType::PoW);
         miner.map_sealing_work(&client, |b| b.block().header().mine_hash());
 
-        client.add_blocks(1, EachBlockWith::Nothing);
+        client.add_blocks(1, EachBlockWith::Nothing, SealType::PoW);
         miner.map_sealing_work(&client, |b| b.block().header().mine_hash());
 
         // solution to original work submitted.
@@ -1767,5 +1768,43 @@ mod tests {
         assert!(miner.prepare_work_sealing(&client, &None));
         // Unless asked to prepare work.
         assert!(miner.requires_reseal(1u8.into()));
+    }
+
+    // use client::EngineClient;
+    // use super::BlockId;
+    use aion_types::{H256, H512};
+    #[test]
+    fn generate_pos_block() {
+        // 1. get seed
+        let miner = miner();
+        let client = TestBlockChainClient::default();
+
+        let header = client.best_block_header_with_seal_type(&SealType::PoS);
+        assert!(header.is_none());
+
+        let seed = H512::zero();
+        println!("seed = {:?}", seed);
+
+        let staker: H256 = "da13c5e00eefa13b58292b9083c04559b77c5859bc764b47e2aa5ecfe9ea3bab"
+            .from_hex()
+            .unwrap()
+            .as_slice()
+            .into();
+
+        // 2. submit seed
+        let seed: H512 = "d1c02f4679b4a022f2d843bd750c34c94cd08a2b6fc2def298653b81b88245a345d8d3e2d8bbce3fdb3ab2918459633f4496d5609ac13d9710ddcede8957cc0c".
+            from_hex().unwrap().as_slice().into();
+        let template = miner.get_pos_template(&client, seed.into(), staker);
+
+        assert!(template.is_some());
+        println!("new block = {:?}, staker = {:?}", template.unwrap(), staker);
+
+        // 3. submit signature
+        let signature: H512 = "8e6151cd613c07fae0aaf521461111c8281c0715dc6bdc5620682efd52540c4040d48dc067b88b1bc225294f4a7412c46f49bdcb9271b6b18022149663eb3108"
+            .from_hex().unwrap().as_slice().into();
+        let (block, mut seal) = miner.get_ready_pos(&template.unwrap()).unwrap();
+        seal[1] = signature[..].into();
+        let result = miner.try_seal_pos(&client, seal, block);
+        assert!(result.is_ok());
     }
 }
