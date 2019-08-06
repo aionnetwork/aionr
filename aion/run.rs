@@ -49,7 +49,11 @@ use params::{fatdb_switch_to_bool, AccountsConfig, StakeConfig, MinerExtras, Pru
 use parking_lot::{Condvar, Mutex};
 use rpc;
 use rpc_apis;
+
+// chris
 use p2p::Config;
+use p2p::Mgr;
+
 use user_defaults::UserDefaults;
 
 // Pops along with error messages when a password is missing or invalid.
@@ -209,11 +213,18 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
           if cmd.ipc_conf.enabled { "y" } else { "n" },
     );
 
+    // chris
+    // start p2p
+    let p2p_mgr = Mgr::new(net_conf.clone());
+    p2p_mgr.run();
+
     // start sync
     let sync = Sync::new(client.clone(), net_conf);
-    let chain_notify = sync.clone() as Arc<ChainNotify>;
-    service.add_notify(chain_notify.clone());
-    sync.start_network();
+    // let chain_notify = sync.clone() as Arc<ChainNotify>;
+    // let chain_notify = Arc::new(sync.clone()) as Arc<ChainNotify>;
+    // service.add_notify(chain_notify.clone());
+    // chris
+    //sync.start_network();
 
     // start rpc server
     let runtime_rpc = tokio::runtime::Builder::new()
@@ -223,9 +234,10 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     let rpc_stats = Arc::new(informant::RpcStats::default());
     let account_store = Some(account_provider.clone());
 
+    // chris
     let deps_for_rpc_apis = Arc::new(rpc_apis::FullDependencies {
         client: client.clone(),
-        sync: sync.clone(),
+        //sync: sync.clone()),
         account_store,
         miner: miner.clone(),
         external_miner: external_miner.clone(),
@@ -323,11 +335,15 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         ipc_server.unwrap().close();
     }
 
+    // chris
     // close p2p
-    sync.stop_network();
+    p2p_mgr.shutdown();
+    // sync.stop_network();
 
     // close/drop this stuff as soon as exit detected.
-    drop((sync, chain_notify));
+    // drop((sync, chain_notify));
+    drop(sync);
+
 
     thread::sleep(Duration::from_secs(5));
 

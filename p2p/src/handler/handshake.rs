@@ -26,47 +26,42 @@ use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
 use version::short_version;
 use ChannelBuffer;
-use Node;
-use MAX_REVISION_LENGTH;
-use IP_LENGTH;
-use NODE_ID_LENGTH;
-use REVISION_PREFIX;
+use node::MAX_REVISION_LENGTH;
+use node::IP_LENGTH;
+use node::NODE_ID_LENGTH;
+use node::REVISION_PREFIX;
+use node::Node;
 use event::Event;
 use route::VERSION;
 use route::MODULE;
 use route::ACTION;
-use states::STATE::ALIVE;
-use super::super::send as p2p_send;
-use super::super::get_local_node;
-use super::super::get_config;
-use super::super::update_node;
+use state::STATE::ACTIVE;
+use super::super::Mgr as P2p;
 use super::super::calculate_hash;
-use super::super::is_connected;
-use super::super::get_peer;
-use super::super::add_peer;
-use super::super::remove_peer;
 
 //TODO: remove it
 const VERSION: &str = "02";
 
-pub fn send(node: &mut Node) {
+pub fn send(p2p: P2p, node: &mut Node) {
     debug!(target: "p2p", "handshake.rs/send");
-    let local_node = get_local_node();
+
     let mut req = ChannelBuffer::new();
     req.head.ver = VERSION::V0.value();
     req.head.ctrl = MODULE::P2P.value();
     req.head.action = ACTION::HANDSHAKEREQ.value();
 
     req.body.clear();
-    req.body.put_slice(&local_node.node_id);
+    //req.body.put_slice(&p2p.config.id);
 
     let mut net_id = [0; 4];
-    BigEndian::write_u32(&mut net_id, local_node.net_id);
+    BigEndian::write_u32(&mut net_id, p2p.config.net_id);
 
     req.body.put_slice(&net_id);
-    req.body.put_slice(&local_node.ip_addr.ip);
+    // TODO: uncomment line below
+    // req.body.put_slice(&local_node.ip_addr.ip);
     let mut port = [0; 4];
-    BigEndian::write_u32(&mut port, local_node.ip_addr.port);
+    // TODO: uncomment line below
+    // BigEndian::write_u32(&mut port, local_node.ip_addr.port);
     req.body.put_slice(&port);
     let mut revision = short_version();
     revision.insert_str(0, REVISION_PREFIX);
@@ -76,18 +71,16 @@ pub fn send(node: &mut Node) {
     req.body.put_slice(VERSION.as_bytes());
     req.head.len = req.body.len() as u32;
 
-    p2p_send(node.node_hash, req.clone());
-    node.inc_repeated();
-    update_node(node.node_hash, node);
+    p2p.send(node.hash, req.clone());
 }
 
-pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
+pub fn receive_req(p2p: P2p, node: &mut Node, req: ChannelBuffer) {
     debug!(target: "p2p", "handshake.rs/receive_req");
 
     let (node_id, req_body_rest) = req.body.split_at(NODE_ID_LENGTH);
     let (mut net_id, req_body_rest) = req_body_rest.split_at(mem::size_of::<i32>());
     let peer_net_id = net_id.read_u32::<BigEndian>().unwrap_or(0);
-    let local_net_id = get_config().net_id;
+    let local_net_id = p2p.config.net_id;
     if peer_net_id != local_net_id {
         warn!(target: "p2p", "invalid net id {}, should be {}.", peer_net_id, local_net_id);
         return;
@@ -102,8 +95,8 @@ pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
     let version_len = version_len[0] as usize;
     let (_version, _rest) = rest.split_at(version_len);
 
-    node.node_id.copy_from_slice(node_id);
-    node.ip_addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
+    node.id.copy_from_slice(node_id);
+    node.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
     if revision_len > MAX_REVISION_LENGTH {
         node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
     } else {
@@ -124,21 +117,20 @@ pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
     res.body.put_slice(res_body.as_slice());
     res.head.len = res.body.len() as u32;
 
-    let old_node_hash = node.node_hash;
-    let node_id_hash = calculate_hash(&node.get_node_id());
-    node.node_hash = node_id_hash;
-    node.state_code = ALIVE.value();
-    if is_connected(node_id_hash) {
-        trace!(target: "p2p", "known node {}@{} ...", node.get_node_id(), node.get_ip_addr());
-    } else {
-        Event::update_node_state(node, Event::OnHandshakeReq);
-        if let Some(socket) = get_peer(old_node_hash) {
-            add_peer(node.clone(), &socket);
-        }
-    }
+    let old_node_hash = node.hash;
+    let node_id_hash = calculate_hash(&node.get_id_string());
+    node.hash = node_id_hash;
+    //node.state_code = ALIVE.value();
+    // if is_connected(node_id_hash) {
+    //     trace!(target: "p2p", "known node {}@{} ...", node.get_node_id(), node.get_ip_addr());
+    // } else {
+    //     Event::update_node_state(node, Event::OnHandshakeReq);
+    //     if let Some(socket) = get_peer(old_node_hash) {
+    //         add_peer(node.clone(), &socket);
+    //     }
+    // }
 
-    p2p_send(node.node_hash, res);
-    remove_peer(old_node_hash);
+    p2p.send(node.hash, res);
 }
 
 pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
@@ -153,7 +145,4 @@ pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
     } else {
         node.revision[0..revision_len].copy_from_slice(revision);
     }
-
-    Event::update_node_state(node, Event::OnHandshakeRes);
-    update_node(node.node_hash, node);
 }

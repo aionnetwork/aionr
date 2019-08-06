@@ -27,9 +27,8 @@ use std::fmt;
 use std::net::SocketAddr;
 use std::time::SystemTime;
 use uuid::Uuid;
-use states::STATE::CONNECTED;
-use states::STATE::DISCONNECTED;
-pub use super::msg::*;
+use super::msg::*;
+use super::state::STATE;
 
 pub const HEADER_LENGTH: usize = 8;
 pub const NODE_ID_LENGTH: usize = 36;
@@ -65,7 +64,6 @@ impl fmt::Display for Mode {
 pub struct IpAddr {
     pub ip: [u8; 8],
     pub port: u32,
-    pub is_server: bool,
 }
 
 impl IpAddr {
@@ -73,11 +71,16 @@ impl IpAddr {
         IpAddr {
             ip: [0; 8],
             port: 0,
-            is_server: false,
+        }
+    }
+    pub fn new1(ip: [u8; 8], port: u32) -> IpAddr{
+        IpAddr {
+            ip,
+            port,
         }
     }
 
-    pub fn get_addr(&self) -> String {
+    pub fn to_string(&self) -> String {
         format!(
             "{}.{}.{}.{}:{}",
             self.ip[1], self.ip[3], self.ip[5], self.ip[7], self.port
@@ -85,7 +88,7 @@ impl IpAddr {
         .to_string()
     }
 
-    pub fn get_display_addr(&self) -> String {
+    pub fn to_formatted_string(&self) -> String {
         format!(
             "{:>3}.{:>3}.{:>3}.{:>3}:{}",
             self.ip[1], self.ip[3], self.ip[5], self.ip[7], self.port
@@ -102,233 +105,303 @@ impl IpAddr {
     }
 }
 
-impl fmt::Display for IpAddr {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "Ip Address: {}, Server: {}",
-            self.get_addr(),
-            self.is_server
-        )
+// impl fmt::Display for IpAddr {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         write!(
+//             f,
+//             "addr: {}",
+//             self.get_addr()
+//         )
+//     }
+// }
+
+// struct for initial seeds && active nodes from p2p communication
+#[derive(Clone)]
+pub struct TempNode {
+    pub id: [u8; NODE_ID_LENGTH],
+    pub addr: IpAddr,
+    pub if_seed: bool
+}
+
+impl TempNode {
+
+    pub fn new(id: [u8; NODE_ID_LENGTH], addr: IpAddr, if_seed: bool) -> TempNode{
+        TempNode{
+            id, 
+            addr,
+            if_seed
+        }
+    }
+
+    // TODO: remove in future
+    pub fn default() -> TempNode {
+        TempNode {
+            id: [b'0'; NODE_ID_LENGTH],
+            addr: IpAddr::new(),
+            if_seed: false
+        }
+    }
+
+    // construct node from seed config
+    // constrait check 
+    // TODO: return Option<TempNode>
+    pub fn new_from_str(node_str: String) -> TempNode {
+        let (_, node_str) = node_str.split_at(PROTOCOL_LENGTH);
+        let (id_str, addr_str_0) = node_str.split_at(NODE_ID_LENGTH);
+        let (_, addr_str_1) = addr_str_0.split_at(1);
+        let addr_str_1_arr: Vec<&str> = addr_str_1.split(":").collect();
+        let ip_str = addr_str_1_arr[0];
+        let port_str = addr_str_1_arr[1];
+
+        let mut id: [u8; NODE_ID_LENGTH] = [b'0'; NODE_ID_LENGTH];
+        if "00000000-0000-0000-0000-000000000000" == id_str.to_string() {
+            let uuid = Uuid::new_v4();
+            id.copy_from_slice(uuid.hyphenated().to_string().as_bytes());
+        } else {
+            id.copy_from_slice(id_str.as_bytes());
+        }
+
+        let mut addr = IpAddr::new();
+        addr.ip.copy_from_slice(convert_ip_string(ip_str.to_string()).as_slice());
+        addr.port = port_str.parse::<u32>().unwrap_or(30303);
+
+        TempNode {
+            id,
+            addr,
+            if_seed: true 
+        }
     }
 }
 
 #[derive(Clone)]
 pub struct Node {
-    pub node_id: [u8; NODE_ID_LENGTH],
+    pub hash: u64,
+    pub id: [u8; NODE_ID_LENGTH],
     pub net_id: u32,
-    pub ip_addr: IpAddr,
-    pub node_hash: u64,
-    pub best_block_num: u64,
-    pub best_hash: H256,
+    pub addr: IpAddr,
+    pub block_num: u64,
+    pub block_hash: H256,
     pub genesis_hash: H256,
-    pub is_from_boot_list: bool,
+    pub if_boot: bool,
     pub revision: [u8; MAX_REVISION_LENGTH],
-    pub tx: Option<mpsc::Sender<ChannelBuffer>>,
+    pub tx: mpsc::Sender<ChannelBuffer>,
+    pub state: STATE,
 
+    // chris
     // TODO: move to sync
-    pub synced_block_num: u64,
-    pub target_total_difficulty: U256,
-    pub current_pow_total_difficulty: U256,
-    pub current_pos_total_difficulty: U256,
-    pub current_total_difficulty: U256,
-    pub mode: Mode,
-    pub state_code: u32,
-    pub last_request_timestamp: SystemTime,
-    pub last_request_num: u64,
-    pub last_broadcast_timestamp: SystemTime,
-    pub last_sent_transactions: HashSet<H256>,
-    pub repeated: u8,
+    // pub synced_block_num: u64,
+    // pub target_total_difficulty: U256,
+    // pub current_pow_total_difficulty: U256,
+    // pub current_pos_total_difficulty: U256,
+    // pub current_total_difficulty: U256,
+    // pub mode: Mode,
+    // pub state_code: u32,
+    // pub last_request_timestamp: SystemTime,
+    // pub last_request_num: u64,
+    // pub last_broadcast_timestamp: SystemTime,
+    // pub last_sent_transactions: HashSet<H256>,
+    // pub repeated: u8,
 }
 
 impl Node {
-    pub fn new() -> Node {
+
+    // construct inbound node
+    pub fn new_outbound(tx: mpsc::Sender<ChannelBuffer>) -> Node {
         Node {
-            node_id: [b'0'; NODE_ID_LENGTH],
+            id: [b'0'; NODE_ID_LENGTH],
             net_id: 0,
-            ip_addr: IpAddr::new(),
-            node_hash: 0,
-            state_code: DISCONNECTED.value(),
-            best_block_num: 0,
-            synced_block_num: 0,
-            best_hash: H256::default(),
+            addr: IpAddr::new(),
+            hash: 0,      
+            block_num: 0,
+            block_hash: H256::default(),
             genesis_hash: H256::default(),
-            target_total_difficulty: U256::default(),
-            current_pow_total_difficulty: U256::default(),
-            current_pos_total_difficulty: U256::default(),
-            current_total_difficulty: U256::default(),
-            mode: Mode::NORMAL,
-            last_request_timestamp: SystemTime::now(),
-            last_request_num: 0,
-            last_broadcast_timestamp: SystemTime::now(),
-            last_sent_transactions: HashSet::new(),
-            tx: None,
-            is_from_boot_list: false,
-            repeated: 0,
+            if_boot: false,
             revision: [b' '; MAX_REVISION_LENGTH],
+            tx,
+            state: STATE::CONNECTED
+
+            // state_code: DISCONNECTED.value(),
+            // synced_block_num: 0,
+            // target_total_difficulty: U256::default(),
+            // current_pow_total_difficulty: U256::default(),
+            // current_pos_total_difficulty: U256::default(),
+            // current_total_difficulty: U256::default(),
+            // mode: Mode::NORMAL,
+            // last_request_timestamp: SystemTime::now(),
+            // last_request_num: 0,
+            // last_broadcast_timestamp: SystemTime::now(),
+            // last_sent_transactions: HashSet::new(),
+            // repeated: 0,
+            
         }
     }
 
-    pub fn new_with_node_str(node_str: String) -> Node {
-        let (_, node) = node_str.split_at(PROTOCOL_LENGTH);
+    // construct outbound node
+    pub fn new_inbound(sa: SocketAddr, tx: mpsc::Sender<ChannelBuffer>) -> Node {
+        let mut addr = IpAddr::new();
+        addr.ip.copy_from_slice(convert_ip_string(sa.ip().to_string()).as_slice());
+        addr.port = sa.port() as u32;
 
-        let (node_id, node_addr) = node.split_at(NODE_ID_LENGTH);
-        let (_, node_addr) = node_addr.split_at(1);
-        let node_addr: Vec<&str> = node_addr.split(":").collect();
-        let node_ip = node_addr[0];
-        let node_port = node_addr[1];
-
-        let mut node = Node::new();
-        if "00000000-0000-0000-0000-000000000000" == node_id.to_string() {
-            let uuid = Uuid::new_v4();
-            node.node_id
-                .copy_from_slice(uuid.hyphenated().to_string().as_bytes());
-        } else {
-            node.node_id.copy_from_slice(node_id.as_bytes());
+        Node {
+            id: [b'0'; NODE_ID_LENGTH],
+            net_id: 0,
+            addr,
+            hash: 0,      
+            block_num: 0,
+            block_hash: H256::default(),
+            genesis_hash: H256::default(),
+            if_boot: false,
+            revision: [b' '; MAX_REVISION_LENGTH],
+            tx,
+            state: STATE::CONNECTED
         }
-
-        node.ip_addr
-            .ip
-            .copy_from_slice(convert_ip_string(node_ip.to_string()).as_slice());
-        node.ip_addr.port = node_port.parse::<u32>().unwrap_or(30303);
-        node.state_code = CONNECTED.value();
-
-        node
     }
 
-    pub fn new_with_addr(addr: SocketAddr) -> Node {
-        let mut node = Node::new();
+    // pub fn new_with_node_str(node_str: String) -> Node {
+    //     let (_, node) = node_str.split_at(PROTOCOL_LENGTH);
 
-        let ip = addr.ip();
-        node.ip_addr
-            .ip
-            .copy_from_slice(convert_ip_string(ip.to_string()).as_slice());
-        let port = addr.port();
-        node.ip_addr.port = port as u32;
-        node.state_code = CONNECTED.value();
+    //     let (node_id, node_addr) = node.split_at(NODE_ID_LENGTH);
+    //     let (_, node_addr) = node_addr.split_at(1);
+    //     let node_addr: Vec<&str> = node_addr.split(":").collect();
+    //     let node_ip = node_addr[0];
+    //     let node_port = node_addr[1];
 
-        node
+    //     let mut node = Node::new();
+    //     if "00000000-0000-0000-0000-000000000000" == node_id.to_string() {
+    //         let uuid = Uuid::new_v4();
+    //         node.node_id
+    //             .copy_from_slice(uuid.hyphenated().to_string().as_bytes());
+    //     } else {
+    //         node.node_id.copy_from_slice(node_id.as_bytes());
+    //     }
+
+    //     node.ip_addr
+    //         .ip
+    //         .copy_from_slice(convert_ip_string(node_ip.to_string()).as_slice());
+    //     node.ip_addr.port = node_port.parse::<u32>().unwrap_or(30303);
+    //     //node.state_code = CONNECTED.value();
+
+    //     node
+    // }
+
+    // pub fn create_node(node_id: &[u8], ip: &[u8], mut port: &[u8], node_hash: u64) -> Node {
+    //     let mut node = Node::new();
+    //     node.node_id.copy_from_slice(node_id);
+    //     node.ip_addr.ip.copy_from_slice(ip);
+    //     node.ip_addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
+    //     node.node_hash = node_hash;
+    //     node
+    // }
+
+    // pub fn update(&mut self, node_new: &Node) {
+    //     self.node_id.copy_from_slice(&node_new.node_id);
+    //     self.net_id = node_new.net_id;
+    //     self.ip_addr.ip.copy_from_slice(&node_new.ip_addr.ip);
+    //     self.ip_addr.port = node_new.ip_addr.port;
+    //     self.ip_addr.is_server = node_new.ip_addr.is_server;
+    //     self.node_hash = node_new.node_hash;
+    //     // self.state_code = node_new.state_code;
+    //     self.best_block_num = node_new.best_block_num;
+    //     // self.synced_block_num = node_new.synced_block_num;
+    //     self.best_hash = node_new.best_hash;
+    //     self.genesis_hash = node_new.genesis_hash;
+    //     // self.target_total_difficulty = node_new.target_total_difficulty;
+    //     // self.current_pow_total_difficulty = node_new.current_pow_total_difficulty;
+    //     // self.current_pos_total_difficulty = node_new.current_pos_total_difficulty;
+    //     // self.current_total_difficulty = node_new.current_total_difficulty;
+    //     // self.mode = node_new.mode.clone();
+    //     // self.last_request_timestamp = node_new.last_request_timestamp;
+    //     // self.last_request_num = node_new.last_request_num;
+    //     // self.last_broadcast_timestamp = node_new.last_broadcast_timestamp;
+    //     self.is_from_boot_list = node_new.is_from_boot_list;
+    //     self.tx = node_new.tx.clone();
+    //     //self.repeated = node_new.repeated;
+    //     self.revision = node_new.revision;
+    // }
+
+    // pub fn set_ip_addr(&mut self, addr: SocketAddr) {
+    //     let ip = addr.ip();
+    //     self.ip_addr
+    //         .ip
+    //         .copy_from_slice(convert_ip_string(ip.to_string()).as_slice());
+    //     let port = addr.port();
+    //     self.ip_addr.port = port as u32;
+    // }
+
+    pub fn get_id_string(&self) -> String {
+        String::from_utf8_lossy(&self.id).into()
     }
 
-    pub fn create_node(node_id: &[u8], ip: &[u8], mut port: &[u8], node_hash: u64) -> Node {
-        let mut node = Node::new();
-        node.node_id.copy_from_slice(node_id);
-        node.ip_addr.ip.copy_from_slice(ip);
-        node.ip_addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
-        node.node_hash = node_hash;
-        node
-    }
+    // pub fn get_ip_addr(&self) -> String { self.ip_addr.get_addr() }
 
-    pub fn update(&mut self, node_new: &Node) {
-        self.node_id.copy_from_slice(&node_new.node_id);
-        self.net_id = node_new.net_id;
-        self.ip_addr.ip.copy_from_slice(&node_new.ip_addr.ip);
-        self.ip_addr.port = node_new.ip_addr.port;
-        self.ip_addr.is_server = node_new.ip_addr.is_server;
-        self.node_hash = node_new.node_hash;
-        self.state_code = node_new.state_code;
-        self.best_block_num = node_new.best_block_num;
-        self.synced_block_num = node_new.synced_block_num;
-        self.best_hash = node_new.best_hash;
-        self.genesis_hash = node_new.genesis_hash;
-        self.target_total_difficulty = node_new.target_total_difficulty;
-        self.current_pow_total_difficulty = node_new.current_pow_total_difficulty;
-        self.current_pos_total_difficulty = node_new.current_pos_total_difficulty;
-        self.current_total_difficulty = node_new.current_total_difficulty;
-        self.mode = node_new.mode.clone();
-        self.last_request_timestamp = node_new.last_request_timestamp;
-        self.last_request_num = node_new.last_request_num;
-        self.last_broadcast_timestamp = node_new.last_broadcast_timestamp;
-        self.is_from_boot_list = node_new.is_from_boot_list;
-        self.tx = node_new.tx.clone();
-        self.repeated = node_new.repeated;
-        self.revision = node_new.revision;
-    }
+    // pub fn get_display_ip_addr(&self) -> String { self.ip_addr.get_display_addr() }
 
-    pub fn set_ip_addr(&mut self, addr: SocketAddr) {
-        let ip = addr.ip();
-        self.ip_addr
-            .ip
-            .copy_from_slice(convert_ip_string(ip.to_string()).as_slice());
-        let port = addr.port();
-        self.ip_addr.port = port as u32;
-    }
+    // pub fn is_over_repeated_threshold(&self) -> bool { return self.repeated > 5; }
 
-    pub fn get_node_id(&self) -> String {
-        let node_id = String::from_utf8_lossy(&self.node_id);
-        node_id.into()
-    }
+    // pub fn inc_repeated(&mut self) { self.repeated = self.repeated + 1; }
 
-    pub fn get_ip_addr(&self) -> String { self.ip_addr.get_addr() }
-
-    pub fn get_display_ip_addr(&self) -> String { self.ip_addr.get_display_addr() }
-
-    pub fn is_over_repeated_threshold(&self) -> bool { return self.repeated > 5; }
-
-    pub fn inc_repeated(&mut self) { self.repeated = self.repeated + 1; }
-
-    pub fn reset_repeated(&mut self) { self.repeated = 0; }
+    // pub fn reset_repeated(&mut self) { self.repeated = 0; }
 }
 
-impl fmt::Display for Node {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "Node information: \n    Node id: ")?;
-        write!(
-            f,
-            "    revision:{}\n",
-            String::from_utf8_lossy(&self.node_id)
-        )?;
-        write!(f, "\n    net_id: {}\n", self.net_id)?;
-        write!(f, "    {}\n", self.ip_addr)?;
-        write!(f, "    node hash: {:064X}\n", self.node_hash)?;
-        write!(f, "    state code: {:032b}\n", self.state_code)?;
-        write!(f, "    best block number: {}\n", self.best_block_num)?;
-        write!(f, "    synced block number: {}\n", self.synced_block_num)?;
-        write!(f, "    boot node: {}\n", self.is_from_boot_list)?;
-        write!(f, "    mode: {}\n", self.mode)?;
-        write!(
-            f,
-            "    last request timestamp: {:?}\n",
-            self.last_request_timestamp
-        )?;
-        write!(f, "    last_request_num: {}\n", self.last_request_num)?;
-        write!(
-            f,
-            "    last broadcast timestamp: {:?}\n",
-            self.last_broadcast_timestamp
-        )?;
-        write!(f, "    best hash: {:?}\n", self.best_hash)?;
-        write!(f, "    genesis hash: {:?}\n", self.genesis_hash)?;
-        write!(f, "    repeated: {:?}\n", self.repeated)?;
-        write!(
-            f,
-            "    total difficulty: {}\n",
-            self.target_total_difficulty
-        )?;
-        write!(
-            f,
-            "    current pow total difficulty: {}\n",
-            self.current_pow_total_difficulty
-        )?;
-        write!(
-            f,
-            "    current pos total difficulty: {}\n",
-            self.current_pos_total_difficulty
-        )?;
-        write!(
-            f,
-            "    current total difficulty: {}\n",
-            self.current_total_difficulty
-        )?;
-        write!(
-            f,
-            "    revision:{}\n",
-            String::from_utf8_lossy(&self.revision)
-        )
-    }
-}
+// impl fmt::Display for Node {
+//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+//         write!(f, "Node information: \n    Node id: ")?;
+//         write!(
+//             f,
+//             "    revision:{}\n",
+//             String::from_utf8_lossy(&self.node_id)
+//         )?;
+//         write!(f, "\n    net_id: {}\n", self.net_id)?;
+//         write!(f, "    {}\n", self.ip_addr)?;
+//         write!(f, "    node hash: {:064X}\n", self.node_hash)?;
+//         write!(f, "    state code: {:032b}\n", self.state_code)?;
+//         write!(f, "    best block number: {}\n", self.best_block_num)?;
+//         write!(f, "    synced block number: {}\n", self.synced_block_num)?;
+//         write!(f, "    boot node: {}\n", self.is_from_boot_list)?;
+//         write!(f, "    mode: {}\n", self.mode)?;
+//         write!(
+//             f,
+//             "    last request timestamp: {:?}\n",
+//             self.last_request_timestamp
+//         )?;
+//         write!(f, "    last_request_num: {}\n", self.last_request_num)?;
+//         write!(
+//             f,
+//             "    last broadcast timestamp: {:?}\n",
+//             self.last_broadcast_timestamp
+//         )?;
+//         write!(f, "    best hash: {:?}\n", self.best_hash)?;
+//         write!(f, "    genesis hash: {:?}\n", self.genesis_hash)?;
+//         write!(f, "    repeated: {:?}\n", self.repeated)?;
+//         write!(
+//             f,
+//             "    total difficulty: {}\n",
+//             self.target_total_difficulty
+//         )?;
+//         write!(
+//             f,
+//             "    current pow total difficulty: {}\n",
+//             self.current_pow_total_difficulty
+//         )?;
+//         write!(
+//             f,
+//             "    current pos total difficulty: {}\n",
+//             self.current_pos_total_difficulty
+//         )?;
+//         write!(
+//             f,
+//             "    current total difficulty: {}\n",
+//             self.current_total_difficulty
+//         )?;
+//         write!(
+//             f,
+//             "    revision:{}\n",
+//             String::from_utf8_lossy(&self.revision)
+//         )
+//     }
+// }
 
-pub fn convert_ip_string(ip_str: String) -> Vec<u8> {
+fn convert_ip_string(ip_str: String) -> Vec<u8> {
     let mut ip = Vec::new();
     let ip_vec: Vec<&str> = ip_str.split(".").collect();
     for sec in ip_vec.iter() {

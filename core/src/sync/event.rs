@@ -22,7 +22,7 @@
 use std::fmt;
 
 use p2p::*;
-use p2p::states::STATE::HANDSHAKEDONE;
+//use p2p::states::STATE::HANDSHAKEDONE;
 pub const STATUS_GOT: u32 = 1 << 4;
 pub const HEADERS_DOWNLOADED: u32 = 1 << 5;
 pub const BODIES_DOWNLOADED: u32 = 1 << 6;
@@ -40,41 +40,42 @@ pub enum SyncEvent {
 
 impl SyncEvent {
     pub fn update_node_state(node: &mut Node, event: SyncEvent) {
-        let state_code = node.state_code;
+        
+        // let state_code = node.state_code;
 
         match event {
             SyncEvent::OnStatusReq | SyncEvent::OnStatusRes => {
-                if state_code & HANDSHAKEDONE.value() == HANDSHAKEDONE.value() {
-                    node.state_code = state_code | STATUS_GOT;
-                } else {
-                    warn!(target: "sync", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
-                }
+                // if state_code & HANDSHAKEDONE.value() == HANDSHAKEDONE.value() {
+                //     node.state_code = state_code | STATUS_GOT;
+                // } else {
+                //     warn!(target: "sync", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
+                // }
             }
             SyncEvent::OnBlockHeadersReq | SyncEvent::OnBlockHeadersRes => {
-                if state_code & STATUS_GOT == STATUS_GOT {
-                    node.state_code = state_code | HEADERS_DOWNLOADED;
-                } else {
-                    warn!(target: "sync", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
-                }
+                // if state_code & STATUS_GOT == STATUS_GOT {
+                //     node.state_code = state_code | HEADERS_DOWNLOADED;
+                // } else {
+                //     warn!(target: "sync", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
+                // }
             }
             SyncEvent::OnBlockBodiesReq | SyncEvent::OnBlockBodiesRes => {
-                if state_code & HEADERS_DOWNLOADED == HEADERS_DOWNLOADED {
-                    node.state_code = (state_code | BODIES_DOWNLOADED) ^ HEADERS_DOWNLOADED;
-                } else {
-                    // TBD
-                }
+                // if state_code & HEADERS_DOWNLOADED == HEADERS_DOWNLOADED {
+                //     node.state_code = (state_code | BODIES_DOWNLOADED) ^ HEADERS_DOWNLOADED;
+                // } else {
+                //     // TBD
+                // }
             }
             SyncEvent::OnBroadCastTx => {
-                if state_code & HANDSHAKEDONE.value() == HANDSHAKEDONE.value() {
-                } else {
-                    warn!(target: "sync", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
-                }
+                // if state_code & HANDSHAKEDONE.value() == HANDSHAKEDONE.value() {
+                // } else {
+                //     warn!(target: "sync", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
+                // }
             }
             SyncEvent::OnBroadCastBlock => {
-                if state_code & HANDSHAKEDONE.value() == HANDSHAKEDONE.value() {
-                } else {
-                    warn!(target: "sync", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
-                }
+                // if state_code & HANDSHAKEDONE.value() == HANDSHAKEDONE.value() {
+                // } else {
+                //     warn!(target: "sync", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
+                // }
             }
         }
     }

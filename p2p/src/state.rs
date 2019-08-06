@@ -19,34 +19,24 @@
  *
  ******************************************************************************/
 
-/// p2p node state
+/// simple p2p node state
 /// states defined here only for p2p layer
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum STATE {
     CONNECTED,
-    ISSERVER,
-    HANDSHAKEDONE,
-    ALIVE,
-    DISCONNECTED,
+    ACTIVE,
 }
 
 impl STATE {
-    pub fn value(&self) -> u32 {
+    pub fn value(&self) -> usize {
         match self {
-            STATE::CONNECTED => 1,
-            STATE::ISSERVER => 1 << 1,
-            STATE::HANDSHAKEDONE => 1 << 2,
-            STATE::ALIVE => 1 << 3,
-            STATE::DISCONNECTED => 1 << 4,
+            STATE::CONNECTED => 0,
+            STATE::ACTIVE => 1,
         }
     }
-    pub fn from(value: u32) -> STATE {
+    pub fn from(value: usize) -> STATE {
         match value {
-            1 => STATE::CONNECTED,
-            2 => STATE::ISSERVER,
-            4 => STATE::HANDSHAKEDONE,
-            8 => STATE::ALIVE,
-            16 => STATE::DISCONNECTED,
+            1 => STATE::ACTIVE,
             _ => STATE::CONNECTED,
         }
     }
@@ -60,30 +50,18 @@ mod tests {
     #[test]
     fn equal() {
         assert_eq!(STATE::CONNECTED, STATE::CONNECTED);
-        assert_eq!(STATE::ISSERVER, STATE::ISSERVER);
-        assert_eq!(STATE::HANDSHAKEDONE, STATE::HANDSHAKEDONE);
-        assert_eq!(STATE::ALIVE, STATE::ALIVE);
-        assert_eq!(STATE::DISCONNECTED, STATE::DISCONNECTED);
+        assert_eq!(STATE::ACTIVE, STATE::ACTIVE);
     }
 
     #[test]
     fn value() {
-        assert_eq!(STATE::CONNECTED.value(), 1);
-        assert_eq!(STATE::ISSERVER.value(), 2);
-        assert_eq!(STATE::HANDSHAKEDONE.value(), 4);
-        assert_eq!(STATE::ALIVE.value(), 8);
-        assert_eq!(STATE::DISCONNECTED.value(), 16);
+        assert_eq!(STATE::CONNECTED.value(), 0);
+        assert_eq!(STATE::ACTIVE.value(), 1);
     }
 
     #[test]
     fn from() {
-        assert_eq!(STATE::CONNECTED, STATE::from(1));
-        assert_eq!(STATE::ISSERVER, STATE::from(2));
-        assert_eq!(STATE::HANDSHAKEDONE, STATE::from(4));
-        assert_eq!(STATE::ALIVE, STATE::from(8));
-        assert_eq!(STATE::DISCONNECTED, STATE::from(16));
         assert_eq!(STATE::CONNECTED, STATE::from(0));
-        assert_eq!(STATE::CONNECTED, STATE::from(17));
-        assert_eq!(STATE::CONNECTED, STATE::from(255));
+        assert_eq!(STATE::ACTIVE, STATE::from(1));
     }
 }

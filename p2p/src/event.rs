@@ -21,8 +21,8 @@
 
 use std::fmt;
 use node::Node;
-use states::STATE::ALIVE;
-use states::STATE::HANDSHAKEDONE;
+// use states::STATE::ALIVE;
+// use states::STATE::HANDSHAKEDONE;
 
 pub enum Event {
     OnHandshakeReq,
@@ -33,19 +33,19 @@ pub enum Event {
 
 impl Event {
     pub fn update_node_state(node: &mut Node, event: Event) {
-        let state_code = node.state_code;
-        match event {
-            Event::OnHandshakeReq | Event::OnHandshakeRes => {
-                node.state_code = state_code | HANDSHAKEDONE.value() | ALIVE.value();
-            }
-            Event::OnActiveNodesReq | Event::OnActiveNodesRes => {
-                if state_code & HANDSHAKEDONE.value() == HANDSHAKEDONE.value() {
-                    node.state_code = state_code | ALIVE.value();
-                } else {
-                    warn!(target: "p2p", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
-                }
-            }
-        }
+        // let state_code = node.state_code;
+        // match event {
+        //     Event::OnHandshakeReq | Event::OnHandshakeRes => {
+        //         node.state_code = state_code | HANDSHAKEDONE.value() | ALIVE.value();
+        //     }
+        //     Event::OnActiveNodesReq | Event::OnActiveNodesRes => {
+        //         if state_code & HANDSHAKEDONE.value() == HANDSHAKEDONE.value() {
+        //             node.state_code = state_code | ALIVE.value();
+        //         } else {
+        //             warn!(target: "p2p", "Invalid status. State code: {:032b}, Event Id: {}, node id: {}", state_code, event, node.get_node_id());
+        //         }
+        //     }
+        // }
     }
 }
 

@@ -152,7 +152,8 @@ pub trait Dependencies {
 /// RPC dependencies for a full node.
 pub struct FullDependencies {
     pub client: Arc<Client>,
-    pub sync: Arc<SyncProvider>,
+    // chris
+    // pub sync: Arc<SyncProvider>,
     pub account_store: Option<Arc<AccountProvider>>,
     pub miner: Arc<Miner>,
     pub external_miner: Arc<ExternalMiner>,
@@ -202,36 +203,37 @@ impl FullDependencies {
                 Api::Web3 => {
                     handler.extend_with(Web3Client::new().to_delegate());
                 }
+                // chris
                 Api::Net => {
-                    handler.extend_with(NetClient::new(&self.sync).to_delegate());
+                    //handler.extend_with(NetClient::new(&self.sync).to_delegate());
                 }
                 Api::Eth => {
-                    let client = EthClient::new(
-                        &self.client,
-                        &self.sync,
-                        &self.account_store,
-                        &self.miner,
-                        &self.external_miner,
-                        self.dynamic_gas_price.clone(),
-                    );
-                    handler.extend_with(client.to_delegate());
+                    // let client = EthClient::new(
+                    //     &self.client,
+                    //     &self.sync,
+                    //     &self.account_store,
+                    //     &self.miner,
+                    //     &self.external_miner,
+                    //     self.dynamic_gas_price.clone(),
+                    // );
+                    // handler.extend_with(client.to_delegate());
 
-                    if !for_generic_pubsub {
-                        let filter_client =
-                            EthFilterClient::new(self.client.clone(), self.miner.clone());
-                        handler.extend_with(filter_client.to_delegate());
+                    // if !for_generic_pubsub {
+                    //     let filter_client =
+                    //         EthFilterClient::new(self.client.clone(), self.miner.clone());
+                    //     handler.extend_with(filter_client.to_delegate());
 
-                        add_signing_methods!(EthSigning, handler, self, nonces.clone());
-                    }
+                    //     add_signing_methods!(EthSigning, handler, self, nonces.clone());
+                    // }
                 }
                 Api::Stratum => {
-                    let client = StratumClient::new(
-                        &self.client,
-                        &self.sync,
-                        &self.miner,
-                        &self.account_store,
-                    );
-                    handler.extend_with(client.to_delegate());
+                    // let client = StratumClient::new(
+                    //     &self.client,
+                    //     &self.sync,
+                    //     &self.miner,
+                    //     &self.account_store,
+                    // );
+                    // handler.extend_with(client.to_delegate());
                 }
                 Api::Personal => {
                     handler.extend_with(
