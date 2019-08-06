@@ -1756,6 +1756,8 @@ impl MiningBlockChainClient for Client {
             );
         });
         self.db.read().flush().expect("DB flush failed.");
+        // clear pending PoS blocks
+        self.miner.clear_pos_pending();
         Ok(h)
     }
 
