@@ -29,40 +29,37 @@ use ChannelBuffer;
 use node::NODE_ID_LENGTH;
 use node::IP_LENGTH;
 use node::Node;
-//use node::IpAddr;
 use node::TempNode;
-//use event::Event;
 use route::VERSION;
 use route::MODULE;
 use route::ACTION;
-use super::super::Mgr as P2p;
-//use super::super::calculate_hash;
+use super::super::Mgr;
+use super::super::send as p2p_send;
 
-pub fn send(p2p: P2p) {
+pub fn send<'a>(p2p: &'a Mgr) {
     debug!(target: "p2p", "active_nodes.rs/send");
     let nodes: Vec<Node> = p2p.get_active_nodes();;
     let len: usize = nodes.len();
     if nodes.len() > 0 {
         let random = random::<usize>() % len;
         let hash = nodes[random].hash.clone();
-        p2p.send(
+        p2p_send(
             hash, 
             ChannelBuffer::new1(
                 VERSION::V0.value(), 
                 MODULE::P2P.value(), 
                 ACTION::ACTIVENODESREQ.value(), 
                 0
-            )
+            ),
+            p2p.nodes.clone()
         );
     }
 }
 
-pub fn receive_req(p2p: P2p, node: &mut Node) {
+pub fn receive_req<'a>(p2p: &'a Mgr, hash: u64) {
     debug!(target: "p2p", "active_noreceive_req");
 
     let mut res = ChannelBuffer::new();
-    let hash = node.hash;
-
     res.head.ver = VERSION::V0.value();
     res.head.ctrl = MODULE::P2P.value();
     res.head.action = ACTION::ACTIVENODESRES.value();
@@ -73,7 +70,7 @@ pub fn receive_req(p2p: P2p, node: &mut Node) {
     if active_nodes.len() > 0 {
         let mut active_nodes_to_send = Vec::new();
         for active_node in active_nodes.iter() {
-            if active_node.hash != node.hash && node.addr.ip != node.addr.ip {
+            if active_node.hash != hash {
                 active_nodes_to_send.push(active_node);
             }
         }
@@ -94,18 +91,17 @@ pub fn receive_req(p2p: P2p, node: &mut Node) {
     }
     res.body.put_slice(res_body.as_slice());
     res.head.len = res.body.len() as u32;
-    p2p.send(node.hash, res);
+    p2p_send(hash, res, p2p.nodes.clone());
 }
 
-pub fn receive_res(p2p: P2p, node: &mut Node, req: ChannelBuffer) {
+pub fn receive_res<'a>(p2p: &'a Mgr, _hash: u64, req: ChannelBuffer) {
     debug!(target: "p2p", "active_nodes/receive_res");
 
-    let peer_node_hash = node.hash;
     let (node_count, rest) = req.body.split_at(1);
     let mut temp_list = Vec::new();
     let mut rest = rest;
     if node_count[0] > 0 {
-
+        // TODO: update node status with healthy active nodes msg
         // TODO: max for check        
         for _i in 0..node_count[0] as u32 {
             

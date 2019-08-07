@@ -142,6 +142,10 @@ impl TempNode {
         }
     }
 
+    pub fn get_id_string(&self) -> String {
+        String::from_utf8_lossy(&self.id).into()
+    }
+
     // construct node from seed config
     // constrait check 
     // TODO: return Option<TempNode>
@@ -208,10 +212,10 @@ impl Node {
     // construct inbound node
     pub fn new_outbound(tx: mpsc::Sender<ChannelBuffer>) -> Node {
         Node {
+            hash: 0,
             id: [b'0'; NODE_ID_LENGTH],
             net_id: 0,
             addr: IpAddr::new(),
-            hash: 0,      
             block_num: 0,
             block_hash: H256::default(),
             genesis_hash: H256::default(),
@@ -243,10 +247,10 @@ impl Node {
         addr.port = sa.port() as u32;
 
         Node {
+            hash: 0, 
             id: [b'0'; NODE_ID_LENGTH],
             net_id: 0,
             addr,
-            hash: 0,      
             block_num: 0,
             block_hash: H256::default(),
             genesis_hash: H256::default(),

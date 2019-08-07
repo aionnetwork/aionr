@@ -20,6 +20,7 @@
  ******************************************************************************/
 
 use std::mem;
+use std::sync::Arc;
 use bytes::BufMut;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
@@ -31,25 +32,24 @@ use node::IP_LENGTH;
 use node::NODE_ID_LENGTH;
 use node::REVISION_PREFIX;
 use node::Node;
-use event::Event;
 use route::VERSION;
 use route::MODULE;
 use route::ACTION;
 use state::STATE::ACTIVE;
-use super::super::Mgr as P2p;
+use super::super::Mgr;
+use super::super::send as p2p_send;
 use super::super::calculate_hash;
 
 //TODO: remove it
 const VERSION: &str = "02";
 
-pub fn send(p2p: P2p, node: &mut Node) {
+pub fn send<'a>(p2p: &'a Mgr, hash: u64) {
     debug!(target: "p2p", "handshake.rs/send");
 
     let mut req = ChannelBuffer::new();
     req.head.ver = VERSION::V0.value();
     req.head.ctrl = MODULE::P2P.value();
     req.head.action = ACTION::HANDSHAKEREQ.value();
-
     req.body.clear();
     //req.body.put_slice(&p2p.config.id);
 
@@ -71,10 +71,14 @@ pub fn send(p2p: P2p, node: &mut Node) {
     req.body.put_slice(VERSION.as_bytes());
     req.head.len = req.body.len() as u32;
 
-    p2p.send(node.hash, req.clone());
+    let p2p_0 = Arc::new(p2p);
+    p2p_send(hash, req.clone(), p2p.nodes.clone());
 }
 
-pub fn receive_req(p2p: P2p, node: &mut Node, req: ChannelBuffer) {
+/// 1. decode handshake msg
+/// 2. validate and prove incoming connection to active
+/// 3. acknowledge sender if it is proved
+pub fn receive_req<'a>(p2p: &'a Mgr, hash: u64, req: ChannelBuffer) {
     debug!(target: "p2p", "handshake.rs/receive_req");
 
     let (node_id, req_body_rest) = req.body.split_at(NODE_ID_LENGTH);
@@ -95,13 +99,16 @@ pub fn receive_req(p2p: P2p, node: &mut Node, req: ChannelBuffer) {
     let version_len = version_len[0] as usize;
     let (_version, _rest) = rest.split_at(version_len);
 
-    node.id.copy_from_slice(node_id);
-    node.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
-    if revision_len > MAX_REVISION_LENGTH {
-        node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
-    } else {
-        node.revision[0..revision_len].copy_from_slice(revision);
-    }
+
+
+
+    // node.id.copy_from_slice(node_id);
+    // node.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
+    // if revision_len > MAX_REVISION_LENGTH {
+    //     node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
+    // } else {
+    //     node.revision[0..revision_len].copy_from_slice(revision);
+    // }
 
     let mut res = ChannelBuffer::new();
     let mut res_body = Vec::new();
@@ -117,9 +124,9 @@ pub fn receive_req(p2p: P2p, node: &mut Node, req: ChannelBuffer) {
     res.body.put_slice(res_body.as_slice());
     res.head.len = res.body.len() as u32;
 
-    let old_node_hash = node.hash;
-    let node_id_hash = calculate_hash(&node.get_id_string());
-    node.hash = node_id_hash;
+    // let old_node_hash = node.hash;
+    // let node_id_hash = calculate_hash(&node.get_id_string());
+    // node.hash = node_id_hash;
     //node.state_code = ALIVE.value();
     // if is_connected(node_id_hash) {
     //     trace!(target: "p2p", "known node {}@{} ...", node.get_node_id(), node.get_ip_addr());
@@ -130,19 +137,27 @@ pub fn receive_req(p2p: P2p, node: &mut Node, req: ChannelBuffer) {
     //     }
     // }
 
-    p2p.send(node.hash, res);
+    p2p_send(hash, res, p2p.nodes.clone());
 }
 
-pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
+/// 1. decode handshake res msg
+/// 2. update outbound node to active
+pub fn receive_res<'a>(p2p: &'a Mgr, hash: u64, req: ChannelBuffer) {
     debug!(target: "p2p", "handshake.rs/receive_res");
 
     let (_, revision) = req.body.split_at(1);
     let (revision_len, rest) = revision.split_at(1);
     let revision_len = revision_len[0] as usize;
     let (revision, _rest) = rest.split_at(revision_len);
-    if revision_len > MAX_REVISION_LENGTH {
-        node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
-    } else {
-        node.revision[0..revision_len].copy_from_slice(revision);
+
+    if let Ok(write) = p2p.nodes.try_write(){
+        if let Some(mut node) = write.get(&hash) {
+            let mut revision_0 = node.revision;
+            if revision_len > MAX_REVISION_LENGTH {
+                revision_0[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
+            } else {
+                revision_0[0..revision_len].copy_from_slice(revision);
+            }
+        }
     }
 }
