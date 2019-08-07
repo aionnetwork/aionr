@@ -237,24 +237,30 @@ impl ClientService {
             loop_end += 1;
 
             // check it's parent
-            let cur_blk_detail: Option<BlockDetails> = dbs.read(db::COL_EXTRA, &cur_blk_hash);
-            let cur_blk_detail = cur_blk_detail.expect("db crashed");
-            cur_blk_hash = cur_blk_detail.parent;
+            let cur_blk_detail: BlockDetails =
+                dbs.read(db::COL_EXTRA, &cur_blk_hash).expect("db crashed");
 
             if header.is_none() || bodies.is_none() {
+                let breakpoint_hash = cur_blk_hash.clone();
+                cur_blk_hash = cur_blk_detail.parent;
                 // if there is a breakpoint earlier than this one
                 return match Self::check_db(dbs, best_block_number - loop_end, cur_blk_hash)? {
                     Some(hash) => Ok(Some(hash)),
-                    None => Ok(Some(cur_blk_hash)),
+                    None => Ok(Some(breakpoint_hash)),
                 };
             }
+            cur_blk_hash = cur_blk_detail.parent;
         }
         Ok(None)
     }
 
+    #[cfg(test)]
+    pub fn test_correct_db(dbs: Arc<KeyValueDB>) -> Result<(), String> { Self::correct_db(dbs) }
+
     /// check db if correct
     fn correct_db(dbs: Arc<KeyValueDB>) -> Result<(), String> {
         use db::Readable;
+        use rlp_compress::{decompress,blocks_swapper};
         use types::blockchain::extra::BlockDetails;
         // get best block hash
         let best_block_hash = dbs.get(db::COL_EXTRA, b"best").expect("EXTRA db not found");
@@ -282,8 +288,9 @@ impl ClientService {
                     let parent_header_bytes = dbs
                         .get(db::COL_HEADERS, &parent)
                         .expect("db crashed")
-                        .expect("HEADERS db not found")
-                        .to_vec();
+                        .expect("HEADERS db not found");
+                    let parent_header_bytes =
+                        decompress(&parent_header_bytes, blocks_swapper()).into_vec();
                     let parent_header = ::encoded::Header::new(parent_header_bytes).decode();
                     let parent_number = parent_header.number();
                     batch.put(db::COL_EXTRA, b"best", &parent);
@@ -342,5 +349,64 @@ impl IoHandler<ClientIoMessage> for ClientIoHandler {
             }
             _ => {} // ignore other messages
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use blockchain::{BlockChain,BlockProvider};
+    use helpers::{new_db,generate_dummy_blockchain_with_db};
+    #[test]
+    fn test_correct_db() {
+        let db = new_db();
+
+        let bc = generate_dummy_blockchain_with_db(50, db.clone());
+
+        assert!(ClientService::test_correct_db(db.clone()).is_ok());
+        assert_eq!(bc.best_block_number(), 49);
+
+        let db = new_db();
+        // correct empty db
+        assert!(ClientService::test_correct_db(db.clone()).is_ok());
+
+        let bc = generate_dummy_blockchain_with_db(500, db.clone());
+
+        assert!(ClientService::test_correct_db(db.clone()).is_ok());
+        assert_eq!(bc.best_block_number(), 499);
+
+        // remove block-498's body
+        let hash = bc.best_block_header().parent_hash();
+        let mut batch = DBTransaction::new();
+        batch.delete(db::COL_BODIES, &hash);
+        assert!(db.write(batch).is_ok());
+
+        assert!(ClientService::test_correct_db(db.clone()).is_ok());
+        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone(), None, None);
+
+        assert_eq!(bc.best_block_number(), 497);
+
+        // remove block-396's header
+        let hash = bc.block_hash(396).unwrap();
+        let mut batch = DBTransaction::new();
+        batch.delete(db::COL_HEADERS, &hash);
+        assert!(db.write(batch).is_ok());
+
+        assert!(ClientService::test_correct_db(db.clone()).is_ok());
+        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone(), None, None);
+
+        assert_eq!(bc.best_block_number(), 497);
+
+        // remove block-496's body and header
+        let hash = bc.block_hash(496).unwrap();
+        let mut batch = DBTransaction::new();
+        batch.delete(db::COL_HEADERS, &hash);
+        batch.delete(db::COL_BODIES, &hash);
+        assert!(db.write(batch).is_ok());
+
+        assert!(ClientService::test_correct_db(db.clone()).is_ok());
+        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone(), None, None);
+
+        assert_eq!(bc.best_block_number(), 395);
     }
 }

@@ -315,7 +315,7 @@ pub fn get_test_client_with_blocks(blocks: Vec<Bytes>) -> Arc<Client> {
     client
 }
 
-fn new_db() -> Arc<KeyValueDB> {
+pub fn new_db() -> Arc<KeyValueDB> {
     let mut db_configs = Vec::new();
     for db_name in db::DB_NAMES.to_vec() {
         db_configs.push(db_name.into());
@@ -340,6 +340,31 @@ pub fn generate_dummy_blockchain(block_number: u32) -> BlockChain {
             &create_unverifiable_block(block_order, bc.best_block_hash()),
             vec![],
         );
+        bc.commit();
+    }
+    db.write(batch).unwrap();
+    bc
+}
+
+pub fn generate_dummy_blockchain_with_db(block_number: u32, db: Arc<KeyValueDB>) -> BlockChain {
+    let bc = BlockChain::new(
+        BlockChainConfig::default(),
+        &create_unverifiable_block(0, H256::zero()),
+        db.clone(),
+        None,
+        None,
+    );
+
+    let mut batch = DBTransaction::new();
+    for block_order in 1..block_number {
+        // which means pow and pos blocks alternately insert every two
+        // it will be like pow pow pos pos pow pow pos pos ...
+        //                 0   1   2   3   4   5   6   7
+        let next_block = match block_order / 2 % 2 == 0 {
+            true => create_unverifiable_block(block_order, bc.best_block_hash()),
+            false => create_unverifiable_pos_block(block_order, bc.best_block_hash()),
+        };
+        bc.insert_block(&mut batch, &next_block, vec![]);
         bc.commit();
     }
     db.write(batch).unwrap();
