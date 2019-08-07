@@ -171,9 +171,8 @@ impl Mgr {
                         debug!(target: "p2p", "connecting to: {}", &temp_node.addr.to_string());                            
                         if let Ok(addr) = temp_node.addr.to_string().parse() {                      
                             executor_outbound_1.spawn(lazy(move||{
-                                debug!(target: "p2p", "fuck !!!!!!!!!!!!!");
                                 TcpStream::connect(&addr)                         
-                                .map(move |mut stream: TcpStream| {     
+                                .map(move |mut ts: TcpStream| {     
                                     debug!(target: "p2p", "connected to: {}", &temp_node.addr.to_string());  
                                     
                                     let hash = calculate_hash(&temp_node.get_id_string());
@@ -188,15 +187,15 @@ impl Mgr {
                                     }
 
                                     // config stream
-                                    config_stream(&stream);
+                                    config_stream(&ts);
 
                                     // construct node instance
                                     let (tx, rx) = mpsc::channel(409600);
                                     let node = Node::new_outbound(tx);
-                                    let hash = node.hash.clone();
-
+                                    let hash = calculate_hash(&node.get_hash());
+                                    
                                     // binding io futures
-                                    let (sink, stream) = split_frame(stream);
+                                    let (sink, stream) = split_frame(ts);
                                     let read = stream.for_each(move |msg| {
                                         if let Some(node) = get_node(&hash, &nodes_outbound_3) {
                                             //self_ref_0_0.handle(&mut peer_node, msg);
@@ -208,6 +207,18 @@ impl Mgr {
                                         rx.map_err(|()| io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")),
                                     );
                                     executor_outbound_3.spawn(write.then(|_| { Ok(()) }));
+
+                                    // store node into nodes 
+                                    {
+                                        match nodes_outbound_3.try_write() {
+                                            Ok(write) => {
+                                                
+                                            },
+                                            Err(err) => {
+                                                error!(target: "p2p", "add node: {}", err);
+                                            }
+                                        } 
+                                    }
 
                                     // send handshake request
                                     // let mut req = ChannelBuffer::new();

@@ -19,17 +19,19 @@
  *
  ******************************************************************************/
 
+use std::collections::HashSet;
+use std::fmt;
+use std::str::from_utf8;
+use std::net::SocketAddr;
+use std::time::SystemTime;
 use aion_types::{H256, U256};
 use byteorder::{BigEndian, ReadBytesExt};
 use futures::sync::mpsc;
-use std::collections::HashSet;
-use std::fmt;
-use std::net::SocketAddr;
-use std::time::SystemTime;
 use uuid::Uuid;
 use super::msg::*;
 use super::state::STATE;
 
+const EMPTY_ID: &str = "00000000-0000-0000-0000-000000000000";
 pub const HEADER_LENGTH: usize = 8;
 pub const NODE_ID_LENGTH: usize = 36;
 pub const PROTOCOL_LENGTH: usize = 6;
@@ -80,6 +82,14 @@ impl IpAddr {
         }
     }
 
+    pub fn get_ip(&self) -> String {
+        format!(
+            "{}.{}.{}.{}",
+            self.ip[1], self.ip[3], self.ip[5], self.ip[7]
+        )
+        .to_string()
+    }
+
     pub fn to_string(&self) -> String {
         format!(
             "{}.{}.{}.{}:{}",
@@ -92,14 +102,6 @@ impl IpAddr {
         format!(
             "{:>3}.{:>3}.{:>3}.{:>3}:{}",
             self.ip[1], self.ip[3], self.ip[5], self.ip[7], self.port
-        )
-        .to_string()
-    }
-
-    pub fn get_ip(&self) -> String {
-        format!(
-            "{}.{}.{}.{}",
-            self.ip[1], self.ip[3], self.ip[5], self.ip[7]
         )
         .to_string()
     }
@@ -158,7 +160,7 @@ impl TempNode {
         let port_str = addr_str_1_arr[1];
 
         let mut id: [u8; NODE_ID_LENGTH] = [b'0'; NODE_ID_LENGTH];
-        if "00000000-0000-0000-0000-000000000000" == id_str.to_string() {
+        if EMPTY_ID == id_str.to_string() {
             let uuid = Uuid::new_v4();
             id.copy_from_slice(uuid.hyphenated().to_string().as_bytes());
         } else {
@@ -259,6 +261,11 @@ impl Node {
             tx,
             state: STATE::CONNECTED
         }
+    }
+
+    pub fn get_hash(&self) -> String{
+        let list = vec![from_utf8(&self.id).unwrap(), &self.addr.get_ip()];
+        return list.join("");
     }
 
     // pub fn new_with_node_str(node_str: String) -> Node {
