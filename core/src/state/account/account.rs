@@ -214,7 +214,7 @@ impl AionVMAccount {
         }
 
         if account_type == AccType::AVM {
-            for k in self.storage_removable.drain() {
+            for k in self.storage_removable.clone() {
                 debug!(target: "vm", "remove avm key: {:?}", k);
                 t.remove(&k)?;
                 self.storage_cache.borrow_mut().remove(&k);
@@ -282,6 +282,10 @@ impl AionVMAccount {
         }
         self.storage_changes = other.storage_changes;
         self.storage_removable = other.storage_removable;
+
+        for k in self.storage_removable.drain() {
+            cache.remove(&k);
+        }
     }
 
     pub fn set_empty_but_commit(&mut self) { self.empty_but_commit = true; }
