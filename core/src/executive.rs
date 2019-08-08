@@ -169,18 +169,18 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     pub fn transact_virtual_bulk(
         &'a mut self,
         txs: &[SignedTransaction],
-        check_nonce: bool,
+        _check_nonce: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
-        self.transact_bulk(txs, check_nonce, true)
+        self.transact_bulk(txs, true, false)
     }
 
     // TIPS: carefully deal with errors in parallelism
     pub fn transact_bulk(
         &'a mut self,
         txs: &[SignedTransaction],
-        _check_nonce: bool,
         is_local_call: bool,
+        check_gas: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
         let _vm_lock = AVM_LOCK.lock().unwrap();
@@ -203,15 +203,13 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                             .add_balance(&sender, &(needed_balance), CleanupMode::NoEmpty);
                 }
                 debug!(target: "vm", "sender: {:?}, balance: {:?}", sender, self.state.balance(&sender).unwrap_or(0.into()));
-            } else {
+            } else if check_gas && self.info.gas_used + t.gas > self.info.gas_limit {
                 // check gas limit
-                if self.info.gas_used + t.gas > self.info.gas_limit {
-                    return vec![Err(From::from(ExecutionError::BlockGasLimitReached {
-                        gas_limit: self.info.gas_limit,
-                        gas_used: self.info.gas_used,
-                        gas: t.gas,
-                    }))];
-                }
+                return vec![Err(From::from(ExecutionError::BlockGasLimitReached {
+                    gas_limit: self.info.gas_limit,
+                    gas_used: self.info.gas_used,
+                    gas: t.gas,
+                }))];
             }
 
             // Transactions are now handled in different ways depending on whether it's
@@ -413,16 +411,17 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // Increment nonce of the sender and deduct the cost of the entire gas limit from
         // the sender's account. After VM execution, gas left (not used) shall be refunded
         // (if applicable) to the sender's account.
+        // This checkpoint aims at Rejected Transaction after vm execution, aionj client specific
+        self.state.checkpoint();
         self.state.inc_nonce(&sender)?;
         self.state.sub_balance(
             &sender,
             &U256::from(gas_cost),
             &mut substate.to_cleanup_mode(),
         )?;
-
         // Transactions are now handled in different ways depending on whether it's
         // action type is Create or Call.
-        self.state.checkpoint();
+
         let result = match t.action {
             Action::Create => {
                 let (new_address, code_hash) = contract_address(&sender, &nonce);

@@ -1521,7 +1521,8 @@ impl MinerService for Miner {
                 match e {
                     Error::Block(BlockError::InvalidPoSTimestamp(t1, _, _)) => {
                         let mut best_pos = self.best_pos.lock();
-                        if best_pos.is_some() && best_pos.clone().unwrap().header().timestamp() > t1
+                        if best_pos.is_some()
+                            && best_pos.clone().unwrap().header().timestamp() >= t1
                         {
                             *best_pos = Some(block.clone());
                         }

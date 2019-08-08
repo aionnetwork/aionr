@@ -697,9 +697,10 @@ impl<B: Backend> State<B> {
         env_info: &EnvInfo,
         machine: &Machine,
         txs: &[SignedTransaction],
+        check_gas: bool,
     ) -> Vec<ApplyResult>
     {
-        let exec_results = self.execute_bulk(env_info, machine, txs, false, false);
+        let exec_results = self.execute_bulk(env_info, machine, txs, false, false, check_gas);
         if !exec_results.is_empty() && !exec_results[0].is_ok() {
             return vec![Err(From::from(exec_results[0].clone().unwrap_err()))];
         }
@@ -739,13 +740,14 @@ impl<B: Backend> State<B> {
         txs: &[SignedTransaction],
         check_nonce: bool,
         virt: bool,
+        check_gas: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
         let mut e = Executive::new(self, env_info, machine);
 
         match virt {
             true => e.transact_virtual_bulk(txs, check_nonce),
-            false => e.transact_bulk(txs, check_nonce, false),
+            false => e.transact_bulk(txs, false, check_gas),
         }
     }
 
