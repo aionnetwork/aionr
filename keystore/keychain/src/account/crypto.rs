@@ -26,7 +26,7 @@ use {json, Error, crypto};
 use blake2b::blake2b;
 use random::Random;
 use smallvec::SmallVec;
-use account::{Cipher, Kdf, Aes128Ctr, Pbkdf2, Prf};
+use account::{Cipher, Kdf, Aes128Ctr, Pbkdf2, Prf, Scrypt};
 use rlp::{self, RlpStream, UntrustedRlp, DecoderError};
 use subtle::ConstantTimeEq;
 use aion_types::H256;
@@ -104,16 +104,31 @@ impl Crypto {
         // KECCAK(DK[16..31] ++ <ciphertext>), where DK[16..31] - derived_right_bits
         let mac = blake2b(crypto::derive_mac(&derived_right_bits, &*ciphertext));
 
+        //        Crypto {
+        //            cipher: Cipher::Aes128Ctr(Aes128Ctr {
+        //                iv,
+        //            }),
+        //            ciphertext: ciphertext.into_vec(),
+        //            kdf: Kdf::Pbkdf2(Pbkdf2 {
+        //                dklen: crypto::KEY_LENGTH as u32,
+        //                salt,
+        //                c: iterations,
+        //                prf: Prf::HmacSha256,
+        //            }),
+        //            mac: mac.0,
+        //        }
+
         Crypto {
             cipher: Cipher::Aes128Ctr(Aes128Ctr {
                 iv,
             }),
             ciphertext: ciphertext.into_vec(),
-            kdf: Kdf::Pbkdf2(Pbkdf2 {
+            kdf: Kdf::Scrypt(Scrypt {
                 dklen: crypto::KEY_LENGTH as u32,
+                p: 1,
+                n: 262144,
+                r: 8,
                 salt,
-                c: iterations,
-                prf: Prf::HmacSha256,
             }),
             mac: mac.0,
         }
