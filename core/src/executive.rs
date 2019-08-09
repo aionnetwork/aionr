@@ -811,6 +811,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         let mut final_results = Vec::new();
 
+        let mut total_gas_used: U256 = U256::from(0);
         for idx in 0..txs.len() {
             let result = results.get(idx).unwrap().clone();
             let t = txs[idx].clone();
@@ -824,6 +825,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 _ => 0.into(),
             };
             let gas_used = t.gas - gas_left;
+
             //TODO: check whether avm has already refunded
             //let refund_value = gas_left * t.gas_price;
             let fees_value = gas_used * t.gas_price;
@@ -833,20 +835,29 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 touched.insert(account);
             }
 
-            final_results.push(Ok(Executed {
-                exception: result.exception,
-                gas: t.gas,
-                gas_used: gas_used,
-                refunded: gas_left,
-                cumulative_gas_used: self.info.gas_used + gas_used,
-                logs: substate.logs,
-                contracts_created: substate.contracts_created,
-                output: result.return_data.to_vec(),
-                state_diff: None,
-                transaction_fee: fees_value,
-                touched: touched,
-                state_root: result.state_root,
-            }))
+            total_gas_used = total_gas_used + gas_used;
+            if total_gas_used + self.info.gas_used > self.info.gas_limit {
+                final_results.push(Err(ExecutionError::BlockGasLimitReached {
+                    gas_limit: self.info.gas_limit,
+                    gas_used: self.info.gas_used + total_gas_used,
+                    gas: t.gas,
+                }));
+            } else {
+                final_results.push(Ok(Executed {
+                    exception: result.exception,
+                    gas: t.gas,
+                    gas_used: gas_used,
+                    refunded: gas_left,
+                    cumulative_gas_used: self.info.gas_used + gas_used,
+                    logs: substate.logs,
+                    contracts_created: substate.contracts_created,
+                    output: result.return_data.to_vec(),
+                    state_diff: None,
+                    transaction_fee: fees_value,
+                    touched: touched,
+                    state_root: result.state_root,
+                }))
+            }
         }
 
         return final_results;

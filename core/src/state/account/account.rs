@@ -790,7 +790,15 @@ impl VMAccount for AionVMAccount {
 }
 
 impl AionVMAccount {
+    /// storage search priority:
+    /// 1. 'removable' which means it needs to be removed from database when commit.
+    /// 2. 'storage_changes' which means latest write access.
+    /// 3. 'storage_cache' latest read access and previous commit results
     pub fn storage_at(&self, db: &HashStore, key: &Bytes) -> trie::Result<Option<Bytes>> {
+        if self.storage_removable.contains(key) {
+            return Ok(None);
+        }
+
         if let Some(value) = self.cached_storage_at(key) {
             return Ok(Some(value));
         }

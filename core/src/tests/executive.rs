@@ -1851,7 +1851,14 @@ fn avm_storage() {
             vec![1, 2, 3, 4, 5, 0, 0, 0, 2],
         )
         .expect("avm set storage failed");
-    println!("state = {:?}", state);
+    state
+        .remove_storage(&address, vec![0, 0, 0, 1])
+        .expect("remove failed");
+    let value = state
+        .storage_at(&address, &vec![0, 0, 0, 1])
+        .expect("set storage failed");
+    assert_eq!(value, None);
+    // println!("state = {:?}", state);
 }
 
 #[test]
