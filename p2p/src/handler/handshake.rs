@@ -39,6 +39,7 @@ use route::VERSION;
 use route::MODULE;
 use route::ACTION;
 use config::Config;
+use state::STATE;
 use super::super::send as p2p_send;
 
 //TODO: remove it
@@ -46,13 +47,7 @@ const VERSION: &str = "02";
 
 // TODO: validate len
 pub fn send(hash: u64, id: String, net_id: u32, ip: String, port: u32, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
-
-    // debug!(target: "p2p", "handshake.rs/send");
-    // unsafe {
-    //     debug!(target: "p2p", "net id {:?}", mem::transmute::<u32, [u8; 4]>(net_id).len());
-    // }
-    // debug!(target: "p2p", "ip {:?} len {:?}", &ip, convert_ip_string(ip.clone()).len());
-    // debug!(target: "p2p", "port {:?} len {:?}", port, "3030".as_bytes().len());
+    debug!(target: "p2p", "handshake/send");
 
     // header
     let mut req = ChannelBuffer::new();
@@ -96,10 +91,10 @@ pub fn send(hash: u64, id: String, net_id: u32, ip: String, port: u32, nodes: Ar
 /// 1. decode handshake msg
 /// 2. validate and prove incoming connection to active
 /// 3. acknowledge sender if it is proved
-pub fn receive_req(hash: u64, req: ChannelBuffer, config: Arc<Config>, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
-    debug!(target: "p2p", "handshake.rs/receive_req");
+pub fn receive_req(hash: u64, cb_in: ChannelBuffer, config: Arc<Config>, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+    debug!(target: "p2p", "handshake/receive_req");
 
-    let (node_id, req_body_rest) = req.body.split_at(NODE_ID_LENGTH);
+    let (node_id, req_body_rest) = cb_in.body.split_at(NODE_ID_LENGTH);
     let (mut net_id, req_body_rest) = req_body_rest.split_at(mem::size_of::<i32>());
     let peer_net_id = net_id.read_u32::<BigEndian>().unwrap_or(0);
     let local_net_id = config.net_id;
@@ -125,19 +120,19 @@ pub fn receive_req(hash: u64, req: ChannelBuffer, config: Arc<Config>, nodes: Ar
     //     node.revision[0..revision_len].copy_from_slice(revision);
     // }
 
-    let mut res = ChannelBuffer::new();
+    let mut cb_out = ChannelBuffer::new();
     let mut res_body = Vec::new();
 
-    res.head.ver = VERSION::V0.value();
-    res.head.ctrl = MODULE::P2P.value();
-    res.head.action = ACTION::HANDSHAKERES.value();
+    cb_out.head.ver = VERSION::V0.value();
+    cb_out.head.ctrl = MODULE::P2P.value();
+    cb_out.head.action = ACTION::HANDSHAKERES.value();
     res_body.push(1 as u8);
     let mut revision = short_version();
     revision.insert_str(0, REVISION_PREFIX);
     res_body.push(revision.len() as u8);
     res_body.put_slice(revision.as_bytes());
-    res.body.put_slice(res_body.as_slice());
-    res.head.len = res.body.len() as u32;
+    cb_out.body.put_slice(res_body.as_slice());
+    cb_out.head.len = cb_out.body.len() as u32;
 
     // let old_node_hash = node.hash;
     // let node_id_hash = calculate_hash(&node.get_id_string());
@@ -152,27 +147,29 @@ pub fn receive_req(hash: u64, req: ChannelBuffer, config: Arc<Config>, nodes: Ar
     //     }
     // }
 
-    p2p_send(&hash, res, nodes);
+    p2p_send(&hash, cb_out, nodes);
 }
 
 /// 1. decode handshake res msg
 /// 2. update outbound node to active
-pub fn receive_res<'a>(hash: u64, req: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
-    debug!(target: "p2p", "handshake.rs/receive_res");
+pub fn receive_res<'a>(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+    debug!(target: "p2p", "handshake/receive_res");
 
-    let (_, revision) = req.body.split_at(1);
+    let (_, revision) = cb_in.body.split_at(1);
     let (revision_len, rest) = revision.split_at(1);
     let revision_len = revision_len[0] as usize;
-    let (revision, _rest) = rest.split_at(revision_len);
+    let (revision_bytes, _rest) = rest.split_at(revision_len);
 
-    if let Ok(write) = nodes.try_write(){
-        if let Some(mut node) = write.get(&hash) {
-            let mut revision_0 = node.revision;
+    if let Ok(mut write) = nodes.try_write(){
+        if let Some(mut node) = write.get_mut(&hash) {
+
+            // TODO: math::low
             if revision_len > MAX_REVISION_LENGTH {
-                revision_0[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
+                node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision_bytes[..MAX_REVISION_LENGTH]);
             } else {
-                revision_0[0..revision_len].copy_from_slice(revision);
+                node.revision[0..revision_len].copy_from_slice(revision_bytes);
             }
+            node.state = STATE::ACTIVE;
         }
     }
 }

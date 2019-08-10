@@ -20,6 +20,11 @@
  ******************************************************************************/
 
 use std::mem;
+use std::sync::Arc;
+use std::sync::RwLock;
+use std::sync::Mutex;
+use std::collections::VecDeque;
+use std::collections::HashMap;
 use bytes::BufMut;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
@@ -33,71 +38,73 @@ use node::TempNode;
 use route::VERSION;
 use route::MODULE;
 use route::ACTION;
-use super::super::Mgr;
+use super::super::get_active_nodes;
 use super::super::send as p2p_send;
 
-pub fn send<'a>(p2p: &'a Mgr) {
-    debug!(target: "p2p", "active_nodes.rs/send");
-    // let nodes: Vec<Node> = p2p.get_active_nodes();;
-    // let len: usize = nodes.len();
-    // if nodes.len() > 0 {
-    //     let random = random::<usize>() % len;
-    //     let hash = nodes[random].hash.clone();
-    //     p2p_send(
-    //         &hash, 
-    //         ChannelBuffer::new1(
-    //             VERSION::V0.value(), 
-    //             MODULE::P2P.value(), 
-    //             ACTION::ACTIVENODESREQ.value(), 
-    //             0
-    //         ),
-    //         p2p.nodes.clone()
-    //     );
-    // }
+pub fn send(nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+    debug!(target: "p2p", "active_nodes/send");
+    
+    let active: Vec<Node> = get_active_nodes(&nodes);;
+    let len: usize = active.len();
+    if len > 0 {
+        // TODO: max 40 records trim
+        let random = random::<usize>() % len;
+        let hash = active[random].hash.clone();
+        p2p_send(
+            &hash, 
+            ChannelBuffer::new1(
+                VERSION::V0.value(), 
+                MODULE::P2P.value(), 
+                ACTION::ACTIVENODESREQ.value(), 
+                0
+            ),
+            nodes
+        );
+    }
 }
 
-pub fn receive_req<'a>(p2p: &'a Mgr, hash: u64) {
-    debug!(target: "p2p", "active_noreceive_req");
+pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+    debug!(target: "p2p", "active_nodes/receive_req");
 
-    let mut res = ChannelBuffer::new();
-    res.head.ver = VERSION::V0.value();
-    res.head.ctrl = MODULE::P2P.value();
-    res.head.action = ACTION::ACTIVENODESRES.value();
+    let mut cb_out = ChannelBuffer::new();
+    cb_out.head.ver = VERSION::V0.value();
+    cb_out.head.ctrl = MODULE::P2P.value();
+    cb_out.head.action = ACTION::ACTIVENODESRES.value();
 
-    // let active_nodes = p2p.get_active_nodes();
-    // let mut res_body = Vec::new();
+    let active_nodes = get_active_nodes(&nodes);
+    let mut res_body = Vec::new();
 
-    // if active_nodes.len() > 0 {
-    //     let mut active_nodes_to_send = Vec::new();
-    //     for active_node in active_nodes.iter() {
-    //         if active_node.hash != hash {
-    //             active_nodes_to_send.push(active_node);
-    //         }
-    //     }
-    //     if active_nodes_to_send.len() > 0 {
-    //         res_body.push(active_nodes_to_send.len() as u8);
-    //         for n in active_nodes_to_send.iter() {
-    //             res_body.put_slice(&n.id);
-    //             res_body.put_slice(&n.addr.ip);
-    //             let mut port = [0; 4];
-    //             BigEndian::write_u32(&mut port, n.addr.port);
-    //             res_body.put_slice(&port);
-    //         }
-    //     } else {
-    //         res_body.push(0 as u8);
-    //     }
-    // } else {
-    //     res_body.push(0 as u8);
-    // }
-    // res.body.put_slice(res_body.as_slice());
-    // res.head.len = res.body.len() as u32;
-    // p2p_send(&hash, res, p2p.nodes.clone());
+    if active_nodes.len() > 0 {
+        let mut active_nodes_to_send = Vec::new();
+        for active_node in active_nodes.iter() {
+            if active_node.hash != hash {
+                active_nodes_to_send.push(active_node);
+            }
+        }
+        if active_nodes_to_send.len() > 0 {
+            res_body.push(active_nodes_to_send.len() as u8);
+            for n in active_nodes_to_send.iter() {
+                res_body.put_slice(&n.id);
+                res_body.put_slice(&n.addr.ip);
+                let mut port = [0; 4];
+                BigEndian::write_u32(&mut port, n.addr.port);
+                res_body.put_slice(&port);
+            }
+        } else {
+            res_body.push(0 as u8);
+        }
+    } else {
+        res_body.push(0 as u8);
+    }
+    cb_out.body.put_slice(res_body.as_slice());
+    cb_out.head.len = cb_out.body.len() as u32;
+    p2p_send(&hash, cb_out, nodes);
 }
 
-pub fn receive_res<'a>(p2p: &'a Mgr, _hash: u64, req: ChannelBuffer) {
+pub fn receive_res(hash: u64, cb_in: ChannelBuffer, temp: Arc<Mutex<VecDeque<TempNode>>>, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     debug!(target: "p2p", "active_nodes/receive_res");
 
-    let (node_count, rest) = req.body.split_at(1);
+    let (node_count, rest) = cb_in.body.split_at(1);
     let mut temp_list = Vec::new();
     if node_count[0] > 0 {
         // TODO: update node status with healthy active nodes msg
@@ -117,7 +124,7 @@ pub fn receive_res<'a>(p2p: &'a Mgr, _hash: u64, req: ChannelBuffer) {
             temp_list.push(temp);
 
         }
-        if let Ok(mut lock) = p2p.temp.try_lock() {
+        if let Ok(mut lock) = temp.try_lock() {
             for t in temp_list.iter() {
                 lock.push_back(t.to_owned());                
             }

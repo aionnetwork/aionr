@@ -71,6 +71,7 @@ use route::MODULE;
 use route::ACTION;
 use state::STATE;
 use handler::handshake;
+use handler::active_nodes;
 use node::TempNode;
 pub use handler::external::Handler;
 pub use msg::ChannelBuffer;
@@ -80,6 +81,7 @@ pub use config::Config;
 const INTERVAL_STATISICS: u64 = 5;
 const INTERVAL_OUTBOUND_CONNECT: u64 = 10;
 const INTERVAL_TIMEOUT: u64 = 5;
+const INTERVAL_ACTIVE_NODES: u64 = 10;
 const TIMEOUT_MAX: u64 = 30;
 const TEMP_MAX: usize = 64;
 
@@ -140,7 +142,7 @@ impl Mgr {
                     if nodes.len() > 0 {
                         let mut active_nodes = vec![];
                         info!(target: "p2p", "{:-^127}","");
-                        info!(target: "p2p","              td         bn          bh                         addr                 rev      conn  seed");
+                        info!(target: "p2p","              td         bn          bh                    addr                 rev      conn  seed");
                         info!(target: "p2p", "{:-^127}","");
 
                         for (hash, node) in nodes.iter(){
@@ -162,7 +164,7 @@ impl Mgr {
                             let mut count: u32 = 0;
                             for node in active_nodes.iter() {
                                 info!(target: "p2p",
-                                    "{:>16}{:>11}{:>12}{:>24}{:>25}{:>10}{:>12}",
+                                    "{:>16}{:>11}{:>12}{:>24}{:>20}{:>8}{:>6}",
                                     format!("{}",node.total_difficulty),
                                     node.block_num,
                                     format!("{}",node.block_hash),
@@ -228,7 +230,8 @@ impl Mgr {
         // outbound
         let config_outbound = config.clone();
         let executor_outbound = executor.clone();
-        let executor_outbound_0 = executor_outbound.clone();  
+        let executor_outbound_0 = executor_outbound.clone();       
+        let temp_outbound_0 = temp.clone();
         let nodes_outbound_0 = nodes.clone(); 
         // TODO: batch outbound connecting     
         executor_outbound.spawn(
@@ -239,8 +242,7 @@ impl Mgr {
 
                 // counters
                 let config_outbound_0 = config_outbound.clone();
-                
-                // setup counters
+                let temp_outbound_1 = temp_outbound_0.clone();
                 let nodes_outbound_1 = nodes_outbound_0.clone();
                 
                 // exist lock immediately after poping temp node
@@ -275,11 +277,12 @@ impl Mgr {
                         }
                     } 
             
+                    // counters 
                     let nodes_outbound_2 = nodes_outbound_1.clone();
                     let executor_outbound_1 = executor_outbound_0.clone();
                     let executor_outbound_2 = executor_outbound_0.clone();
                     let executor_outbound_3 = executor_outbound_0.clone();
-                
+                      
                     if let Ok(addr) = temp_node.addr.to_string().parse() { 
                         debug!(target: "p2p", "connecting to: {}", &addr);                     
                         executor_outbound_0.spawn(lazy(move||{
@@ -288,7 +291,7 @@ impl Mgr {
                             .map(move |ts: TcpStream| {     
                                 debug!(target: "p2p", "connected to: {}", &temp_node.addr.to_string());  
 
-                                // setup counters                              
+                                // counters                              
                                 let config_outbound_2 = config_outbound_1.clone();
                                 let nodes_outbound_3 = nodes_outbound_2.clone();
                                 let nodes_outbound_4 = nodes_outbound_2.clone();
@@ -317,10 +320,13 @@ impl Mgr {
                                 let config_outbound_3 = config_outbound_2.clone();  
                                 let (sink, stream) = split_frame(ts);
                                 let read = stream.for_each(move |cb| {
+                                    
+                                    // counters 
+                                    let temp_outbound_2 = temp_outbound_1.clone();
                                     let config_outbound_4 = config_outbound_3.clone();
+
                                     if let Some(node) = get_node(&hash, &nodes_outbound_4) {
-                                        println!("here !");
-                                        handle(hash.clone(), cb, config_outbound_4, nodes_outbound_5.clone());
+                                        handle(hash.clone(), cb, config_outbound_4, temp_outbound_2, nodes_outbound_5.clone());
                                     }
                                     Ok(())
                                 }).map_err(move|err|{error!(target: "p2p", "read: {:?}", err)});
@@ -346,6 +352,20 @@ impl Mgr {
                 }
                 Ok(())
             }).map_err(|err| error!(target: "p2p", "executor outbound: {:?}", err))
+        );
+
+        // active nodes
+        let executor_active_nodes = executor.clone();
+        let nodes_active_nodes = nodes.clone();
+        executor_active_nodes.spawn(
+            Interval::new(
+                Instant::now(),
+                Duration::from_secs(INTERVAL_ACTIVE_NODES)
+            ).for_each(move|_|{
+                let nodes_active_nodes_0 = nodes_active_nodes.clone();
+                active_nodes::send(nodes_active_nodes_0);
+                Ok(())
+            }).map_err(|err| error!(target: "p2p", "executor active nodes: {:?}", err))
         );
 
         // inbound    
@@ -470,9 +490,10 @@ fn handle(
     hash: u64, 
     cb: ChannelBuffer,
     config: Arc<Config>,
+    temp: Arc<Mutex<VecDeque<TempNode>>>,
     nodes: Arc<RwLock<HashMap<u64, Node>>>
 ) {
-    debug!(target: "p2p", "handle: {} {}/{}/{}", &hash, cb.head.ctrl, cb.head.ctrl, cb.head.action);
+    trace!(target: "p2p", "handle: {} {}/{}/{}", &hash, cb.head.ctrl, cb.head.ctrl, cb.head.action);
     match VERSION::from(cb.head.ver) {
         VERSION::V0 => {
             match MODULE::from(cb.head.ctrl) {
@@ -480,8 +501,8 @@ fn handle(
                     match ACTION::from(cb.head.action) {
                         ACTION::HANDSHAKEREQ => handshake::receive_req(hash, cb, config, nodes),
                         ACTION::HANDSHAKERES => handshake::receive_res(hash, cb, nodes),
-                        // ACTION::ACTIVENODESREQ => active_nodes::receive_req(p2p, hash),
-                        // ACTION::ACTIVENODESRES => active_nodes::receive_res(p2p, hash, cb),
+                        ACTION::ACTIVENODESREQ => active_nodes::receive_req(hash, nodes),
+                        ACTION::ACTIVENODESRES => active_nodes::receive_res(hash, cb, temp, nodes),
                         _ => error!(target: "p2p", "invalid action {}", cb.head.action)
                     };
                 }
@@ -508,10 +529,9 @@ pub fn send(
     if let Ok(lock) = nodes.try_read() {
         if let Some(ref node) = lock.get(hash) {
             let mut tx = node.tx.clone();
-            if let Err(err) = tx.try_send(cb) {
-                error!(target: "p2p", "send: {:?}", err);
-            } else {
-                debug!(target: "p2p", "send to {} {}", node.get_hash(), node.addr.get_ip());
+            match tx.try_send(cb) {
+                Ok(_) => trace!(target: "p2p", "send to {}", node.addr.get_ip()),
+                Err(err) => error!(target: "p2p", "send to {}: {:?}", node.addr.get_ip(), err)
             }
         }
     } 
