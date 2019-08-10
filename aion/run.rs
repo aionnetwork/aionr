@@ -89,6 +89,7 @@ pub struct RunCmd {
 }
 
 pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
+    
     // load spec
     let spec = cmd.spec.spec()?;
 
@@ -163,8 +164,11 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     client_config.queue.verifier_settings = cmd.verifier_settings;
     client_config.stake_contract = cmd.stake_conf.contract;
 
-    // set up bootnodes
-    let net_conf = cmd.net_conf;
+    //let net_conf = cmd.net_conf;
+    let (id, binding) = &cmd.net_conf.get_id_and_binding();
+    
+    info!(target: "run","          id: {}", &id);
+    info!(target: "run","     binding: {}", &binding);
 
     // create client service.
     let service = ClientService::start(
@@ -177,8 +181,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     .map_err(|e| format!("Client service error: {:?}", e))?;
 
     info!(target: "run","     genesis: {:?}",genesis_hash);
-
-    // display info about used pruning algorithm
     info!(
         target: "run",
         "    state db: {}{}",
@@ -188,8 +190,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
             false => "".to_owned(),
         }
     );
-
-    // display warning about using experimental journaldb algorithm
     if !algorithm.is_stable() {
         warn!(
             target: "run",
@@ -215,11 +215,13 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // chris
     // start p2p
-    let p2p_mgr = Mgr::new(net_conf.clone());
-    p2p_mgr.run();
+    let config_0 = cmd.net_conf.clone();
+    let p2p = Mgr::new(config_0);
+    p2p.run();
 
     // start sync
-    let sync = Sync::new(client.clone(), net_conf);
+    let config_1 = cmd.net_conf.clone();
+    let sync = Sync::new(client.clone(), config_1);
     // let chain_notify = sync.clone() as Arc<ChainNotify>;
     // let chain_notify = Arc::new(sync.clone()) as Arc<ChainNotify>;
     // service.add_notify(chain_notify.clone());
@@ -337,9 +339,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // chris
     // close p2p
-    p2p_mgr.shutdown();
+    p2p.shutdown();
     // sync.stop_network();
-
     // close/drop this stuff as soon as exit detected.
     // drop((sync, chain_notify));
     drop(sync);
