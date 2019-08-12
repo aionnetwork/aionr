@@ -27,8 +27,7 @@ use acore::account_provider::{AccountProvider, AccountProviderSettings};
 use acore::client::{Client, DatabaseCompactionProfile, VMType, ChainNotify};
 use acore::miner::external::ExternalMiner;
 use acore::miner::{Miner, MinerOptions, MinerService};
-use acore::service::{ClientService, run_miner,
-run_staker, run_transaction_pool};
+use acore::service::{ClientService, run_miner, run_staker, pos_sealing, run_transaction_pool};
 use acore::verification::queue::VerifierSettings;
 use acore::sync::Sync;
 use aion_rpc::{dispatch::DynamicGasPrice, informant};
@@ -49,8 +48,6 @@ use params::{fatdb_switch_to_bool, AccountsConfig, StakeConfig, MinerExtras, Pru
 use parking_lot::{Condvar, Mutex};
 use rpc;
 use rpc_apis;
-
-// chris
 use p2p::Config;
 use p2p::Mgr;
 
@@ -213,8 +210,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
           if cmd.ipc_conf.enabled { "y" } else { "n" },
     );
 
-    // chris
-    // start p2p
     let config_0 = cmd.net_conf.clone();
     let p2p = Mgr::new(config_0);
     p2p.run();
@@ -222,11 +217,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // start sync
     let config_1 = cmd.net_conf.clone();
     let sync = Sync::new(client.clone(), config_1);
-    // let chain_notify = sync.clone() as Arc<ChainNotify>;
-    // let chain_notify = Arc::new(sync.clone()) as Arc<ChainNotify>;
-    // service.add_notify(chain_notify.clone());
-    // chris
-    //sync.start_network();
 
     // start rpc server
     let runtime_rpc = tokio::runtime::Builder::new()
@@ -236,10 +226,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     let rpc_stats = Arc::new(informant::RpcStats::default());
     let account_store = Some(account_provider.clone());
 
-    // chris
     let deps_for_rpc_apis = Arc::new(rpc_apis::FullDependencies {
         client: client.clone(),
-        //sync: sync.clone()),
         account_store,
         miner: miner.clone(),
         external_miner: external_miner.clone(),
@@ -313,6 +301,15 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     let executor_staker = runtime_staker.executor();
     let close_staker = run_staker(executor_staker.clone(), client.clone());
 
+    // start PoS invoker
+    let pos_invoker = tokio::runtime::Builder::new()
+        .core_threads(1)
+        .name_prefix("seal-block-loop #")
+        .build()
+        .expect("internal staker runtime loop init failed");
+    let executor_staker = pos_invoker.executor();
+    let close_pos_invoker = pos_sealing(executor_staker.clone(), client.clone());
+
     // Create a weak reference to the client so that we can wait on shutdown until it is dropped
     let weak_client = Arc::downgrade(&client);
 
@@ -325,6 +322,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     let _ = close_transaction_pool.send(());
     let _ = close_miner.send(());
     let _ = close_staker.send(());
+    let _ = close_pos_invoker.send(());
 
     // close rpc
     if ws_server.is_some() {
@@ -368,6 +366,10 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .shutdown_now()
         .wait()
         .expect("Failed to shutdown internal staker runtime instance!");
+    pos_invoker
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown pos invoker!");
 
     info!(target: "run","Shutdown.");
 

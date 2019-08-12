@@ -26,21 +26,19 @@ use rustc_hex::{ToHex, FromHex};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use serde::de::{Error, Visitor};
 
-const LEN: usize = 96;
+pub const SEED_SIZE: usize = 64;
 
-pub const BLANK_SEED: [u8; LEN] = [
+pub const BLANK_SEED: [u8; SEED_SIZE] = [
     0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
     0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
     0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
-    0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
-    0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
-    0u8,
+    0u8, 0u8, 0u8, 0u8, 0u8, 0u8, 0u8,
 ];
 
-pub struct Seed(pub [u8; LEN]);
+pub struct Seed(pub [u8; SEED_SIZE]);
 
 impl Seed {
-    pub fn new(bytes: [u8; LEN]) -> Seed { Seed(bytes) }
+    pub fn new(bytes: [u8; SEED_SIZE]) -> Seed { Seed(bytes) }
 }
 
 impl Serialize for Seed {
@@ -70,10 +68,10 @@ impl<'a> Visitor<'a> for SeedVisitor {
 
     fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
     where E: Error {
-        if value.len() == (LEN + 1) * 2 && &value[0..2] == "0x" {
+        if value.len() == (SEED_SIZE + 1) * 2 && &value[0..2] == "0x" {
             let data = FromHex::from_hex(&value[2..]).unwrap();
-            let mut res: [u8; LEN] = BLANK_SEED;
-            for i in 0..LEN {
+            let mut res: [u8; SEED_SIZE] = BLANK_SEED;
+            for i in 0..SEED_SIZE {
                 res[i] = data[i];
             }
             Ok(Seed::new(res))

@@ -208,22 +208,23 @@
 //                                 //     continue;
 //                                 // }
 
-//                                 match seal_type {
-//                                     SealType::PoW => {
-//                                         node.current_pow_total_difficulty =
-//                                             node.current_pow_total_difficulty + difficulty;
-//                                     }
-//                                     SealType::PoS => {
-//                                         node.current_pos_total_difficulty =
-//                                             node.current_pos_total_difficulty + difficulty;
-//                                     }
-//                                 }
-//                                 // TODO-UNITY: add overflow check
-//                                 node.current_total_difficulty = node.current_pow_total_difficulty
-//                                     * ::std::cmp::max(
-//                                         node.current_pos_total_difficulty,
-//                                         U256::from(1u64),
-//                                     );
+                                match seal_type {
+                                    SealType::PoW => {
+                                        node.current_pow_total_difficulty =
+                                            node.current_pow_total_difficulty + difficulty;
+                                    }
+                                    SealType::PoS => {
+                                        node.current_pos_total_difficulty =
+                                            node.current_pos_total_difficulty + difficulty;
+                                    }
+                                }
+                                // TODO-UNITY(lyj): add overflow check
+                                // TODO-UNITY(lyj): add ut after p2p merge
+                                node.current_total_difficulty = node.current_pow_total_difficulty
+                                    * ::std::cmp::max(
+                                        node.current_pos_total_difficulty,
+                                        U256::from(1u64),
+                                    );
 
 //                                 node.synced_block_num = number;
 //                                 if result.is_err() {

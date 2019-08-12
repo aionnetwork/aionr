@@ -34,7 +34,7 @@ use aion_machine::{LiveBlock, WithBalances};
 use aion_types::{U256, U512};
 use header::{Header, SealType};
 use block::ExecutedBlock;
-use types::error::Error;
+use types::error::{BlockError, Error};
 use std::cmp;
 use std::sync::Mutex;
 use types::BlockNumber;
@@ -65,8 +65,11 @@ pub struct UnityEngineParams {
     pub rampup_end_value: U256,
     pub upper_block_reward: U256,
     pub lower_block_reward: U256,
-    pub difficulty_bound_divisor: u64,
-    pub block_time: u64,
+    pub difficulty_bound_divisor: U256,
+    pub difficulty_bound_divisor_unity: u64,
+    pub block_time_lower_bound: u64,
+    pub block_time_upper_bound: u64,
+    pub block_time_unity: u64,
     pub minimum_difficulty: U256,
 }
 
@@ -87,8 +90,15 @@ impl From<ajson::spec::UnityEngineParams> for UnityEngineParams {
             lower_block_reward: p
                 .lower_block_reward
                 .map_or(U256::from(748994641621655092u64), Into::into),
-            difficulty_bound_divisor: p.difficulty_bound_divisor.map_or(20u64, Into::into),
-            block_time: p.block_time.map_or(10u64, Into::into),
+            difficulty_bound_divisor: p
+                .difficulty_bound_divisor
+                .map_or(U256::from(2048), Into::into),
+            difficulty_bound_divisor_unity: p
+                .difficulty_bound_divisor_unity
+                .map_or(20u64, Into::into),
+            block_time_lower_bound: p.block_time_lower_bound.map_or(5u64, Into::into),
+            block_time_upper_bound: p.block_time_upper_bound.map_or(15u64, Into::into),
+            block_time_unity: p.block_time_unity.map_or(10u64, Into::into),
             minimum_difficulty: p.minimum_difficulty.map_or(U256::from(16), Into::into),
         }
     }
@@ -96,17 +106,32 @@ impl From<ajson::spec::UnityEngineParams> for UnityEngineParams {
 
 /// Difficulty calculator. TODO: impl mfc trait.
 pub struct DifficultyCalc {
-    difficulty_bound_divisor: u64,
-    block_time: u64,
+    difficulty_bound_divisor: U256,
+    difficulty_bound_divisor_unity: u64,
+    block_time_lower_bound: u64,
+    block_time_upper_bound: u64,
+    block_time_unity: u64,
     minimum_difficulty: U256,
+    unity_update: Option<BlockNumber>,
+    unity_initial_pos_difficulty: Option<U256>,
 }
 
 impl DifficultyCalc {
-    pub fn new(params: &UnityEngineParams) -> DifficultyCalc {
+    pub fn new(
+        params: &UnityEngineParams,
+        unity_update: Option<BlockNumber>,
+        unity_initial_pos_difficulty: Option<U256>,
+    ) -> DifficultyCalc
+    {
         DifficultyCalc {
             difficulty_bound_divisor: params.difficulty_bound_divisor,
-            block_time: params.block_time,
+            difficulty_bound_divisor_unity: params.difficulty_bound_divisor_unity,
+            block_time_lower_bound: params.block_time_lower_bound,
+            block_time_upper_bound: params.block_time_upper_bound,
             minimum_difficulty: params.minimum_difficulty,
+            block_time_unity: params.block_time_unity,
+            unity_update: unity_update,
+            unity_initial_pos_difficulty: unity_initial_pos_difficulty,
         }
     }
 
@@ -116,11 +141,13 @@ impl DifficultyCalc {
         grand_parent: Option<&Header>,
     ) -> U256
     {
-        // First PoS block does not have seal parent.
         let parent = match parent {
             Some(header) => header,
+            // First PoS block does not have seal parent.
             None => {
-                return U256::from(2_000_000_000u64); // TODO-Unity: test setup to be comparable to the initial 1*10^9 stake. Change it in real setup or make it configurable in engine paremeter.
+                return self
+                    .unity_initial_pos_difficulty
+                    .unwrap_or(self.minimum_difficulty);
             }
         };
 
@@ -132,6 +159,51 @@ impl DifficultyCalc {
             }
         };
 
+        match self.unity_update {
+            Some(fork_number) if parent.number() + 1 >= fork_number => {
+                self.calculate_difficulty_v2(parent, grand_parent)
+            }
+            _ => self.calculate_difficulty_v1(parent, grand_parent),
+        }
+    }
+
+    // Aion 1.0 difficulty adjustment algorithm (pure PoW)
+    fn calculate_difficulty_v1(&self, parent: &Header, grand_parent: &Header) -> U256 {
+        let parent_difficulty = parent.difficulty().to_owned();
+        let mut diff_base = parent_difficulty / self.difficulty_bound_divisor;
+        // if smaller than our bound divisor, always round up
+        if diff_base.is_zero() {
+            diff_base = U256::one();
+        }
+        let parent_timestamp = parent.timestamp();
+        let grand_parent_timestamp = grand_parent.timestamp();
+        let delta = parent_timestamp - grand_parent_timestamp;
+        let bound_domain = 10;
+
+        // split into our ranges 0 <= x <= min_block_time, min_block_time < x <
+        // max_block_time, max_block_time < x
+        let mut output_difficulty: U256;
+        if delta <= self.block_time_lower_bound {
+            output_difficulty = parent_difficulty + diff_base;
+        } else if self.block_time_lower_bound < delta && delta < self.block_time_upper_bound {
+            output_difficulty = parent_difficulty;
+        } else {
+            let bound_quotient =
+                U256::from(((delta - self.block_time_upper_bound) / bound_domain) + 1);
+            let lower_bound = U256::from(99);
+            let multiplier = cmp::min(bound_quotient, lower_bound);
+            if parent_difficulty > multiplier * diff_base {
+                output_difficulty = parent_difficulty - multiplier * diff_base;
+            } else {
+                output_difficulty = self.minimum_difficulty;
+            }
+        }
+        output_difficulty = cmp::max(output_difficulty, self.minimum_difficulty);
+        output_difficulty
+    }
+
+    // Aion 2.0 (Unity) difficulty adjusmtnet algorithm (PoS and PoW hybrid)
+    fn calculate_difficulty_v2(&self, parent: &Header, grand_parent: &Header) -> U256 {
         let parent_difficulty = parent.difficulty();
         let parent_timestamp = parent.timestamp();
         let grand_parent_timestamp = grand_parent.timestamp();
@@ -139,8 +211,8 @@ impl DifficultyCalc {
         assert!(delta_time > 0);
 
         // TODO-Unity: To refine floating calculation
-        let alpha = 1f64 / (self.difficulty_bound_divisor as f64);
-        let lambda = 1f64 / (2f64 * self.block_time as f64);
+        let alpha = 1f64 / (self.difficulty_bound_divisor_unity as f64);
+        let lambda = 1f64 / (2f64 * self.block_time_unity as f64);
         let diff = match (delta_time as f64) - (-0.5f64.ln() / lambda) {
             res if res > 0f64 => {
                 cmp::min(
@@ -309,7 +381,11 @@ impl UnityEngine {
             machine.params().monetary_policy_update,
             machine.premine(),
         );
-        let difficulty_calc = DifficultyCalc::new(&params);
+        let difficulty_calc = DifficultyCalc::new(
+            &params,
+            machine.params().unity_update,
+            machine.params().unity_initial_pos_difficulty,
+        );
         Arc::new(UnityEngine {
             machine,
             rewards_calculator,
@@ -394,8 +470,17 @@ impl Engine for Arc<UnityEngine> {
         stake: Option<u64>,
     ) -> Result<(), Error>
     {
-        PoSValidator::validate(header, seal_parent, stake)?;
-        Ok(())
+        if self
+            .machine
+            .params()
+            .unity_update
+            .map_or(true, |fork_number| header.number() < fork_number)
+        {
+            Err(BlockError::InvalidPoSBlockNumber.into())
+        } else {
+            PoSValidator::validate(header, seal_parent, stake)?;
+            Ok(())
+        }
     }
 
     fn verify_block_family(

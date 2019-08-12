@@ -41,7 +41,7 @@ use kvdb::{DatabaseConfig, RepositoryConfig, DbRepository, DBTransaction, Error 
 use miner::Miner;
 use spec::Spec;
 use stop_guard::StopGuard;
-use aion_types::{H256, U256};
+use aion_types::{H256};
 use rlp::*;
 
 /// Message type for external and internal events
@@ -64,6 +64,25 @@ pub fn run_miner(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender
         .for_each(move |_| {
             let client: Arc<Client> = client.clone();
             client.miner().try_prepare_block(&*client, false);
+            Ok(())
+        })
+        .map_err(|e| panic!("interval err: {:?}", e))
+        .select(shutdown_signal.map_err(|_| {}))
+        .map(|_| ())
+        .map_err(|_| ());
+    executor.spawn(seal_block_task);
+    close
+}
+
+pub fn pos_sealing(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
+    let (close, shutdown_signal) = oneshot::channel();
+    let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(1))
+        .for_each(move |_| {
+            let client: Arc<Client> = client.clone();
+            client
+                .miner()
+                .invoke_pos_interval(&*client)
+                .map_err(|e| panic!("pos block generation err: {:?}", e))?;
             Ok(())
         })
         .map_err(|e| panic!("interval err: {:?}", e))
@@ -195,9 +214,53 @@ impl ClientService {
     /// Get a handle to the database.
     pub fn db(&self) -> Arc<KeyValueDB> { self.database.clone() }
 
+    fn check_db(
+        dbs: Arc<KeyValueDB>,
+        best_block_number: u64,
+        best_block_hash: H256,
+    ) -> Result<Option<H256>, String>
+    {
+        use db::Readable;
+        use types::blockchain::extra::BlockDetails;
+
+        let mut loop_end = 0u64;
+        let mut cur_blk_hash = best_block_hash;
+
+        while loop_end < 100 && best_block_number - loop_end > 0 {
+            // check header and bodies whether exist in db
+            let header = dbs
+                .get(db::COL_HEADERS, &cur_blk_hash)
+                .expect("HEADERS db not found");
+            let bodies = dbs
+                .get(db::COL_BODIES, &cur_blk_hash)
+                .expect("BODIES db not found");
+            loop_end += 1;
+
+            // check it's parent
+            let cur_blk_detail: BlockDetails =
+                dbs.read(db::COL_EXTRA, &cur_blk_hash).expect("db crashed");
+
+            if header.is_none() || bodies.is_none() {
+                let breakpoint_hash = cur_blk_hash.clone();
+                cur_blk_hash = cur_blk_detail.parent;
+                // if there is a breakpoint earlier than this one
+                return match Self::check_db(dbs, best_block_number - loop_end, cur_blk_hash)? {
+                    Some(hash) => Ok(Some(hash)),
+                    None => Ok(Some(breakpoint_hash)),
+                };
+            }
+            cur_blk_hash = cur_blk_detail.parent;
+        }
+        Ok(None)
+    }
+
+    #[cfg(test)]
+    pub fn test_correct_db(dbs: Arc<KeyValueDB>) -> Result<(), String> { Self::correct_db(dbs) }
+
     /// check db if correct
     fn correct_db(dbs: Arc<KeyValueDB>) -> Result<(), String> {
         use db::Readable;
+        use rlp_compress::{decompress,blocks_swapper};
         use types::blockchain::extra::BlockDetails;
         // get best block hash
         let best_block_hash = dbs.get(db::COL_EXTRA, b"best").expect("EXTRA db not found");
@@ -212,37 +275,11 @@ impl ClientService {
                     .read(db::COL_EXTRA, &best_block_hash)
                     .expect("db crashed");
                 let best_block_number = best_block_detail.number;
-                let mut loop_end = if best_block_number > 10 {
-                    10
-                } else {
-                    best_block_number as i64
-                };
-                let mut cur_blk_hash = best_block_hash;
-                loop {
-                    // check header and bodies whether exist in db
-                    let header = dbs
-                        .get(db::COL_HEADERS, &cur_blk_hash)
-                        .expect("HEADERS db not found");
-                    let bodies = dbs
-                        .get(db::COL_BODIES, &cur_blk_hash)
-                        .expect("BODIES db not found");
-                    if header.is_none() || bodies.is_none() {
-                        break;
-                    }
-                    loop_end -= 1;
-                    if loop_end < 0 {
-                        break;
-                    }
-                    // check it's parent
-                    let cur_blk_detail: Option<BlockDetails> =
-                        dbs.read(db::COL_EXTRA, &cur_blk_hash);
-                    if cur_blk_detail.is_none() {
-                        return Err(format!("db crashed"));
-                    }
-                    let cur_blk_detail = cur_blk_detail.expect("db crashed");
-                    cur_blk_hash = cur_blk_detail.parent;
-                }
-                if loop_end > 0 {
+
+                let breakpoint_hash =
+                    Self::check_db(dbs.clone(), best_block_number, best_block_hash)?;
+
+                if let Some(cur_blk_hash) = breakpoint_hash {
                     // reset db
                     let mut batch = DBTransaction::new();
                     let cur_blk_detail: BlockDetails =
@@ -250,27 +287,25 @@ impl ClientService {
                     let parent = cur_blk_detail.parent;
                     let parent_header_bytes = dbs
                         .get(db::COL_HEADERS, &parent)
-                        .expect("HEADERS db not found")
                         .expect("db crashed")
-                        .to_vec();
+                        .expect("HEADERS db not found");
+                    let parent_header_bytes =
+                        decompress(&parent_header_bytes, blocks_swapper()).into_vec();
                     let parent_header = ::encoded::Header::new(parent_header_bytes).decode();
-                    let parnet_number = parent_header.number();
+                    let parent_number = parent_header.number();
                     batch.put(db::COL_EXTRA, b"best", &parent);
-                    // TODO-UNITY: to fix wrong total difficulties filling in new parent block details.
-                    let new_parent_block_detail = BlockDetails {
-                        number: parnet_number,
-                        total_difficulty: U256::from(*parent_header.difficulty()),
-                        pow_total_difficulty: U256::from(*parent_header.difficulty()),
-                        pos_total_difficulty: U256::from(*parent_header.difficulty()),
-                        parent: H256::from(*parent_header.parent_hash()),
-                        children: vec![],
-                        anti_seal_parent: H256::default(), // TODO-Unity: implement calculation of anti_seal_parent
-                    };
+
+                    // set parent's children empty
+                    let mut parent_detail: BlockDetails =
+                        dbs.read(db::COL_EXTRA, &parent).expect("db crashed");
+                    parent_detail.children.clear();
+
                     // reset state db
+                    warn!(target: "run", "Db is incorrect, reset to {}", parent_number);
                     let latest_era_key = [b'l', b'a', b's', b't', 0, 0, 0, 0, 0, 0, 0, 0];
-                    batch.put(db::COL_STATE, &latest_era_key, &encode(&parnet_number));
+                    batch.put(db::COL_STATE, &latest_era_key, &encode(&parent_number));
                     use db::Writable;
-                    batch.write(db::COL_EXTRA, &parent, &new_parent_block_detail);
+                    batch.write(db::COL_EXTRA, &parent, &parent_detail);
                     let _ = dbs.write(batch);
                 }
                 return Ok(());
@@ -314,5 +349,64 @@ impl IoHandler<ClientIoMessage> for ClientIoHandler {
             }
             _ => {} // ignore other messages
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use blockchain::{BlockChain,BlockProvider};
+    use helpers::{new_db,generate_dummy_blockchain_with_db};
+    #[test]
+    fn test_correct_db() {
+        let db = new_db();
+
+        let bc = generate_dummy_blockchain_with_db(50, db.clone());
+
+        assert!(ClientService::test_correct_db(db.clone()).is_ok());
+        assert_eq!(bc.best_block_number(), 49);
+
+        let db = new_db();
+        // correct empty db
+        assert!(ClientService::test_correct_db(db.clone()).is_ok());
+
+        let bc = generate_dummy_blockchain_with_db(500, db.clone());
+
+        assert!(ClientService::test_correct_db(db.clone()).is_ok());
+        assert_eq!(bc.best_block_number(), 499);
+
+        // remove block-498's body
+        let hash = bc.best_block_header().parent_hash();
+        let mut batch = DBTransaction::new();
+        batch.delete(db::COL_BODIES, &hash);
+        assert!(db.write(batch).is_ok());
+
+        assert!(ClientService::test_correct_db(db.clone()).is_ok());
+        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone(), None, None);
+
+        assert_eq!(bc.best_block_number(), 497);
+
+        // remove block-396's header
+        let hash = bc.block_hash(396).unwrap();
+        let mut batch = DBTransaction::new();
+        batch.delete(db::COL_HEADERS, &hash);
+        assert!(db.write(batch).is_ok());
+
+        assert!(ClientService::test_correct_db(db.clone()).is_ok());
+        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone(), None, None);
+
+        assert_eq!(bc.best_block_number(), 497);
+
+        // remove block-496's body and header
+        let hash = bc.block_hash(496).unwrap();
+        let mut batch = DBTransaction::new();
+        batch.delete(db::COL_HEADERS, &hash);
+        batch.delete(db::COL_BODIES, &hash);
+        assert!(db.write(batch).is_ok());
+
+        assert!(ClientService::test_correct_db(db.clone()).is_ok());
+        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone(), None, None);
+
+        assert_eq!(bc.best_block_number(), 395);
     }
 }

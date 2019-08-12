@@ -282,21 +282,14 @@ impl Mgr {
                     let hash = temp_node.get_hash();                                        
                     {
                         match nodes_outbound_1.try_read() {
-                            Ok(mut read) => {
-                                
-                                // println!("hash_0 {}", &hash_0);
-                                // println!("hash_1 {}", &hash_1);
-                                // for k in read.keys() {
-                                //     println!("key {}", &k);
-                                // }
-
+                            Ok(read) => {
                                 // return at node existing
                                 if let Some(node) = read.get(&hash) {
                                     debug!(target: "p2p", "exist hash/id/ip {}/{}", &hash, node.get_id_string());    
                                     return Ok(());
                                 }
                             },
-                            Err(err) => {
+                            Err(_err) => {
                                 // return if read lock is unable to be rechieved
                                 return Ok(())
                             } 
@@ -523,7 +516,7 @@ pub fn send(
                     Ok(_) => trace!(target: "p2p", "send to {}", node.addr.get_ip()),
                     Err(err) => { 
                         flag = false;
-                        error!(target: "p2p", "send to {}: {:?}", node.addr.get_ip(), err); 
+                        error!(target: "p2p", "send to {}: {}", node.addr.get_ip(), err); 
                     }
                 }
             } else {
@@ -554,9 +547,6 @@ fn get_active_nodes(nodes: Arc<RwLock<HashMap<u64, Node>>>) -> Vec<Node> {
     let mut active_nodes: Vec<Node> = Vec::new();
     if let Ok(read) = nodes.try_read() {
         for node in read.values() {
-
-            println!(">>> key {}", &node.get_hash());
-
             if node.state == STATE::ACTIVE {
                 active_nodes.push(node.clone())
             }

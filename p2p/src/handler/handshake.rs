@@ -104,7 +104,7 @@ pub fn receive_req(hash: u64, cb_in: ChannelBuffer, config: Arc<Config>, nodes: 
     }
 
     let (_ip, req_body_rest) = req_body_rest.split_at(IP_LENGTH);
-    let (port, revision_version) = req_body_rest.split_at(mem::size_of::<i32>());
+    let (_port, revision_version) = req_body_rest.split_at(mem::size_of::<i32>());
     let (revision_len, rest) = revision_version.split_at(1);
     let revision_len = revision_len[0] as usize;
     let (revision, rest) = rest.split_at(revision_len);
@@ -113,7 +113,7 @@ pub fn receive_req(hash: u64, cb_in: ChannelBuffer, config: Arc<Config>, nodes: 
     let (_version, _rest) = rest.split_at(version_len);
 
     if let Ok(mut write) = nodes.try_write(){
-        if let Some(mut node) = write.get(&hash) {
+        if let Some(mut node) = write.get_mut(&hash) {
             debug!(target: "p2p", "inbound node state: connected -> active");
             node.id.copy_from_slice(node_id);
             // node.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);

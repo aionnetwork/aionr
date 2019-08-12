@@ -46,6 +46,15 @@ pub struct Params {
     /// Transaction permission contract address.
     #[serde(rename = "transactionPermissionContract")]
     pub transaction_permission_contract: Option<Address>,
+    /// Unity update block number.
+    #[serde(rename = "unityUpdate")]
+    pub unity_update: Option<Uint>,
+    /// Unity update block number.
+    #[serde(rename = "unityPoSBaseTotalDifficulty")]
+    pub unity_base_pos_total_difficulty: Option<Uint>,
+    /// Unity update block number.
+    #[serde(rename = "unityPoSInitialDifficulty")]
+    pub unity_initial_pos_difficulty: Option<Uint>,
 }
 
 #[cfg(test)]

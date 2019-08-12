@@ -285,11 +285,29 @@ mod tests {
             data_0.encode(),
             vec![0x08, 0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
         );
+        data_0 = AbiToken::ADDRESS([
+            0xa0, 0xb8, 0xae, 0x18, 0xd8, 0x1f, 0xe0, 0x58, 0x06, 0x8e, 0xbe, 0x7c, 0x2e, 0x9c,
+            0xcd, 0x3b, 0x77, 0x69, 0xd7, 0x14, 0x62, 0x98, 0x62, 0x91, 0x83, 0x89, 0x33, 0x09,
+            0x57, 0x06, 0xe6, 0x4b,
+        ]);
+        println!("{:x?}", data_0.encode());
         data_0 = AbiToken::ADOUBLE(&[1.0, 2.0]);
         assert_eq!(
             data_0.encode(),
             vec![24, 63, 240, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0]
         );
+
+        data_0 = AbiToken::STRING("vote".to_string());
+        println!("vote = {:x?}", data_0.encode());
+        println!(
+            "register = {:x?}",
+            AbiToken::STRING("register".to_string()).encode()
+        );
+        println!(
+            "getVote = {:x?}",
+            AbiToken::STRING("getVote".to_string()).encode()
+        );
+        assert_eq!(data_0.encode(), vec![33, 0, 4, 118, 111, 116, 101]);
     }
 
     #[test]

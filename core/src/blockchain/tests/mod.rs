@@ -26,7 +26,7 @@ fn new_db() -> Arc<KeyValueDB> {
 }
 
 fn new_chain(genesis: &[u8], db: Arc<KeyValueDB>) -> BlockChain {
-    BlockChain::new(Default::default(), genesis, db)
+    BlockChain::new(Default::default(), genesis, db, None, None)
 }
 
 #[test]
@@ -930,4 +930,67 @@ fn encode_block_receipts() {
     s.append(&br);
     assert!(s.is_finished(), "List should be finished now");
     s.out();
+}
+
+#[test]
+fn test_new_difficulty1() {
+    let bc_pow_only = generate_dummy_blockchain(50);
+    // td = pow_td if there is no pos block in chain
+    // td = pow_td(0+100+200+300+...+4800+4900) * 1 = 122500
+    assert_eq!(
+        bc_pow_only.best_block_total_difficulty(),
+        U256::from(122500)
+    );
+
+    let bc = generate_dummy_blockchain_with_pos_block(50);
+    // td = pow_td * pos_td if there is pos block in chain
+    // td = pow_td(0+100+400+500+...+4800+4900) * pos_td(200+300+600+700+...+4600+4700) = 3745560000
+    assert_eq!(bc.best_block_total_difficulty(), U256::from(3745560000u64));
+}
+
+#[test]
+fn test_new_difficulty2() {
+    // genensis difficulty is 0
+    let genesis = BlockBuilder::genesis();
+
+    let db = new_db();
+    let bc = new_chain(&genesis.last().encoded(), db.clone());
+    assert_eq!(bc.best_block_total_difficulty(), U256::zero());
+
+    // add 10 pow blocks with total pow difficulty 100 to simulate a blockchain
+    // pow td > 0 when the first pos block come to chain.
+    let a1 = genesis.add_blocks(10);
+    let generator1 = BlockGenerator::new(iter::once(a1.clone()));
+
+    let mut batch = DBTransaction::new();
+    let mut difficulty = U256::zero();
+    for block in generator1 {
+        bc.insert_block(&mut batch, &block.encoded(), vec![]);
+        bc.commit();
+        difficulty = difficulty + U256::from(10);
+        assert_eq!(bc.best_block_total_difficulty(), difficulty);
+    }
+
+    assert_eq!(bc.best_block_total_difficulty(), U256::from(100));
+
+    // add a pos block and then td = 100 * 10 = 1000
+    let a2 = a1.add_pos_block();
+    bc.insert_block(&mut batch, &a2.last().encoded(), vec![]);
+    db.write_buffered(batch.clone());
+    bc.commit();
+    assert_eq!(bc.best_block_total_difficulty(), U256::from(1000));
+
+    // if a pow block come with the same block number as the pos block at moment,
+    // b2 td = 100 + 10 = 110 < 1000, it will not be accepted
+    let b2 = a1.add_block();
+    bc.insert_block(&mut batch, &b2.last().encoded(), vec![]);
+    bc.commit();
+    assert_eq!(bc.best_block_total_difficulty(), U256::from(1000));
+
+    // if a pow block come with the same block number as the pos block and 901 difficulty at moment,
+    // b3 td = 100 + 901 = 1001 > 1000, it will be accepted
+    let c2 = a1.add_block_with_difficulty(901);
+    bc.insert_block(&mut batch, &c2.last().encoded(), vec![]);
+    bc.commit();
+    assert_eq!(bc.best_block_total_difficulty(), U256::from(1001));
 }

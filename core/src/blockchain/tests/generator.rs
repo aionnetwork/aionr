@@ -27,7 +27,7 @@ use aion_types::{U256, H256};
 use ethbloom::Bloom;
 
 use acore_bytes::Bytes;
-use header::Header;
+use header::{Header,SealType};
 use rlp::encode;
 use transaction::SignedTransaction;
 use views::BlockView;
@@ -59,6 +59,7 @@ impl Block {
 #[derive(Debug)]
 pub struct BlockOptions {
     pub difficulty: U256,
+    pub seal_type: SealType,
     pub bloom: Bloom,
     pub transactions: Vec<SignedTransaction>,
 }
@@ -67,8 +68,18 @@ impl Default for BlockOptions {
     fn default() -> Self {
         BlockOptions {
             difficulty: 10.into(),
+            seal_type: SealType::PoW,
             bloom: Bloom::default(),
             transactions: Vec::new(),
+        }
+    }
+}
+
+impl BlockOptions {
+    pub fn type_pos() -> Self {
+        BlockOptions {
+            seal_type: SealType::PoS,
+            ..Default::default()
         }
     }
 }
@@ -90,6 +101,9 @@ impl BlockBuilder {
 
     #[inline]
     pub fn add_block(&self) -> Self { self.add_block_with(|| BlockOptions::default()) }
+
+    #[inline]
+    pub fn add_pos_block(&self) -> Self { self.add_block_with(|| BlockOptions::type_pos()) }
 
     #[inline]
     pub fn add_blocks(&self, count: usize) -> Self {
@@ -150,6 +164,7 @@ impl BlockBuilder {
             block.header.set_number(block_number);
             block.header.set_log_bloom(metadata.bloom);
             block.header.set_difficulty(metadata.difficulty);
+            block.header.set_seal_type(metadata.seal_type);
             block.transactions = metadata.transactions;
 
             parent_hash = block.hash();

@@ -55,9 +55,9 @@ pub fn u256_to_u16(value: U256) -> [u8; 2] {
 
 /// Semantic boolean for when a seal/signature is included.
 pub enum Seal {
-    /// The seal/signature is included.
+    /// The seal is included.
     With,
-    /// The seal/signature is not included.
+    /// The seal is not included.
     Without,
 }
 
@@ -156,7 +156,7 @@ pub struct Header {
     gas_limit: U256,
     /// Block timestamp
     timestamp: u64,
-    /// Vector of post-RLP-encoded fields. It includes nonce and solution for a PoW seal.
+    /// Vector of post-RLP-encoded fields. It includes (nonce, solution) for a PoW seal, or (seed, signature, public key) for a PoS seal
     seal: Vec<Bytes>,
     /// The memoized hash of the RLP representation *including* the seal fields.
     hash: RefCell<Option<H256>>,
@@ -322,8 +322,14 @@ impl Header {
         self.note_dirty();
     }
 
-    /// Set the timestamp field of the header to the current time.
-    pub fn set_timestamp_now(&mut self, but_later_than: u64) {
+    /// Set the timestamp field of the header, but later than the specified time.
+    pub fn set_timestamp_later_than(&mut self, a: u64, but_later_than: u64) {
+        self.timestamp = cmp::max(a, but_later_than + 1);
+        self.note_dirty();
+    }
+
+    /// Set the timestamp field of the header to the current time, but later than the specified time.
+    pub fn set_timestamp_now_later_than(&mut self, but_later_than: u64) {
         self.timestamp = cmp::max(get_time().sec as u64, but_later_than + 1);
         self.note_dirty();
     }
@@ -424,6 +430,14 @@ impl Header {
         mine_hash_bytes.extend(u64_to_bytes(self.gas_used.low_u64()).iter());
         mine_hash_bytes.extend(u64_to_bytes(self.gas_limit.low_u64()).iter());
         mine_hash_bytes.extend(u64_to_bytes(self.timestamp).iter());
+        if self.seal_type == Some(SealType::PoS) && self.seal.len() >= 1 {
+            mine_hash_bytes.extend(
+                self.seal
+                    .get(0)
+                    .expect("seal length greater than 0 tested before.")
+                    .iter(),
+            );
+        }
         blake2b(mine_hash_bytes)
     }
 
