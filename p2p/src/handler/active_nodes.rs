@@ -42,14 +42,16 @@ use super::super::get_active_nodes;
 use super::super::send as p2p_send;
 
 pub fn send(nodes: Arc<RwLock<HashMap<u64, Node>>>) {
-    debug!(target: "p2p", "active_nodes/send");
     
     let active: Vec<Node> = get_active_nodes(&nodes);;
     let len: usize = active.len();
     if len > 0 {
+        debug!(target: "p2p", "active_nodes/send");
+        
         // TODO: max 40 records trim
         let random = random::<usize>() % len;
         let hash = active[random].hash.clone();
+        
         p2p_send(
             &hash, 
             ChannelBuffer::new1(

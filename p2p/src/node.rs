@@ -192,7 +192,7 @@ impl TempNode {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq)]
 pub enum Connection {
     INBOUND,
     OUTBOUND
@@ -290,6 +290,7 @@ impl Node {
         let ip = self.addr.get_ip();
         let list = vec![String::from(from_utf8(&self.id).unwrap()), ip];
         let text = list.join("").to_string();
+        debug!(target: "p2p", "get hash text: {}", &text);
         calculate_hash(&text)
     }
 

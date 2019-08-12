@@ -104,7 +104,7 @@ pub fn receive_req(hash: u64, cb_in: ChannelBuffer, config: Arc<Config>, nodes: 
     }
 
     let (_ip, req_body_rest) = req_body_rest.split_at(IP_LENGTH);
-    let (mut port, revision_version) = req_body_rest.split_at(mem::size_of::<i32>());
+    let (port, revision_version) = req_body_rest.split_at(mem::size_of::<i32>());
     let (revision_len, rest) = revision_version.split_at(1);
     let revision_len = revision_len[0] as usize;
     let (revision, rest) = rest.split_at(revision_len);
@@ -112,42 +112,53 @@ pub fn receive_req(hash: u64, cb_in: ChannelBuffer, config: Arc<Config>, nodes: 
     let version_len = version_len[0] as usize;
     let (_version, _rest) = rest.split_at(version_len);
 
-    // node.id.copy_from_slice(node_id);
-    // node.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
-    // if revision_len > MAX_REVISION_LENGTH {
-    //     node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
-    // } else {
-    //     node.revision[0..revision_len].copy_from_slice(revision);
-    // }
+    if let Ok(mut write) = nodes.try_write(){
+        if let Some(mut node) = write.remove(&hash) {
+            
+            node.id.copy_from_slice(node_id);
+            // node.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
+            node.state = STATE::ACTIVE;
+            if revision_len > MAX_REVISION_LENGTH {
+                node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
+            } else {
+                node.revision[0..revision_len].copy_from_slice(revision);
+            }
 
-    let mut cb_out = ChannelBuffer::new();
-    let mut res_body = Vec::new();
+            // due to target id updated, hash of node needs to be updated
+            let new_hash = node.get_hash();
+            let mut tx = node.tx.clone();
+            if let None = write.insert(new_hash.clone(), node) {
+                debug!(target: "p2p", "inbound node state: connected -> active");
+            }
 
-    cb_out.head.ver = VERSION::V0.value();
-    cb_out.head.ctrl = MODULE::P2P.value();
-    cb_out.head.action = ACTION::HANDSHAKERES.value();
-    res_body.push(1 as u8);
-    let mut revision = short_version();
-    revision.insert_str(0, REVISION_PREFIX);
-    res_body.push(revision.len() as u8);
-    res_body.put_slice(revision.as_bytes());
-    cb_out.body.put_slice(res_body.as_slice());
-    cb_out.head.len = cb_out.body.len() as u32;
+            let mut cb_out = ChannelBuffer::new();
+            let mut res_body = Vec::new();
+            cb_out.head.ver = VERSION::V0.value();
+            cb_out.head.ctrl = MODULE::P2P.value();
+            cb_out.head.action = ACTION::HANDSHAKERES.value();
+            res_body.push(1 as u8);
+            let mut revision = short_version();
+            revision.insert_str(0, REVISION_PREFIX);
+            res_body.push(revision.len() as u8);
+            res_body.put_slice(revision.as_bytes());
+            cb_out.body.put_slice(res_body.as_slice());
+            cb_out.head.len = cb_out.body.len() as u32;
+            
+            println!("old hash {}", &hash);
+            println!("new hash {}", &new_hash);    
 
-    // let old_node_hash = node.hash;
-    // let node_id_hash = calculate_hash(&node.get_id_string());
-    // node.hash = node_id_hash;
-    //node.state_code = ALIVE.value();
-    // if is_connected(node_id_hash) {
-    //     trace!(target: "p2p", "known node {}@{} ...", node.get_node_id(), node.get_ip_addr());
-    // } else {
-    //     Event::update_node_state(node, Event::OnHandshakeReq);
-    //     if let Some(socket) = get_peer(old_node_hash) {
-    //         add_peer(node.clone(), &socket);
-    //     }
-    // }
 
-    p2p_send(&hash, cb_out, nodes);
+            // special handle prevent read lock
+            // TODO: 
+            match tx.try_send(cb_out) {
+                Ok(_) => trace!(target: "p2p", "succeed sending handshake res"),
+                Err(err) => { 
+                    error!(target: "p2p", "failed sending handshake res: {:?}", err); 
+                }
+            }
+            // p2p_send(&new_hash, cb_out, nodes.clone());           
+        }
+    } 
 }
 
 /// 1. decode handshake res msg
