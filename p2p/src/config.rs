@@ -25,13 +25,6 @@ pub struct Config {
     pub max_peers: u32,
     pub net_id: u32,
     pub local_node: String,
-
-    // // TODO: simple  
-    // pub id: String,
-    // pub ip: String,
-    // pub port: u32,
-    // pub binding: String,
-
     pub sync_from_boot_nodes_only: bool,
     pub ip_black_list: Vec<String>,
 }

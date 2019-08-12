@@ -85,7 +85,7 @@ pub fn send(hash: u64, id: String, net_id: u32, ip: String, port: u32, nodes: Ar
     req.head.len = req.body.len() as u32;
     
     // send
-    p2p_send(&hash, req, nodes);
+    p2p_send(hash, req, nodes);
 }
 
 /// 1. decode handshake msg
@@ -113,8 +113,8 @@ pub fn receive_req(hash: u64, cb_in: ChannelBuffer, config: Arc<Config>, nodes: 
     let (_version, _rest) = rest.split_at(version_len);
 
     if let Ok(mut write) = nodes.try_write(){
-        if let Some(mut node) = write.remove(&hash) {
-            
+        if let Some(mut node) = write.get(&hash) {
+            debug!(target: "p2p", "inbound node state: connected -> active");
             node.id.copy_from_slice(node_id);
             // node.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
             node.state = STATE::ACTIVE;
@@ -122,13 +122,6 @@ pub fn receive_req(hash: u64, cb_in: ChannelBuffer, config: Arc<Config>, nodes: 
                 node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
             } else {
                 node.revision[0..revision_len].copy_from_slice(revision);
-            }
-
-            // due to target id updated, hash of node needs to be updated
-            let new_hash = node.get_hash();
-            let mut tx = node.tx.clone();
-            if let None = write.insert(new_hash.clone(), node) {
-                debug!(target: "p2p", "inbound node state: connected -> active");
             }
 
             let mut cb_out = ChannelBuffer::new();
@@ -142,21 +135,15 @@ pub fn receive_req(hash: u64, cb_in: ChannelBuffer, config: Arc<Config>, nodes: 
             res_body.push(revision.len() as u8);
             res_body.put_slice(revision.as_bytes());
             cb_out.body.put_slice(res_body.as_slice());
-            cb_out.head.len = cb_out.body.len() as u32;
-            
-            println!("old hash {}", &hash);
-            println!("new hash {}", &new_hash);    
+            cb_out.head.len = cb_out.body.len() as u32; 
 
-
-            // special handle prevent read lock
-            // TODO: 
+            let mut tx = node.tx.clone();
             match tx.try_send(cb_out) {
                 Ok(_) => trace!(target: "p2p", "succeed sending handshake res"),
                 Err(err) => { 
                     error!(target: "p2p", "failed sending handshake res: {:?}", err); 
                 }
-            }
-            // p2p_send(&new_hash, cb_out, nodes.clone());           
+            }    
         }
     } 
 }

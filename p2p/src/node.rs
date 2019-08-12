@@ -152,10 +152,21 @@ impl TempNode {
 
     pub fn get_hash(&self) -> u64 {
         let ip = self.addr.get_ip();
-        let list = vec![String::from(from_utf8(&self.id).unwrap()), ip];
-        let text = list.join("").to_string();
-        calculate_hash(&text)
+        // let list = vec![String::from(from_utf8(&self.id).unwrap()), ip];
+        // let text = list.join("").to_string();
+        // calculate_hash(&text)
+        let hash: u64 = calculate_hash(&ip);
+        trace!(target: "p2p", "temp_node/get_hash: {}", &hash);
+        hash
     }
+
+    // filter out incoming connection
+    // pub fn get_blank_id_hash(&self) -> u64 {
+    //     let ip = self.addr.get_ip();
+    //     let list = vec![String::from(EMPTY_ID), ip];
+    //     let text = list.join("").to_string();
+    //     calculate_hash(&text)
+    // }
 
     pub fn get_id_string(&self) -> String {
         String::from_utf8_lossy(&self.id).into()
@@ -288,14 +299,24 @@ impl Node {
 
     pub fn get_hash(&self) -> u64{
         let ip = self.addr.get_ip();
-        let list = vec![String::from(from_utf8(&self.id).unwrap()), ip];
-        let text = list.join("").to_string();
-        debug!(target: "p2p", "get hash text: {}", &text);
-        calculate_hash(&text)
+        // let list = vec![String::from(from_utf8(&self.id).unwrap()), ip];
+        // let text = list.join("").to_string();
+        // let hash: u64 = calculate_hash(&text);
+        let hash: u64 = calculate_hash(&ip);
+        // trace!(target: "p2p", "node/get_hash: text/hash {}/{}", &text, &hash);
+        trace!(target: "p2p", "node/get_hash: {}", &hash);
+        hash
     }
 
     pub fn get_id_string(&self) -> String {
         String::from_utf8_lossy(&self.id).into()
+    }
+
+    // refresh update field (timestamp) 
+    // prevent to be removed 
+    pub fn update(&mut self) {
+        debug!(target: "p2p", "node timestamp updated");
+        self.update = SystemTime::now();
     }
 }
 

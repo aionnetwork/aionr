@@ -43,17 +43,19 @@ use super::super::send as p2p_send;
 
 pub fn send(nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     
-    let active: Vec<Node> = get_active_nodes(&nodes);;
+    let active: Vec<Node> = get_active_nodes(nodes.clone());;
     let len: usize = active.len();
     if len > 0 {
-        debug!(target: "p2p", "active_nodes/send");
+        
         
         // TODO: max 40 records trim
         let random = random::<usize>() % len;
-        let hash = active[random].hash.clone();
-        
+
+        let hash = active[random].get_hash();
+
+        debug!(target: "p2p", "active_nodes/send:  hash {}", &hash);
         p2p_send(
-            &hash, 
+            hash, 
             ChannelBuffer::new1(
                 VERSION::V0.value(), 
                 MODULE::P2P.value(), 
@@ -66,14 +68,15 @@ pub fn send(nodes: Arc<RwLock<HashMap<u64, Node>>>) {
 }
 
 pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
-    debug!(target: "p2p", "active_nodes/receive_req");
+
+    debug!(target: "p2p", "active_nodes/receive_req");    
 
     let mut cb_out = ChannelBuffer::new();
     cb_out.head.ver = VERSION::V0.value();
     cb_out.head.ctrl = MODULE::P2P.value();
     cb_out.head.action = ACTION::ACTIVENODESRES.value();
 
-    let active_nodes = get_active_nodes(&nodes);
+    let active_nodes = get_active_nodes(nodes.clone());
     let mut res_body = Vec::new();
 
     if active_nodes.len() > 0 {
@@ -100,7 +103,7 @@ pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     }
     cb_out.body.put_slice(res_body.as_slice());
     cb_out.head.len = cb_out.body.len() as u32;
-    p2p_send(&hash, cb_out, nodes);
+    p2p_send(hash, cb_out, nodes);
 }
 
 pub fn receive_res(hash: u64, cb_in: ChannelBuffer, temp: Arc<Mutex<VecDeque<TempNode>>>, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
@@ -130,6 +133,12 @@ pub fn receive_res(hash: u64, cb_in: ChannelBuffer, temp: Arc<Mutex<VecDeque<Tem
             for t in temp_list.iter() {
                 lock.push_back(t.to_owned());                
             }
+        }
+    }
+    
+    if let Ok(mut lock) = nodes.try_write(){
+        if let Some(node) = lock.get_mut(&hash) {
+            node.update();
         }
     }
 }

@@ -83,8 +83,8 @@ pub use config::Config;
 const INTERVAL_STATISICS: u64 = 5;
 const INTERVAL_OUTBOUND_CONNECT: u64 = 10;
 const INTERVAL_TIMEOUT: u64 = 5;
-const INTERVAL_ACTIVE_NODES: u64 = 10;
-const TIMEOUT_MAX: u64 = 30;
+const INTERVAL_ACTIVE_NODES: u64 = 3;
+const TIMEOUT_MAX: u64 = 90;
 const TEMP_MAX: usize = 64;
 
 pub struct Mgr{
@@ -212,8 +212,7 @@ impl Mgr {
                 if let Ok(mut write) = nodes_timeout.try_write(){
                     let mut index: Vec<u64> = vec![];
                     for (hash, node) in write.iter_mut() {
-                        if now.duration_since(node.update).expect("SystemTime::duration_since failed").as_secs() >= TIMEOUT_MAX { 
-                            debug!(target: "p2p", "timeout {} {}", &hash, &node.addr.get_ip());
+                        if now.duration_since(node.update).expect("SystemTime::duration_since failed").as_secs() >= TIMEOUT_MAX {                           
                             index.push(*hash);     
                             match node.tx.close(){
                                 Ok(_) => {
@@ -231,8 +230,9 @@ impl Mgr {
 
                     for i in 0 .. index.len() {
                         match write.remove(&index[i]) {
-                            Some(node) => {
-                                debug!(target: "p2p", "timeout {} {}", node.get_id_string(), node.addr.get_ip());
+                            Some(mut node) => {
+                                node.tx.close().unwrap();
+                                debug!(target: "p2p", "timeout hash/id/ip {}/{}/{}", &node.get_hash(), &node.get_id_string(), &node.addr.get_ip());
                             },
                             None => {}
                         }
@@ -277,16 +277,29 @@ impl Mgr {
 
                     // process outbound connection
                     let temp_node = temp_node_opt.unwrap();
-                    let hash = temp_node.get_hash();
 
-                    // return if exist                        
+                    // return if exist
+                    let hash = temp_node.get_hash();                                        
                     {
-                        if let Ok(read) = nodes_outbound_1.try_read(){
-                            // return at node existing
-                            if let Some(node) = read.get(&hash) {
-                                debug!(target: "p2p", "exist {}", node.get_id_string());
-                                return Ok(());
-                            }
+                        match nodes_outbound_1.try_read() {
+                            Ok(mut read) => {
+                                
+                                // println!("hash_0 {}", &hash_0);
+                                // println!("hash_1 {}", &hash_1);
+                                // for k in read.keys() {
+                                //     println!("key {}", &k);
+                                // }
+
+                                // return at node existing
+                                if let Some(node) = read.get(&hash) {
+                                    debug!(target: "p2p", "exist hash/id/ip {}/{}", &hash, node.get_id_string());    
+                                    return Ok(());
+                                }
+                            },
+                            Err(err) => {
+                                // return if read lock is unable to be rechieved
+                                return Ok(())
+                            } 
                         }
                     } 
             
@@ -320,11 +333,10 @@ impl Mgr {
                                 let id = node.id.clone();
                                 if let Ok(mut write) = nodes_outbound_3.try_write() {
                                     if !write.contains_key(&hash) {
-                                        let hash_0 = hash.clone();
                                         let id = node.get_id_string();
                                         let ip = node.addr.get_ip();
-                                        if let None = write.insert(hash, node) {
-                                            debug!(target: "p2p", "outbound node added: {} {} {}", hash_0, id, ip);
+                                        if let None = write.insert(hash.clone(), node) {
+                                            debug!(target: "p2p", "outbound node added: {} {} {}", hash, id, ip);
                                         }
                                     }
                                 }                     
@@ -355,7 +367,7 @@ impl Mgr {
                                     let net_id = config_outbound_4.net_id.clone();
                                     let (id, binding) = config_outbound_4.get_id_and_binding();
                                     let (ip, port) = config_outbound_4.get_ip_and_port();
-                                    handshake::send(hash.clone(), id, net_id, ip, port, nodes_outbound_6);
+                                    handshake::send(hash, id, net_id, ip, port, nodes_outbound_6);
                                     Ok(())
                                 }));
 
@@ -391,7 +403,7 @@ impl Mgr {
             .for_each(move |ts: TcpStream| {
 
                 // TODO: black list check
-                if get_active_nodes_len(&nodes) >= config_inbound.max_peers {
+                if get_active_nodes_len(nodes.clone()) >= config_inbound.max_peers {
                     debug!(target:"p2p", "max peers reached");
                     return Ok(());
                 }
@@ -409,20 +421,24 @@ impl Mgr {
                 // construct node instance and store it 
                 let (tx, rx) = mpsc::channel(409600);
                 let addr = ts.peer_addr().unwrap();
-                let node = Node::new_inbound(addr, tx, false);
+                let node = Node::new_inbound(addr, tx, false);        
                 let hash = node.get_hash();
-                if let Ok(mut write) = nodes_inbound_0.try_write() {
-                    debug!(target: "p2p", "inbound connection: hash/id/ip {:?}/{:?}/{:?}", &hash, &node.get_id_string(), &node.addr.to_string()); 
-                    if let None = write.insert(node.get_hash(), node) {
-                        error!(target: "p2p", "inbound add node failed");
+            
+                if let Ok(mut write) = nodes_inbound_0.try_write() { 
+                    let id: String = node.get_id_string();
+                    let binding: String = node.addr.to_string();              
+                    if !write.contains_key(&node.get_hash()){
+                        if let None = write.insert(node.get_hash(), node) {
+                            debug!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding); 
+                        }
                     }
-                }    
+                } 
                 
                 // binding io futures
                 let temp_inbound_1 = temp_inbound_0.clone();
                 let config_inbound_1 = config_inbound_0;
                 let (sink, stream) = split_frame(ts);
-                let read = stream.for_each(move |cb| {                    
+                let read = stream.for_each(move |cb| {                   
                     if let Some(node) = get_node(&hash, &nodes_inbound_2) {
                         let config_inbound_2 = config_inbound_1.clone();
                         let temp_inbound_2 = temp_inbound_1.clone();
@@ -442,6 +458,7 @@ impl Mgr {
     }
 
     // shutdown p2p instance
+    // TODO: test
     pub fn shutdown(self) {
         match self.runtime.shutdown_now().wait(){
             Ok(_) => {
@@ -463,7 +480,7 @@ fn handle(
     temp: Arc<Mutex<VecDeque<TempNode>>>,
     nodes: Arc<RwLock<HashMap<u64, Node>>>
 ) {
-    trace!(target: "p2p", "handle: {} {}/{}/{}", &hash, cb.head.ctrl, cb.head.ctrl, cb.head.action);
+    trace!(target: "p2p", "handle: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
     match VERSION::from(cb.head.ver) {
         VERSION::V0 => {
             match MODULE::from(cb.head.ctrl) {
@@ -492,23 +509,30 @@ fn handle(
 }
 
 pub fn send(
-    hash: &u64, 
+    hash: u64, 
     cb: ChannelBuffer,
     nodes: Arc<RwLock<HashMap<u64, Node>>>
 ){
     // TODO: solve issue msg lost
-    match nodes.try_read() {
-        Ok(lock) => {
-            if let Some(ref node) = lock.get(hash) {
+    match nodes.try_write() {
+        Ok(mut lock) => {
+            let mut flag = true;
+            if let Some(node) = lock.get(&hash) {
                 let mut tx = node.tx.clone();
                 match tx.try_send(cb) {
                     Ok(_) => trace!(target: "p2p", "send to {}", node.addr.get_ip()),
                     Err(err) => { 
+                        flag = false;
                         error!(target: "p2p", "send to {}: {:?}", node.addr.get_ip(), err); 
                     }
                 }
             } else {
-                warn!(target:"p2p", "send: node not found {}", hash);
+                warn!(target:"p2p", "send: node not found hash {}", hash);
+            }
+            if !flag {
+                if let Some(node) = lock.remove(&hash) {
+                    trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
+                }
             }
         },
         Err(err) => {
@@ -518,19 +542,21 @@ pub fn send(
 }
 
 fn config_stream(stream: &TcpStream){ 
-
     stream
         .set_recv_buffer_size(1 << 24)
         .expect("set_recv_buffer_size failed");
     stream
-        .set_keepalive(Some(Duration::from_secs(30)))
+        .set_keepalive(Some(Duration::from_secs(TIMEOUT_MAX)))
         .expect("set_keepalive failed");
 }
 
-fn get_active_nodes(nodes: &Arc<RwLock<HashMap<u64, Node>>>) -> Vec<Node> {
+fn get_active_nodes(nodes: Arc<RwLock<HashMap<u64, Node>>>) -> Vec<Node> {
     let mut active_nodes: Vec<Node> = Vec::new();
     if let Ok(read) = nodes.try_read() {
         for node in read.values() {
+
+            println!(">>> key {}", &node.get_hash());
+
             if node.state == STATE::ACTIVE {
                 active_nodes.push(node.clone())
             }
@@ -539,7 +565,7 @@ fn get_active_nodes(nodes: &Arc<RwLock<HashMap<u64, Node>>>) -> Vec<Node> {
     active_nodes
 }
 
-fn get_active_nodes_len(nodes: &Arc<RwLock<HashMap<u64, Node>>>) -> u32 {
+fn get_active_nodes_len(nodes: Arc<RwLock<HashMap<u64, Node>>>) -> u32 {
     let mut len: u32 = 0;
     if let Ok(read) = nodes.try_read() {
         for node in read.values() {
@@ -552,23 +578,23 @@ fn get_active_nodes_len(nodes: &Arc<RwLock<HashMap<u64, Node>>>) -> u32 {
 }
 
 fn get_node(hash: &u64, nodes: &Arc<RwLock<HashMap<u64, Node>>>) -> Option<Node>{
-    if let Ok(read) = nodes.try_read() {
-        if let Some(node) = read.get(hash){
-            return Some(node.clone());
-        } 
-    } 
-    None
-}
-
-fn remove(_hash: u64, nodes: &mut Arc<RwLock<HashMap<u64, Node>>>){
-    match nodes.try_write() {
-        Ok(_write) => {
-            // TODO
+    match nodes.read() {
+        Ok(read) => {
+            match read.get(hash) {
+                Some(node) => {
+                    Some(node.clone())
+                },
+                None => {
+                    warn!(target: "p2p", "get_node: node not found: hash {}", hash);
+                    None
+                }
+            }
         },
         Err(err) => {
-            error!(target: "p2p", "remove: {}", err);
-        }
-    }
+            warn!(target: "p2p", "get_node: {:?}", err);
+            None
+        } 
+    } 
 }
 
 pub fn split_frame(socket: TcpStream) -> (stream::SplitSink<Framed<TcpStream, Codec>>, stream::SplitStream<Framed<TcpStream, Codec>>) {
