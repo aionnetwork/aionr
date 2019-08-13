@@ -886,19 +886,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         if rejected {
             self.state.revert_to_checkpoint();
-            Ok(Executed {
-                exception: result.exception,
+            Err(ExecutionError::BlockGasLimitReached {
+                gas_limit: self.info.gas_limit,
+                gas_used: self.info.gas_used + t.gas - gas_left,
                 gas: t.gas,
-                gas_used: t.gas,
-                refunded: 0.into(),
-                cumulative_gas_used: self.info.gas_used + t.gas,
-                logs: substate.logs,
-                contracts_created: vec![],
-                output: vec![],
-                state_diff: None,
-                transaction_fee: t.gas * t.gas_price,
-                touched: HashSet::new(),
-                state_root: H256::default(),
             })
         } else {
             let gas_used = t.gas - gas_left;
