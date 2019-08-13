@@ -1,11 +1,13 @@
 package org.aion.avm.jni;
 
 import org.aion.vm.api.interfaces.TransactionSideEffects;
+
 import org.aion.vm.api.interfaces.TransactionInterface;
 import org.aion.avm.core.BillingRules;
 
-import org.aion.types.Address;
-import org.aion.kernel.Transaction;
+import org.aion.types.AionAddress;
+import org.aion.types.Transaction;
+// import org.aion.kernel.Transaction;
 import org.aion.kernel.SideEffects;
 
 import java.math.BigInteger;
@@ -14,7 +16,7 @@ import java.util.Arrays;
 /**
  * Represents a transaction context for execution.
  */
-public class Message implements TransactionInterface {
+public class Message {
 
     private final byte type;
     private final byte[] address;
@@ -31,7 +33,7 @@ public class Message implements TransactionInterface {
     
     private final byte[] blockPreviousHash;
     private final int internalCallDepth;
-    private final TransactionSideEffects sideEffects;
+    private final SideEffects sideEffects;
 
     public final long blockTimestamp;
     public final long blockNumber;
@@ -97,12 +99,36 @@ public class Message implements TransactionInterface {
         }
     }
 
-    @Override
+    public Transaction toAvmTransaction() {
+        if (this.isContractCreationTransaction()) {
+            return Transaction.contractCreateTransaction(
+                new AionAddress(this.caller),
+                this.transactionHash,
+                BigInteger.valueOf(this.nonce),
+                new BigInteger(this.value),
+                this.data,
+                this.energyLimit,
+                this.energyPrice
+            );
+        } else {
+            return Transaction.contractCallTransaction(
+                new AionAddress(this.caller),
+                new AionAddress(this.address),
+                this.transactionHash,
+                BigInteger.valueOf(this.nonce),
+                new BigInteger(this.value),
+                this.data,
+                this.energyLimit,
+                this.energyPrice
+            );
+        }
+        
+    }
+
     public byte[] getTimestamp() {
         return BigInteger.valueOf(this.transactionTimestamp).toByteArray();
     }
 
-    @Override
     public byte getKind() {
         if (Constants.DEBUG)
             System.out.printf("message: getKind = %d\n", toAvmType(type).toInt());
@@ -119,13 +145,11 @@ public class Message implements TransactionInterface {
      *
      * @return The VM to use to create a new contract.
      */
-    @Override
     public byte getTargetVM() {
         return this.vm;
     }
 
-    @Override
-    public Address getContractAddress() {
+    public AionAddress getContractAddress() {
         throw new AssertionError("Did not expect this to be called.");
     }
 
@@ -136,17 +160,14 @@ public class Message implements TransactionInterface {
         return toAvmType(type);
     }
 
-    @Override
-    public Address getSenderAddress() {
-        return org.aion.types.Address.wrap(caller);
+    public AionAddress getSenderAddress() {
+        return new org.aion.types.AionAddress(caller);
     }
 
-    @Override
-    public Address getDestinationAddress() {
-        return org.aion.types.Address.wrap(address);
+    public AionAddress getDestinationAddress() {
+        return new org.aion.types.AionAddress(address);
     }
 
-    @Override
     public byte[] getNonce() {
         return BigInteger.valueOf(nonce).toByteArray();
     }
@@ -155,7 +176,6 @@ public class Message implements TransactionInterface {
         return nonce;
     }
 
-    @Override
     public byte[] getValue() {
         return this.value;
     }
@@ -164,27 +184,22 @@ public class Message implements TransactionInterface {
         return new BigInteger(value);
     }
 
-    @Override
     public byte[] getData() {
         return data;
     }
 
-    @Override
     public long getEnergyLimit() {
         return energyLimit;
     }
 
-    @Override
     public long getEnergyPrice() {
         return energyPrice;
     }
 
-    @Override
     public byte[] getTransactionHash() {
         return transactionHash;
     }
 
-    @Override
     public long getTransactionCost() {
         if (Constants.DEBUG)
             System.out.println("AVM getTransactionCost");
@@ -196,12 +211,10 @@ public class Message implements TransactionInterface {
         this.transactionTimestamp = timestamp;
     }
 
-    @Override
     public boolean isContractCreationTransaction() {
         return toAvmType(this.type) == Type.CREATE;
     }
 
-    @Override
     public String toString() {
         return "TransactionContextHelper{" +
                 "type=" + type +

@@ -169,18 +169,18 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     pub fn transact_virtual_bulk(
         &'a mut self,
         txs: &[SignedTransaction],
-        check_nonce: bool,
+        _check_nonce: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
-        self.transact_bulk(txs, check_nonce, true)
+        self.transact_bulk(txs, true, false)
     }
 
     // TIPS: carefully deal with errors in parallelism
     pub fn transact_bulk(
         &'a mut self,
         txs: &[SignedTransaction],
-        _check_nonce: bool,
         is_local_call: bool,
+        check_gas: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
         let _vm_lock = AVM_LOCK.lock().unwrap();
@@ -203,15 +203,13 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                             .add_balance(&sender, &(needed_balance), CleanupMode::NoEmpty);
                 }
                 debug!(target: "vm", "sender: {:?}, balance: {:?}", sender, self.state.balance(&sender).unwrap_or(0.into()));
-            } else {
+            } else if check_gas && self.info.gas_used + t.gas > self.info.gas_limit {
                 // check gas limit
-                if self.info.gas_used + t.gas > self.info.gas_limit {
-                    return vec![Err(From::from(ExecutionError::BlockGasLimitReached {
-                        gas_limit: self.info.gas_limit,
-                        gas_used: self.info.gas_used,
-                        gas: t.gas,
-                    }))];
-                }
+                return vec![Err(From::from(ExecutionError::BlockGasLimitReached {
+                    gas_limit: self.info.gas_limit,
+                    gas_used: self.info.gas_used,
+                    gas: t.gas,
+                }))];
             }
 
             // Transactions are now handled in different ways depending on whether it's
@@ -413,16 +411,17 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // Increment nonce of the sender and deduct the cost of the entire gas limit from
         // the sender's account. After VM execution, gas left (not used) shall be refunded
         // (if applicable) to the sender's account.
+        // This checkpoint aims at Rejected Transaction after vm execution, aionj client specific
+        self.state.checkpoint();
         self.state.inc_nonce(&sender)?;
         self.state.sub_balance(
             &sender,
             &U256::from(gas_cost),
             &mut substate.to_cleanup_mode(),
         )?;
-
         // Transactions are now handled in different ways depending on whether it's
         // action type is Create or Call.
-        self.state.checkpoint();
+
         let result = match t.action {
             Action::Create => {
                 let (new_address, code_hash) = contract_address(&sender, &nonce);
@@ -812,6 +811,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         let mut final_results = Vec::new();
 
+        let mut total_gas_used: U256 = U256::from(0);
         for idx in 0..txs.len() {
             let result = results.get(idx).unwrap().clone();
             let t = txs[idx].clone();
@@ -825,6 +825,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 _ => 0.into(),
             };
             let gas_used = t.gas - gas_left;
+
             //TODO: check whether avm has already refunded
             //let refund_value = gas_left * t.gas_price;
             let fees_value = gas_used * t.gas_price;
@@ -834,20 +835,29 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 touched.insert(account);
             }
 
-            final_results.push(Ok(Executed {
-                exception: result.exception,
-                gas: t.gas,
-                gas_used: gas_used,
-                refunded: gas_left,
-                cumulative_gas_used: self.info.gas_used + gas_used,
-                logs: substate.logs,
-                contracts_created: substate.contracts_created,
-                output: result.return_data.to_vec(),
-                state_diff: None,
-                transaction_fee: fees_value,
-                touched: touched,
-                state_root: result.state_root,
-            }))
+            total_gas_used = total_gas_used + gas_used;
+            if total_gas_used + self.info.gas_used > self.info.gas_limit {
+                final_results.push(Err(ExecutionError::BlockGasLimitReached {
+                    gas_limit: self.info.gas_limit,
+                    gas_used: self.info.gas_used + total_gas_used,
+                    gas: t.gas,
+                }));
+            } else {
+                final_results.push(Ok(Executed {
+                    exception: result.exception,
+                    gas: t.gas,
+                    gas_used: gas_used,
+                    refunded: gas_left,
+                    cumulative_gas_used: self.info.gas_used + gas_used,
+                    logs: substate.logs,
+                    contracts_created: substate.contracts_created,
+                    output: result.return_data.to_vec(),
+                    state_diff: None,
+                    transaction_fee: fees_value,
+                    touched: touched,
+                    state_root: result.state_root,
+                }))
+            }
         }
 
         return final_results;
@@ -876,19 +886,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         if rejected {
             self.state.revert_to_checkpoint();
-            Ok(Executed {
-                exception: result.exception,
+            Err(ExecutionError::BlockGasLimitReached {
+                gas_limit: self.info.gas_limit,
+                gas_used: self.info.gas_used + t.gas - gas_left,
                 gas: t.gas,
-                gas_used: t.gas,
-                refunded: 0.into(),
-                cumulative_gas_used: self.info.gas_used + t.gas,
-                logs: substate.logs,
-                contracts_created: vec![],
-                output: vec![],
-                state_diff: None,
-                transaction_fee: t.gas * t.gas_price,
-                touched: HashSet::new(),
-                state_root: H256::default(),
             })
         } else {
             let gas_used = t.gas - gas_left;

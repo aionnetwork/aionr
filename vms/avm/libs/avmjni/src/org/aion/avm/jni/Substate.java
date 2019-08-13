@@ -1,7 +1,7 @@
 package org.aion.avm.jni;
 
-import org.aion.vm.api.interfaces.KernelInterface;
-import org.aion.types.Address;
+import org.aion.avm.core.IExternalState;
+import org.aion.types.AionAddress;
 
 import java.util.List;
 import java.util.Set;
@@ -12,17 +12,17 @@ import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.HashSet;
 
-public class Substate implements KernelInterface {
-    final private KernelInterface parent;
-    private final List<Consumer<KernelInterface>> writeLog;
+public class Substate implements IExternalState {
+    final private IExternalState parent;
+    private final List<Consumer<IExternalState>> writeLog;
     /// cached nonces
-    private final HashMap<Address, BigInteger> nonces;
+    private final HashMap<AionAddress, BigInteger> nonces;
     /// cached balances
-    private final HashMap<Address, BigInteger> balances;
+    private final HashMap<AionAddress, BigInteger> balances;
     /// cached object graph
-    private final HashMap<Address, byte[]> objectGraphs;
+    private final HashMap<AionAddress, byte[]> objectGraphs;
     /// storage keys and values
-    private final HashMap<Address, HashSet<byte[]>> keys;
+    private final HashMap<AionAddress, HashSet<byte[]>> keys;
     private final HashMap<byte[], byte[]> values;
     
     /// block info (act as env info)
@@ -47,14 +47,14 @@ public class Substate implements KernelInterface {
             "0000000000000000000000000000000000000000000000000000000000000012";
 
     private class EnvInfo {
-        private Address coinbase;
+        private AionAddress coinbase;
         private long blockTimestamp;
         private long blockDifficulty;
         private long blockGasLimit;
         private long blockNumber;
     }
 
-    public Substate(KernelInterface parent, boolean isLocal) {
+    public Substate(IExternalState parent, boolean isLocal) {
         this.parent = parent;
         this.writeLog = new ArrayList<>();
         this.nonces = new HashMap<>();
@@ -66,6 +66,11 @@ public class Substate implements KernelInterface {
         this.isLocalCall = isLocal;
     }
 
+    @Override
+    public Substate newChildExternalState() {
+        return new Substate(this, this.isLocalCall);
+    }
+
     // block info is regarded as EnvInfo for transactions
     public void updateEnvInfo(Message msg) {
         byte[] difficulty = Arrays.copyOfRange(msg.blockDifficulty, 8, 16);
@@ -74,10 +79,10 @@ public class Substate implements KernelInterface {
         this.info.blockTimestamp = msg.blockTimestamp;
         this.info.blockGasLimit = msg.blockEnergyLimit;
         this.info.blockNumber = msg.blockNumber;
-        this.info.coinbase = new Address(msg.blockCoinbase);
+        this.info.coinbase = new AionAddress(msg.blockCoinbase);
     }
 
-    private boolean isPrecompiledContract(Address address) {
+    private boolean isPrecompiledContract(AionAddress address) {
         switch (address.toString()) {
             case ADDR_TOKEN_BRIDGE:
             case ADDR_ED_VERIFY:
@@ -91,18 +96,18 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public void createAccount(Address address) {
+    public void createAccount(AionAddress address) {
         if (Constants.DEBUG) {
             System.out.printf("JNI: create account: %s", address);
         }
-        Consumer<KernelInterface> write = (kernel) -> {
+        Consumer<IExternalState> write = (kernel) -> {
             kernel.createAccount(address);
         };
         writeLog.add(write);
     }
 
     @Override
-    public boolean hasAccountState(Address address) {
+    public boolean hasAccountState(AionAddress address) {
         if (Constants.DEBUG) {
             System.out.printf("JNI: check account state: %s", address);
         }
@@ -110,18 +115,18 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public void putCode(Address address, byte[] code) {
+    public void putCode(AionAddress address, byte[] code) {
         if (Constants.DEBUG) {
             System.out.printf("JNI: save code: %s", address);
         }
-        Consumer<KernelInterface> write = (kernel) -> {
+        Consumer<IExternalState> write = (kernel) -> {
             kernel.putCode(address, code);
         };
         writeLog.add(write);
     }
 
     @Override
-    public byte[] getCode(Address address) {
+    public byte[] getCode(AionAddress address) {
         if (Constants.DEBUG) {
             System.out.printf("JNI: get code of %s", address);
         }
@@ -129,11 +134,11 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public void putStorage(Address address, byte[] key, byte[] value) {
+    public void putStorage(AionAddress address, byte[] key, byte[] value) {
         if (Constants.DEBUG) {
             System.out.printf("JNI: put storage");
         }
-        Consumer<KernelInterface> write = (kernel) -> {
+        Consumer<IExternalState> write = (kernel) -> {
             kernel.putStorage(address, key, value);
         };
         writeLog.add(write);
@@ -153,7 +158,7 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public byte[] getStorage(Address address, byte[] key) {
+    public byte[] getStorage(AionAddress address, byte[] key) {
         if (Constants.DEBUG) {
             System.out.printf("JNI: get storage");
         }
@@ -181,15 +186,15 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public void deleteAccount(Address address) {
-        Consumer<KernelInterface> write = (kernel) -> {
+    public void deleteAccount(AionAddress address) {
+        Consumer<IExternalState> write = (kernel) -> {
             kernel.deleteAccount(address);
         };
         writeLog.add(write);
     }
 
     @Override
-    public boolean accountNonceEquals(Address address, BigInteger nonce) {
+    public boolean accountNonceEquals(AionAddress address, BigInteger nonce) {
         if (Constants.DEBUG) {
             System.out.print("current Nonce = ");
             System.out.println(getNonce(address));
@@ -199,7 +204,7 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public BigInteger getBalance(Address address) {
+    public BigInteger getBalance(AionAddress address) {
         if (Constants.DEBUG) {
             System.out.printf("JNI: getBalance of ");
             System.out.println(address);
@@ -213,11 +218,11 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public void adjustBalance(Address address, BigInteger delta) {
+    public void adjustBalance(AionAddress address, BigInteger delta) {
         if (Constants.DEBUG) {
             System.out.printf("try adjust balance: %d\n", delta.longValue());
         }
-        Consumer<KernelInterface> write = (kernel) -> {
+        Consumer<IExternalState> write = (kernel) -> {
             kernel.adjustBalance(address, delta);
         };
         writeLog.add(write);
@@ -226,7 +231,7 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public BigInteger getNonce(Address address) {
+    public BigInteger getNonce(AionAddress address) {
         if (Constants.DEBUG) {
             System.out.print("JNI: try getNonce of: ");
             System.out.println(address);
@@ -241,8 +246,8 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public void incrementNonce(Address address) {
-        Consumer<KernelInterface> write = (kernel) -> {
+    public void incrementNonce(AionAddress address) {
+        Consumer<IExternalState> write = (kernel) -> {
             kernel.incrementNonce(address);
         };
         writeLog.add(write);
@@ -254,7 +259,7 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public boolean accountBalanceIsAtLeast(Address address, BigInteger amount) {
+    public boolean accountBalanceIsAtLeast(AionAddress address, BigInteger amount) {
         return this.isLocalCall || getBalance(address).compareTo(amount) >= 0;
     }
     
@@ -269,7 +274,7 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public boolean destinationAddressIsSafeForThisVM(Address address) {
+    public boolean destinationAddressIsSafeForThisVM(AionAddress address) {
         if (isPrecompiledContract(address)) {
             return false;
         }
@@ -282,36 +287,31 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public void payMiningFee(Address address, BigInteger fee) {
+    public void payMiningFee(AionAddress address, BigInteger fee) {
         adjustBalance(address, fee);
     }
 
     @Override
-    public void refundAccount(Address address, BigInteger amount) {
+    public void refundAccount(AionAddress address, BigInteger amount) {
         adjustBalance(address, amount);
     }
 
     @Override
-    public void deductEnergyCost(Address address, BigInteger cost) {
+    public void deductEnergyCost(AionAddress address, BigInteger cost) {
         adjustBalance(address, cost);
     }
 
     @Override
-    public void removeStorage(Address address, byte[] key) {
+    public void removeStorage(AionAddress address, byte[] key) {
         putStorage(address, key, null);
-        Consumer<KernelInterface> write = (kernel) -> {
+        Consumer<IExternalState> write = (kernel) -> {
             kernel.removeStorage(address, key);
         };
         writeLog.add(write);
     }
 
     @Override
-    public KernelInterface makeChildKernelInterface() {
-        return new Substate(this, isLocalCall);
-    }
-
-    @Override
-    public byte[] getObjectGraph(Address a) {
+    public byte[] getObjectGraph(AionAddress a) {
         if (this.objectGraphs.get(a) == null) {
             if (Constants.DEBUG) {
                 System.out.println("JNI: try updating object graph");
@@ -325,13 +325,13 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public void putObjectGraph(Address a, byte[] data) {
+    public void putObjectGraph(AionAddress a, byte[] data) {
         if (Constants.DEBUG) {
             System.out.printf("JNI: save object graph at ");
             System.out.println(a);
         }
         this.objectGraphs.put(a, data);
-        Consumer<KernelInterface> write = (kernel) -> {
+        Consumer<IExternalState> write = (kernel) -> {
             kernel.putObjectGraph(a, data);
         };
         writeLog.add(write);
@@ -339,17 +339,17 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public void commitTo(KernelInterface target) { }
+    public void commitTo(IExternalState target) { }
 
     @Override
     public void commit() {
-        for (Consumer<KernelInterface> mutation : this.writeLog) {
+        for (Consumer<IExternalState> mutation : this.writeLog) {
             mutation.accept(this.parent);
         }
     }
 
     @Override
-    public Address getMinerAddress() {
+    public AionAddress getMinerAddress() {
         if (Constants.DEBUG) {
             System.out.printf("JNI: try to get miner address\n");
         }
@@ -383,15 +383,15 @@ public class Substate implements KernelInterface {
     }
 
     @Override
-    public void setTransformedCode(Address address, byte[] bytes) {
-        Consumer<KernelInterface> write = (kernel) -> {
+    public void setTransformedCode(AionAddress address, byte[] bytes) {
+        Consumer<IExternalState> write = (kernel) -> {
             kernel.setTransformedCode(address, bytes);
         };
         writeLog.add(write);
     }
 
     @Override
-    public byte[] getTransformedCode(Address address) {
+    public byte[] getTransformedCode(AionAddress address) {
         return parent.getTransformedCode(address);
     }
 }

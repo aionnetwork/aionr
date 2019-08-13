@@ -322,6 +322,7 @@ impl<'x> OpenBlock<'x> {
         &mut self,
         txs: &[SignedTransaction],
         h: Option<H256>,
+        check_gas: bool,
     ) -> Vec<Result<Receipt, Error>>
     {
         //TODO: deal with AVM parallelism
@@ -337,10 +338,10 @@ impl<'x> OpenBlock<'x> {
         let mut idx = 0;
         let mut receipts_results = Vec::new();
         // avm should deal with exceptions correctly
-        for apply_result in self
-            .block
-            .state
-            .apply_batch(&env_info, self.engine.machine(), txs)
+        for apply_result in
+            self.block
+                .state
+                .apply_batch(&env_info, self.engine.machine(), txs, check_gas)
         {
             let result = match apply_result {
                 Ok(outcome) => {
@@ -398,6 +399,7 @@ impl<'x> OpenBlock<'x> {
                     &env_info,
                     self.engine.machine(),
                     &[t.clone()],
+                    check_gas,
                 ));
             } else {
                 result.push(self.block.state.apply(
@@ -785,7 +787,7 @@ fn push_transactions(
         for tx in transactions {
             if !is_for_avm(block, tx) {
                 if tx_batch.len() >= 1 {
-                    block.apply_batch_txs(tx_batch.as_slice(), None);
+                    block.apply_batch_txs(tx_batch.as_slice(), None, false);
                     tx_batch.clear();
                 }
                 block.push_transaction(tx.clone(), None, false)?;
@@ -796,7 +798,7 @@ fn push_transactions(
         }
 
         if !tx_batch.is_empty() {
-            block.apply_batch_txs(tx_batch.as_slice(), None);
+            block.apply_batch_txs(tx_batch.as_slice(), None, false);
             tx_batch.clear();
         }
     } else {

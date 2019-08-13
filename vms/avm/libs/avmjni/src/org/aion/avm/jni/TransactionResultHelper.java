@@ -1,11 +1,14 @@
 package org.aion.avm.jni;
 
-import org.aion.kernel.Log;
-import org.aion.kernel.AvmTransactionResult;
-import org.aion.vm.api.interfaces.TransactionResult;
-import org.aion.vm.api.interfaces.ResultCode;
+// import org.aion.kernel.Log;
+// import org.aion.kernel.AvmTransactionResult;
+// import org.aion.vm.api.interfaces.TransactionResult;
+// import org.aion.vm.api.interfaces.ResultCode;
+import org.aion.types.TransactionResult;
+import org.aion.types.TransactionStatus;
 
 import java.util.List;
+import java.util.Optional;
 
 public class TransactionResultHelper {
 
@@ -23,7 +26,7 @@ public class TransactionResultHelper {
      * @param code
      * @return
      */
-    public static int encodeAvmResultCode(ResultCode code) {
+    public static int encodeAvmResultCode(TransactionStatus code) {
         if (code.isFailed()) {
             return 2;
         } else if (code.isRejected()) {
@@ -39,11 +42,13 @@ public class TransactionResultHelper {
     public static byte[] encodeTransactionResult(TransactionResult result) {
         NativeEncoder enc = new NativeEncoder();
 
-        AvmTransactionResult avm_result = (AvmTransactionResult) result;
-        ResultCode code = avm_result.getResultCode();
-        enc.encodeInt(encodeAvmResultCode(code));
-        enc.encodeBytes(result.getReturnData() == null ? new byte[0] : result.getReturnData());
-        enc.encodeLong(avm_result.getEnergyUsed());
+        // AvmTransactionResult avm_result = (AvmTransactionResult) result;
+        // ResultCode code = result.getResultCode();
+        enc.encodeInt(encodeAvmResultCode(result.transactionStatus));
+        Optional<byte[]> output = result.copyOfTransactionOutput();
+        // enc.encodeBytes(result.output == null ? new byte[0] : result.output);
+        enc.encodeBytes(output.orElse(new byte[0]));
+        enc.encodeLong(result.energyUsed);
 
         return enc.toByteArray();
     }
