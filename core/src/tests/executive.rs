@@ -1838,12 +1838,12 @@ fn avm_storage() {
     let mut state = get_temp_state();
     let address = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
     state
-        .set_storage(&address, vec![0, 0, 0, 1], vec![0, 0, 0, 2])
+        .set_storage(&address, vec![0, 0, 0, 1], vec![0])
         .expect("avm set storage failed");
     let value = state
         .storage_at(&address, &vec![0, 0, 0, 1])
         .expect("avm get storage failed");
-    assert_eq!(value, Some(vec![0, 0, 0, 2]));
+    assert_eq!(value, Some(vec![0]));
     state
         .set_storage(
             &address,

@@ -701,7 +701,7 @@ impl VMAccount for AionVMAccount {
                 }
             }
 
-            debug!(target: "vm", "object graph = {:?}", self.object_graph_cache);
+            debug!(target: "vm", "object graph hash = {:?}", self.object_graph_hash);
         }
 
         if let RequireCache::None = require {
@@ -844,7 +844,9 @@ impl AionVMAccount {
             debug!(target: "vm", "removed avm value {:?}", old);
         }
 
-        self.storage_removable.insert(key);
+        self.storage_cache.borrow_mut().remove(&key);
+
+        self.storage_removable.insert(key.clone());
     }
 
     pub fn update_root(&mut self, graph_db: Arc<KeyValueDB>) {
@@ -858,25 +860,13 @@ impl AionVMAccount {
             debug!(target: "vm", "updated storage root = {:?}, delta_root = {:?}, code hash = {:?}",
                 self.storage_root, self.delta_root, self.code_hash);
             // save object graph
-            debug!(target: "vm", "hash for object graph = {:?}", self.object_graph_hash);
+            debug!(target: "vm", "saving object graph with hash = {:?}", self.object_graph_hash);
 
             let mut stream = RlpStream::new_list(2);
             stream.append(&self.storage_root);
             stream.append(&self.object_graph_hash);
             let content = stream.out();
 
-            // db.emplace(
-            //     self.delta_root.clone(),
-            //     DBValue::from_slice(self.object_graph_cache.as_slice()),
-            // );
-            // db.emplace(
-            //     self.delta_root.clone(),
-            //     DBValue::from_slice(content.as_slice()),
-            // );
-            // db.emplace(
-            //     self.object_graph_hash,
-            //     DBValue::from_slice(self.object_graph_cache.as_slice())
-            // );
             let mut batch = DBTransaction::new();
             batch.put(
                 ::db::COL_AVM_GRAPH,
@@ -889,39 +879,8 @@ impl AionVMAccount {
                 self.object_graph_cache.as_slice(),
             );
             graph_db.write(batch).expect("GRAPH DB write failed");
-            // save key/valud storage root
-            // let mut raw_key = Vec::new();
-            // raw_key.extend_from_slice(&address[..]);
-            // raw_key.push(AccType::AVM.into());
-            // db.emplace(
-            //     blake2b(raw_key),
-            //     DBValue::from_slice(&self.storage_root[..]),
-            // );
         }
     }
-
-    // pub fn save_object_graph(&mut self, address: &Address, db: &mut HashStore) {
-    //     // save object graph
-    //     println!("hash for object graph = {:?}", self.delta_root);
-    //     db.emplace(
-    //         self.delta_root.clone(),
-    //         DBValue::from_slice(self.object_graph_cache.as_slice()),
-    //     );
-    //     // save key/valud storage root
-    //     db.emplace(address.clone(), DBValue::from_slice(&self.storage_root[..]));
-    // }
-
-    // pub fn update_object_graph(&mut self, db: &HashStore) {
-    //     match db.get(&self.storage_root) {
-    //         Some(x) => {
-    //             self.object_graph_size = Some(x.len());
-    //             self.object_graph_cache = Arc::new(x[..].to_vec());
-    //         }
-    //         None => {
-    //             self.object_graph_size = None;
-    //         }
-    //     }
-    // }
 
     #[cfg(test)]
     /// Provide a byte array which hashes to the `code_hash`. returns the hash as a result.

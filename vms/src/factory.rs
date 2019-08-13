@@ -307,7 +307,7 @@ impl Factory for AVMFactory {
                 let mut gas_left =
                     U256::from(avm_tx_contexts[index].energy_limit - result.energy_used);
                 let return_data = result.return_data;
-                debug!(target: "vm", "avm status code = {:?}, gas left = {:?}", status_code, gas_left);
+                debug!(target: "vm", "tx: {:?}, avm status code = {:?}, gas left = {:?}", index, status_code, gas_left);
                 exec_results.push(ExecutionResult {
                     gas_left: gas_left.into(),
                     status_code: status_code.clone().into(),
