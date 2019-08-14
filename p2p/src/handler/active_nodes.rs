@@ -45,14 +45,9 @@ pub fn send(nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     
     let active: Vec<Node> = get_active_nodes(nodes.clone());;
     let len: usize = active.len();
-    if len > 0 {
-        
-        
-        // TODO: max 40 records trim
+    if len > 0 {    
         let random = random::<usize>() % len;
-
         let hash = active[random].get_hash();
-
         debug!(target: "p2p", "active_nodes/send:  hash {}", &hash);
         p2p_send(
             hash, 
@@ -68,7 +63,6 @@ pub fn send(nodes: Arc<RwLock<HashMap<u64, Node>>>) {
 }
 
 pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
-
     debug!(target: "p2p", "active_nodes/receive_req");    
 
     let mut cb_out = ChannelBuffer::new();
@@ -113,7 +107,7 @@ pub fn receive_res(hash: u64, cb_in: ChannelBuffer, temp: Arc<Mutex<VecDeque<Tem
     let mut temp_list = Vec::new();
     if node_count[0] > 0 {
         // TODO: update node status with healthy active nodes msg
-        // TODO: max for check        
+        // TODO: max active nodes filter        
         for _i in 0..node_count[0] as u32 {
             
             let (id, rest) = rest.split_at(NODE_ID_LENGTH);

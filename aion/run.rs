@@ -49,7 +49,6 @@ use parking_lot::{Condvar, Mutex};
 use rpc;
 use rpc_apis;
 use p2p::Config;
-use p2p::Mgr;
 
 use user_defaults::UserDefaults;
 
@@ -161,7 +160,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     client_config.queue.verifier_settings = cmd.verifier_settings;
     client_config.stake_contract = cmd.stake_conf.contract;
 
-    //let net_conf = cmd.net_conf;
     let (id, binding) = &cmd.net_conf.get_id_and_binding();
     
     info!(target: "run","          id: {}", &id);
@@ -210,13 +208,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
           if cmd.ipc_conf.enabled { "y" } else { "n" },
     );
 
-    let config_0 = cmd.net_conf.clone();
-    let p2p = Mgr::new(config_0);
-    p2p.run();
-
-    // start sync
-    let config_1 = cmd.net_conf.clone();
-    let sync = Sync::new(client.clone(), config_1);
+    let sync = Sync::new(cmd.net_conf.clone(), client.clone());   
+    sync.run();
 
     // start rpc server
     let runtime_rpc = tokio::runtime::Builder::new()
@@ -335,9 +328,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         ipc_server.unwrap().close();
     }
 
-    // chris
-    // close p2p
-    p2p.shutdown();
     // sync.stop_network();
     // close/drop this stuff as soon as exit detected.
     // drop((sync, chain_notify));

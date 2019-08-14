@@ -21,7 +21,7 @@
 
 use std::sync::Arc;
 use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::Duration;
 use client::{BlockChainClient, BlockId, BlockImportError};
 use types::error::{BlockError, ImportError};
 use header::Header;
@@ -31,10 +31,7 @@ use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use p2p::ChannelBuffer;
 use p2p::Node;
-use p2p::get_nodes;
-use p2p::update_node;
 use p2p::send;
-use p2p::states::STATE::ALIVE;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
@@ -73,7 +70,7 @@ pub fn propagate_transactions() {
 
         let mut node_count = 0;
         for node in active_nodes.iter() {
-            send(node.node_hash, req.clone());
+            send(node.get_hash(), req.clone());
             trace!(target: "sync", "Sync broadcast new transactions sent...");
             node_count += 1;
             if node_count > 10 {
@@ -181,10 +178,10 @@ pub fn receive_block(node: &mut Node, req: ChannelBuffer) {
 pub fn receive_tx(node: &mut Node, req: ChannelBuffer) {
     trace!(target: "sync", "BROADCASTTX received.");
 
-    if node.last_broadcast_timestamp + Duration::from_millis(20) > SystemTime::now() {
-        // ignore frequent broadcasting
-        return;
-    }
+    // if node.last_broadcast_timestamp + Duration::from_millis(20) > SystemTime::now() {
+    //     // ignore frequent broadcasting
+    //     return;
+    // }
 
     if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number() {
         // Ignore BROADCASTTX message until full synced
@@ -213,7 +210,7 @@ pub fn receive_tx(node: &mut Node, req: ChannelBuffer) {
             let client = SyncStorage::get_block_chain();
             client.import_queued_transactions(transactions);
         }
-        node.last_broadcast_timestamp = SystemTime::now();
+        // node.last_broadcast_timestamp = SystemTime::now();
     }
 
     SyncEvent::update_node_state(node, SyncEvent::OnBroadCastTx);

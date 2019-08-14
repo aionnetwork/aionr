@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 mod event;
-//mod handler;
+mod handler;
 mod route;
 mod storage;
 #[cfg(test)]
@@ -28,6 +28,7 @@ mod test;
 
 use std::collections::BTreeMap;
 use std::ops::Index;
+use std::sync::RwLock;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
@@ -42,6 +43,7 @@ use aion_types::H256;
 use futures::Future;
 use futures::Stream;
 use rlp::UntrustedRlp;
+use tokio::runtime::Runtime;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 
@@ -62,14 +64,16 @@ use p2p::Config;
 // use p2p::states::STATE::CONNECTED;
 // use p2p::states::STATE::ALIVE;
 use p2p::Mgr;
-
-// use sync::route::VERSION;
-// use sync::route::ACTION;
-// use sync::handler::status;
+use p2p::register;
+use sync::route::VERSION;
+use sync::route::MODULE;
+use sync::route::ACTION;
+use sync::handler::status;
 // use sync::handler::bodies;
 // use sync::handler::headers;
 // use sync::handler::broadcast;
 // use sync::handler::import;
+
 use sync::storage::ActivePeerInfo;
 use sync::storage::PeerInfo;
 use sync::storage::SyncState;
@@ -80,14 +84,17 @@ use sync::storage::TransactionStats;
 const STATUS_REQ_INTERVAL: u64 = 2;
 const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
 const BLOCKS_IMPORT_INTERVAL: u64 = 50;
-const STATICS_INTERVAL: u64 = 15;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
+const INTERVAL_STATUS: u64 = 10;
 
 #[derive(Clone)]
-struct SyncMgr;
+struct SyncMgr{
+
+}
 
 impl SyncMgr {
     fn enable(executor: &TaskExecutor, max_peers: u32) {
+
         // let status_req_task =
         //     Interval::new(Instant::now(), Duration::from_secs(STATUS_REQ_INTERVAL))
         //         .for_each(move |_| {
@@ -348,50 +355,81 @@ impl SyncMgr {
 }
 
 pub struct Sync {
-    /// Network service
-    config: Config,
-    /// starting block number.
-    starting_block_number: u64,
+    config: Arc<Config>,
+    client: Arc<BlockChainClient>,
+    runtime: Arc<Runtime>,
+    p2p: Arc<Mgr>,
+
+    /// network best td
+    td: Arc<RwLock<u64>>
 }
 
 impl Sync {
-    // pub fn new(client: Arc<BlockChainClient>, config: Config) -> Arc<Sync> {
-    pub fn new(client: Arc<BlockChainClient>, config: Config) {
-        // let chain_info = client.chain_info();
-        // // starting block number is the local best block number during kernel startup.
-        // let starting_block_number = chain_info.best_block_number;
-
+    pub fn new(
+        config: Config,
+        client: Arc<BlockChainClient>) -> Sync {
+        let starting_block_number = client.chain_info().best_block_number;
+        // TODO: remove
         // SyncStorage::init(client);
-        // Arc::new(Sync {
-        //     config,
-        //     starting_block_number,
-        // })
+        let config = Arc::new(config);
+        Sync {
+            config: config.clone(),
+            client,
+            p2p: Arc::new(Mgr::new(config)),
+            runtime: Arc::new(Runtime::new().expect("tokio runtime")),
+            td: Arc::new(RwLock::new(starting_block_number))
+        }
     }
 
-    pub fn start_network(&self) {
-        // let executor = SyncStorage::get_executor();
-        
-        // // chris
-        // // register(Handler {
-        // //     callback: SyncMgr::handle,
-        // // });
-        // // p2p_start(self.config.clone());
-        // let p2p_mgr = Mgr::new();
-        // p2p_mgr.run();
+    pub fn run(&self) {
 
-        // thread::spawn(move || {
-        //     thread::sleep(Duration::from_secs(50));
-        //     p2p_mgr.stop();    
-        // });
+        // counters
+        let runtime = self.runtime.clone(); 
+        let executor = Arc::new(runtime.executor());
+        let nodes = self.p2p.nodes.clone();
+        let mut handlers = self.p2p.handlers.clone(); 
+
+        // register handlers
+        register(0, 1, 0, &mut handlers, status::receive_req);
+        register(0, 1, 1, &mut handlers, status::receive_res);
+        // register(0, 1, 0, &mut handlers, status::receive_req);
+        // register(0, 1, 1, &mut handlers, status::receive_res);
+        // register(0, 1, 0, &mut handlers, status::receive_req);
+        // register(0, 1, 1, &mut handlers, status::receive_res);
+        // register(0, 1, 0, &mut handlers, status::receive_req);
+        // register(0, 1, 1, &mut handlers, status::receive_res);
         
-        // SyncMgr::enable(&executor, self.config.max_peers);
+        // init p2p
+        &self.p2p.run();
+
+        // status
+        let executor_status = executor.clone();
+        executor_status.spawn(
+            Interval::new(
+                Instant::now(), 
+                Duration::from_secs(INTERVAL_STATUS)
+            ).for_each(move |_| {  
+                
+
+                // make it constant
+                // let mut cb = ChannelBuffer::new();
+                // cb.head.ver = VERSION::V0.value();
+                // cb.head.ctrl = MODULE::SYNC.value();
+                // cb.head.action = ACTION::STATUSREQ.value();
+                // cb.head.len = 0;
+                // p2p.send(node_hash, cb);
+
+                // p2p.get_node_by_td(10);                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  
+                Ok(())   
+            }).map_err(|err| error!(target: "p2p", "executor status: {:?}", err))
+        );
     }
 
-    pub fn stop_network(&self) {
+    pub fn shutdown(&self) {
         // SyncMgr::disable();
-        // // original is p2p::disable which internally calls reset() with unuse atomic boolean
-        // // TODO: update proper ways to clear up threads and connections on p2p layer
-        // p2p_shutdown();
+        // TODO: update proper ways to clear up threads and connections on p2p layer
+        let p2p = self.p2p.clone();
+        p2p.shutdown();
     }
 }
 
@@ -420,7 +458,7 @@ impl SyncProvider for Sync {
             state: SyncState::Idle,
             protocol_version: 0,
             network_id: 256,
-            start_block_number: self.starting_block_number,
+            start_block_number: self.client.chain_info().best_block_number,
             last_imported_block_number: None,
             highest_block_number: { Some(SyncStorage::get_network_best_block_number()) },
             blocks_received: 0,
@@ -454,18 +492,17 @@ impl SyncProvider for Sync {
         BTreeMap::new() }
 
     fn active(&self) -> Vec<ActivePeerInfo> {
-        // let ac_nodes = get_nodes(ALIVE.value());
-        // ac_nodes
-        //     .into_iter()
-        //     .map(|node| {
-        //         ActivePeerInfo {
-        //             highest_block_number: node.best_block_num,
-        //             id: node.node_id.to_hex(),
-        //             ip: node.ip_addr.ip.to_hex(),
-        //         }
-        //     })
-        //     .collect()
-        Vec::new()
+        let nodes = &self.p2p.get_active_nodes();
+        nodes
+            .into_iter()
+            .map(|node| {
+                ActivePeerInfo {
+                    highest_block_number: node.block_num,
+                    id: node.id.to_hex(),
+                    ip: node.addr.ip.to_hex(),
+                }
+            })
+            .collect()
     }
 }
 
@@ -526,27 +563,27 @@ impl ChainNotify for Sync {
                 if let Some(blk) = client.block(block_id) {
                     let block_hash = blk.hash();
                     // import::import_staged_blocks(&block_hash);
-                    // if let Some(time) = SyncStorage::get_requested_time(&block_hash) {
-                    //     info!(target: "sync",
-                    //         "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
-                    //         block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
-                    // }
+                    if let Some(time) = SyncStorage::get_requested_time(&block_hash) {
+                        info!(target: "sync",
+                            "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
+                            block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
+                    }
                 }
             }
         }
 
-        // if enacted.is_empty() {
-        //     for hash in enacted.iter() {
-        //         debug!(target: "sync", "enacted hash: {:?}", hash);
-        //         import::import_staged_blocks(&hash);
-        //     }
-        // }
+        if enacted.is_empty() {
+            for hash in enacted.iter() {
+                debug!(target: "sync", "enacted hash: {:?}", hash);
+                // import::import_staged_blocks(&hash);
+            }
+        }
 
-        // if !sealed.is_empty() {
-        //     debug!(target: "sync", "Propagating blocks...");
-        //     SyncStorage::insert_imported_block_hashes(sealed.clone());
-        //     broadcast::propagate_blocks(sealed.index(0), SyncStorage::get_block_chain());
-        // }
+        if !sealed.is_empty() {
+            debug!(target: "sync", "Propagating blocks...");
+            SyncStorage::insert_imported_block_hashes(sealed.clone());
+            // broadcast::propagate_blocks(sealed.index(0), SyncStorage::get_block_chain());
+        }
     }
 
     fn start(&self) {

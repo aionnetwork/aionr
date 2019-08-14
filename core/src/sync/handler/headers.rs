@@ -30,10 +30,7 @@ use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use p2p::ChannelBuffer;
 use p2p::Node;
-use p2p::Mode;
-use p2p::get_config;
 use p2p::send;
-use p2p::update_node;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
@@ -45,16 +42,7 @@ const REQUEST_SIZE: u64 = 24;
 const LARGE_REQUEST_SIZE: u64 = 48;
 
 pub fn get_headers_from_node(node: &mut Node) {
-    trace!(target: "sync", "get_headers_from_node, node id: {}", node.get_node_id());
-
-    if get_config().sync_from_boot_nodes_only && !node.is_from_boot_list {
-        return;
-    }
-
-    if node.last_request_timestamp + Duration::from_millis(1000) > SystemTime::now() {
-        return;
-    }
-
+    trace!(target: "sync", "get_headers_from_node, node id: {}", node.get_id_string());
     if node.target_total_difficulty > node.current_total_difficulty {
         let mut from: u64 = 1;
         let mut size = REQUEST_SIZE;

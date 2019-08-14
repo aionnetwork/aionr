@@ -20,41 +20,30 @@
  ******************************************************************************/
 
 use std::mem;
+use std::sync::Arc;
+use std::sync::RwLock;
+use std::collections::HashMap;
 use aion_types::{H256, U256};
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
-use sync::event::SyncEvent;
 use sync::storage::SyncStorage;
-use sync::handler::headers;
 use p2p::send as p2p_send;
-use p2p::update_node;
 use p2p::ChannelBuffer;
 use p2p::Node;
-use p2p::Mode;
 
 const HASH_LENGTH: usize = 32;
 
-pub fn send(node_hash: u64) {
-    let mut req = ChannelBuffer::new();
-    req.head.ver = VERSION::V0.value();
-    req.head.ctrl = MODULE::SYNC.value();
-    req.head.action = ACTION::STATUSREQ.value();
-    req.head.len = 0;
-    p2p_send(node_hash, req);
-}
+pub fn receive_req(hash: u64, cb_in: Option<ChannelBuffer>, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+    debug!(target: "sync", "status/receive_req");
 
-pub fn receive_req(node: &mut Node) {
-    trace!(target: "sync", "STATUSREQ received.");
+    let mut cb = ChannelBuffer::new();
 
-    let mut res = ChannelBuffer::new();
-    let node_hash = node.node_hash;
-
-    res.head.ver = VERSION::V0.value();
-    res.head.ctrl = MODULE::SYNC.value();
-    res.head.action = ACTION::STATUSRES.value();
+    cb.head.ver = VERSION::V0.value();
+    cb.head.ctrl = MODULE::SYNC.value();
+    cb.head.action = ACTION::STATUSRES.value();
 
     let mut res_body = Vec::new();
     let chain_info = SyncStorage::get_chain_info();
@@ -76,46 +65,61 @@ pub fn receive_req(node: &mut Node) {
     res_body.put_slice(&best_hash);
     res_body.put_slice(&genesis_hash);
 
-    res.body.put_slice(res_body.as_slice());
-    res.head.len = res.body.len() as u32;
-    SyncEvent::update_node_state(node, SyncEvent::OnStatusReq);
-    update_node(node_hash, node);
-    p2p_send(node_hash, res);
+    cb.body.put_slice(res_body.as_slice());
+    cb.head.len = cb.body.len() as u32;
+    
+    p2p_send(hash, cb, nodes);
 }
 
-pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
-    trace!(target: "sync", "STATUSRES received.");
+pub fn receive_res(hash: u64, cb_in: Option<ChannelBuffer>, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+    trace!(target: "sync", "status/receive_res");
 
-    let (mut best_block_num, req_body_rest) = req.body.split_at(mem::size_of::<u64>());
-    let best_block_num = best_block_num.read_u64::<BigEndian>().unwrap_or(0);
-    let (mut total_difficulty_len, req_body_rest) = req_body_rest.split_at(mem::size_of::<u8>());
-    let total_difficulty_len = total_difficulty_len.read_u8().unwrap_or(0) as usize;
-    let (total_difficulty, req_body_rest) = req_body_rest.split_at(total_difficulty_len);
-    let (best_hash, req_body_rest) = req_body_rest.split_at(HASH_LENGTH);
-    let (_genesis_hash, _) = req_body_rest.split_at(HASH_LENGTH);
+    match nodes.try_write() {
+        Ok(mut write) => {
+            match write.get_mut(&hash) {
+                Some(mut node) => {
+                   
+                    let req = cb_in.unwrap();
+                    let (mut best_block_num, req_body_rest) = req.body.split_at(mem::size_of::<u64>());
+                    let best_block_num = best_block_num.read_u64::<BigEndian>().unwrap_or(0);
+                    let (mut total_difficulty_len, req_body_rest) = req_body_rest.split_at(mem::size_of::<u8>());
+                    let total_difficulty_len = total_difficulty_len.read_u8().unwrap_or(0) as usize;
+                    let (total_difficulty, req_body_rest) = req_body_rest.split_at(total_difficulty_len);
+                    let (best_hash, req_body_rest) = req_body_rest.split_at(HASH_LENGTH);
+                    let (_genesis_hash, _) = req_body_rest.split_at(HASH_LENGTH);
 
-    node.best_hash = H256::from(best_hash);
-    node.best_block_num = best_block_num;
-    if node.mode != Mode::BACKWARD && node.mode != Mode::FORWARD {
-        let chain_info = SyncStorage::get_chain_info();
-        node.synced_block_num = chain_info.best_block_number;
-        node.current_total_difficulty = chain_info.total_difficulty;
+                    node.block_hash = H256::from(best_hash);
+                    node.block_num = best_block_num;
+                    node.total_difficulty = U256::from(total_difficulty);
+                },
+                None => {
+                    // TODO: 
+                }
+            }
+        },
+        Err(err) => {
+            //TODO:
+        }
     }
-    node.target_total_difficulty = U256::from(total_difficulty);
-    SyncEvent::update_node_state(node, SyncEvent::OnStatusRes);
-    update_node(node.node_hash, node);
+
+    // if node.mode != Mode::BACKWARD && node.mode != Mode::FORWARD {
+    //     let chain_info = SyncStorage::get_chain_info();
+    //     node.synced_block_num = chain_info.best_block_number;
+    //     node.current_total_difficulty = chain_info.total_difficulty;
+    // }
+    
 
     // internal comparing node td vs current network status td
-    SyncStorage::update_network_status(
-        node.best_block_num,
-        node.best_hash,
-        node.target_total_difficulty,
-    );
+    //SyncStorage::update_network_status(
+    //    node.block_num,
+    //    node.block_hash,
+    //    node.total_difficulty,
+    //);
 
     // immediately send request when incoming response indicates node td > local chain td
     // even headers::get_headers_from_node has condition check internally
     // TODO: leave condition check in one place
-    if node.target_total_difficulty >= SyncStorage::get_chain_info().total_difficulty {
-        headers::get_headers_from_node(node);
-    }
+    //if node.total_difficulty >= SyncStorage::get_chain_info().total_difficulty {
+        // headers::get_headers_from_node(node);
+    //}
 }

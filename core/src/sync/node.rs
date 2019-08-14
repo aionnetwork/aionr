@@ -19,8 +19,12 @@
  *
  ******************************************************************************/
 
-pub mod status;
-// pub mod headers;
-// pub mod bodies;
-// pub mod broadcast;
-// pub mod import;
+use p2p::Node;
+
+struct SyncNode {
+    inner: Node
+}
+
+impl SyncNode {
+    
+}
