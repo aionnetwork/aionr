@@ -73,6 +73,7 @@ pub fn receive_req(
 
     cb.body.put_slice(res_body.as_slice());
     cb.head.len = cb.body.len() as u32;
+    trace!(target:"sync", "status res bc body len: {}", cb.head.len);
 
     p2p_send(hash, cb, nodes);
 }
@@ -90,6 +91,7 @@ pub fn receive_res(
             match write.get_mut(&hash) {
                 Some(mut node) => {
                     let req = cb_in.unwrap();
+                    trace!(target: "sync", "cb_body_len{}",req.head.len);
                     let (mut best_block_num, req_body_rest) =
                         req.body.split_at(mem::size_of::<u64>());
                     let best_block_num = best_block_num.read_u64::<BigEndian>().unwrap_or(0);

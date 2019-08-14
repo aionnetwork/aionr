@@ -516,7 +516,8 @@ pub fn register(
     f: fn(hash: u64, cb: Option<ChannelBuffer>, nodes: Arc<RwLock<HashMap<u64, Node>>>),
 )
 {
-    let route: u32 = (ver as u32) << 16 + (ctrl as u32) << 8 + (action as u32);
+    let route: u32 = ((ver as u32) << 16) + ((ctrl as u32) << 8) + (action as u32);
+    println!("!!!!!!!!!!{:?}", route);
     if let Ok(mut write) = handlers.write() {
         write.insert(route, f);
     }
