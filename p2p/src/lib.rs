@@ -56,6 +56,7 @@ use std::time::Duration;
 use std::time::SystemTime;
 use std::time::Instant;
 use std::net::SocketAddr;
+use rand::random;
 use futures::sync::mpsc;
 use futures::{Future, Stream};
 use futures::lazy;
@@ -607,6 +608,17 @@ pub fn send(hash: u64, cb: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>
     }
 }
 
+pub fn get_random_active_node_hash(nodes: Arc<RwLock<HashMap<u64, Node>>>) -> Option<u64> {
+    let active: Vec<Node> = get_active_nodes(nodes.clone());
+    let len: usize = active.len();
+    if len > 0 {
+        let random = random::<usize>() % len;
+        Some(active[random].get_hash())
+    } else {
+        None
+    }
+}
+
 fn config_stream(stream: &TcpStream) {
     stream
         .set_recv_buffer_size(1 << 24)
@@ -658,7 +670,7 @@ fn get_node(hash: &u64, nodes: &Arc<RwLock<HashMap<u64, Node>>>) -> Option<Node>
     }
 }
 
-pub fn split_frame(
+fn split_frame(
     socket: TcpStream,
 ) -> (
     stream::SplitSink<Framed<TcpStream, Codec>>,

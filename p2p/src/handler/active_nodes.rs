@@ -42,28 +42,27 @@ use super::super::get_active_nodes;
 use super::super::send as p2p_send;
 
 pub fn send(nodes: Arc<RwLock<HashMap<u64, Node>>>) {
-    
-    let active: Vec<Node> = get_active_nodes(nodes.clone());;
+    let active: Vec<Node> = get_active_nodes(nodes.clone());
     let len: usize = active.len();
-    if len > 0 {    
+    if len > 0 {
         let random = random::<usize>() % len;
         let hash = active[random].get_hash();
         debug!(target: "p2p", "active_nodes/send:  hash {}", &hash);
         p2p_send(
-            hash, 
+            hash,
             ChannelBuffer::new1(
-                VERSION::V0.value(), 
-                MODULE::P2P.value(), 
-                ACTION::ACTIVENODESREQ.value(), 
-                0
+                VERSION::V0.value(),
+                MODULE::P2P.value(),
+                ACTION::ACTIVENODESREQ.value(),
+                0,
             ),
-            nodes
+            nodes,
         );
     }
 }
 
 pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
-    debug!(target: "p2p", "active_nodes/receive_req");    
+    debug!(target: "p2p", "active_nodes/receive_req");
 
     let mut cb_out = ChannelBuffer::new();
     cb_out.head.ver = VERSION::V0.value();
@@ -100,16 +99,21 @@ pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     p2p_send(hash, cb_out, nodes);
 }
 
-pub fn receive_res(hash: u64, cb_in: ChannelBuffer, temp: Arc<Mutex<VecDeque<TempNode>>>, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn receive_res(
+    hash: u64,
+    cb_in: ChannelBuffer,
+    temp: Arc<Mutex<VecDeque<TempNode>>>,
+    nodes: Arc<RwLock<HashMap<u64, Node>>>,
+)
+{
     debug!(target: "p2p", "active_nodes/receive_res");
 
     let (node_count, rest) = cb_in.body.split_at(1);
     let mut temp_list = Vec::new();
     if node_count[0] > 0 {
         // TODO: update node status with healthy active nodes msg
-        // TODO: max active nodes filter        
+        // TODO: max active nodes filter
         for _i in 0..node_count[0] as u32 {
-            
             let (id, rest) = rest.split_at(NODE_ID_LENGTH);
             let (ip, rest) = rest.split_at(IP_LENGTH);
             let (mut port, rest) = rest.split_at(mem::size_of::<u32>());
@@ -121,16 +125,15 @@ pub fn receive_res(hash: u64, cb_in: ChannelBuffer, temp: Arc<Mutex<VecDeque<Tem
 
             // TODO: complete if should add
             temp_list.push(temp);
-
         }
         if let Ok(mut lock) = temp.try_lock() {
             for t in temp_list.iter() {
-                lock.push_back(t.to_owned());                
+                lock.push_back(t.to_owned());
             }
         }
     }
-    
-    if let Ok(mut lock) = nodes.try_write(){
+
+    if let Ok(mut lock) = nodes.try_write() {
         if let Some(node) = lock.get_mut(&hash) {
             node.update();
         }

@@ -83,7 +83,7 @@ impl IpAddr {
             port: 0,
         }
     }
-    pub fn new1(ip: [u8; 8], port: u32) -> IpAddr{
+    pub fn new1(ip: [u8; 8], port: u32) -> IpAddr {
         IpAddr {
             ip,
             port,
@@ -93,7 +93,8 @@ impl IpAddr {
     // TODO: merge with new1
     pub fn parse(sa: SocketAddr) -> IpAddr {
         let mut addr = IpAddr::new();
-        addr.ip.copy_from_slice(&convert_ip_string(sa.ip().to_string()));
+        addr.ip
+            .copy_from_slice(&convert_ip_string(sa.ip().to_string()));
         addr.port = sa.port() as u32;
         addr
     }
@@ -128,16 +129,15 @@ impl IpAddr {
 pub struct TempNode {
     pub id: [u8; NODE_ID_LENGTH],
     pub addr: IpAddr,
-    pub if_seed: bool
+    pub if_seed: bool,
 }
 
 impl TempNode {
-
-    pub fn new(id: [u8; NODE_ID_LENGTH], addr: IpAddr, if_seed: bool) -> TempNode{
-        TempNode{
-            id, 
+    pub fn new(id: [u8; NODE_ID_LENGTH], addr: IpAddr, if_seed: bool) -> TempNode {
+        TempNode {
+            id,
             addr,
-            if_seed
+            if_seed,
         }
     }
 
@@ -146,7 +146,7 @@ impl TempNode {
         TempNode {
             id: [b'0'; NODE_ID_LENGTH],
             addr: IpAddr::new(),
-            if_seed: false
+            if_seed: false,
         }
     }
 
@@ -168,12 +168,10 @@ impl TempNode {
     //     calculate_hash(&text)
     // }
 
-    pub fn get_id_string(&self) -> String {
-        String::from_utf8_lossy(&self.id).into()
-    }
+    pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
 
     // construct node from seed config
-    // constrait check 
+    // constrait check
     // TODO: return Option<TempNode>
     pub fn new_from_str(node_str: String) -> TempNode {
         let (_, node_str) = node_str.split_at(PROTOCOL_LENGTH);
@@ -192,13 +190,14 @@ impl TempNode {
         }
 
         let mut addr = IpAddr::new();
-        addr.ip.copy_from_slice(&convert_ip_string(ip_str.to_string()));
+        addr.ip
+            .copy_from_slice(&convert_ip_string(ip_str.to_string()));
         addr.port = port_str.parse::<u32>().unwrap_or(30303);
 
         TempNode {
             id,
             addr,
-            if_seed: true 
+            if_seed: true,
         }
     }
 }
@@ -206,7 +205,7 @@ impl TempNode {
 #[derive(Clone, PartialEq)]
 pub enum Connection {
     INBOUND,
-    OUTBOUND
+    OUTBOUND,
 }
 
 impl fmt::Display for Connection {
@@ -235,28 +234,31 @@ pub struct Node {
     pub state: STATE,
     pub connection: Connection,
     pub if_seed: bool,
-    pub update: SystemTime
-
-    // chris
-    // TODO: move to sync
-    // pub synced_block_num: u64,
-    // pub target_total_difficulty: U256,
-    // pub current_pow_total_difficulty: U256,
-    // pub current_pos_total_difficulty: U256,
-    // pub current_total_difficulty: U256,
-    // pub mode: Mode,
-    // pub state_code: u32,
-    // pub last_request_timestamp: SystemTime,
-    // pub last_request_num: u64,
-    // pub last_broadcast_timestamp: SystemTime,
-    // pub last_sent_transactions: HashSet<H256>,
-    // pub repeated: u8,
+    pub update: SystemTime, // chris
+                            // TODO: move to sync
+                            // pub synced_block_num: u64,
+                            // pub target_total_difficulty: U256,
+                            // pub current_pow_total_difficulty: U256,
+                            // pub current_pos_total_difficulty: U256,
+                            // pub current_total_difficulty: U256,
+                            // pub mode: Mode,
+                            // pub state_code: u32,
+                            // pub last_request_timestamp: SystemTime,
+                            // pub last_request_num: u64,
+                            // pub last_broadcast_timestamp: SystemTime,
+                            // pub last_sent_transactions: HashSet<H256>,
+                            // pub repeated: u8
 }
 
 impl Node {
-
     // construct inbound node
-    pub fn new_outbound(sa: SocketAddr, tx: mpsc::Sender<ChannelBuffer>, id: [u8; NODE_ID_LENGTH], if_seed: bool) -> Node {
+    pub fn new_outbound(
+        sa: SocketAddr,
+        tx: mpsc::Sender<ChannelBuffer>,
+        id: [u8; NODE_ID_LENGTH],
+        if_seed: bool,
+    ) -> Node
+    {
         Node {
             hash: 0,
             id,
@@ -272,14 +274,14 @@ impl Node {
             state: STATE::CONNECTED,
             connection: Connection::OUTBOUND,
             if_seed,
-            update: SystemTime::now()           
+            update: SystemTime::now(),
         }
     }
 
     // construct outbound node
     pub fn new_inbound(sa: SocketAddr, tx: mpsc::Sender<ChannelBuffer>, if_seed: bool) -> Node {
         Node {
-            hash: 0, 
+            hash: 0,
             id: [b'0'; NODE_ID_LENGTH],
             net_id: 0,
             addr: IpAddr::parse(sa),
@@ -293,11 +295,11 @@ impl Node {
             state: STATE::CONNECTED,
             connection: Connection::INBOUND,
             if_seed,
-            update: SystemTime::now()
+            update: SystemTime::now(),
         }
     }
 
-    pub fn get_hash(&self) -> u64{
+    pub fn get_hash(&self) -> u64 {
         let ip = self.addr.get_ip();
         // let list = vec![String::from(from_utf8(&self.id).unwrap()), ip];
         // let text = list.join("").to_string();
@@ -308,12 +310,10 @@ impl Node {
         hash
     }
 
-    pub fn get_id_string(&self) -> String {
-        String::from_utf8_lossy(&self.id).into()
-    }
+    pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
 
-    // refresh update field (timestamp) 
-    // prevent to be removed 
+    // refresh update field (timestamp)
+    // prevent to be removed
     pub fn update(&mut self) {
         debug!(target: "p2p", "node timestamp updated");
         self.update = SystemTime::now();
@@ -332,11 +332,11 @@ pub fn convert_ip_string(ip_str: String) -> [u8; 8] {
         ip[5] = ip_vec[2].parse::<u8>().unwrap_or(0);
         ip[6] = 0;
         ip[7] = ip_vec[3].parse::<u8>().unwrap_or(0);
-    } 
+    }
     ip
 }
 
-// TODO 
+// TODO
 #[cfg(test)]
 mod node_tests {
 

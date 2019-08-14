@@ -64,6 +64,7 @@ use p2p::Config;
 // use p2p::states::STATE::CONNECTED;
 // use p2p::states::STATE::ALIVE;
 use p2p::Mgr;
+use p2p::send;
 use p2p::register;
 use sync::route::VERSION;
 use sync::route::MODULE;
@@ -80,6 +81,7 @@ use sync::storage::SyncState;
 use sync::storage::SyncStatus;
 use sync::storage::SyncStorage;
 use sync::storage::TransactionStats;
+use p2p::get_random_active_node_hash;
 
 const STATUS_REQ_INTERVAL: u64 = 2;
 const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
@@ -403,14 +405,16 @@ impl Sync {
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_STATUS))
                 .for_each(move |_| {
                     // make it constant
-                    // let mut cb = ChannelBuffer::new();
-                    // cb.head.ver = VERSION::V0.value();
-                    // cb.head.ctrl = MODULE::SYNC.value();
-                    // cb.head.action = ACTION::STATUSREQ.value();
-                    // cb.head.len = 0;
-                    // p2p.send(node_hash, cb);
+                    if let Some(hash) = get_random_active_node_hash(nodes.clone()) {
+                        let mut cb = ChannelBuffer::new();
+                        cb.head.ver = VERSION::V0.value();
+                        cb.head.ctrl = MODULE::SYNC.value();
+                        cb.head.action = ACTION::STATUSREQ.value();
+                        cb.head.len = 0;
+                        send(hash, cb, nodes.clone());
+                    }
 
-                    // p2p.get_node_by_td(10);
+                    //                     p2p.get_node_by_td(10);
                     Ok(())
                 })
                 .map_err(|err| error!(target: "p2p", "executor status: {:?}", err)),

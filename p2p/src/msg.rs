@@ -45,7 +45,7 @@ impl Head {
             ver,
             ctrl,
             action,
-            len
+            len,
         }
     }
 }
@@ -64,7 +64,7 @@ impl ChannelBuffer {
         }
     }
     // temporiy name it for it now
-    pub fn new1(ver: u16, ctrl: u8, action: u8, len: u32) -> ChannelBuffer{
+    pub fn new1(ver: u16, ctrl: u8, action: u8, len: u32) -> ChannelBuffer {
         ChannelBuffer {
             head: Head::new1(ver, ctrl, action, len),
             body: Vec::new(),

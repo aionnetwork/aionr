@@ -30,13 +30,18 @@ use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
 use sync::storage::SyncStorage;
-use p2p::send as p2p_send;
 use p2p::ChannelBuffer;
 use p2p::Node;
+use p2p::send as p2p_send;
 
 const HASH_LENGTH: usize = 32;
 
-pub fn receive_req(hash: u64, cb_in: Option<ChannelBuffer>, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn receive_req(
+    hash: u64,
+    cb_in: Option<ChannelBuffer>,
+    nodes: Arc<RwLock<HashMap<u64, Node>>>,
+)
+{
     debug!(target: "sync", "status/receive_req");
 
     let mut cb = ChannelBuffer::new();
@@ -48,16 +53,17 @@ pub fn receive_req(hash: u64, cb_in: Option<ChannelBuffer>, nodes: Arc<RwLock<Ha
     let mut res_body = Vec::new();
     let chain_info = SyncStorage::get_chain_info();
 
-    let mut best_block_number = [0; 8];
-    BigEndian::write_u64(&mut best_block_number, chain_info.best_block_number);
+    let mut best_block_number = [2u8; 8];
+    //    BigEndian::write_u64(&mut best_block_number, chain_info.best_block_number);
 
     let total_difficulty = chain_info.total_difficulty;
-    let best_hash = chain_info.best_block_hash;
+    //    let best_hash = chain_info.best_block_hash;
+    let best_hash = H256::from("0x12345");
     let genesis_hash = chain_info.genesis_hash;
 
     res_body.put_slice(&best_block_number);
 
-    let mut total_difficulty_buf = [0u8; 32];
+    let mut total_difficulty_buf = [1u8; 32];
     total_difficulty.to_big_endian(&mut total_difficulty_buf);
 
     res_body.push(32 as u8);
@@ -67,36 +73,43 @@ pub fn receive_req(hash: u64, cb_in: Option<ChannelBuffer>, nodes: Arc<RwLock<Ha
 
     cb.body.put_slice(res_body.as_slice());
     cb.head.len = cb.body.len() as u32;
-    
+
     p2p_send(hash, cb, nodes);
 }
 
-pub fn receive_res(hash: u64, cb_in: Option<ChannelBuffer>, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn receive_res(
+    hash: u64,
+    cb_in: Option<ChannelBuffer>,
+    nodes: Arc<RwLock<HashMap<u64, Node>>>,
+)
+{
     trace!(target: "sync", "status/receive_res");
 
     match nodes.try_write() {
         Ok(mut write) => {
             match write.get_mut(&hash) {
                 Some(mut node) => {
-                   
                     let req = cb_in.unwrap();
-                    let (mut best_block_num, req_body_rest) = req.body.split_at(mem::size_of::<u64>());
+                    let (mut best_block_num, req_body_rest) =
+                        req.body.split_at(mem::size_of::<u64>());
                     let best_block_num = best_block_num.read_u64::<BigEndian>().unwrap_or(0);
-                    let (mut total_difficulty_len, req_body_rest) = req_body_rest.split_at(mem::size_of::<u8>());
+                    let (mut total_difficulty_len, req_body_rest) =
+                        req_body_rest.split_at(mem::size_of::<u8>());
                     let total_difficulty_len = total_difficulty_len.read_u8().unwrap_or(0) as usize;
-                    let (total_difficulty, req_body_rest) = req_body_rest.split_at(total_difficulty_len);
+                    let (total_difficulty, req_body_rest) =
+                        req_body_rest.split_at(total_difficulty_len);
                     let (best_hash, req_body_rest) = req_body_rest.split_at(HASH_LENGTH);
                     let (_genesis_hash, _) = req_body_rest.split_at(HASH_LENGTH);
 
                     node.block_hash = H256::from(best_hash);
                     node.block_num = best_block_num;
                     node.total_difficulty = U256::from(total_difficulty);
-                },
+                }
                 None => {
-                    // TODO: 
+                    // TODO:
                 }
             }
-        },
+        }
         Err(err) => {
             //TODO:
         }
@@ -107,7 +120,6 @@ pub fn receive_res(hash: u64, cb_in: Option<ChannelBuffer>, nodes: Arc<RwLock<Ha
     //     node.synced_block_num = chain_info.best_block_number;
     //     node.current_total_difficulty = chain_info.total_difficulty;
     // }
-    
 
     // internal comparing node td vs current network status td
     //SyncStorage::update_network_status(
@@ -120,6 +132,6 @@ pub fn receive_res(hash: u64, cb_in: Option<ChannelBuffer>, nodes: Arc<RwLock<Ha
     // even headers::get_headers_from_node has condition check internally
     // TODO: leave condition check in one place
     //if node.total_difficulty >= SyncStorage::get_chain_info().total_difficulty {
-        // headers::get_headers_from_node(node);
+    // headers::get_headers_from_node(node);
     //}
 }

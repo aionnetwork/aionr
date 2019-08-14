@@ -43,12 +43,12 @@ impl Config {
 
     /// get id & binding
     pub fn get_id_and_binding(&self) -> (String, String) {
-        let local = &self.local_node.clone().replace("\"", ""); 
+        let local = &self.local_node.clone().replace("\"", "");
         let (_, node_str) = local.split_at(6);
         let (id_str, binding_str) = node_str.split_at(36);
         (
             String::from(id_str),
-            String::from(binding_str.replace("@", ""))
+            String::from(binding_str.replace("@", "")),
         )
     }
 
@@ -56,6 +56,9 @@ impl Config {
     pub fn get_ip_and_port(&self) -> (String, u32) {
         let (id, binding) = &self.get_id_and_binding();
         let frags: Vec<&str> = binding.split(":").collect::<Vec<&str>>();
-        (String::from(frags[0]), String::from(frags[1]).parse::<u32>().unwrap())
+        (
+            String::from(frags[0]),
+            String::from(frags[1]).parse::<u32>().unwrap(),
+        )
     }
 }

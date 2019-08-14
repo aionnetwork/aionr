@@ -46,7 +46,15 @@ use super::super::send as p2p_send;
 const VERSION: &str = "02";
 
 // TODO: validate len
-pub fn send(hash: u64, id: String, net_id: u32, ip: String, port: u32, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn send(
+    hash: u64,
+    id: String,
+    net_id: u32,
+    ip: String,
+    port: u32,
+    nodes: Arc<RwLock<HashMap<u64, Node>>>,
+)
+{
     debug!(target: "p2p", "handshake/send");
 
     // header
@@ -54,36 +62,36 @@ pub fn send(hash: u64, id: String, net_id: u32, ip: String, port: u32, nodes: Ar
     req.head.ver = VERSION::V0.value();
     req.head.ctrl = MODULE::P2P.value();
     req.head.action = ACTION::HANDSHAKEREQ.value();
-    
+
     // write id
     req.body.put_slice(id.as_bytes());
-    
+
     // write net_id
     let mut net_id_bytes = [0; 4];
     BigEndian::write_u32(&mut net_id_bytes, net_id);
     req.body.put_slice(&net_id_bytes);
-    
+
     // write ip
     req.body.put_slice(&convert_ip_string(ip));
-    
+
     // write port
     let mut port_bytes = [0; 4];
     BigEndian::write_u32(&mut port_bytes, port);
     req.body.put_slice(&port_bytes);
-    
+
     // write revision
     let mut revision = short_version();
     revision.insert_str(0, REVISION_PREFIX);
     req.body.push(revision.len() as u8);
     req.body.put_slice(revision.as_bytes());
-    
+
     // write version
     req.body.push((VERSION.len() / 2) as u8);
     req.body.put_slice(VERSION.as_bytes());
-    
+
     // get bodylen
     req.head.len = req.body.len() as u32;
-    
+
     // send
     p2p_send(hash, req, nodes);
 }
@@ -91,7 +99,13 @@ pub fn send(hash: u64, id: String, net_id: u32, ip: String, port: u32, nodes: Ar
 /// 1. decode handshake msg
 /// 2. validate and prove incoming connection to active
 /// 3. acknowledge sender if it is proved
-pub fn receive_req(hash: u64, cb_in: ChannelBuffer, config: Arc<Config>, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn receive_req(
+    hash: u64,
+    cb_in: ChannelBuffer,
+    config: Arc<Config>,
+    nodes: Arc<RwLock<HashMap<u64, Node>>>,
+)
+{
     debug!(target: "p2p", "handshake/receive_req");
 
     let (node_id, req_body_rest) = cb_in.body.split_at(NODE_ID_LENGTH);
@@ -112,14 +126,15 @@ pub fn receive_req(hash: u64, cb_in: ChannelBuffer, config: Arc<Config>, nodes: 
     let version_len = version_len[0] as usize;
     let (_version, _rest) = rest.split_at(version_len);
 
-    if let Ok(mut write) = nodes.try_write(){
+    if let Ok(mut write) = nodes.try_write() {
         if let Some(mut node) = write.get_mut(&hash) {
             debug!(target: "p2p", "inbound node state: connected -> active");
             node.id.copy_from_slice(node_id);
             // node.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
             node.state = STATE::ACTIVE;
             if revision_len > MAX_REVISION_LENGTH {
-                node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
+                node.revision[0..MAX_REVISION_LENGTH]
+                    .copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
             } else {
                 node.revision[0..revision_len].copy_from_slice(revision);
             }
@@ -135,17 +150,17 @@ pub fn receive_req(hash: u64, cb_in: ChannelBuffer, config: Arc<Config>, nodes: 
             res_body.push(revision.len() as u8);
             res_body.put_slice(revision.as_bytes());
             cb_out.body.put_slice(res_body.as_slice());
-            cb_out.head.len = cb_out.body.len() as u32; 
+            cb_out.head.len = cb_out.body.len() as u32;
 
             let mut tx = node.tx.clone();
             match tx.try_send(cb_out) {
                 Ok(_) => trace!(target: "p2p", "succeed sending handshake res"),
-                Err(err) => { 
-                    error!(target: "p2p", "failed sending handshake res: {:?}", err); 
+                Err(err) => {
+                    error!(target: "p2p", "failed sending handshake res: {:?}", err);
                 }
-            }    
+            }
         }
-    } 
+    }
 }
 
 /// 1. decode handshake res msg
@@ -158,12 +173,12 @@ pub fn receive_res<'a>(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMa
     let revision_len = revision_len[0] as usize;
     let (revision_bytes, _rest) = rest.split_at(revision_len);
 
-    if let Ok(mut write) = nodes.try_write(){
+    if let Ok(mut write) = nodes.try_write() {
         if let Some(mut node) = write.get_mut(&hash) {
-
             // TODO: math::low
             if revision_len > MAX_REVISION_LENGTH {
-                node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision_bytes[..MAX_REVISION_LENGTH]);
+                node.revision[0..MAX_REVISION_LENGTH]
+                    .copy_from_slice(&revision_bytes[..MAX_REVISION_LENGTH]);
             } else {
                 node.revision[0..revision_len].copy_from_slice(revision_bytes);
             }

@@ -40,7 +40,6 @@ pub enum SyncEvent {
 
 impl SyncEvent {
     pub fn update_node_state(node: &mut Node, event: SyncEvent) {
-        
         // let state_code = node.state_code;
 
         match event {
