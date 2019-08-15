@@ -50,7 +50,7 @@ mod handler;
 use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
-use std::collections::VecDeque;
+use std::collections::{VecDeque,BTreeMap};
 use std::sync::{Mutex,RwLock};
 use std::time::Duration;
 use std::time::SystemTime;
@@ -129,7 +129,14 @@ impl Mgr {
     }
 
     /// run p2p instance
-    pub fn run(&self) {
+    pub fn run<F, T>(&self, sync_handler: Arc<F>, headers: Arc<RwLock<BTreeMap<u64, T>>>)
+    where
+        F: Fn(u64, ChannelBuffer, Arc<RwLock<HashMap<u64, Node>>>, Arc<RwLock<BTreeMap<u64, T>>>)
+            + 'static
+            + Send
+            + Sync,
+        T: 'static + Send + Sync,
+    {
         // counters
         // TODO: organize counters
         let executor = Arc::new(self.runtime.executor());
@@ -258,7 +265,8 @@ impl Mgr {
         let executor_outbound = executor.clone();
         let executor_outbound_0 = executor_outbound.clone();
         let nodes_outbound_0 = nodes.clone();
-        let handlers_out = handlers.clone();
+        let handlers_out0 = sync_handler.clone();
+        let headers_out = headers.clone();
         // TODO: batch outbound connecting
         executor_outbound.spawn(
             Interval::new(
@@ -315,13 +323,15 @@ impl Mgr {
                     let executor_outbound_2 = executor_outbound_0.clone();
                     let executor_outbound_3 = executor_outbound_0.clone();
 
-                    let handlers_out = handlers_out.clone();
+                    let handlers_out1 = handlers_out0.clone();
+                    let headers_out = headers_out.clone();
 
                     if let Ok(addr) = temp_node.addr.to_string().parse() {
                         debug!(target: "p2p", "connecting to: {}", &addr);
                         executor_outbound_0.spawn(lazy(move||{
                             let config_outbound_1 = config_outbound_0;
-                            let handlers_out = handlers_out.clone();
+                            let handlers_out2 = handlers_out1.clone();
+                            let headers_out = headers_out.clone();
                             TcpStream::connect(&addr)
                             .map(move |ts: TcpStream| {
                                 debug!(target: "p2p", "connected to: {}", &temp_node.addr.to_string());
@@ -352,7 +362,8 @@ impl Mgr {
 
                                 // binding io futures
                                 let config_outbound_3 = config_outbound_2.clone();
-                                let handlers_out = handlers_out.clone();
+                                let handlers_out3 = handlers_out2.clone();
+                                let headers_out = headers_out.clone();
                                 let (sink, stream) = split_frame(ts);
                                 let read = stream.for_each(move |cb| {
 
@@ -362,7 +373,7 @@ impl Mgr {
 
                                     if let Some(node) = get_node(&hash, &nodes_outbound_4) {
                                         // chris
-                                        handle(hash.clone(), cb, config_outbound_4,  handlers_out.clone(),temp_outbound_2, nodes_outbound_5.clone());
+                                        handle(hash.clone(), cb, config_outbound_4,  handlers_out3.clone(),temp_outbound_2, nodes_outbound_5.clone(), headers_out.clone());
                                     }
                                     Ok(())
                                 }).map_err(move|err|{error!(target: "p2p", "read: {:?}", err)});
@@ -407,7 +418,8 @@ impl Mgr {
         let executor_inbound = executor.clone();
         let executor_inbound_0 = executor_inbound.clone();
         let nodes_inbound_0 = nodes.clone();
-        let handlers_in = handlers.clone();
+        let handlers_in0 = sync_handler.clone();
+        let headers_in = headers.clone();
         let listener = TcpListener::bind(&binding).expect("binding failed");
         let server = listener
             .incoming()
@@ -449,7 +461,8 @@ impl Mgr {
                 let temp_inbound_1 = temp_inbound_0.clone();
                 let config_inbound_1 = config_inbound_0;
 
-                let handlers_in = handlers_in.clone();
+                let handlers_in1 = handlers_in0.clone();
+                let headers_in = headers_in.clone();
 
                 let (sink, stream) = split_frame(ts);
                 let read = stream.for_each(move |cb| {
@@ -459,7 +472,7 @@ impl Mgr {
 
                         let nodes_inbound_3 = nodes_inbound_2.clone();
                         // chris
-                        handle(hash, cb, config_inbound_2, handlers_in.clone(),temp_inbound_2, nodes_inbound_3);
+                        handle(hash, cb, config_inbound_2, handlers_in1.clone(),temp_inbound_2, nodes_inbound_3, headers_in.clone());
                     }
                     Ok(())
                 });
@@ -516,7 +529,7 @@ pub fn register(
     f: fn(hash: u64, cb: Option<ChannelBuffer>, nodes: Arc<RwLock<HashMap<u64, Node>>>),
 )
 {
-    let route: u32 = ((ver as u32) << 16) + ((ctrl as u32) << 8) + (action as u32);
+    let route: u32 = ChannelBuffer::to_route(ver, ctrl, action);
     println!("!!!!!!!!!!{:?}", route);
     if let Ok(mut write) = handlers.write() {
         write.insert(route, f);
@@ -525,21 +538,19 @@ pub fn register(
 
 /// messages with module code other than p2p module
 /// should flow into external handlers
-fn handle(
+fn handle<F, T>(
     hash: u64,
     cb: ChannelBuffer,
     config: Arc<Config>,
-    handlers: Arc<
-        RwLock<
-            HashMap<
-                u32,
-                fn(hash: u64, cb: Option<ChannelBuffer>, nodes: Arc<RwLock<HashMap<u64, Node>>>),
-            >,
-        >,
-    >,
+    handler: Arc<F>,
     temp: Arc<Mutex<VecDeque<TempNode>>>,
     nodes: Arc<RwLock<HashMap<u64, Node>>>,
-)
+    headers: Arc<RwLock<BTreeMap<u64, T>>>,
+) where
+    F: Fn(u64, ChannelBuffer, Arc<RwLock<HashMap<u64, Node>>>, Arc<RwLock<BTreeMap<u64, T>>>)
+        + Send
+        + Sync,
+    T: Send + Sync,
 {
     trace!(target: "p2p", "handle: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
 
@@ -556,21 +567,21 @@ fn handle(
                     };
                 }
                 MODULE::EXTERNAL => {
-                    let route: u32 =
-                        (cb.head.ver as u32) << 16 + (cb.head.ctrl as u32) << 8 + cb.head.action;
-                    match handlers.read() {
-                        Ok(read) => {
-                            match read.get(&route) {
-                                Some(handler) => {
-                                    handler(hash, Some(cb), nodes);
-                                }
-                                None => {
-                                    println!("fuck !!!!!");
-                                }
-                            }
-                        }
-                        Err(_err) => {}
-                    }
+                    handler(hash, cb, nodes, headers);
+                    //                    let route = ChannelBuffer::to_route(cb.head.ver,cb.head.ctrl,cb.head.action);
+                    //                    match handlers.read() {
+                    //                        Ok(read) => {
+                    //                            match read.get(&route) {
+                    //                                Some(handler) => {
+                    //                                    handler(hash, Some(cb), nodes);
+                    //                                }
+                    //                                None => {
+                    //                                    println!("fuck !!!!!");
+                    //                                }
+                    //                            }
+                    //                        }
+                    //                        Err(_err) => {}
+                    //                    }
                 }
             }
         }
@@ -615,6 +626,17 @@ pub fn get_random_active_node_hash(nodes: Arc<RwLock<HashMap<u64, Node>>>) -> Op
     if len > 0 {
         let random = random::<usize>() % len;
         Some(active[random].get_hash())
+    } else {
+        None
+    }
+}
+
+pub fn get_random_active_node(nodes: Arc<RwLock<HashMap<u64, Node>>>) -> Option<Node> {
+    let active: Vec<Node> = get_active_nodes(nodes.clone());
+    let len: usize = active.len();
+    if len > 0 {
+        let random = random::<usize>() % len;
+        Some(active[random].clone())
     } else {
         None
     }

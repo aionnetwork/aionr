@@ -70,4 +70,8 @@ impl ChannelBuffer {
             body: Vec::new(),
         }
     }
+
+    pub fn to_route(ver: u16, ctrl: u8, action: u8) -> u32 {
+        ((ver as u32) << 16) + ((ctrl as u32) << 8) + (action as u32)
+    }
 }

@@ -36,12 +36,7 @@ use p2p::send as p2p_send;
 
 const HASH_LENGTH: usize = 32;
 
-pub fn receive_req(
-    hash: u64,
-    cb_in: Option<ChannelBuffer>,
-    nodes: Arc<RwLock<HashMap<u64, Node>>>,
-)
-{
+pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     debug!(target: "sync", "status/receive_req");
 
     let mut cb = ChannelBuffer::new();
@@ -78,22 +73,16 @@ pub fn receive_req(
     p2p_send(hash, cb, nodes);
 }
 
-pub fn receive_res(
-    hash: u64,
-    cb_in: Option<ChannelBuffer>,
-    nodes: Arc<RwLock<HashMap<u64, Node>>>,
-)
-{
+pub fn receive_res(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     trace!(target: "sync", "status/receive_res");
 
     match nodes.try_write() {
         Ok(mut write) => {
             match write.get_mut(&hash) {
                 Some(mut node) => {
-                    let req = cb_in.unwrap();
-                    trace!(target: "sync", "cb_body_len{}",req.head.len);
+                    trace!(target: "sync", "cb_body_len{}",cb_in.head.len);
                     let (mut best_block_num, req_body_rest) =
-                        req.body.split_at(mem::size_of::<u64>());
+                        cb_in.body.split_at(mem::size_of::<u64>());
                     let best_block_num = best_block_num.read_u64::<BigEndian>().unwrap_or(0);
                     let (mut total_difficulty_len, req_body_rest) =
                         req_body_rest.split_at(mem::size_of::<u8>());

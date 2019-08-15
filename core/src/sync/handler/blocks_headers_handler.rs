@@ -147,7 +147,7 @@
 //         let mut req = ChannelBuffer::new();
 //         req.head.ver = VERSION::V0.value();
 //         req.head.ctrl = MODULE::SYNC.value();
-//         req.head.action = ACTION::BLOCKSHEADERSREQ.value();
+//         req.head.action = ACTION::HEADERSREQ.value();
 
 //         let mut from_buf = [0; 8];
 //         BigEndian::write_u64(&mut from_buf, from);
@@ -163,7 +163,7 @@
 //     }
 
 //     pub fn handle_blocks_headers_req(node: &mut Node, req: ChannelBuffer) {
-//         trace!(target: "sync", "BLOCKSHEADERSREQ received.");
+//         trace!(target: "sync", "HEADERSREQ received.");
 
 //         let client = SyncStorage::get_block_chain();
 
@@ -172,7 +172,7 @@
 
 //         res.head.ver = VERSION::V0.value();
 //         res.head.ctrl = MODULE::SYNC.value();
-//         res.head.action = ACTION::BLOCKSHEADERSRES.value();
+//         res.head.action = ACTION::HEADERSRES.value();
 
 //         let mut res_body = Vec::new();
 
@@ -212,7 +212,7 @@
 //     }
 
 //     pub fn handle_blocks_headers_res(node: &mut Node, req: ChannelBuffer) {
-//         trace!(target: "sync", "BLOCKSHEADERSRES received.");
+//         trace!(target: "sync", "HEADERSRES received.");
 
 //         let node_hash = node.node_hash;
 //         let rlp = UntrustedRlp::new(req.body.as_slice());

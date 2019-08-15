@@ -22,11 +22,12 @@
 mod event;
 mod handler;
 mod route;
+mod helper;
 mod storage;
 #[cfg(test)]
 mod test;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap,HashMap};
 use std::ops::Index;
 use std::sync::RwLock;
 use std::sync::Arc;
@@ -39,13 +40,15 @@ use client::BlockId;
 use client::BlockStatus;
 use client::ChainNotify;
 use transaction::UnverifiedTransaction;
-use aion_types::H256;
+use aion_types::{H256,U256};
 use futures::Future;
 use futures::Stream;
 use rlp::UntrustedRlp;
 use tokio::runtime::Runtime;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
+use bytes::BufMut;
+use byteorder::{BigEndian,ByteOrder};
 
 // chris
 // use p2p::handler::external::Handler;
@@ -71,9 +74,10 @@ use sync::route::MODULE;
 use sync::route::ACTION;
 use sync::handler::status;
 // use sync::handler::bodies;
-// use sync::handler::headers;
+use sync::handler::headers;
 // use sync::handler::broadcast;
 // use sync::handler::import;
+use self::helper::HeadersWrapper;
 
 use sync::storage::ActivePeerInfo;
 use sync::storage::PeerInfo;
@@ -81,13 +85,15 @@ use sync::storage::SyncState;
 use sync::storage::SyncStatus;
 use sync::storage::SyncStorage;
 use sync::storage::TransactionStats;
-use p2p::get_random_active_node_hash;
+use p2p::{get_random_active_node_hash,get_random_active_node};
 
 const STATUS_REQ_INTERVAL: u64 = 2;
 const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
 const BLOCKS_IMPORT_INTERVAL: u64 = 50;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const INTERVAL_STATUS: u64 = 10;
+const INTERVAL_HEADERS: u64 = 2;
+const HEADERS_STEP: u32 = 64;
 
 #[derive(Clone)]
 struct SyncMgr {}
@@ -320,16 +326,16 @@ impl SyncMgr {
         //             ACTION::STATUSRES => {
         //                 status::receive_res(node, req);
         //             }
-        //             ACTION::BLOCKSHEADERSREQ => {
+        //             ACTION::HEADERSREQ => {
         //                 headers::handle_blocks_headers_req(node, req);
         //             }
-        //             ACTION::BLOCKSHEADERSRES => {
+        //             ACTION::HEADERSRES => {
         //                 headers::handle_blocks_headers_res(node, req);
         //             }
-        //             ACTION::BLOCKSBODIESREQ => {
+        //             ACTION::BODIESREQ => {
         //                 bodies::receive_req(node, req);
         //             }
-        //             ACTION::BLOCKSBODIESRES => {
+        //             ACTION::BODIESRES => {
         //                 bodies::receive_res(node, req);
         //             }
         //             ACTION::BROADCASTTX => {
@@ -360,13 +366,15 @@ pub struct Sync {
     runtime: Arc<Runtime>,
     p2p: Arc<Mgr>,
 
+    headers: Arc<RwLock<BTreeMap<u64, HeadersWrapper>>>,
+
     /// network best td
-    td: Arc<RwLock<u64>>,
+    td: Arc<RwLock<U256>>,
 }
 
 impl Sync {
     pub fn new(config: Config, client: Arc<BlockChainClient>) -> Sync {
-        let starting_block_number = client.chain_info().best_block_number;
+        let starting_td = client.chain_info().total_difficulty;
         // TODO: remove
         // SyncStorage::init(client);
         let config = Arc::new(config);
@@ -375,7 +383,8 @@ impl Sync {
             client,
             p2p: Arc::new(Mgr::new(config)),
             runtime: Arc::new(Runtime::new().expect("tokio runtime")),
-            td: Arc::new(RwLock::new(starting_block_number)),
+            headers: Arc::new(RwLock::new(BTreeMap::new())),
+            td: Arc::new(RwLock::new(starting_td)),
         }
     }
 
@@ -384,34 +393,38 @@ impl Sync {
         let runtime = self.runtime.clone();
         let executor = Arc::new(runtime.executor());
         let nodes = self.p2p.nodes.clone();
-        let mut handlers = self.p2p.handlers.clone();
+        //        let mut handlers = self.p2p.handlers.clone();
 
         // register handlers
-        register(0, 1, 0, &mut handlers, status::receive_req);
-        register(0, 1, 1, &mut handlers, status::receive_res);
-        // register(0, 1, 2, &mut handlers, status::receive_req);
-        // register(0, 1, 3, &mut handlers, status::receive_res);
+        //        register(0, 1, 0, &mut handlers, status::receive_req);
+        //        register(0, 1, 1, &mut handlers, status::receive_res);
+        //         register(0, 1, 2, &mut handlers, headers::receive_req);
+        //         register(0, 1, 3, &mut handlers, headers::receive_res);
         // register(0, 1, 4, &mut handlers, status::receive_req);
         // register(0, 1, 5, &mut handlers, status::receive_res);
         // register(0, 1, 6, &mut handlers, status::receive_req);
         // register(0, 1, 7, &mut handlers, status::receive_res);
 
         // init p2p
-        &self.p2p.run();
+        &self.p2p.run(Arc::new(handle), self.headers.clone());
 
         // status
         let executor_status = executor.clone();
+        let nodes_status = nodes.clone();
+        let nodes_headers = nodes.clone();
+        let nodes_send1 = nodes.clone();
+        let nodes_send2 = nodes.clone();
         executor_status.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_STATUS))
                 .for_each(move |_| {
                     // make it constant
-                    if let Some(hash) = get_random_active_node_hash(nodes.clone()) {
+                    if let Some(hash) = get_random_active_node_hash(nodes_status.clone()) {
                         let mut cb = ChannelBuffer::new();
                         cb.head.ver = VERSION::V0.value();
                         cb.head.ctrl = MODULE::SYNC.value();
                         cb.head.action = ACTION::STATUSREQ.value();
                         cb.head.len = 0;
-                        send(hash, cb, nodes.clone());
+                        send(hash, cb, nodes_send1.clone());
                     }
 
                     //                     p2p.get_node_by_td(10);
@@ -419,6 +432,45 @@ impl Sync {
                 })
                 .map_err(|err| error!(target: "p2p", "executor status: {:?}", err)),
         );
+        let executor_headers = executor.clone();
+        executor_headers.spawn(
+            Interval::new(Instant::now(), Duration::from_secs(INTERVAL_HEADERS))
+                .for_each(move |_| {
+                    // make it constant
+                    if let Some(node) = get_random_active_node(nodes_headers.clone()) {
+                        let chain_info = SyncStorage::get_chain_info();
+                        if node.total_difficulty > chain_info.total_difficulty
+                            && node.block_num - HEADERS_STEP as u64 >= chain_info.best_block_number
+                        {
+                            let start = if chain_info.best_block_number > 3 {
+                                chain_info.best_block_number - 3
+                            } else {
+                                1
+                            };
+
+                            let mut cb = ChannelBuffer::new();
+                            cb.head.ver = VERSION::V0.value();
+                            cb.head.ctrl = MODULE::SYNC.value();
+                            cb.head.action = ACTION::HEADERSREQ.value();
+
+                            let mut from_buf = [0u8; 8];
+                            BigEndian::write_u64(&mut from_buf, start);
+                            cb.body.put_slice(&from_buf);
+
+                            let mut size_buf = [0u8; 4];
+                            BigEndian::write_u32(&mut size_buf, HEADERS_STEP);
+                            cb.body.put_slice(&size_buf);
+
+                            cb.head.len = cb.body.len() as u32;
+                            send(node.get_hash(), cb, nodes_send2.clone());
+                        }
+                    }
+
+                    //                     p2p.get_node_by_td(10);
+                    Ok(())
+                })
+                .map_err(|err| error!(target: "p2p", "executor status: {:?}", err)),
+        )
     }
 
     pub fn shutdown(&self) {
@@ -427,6 +479,31 @@ impl Sync {
         let p2p = self.p2p.clone();
         p2p.shutdown();
     }
+}
+
+pub fn handle(
+    hash: u64,
+    cb: ChannelBuffer,
+    nodes: Arc<RwLock<HashMap<u64, Node>>>,
+    hws: Arc<RwLock<BTreeMap<u64, HeadersWrapper>>>,
+)
+{
+    match ACTION::from(cb.head.action) {
+        ACTION::STATUSREQ => {
+            if cb.head.len != 0 {
+                // TODO: kill the node
+            }
+            status::receive_req(hash, nodes)
+        }
+        ACTION::STATUSRES => status::receive_res(hash, cb, nodes),
+        ACTION::HEADERSREQ => headers::receive_req(hash, cb, nodes),
+        ACTION::HEADERSRES => headers::receive_res(hash, cb, nodes, hws),
+        ACTION::BODIESREQ => (),
+        ACTION::BODIESRES => (),
+        ACTION::BROADCASTTX => (),
+        ACTION::BROADCASTBLOCK => (),
+        ACTION::UNKNOWN => (),
+    };
 }
 
 pub trait SyncProvider: Send + ::std::marker::Sync {

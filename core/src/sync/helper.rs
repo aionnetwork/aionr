@@ -19,8 +19,21 @@
  *
  ******************************************************************************/
 
-pub mod status;
-pub mod headers;
-// pub mod bodies;
-// pub mod broadcast;
-// pub mod import;
+use std::time::SystemTime;
+
+#[derive(Clone, PartialEq)]
+pub struct HeadersWrapper {
+    pub node_hash: u64,
+    pub timestamp: SystemTime,
+    pub headers: Vec<Vec<u8>>,
+}
+
+impl HeadersWrapper {
+    pub fn new() -> Self {
+        HeadersWrapper {
+            node_hash: 0,
+            timestamp: SystemTime::now(),
+            headers: Vec::new(),
+        }
+    }
+}

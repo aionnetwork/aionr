@@ -26,6 +26,7 @@ use std::time::SystemTime;
 use block::Block;
 use client::{BlockChainClient, BlockChainInfo, BlockQueueInfo};
 use header::Header;
+use sync::helper::HeadersWrapper;
 use aion_types::{H256, U256};
 use lru_cache::LruCache;
 use crate_state::Storage;
@@ -589,23 +590,6 @@ impl fmt::Display for NetworkStatus {
             try!(write!(f, "{:02X}", item));
         }
         write!(f, "\n")
-    }
-}
-
-#[derive(Clone, PartialEq)]
-pub struct HeadersWrapper {
-    pub node_hash: u64,
-    pub timestamp: SystemTime,
-    pub headers: Vec<Header>,
-}
-
-impl HeadersWrapper {
-    pub fn new() -> Self {
-        HeadersWrapper {
-            node_hash: 0,
-            timestamp: SystemTime::now(),
-            headers: Vec::new(),
-        }
     }
 }
 

@@ -45,7 +45,7 @@ pub fn send() {
     let mut req = ChannelBuffer::new();
     req.head.ver = VERSION::V0.value();
     req.head.ctrl = MODULE::SYNC.value();
-    req.head.action = ACTION::BLOCKSBODIESREQ.value();
+    req.head.action = ACTION::BODIESREQ.value();
 
     let mut hws = Vec::new();
     if let Ok(mut downloaded_headers) = SyncStorage::get_downloaded_headers().try_lock() {
@@ -93,14 +93,14 @@ pub fn send() {
 }
 
 pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
-    trace!(target: "sync", "BLOCKSBODIESREQ received.");
+    trace!(target: "sync", "BODIESREQ received.");
 
     let mut res = ChannelBuffer::new();
     let node_hash = node.node_hash;
 
     res.head.ver = VERSION::V0.value();
     res.head.ctrl = MODULE::SYNC.value();
-    res.head.action = ACTION::BLOCKSBODIESRES.value();
+    res.head.action = ACTION::BODIESRES.value();
 
     let mut res_body = Vec::new();
     let hash_count = req.body.len() / HASH_LEN;
@@ -137,7 +137,7 @@ pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
 }
 
 pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
-    trace!(target: "sync", "BLOCKSBODIESRES received from: {}.", node.get_ip_addr());
+    trace!(target: "sync", "BODIESRES received from: {}.", node.get_ip_addr());
 
     let node_hash = node.node_hash;
     let mut blocks = Vec::new();
