@@ -251,62 +251,62 @@ pub fn import_blocks() {
 
                             node.reset_repeated();
 
-                            match node.mode {
-                                Mode::BACKWARD => {
-                                    info!(target: "sync", "Node: {}, found the fork point #{}, with status {:?}, switched to FORWARD mode", node.get_node_id(), number, status);
-                                    node.mode = Mode::FORWARD;
-                                    update_node_with_mode(node.node_hash, &node);
-                                    // break;
-                                }
-                                Mode::FORWARD => {
-                                    info!(target: "sync", "Node: {}, found the best block #{} with status {:?}, switched to NORMAL mode", node.get_node_id(), number, status);
-                                    node.mode = Mode::NORMAL;
-                                    // info!(target: "sync", "Node: {}, found the best block #{} with status {:?}, switched to NORMAL mode", node.get_node_id(), number, status);
-                                    // node.mode = Mode::NORMAL;
-                                    // ------
-                                    // FIX: Same as above FIX
-                                    // ------
-                                    // if number >= SyncStorage::get_network_best_block_number() {
-                                    //   info!(target: "sync", "Node: {}, found the best block #{} with status {:?}, switched to NORMAL mode", node.get_node_id(), number, status);
-                                    //   node.mode = Mode::NORMAL;
-                                    // }
-                                    update_node_with_mode(node.node_hash, &node);
-                                    // break;
-                                }
-                                _ => {
-                                    if node.synced_block_num + 32
-                                        > SyncStorage::get_network_best_block_number()
-                                    {
-                                        node.mode = Mode::NORMAL;
-                                    } else {
-                                        let (
-                                            normal_nodes_count,
-                                            _,
-                                            _,
-                                            lightning_nodes_count,
-                                            thunder_nodes_count,
-                                        ) = get_nodes_count_all_modes();
-                                        if normal_nodes_count == 0 {
-                                            node.mode = Mode::NORMAL;
-                                        } else if node.target_total_difficulty
-                                            >= SyncStorage::get_network_total_diff()
-                                            && node.synced_block_num + 500
-                                                < SyncStorage::get_network_best_block_number()
-                                            && thunder_nodes_count >= 1
-                                            && lightning_nodes_count
-                                                < (thunder_nodes_count + normal_nodes_count) / 5
-                                        {
-                                            // attempt to jump
-                                            node.mode = Mode::LIGHTNING;
-                                        } else if thunder_nodes_count < normal_nodes_count * 10 {
-                                            node.mode = Mode::THUNDER;
-                                        } else {
-                                            node.mode = Mode::NORMAL;
-                                        }
-                                    }
-                                    update_node_with_mode(node.node_hash, &node);
-                                }
-                            }
+                            //                            match node.mode {
+                            //                                Mode::BACKWARD => {
+                            //                                    info!(target: "sync", "Node: {}, found the fork point #{}, with status {:?}, switched to FORWARD mode", node.get_node_id(), number, status);
+                            //                                    node.mode = Mode::FORWARD;
+                            //                                    update_node_with_mode(node.node_hash, &node);
+                            //                                    // break;
+                            //                                }
+                            //                                Mode::FORWARD => {
+                            //                                    info!(target: "sync", "Node: {}, found the best block #{} with status {:?}, switched to NORMAL mode", node.get_node_id(), number, status);
+                            //                                    node.mode = Mode::NORMAL;
+                            //                                    // info!(target: "sync", "Node: {}, found the best block #{} with status {:?}, switched to NORMAL mode", node.get_node_id(), number, status);
+                            //                                    // node.mode = Mode::NORMAL;
+                            //                                    // ------
+                            //                                    // FIX: Same as above FIX
+                            //                                    // ------
+                            //                                    // if number >= SyncStorage::get_network_best_block_number() {
+                            //                                    //   info!(target: "sync", "Node: {}, found the best block #{} with status {:?}, switched to NORMAL mode", node.get_node_id(), number, status);
+                            //                                    //   node.mode = Mode::NORMAL;
+                            //                                    // }
+                            //                                    update_node_with_mode(node.node_hash, &node);
+                            //                                    // break;
+                            //                                }
+                            //                                _ => {
+                            //                                    if node.synced_block_num + 32
+                            //                                        > SyncStorage::get_network_best_block_number()
+                            //                                    {
+                            //                                        node.mode = Mode::NORMAL;
+                            //                                    } else {
+                            //                                        let (
+                            //                                            normal_nodes_count,
+                            //                                            _,
+                            //                                            _,
+                            //                                            lightning_nodes_count,
+                            //                                            thunder_nodes_count,
+                            //                                        ) = get_nodes_count_all_modes();
+                            //                                        if normal_nodes_count == 0 {
+                            //                                            node.mode = Mode::NORMAL;
+                            //                                        } else if node.target_total_difficulty
+                            //                                            >= SyncStorage::get_network_total_diff()
+                            //                                            && node.synced_block_num + 500
+                            //                                                < SyncStorage::get_network_best_block_number()
+                            //                                            && thunder_nodes_count >= 1
+                            //                                            && lightning_nodes_count
+                            //                                                < (thunder_nodes_count + normal_nodes_count) / 5
+                            //                                        {
+                            //                                            // attempt to jump
+                            //                                            node.mode = Mode::LIGHTNING;
+                            //                                        } else if thunder_nodes_count < normal_nodes_count * 10 {
+                            //                                            node.mode = Mode::THUNDER;
+                            //                                        } else {
+                            //                                            node.mode = Mode::NORMAL;
+                            //                                        }
+                            //                                    }
+                            //                                    update_node_with_mode(node.node_hash, &node);
+                            //                                }
+                            //                            }
                         }
                         Err(BlockImportError::Block(BlockError::UnknownParent(_))) => {
                             if number == 1 {
@@ -369,20 +369,20 @@ pub fn import_blocks() {
                                 {
                                     remove_peer(node.node_hash);
                                 }
-                                match node.mode {
-                                    Mode::LIGHTNING | Mode::THUNDER => {
-                                        warn!(target: "sync", "Unknown block: #{}, node {} run in NORMAL mode now.", number, node.get_node_id());
-                                        node.mode = Mode::NORMAL;
-                                    }
-                                    Mode::FORWARD | Mode::NORMAL => {
-                                        warn!(target: "sync", "Unknown block: #{}, node {} run in BACKWARD mode now.", number, node.get_node_id());
-                                        node.mode = Mode::BACKWARD;
-                                        node.last_request_num = 0;
-                                    }
-                                    Mode::BACKWARD => {
-                                        warn!(target: "sync", "Unknown block: #{}, node {} run in BACKWARD mode.", number, node.get_node_id());
-                                    }
-                                }
+                                //                                match node.mode {
+                                //                                    Mode::LIGHTNING | Mode::THUNDER => {
+                                //                                        warn!(target: "sync", "Unknown block: #{}, node {} run in NORMAL mode now.", number, node.get_node_id());
+                                //                                        node.mode = Mode::NORMAL;
+                                //                                    }
+                                //                                    Mode::FORWARD | Mode::NORMAL => {
+                                //                                        warn!(target: "sync", "Unknown block: #{}, node {} run in BACKWARD mode now.", number, node.get_node_id());
+                                //                                        node.mode = Mode::BACKWARD;
+                                //                                        node.last_request_num = 0;
+                                //                                    }
+                                //                                    Mode::BACKWARD => {
+                                //                                        warn!(target: "sync", "Unknown block: #{}, node {} run in BACKWARD mode.", number, node.get_node_id());
+                                //                                    }
+                                //                                }
                                 update_node_with_mode(node.node_hash, &node);
                                 break;
                             }
@@ -404,13 +404,13 @@ pub fn import_blocks() {
                     }
                 }
 
-                if node.mode == Mode::NORMAL || node.mode == Mode::THUNDER {
-                    node.synced_block_num = SyncStorage::get_synced_block_number();
-
-                    if node.synced_block_num + 8 < SyncStorage::get_network_best_block_number() {
-                        headers::get_headers_from_node(&mut node);
-                    }
-                }
+                //                if node.mode == Mode::NORMAL || node.mode == Mode::THUNDER {
+                //                    node.synced_block_num = SyncStorage::get_synced_block_number();
+                //
+                //                    if node.synced_block_num + 8 < SyncStorage::get_network_best_block_number() {
+                //                        headers::get_headers_from_node(&mut node);
+                //                    }
+                //                }
             }
         }
     }

@@ -54,56 +54,56 @@ pub fn propagate_transactions() {
         return;
     }
 
-    let active_nodes = get_nodes(ALIVE.value());
+    // let active_nodes = get_nodes(ALIVE.value());
 
-    if active_nodes.len() > 0 {
-        let mut req = ChannelBuffer::new();
-        req.head.ver = VERSION::V0.value();
-        req.head.ctrl = MODULE::SYNC.value();
-        req.head.action = ACTION::BROADCASTTX.value();
+    // if active_nodes.len() > 0 {
+    //     let mut req = ChannelBuffer::new();
+    //     req.head.ver = VERSION::V0.value();
+    //     req.head.ctrl = MODULE::SYNC.value();
+    //     req.head.action = ACTION::BROADCASTTX.value();
 
-        let mut txs_rlp = RlpStream::new_list(size);
-        txs_rlp.append_raw(transactions.as_slice(), size);
-        req.body.put_slice(txs_rlp.as_raw());
+    //     let mut txs_rlp = RlpStream::new_list(size);
+    //     txs_rlp.append_raw(transactions.as_slice(), size);
+    //     req.body.put_slice(txs_rlp.as_raw());
 
-        req.head.len = req.body.len() as u32;
+    //     req.head.len = req.body.len() as u32;
 
-        let mut node_count = 0;
-        for node in active_nodes.iter() {
-            send(node.get_hash(), req.clone());
-            trace!(target: "sync", "Sync broadcast new transactions sent...");
-            node_count += 1;
-            if node_count > 10 {
-                break;
-            } else {
-                thread::sleep(Duration::from_millis(50));
-            }
-        }
-        debug!(target: "sync", "Sync broadcasted {} new transactions...", size);
-    }
+    //     let mut node_count = 0;
+    //     for node in active_nodes.iter() {
+    //         // send(node.get_hash(), req.clone());
+    //         trace!(target: "sync", "Sync broadcast new transactions sent...");
+    //         node_count += 1;
+    //         if node_count > 10 {
+    //             break;
+    //         } else {
+    //             thread::sleep(Duration::from_millis(50));
+    //         }
+    //     }
+    //     debug!(target: "sync", "Sync broadcasted {} new transactions...", size);
+    // }
 }
 
 pub fn propagate_blocks(block_hash: &H256, client: Arc<BlockChainClient>) {
     // broadcast new blocks
-    let active_nodes = get_nodes(ALIVE.value());
+    // let active_nodes = get_nodes(ALIVE.value());
 
-    if active_nodes.len() > 0 {
-        let mut req = ChannelBuffer::new();
-        req.head.ver = VERSION::V0.value();
-        req.head.ctrl = MODULE::SYNC.value();
-        req.head.action = ACTION::BROADCASTBLOCK.value();
+    // if active_nodes.len() > 0 {
+    //     let mut req = ChannelBuffer::new();
+    //     req.head.ver = VERSION::V0.value();
+    //     req.head.ctrl = MODULE::SYNC.value();
+    //     req.head.action = ACTION::BROADCASTBLOCK.value();
 
-        if let Some(block_rlp) = client.block(BlockId::Hash(block_hash.clone())) {
-            req.body.put_slice(&block_rlp.into_inner());
+    //     if let Some(block_rlp) = client.block(BlockId::Hash(block_hash.clone())) {
+    //         req.body.put_slice(&block_rlp.into_inner());
 
-            req.head.len = req.body.len() as u32;
+    //         req.head.len = req.body.len() as u32;
 
-            for node in active_nodes.iter() {
-                send(node.node_hash, req.clone());
-                trace!(target: "sync", "Sync broadcast new block sent...");
-            }
-        }
-    }
+    //         for node in active_nodes.iter() {
+    //             // send(node.node_hash, req.clone());
+    //             trace!(target: "sync", "Sync broadcast new block sent...");
+    //         }
+    //     }
+    // }
 }
 
 pub fn receive_block(node: &mut Node, req: ChannelBuffer) {
@@ -143,12 +143,12 @@ pub fn receive_block(node: &mut Node, req: ChannelBuffer) {
                                 Ok(_) => {
                                     trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
                                     imported_block_hashes.insert(hash, 0);
-                                    let active_nodes = get_nodes(ALIVE.value());
-                                    for n in active_nodes.iter() {
-                                        // broadcast new block
-                                        trace!(target: "sync", "Sync broadcast new block sent...");
-                                        send(n.node_hash, req.clone());
-                                    }
+                                    // let active_nodes = get_nodes(ALIVE.value());
+                                    // for n in active_nodes.iter() {
+                                    //     // broadcast new block
+                                    //     trace!(target: "sync", "Sync broadcast new block sent...");
+                                    //     send(n.node_hash, req.clone());
+                                    // }
                                 }
                                 Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
                                     trace!(target: "sync", "New block already in chain {:?}", hash);
@@ -177,11 +177,6 @@ pub fn receive_block(node: &mut Node, req: ChannelBuffer) {
 
 pub fn receive_tx(node: &mut Node, req: ChannelBuffer) {
     trace!(target: "sync", "BROADCASTTX received.");
-
-    // if node.last_broadcast_timestamp + Duration::from_millis(20) > SystemTime::now() {
-    //     // ignore frequent broadcasting
-    //     return;
-    // }
 
     if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number() {
         // Ignore BROADCASTTX message until full synced
@@ -214,5 +209,5 @@ pub fn receive_tx(node: &mut Node, req: ChannelBuffer) {
     }
 
     SyncEvent::update_node_state(node, SyncEvent::OnBroadCastTx);
-    update_node(node.node_hash, node);
+    // update_node(node.node_hash, node);
 }
