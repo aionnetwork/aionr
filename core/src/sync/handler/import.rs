@@ -37,40 +37,40 @@ use sync::storage::SyncStorage;
 use sync::handler::headers;
 
 pub fn import_staged_blocks(hash: &H256) {
-    let mut blocks_to_import = Vec::new();
-    if let Ok(mut staged_blocks) = SyncStorage::get_staged_blocks().lock() {
-        if staged_blocks.contains_key(&hash) {
-            if let Some(blocks_staged) = staged_blocks.remove(hash) {
-                blocks_to_import.extend(blocks_staged);
-            }
-        }
-    }
-
-    if blocks_to_import.len() > 0 {
-        let client = SyncStorage::get_block_chain();
-        let mut enable_import = true;
-        for block in blocks_to_import.iter() {
-            let block_view = BlockView::new(block);
-            let header_view = block_view.header_view();
-            let number = header_view.number();
-            let hash = header_view.hash();
-
-            if enable_import {
-                SyncStorage::insert_requested_time(hash);
-                match client.import_block(block.clone()) {
-                    Ok(_)
-                    | Err(BlockImportError::Import(ImportError::AlreadyInChain))
-                    | Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
-                        trace!(target: "sync", "Staged block #{} imported...", number);
-                    }
-                    Err(e) => {
-                        enable_import = false;
-                        warn!(target: "sync", "Failed to import staged block #{}, due to {:?}", number, e);
-                    }
-                }
-            }
-        }
-    }
+    //    let mut blocks_to_import = Vec::new();
+    //    if let Ok(mut staged_blocks) = SyncStorage::get_staged_blocks().lock() {
+    //        if staged_blocks.contains_key(&hash) {
+    //            if let Some(blocks_staged) = staged_blocks.remove(hash) {
+    //                blocks_to_import.extend(blocks_staged);
+    //            }
+    //        }
+    //    }
+    //
+    //    if blocks_to_import.len() > 0 {
+    //        let client = SyncStorage::get_block_chain();
+    //        let mut enable_import = true;
+    //        for block in blocks_to_import.iter() {
+    //            let block_view = BlockView::new(block);
+    //            let header_view = block_view.header_view();
+    //            let number = header_view.number();
+    //            let hash = header_view.hash();
+    //
+    //            if enable_import {
+    //                SyncStorage::insert_requested_time(hash);
+    //                match client.import_block(block.clone()) {
+    //                    Ok(_)
+    //                    | Err(BlockImportError::Import(ImportError::AlreadyInChain))
+    //                    | Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
+    //                        trace!(target: "sync", "Staged block #{} imported...", number);
+    //                    }
+    //                    Err(e) => {
+    //                        enable_import = false;
+    //                        warn!(target: "sync", "Failed to import staged block #{}, due to {:?}", number, e);
+    //                    }
+    //                }
+    //            }
+    //        }
+    //    }
 }
 
 pub fn import_blocks() {
@@ -106,78 +106,78 @@ pub fn import_blocks() {
 
             if let Some(mut node) = get_node(bw.node_id_hash) {
                 if blocks_to_import.is_empty() {
-                    match node.mode {
-                        Mode::BACKWARD => {
-                            info!(target: "sync", "Node: {}, the fork point #{} found, switched from BACKWARD mode to FORWARD mode", node.get_node_id(), max_block_number);
-                            node.mode = Mode::FORWARD;
-                            node.synced_block_num = max_block_number;
-                        }
-                        Mode::FORWARD => {
-                            if SyncStorage::get_synced_block_number_last_time()
-                                == SyncStorage::get_synced_block_number()
-                            {
-                                SyncStorage::set_synced_block_number_last_time(max_block_number);
-                                SyncStorage::set_synced_block_number(max_block_number);
-                            } else {
-                                // } else {
-                                // ------
-                                // FIX:
-                                //   synced_block_number is set when new block imported successfully
-                                //   synced_block_number_last_time is set to the local best block
-                                //   when doing a deep chain reorg, steps will be:
-                                //     1. BACKWARD syncing till the fork point
-                                //     2. FORWARD syncing to the highest (total difficulty) block
-                                //   During step 2, if it can't be done within one syncing batch, synced_block_number will not be equal to synced_block_number_last_time. In this case, we can't switch to NORMAL because the FORWARD syncing is not finished yet.
-                                // ------
-                                // } else if SyncStorage::get_synced_block_number() >= SyncStorage::get_network_best_block_number() {
-                                info!(target: "sync", "Node: {}, the best block #{} found, switched from FORWARD mode to NORMAL mode", node.get_node_id(), max_block_number);
-                                node.mode = Mode::NORMAL;
-                            }
-                            node.synced_block_num = max_block_number;
-                        }
-                        _ => {
-                            if max_block_number > node.synced_block_num {
-                                if node.synced_block_num + 32
-                                    > SyncStorage::get_network_best_block_number()
-                                {
-                                    node.mode = Mode::NORMAL;
-                                } else {
-                                    let (
-                                        normal_nodes_count,
-                                        _,
-                                        _,
-                                        lightning_nodes_count,
-                                        thunder_nodes_count,
-                                    ) = get_nodes_count_all_modes();
-                                    if normal_nodes_count == 0 {
-                                        node.mode = Mode::NORMAL;
-                                    } else if node.target_total_difficulty
-                                        >= SyncStorage::get_network_total_diff()
-                                        && node.synced_block_num + 500
-                                            < SyncStorage::get_network_best_block_number()
-                                        && thunder_nodes_count >= 1
-                                        && lightning_nodes_count
-                                            < (thunder_nodes_count + normal_nodes_count) / 5
-                                    {
-                                        // attempt to jump
-                                        node.mode = Mode::LIGHTNING;
-                                    } else if thunder_nodes_count < normal_nodes_count * 10 {
-                                        node.mode = Mode::THUNDER;
-                                    } else {
-                                        node.mode = Mode::NORMAL;
-                                    }
-                                }
-                            }
-                        }
+                    //                    match node.mode {
+                    //                        Mode::BACKWARD => {
+                    //                            info!(target: "sync", "Node: {}, the fork point #{} found, switched from BACKWARD mode to FORWARD mode", node.get_node_id(), max_block_number);
+                    //                            node.mode = Mode::FORWARD;
+                    //                            node.synced_block_num = max_block_number;
+                    //                        }
+                    //                        Mode::FORWARD => {
+                    //                            if SyncStorage::get_synced_block_number_last_time()
+                    //                                == SyncStorage::get_synced_block_number()
+                    //                            {
+                    //                                SyncStorage::set_synced_block_number_last_time(max_block_number);
+                    //                                SyncStorage::set_synced_block_number(max_block_number);
+                    //                            } else {
+                    //                                // } else {
+                    //                                // ------
+                    //                                // FIX:
+                    //                                //   synced_block_number is set when new block imported successfully
+                    //                                //   synced_block_number_last_time is set to the local best block
+                    //                                //   when doing a deep chain reorg, steps will be:
+                    //                                //     1. BACKWARD syncing till the fork point
+                    //                                //     2. FORWARD syncing to the highest (total difficulty) block
+                    //                                //   During step 2, if it can't be done within one syncing batch, synced_block_number will not be equal to synced_block_number_last_time. In this case, we can't switch to NORMAL because the FORWARD syncing is not finished yet.
+                    //                                // ------
+                    //                                // } else if SyncStorage::get_synced_block_number() >= SyncStorage::get_network_best_block_number() {
+                    //                                info!(target: "sync", "Node: {}, the best block #{} found, switched from FORWARD mode to NORMAL mode", node.get_node_id(), max_block_number);
+                    //                                node.mode = Mode::NORMAL;
+                    //                            }
+                    //                            node.synced_block_num = max_block_number;
+                    //                        }
+                    //                        _ => {
+                    //                            if max_block_number > node.synced_block_num {
+                    //                                if node.synced_block_num + 32
+                    //                                    > SyncStorage::get_network_best_block_number()
+                    //                                {
+                    //                                    node.mode = Mode::NORMAL;
+                    //                                } else {
+                    //                                    let (
+                    //                                        normal_nodes_count,
+                    //                                        _,
+                    //                                        _,
+                    //                                        lightning_nodes_count,
+                    //                                        thunder_nodes_count,
+                    //                                    ) = get_nodes_count_all_modes();
+                    //                                    if normal_nodes_count == 0 {
+                    //                                        node.mode = Mode::NORMAL;
+                    //                                    } else if node.target_total_difficulty
+                    //                                        >= SyncStorage::get_network_total_diff()
+                    //                                        && node.synced_block_num + 500
+                    //                                            < SyncStorage::get_network_best_block_number()
+                    //                                        && thunder_nodes_count >= 1
+                    //                                        && lightning_nodes_count
+                    //                                            < (thunder_nodes_count + normal_nodes_count) / 5
+                    //                                    {
+                    //                                        // attempt to jump
+                    //                                        node.mode = Mode::LIGHTNING;
+                    //                                    } else if thunder_nodes_count < normal_nodes_count * 10 {
+                    //                                        node.mode = Mode::THUNDER;
+                    //                                    } else {
+                    //                                        node.mode = Mode::NORMAL;
+                    //                                    }
+                    //                                }
+                    //                            }
+                    //                        }
+                    //                    }
+                    //                    update_node_with_mode(node.node_hash, &node);
+                    //                    if node.mode == Mode::NORMAL || node.mode == Mode::THUNDER {
+                    if SyncStorage::get_synced_block_number() + 8
+                        < SyncStorage::get_network_best_block_number()
+                    {
+                        headers::get_headers_from_node(&mut node);
                     }
-                    update_node_with_mode(node.node_hash, &node);
-                    if node.mode == Mode::NORMAL || node.mode == Mode::THUNDER {
-                        if SyncStorage::get_synced_block_number() + 8
-                            < SyncStorage::get_network_best_block_number()
-                        {
-                            headers::get_headers_from_node(&mut node);
-                        }
-                    }
+                    //                    }
                     continue;
                 }
 

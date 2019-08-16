@@ -32,16 +32,17 @@ use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use p2p::ChannelBuffer;
 use p2p::Node;
-use p2p::send;
+use p2p::get_random_active_node;
+use p2p::send as p2p_send;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
 use sync::event::SyncEvent;
 use sync::storage::{ SyncStorage};
-use sync::helper::HeadersWrapper;
+use sync::helper::{Wrapper,WithStatus};
 
 const BACKWARD_SYNC_STEP: u64 = 64;
-const REQUEST_SIZE: u64 = 24;
+pub const REQUEST_SIZE: u32 = 64;
 const LARGE_REQUEST_SIZE: u64 = 48;
 
 pub fn get_headers_from_node(node: &mut Node) {
@@ -126,27 +127,26 @@ pub fn get_headers_from_node(node: &mut Node) {
     //    }
 }
 
-fn send_blocks_headers_req(node_hash: u64, from: u64, size: u32) {
-    //    let mut req = ChannelBuffer::new();
-    //    req.head.ver = VERSION::V0.value();
-    //    req.head.ctrl = MODULE::SYNC.value();
-    //    req.head.action = ACTION::HEADERSREQ.value();
-    //
-    //    let mut from_buf = [0; 8];
-    //    BigEndian::write_u64(&mut from_buf, from);
-    //    req.body.put_slice(&from_buf);
-    //
-    //    let mut size_buf = [0; 4];
-    //    BigEndian::write_u32(&mut size_buf, size);
-    //    req.body.put_slice(&size_buf);
-    //
-    //    req.head.len = req.body.len() as u32;
-    //
-    //    send(node_hash, req);
+pub fn send(start: u64, hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+    let mut cb = ChannelBuffer::new();
+    cb.head.ver = VERSION::V0.value();
+    cb.head.ctrl = MODULE::SYNC.value();
+    cb.head.action = ACTION::HEADERSREQ.value();
+
+    let mut from_buf = [0u8; 8];
+    BigEndian::write_u64(&mut from_buf, start);
+    cb.body.put_slice(&from_buf);
+
+    let mut size_buf = [0u8; 4];
+    BigEndian::write_u32(&mut size_buf, REQUEST_SIZE);
+    cb.body.put_slice(&size_buf);
+
+    cb.head.len = cb.body.len() as u32;
+    p2p_send(&hash, cb, nodes.clone());
 }
 
 pub fn receive_req(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
-    trace!(target: "sync", "HEADERSREQ received.");
+    trace!(target: "sync", "headers/receive_req");
 
     let client = SyncStorage::get_block_chain();
 
@@ -190,21 +190,21 @@ pub fn receive_req(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMap<u6
 
     //    SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersReq);
     //    update_node(node_hash, node);
-    send(hash, res, nodes);
+    p2p_send(&hash, res, nodes);
 }
 
 pub fn receive_res(
     hash: u64,
     cb_in: ChannelBuffer,
     _nodes: Arc<RwLock<HashMap<u64, Node>>>,
-    hws: Arc<RwLock<BTreeMap<u64, HeadersWrapper>>>,
+    hws: Arc<RwLock<BTreeMap<u64, Wrapper>>>,
 )
 {
-    trace!(target: "sync", "HEADERSRES received.");
+    trace!(target: "sync", "headers/receive_res");
 
     let rlp = UntrustedRlp::new(cb_in.body.as_slice());
     let mut prev_header = BlockHeader::new();
-    let mut hw = HeadersWrapper::new();
+    let mut hw = Wrapper::new();
     let mut headers = Vec::new();
     let mut number = 0;
     for header_rlp in rlp.iter() {
@@ -257,10 +257,10 @@ pub fn receive_res(
             error!(target: "sync", "Invalid header: {}", to_hex(header_rlp.as_raw()));
         }
     }
-    hw.headers = headers;
 
-    if !hw.headers.is_empty() {
+    if !headers.is_empty() {
         hw.node_hash = hash;
+        hw.with_status = WithStatus::GetHeader(headers);
         hw.timestamp = SystemTime::now();
         if let Ok(mut hws) = hws.try_write() {
             info!(target: "sync", "get headers to #{}", number);

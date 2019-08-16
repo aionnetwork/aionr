@@ -32,7 +32,7 @@
 // use sync::route::MODULE;
 // use sync::route::ACTION;
 // use super::super::event::SyncEvent;
-// use super::super::storage::{HeadersWrapper, SyncStorage};
+// use super::super::storage::{Wrapper, SyncStorage};
 
 // use p2p::*;
 
@@ -217,7 +217,7 @@
 //         let node_hash = node.node_hash;
 //         let rlp = UntrustedRlp::new(req.body.as_slice());
 //         let mut prev_header = BlockHeader::new();
-//         let mut hw = HeadersWrapper::new();
+//         let mut hw = Wrapper::new();
 
 //         for header_rlp in rlp.iter() {
 //             if let Ok(header) = header_rlp.as_val() {

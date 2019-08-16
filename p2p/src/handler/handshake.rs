@@ -93,7 +93,7 @@ pub fn send(
     req.head.len = req.body.len() as u32;
 
     // send
-    p2p_send(hash, req, nodes);
+    p2p_send(&hash, req, nodes);
 }
 
 /// 1. decode handshake msg

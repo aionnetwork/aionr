@@ -501,7 +501,7 @@ impl Mgr {
     }
 
     /// send
-    pub fn send(&self, hash: u64, cb: ChannelBuffer) {
+    pub fn send(&self, hash: &u64, cb: ChannelBuffer) {
         let nodes = self.nodes.clone();
         send(hash, cb, nodes);
     }
@@ -591,12 +591,12 @@ fn handle<F, T>(
 }
 
 /// helper method processes send action
-pub fn send(hash: u64, cb: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn send(hash: &u64, cb: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     // TODO: solve issue msg lost
     match nodes.try_write() {
         Ok(mut lock) => {
             let mut flag = true;
-            if let Some(node) = lock.get(&hash) {
+            if let Some(node) = lock.get(hash) {
                 let mut tx = node.tx.clone();
                 match tx.try_send(cb) {
                     Ok(_) => trace!(target: "p2p", "p2p/send: {}", node.addr.get_ip()),
@@ -609,7 +609,7 @@ pub fn send(hash: u64, cb: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>
                 warn!(target:"p2p", "send: node not found hash {}", hash);
             }
             if !flag {
-                if let Some(node) = lock.remove(&hash) {
+                if let Some(node) = lock.remove(hash) {
                     trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
                 }
             }

@@ -49,7 +49,7 @@ pub fn send(nodes: Arc<RwLock<HashMap<u64, Node>>>) {
         let hash = active[random].get_hash();
         debug!(target: "p2p", "active_nodes/send:  hash {}", &hash);
         p2p_send(
-            hash,
+            &hash,
             ChannelBuffer::new1(
                 VERSION::V0.value(),
                 MODULE::P2P.value(),
@@ -96,7 +96,7 @@ pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     }
     cb_out.body.put_slice(res_body.as_slice());
     cb_out.head.len = cb_out.body.len() as u32;
-    p2p_send(hash, cb_out, nodes);
+    p2p_send(&hash, cb_out, nodes);
 }
 
 pub fn receive_res(
