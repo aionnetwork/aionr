@@ -47,10 +47,11 @@ mod codec;
 mod state;
 mod handler;
 
-use std::collections::HashMap;
 use std::io;
 use std::sync::Arc;
-use std::collections::{VecDeque,BTreeMap};
+use std::collections::VecDeque;
+use std::collections::BTreeMap;
+use std::collections::HashMap;
 use std::sync::{Mutex,RwLock};
 use std::time::Duration;
 use std::time::SystemTime;
@@ -75,7 +76,6 @@ use handler::handshake;
 use handler::active_nodes;
 use node::TempNode;
 
-//pub use handler::external::Handler;
 pub use msg::ChannelBuffer;
 pub use node::Node;
 pub use config::Config;
@@ -511,29 +511,6 @@ impl Mgr {
 
     /// rechieve a random node with td >= target_td
     pub fn get_node_by_td(&self, target_td: u64) -> u64 { 120 }
-}
-
-/// register externl handlers
-pub fn register(
-    ver: u16,
-    ctrl: u8,
-    action: u8,
-    handlers: &mut Arc<
-        RwLock<
-            HashMap<
-                u32,
-                fn(hash: u64, cb: Option<ChannelBuffer>, handlers: Arc<RwLock<HashMap<u64, Node>>>),
-            >,
-        >,
-    >,
-    f: fn(hash: u64, cb: Option<ChannelBuffer>, nodes: Arc<RwLock<HashMap<u64, Node>>>),
-)
-{
-    let route: u32 = ChannelBuffer::to_route(ver, ctrl, action);
-    println!("!!!!!!!!!!{:?}", route);
-    if let Ok(mut write) = handlers.write() {
-        write.insert(route, f);
-    }
 }
 
 /// messages with module code other than p2p module
