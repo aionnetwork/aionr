@@ -21,10 +21,6 @@
 
 use std::mem;
 use std::sync::Arc;
-use std::sync::RwLock;
-use std::sync::Mutex;
-use std::collections::VecDeque;
-use std::collections::HashMap;
 use bytes::BufMut;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
@@ -38,30 +34,34 @@ use node::TempNode;
 use route::VERSION;
 use route::MODULE;
 use route::ACTION;
-use super::super::get_active_nodes;
-use super::super::send as p2p_send;
+use super::super::Mgr;
 
-pub fn send(nodes: Arc<RwLock<HashMap<u64, Node>>>) {
-    let active: Vec<Node> = get_active_nodes(nodes.clone());
+pub fn send(
+    p2p: Arc<Mgr>
+) {
+    let active: Vec<Node> = p2p.get_active_nodes();
     let len: usize = active.len();
     if len > 0 {
         let random = random::<usize>() % len;
         let hash = active[random].get_hash();
         debug!(target: "p2p", "active_nodes/send:  hash {}", &hash);
-        p2p_send(
+        p2p.send(
+            p2p.clone(),
             hash,
             ChannelBuffer::new1(
                 VERSION::V0.value(),
                 MODULE::P2P.value(),
                 ACTION::ACTIVENODESREQ.value(),
                 0,
-            ),
-            nodes,
+            )
         );
     }
 }
 
-pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn receive_req(
+    p2p: Arc<Mgr>,
+    hash: u64
+) {
     debug!(target: "p2p", "active_nodes/receive_req");
 
     let mut cb_out = ChannelBuffer::new();
@@ -69,7 +69,7 @@ pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     cb_out.head.ctrl = MODULE::P2P.value();
     cb_out.head.action = ACTION::ACTIVENODESRES.value();
 
-    let active_nodes = get_active_nodes(nodes.clone());
+    let active_nodes = p2p.get_active_nodes();
     let mut res_body = Vec::new();
 
     if active_nodes.len() > 0 {
@@ -96,16 +96,14 @@ pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     }
     cb_out.body.put_slice(res_body.as_slice());
     cb_out.head.len = cb_out.body.len() as u32;
-    p2p_send(hash, cb_out, nodes);
+    p2p.send(p2p.clone(), hash, cb_out);
 }
 
 pub fn receive_res(
+    p2p: Arc<Mgr>,
     hash: u64,
     cb_in: ChannelBuffer,
-    temp: Arc<Mutex<VecDeque<TempNode>>>,
-    nodes: Arc<RwLock<HashMap<u64, Node>>>,
-)
-{
+){
     debug!(target: "p2p", "active_nodes/receive_res");
 
     let (node_count, rest) = cb_in.body.split_at(1);
@@ -126,14 +124,14 @@ pub fn receive_res(
             // TODO: complete if should add
             temp_list.push(temp);
         }
-        if let Ok(mut lock) = temp.try_lock() {
+        if let Ok(mut lock) = p2p.temp.try_lock() {
             for t in temp_list.iter() {
                 lock.push_back(t.to_owned());
             }
         }
     }
 
-    if let Ok(mut lock) = nodes.try_write() {
+    if let Ok(mut lock) = p2p.nodes.try_write() {
         if let Some(node) = lock.get_mut(&hash) {
             node.update();
         }

@@ -27,13 +27,12 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use std::ops::Index;
 use std::sync::RwLock;
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::time::Duration;
 use std::time::Instant;
 use std::time::SystemTime;
-use std::collections::VecDeque;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
 use rustc_hex::ToHex;
@@ -48,12 +47,10 @@ use futures::Stream;
 use lru_cache::LruCache;
 use rlp::UntrustedRlp;
 use tokio::runtime::Runtime;
-use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use bytes::BufMut;
 use byteorder::{BigEndian,ByteOrder};
 
-// chris
 use p2p::Node;
 use p2p::ChannelBuffer;
 use p2p::Config;
@@ -65,7 +62,7 @@ use sync::route::ACTION;
 use sync::handler::status;
 use sync::handler::headers;
 // use sync::handler::bodies;
-// use sync::handler::broadcast;
+use sync::handler::broadcast;
 // use sync::handler::import;
 use self::helper::HeadersWrapper;
 use sync::storage::ActivePeerInfo;
@@ -96,19 +93,29 @@ pub struct Sync {
     /// collection of sent headers
     headers: Arc<RwLock<BTreeMap<u64, HeadersWrapper>>>,
 
+    /// local best td
+    local_best_td: Arc<RwLock<U256>>,
+
+    /// local best block number
+    local_best_block_number: Arc<RwLock<u64>>,
+
     /// network best td
-    td: Arc<RwLock<U256>>,
+    network_best_td: Arc<RwLock<U256>>,
+
+    /// network best block number
+    network_best_block_number: Arc<RwLock<u64>>,
 
     /// cache tx hash which has been stored and broadcasted
-    cached_tx_hashes: Arc<RwLock<LruCache<H256, u8>>>,
+    cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 
     /// cache block hash which has been committed and broadcasted
-    cached_block_hashes:  Arc<RwLock<LruCache<H256, u8>>>  
+    cached_block_hashes:  Arc<Mutex<LruCache<H256, u8>>>  
 }
 
 impl Sync {
     pub fn new(config: Config, client: Arc<BlockChainClient>) -> Sync {
-        let starting_td = client.chain_info().total_difficulty;
+        let local_best_td: U256 = client.chain_info().total_difficulty;
+        let local_best_block_number: u64 = client.chain_info().best_block_number;
         let config = Arc::new(config);
         Sync {
             config: config.clone(),
@@ -116,9 +123,13 @@ impl Sync {
             p2p: Arc::new(Mgr::new(config)),
             runtime: Arc::new(Runtime::new().expect("tokio runtime")),
             headers: Arc::new(RwLock::new(BTreeMap::new())),
-            td: Arc::new(RwLock::new(starting_td)),
-            cached_tx_hashes: Arc::new(RwLock::new(LruCache::new(MAX_TX_CACHE))),
-            cached_block_hashes: Arc::new(RwLock::new(LruCache::new(MAX_BLOCK_CACHE))),
+
+            local_best_td: Arc::new(RwLock::new(local_best_td)),
+            local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
+            network_best_td: Arc::new(RwLock::new(local_best_td)),
+            network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
+            cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
+            cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
         }
     }
 
@@ -135,8 +146,9 @@ impl Sync {
         let executor_status = executor.clone();
         let nodes_status = nodes.clone();
         let nodes_headers = nodes.clone();
-        let nodes_send1 = nodes.clone();
-        let nodes_send2 = nodes.clone();
+        let nodes_send_0 = nodes.clone();
+        let nodes_send_1 = nodes.clone();
+
         executor_status.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_STATUS))
                 .for_each(move |_| {
@@ -147,14 +159,15 @@ impl Sync {
                         cb.head.ctrl = MODULE::SYNC.value();
                         cb.head.action = ACTION::STATUSREQ.value();
                         cb.head.len = 0;
-                        send(hash, cb, nodes_send1.clone());
+                        send(hash, cb, nodes_send_0.clone());
                     }
 
-                    //                     p2p.get_node_by_td(10);
+                    // p2p.get_node_by_td(10);
                     Ok(())
                 })
                 .map_err(|err| error!(target: "p2p", "executor status: {:?}", err)),
         );
+
         let executor_headers = executor.clone();
         executor_headers.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_HEADERS))
@@ -185,7 +198,7 @@ impl Sync {
                             cb.body.put_slice(&size_buf);
 
                             cb.head.len = cb.body.len() as u32;
-                            send(node.get_hash(), cb, nodes_send2.clone());
+                            send(node.get_hash(), cb, nodes_send_1.clone());
                         }
                     }
 
@@ -209,6 +222,10 @@ pub fn handle(
     cb: ChannelBuffer,
     nodes: Arc<RwLock<HashMap<u64, Node>>>,
     hws: Arc<RwLock<BTreeMap<u64, HeadersWrapper>>>,
+    local_best_block_number: Arc<RwLock<u64>>,
+    network_best_block_number: Arc<RwLock<u64>>,
+    cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
+    cached_block_hashes:  Arc<Mutex<LruCache<H256, u8>>>
 ){
     match ACTION::from(cb.head.action) {
         ACTION::STATUSREQ => {
@@ -222,8 +239,8 @@ pub fn handle(
         ACTION::HEADERSRES => headers::receive_res(hash, cb, nodes, hws),
         ACTION::BODIESREQ => (),
         ACTION::BODIESRES => (),
-        ACTION::BROADCASTTX => (),
-        ACTION::BROADCASTBLOCK => (),
+        // ACTION::BROADCASTTX => broadcast::receive_tx(hash, cb, nodes, localnetwork_best_block_number, client, cached_tx_hashes),
+        ACTION::BROADCASTBLOCK => (), // broadcast::receive_block(hash, cb, nodes),
         ACTION::UNKNOWN => (),
     };
 }

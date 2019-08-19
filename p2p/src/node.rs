@@ -19,7 +19,6 @@
  *
  ******************************************************************************/
 
-use std::str::from_utf8;
 use std::fmt;
 use std::time::SystemTime;
 use std::net::SocketAddr;
@@ -234,20 +233,7 @@ pub struct Node {
     pub state: STATE,
     pub connection: Connection,
     pub if_seed: bool,
-    pub update: SystemTime, // chris
-                            // TODO: move to sync
-                            // pub synced_block_num: u64,
-                            // pub target_total_difficulty: U256,
-                            // pub current_pow_total_difficulty: U256,
-                            // pub current_pos_total_difficulty: U256,
-                            // pub current_total_difficulty: U256,
-                            // pub mode: Mode,
-                            // pub state_code: u32,
-                            // pub last_request_timestamp: SystemTime,
-                            // pub last_request_num: u64,
-                            // pub last_broadcast_timestamp: SystemTime,
-                            // pub last_sent_transactions: HashSet<H256>,
-                            // pub repeated: u8
+    pub update: SystemTime,
 }
 
 impl Node {

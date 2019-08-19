@@ -21,8 +21,6 @@
 
 use std::mem;
 use std::sync::Arc;
-use std::sync::RwLock;
-use std::collections::HashMap;
 use bytes::BufMut;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
@@ -33,28 +31,21 @@ use node::MAX_REVISION_LENGTH;
 use node::IP_LENGTH;
 use node::NODE_ID_LENGTH;
 use node::REVISION_PREFIX;
-use node::Node;
 use node::convert_ip_string;
 use route::VERSION;
 use route::MODULE;
 use route::ACTION;
-use config::Config;
 use state::STATE;
-use super::super::send as p2p_send;
+use super::super::Mgr;
 
 //TODO: remove it
 const VERSION: &str = "02";
 
 // TODO: validate len
 pub fn send(
+    p2p: Arc<Mgr>,
     hash: u64,
-    id: String,
-    net_id: u32,
-    ip: String,
-    port: u32,
-    nodes: Arc<RwLock<HashMap<u64, Node>>>,
-)
-{
+){
     debug!(target: "p2p", "handshake/send");
 
     // header
@@ -63,18 +54,19 @@ pub fn send(
     req.head.ctrl = MODULE::P2P.value();
     req.head.action = ACTION::HANDSHAKEREQ.value();
 
+    
     // write id
+    let (id, _) = p2p.config.get_id_and_binding();
     req.body.put_slice(id.as_bytes());
 
     // write net_id
     let mut net_id_bytes = [0; 4];
-    BigEndian::write_u32(&mut net_id_bytes, net_id);
+    BigEndian::write_u32(&mut net_id_bytes, p2p.config.net_id);
     req.body.put_slice(&net_id_bytes);
 
-    // write ip
+    // write ip & port
+    let (ip, port) = p2p.config.get_ip_and_port();
     req.body.put_slice(&convert_ip_string(ip));
-
-    // write port
     let mut port_bytes = [0; 4];
     BigEndian::write_u32(&mut port_bytes, port);
     req.body.put_slice(&port_bytes);
@@ -93,17 +85,16 @@ pub fn send(
     req.head.len = req.body.len() as u32;
 
     // send
-    p2p_send(hash, req, nodes);
+    p2p.send(p2p.clone(), hash, req);
 }
 
 /// 1. decode handshake msg
 /// 2. validate and prove incoming connection to active
 /// 3. acknowledge sender if it is proved
 pub fn receive_req(
+    p2p: Arc<Mgr>,
     hash: u64,
     cb_in: ChannelBuffer,
-    config: Arc<Config>,
-    nodes: Arc<RwLock<HashMap<u64, Node>>>,
 )
 {
     debug!(target: "p2p", "handshake/receive_req");
@@ -111,7 +102,7 @@ pub fn receive_req(
     let (node_id, req_body_rest) = cb_in.body.split_at(NODE_ID_LENGTH);
     let (mut net_id, req_body_rest) = req_body_rest.split_at(mem::size_of::<i32>());
     let peer_net_id = net_id.read_u32::<BigEndian>().unwrap_or(0);
-    let local_net_id = config.net_id;
+    let local_net_id = p2p.config.net_id;
     if peer_net_id != local_net_id {
         warn!(target: "p2p", "invalid net id {}, should be {}.", peer_net_id, local_net_id);
         return;
@@ -126,7 +117,7 @@ pub fn receive_req(
     let version_len = version_len[0] as usize;
     let (_version, _rest) = rest.split_at(version_len);
 
-    if let Ok(mut write) = nodes.try_write() {
+    if let Ok(mut write) = p2p.nodes.try_write() {
         if let Some(mut node) = write.get_mut(&hash) {
             debug!(target: "p2p", "inbound node state: connected -> active");
             node.id.copy_from_slice(node_id);
@@ -165,7 +156,11 @@ pub fn receive_req(
 
 /// 1. decode handshake res msg
 /// 2. update outbound node to active
-pub fn receive_res<'a>(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn receive_res(
+    p2p: Arc<Mgr>,
+    hash: u64, 
+    cb_in: ChannelBuffer, 
+) {
     debug!(target: "p2p", "handshake/receive_res");
 
     let (_, revision) = cb_in.body.split_at(1);
@@ -173,7 +168,7 @@ pub fn receive_res<'a>(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMa
     let revision_len = revision_len[0] as usize;
     let (revision_bytes, _rest) = rest.split_at(revision_len);
 
-    if let Ok(mut write) = nodes.try_write() {
+    if let Ok(mut write) = p2p.nodes.try_write() {
         if let Some(mut node) = write.get_mut(&hash) {
             // TODO: math::low
             if revision_len > MAX_REVISION_LENGTH {

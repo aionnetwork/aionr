@@ -31,6 +31,9 @@ pub struct Config {
 
 impl Config {
     pub fn new() -> Self {
+
+
+
         Config {
             boot_nodes: Vec::new(),
             max_peers: 64,

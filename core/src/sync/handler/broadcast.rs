@@ -20,8 +20,12 @@
  ******************************************************************************/
 
 use std::sync::Arc;
+use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
+use std::sync::RwLock;
+use std::collections::HashMap;
+use lru_cache::LruCache;
 use client::{BlockChainClient, BlockId, BlockImportError};
 use types::error::{BlockError, ImportError};
 use header::Header;
@@ -32,23 +36,23 @@ use rlp::{RlpStream, UntrustedRlp};
 use p2p::ChannelBuffer;
 use p2p::Node;
 use p2p::send;
+use p2p::get_active_nodes;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
-use sync::event::SyncEvent;
-use sync::storage::SyncStorage;
 
 const MAX_NEW_BLOCK_AGE: u64 = 20;
+const MAX_RE_BROADCAST: usize = 10;
 
 pub fn propagate_transactions() {
     let mut transactions = Vec::new();
     let mut size = 0;
-    if let Ok(mut received_transactions) = SyncStorage::get_received_transactions().try_lock() {
-        while let Some(transaction) = received_transactions.pop_front() {
-            transactions.extend_from_slice(&transaction);
-            size += 1;
-        }
-    }
+    // if let Ok(mut received_transactions) = SyncStorage::get_received_transactions().try_lock() {
+    //     while let Some(transaction) = received_transactions.pop_front() {
+    //         transactions.extend_from_slice(&transaction);
+    //         size += 1;
+    //     }
+    // }
 
     if size < 1 {
         return;
@@ -109,105 +113,149 @@ pub fn propagate_blocks(block_hash: &H256, client: Arc<BlockChainClient>) {
 pub fn receive_block(node: &mut Node, req: ChannelBuffer) {
     trace!(target: "sync", "BROADCASTBLOCK received.");
 
-    if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number() {
-        // Ignore BROADCASTBLOCK message until full synced
-        trace!(target: "sync", "Syncing..., ignore BROADCASTBLOCK message.");
-        return;
-    }
+    // if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number() {
+    //     // Ignore BROADCASTBLOCK message until full synced
+    //     trace!(target: "sync", "Syncing..., ignore BROADCASTBLOCK message.");
+    //     return;
+    // }
 
     let block_rlp = UntrustedRlp::new(req.body.as_slice());
     if let Ok(header_rlp) = block_rlp.at(0) {
         if let Ok(h) = header_rlp.as_val() {
             let header: Header = h;
-            let last_imported_number = SyncStorage::get_synced_block_number();
-            let hash = header.hash();
+            // let last_imported_number = SyncStorage::get_synced_block_number();
+            // let hash = header.hash();
 
-            if last_imported_number > header.number()
-                && last_imported_number - header.number() > MAX_NEW_BLOCK_AGE
-            {
-                trace!(target: "sync", "Ignored ancient new block {:?}", header.hash());
-                return;
-            }
+            // if last_imported_number > header.number()
+            //     && last_imported_number - header.number() > MAX_NEW_BLOCK_AGE
+            // {
+            //     trace!(target: "sync", "Ignored ancient new block {:?}", header.hash());
+            //     return;
+            // }
 
-            let parent_hash = header.parent_hash();
-            let client = SyncStorage::get_block_chain();
-            match client.block_header(BlockId::Hash(*parent_hash)) {
-                Some(_) => {
-                    if let Ok(ref mut imported_block_hashes) =
-                        SyncStorage::get_imported_block_hashes().lock()
-                    {
-                        if !imported_block_hashes.contains_key(&hash) {
-                            let result = client.import_block(block_rlp.as_raw().to_vec());
+            // let parent_hash = header.parent_hash();
+            // let client = SyncStorage::get_block_chain();
+            // match client.block_header(BlockId::Hash(*parent_hash)) {
+            //     Some(_) => {
+            //         if let Ok(ref mut imported_block_hashes) =
+            //             SyncStorage::get_imported_block_hashes().lock()
+            //         {
+            //             if !imported_block_hashes.contains_key(&hash) {
+            //                 let result = client.import_block(block_rlp.as_raw().to_vec());
 
-                            match result {
-                                Ok(_) => {
-                                    trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
-                                    imported_block_hashes.insert(hash, 0);
-                                    // let active_nodes = get_nodes(ALIVE.value());
-                                    // for n in active_nodes.iter() {
-                                    //     // broadcast new block
-                                    //     trace!(target: "sync", "Sync broadcast new block sent...");
-                                    //     send(n.node_hash, req.clone());
-                                    // }
-                                }
-                                Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
-                                    trace!(target: "sync", "New block already in chain {:?}", hash);
-                                }
-                                Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
-                                    trace!(target: "sync", "New block already queued {:?}", hash);
-                                }
-                                Err(BlockImportError::Block(BlockError::UnknownParent(p))) => {
-                                    info!(target: "sync", "New block with unknown parent ({:?}) {:?}", p, hash);
-                                }
-                                Err(e) => {
-                                    error!(target: "sync", "Bad new block {:?} : {:?}", hash, e);
-                                }
-                            };
-                        }
-                    } else {
-                        trace!(target: "sync", "imported_block_hashes_mutex lock failed");
-                    }
-                }
-                None => {}
-            };
-            SyncEvent::update_node_state(node, SyncEvent::OnBroadCastBlock);
+            //                 match result {
+            //                     Ok(_) => {
+            //                         trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
+            //                         imported_block_hashes.insert(hash, 0);
+            //                         // let active_nodes = get_nodes(ALIVE.value());
+            //                         // for n in active_nodes.iter() {
+            //                         //     // broadcast new block
+            //                         //     trace!(target: "sync", "Sync broadcast new block sent...");
+            //                         //     send(n.node_hash, req.clone());
+            //                         // }
+            //                     }
+            //                     Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
+            //                         trace!(target: "sync", "New block already in chain {:?}", hash);
+            //                     }
+            //                     Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
+            //                         trace!(target: "sync", "New block already queued {:?}", hash);
+            //                     }
+            //                     Err(BlockImportError::Block(BlockError::UnknownParent(p))) => {
+            //                         info!(target: "sync", "New block with unknown parent ({:?}) {:?}", p, hash);
+            //                     }
+            //                     Err(e) => {
+            //                         error!(target: "sync", "Bad new block {:?} : {:?}", hash, e);
+            //                     }
+            //                 };
+            //             }
+            //         } else {
+            //             trace!(target: "sync", "imported_block_hashes_mutex lock failed");
+            //         }
+            //     }
+            //     None => {}
+            // };
+            // SyncEvent::update_node_state(node, SyncEvent::OnBroadCastBlock);
         }
     }
 }
 
-pub fn receive_tx(node: &mut Node, req: ChannelBuffer) {
-    trace!(target: "sync", "BROADCASTTX received.");
+pub fn receive_tx(
+    hash: u64, 
+    cb: ChannelBuffer, 
+    nodes: Arc<RwLock<HashMap<u64, Node>>>,
+    local_best_block_num: Arc<RwLock<u64>>,
+    network_best_block_num: Arc<RwLock<u64>>,
+    cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>
+) {
+    trace!(target: "sync", "broadcast/receive_tx");
 
-    if SyncStorage::get_synced_block_number() + 4 < SyncStorage::get_network_best_block_number() {
-        // Ignore BROADCASTTX message until full synced
-        trace!(target: "sync", "Syncing..., ignore BROADCASTTX message.");
+    // ignore when local is away from full synced
+    let lbbn: u64 = local_best_block_num.read().unwrap().unwrap();
+    let nbbn: u64 = network_best_block_num.read().unwrap().unwrap(); 
+   
+    if lbbn + 4 < nbbn {
         return;
     }
 
-    let transactions_rlp = UntrustedRlp::new(req.body.as_slice());
+    let transactions_rlp = UntrustedRlp::new(cb.body.as_slice());
     let mut transactions = Vec::new();
-    if let Ok(ref mut transaction_hashes) = SyncStorage::get_sent_transaction_hashes().lock() {
-        for transaction_rlp in transactions_rlp.iter() {
-            if !transaction_rlp.is_empty() {
-                if let Ok(t) = transaction_rlp.as_val() {
-                    let tx: UnverifiedTransaction = t;
-                    let hash = tx.hash().clone();
-                    if !transaction_hashes.contains_key(&hash) {
-                        transactions.push(tx);
-                        transaction_hashes.insert(hash, 0);
-                        SyncStorage::insert_received_transaction(transaction_rlp.as_raw().to_vec());
+
+    match cached_tx_hashes.try_lock() {
+        Ok(mut lock) => {
+            for transaction_rlp in transactions_rlp.iter() {
+                if !transaction_rlp.is_empty() {
+                    if let Ok(t) = transaction_rlp.as_val() {
+                        let tx: UnverifiedTransaction = t;
+                        let hash = tx.hash().clone();
+                        if !lock.contains_key(&hash) {
+                            transactions.push(tx);
+                            lock.insert(hash, 0);
+                        } 
                     }
                 }
             }
+        }, 
+        Err(err) => {
+            error!(target: "sync", "broadcast/receive_tx: {:?}", err);
         }
-
-        if transactions.len() > 0 {
-            let client = SyncStorage::get_block_chain();
-            client.import_queued_transactions(transactions);
-        }
-        // node.last_broadcast_timestamp = SystemTime::now();
     }
 
-    SyncEvent::update_node_state(node, SyncEvent::OnBroadCastTx);
-    // update_node(node.node_hash, node);
+    if transactions.len() > 0 {
+
+        // TODO:
+        // client.import_queued_transactions(transactions);
+        // match nodes.try_write() {
+        //     Ok(mut write) => {
+        //         match write.get_mut(&hash) {
+        //             Some(mut node) => {
+        //                 node.update();
+        //             },
+        //             None => {
+        //                 // TODO:
+        //             }
+        //         }
+        //     }, 
+        //     Err(err) => {
+        //         error!(target: "sync", "broadcast/receive_tx: {:?}", err);
+        //     }
+        // }
+
+        /// re-broadcast tx    
+        let mut node_count = 0;
+        let active_nodes = get_active_nodes(nodes);
+        if active_nodes.len() > 0 {
+            for node in active_nodes.iter(){
+                if(node.block_num + 4 >= nbbn) {
+                    // send(node.get_hash(), cb);
+                    node_count += 1;
+                    if node_count > MAX_RE_BROADCAST {
+                        /// re broadcast tx up to MAX_RE_BROADCAST nodes
+                        return;
+                    } else {
+                        thread::sleep(Duration::from_millis(50));
+                    }    
+                }
+            }
+        }
+    }
 }
