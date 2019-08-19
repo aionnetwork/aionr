@@ -28,25 +28,22 @@ use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use sync::route::{VERSION,MODULE,ACTION};
 use sync::storage::SyncStorage;
-use p2p::{ChannelBuffer,Node,send as p2p_send,get_random_active_node_hash};
+use p2p::{ChannelBuffer, Node, Mgr};
 
 const HASH_LENGTH: usize = 32;
 
-pub fn send(nodes: Arc<RwLock<HashMap<u64, Node>>>) {
-    let nodes1 = nodes.clone();
-    let nodes2 = nodes.clone();
-
-    if let Some(hash) = get_random_active_node_hash(nodes1.clone()) {
+pub fn send(p2p: Arc<Mgr>) {
+    if let Some(hash) = p2p.get_random_active_node_hash() {
         let mut cb = ChannelBuffer::new();
         cb.head.ver = VERSION::V0.value();
         cb.head.ctrl = MODULE::SYNC.value();
         cb.head.action = ACTION::STATUSREQ.value();
         cb.head.len = 0;
-        p2p_send(&hash, cb, nodes.clone());
+        p2p.send(p2p.clone(), hash, cb);
     }
 }
 
-pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn receive_req(p2p: Arc<Mgr>, hash: u64) {
     debug!(target: "sync", "status/receive_req");
 
     let mut cb = ChannelBuffer::new();
@@ -80,13 +77,12 @@ pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     cb.head.len = cb.body.len() as u32;
     trace!(target:"sync", "status res bc body len: {}", cb.head.len);
 
-    p2p_send(&hash, cb, nodes);
+    p2p.send(p2p.clone(), hash, cb);
 }
 
-pub fn receive_res(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn receive_res(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
     trace!(target: "sync", "status/receive_res");
-
-    match nodes.try_write() {
+    match p2p.nodes.try_write() {
         Ok(mut write) => {
             match write.get_mut(&hash) {
                 Some(mut node) => {
@@ -115,24 +111,4 @@ pub fn receive_res(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMap<u6
             //TODO:
         }
     }
-
-    // if node.mode != Mode::BACKWARD && node.mode != Mode::FORWARD {
-    //     let chain_info = SyncStorage::get_chain_info();
-    //     node.synced_block_num = chain_info.best_block_number;
-    //     node.current_total_difficulty = chain_info.total_difficulty;
-    // }
-
-    // internal comparing node td vs current network status td
-    //SyncStorage::update_network_status(
-    //    node.block_num,
-    //    node.block_hash,
-    //    node.total_difficulty,
-    //);
-
-    // immediately send request when incoming response indicates node td > local chain td
-    // even headers::get_headers_from_node has condition check internally
-    // TODO: leave condition check in one place
-    //if node.total_difficulty >= SyncStorage::get_chain_info().total_difficulty {
-    // headers::get_headers_from_node(node);
-    //}
 }

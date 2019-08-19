@@ -208,8 +208,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
           if cmd.ipc_conf.enabled { "y" } else { "n" },
     );
 
-    let sync = Sync::new(cmd.net_conf.clone(), client.clone());   
-    sync.run();
+    let sync = Arc::new(Sync::new(cmd.net_conf.clone(), client.clone()));   
+    sync.run(sync.clone());
 
     // start rpc server
     let runtime_rpc = tokio::runtime::Builder::new()

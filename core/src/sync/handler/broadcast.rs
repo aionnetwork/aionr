@@ -35,8 +35,7 @@ use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use p2p::ChannelBuffer;
 use p2p::Node;
-use p2p::send;
-use p2p::get_active_nodes;
+use p2p::Mgr;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
@@ -45,7 +44,6 @@ const MAX_NEW_BLOCK_AGE: u64 = 20;
 const MAX_RE_BROADCAST: usize = 10;
 
 pub fn propagate_transactions() {
-    let mut transactions = Vec::new();
     let mut size = 0;
     // if let Ok(mut received_transactions) = SyncStorage::get_received_transactions().try_lock() {
     //     while let Some(transaction) = received_transactions.pop_front() {
@@ -180,9 +178,9 @@ pub fn receive_block(node: &mut Node, req: ChannelBuffer) {
 }
 
 pub fn receive_tx(
+    p2p: Arc<Mgr>,
     hash: u64, 
     cb: ChannelBuffer, 
-    nodes: Arc<RwLock<HashMap<u64, Node>>>,
     local_best_block_num: Arc<RwLock<u64>>,
     network_best_block_num: Arc<RwLock<u64>>,
     cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>
@@ -190,8 +188,8 @@ pub fn receive_tx(
     trace!(target: "sync", "broadcast/receive_tx");
 
     // ignore when local is away from full synced
-    let lbbn: u64 = local_best_block_num.read().unwrap().unwrap();
-    let nbbn: u64 = network_best_block_num.read().unwrap().unwrap(); 
+    let lbbn: u64 = *local_best_block_num.read().unwrap();
+    let nbbn: u64 = *network_best_block_num.read().unwrap(); 
    
     if lbbn + 4 < nbbn {
         return;
@@ -242,14 +240,14 @@ pub fn receive_tx(
 
         /// re-broadcast tx    
         let mut node_count = 0;
-        let active_nodes = get_active_nodes(nodes);
+        let active_nodes = &p2p.get_active_nodes();
         if active_nodes.len() > 0 {
             for node in active_nodes.iter(){
                 if(node.block_num + 4 >= nbbn) {
                     // send(node.get_hash(), cb);
                     node_count += 1;
                     if node_count > MAX_RE_BROADCAST {
-                        /// re broadcast tx up to MAX_RE_BROADCAST nodes
+                        // re broadcast tx up to MAX_RE_BROADCAST nodes
                         return;
                     } else {
                         thread::sleep(Duration::from_millis(50));

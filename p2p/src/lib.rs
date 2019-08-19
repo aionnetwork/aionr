@@ -47,6 +47,7 @@ mod node;
 mod codec;
 mod state;
 mod handler;
+mod callable;
 
 use std::io;
 use std::sync::Arc;
@@ -82,6 +83,7 @@ use aion_types::H256;
 pub use msg::ChannelBuffer;
 pub use node::Node;
 pub use config::Config;
+pub use callable::Callable;
 
 const INTERVAL_STATISICS: u64 = 5;
 const INTERVAL_OUTBOUND_CONNECT: u64 = 10;
@@ -98,26 +100,7 @@ pub struct Mgr {
     /// temp queue storing seeds and active nodes queried from other nodes
     temp: Arc<Mutex<VecDeque<TempNode>>>,
     /// nodes
-    // TODO: remove pub
     pub nodes: Arc<RwLock<HashMap<u64, Node>>>,
-    /// handlers
-    pub handlers: Arc<
-        RwLock<
-            HashMap<
-                u32,
-                fn(
-                    hash: u64, 
-                    cb: Option<ChannelBuffer>, 
-                    handlers: Arc<RwLock<HashMap<u64, Node>>>,
-                    
-                    local_best_block_number: Arc<RwLock<u64>>,
-                    network_best_block_number: Arc<RwLock<u64>>,
-                    cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
-                    cached_block_hashes:  Arc<Mutex<LruCache<H256, u8>>>
-                ),
-            >,
-        >,
-    >,
 }
 
 impl Mgr {
@@ -136,33 +119,15 @@ impl Mgr {
             config,
             temp: Arc::new(Mutex::new(temp_queue)),
             nodes: Arc::new(RwLock::new(HashMap::new())),
-            handlers: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
     /// run p2p instance
-    pub fn run<F, T>(
+    pub fn run(
         &self,
         p2p: Arc<Mgr>, 
-        handler: Arc<F>, 
-        headers: Arc<RwLock<BTreeMap<u64, T>>>
-    )
-    where
-        F: Fn(
-            u64, 
-            ChannelBuffer, 
-            Arc<RwLock<HashMap<u64, Node>>>, 
-            Arc<RwLock<BTreeMap<u64, T>>>,
-            Arc<RwLock<u64>>,
-            Arc<RwLock<u64>>,
-            Arc<Mutex<LruCache<H256, u8>>>,
-            Arc<Mutex<LruCache<H256, u8>>>
-        )
-            + 'static
-            + Send
-            + Sync,
-        T: 'static + Send + Sync,
-    {
+        callbacks: Arc<Callable>,
+    ){
         // init
         let executor = Arc::new(self.runtime.executor());
         let binding: SocketAddr = self
@@ -594,21 +559,12 @@ impl Mgr {
 
     /// messages with module code other than p2p module
     /// should flow into external handlers
-    fn handle<F, T>(
-        &self,
+    fn handle(
         p2p: Arc<Mgr>,
         hash: u64,
         cb: ChannelBuffer,
-    ) where
-        F: Fn(
-            Arc<Mgr>,
-            u64, 
-            ChannelBuffer, 
-        )
-            + Send
-            + Sync,
-        T: Send + Sync,
-    {
+        callable: Arc<Callable>
+    ) {
         trace!(target: "p2p", "handle: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
         match VERSION::from(cb.head.ver) {
             VERSION::V0 => {
@@ -623,6 +579,7 @@ impl Mgr {
                         };
                     }
                     MODULE::EXTERNAL => {
+                        callable.handle(hash, cb);
                         // handle(
                         //     p2p,
                         //     hash, 
@@ -636,8 +593,6 @@ impl Mgr {
         };
     }
 }
-
-
 
 fn config_stream(stream: &TcpStream) {
     stream

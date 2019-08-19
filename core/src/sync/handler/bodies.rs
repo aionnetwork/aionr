@@ -30,7 +30,7 @@ use rlp::{RlpStream, UntrustedRlp};
 use std::time::SystemTime;
 use p2p::ChannelBuffer;
 use p2p::Node;
-use p2p::send as p2p_send;
+use p2p::Mgr;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
@@ -42,58 +42,11 @@ use sync::handler::headers;
 
 const HASH_LEN: usize = 32;
 
-pub fn send() {
-    //    let mut req = ChannelBuffer::new();
-    //    req.head.ver = VERSION::V0.value();
-    //    req.head.ctrl = MODULE::SYNC.value();
-    //    req.head.action = ACTION::BODIESREQ.value();
-    //
-    //    let mut hws = Vec::new();
-    //    if let Ok(mut downloaded_headers) = SyncStorage::get_downloaded_headers().try_lock() {
-    //        while let Some(hw) = downloaded_headers.pop_front() {
-    //            if !hw.headers.is_empty() {
-    //                hws.push(hw);
-    //            }
-    //        }
-    //    }
-    //
-    //    for hw in hws.iter() {
-    //        let mut req = req.clone();
-    //        req.body.clear();
-    //
-    //        let mut header_requested = Vec::new();
-    //        for header in hw.headers.iter() {
-    //            if !SyncStorage::is_downloaded_block_hashes(&header.hash())
-    //                && !SyncStorage::is_imported_block_hash(&header.hash())
-    //            {
-    //                req.body.put_slice(&header.hash());
-    //                header_requested.push(header.clone());
-    //            }
-    //        }
-    //
-    //        let body_len = req.body.len();
-    //        if body_len > 0 {
-    //            if let Ok(ref mut headers_with_bodies_requested) =
-    //                SyncStorage::get_headers_with_bodies_requested().lock()
-    //            {
-    //                if !headers_with_bodies_requested.contains_key(&hw.node_hash) {
-    //                    req.head.len = body_len as u32;
-    //
-    //                    p2p_send(hw.node_hash, req);
-    //
-    //                    trace!(target: "sync", "Sync blocks bodies req sent...");
-    //                    let mut hw = hw.clone();
-    //                    hw.timestamp = SystemTime::now();
-    //                    hw.headers.clear();
-    //                    hw.headers.extend(header_requested);
-    //                    headers_with_bodies_requested.insert(hw.node_hash, hw);
-    //                }
-    //            }
-    //        }
-    //    }
-}
-
-pub fn receive_req(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn receive_req(
+    p2p: Arc<Mgr>, 
+    hash: u64, 
+    cb_in: ChannelBuffer
+) {
     trace!(target: "sync", "bodies/receive_req");
 
     let mut res = ChannelBuffer::new();
@@ -130,21 +83,16 @@ pub fn receive_req(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMap<u6
 
     res.body.put_slice(res_body.as_slice());
     res.head.len = res.body.len() as u32;
-
-    //    SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesReq);
-    //    update_node(node_hash, node);
-    p2p_send(&hash, res, nodes);
+    p2p.send(p2p.clone(), hash, res);
 }
 
 pub fn receive_res(
+    p2p: Arc<Mgr>,
     hash: u64,
     cb_in: ChannelBuffer,
-    nodes: Arc<RwLock<HashMap<u64, Node>>>,
     hws: Arc<RwLock<BTreeMap<u64, Wrapper>>>,
-)
-{
+){
     trace!(target: "sync", "bodies/receive_res");
-
     if cb_in.body.len() > 0 {
         if let Ok(mut wrappers) = hws.write() {
             if let Some((hash, wrapper)) = wrappers
@@ -219,65 +167,6 @@ pub fn receive_res(
                                     (*w).timestamp = SystemTime::now();
                                     (*w).with_status = WithStatus::GetBody(blocks);
                                 }
-                                //                                    if node.mode == Mode::LIGHTNING {
-                                //                                        if let Some(block) = blocks.get(0) {
-                                //                                            let block_number = block.header.number();
-                                //                                            let max_staged_block_number =
-                                //                                                SyncStorage::get_max_staged_block_number();
-                                //                                            if block_number < = max_staged_block_number {
-                                //                                                debug!(target: "sync", "Block #{} is out of staging scope: [#{} - Lastest)", block_number, max_staged_block_number);
-                                //                                                return;
-                                //                                            } else {
-                                //                                                let mut block_hashes_to_stage = Vec::new();
-                                //                                                let mut blocks_to_stage = Vec::new();
-                                //
-                                //                                                let parent_hash = block.header.parent_hash();
-                                //                                                let parent_number = block_number - 1;
-                                //                                                if let Ok(mut staged_blocks) =
-                                //                                                SyncStorage::get_staged_blocks().lock()
-                                //                                                    {
-                                //                                                        if staged_blocks.len() < 32
-                                //                                                            & &!staged_blocks.contains_key(&parent_hash)
-                                //                                                            {
-                                //                                                                for blk in blocks.iter() {
-                                //                                                                    let hash = blk.header.hash();
-                                //                                                                    block_hashes_to_stage.push(hash);
-                                //                                                                    blocks_to_stage.push(blk.rlp_bytes(Seal::With));
-                                //                                                                }
-                                //
-                                //                                                                let max_staged_block_number =
-                                //                                                                    parent_number + blocks_to_stage.len() as u64;
-                                //
-                                //                                                                info!(target: "sync", "Staged blocks from {} to {} with parent: {}", parent_number + 1, max_staged_block_number, parent_hash);
-                                //                                                                debug!(target: "sync", "cache size: {}", staged_blocks.len());
-                                //
-                                //                                                                SyncStorage::insert_staged_block_hashes(
-                                //                                                                    block_hashes_to_stage,
-                                //                                                                );
-                                //
-                                //                                                                staged_blocks.insert(*parent_hash, blocks_to_stage);
-                                //
-                                //                                                                if max_staged_block_number
-                                //                                                                    > SyncStorage::get_max_staged_block_number()
-                                //                                                                    {
-                                //                                                                        SyncStorage::set_max_staged_block_number(
-                                //                                                                            max_staged_block_number,
-                                //                                                                        );
-                                //                                                                    }
-                                //                                                            }
-                                //                                                    }
-                                //                                            }
-                                //                                        }
-                                //                                    } else {
-                                //                                        let mut bw = BlocksWrapper::new();
-                                //                                        bw.node_id_hash = node.node_hash;
-                                //                                        bw.blocks.extend(blocks);
-                                //                                        SyncStorage::insert_downloaded_blocks(bw);
-                                //                                    }
-
-                                //                                    if node.mode == Mode::NORMAL | | node.mode == Mode::THUNDER {
-                                //                                        headers::get_headers_from_node(node);
-                                //                                    }
                             }
                         }
                     }
@@ -289,6 +178,3 @@ pub fn receive_res(
         }
     }
 }
-
-//    SyncEvent::update_node_state(node, SyncEvent::OnBlockBodiesRes);
-//    update_node(node_hash, node);

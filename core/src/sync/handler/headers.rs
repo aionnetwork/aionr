@@ -32,12 +32,10 @@ use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use p2p::ChannelBuffer;
 use p2p::Node;
-use p2p::get_random_active_node;
-use p2p::send as p2p_send;
+use p2p::Mgr;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
-use sync::event::SyncEvent;
 use sync::storage::{ SyncStorage};
 use sync::helper::{Wrapper,WithStatus};
 
@@ -45,89 +43,7 @@ const BACKWARD_SYNC_STEP: u64 = 64;
 pub const REQUEST_SIZE: u32 = 64;
 const LARGE_REQUEST_SIZE: u64 = 48;
 
-pub fn get_headers_from_node(node: &mut Node) {
-    trace!(target: "sync", "get_headers_from_node, node id: {}", node.get_id_string());
-    //    if node.target_total_difficulty > node.current_total_difficulty {
-    //        let mut from: u64 = 1;
-    //        let mut size = REQUEST_SIZE;
-    //
-    //        match node.mode {
-    //            Mode::LIGHTNING => {
-    //                // request far forward blocks
-    //                let mut self_num;
-    //                let max_staged_block_number = SyncStorage::get_max_staged_block_number();
-    //                let synced_block_number = SyncStorage::get_synced_block_number();
-    //                if synced_block_number + LARGE_REQUEST_SIZE * 5 > max_staged_block_number {
-    //                    let sync_speed = SyncStorage::get_sync_speed();
-    //                    let jump_size = if sync_speed <= 40 {
-    //                        480
-    //                    } else if sync_speed > 40 && sync_speed <= 100 {
-    //                        sync_speed as u64 * 12
-    //                    } else {
-    //                        1200
-    //                    };
-    //                    self_num = synced_block_number + jump_size;
-    //                } else {
-    //                    self_num = max_staged_block_number + 1;
-    //                }
-    //                if node.best_block_num > self_num + LARGE_REQUEST_SIZE {
-    //                    size = LARGE_REQUEST_SIZE;
-    //                    from = self_num;
-    //                } else {
-    //                    // transition to ramp down strategy
-    //                    node.mode = Mode::THUNDER;
-    //                    return;
-    //                }
-    //            }
-    //            Mode::THUNDER => {
-    //                let mut self_num = SyncStorage::get_synced_block_number();
-    //                size = LARGE_REQUEST_SIZE;
-    //                from = if self_num > 4 { self_num - 3 } else { 1 };
-    //            }
-    //            Mode::NORMAL => {
-    //                let self_num = SyncStorage::get_synced_block_number();
-    //                let node_num = node.best_block_num;
-    //
-    //                if node_num >= self_num + BACKWARD_SYNC_STEP {
-    //                    from = if self_num > 4 { self_num - 3 } else { 1 };
-    //                } else if self_num < BACKWARD_SYNC_STEP {
-    //                    from = if self_num > 16 { self_num - 15 } else { 1 };
-    //                } else if node_num >= self_num - BACKWARD_SYNC_STEP {
-    //                    from = self_num - 16;
-    //                } else {
-    //                    return;
-    //                    // return;
-    //                    // ------
-    //                    // FIX: must consider a case when syncing backward (chain reorg) node_num < self_num - BACKWARD_SYNC_STEP
-    //                    // ------
-    //                    // from = node_num;
-    //                }
-    //            }
-    //            Mode::BACKWARD => {
-    //                let self_num = node.synced_block_num;
-    //                if self_num > BACKWARD_SYNC_STEP {
-    //                    from = self_num - BACKWARD_SYNC_STEP;
-    //                }
-    //            }
-    //            Mode::FORWARD => {
-    //                let self_num = node.synced_block_num;
-    //                from = self_num + 1;
-    //            }
-    //        };
-    //
-    //        if node.last_request_num != from {
-    //            node.last_request_timestamp = SystemTime::now();
-    //        }
-    //        node.last_request_num = from;
-    //
-    //        debug!(target: "sync", "request headers: from number: {}, node: {}, sn: {}, mode: {}.", from, node.get_ip_addr(), node.synced_block_num, node.mode);
-    //
-    //        send_blocks_headers_req(node.node_hash, from, size as u32);
-    //        update_node(node.node_hash, node);
-    //    }
-}
-
-pub fn send(start: u64, hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn send(p2p: Arc<Mgr>, start: u64, hash: u64) {
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
     cb.head.ctrl = MODULE::SYNC.value();
@@ -142,10 +58,14 @@ pub fn send(start: u64, hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     cb.body.put_slice(&size_buf);
 
     cb.head.len = cb.body.len() as u32;
-    p2p_send(&hash, cb, nodes.clone());
+    p2p.send(p2p.clone(), hash, cb);
 }
 
-pub fn receive_req(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+pub fn receive_req(
+    p2p: Arc<Mgr>, 
+    hash: u64, 
+    cb_in: ChannelBuffer
+) {
     trace!(target: "sync", "headers/receive_req");
 
     let client = SyncStorage::get_block_chain();
@@ -187,19 +107,15 @@ pub fn receive_req(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMap<u6
 
     res.body.put_slice(res_body.as_slice());
     res.head.len = res.body.len() as u32;
-
-    //    SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersReq);
-    //    update_node(node_hash, node);
-    p2p_send(&hash, res, nodes);
+    p2p.send(p2p.clone(), hash, res);
 }
 
 pub fn receive_res(
+    p2p: Arc<Mgr>, 
     hash: u64,
     cb_in: ChannelBuffer,
-    _nodes: Arc<RwLock<HashMap<u64, Node>>>,
     hws: Arc<RwLock<BTreeMap<u64, Wrapper>>>,
-)
-{
+){
     trace!(target: "sync", "headers/receive_res");
 
     let rlp = UntrustedRlp::new(cb_in.body.as_slice());
@@ -269,7 +185,4 @@ pub fn receive_res(
     } else {
         debug!(target: "sync", "Came too late............");
     }
-
-    //    SyncEvent::update_node_state(node, SyncEvent::OnBlockHeadersRes);
-    //    update_node(node_hash, node);
 }
