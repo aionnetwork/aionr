@@ -23,24 +23,32 @@ use std::time::SystemTime;
 
 #[derive(Clone, PartialEq)]
 pub enum WithStatus {
-    GetHeader(Vec<Vec<u8>>),
-    WaitForBody(Vec<Vec<u8>>),
-    GetBody(Vec<Vec<u8>>),
+    GetHeader,
+    GetBody,
+}
+
+impl WithStatus {
+    pub fn value(&self) -> u8 {
+        match self {
+            WithStatus::GetHeader => 0,
+            WithStatus::GetBody => 1,
+        }
+    }
 }
 
 #[derive(Clone, PartialEq)]
 pub struct Wrapper {
-    pub node_hash: u64,
     pub timestamp: SystemTime,
     pub with_status: WithStatus,
+    pub data: Vec<Vec<u8>>,
 }
 
 impl Wrapper {
     pub fn new() -> Self {
         Wrapper {
-            node_hash: 0,
             timestamp: SystemTime::now(),
-            with_status: WithStatus::GetHeader(Vec::new()),
+            with_status: WithStatus::GetHeader,
+            data: Vec::new(),
         }
     }
 }

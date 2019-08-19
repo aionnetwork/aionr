@@ -73,18 +73,8 @@ pub fn import_staged_blocks(hash: &H256) {
     //    }
 }
 
-pub fn import_blocks() {
+pub fn import_blocks(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     let mut blocks_to_import = Vec::new();
-    let client = SyncStorage::get_block_chain();
-    let mut bws = Vec::new();
-
-    if let Ok(ref mut downloaded_blocks) = SyncStorage::get_downloaded_blocks().try_lock() {
-        while let Some(bw) = downloaded_blocks.pop_front() {
-            bws.push(bw);
-        }
-    } else {
-        warn!(target: "sync", "import_block fail to get downloaded blocks.");
-    }
 
     for bw in bws.iter() {
         if let Some(mut node) = get_node(bw.node_id_hash) {

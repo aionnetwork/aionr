@@ -32,15 +32,19 @@ use p2p::{ChannelBuffer, Node, Mgr};
 
 const HASH_LENGTH: usize = 32;
 
-pub fn send(p2p: Arc<Mgr>) {
+pub fn send_random(p2p: Arc<Mgr>) {
     if let Some(hash) = p2p.get_random_active_node_hash() {
-        let mut cb = ChannelBuffer::new();
-        cb.head.ver = VERSION::V0.value();
-        cb.head.ctrl = MODULE::SYNC.value();
-        cb.head.action = ACTION::STATUSREQ.value();
-        cb.head.len = 0;
-        p2p.send(p2p.clone(), hash, cb);
+        send(hash, p2p.clone())
     }
+}
+
+pub fn send(hash: u64, p2p: Arc<Mgr>) {
+    let mut cb = ChannelBuffer::new();
+    cb.head.ver = VERSION::V0.value();
+    cb.head.ctrl = MODULE::SYNC.value();
+    cb.head.action = ACTION::STATUSREQ.value();
+    cb.head.len = 0;
+    p2p.send(p2p.clone(), hash, cb);
 }
 
 pub fn receive_req(p2p: Arc<Mgr>, hash: u64) {
@@ -77,6 +81,7 @@ pub fn receive_req(p2p: Arc<Mgr>, hash: u64) {
     cb.head.len = cb.body.len() as u32;
     trace!(target:"sync", "status res bc body len: {}", cb.head.len);
 
+    p2p.update_node(&hash);
     p2p.send(p2p.clone(), hash, cb);
 }
 
@@ -101,6 +106,7 @@ pub fn receive_res(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
                     node.block_hash = H256::from(best_hash);
                     node.block_num = best_block_num;
                     node.total_difficulty = U256::from(total_difficulty);
+                    node.update();
                 }
                 None => {
                     // TODO:

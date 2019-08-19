@@ -27,12 +27,14 @@ use client::BlockId;
 use engine::unity_engine::UnityEngine;
 use header::{Header as BlockHeader,Seal};
 use acore_bytes::to_hex;
+use client::BlockChainInfo;
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use p2p::ChannelBuffer;
 use p2p::Node;
 use p2p::Mgr;
+use super::bodies;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
@@ -43,29 +45,55 @@ const BACKWARD_SYNC_STEP: u64 = 64;
 pub const REQUEST_SIZE: u32 = 64;
 const LARGE_REQUEST_SIZE: u64 = 48;
 
-pub fn send(p2p: Arc<Mgr>, start: u64, hash: u64) {
-    let mut cb = ChannelBuffer::new();
-    cb.head.ver = VERSION::V0.value();
-    cb.head.ctrl = MODULE::SYNC.value();
-    cb.head.action = ACTION::HEADERSREQ.value();
-
-    let mut from_buf = [0u8; 8];
-    BigEndian::write_u64(&mut from_buf, start);
-    cb.body.put_slice(&from_buf);
-
-    let mut size_buf = [0u8; 4];
-    BigEndian::write_u32(&mut size_buf, REQUEST_SIZE);
-    cb.body.put_slice(&size_buf);
-
-    cb.head.len = cb.body.len() as u32;
-    p2p.send(p2p.clone(), hash, cb);
+pub fn get_working_nodes(ws: Arc<RwLock<HashMap<u64, Wrapper>>>) -> Vec<u64> {
+    let mut working_nodes = Vec::new();
+    if let Ok(wrappers) = ws.read() {
+        working_nodes = wrappers.keys().cloned().collect();
+    }
+    working_nodes
 }
 
-pub fn receive_req(
-    p2p: Arc<Mgr>, 
-    hash: u64, 
-    cb_in: ChannelBuffer
-) {
+pub fn send(
+    p2p: Arc<Mgr>,
+    start: u64,
+    chain_info: &BlockChainInfo,
+    ws: Arc<RwLock<HashMap<u64, Wrapper>>>,
+)
+{
+    let working_nodes = get_working_nodes(ws);
+
+    if let Some(node) = p2p.get_random_active_node(&working_nodes) {
+        if node.total_difficulty > chain_info.total_difficulty
+            && node.block_num - REQUEST_SIZE as u64 >= chain_info.best_block_number
+        {
+            let start = if start > 3 {
+                start - 3
+            } else if chain_info.best_block_number > 3 {
+                chain_info.best_block_number - 3
+            } else {
+                1
+            };
+            debug!(target:"sync","send header req start: {} , size: {} , node_hash: {}", start, REQUEST_SIZE,node.hash);
+            let mut cb = ChannelBuffer::new();
+            cb.head.ver = VERSION::V0.value();
+            cb.head.ctrl = MODULE::SYNC.value();
+            cb.head.action = ACTION::HEADERSREQ.value();
+
+            let mut from_buf = [0u8; 8];
+            BigEndian::write_u64(&mut from_buf, start);
+            cb.body.put_slice(&from_buf);
+
+            let mut size_buf = [0u8; 4];
+            BigEndian::write_u32(&mut size_buf, REQUEST_SIZE);
+            cb.body.put_slice(&size_buf);
+
+            cb.head.len = cb.body.len() as u32;
+            p2p.send(p2p.clone(), node.hash, cb);
+        }
+    }
+}
+
+pub fn receive_req(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
     trace!(target: "sync", "headers/receive_req");
 
     let client = SyncStorage::get_block_chain();
@@ -107,22 +135,26 @@ pub fn receive_req(
 
     res.body.put_slice(res_body.as_slice());
     res.head.len = res.body.len() as u32;
+
+    p2p.update_node(&hash);
+
     p2p.send(p2p.clone(), hash, res);
 }
 
 pub fn receive_res(
-    p2p: Arc<Mgr>, 
+    p2p: Arc<Mgr>,
     hash: u64,
     cb_in: ChannelBuffer,
-    hws: Arc<RwLock<BTreeMap<u64, Wrapper>>>,
-){
+    hws: Arc<RwLock<HashMap<u64, Wrapper>>>,
+)
+{
     trace!(target: "sync", "headers/receive_res");
 
     let rlp = UntrustedRlp::new(cb_in.body.as_slice());
     let mut prev_header = BlockHeader::new();
     let mut hw = Wrapper::new();
     let mut headers = Vec::new();
-    let mut number = 0;
+    let mut hashes = Vec::new();
     for header_rlp in rlp.iter() {
         if let Ok(header) = header_rlp.as_val() {
             let result = UnityEngine::validate_block_header(&header);
@@ -158,7 +190,7 @@ pub fn receive_res(
                         //                        if !SyncStorage::is_downloaded_block_hashes(&hash)
                         //                            && !SyncStorage::is_imported_block_hash(&hash)
                         //                        {
-                        number = header.number();
+                        hashes.put_slice(&header.hash());
                         headers.push(header.clone().rlp(Seal::Without));
                         //                        }
                     }
@@ -175,13 +207,14 @@ pub fn receive_res(
     }
 
     if !headers.is_empty() {
-        hw.node_hash = hash;
-        hw.with_status = WithStatus::GetHeader(headers);
+        hw.data = headers;
+        hw.with_status = WithStatus::GetHeader;
         hw.timestamp = SystemTime::now();
-        if let Ok(mut hws) = hws.try_write() {
-            info!(target: "sync", "get headers to #{}", number);
-            hws.insert(number, hw);
+        p2p.update_node(&hash);
+        if let Ok(mut hws) = hws.write() {
+            hws.insert(hash.clone(), hw);
         }
+        bodies::send(p2p.clone(), hash, hashes);
     } else {
         debug!(target: "sync", "Came too late............");
     }
