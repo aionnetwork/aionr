@@ -21,6 +21,6 @@
 
 pub mod status;
 pub mod headers;
-// pub mod bodies;
+pub mod bodies;
 pub mod broadcast;
 // pub mod import;

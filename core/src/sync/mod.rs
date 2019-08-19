@@ -60,11 +60,14 @@ use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
 use sync::handler::status;
+use sync::handler::bodies;
 use sync::handler::headers;
-// use sync::handler::bodies;
-use sync::handler::broadcast;
+// use sync::handler::broadcast;
 // use sync::handler::import;
-use self::helper::HeadersWrapper;
+use sync::helper::{Wrapper,WithStatus};
+use sync::handler::headers::REQUEST_SIZE;
+use header::Header;
+
 use sync::storage::ActivePeerInfo;
 use sync::storage::PeerInfo;
 use sync::storage::SyncState;
@@ -74,13 +77,15 @@ use sync::storage::TransactionStats;
 use p2p::get_random_active_node_hash;
 use p2p::get_random_active_node;
 
+const HEADERS_CAPACITY: u64 = 256;
 const STATUS_REQ_INTERVAL: u64 = 2;
 const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
 const BLOCKS_IMPORT_INTERVAL: u64 = 50;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const INTERVAL_STATUS: u64 = 10;
 const INTERVAL_HEADERS: u64 = 2;
-const HEADERS_STEP: u32 = 64;
+const INTERVAL_BODIES: u64 = 2;
+
 const MAX_TX_CACHE: usize = 20480;
 const MAX_BLOCK_CACHE: usize = 32;
 
@@ -90,8 +95,10 @@ pub struct Sync {
     runtime: Arc<Runtime>,
     p2p: Arc<Mgr>,
 
-    /// collection of sent headers
-    headers: Arc<RwLock<BTreeMap<u64, HeadersWrapper>>>,
+    // TODO: avoid the same type req to one node
+    //    working_nodes : Arc<RwLock<HashSet<u64>>>,
+    /// collection of sent wrappers
+    wrappers: Arc<RwLock<BTreeMap<u64, Wrapper>>>,
 
     /// local best td
     local_best_td: Arc<RwLock<U256>>,
@@ -140,7 +147,7 @@ impl Sync {
         let nodes = self.p2p.nodes.clone();
 
         // init p2p
-        &self.p2p.run(Arc::new(handle), self.headers.clone());
+        &self.p2p.run(Arc::new(handle), self.wrappers.clone());
 
         // status
         let executor_status = executor.clone();
@@ -169,44 +176,120 @@ impl Sync {
         );
 
         let executor_headers = executor.clone();
+        let wrappers1 = self.wrappers.clone();
+        let client = self.client.clone();
         executor_headers.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_HEADERS))
                 .for_each(move |_| {
                     // make it constant
-                    if let Some(node) = get_random_active_node(nodes_headers.clone()) {
-                        let chain_info = SyncStorage::get_chain_info();
-                        if node.total_difficulty > chain_info.total_difficulty
-                            && node.block_num - HEADERS_STEP as u64 >= chain_info.best_block_number
-                        {
-                            let start = if chain_info.best_block_number > 3 {
-                                chain_info.best_block_number - 3
-                            } else {
-                                1
-                            };
+                    let chain_info = client.chain_info();
+                    let mut max = 0u64;
+                    if let Ok(read) = wrappers1.read() {
+                        max = read.keys().last().map_or(0u64, |x| x.clone());
+                    };
+                    if max < chain_info.best_block_number + HEADERS_CAPACITY {
+                        if let Some(node) = get_random_active_node(nodes_headers.clone()) {
+                            if node.total_difficulty > chain_info.total_difficulty
+                                && node.block_num - REQUEST_SIZE as u64
+                                    >= chain_info.best_block_number
+                            {
+                                let start = if max != 0 {
+                                    max
+                                } else if chain_info.best_block_number > 3 {
+                                    chain_info.best_block_number - 3
+                                } else {
+                                    1
+                                };
 
-                            let mut cb = ChannelBuffer::new();
-                            cb.head.ver = VERSION::V0.value();
-                            cb.head.ctrl = MODULE::SYNC.value();
-                            cb.head.action = ACTION::HEADERSREQ.value();
-
-                            let mut from_buf = [0u8; 8];
-                            BigEndian::write_u64(&mut from_buf, start);
-                            cb.body.put_slice(&from_buf);
-
-                            let mut size_buf = [0u8; 4];
-                            BigEndian::write_u32(&mut size_buf, HEADERS_STEP);
-                            cb.body.put_slice(&size_buf);
-
-                            cb.head.len = cb.body.len() as u32;
-                            send(node.get_hash(), cb, nodes_send_1.clone());
+                                headers::send(start, node.get_hash(), nodes_send1.clone());
+                            }
                         }
                     }
-
                     //                     p2p.get_node_by_td(10);
                     Ok(())
                 })
-                .map_err(|err| error!(target: "p2p", "executor status: {:?}", err)),
-        )
+                .map_err(|err| error!(target: "p2p", "executor headers: {:?}", err)),
+        );
+        let executor_bodies = executor.clone();
+        let wrappers2 = self.wrappers.clone();
+        executor_bodies.spawn(
+            Interval::new(Instant::now(), Duration::from_secs(INTERVAL_BODIES))
+                .for_each(move |_| {
+                    if let Ok(mut wrappers) = wrappers2.try_write() {
+                        if let Some((num, wrapper)) = wrappers
+                            .clone()
+                            .iter()
+                            .filter(|(_, w)| {
+                                match w.with_status {
+                                    WithStatus::GetHeader(_) => true,
+                                    _ => false,
+                                }
+                            })
+                            .next()
+                        {
+                            match wrapper.with_status {
+                                WithStatus::GetHeader(ref hw) => {
+                                    let mut cb = ChannelBuffer::new();
+                                    cb.head.ver = VERSION::V0.value();
+                                    cb.head.ctrl = MODULE::SYNC.value();
+                                    cb.head.action = ACTION::BODIESREQ.value();
+                                    for h in hw.clone() {
+                                        let rlp = UntrustedRlp::new(&h);
+                                        let header: Header =
+                                            rlp.as_val().expect("should not be err");
+                                        cb.body.put_slice(&header.hash());
+                                    }
+                                    cb.head.len = cb.body.len() as u32;
+                                    send(num, cb, nodes_bodies.clone());
+                                    if let Some(w) = wrappers.get_mut(num) {
+                                        (*w).timestamp = SystemTime::now();
+                                        (*w).with_status = WithStatus::WaitForBody(hw.clone());
+                                    };
+                                }
+                                _ => (),
+                            };
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|err| error!(target: "p2p", "executor bodies: {:?}", err)),
+        );
+        //        let executor_import = executor.clone();
+        //        executor_bodies.spawn(
+        //            Interval::new(Instant::now(), Duration::from_secs(INTERVAL_BODIES))
+        //                .for_each(move |_| {
+        //                    if let Ok(mut wrappers) = wrappers2.try_write(){
+        //                        if let Some((num,wrapper)) = wrappers.clone()
+        //                            .iter()
+        //                            .filter(|(_,w)| match w.with_status { WithStatus::GetHeader(_) => true, _ => false })
+        //                            .next()
+        //                            {
+        //                                match wrapper.with_status {
+        //                                    WithStatus::GetHeader(ref hw) => {
+        //                                        let mut cb = ChannelBuffer::new();
+        //                                        cb.head.ver = VERSION::V0.value();
+        //                                        cb.head.ctrl = MODULE::SYNC.value();
+        //                                        cb.head.action = ACTION::BODIESREQ.value();
+        //                                        for h in hw.clone() {
+        //                                            let rlp = UntrustedRlp::new(&h);
+        //                                            let header:Header = rlp.as_val().expect("should not be err");
+        //                                            cb.body.put_slice(&header.hash());
+        //                                        }
+        //                                        cb.head.len = cb.body.len() as u32;
+        //                                        send(num,cb,nodes_bodies.clone());
+        //                                        if let Some(w) =wrappers.get_mut(num){
+        //                                            (*w).timestamp = SystemTime::now();
+        //                                            (*w).with_status = WithStatus::WaitForBody(hw.clone());
+        //                                        };
+        //                                    }
+        //                                    _ => ()
+        //                                };
+        //                            }
+        //                    }
+        //                    Ok(())
+        //                })
+        //                .map_err(|err| error!(target: "p2p", "executor status: {:?}", err)),
+        //        );
     }
 
     pub fn shutdown(&self) {
@@ -221,11 +304,11 @@ pub fn handle(
     hash: u64,
     cb: ChannelBuffer,
     nodes: Arc<RwLock<HashMap<u64, Node>>>,
-    hws: Arc<RwLock<BTreeMap<u64, HeadersWrapper>>>,
     local_best_block_number: Arc<RwLock<u64>>,
     network_best_block_number: Arc<RwLock<u64>>,
     cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
-    cached_block_hashes:  Arc<Mutex<LruCache<H256, u8>>>
+    cached_block_hashes:  Arc<Mutex<LruCache<H256, u8>>>,
+    ws: Arc<RwLock<BTreeMap<u64, Wrapper>>>,
 ){
     match ACTION::from(cb.head.action) {
         ACTION::STATUSREQ => {
@@ -236,11 +319,12 @@ pub fn handle(
         }
         ACTION::STATUSRES => status::receive_res(hash, cb, nodes),
         ACTION::HEADERSREQ => headers::receive_req(hash, cb, nodes),
-        ACTION::HEADERSRES => headers::receive_res(hash, cb, nodes, hws),
-        ACTION::BODIESREQ => (),
-        ACTION::BODIESRES => (),
-        // ACTION::BROADCASTTX => broadcast::receive_tx(hash, cb, nodes, localnetwork_best_block_number, client, cached_tx_hashes),
-        ACTION::BROADCASTBLOCK => (), // broadcast::receive_block(hash, cb, nodes),
+        ACTION::HEADERSRES => headers::receive_res(hash, cb, nodes, ws),
+        ACTION::BODIESREQ => bodies::receive_req(hash, cb, nodes),
+        ACTION::BODIESRES => bodies::receive_res(hash, cb, nodes, ws),
+        ACTION::BROADCASTTX => (),
+        ACTION::BROADCASTBLOCK => (),
+        // TODO: kill the node
         ACTION::UNKNOWN => (),
     };
 }

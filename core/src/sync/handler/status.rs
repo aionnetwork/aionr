@@ -26,15 +26,25 @@ use std::collections::HashMap;
 use aion_types::{H256, U256};
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
-use sync::route::VERSION;
-use sync::route::MODULE;
-use sync::route::ACTION;
+use sync::route::{VERSION,MODULE,ACTION};
 use sync::storage::SyncStorage;
-use p2p::ChannelBuffer;
-use p2p::Node;
-use p2p::send as p2p_send;
+use p2p::{ChannelBuffer,Node,send as p2p_send,get_random_active_node_hash};
 
 const HASH_LENGTH: usize = 32;
+
+pub fn send(nodes: Arc<RwLock<HashMap<u64, Node>>>) {
+    let nodes1 = nodes.clone();
+    let nodes2 = nodes.clone();
+
+    if let Some(hash) = get_random_active_node_hash(nodes1.clone()) {
+        let mut cb = ChannelBuffer::new();
+        cb.head.ver = VERSION::V0.value();
+        cb.head.ctrl = MODULE::SYNC.value();
+        cb.head.action = ACTION::STATUSREQ.value();
+        cb.head.len = 0;
+        p2p_send(&hash, cb, nodes.clone());
+    }
+}
 
 pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     debug!(target: "sync", "status/receive_req");
@@ -70,7 +80,7 @@ pub fn receive_req(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
     cb.head.len = cb.body.len() as u32;
     trace!(target:"sync", "status res bc body len: {}", cb.head.len);
 
-    p2p_send(hash, cb, nodes);
+    p2p_send(&hash, cb, nodes);
 }
 
 pub fn receive_res(hash: u64, cb_in: ChannelBuffer, nodes: Arc<RwLock<HashMap<u64, Node>>>) {

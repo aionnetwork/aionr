@@ -26,7 +26,7 @@ use std::time::SystemTime;
 use block::Block;
 use client::{BlockChainClient, BlockChainInfo, BlockQueueInfo};
 use header::Header;
-use sync::helper::HeadersWrapper;
+use sync::helper::Wrapper;
 use aion_types::{H256, U256};
 use lru_cache::LruCache;
 use crate_state::Storage;
@@ -37,8 +37,8 @@ lazy_static! {
     static ref SYNC_EXECUTORS: Storage<RwLock<SyncExecutor>> = Storage::new();
     static ref LOCAL_STATUS: Storage<RwLock<LocalStatus>> = Storage::new();
     static ref NETWORK_STATUS: Storage<RwLock<NetworkStatus>> = Storage::new();
-    static ref DOWNLOADED_HEADERS: Storage<Mutex<VecDeque<HeadersWrapper>>> = Storage::new();
-    static ref HEADERS_WITH_BODIES_REQUESTED: Storage<Mutex<HashMap<u64, HeadersWrapper>>> =
+    static ref DOWNLOADED_HEADERS: Storage<Mutex<VecDeque<Wrapper>>> = Storage::new();
+    static ref HEADERS_WITH_BODIES_REQUESTED: Storage<Mutex<HashMap<u64, Wrapper>>> =
         Storage::new();
     static ref DOWNLOADED_BLOCKS: Storage<Mutex<VecDeque<BlocksWrapper>>> = Storage::new();
     static ref REQUESTED_BLOCK_HASHES: Storage<Mutex<LruCache<H256, SystemTime>>> = Storage::new();
@@ -210,7 +210,7 @@ impl SyncStorage {
         0
     }
 
-    pub fn get_downloaded_headers() -> &'static Mutex<VecDeque<HeadersWrapper>> {
+    pub fn get_downloaded_headers() -> &'static Mutex<VecDeque<Wrapper>> {
         DOWNLOADED_HEADERS.get()
     }
 
@@ -220,11 +220,11 @@ impl SyncStorage {
         }
     }
 
-    pub fn get_headers_with_bodies_requested() -> &'static Mutex<HashMap<u64, HeadersWrapper>> {
+    pub fn get_headers_with_bodies_requested() -> &'static Mutex<HashMap<u64, Wrapper>> {
         HEADERS_WITH_BODIES_REQUESTED.get()
     }
 
-    pub fn pick_headers_with_bodies_requested(node_hash: &u64) -> Option<HeadersWrapper> {
+    pub fn pick_headers_with_bodies_requested(node_hash: &u64) -> Option<Wrapper> {
         if let Ok(ref mut headers_with_bodies_requested) =
             HEADERS_WITH_BODIES_REQUESTED.get().lock()
         {
@@ -247,7 +247,7 @@ impl SyncStorage {
         DOWNLOADED_BLOCKS.get()
     }
 
-    pub fn insert_downloaded_headers(hw: HeadersWrapper) {
+    pub fn insert_downloaded_headers(hw: Wrapper) {
         let downloaded_headers_mutex = DOWNLOADED_HEADERS.get();
         {
             let mut lock = downloaded_headers_mutex.lock();
