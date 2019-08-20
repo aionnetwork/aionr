@@ -327,10 +327,12 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         ipc_server.unwrap().close();
     }
 
-    // sync.stop_network();
+    println!("wocao !!!!!!!!!!!!!!!");
+    // sync.shutdown()
+
     // close/drop this stuff as soon as exit detected.
     // drop((sync, chain_notify));
-    drop(sync);
+    
 
     thread::sleep(Duration::from_secs(5));
 

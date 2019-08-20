@@ -109,11 +109,19 @@ pub fn receive_res(
     let (node_count, rest) = cb_in.body.split_at(1);
     let mut temp_list = Vec::new();
     if node_count[0] > 0 {
+
+        let (local_ip, port) = p2p.config.get_ip_and_port();
+
         // TODO: update node status with healthy active nodes msg
         // TODO: max active nodes filter
         for _i in 0..node_count[0] as u32 {
             let (id, rest) = rest.split_at(NODE_ID_LENGTH);
             let (ip, rest) = rest.split_at(IP_LENGTH);
+            
+            if local_ip.as_bytes() == ip {
+                continue;
+            }
+
             let (mut port, rest) = rest.split_at(mem::size_of::<u32>());
 
             let mut temp = TempNode::default();

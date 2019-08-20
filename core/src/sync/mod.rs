@@ -333,11 +333,18 @@ impl Sync {
         //        );
     }
 
-    pub fn shutdown(&self) {
+    pub fn shutdown(self) {
         // SyncMgr::disable();
         // TODO: update proper ways to clear up threads and connections on p2p layer
-        let p2p = self.p2p.clone();
-        p2p.shutdown();
+        // self.p2p.shutdown();
+        match Arc::try_unwrap(self.p2p) {
+            Ok(p2p) => {
+                p2p.shutdown();
+            }, 
+            Err(err) => {
+                error!(target: "sync", "shutdown p2p");
+            }
+        }
     }
 }
 

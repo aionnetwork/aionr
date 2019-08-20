@@ -36,7 +36,6 @@ extern crate uuid;
 extern crate aion_version as version;
 extern crate bytes;
 extern crate byteorder;
-extern crate lru_cache;
 
 #[cfg(test)]
 mod test;
@@ -53,15 +52,19 @@ use std::io;
 use std::sync::Arc;
 use std::collections::VecDeque;
 use std::collections::HashMap;
-use std::sync::{Mutex,RwLock};
+use std::sync::Mutex;
+use std::sync::RwLock;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::Instant;
 use std::net::SocketAddr;
 use rand::random;
+use futures::prelude::*;
 use futures::sync::mpsc;
 use futures::{Future, Stream};
 use futures::lazy;
+use futures::sync::oneshot;
+use futures::sync::oneshot::Sender;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
@@ -82,7 +85,6 @@ pub use node::Node;
 pub use config::Config;
 pub use callable::Callable;
 
-const INTERVAL_STATISICS: u64 = 5;
 const INTERVAL_OUTBOUND_CONNECT: u64 = 10;
 const INTERVAL_TIMEOUT: u64 = 5;
 const INTERVAL_ACTIVE_NODES: u64 = 3;
@@ -91,7 +93,9 @@ const TEMP_MAX: usize = 64;
 
 pub struct Mgr {
     /// threading
-    runtime: Arc<Runtime>,
+    //runtime: Arc<Runtime>,
+    //runtime: Runtime,
+    shutdown_hook: RwLock<Option<Sender<()>>>,
     /// config
     config: Arc<Config>,
     /// temp queue storing seeds and active nodes queried from other nodes
@@ -103,7 +107,8 @@ pub struct Mgr {
 impl Mgr {
     /// construct p2p instance
     pub fn new(config: Arc<Config>) -> Mgr {
-        // construct seeds
+
+        // load seeds
         let mut temp_queue = VecDeque::<TempNode>::with_capacity(TEMP_MAX);
         for boot_node_str in config.boot_nodes.clone() {
             info!(target: "run", "        seed: {}", &boot_node_str);
@@ -112,7 +117,9 @@ impl Mgr {
 
         // return instance
         Mgr {
-            runtime: Arc::new(Runtime::new().expect("tokio runtime")),
+            // runtime: Arc::new(Runtime::new().expect("tokio runtime")),
+            //runtime: Runtime::new().expect("tokio runtime"),
+            shutdown_hook: RwLock::new(None),
             config,
             temp: Arc::new(Mutex::new(temp_queue)),
             nodes: Arc::new(RwLock::new(HashMap::new())),
@@ -120,9 +127,11 @@ impl Mgr {
     }
 
     /// run p2p instance
-    pub fn run(&self, p2p: Arc<Mgr>, callback: Arc<Callable>) {
+    pub fn run(&mut self, p2p: Arc<Mgr>, callback: Arc<Callable>) {
+
         // init
-        let executor = Arc::new(self.runtime.executor());
+        let mut rt = Runtime::new().unwrap();
+        let executor = rt.executor();
         let binding: SocketAddr = self
             .config
             .get_id_and_binding()
@@ -353,19 +362,20 @@ impl Mgr {
                 Ok(())
             }).map_err(|err| error!(target: "p2p", "executor server: {:?}", err));
         executor_inbound.spawn(server);
+
+        // init signal
+        let (tx, rx) = oneshot::channel::<()>();
+        self.shutdown_hook = RwLock::new(Some(tx));
+        rt.block_on(rx.map_err(|_| ())).unwrap();
+        rt.shutdown_now().wait().unwrap();
     }
 
-    /// shutdown p2p instance
-    pub fn shutdown(&self) {
-        // let runtime = self.runtime.clone();
-        // match runtime.shutdown_now().wait(){
-        //     Ok(_) => {
-        //         info!(target: "p2p", "shutdown");
-        //     },
-        //     Err(err) => {
-        //         error!(target: "p2p", "shutdown failed: {:?}", err);
-        //     }
-        // }
+    pub fn shutdown(self) {
+        let mut lock = self.shutdown_hook.write().unwrap();
+            if let Some(mut tx) = lock.take() {
+                tx.send(());
+            }
+        
     }
 
     /// rechieve a random node with td >= target_td
