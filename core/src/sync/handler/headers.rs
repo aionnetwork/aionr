@@ -34,7 +34,7 @@ use rlp::{RlpStream, UntrustedRlp};
 use p2p::ChannelBuffer;
 use p2p::Node;
 use p2p::Mgr;
-use super::bodies;
+use sync::handler::bodies;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
@@ -60,43 +60,68 @@ pub fn get_working_nodes(ws: Arc<RwLock<HashMap<u64, Wrapper>>>) -> Vec<u64> {
 
 pub fn send(
     p2p: Arc<Mgr>,
+    hash: u64,
     start: u64,
     chain_info: &BlockChainInfo,
-    ws: Arc<RwLock<HashMap<u64, Wrapper>>>,
-)
-{
-    let working_nodes = get_working_nodes(ws);
+){ 
+    debug!(target:"sync","headers.rs/send: start {}, size: {}, node hash: {}", start, REQUEST_SIZE, hash);
+    let mut cb = ChannelBuffer::new();
+    cb.head.ver = VERSION::V0.value();
+    cb.head.ctrl = MODULE::SYNC.value();
+    cb.head.action = ACTION::HEADERSREQ.value();
 
-    if let Some(node) = p2p.get_random_active_node(&working_nodes) {
-        if node.total_difficulty > chain_info.total_difficulty
-            && node.block_num - REQUEST_SIZE as u64 >= chain_info.best_block_number
-        {
-            let start = if start > 3 {
-                start - 3
-            } else if chain_info.best_block_number > 3 {
-                chain_info.best_block_number - 3
-            } else {
-                1
-            };
-            debug!(target:"sync","send header req start: {} , size: {} , node_hash: {}", start, REQUEST_SIZE,node.hash);
-            let mut cb = ChannelBuffer::new();
-            cb.head.ver = VERSION::V0.value();
-            cb.head.ctrl = MODULE::SYNC.value();
-            cb.head.action = ACTION::HEADERSREQ.value();
+    let mut from_buf = [0u8; 8];
+    BigEndian::write_u64(&mut from_buf, start);
+    cb.body.put_slice(&from_buf);
 
-            let mut from_buf = [0u8; 8];
-            BigEndian::write_u64(&mut from_buf, start);
-            cb.body.put_slice(&from_buf);
+    let mut size_buf = [0u8; 4];
+    BigEndian::write_u32(&mut size_buf, REQUEST_SIZE);
+    cb.body.put_slice(&size_buf);
 
-            let mut size_buf = [0u8; 4];
-            BigEndian::write_u32(&mut size_buf, REQUEST_SIZE);
-            cb.body.put_slice(&size_buf);
-
-            cb.head.len = cb.body.len() as u32;
-            p2p.send(p2p.clone(), node.hash, cb);
-        }
-    }
+    cb.head.len = cb.body.len() as u32;
+    p2p.send(p2p.clone(), hash, cb);
 }
+
+// pub fn send(
+//     p2p: Arc<Mgr>,
+//     start: u64,
+//     chain_info: &BlockChainInfo,
+//     ws: Arc<RwLock<HashMap<u64, Wrapper>>>,
+// )
+// {
+//     let working_nodes = get_working_nodes(ws);
+
+//     if let Some(node) = p2p.get_random_active_node(&working_nodes) {
+
+//         if node.total_difficulty > chain_info.total_difficulty
+//             && node.block_num - REQUEST_SIZE as u64 >= chain_info.best_block_number
+//         {
+//             let start = if start > 3 {
+//                 start - 3
+//             } else if chain_info.best_block_number > 3 {
+//                 chain_info.best_block_number - 3
+//             } else {
+//                 1
+//             };
+//             debug!(target:"sync","send header req start: {} , size: {} , node_hash: {}", start, REQUEST_SIZE,node.hash);
+//             let mut cb = ChannelBuffer::new();
+//             cb.head.ver = VERSION::V0.value();
+//             cb.head.ctrl = MODULE::SYNC.value();
+//             cb.head.action = ACTION::HEADERSREQ.value();
+
+//             let mut from_buf = [0u8; 8];
+//             BigEndian::write_u64(&mut from_buf, start);
+//             cb.body.put_slice(&from_buf);
+
+//             let mut size_buf = [0u8; 4];
+//             BigEndian::write_u32(&mut size_buf, REQUEST_SIZE);
+//             cb.body.put_slice(&size_buf);
+
+//             cb.head.len = cb.body.len() as u32;
+//             p2p.send(p2p.clone(), node.hash, cb);
+//         }
+//     }
+// }
 
 pub fn receive_req(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
     trace!(target: "sync", "headers/receive_req");

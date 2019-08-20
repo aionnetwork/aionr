@@ -36,7 +36,9 @@ use route::MODULE;
 use route::ACTION;
 use super::super::Mgr;
 
-pub fn send(p2p: Arc<Mgr>) {
+pub fn send(
+    p2p: Arc<Mgr>
+) {
     let active: Vec<Node> = p2p.get_active_nodes();
     let len: usize = active.len();
     if len > 0 {
@@ -51,12 +53,15 @@ pub fn send(p2p: Arc<Mgr>) {
                 MODULE::P2P.value(),
                 ACTION::ACTIVENODESREQ.value(),
                 0,
-            ),
+            )
         );
     }
 }
 
-pub fn receive_req(p2p: Arc<Mgr>, hash: u64) {
+pub fn receive_req(
+    p2p: Arc<Mgr>,
+    hash: u64 
+) {
     debug!(target: "p2p", "active_nodes/receive_req");
 
     let mut cb_out = ChannelBuffer::new();
@@ -94,7 +99,11 @@ pub fn receive_req(p2p: Arc<Mgr>, hash: u64) {
     p2p.send(p2p.clone(), hash, cb_out);
 }
 
-pub fn receive_res(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
+pub fn receive_res(
+    p2p: Arc<Mgr>,
+    hash: u64,
+    cb_in: ChannelBuffer,
+){
     debug!(target: "p2p", "active_nodes/receive_res");
 
     let (node_count, rest) = cb_in.body.split_at(1);
@@ -105,7 +114,7 @@ pub fn receive_res(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
         for _i in 0..node_count[0] as u32 {
             let (id, rest) = rest.split_at(NODE_ID_LENGTH);
             let (ip, rest) = rest.split_at(IP_LENGTH);
-            let (mut port, _rest) = rest.split_at(mem::size_of::<u32>());
+            let (mut port, rest) = rest.split_at(mem::size_of::<u32>());
 
             let mut temp = TempNode::default();
             temp.addr.ip.copy_from_slice(ip);

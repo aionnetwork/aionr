@@ -21,11 +21,14 @@
 
 use std::mem;
 use std::sync::Arc;
+use std::sync::RwLock;
+use std::collections::HashMap;
 use aion_types::{H256, U256};
+use types::blockchain::info::BlockChainInfo;
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
+use sync::node_info::NodeInfo;
 use sync::route::{VERSION,MODULE,ACTION};
-use sync::storage::SyncStorage;
 use p2p::{ChannelBuffer,  Mgr};
 
 const HASH_LENGTH: usize = 32;
@@ -45,7 +48,7 @@ pub fn send(hash: u64, p2p: Arc<Mgr>) {
     p2p.send(p2p.clone(), hash, cb);
 }
 
-pub fn receive_req(p2p: Arc<Mgr>, hash: u64) {
+pub fn receive_req(p2p: Arc<Mgr>, chain_info: &BlockChainInfo, hash: u64) {
     debug!(target: "sync", "status/receive_req");
 
     let mut cb = ChannelBuffer::new();
@@ -55,14 +58,12 @@ pub fn receive_req(p2p: Arc<Mgr>, hash: u64) {
     cb.head.action = ACTION::STATUSRES.value();
 
     let mut res_body = Vec::new();
-    let chain_info = SyncStorage::get_chain_info();
 
     let mut best_block_number = [2u8; 8];
-    //    BigEndian::write_u64(&mut best_block_number, chain_info.best_block_number);
+    BigEndian::write_u64(&mut best_block_number, chain_info.best_block_number);
 
     let total_difficulty = chain_info.total_difficulty;
-    //    let best_hash = chain_info.best_block_hash;
-    let best_hash = H256::from("0x12345");
+    let best_hash = chain_info.best_block_hash;
     let genesis_hash = chain_info.genesis_hash;
 
     res_body.put_slice(&best_block_number);
@@ -83,12 +84,17 @@ pub fn receive_req(p2p: Arc<Mgr>, hash: u64) {
     p2p.send(p2p.clone(), hash, cb);
 }
 
-pub fn receive_res(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
+pub fn receive_res(
+    p2p: Arc<Mgr>, 
+    node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>, 
+    hash: u64, 
+    cb_in: ChannelBuffer
+) {
     trace!(target: "sync", "status/receive_res");
-    match p2p.nodes.try_write() {
+    match node_info.try_write() {
         Ok(mut write) => {
             match write.get_mut(&hash) {
-                Some(mut node) => {
+                Some(mut node_info) => {
                     trace!(target: "sync", "cb_body_len{}",cb_in.head.len);
                     let (mut best_block_num, req_body_rest) =
                         cb_in.body.split_at(mem::size_of::<u64>());
@@ -101,10 +107,26 @@ pub fn receive_res(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
                     let (best_hash, req_body_rest) = req_body_rest.split_at(HASH_LENGTH);
                     let (_genesis_hash, _) = req_body_rest.split_at(HASH_LENGTH);
 
-                    node.block_hash = H256::from(best_hash);
-                    node.block_num = best_block_num;
-                    node.total_difficulty = U256::from(total_difficulty);
-                    node.update();
+                    node_info.block_hash = H256::from(best_hash);
+                    node_info.block_number = best_block_num;
+                    node_info.total_difficulty = U256::from(total_difficulty);
+                    p2p.update_node(&hash);
+
+
+
+                    // if node.total_difficulty > chain_info.total_difficulty
+                    //     && node.block_num - REQUEST_SIZE as u64 >= chain_info.best_block_number
+                    // {
+                        // let start = if start > 3 {
+                        //     start - 3
+                        // } else if chain_info.best_block_number > 3 {
+                        //     chain_info.best_block_number - 3
+                        // } else {
+                        //     1
+                        // };
+
+
+
                 }
                 None => {
                     // TODO:
