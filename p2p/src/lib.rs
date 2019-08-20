@@ -134,72 +134,9 @@ impl Mgr {
         let callback_in = callback.clone();
         let callback_out = callback.clone();
 
-        // interval statisics
-        let executor_statisics = executor.clone();
-        let p2p_statisics = p2p.clone();
-        executor_statisics.spawn(
-            Interval::new(
-                Instant::now(),
-                Duration::from_secs(INTERVAL_STATISICS)
-            ).for_each(move |_| {
-                match p2p_statisics.nodes.try_read() {
-                    Ok(nodes) => {
-                        let mut total: usize = 0;
-                        let mut active: usize = 0;
-                        if nodes.len() > 0 {
-                            let mut active_nodes = vec![];
-                            info!(target: "p2p", "{:-^127}","");
-                            info!(target: "p2p","              td         bn          bh                    addr                 rev      conn  seed");
-                            info!(target: "p2p", "{:-^127}","");
-
-                            for (_hash, node) in nodes.iter(){
-                                total += 1;
-                                if node.state == STATE::ACTIVE {
-                                    active += 1;
-                                    active_nodes.push(node.clone());
-                                }
-                            }
-
-                            if active_nodes.len() > 0 {
-                                active_nodes.sort_by(|a, b| {
-                                    if a.total_difficulty != b.total_difficulty {
-                                        b.total_difficulty.cmp(&a.total_difficulty)
-                                    } else {
-                                        b.block_num.cmp(&a.block_num)
-                                    }
-                                });
-                                for node in active_nodes.iter() {
-                                    info!(target: "p2p",
-                                        "{:>16}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}",
-                                        format!("{}",node.total_difficulty),
-                                        node.block_num,
-                                        format!("{}",node.block_hash),
-                                        node.addr.to_formatted_string(),
-                                        String::from_utf8_lossy(&node.revision).trim(),
-                                        format!("{}",node.connection),
-                                        match node.if_seed{
-                                            true => "y",
-                                            _ => " "
-                                        }
-                                    );
-                                }
-
-                            }
-
-                            info!(target: "p2p", "{:-^127}","");
-                        }
-                        info!(target: "p2p", "total/active {}/{}", total, active);
-                    },
-                    Err(err) => {
-                        warn!(target:"p2p", "executor statisics: try read {:?}", err);
-                    }
-                }
-                Ok(())
-            }).map_err(|err| error!(target: "p2p", "executor statisics: {:?}", err))
-        );
-
         // interval timeout
         let executor_timeout = executor.clone();
+        let callback_timeout = callback.clone();
         let p2p_timeout = p2p.clone();
         executor_timeout.spawn(
             Interval::new(
@@ -207,29 +144,26 @@ impl Mgr {
                 Duration::from_secs(INTERVAL_TIMEOUT)
             ).for_each(move|_|{
                 let now = SystemTime::now();
+                let mut index: Vec<u64> = vec![];
                 if let Ok(mut write) = p2p_timeout.nodes.try_write(){
-                    let mut index: Vec<u64> = vec![];
                     for (hash, node) in write.iter_mut() {
                         if now.duration_since(node.update).expect("SystemTime::duration_since failed").as_secs() >= TIMEOUT_MAX {
                             index.push(*hash);
-                            match node.tx.close(){
-                                Ok(_) => {
-                                    debug!(target: "p2p", "tx close");
-                                },
-                                Err(err) => {
-                                    error!(target: "p2p", "tx close: {}", err);
-                                }
-                            }
                         }
+                        // resend handshake
                         // else if node.state == STATE::CONNECTED && node.connection == Connection::INBOUND {
                         //     handshake::send(&hash, node.id, net_id, ip, port, nodes_outbound_6);
                         // }
                     }
 
                     for i in 0 .. index.len() {
-                        match write.remove(&index[i]) {
+                        let hash = index[i];
+                        match write.remove(&hash) {
                             Some(mut node) => {
                                 node.tx.close().unwrap();
+
+                                // dispatch node remove event
+                                callback_timeout.disconnect(hash.clone());
                                 debug!(target: "p2p", "timeout hash/id/ip {}/{}/{}", &node.get_hash(), &node.get_id_string(), &node.addr.get_ip());
                             },
                             None => {}
@@ -422,7 +356,6 @@ impl Mgr {
     }
 
     /// shutdown p2p instance
-    // TODO: test
     pub fn shutdown(&self) {
         // let runtime = self.runtime.clone();
         // match runtime.shutdown_now().wait(){
@@ -468,6 +401,7 @@ impl Mgr {
         }
     }
 
+    /// get copy of active nodes as vec
     pub fn get_active_nodes(&self) -> Vec<Node> {
         let mut active_nodes: Vec<Node> = Vec::new();
         if let Ok(read) = &self.nodes.try_read() {
@@ -480,6 +414,7 @@ impl Mgr {
         active_nodes
     }
 
+    /// get randome active node hash
     pub fn get_random_active_node_hash(&self) -> Option<u64> {
         let active: Vec<Node> = self.get_active_nodes();
         let len: usize = active.len();
@@ -491,6 +426,7 @@ impl Mgr {
         }
     }
 
+    /// get random active node
     pub fn get_random_active_node(&self, filter: &[u64]) -> Option<Node> {
         let active: Vec<Node> = self.get_active_nodes();
         let free_node: Vec<_> = active
@@ -507,6 +443,7 @@ impl Mgr {
         }
     }
 
+    /// get total active nodes count
     pub fn get_active_nodes_len(&self) -> u32 {
         let mut len: u32 = 0;
         if let Ok(read) = &self.nodes.try_read() {
@@ -519,6 +456,7 @@ impl Mgr {
         len
     }
 
+    /// get node by hash
     pub fn get_node(&self, hash: &u64) -> Option<Node> {
         match &self.nodes.read() {
             Ok(read) => {
@@ -560,16 +498,12 @@ impl Mgr {
                             ACTION::HANDSHAKERES => handshake::receive_res(p2p, hash, cb),
                             ACTION::ACTIVENODESREQ => active_nodes::receive_req(p2p, hash),
                             ACTION::ACTIVENODESRES => active_nodes::receive_res(p2p, hash, cb),
+                            ACTION::DISCONNECT => {}
                             _ => error!(target: "p2p", "invalid action {}", cb.head.action),
                         };
                     }
                     MODULE::EXTERNAL => {
                         callable.handle(hash, cb);
-                        // handle(
-                        //     p2p,
-                        //     hash,
-                        //     cb,
-                        // );
                     }
                 }
             }
@@ -579,6 +513,7 @@ impl Mgr {
     }
 }
 
+/// helper function for config inbound & outbound stream
 fn config_stream(stream: &TcpStream) {
     stream
         .set_recv_buffer_size(1 << 24)
@@ -588,6 +523,7 @@ fn config_stream(stream: &TcpStream) {
         .expect("set_keepalive failed");
 }
 
+/// helper function for tokio io frame
 fn split_frame(
     socket: TcpStream,
 ) -> (

@@ -27,7 +27,7 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use uuid::Uuid;
 use futures::sync::mpsc;
-use aion_types::{H256, U256};
+use aion_types::H256;
 use super::msg::*;
 use super::state::STATE;
 
@@ -36,37 +36,15 @@ const EMPTY_ID: &str = "00000000-0000-0000-0000-000000000000";
 pub const HEADER_LENGTH: usize = 8;
 pub const NODE_ID_LENGTH: usize = 36;
 pub const PROTOCOL_LENGTH: usize = 6;
-pub const IP_LENGTH: usize = 8;
-pub const DIFFICULTY_LENGTH: usize = 16;
 pub const MAX_REVISION_LENGTH: usize = 24;
 pub const REVISION_PREFIX: &str = "r-";
+pub const IP_LENGTH: usize = 8;
+pub const DIFFICULTY_LENGTH: usize = 16;
 
 fn calculate_hash<T: Hash>(t: &T) -> u64 {
     let mut s = DefaultHasher::new();
     t.hash(&mut s);
     s.finish()
-}
-
-#[derive(Clone, PartialEq)]
-pub enum Mode {
-    NORMAL,
-    BACKWARD,
-    FORWARD,
-    LIGHTNING,
-    THUNDER,
-}
-
-impl fmt::Display for Mode {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let printable = match *self {
-            Mode::NORMAL => "NORMAL",
-            Mode::BACKWARD => "BACKWARD",
-            Mode::FORWARD => "FORWARD",
-            Mode::LIGHTNING => "LIGHTNING",
-            Mode::THUNDER => "THUNDER",
-        };
-        write!(f, "{}", printable)
-    }
 }
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -223,10 +201,8 @@ pub struct Node {
     pub id: [u8; NODE_ID_LENGTH],
     pub net_id: u32,
     pub addr: IpAddr,
-    pub total_difficulty: U256,
-    pub block_num: u64,
-    pub block_hash: H256,
     pub genesis_hash: H256,
+
     pub if_boot: bool,
     pub revision: [u8; MAX_REVISION_LENGTH],
     pub tx: mpsc::Sender<ChannelBuffer>,
@@ -250,9 +226,6 @@ impl Node {
             id,
             net_id: 0,
             addr: IpAddr::parse(sa),
-            total_difficulty: U256::default(),
-            block_num: 0,
-            block_hash: H256::default(),
             genesis_hash: H256::default(),
             if_boot: false,
             revision: [b' '; MAX_REVISION_LENGTH],
@@ -271,9 +244,6 @@ impl Node {
             id: [b'0'; NODE_ID_LENGTH],
             net_id: 0,
             addr: IpAddr::parse(sa),
-            total_difficulty: U256::default(),
-            block_num: 0,
-            block_hash: H256::default(),
             genesis_hash: H256::default(),
             if_boot: false,
             revision: [b' '; MAX_REVISION_LENGTH],
@@ -287,19 +257,13 @@ impl Node {
 
     pub fn get_hash(&self) -> u64 {
         let ip = self.addr.get_ip();
-        // let list = vec![String::from(from_utf8(&self.id).unwrap()), ip];
-        // let text = list.join("").to_string();
-        // let hash: u64 = calculate_hash(&text);
         let hash: u64 = calculate_hash(&ip);
-        // trace!(target: "p2p", "node/get_hash: text/hash {}/{}", &text, &hash);
         trace!(target: "p2p", "node/get_hash: {}", &hash);
         hash
     }
 
     pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
 
-    // refresh update field (timestamp)
-    // prevent to be removed
     pub fn update(&mut self) {
         debug!(target: "p2p", "node timestamp updated");
         self.update = SystemTime::now();
