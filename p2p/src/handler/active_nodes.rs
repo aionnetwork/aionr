@@ -37,7 +37,7 @@ use route::ACTION;
 use super::super::Mgr;
 
 pub fn send(
-    p2p: Arc<Mgr>
+    p2p: Mgr
 ) {
     let active: Vec<Node> = p2p.get_active_nodes();
     let len: usize = active.len();
@@ -46,7 +46,6 @@ pub fn send(
         let hash = active[random].get_hash();
         debug!(target: "p2p", "active_nodes/send:  hash {}", &hash);
         p2p.send(
-            p2p.clone(),
             hash,
             ChannelBuffer::new1(
                 VERSION::V0.value(),
@@ -59,7 +58,7 @@ pub fn send(
 }
 
 pub fn receive_req(
-    p2p: Arc<Mgr>,
+    p2p: Mgr,
     hash: u64 
 ) {
     debug!(target: "p2p", "active_nodes/receive_req");
@@ -96,11 +95,11 @@ pub fn receive_req(
     }
     cb_out.body.put_slice(res_body.as_slice());
     cb_out.head.len = cb_out.body.len() as u32;
-    p2p.send(p2p.clone(), hash, cb_out);
+    p2p.send(hash, cb_out);
 }
 
 pub fn receive_res(
-    p2p: Arc<Mgr>,
+    p2p: Mgr,
     hash: u64,
     cb_in: ChannelBuffer,
 ){
