@@ -83,6 +83,7 @@ const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const INTERVAL_STATUS: u64 = 10;
 const INTERVAL_HEADERS: u64 = 2;
 const INTERVAL_BODIES: u64 = 2;
+const INTERVAL_STATISICS: u64 = 5;
 
 const MAX_TX_CACHE: usize = 20480;
 const MAX_BLOCK_CACHE: usize = 32;
@@ -149,7 +150,72 @@ impl Sync {
         let p2p_0 = p2p.clone();
         p2p.run(p2p_0, sync.clone());
 
-        // status
+        // interval statisics
+        // let executor_statisics = executor.clone();
+        // let p2p_statisics = p2p.clone();
+        // executor_statisics.spawn(
+        //     Interval::new(
+        //         Instant::now(),
+        //         Duration::from_secs(INTERVAL_STATISICS)
+        //     ).for_each(move |_| {
+        //         match p2p_statisics.nodes.try_read() {
+        //             Ok(nodes) => {
+        //                 let mut total: usize = 0;
+        //                 let mut active: usize = 0;
+        //                 if nodes.len() > 0 {
+        //                     let mut active_nodes = vec![];
+        //                     info!(target: "p2p", "{:-^127}","");
+        //                     info!(target: "p2p","              td         bn          bh                    addr                 rev      conn  seed");
+        //                     info!(target: "p2p", "{:-^127}","");
+
+        //                     for (_hash, node) in nodes.iter(){
+        //                         total += 1;
+        //                         if node.state == STATE::ACTIVE {
+        //                             active += 1;
+        //                             active_nodes.push(node.clone());
+        //                         }
+        //                     }
+
+        //                     if active_nodes.len() > 0 {
+        //                         active_nodes.sort_by(|a, b| {
+        //                             if a.total_difficulty != b.total_difficulty {
+        //                                 b.total_difficulty.cmp(&a.total_difficulty)
+        //                             } else {
+        //                                 b.block_num.cmp(&a.block_num)
+        //                             }
+        //                         });
+        //                         for node in active_nodes.iter() {
+        //                             info!(target: "p2p",
+        //                                 "{:>16}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}",
+        //                                 format!("{}",node.total_difficulty),
+        //                                 node.block_num,
+        //                                 format!("{}",node.block_hash),
+        //                                 node.addr.to_formatted_string(),
+        //                                 String::from_utf8_lossy(&node.revision).trim(),
+        //                                 format!("{}",node.connection),
+        //                                 match node.if_seed{
+        //                                     true => "y",
+        //                                     _ => " "
+        //                                 }
+        //                             );
+        //                         }
+
+        //                     }
+
+        //                     info!(target: "p2p", "{:-^127}","");
+        //                 }
+        //                 info!(target: "p2p", "total/active {}/{}", total, active);
+        //             },
+        //             Err(err) => {
+        //                 warn!(target:"p2p", "executor statisics: try read {:?}", err);
+        //             }
+        //         }
+        //         Ok(())
+        //     }).map_err(|err| error!(target: "p2p", "executor statisics: {:?}", err))
+        // );
+
+
+        // interval status
         let p2p_1 = p2p.clone();
         let executor_status = executor.clone();
         executor_status.spawn(

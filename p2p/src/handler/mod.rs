@@ -21,4 +21,3 @@
 
 pub mod active_nodes;
 pub mod handshake;
-// pub mod external;
