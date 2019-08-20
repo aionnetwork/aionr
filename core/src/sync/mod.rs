@@ -24,6 +24,7 @@ mod handler;
 mod route;
 mod helper;
 mod storage;
+mod node;
 #[cfg(test)]
 mod test;
 
@@ -66,6 +67,7 @@ use sync::handler::headers;
 // use sync::handler::import;
 use sync::helper::{Wrapper,WithStatus};
 use sync::handler::headers::REQUEST_SIZE;
+use sync::node::NodeInfo;
 use header::Header;
 
 use sync::storage::ActivePeerInfo;
@@ -96,6 +98,9 @@ pub struct Sync {
     /// collection of sent queue
     queue: Arc<RwLock<HashMap<u64, Wrapper>>>,
 
+    /// active nodes info
+    node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
+
     /// local best td
     local_best_td: Arc<RwLock<U256>>,
 
@@ -113,9 +118,8 @@ pub struct Sync {
 
     /// cache block hash which has been committed and broadcasted
     cached_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
-
-    /// cache block num which has been verified
-    cached_synced_block_num: Arc<RwLock<u64>>,
+    //    /// cache block num which has been verified
+    //    cached_synced_block_num: Arc<RwLock<u64>>,
 }
 
 impl Sync {
@@ -128,7 +132,9 @@ impl Sync {
             client,
             p2p: Arc::new(Mgr::new(config)),
             runtime: Arc::new(Runtime::new().expect("tokio runtime")),
+
             queue: Arc::new(RwLock::new(HashMap::new())),
+            node_info: Arc::new(RwLock::new(HashMap::new())),
 
             local_best_td: Arc::new(RwLock::new(local_best_td)),
             local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
@@ -136,7 +142,7 @@ impl Sync {
             network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
             cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
             cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
-            cached_synced_block_num: Arc::new(RwLock::new(local_best_block_number)),
+            //            cached_synced_block_num: Arc::new(RwLock::new(local_best_block_number)),
         }
     }
 
@@ -177,16 +183,18 @@ impl Sync {
         let executor_headers = executor.clone();
         let queue1 = self.queue.clone();
         let client = self.client.clone();
-        let synced_number = self.cached_synced_block_num.clone();
+        //        let synced_number = self.cached_synced_block_num.clone();
+        let chain_info = self.client.chain_info();
+        let start = chain_info.best_block_number;
         let p2p_2 = p2p.clone();
         executor_headers.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_HEADERS))
                 .for_each(move |_| {
                     // make it constant
                     let chain_info = client.chain_info();
-                    if let Ok(start) = synced_number.read() {
-                        headers::send(p2p_2.clone(), *start, &chain_info, queue1.clone());
-                    }
+                    //                    if let Ok(start) = synced_number.read() {
+                    headers::send(p2p_2.clone(), start, &chain_info, queue1.clone());
+                    //                    }
                     //                     p2p.get_node_by_td(10);
                     Ok(())
                 })

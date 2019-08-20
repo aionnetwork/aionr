@@ -22,10 +22,30 @@ use aion_types::H256;
 use p2p::Node;
 //use p2p::Mode;
 
-struct NodeInfo {
-    td: H256,
-    bn: u64,
-    block_hash: H256, //mode: Mode
+pub struct NodeInfo {
+    /// node total difficulty
+    total_difficulty: H256,
+    /// node best block number
+    block_number: u64,
+    /// node best block hash
+    block_hash: H256,
+    // node mode
+    //mode: Mode
 }
 
-impl NodeInfo {}
+impl NodeInfo {
+    pub fn new(td: H256, bn: u64, bh: H256) -> Self {
+        NodeInfo {
+            total_difficulty: td,
+            block_number: bn,
+            block_hash: bh,
+            // mode :
+        }
+    }
+    pub fn update(&mut self, td: H256, bn: u64, bh: H256) {
+        self.total_difficulty = td;
+        self.block_number = bn;
+        self.block_hash = bh;
+        //self.mode = ;
+    }
+}
