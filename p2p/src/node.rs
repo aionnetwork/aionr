@@ -110,14 +110,7 @@ pub struct TempNode {
 }
 
 impl TempNode {
-    pub fn new(id: [u8; NODE_ID_LENGTH], addr: IpAddr, if_seed: bool) -> TempNode {
-        TempNode {
-            id,
-            addr,
-            if_seed,
-        }
-    }
-
+    
     // TODO: remove in future
     pub fn default() -> TempNode {
         TempNode {
