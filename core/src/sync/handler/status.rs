@@ -29,6 +29,8 @@ use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use sync::node_info::NodeInfo;
 use sync::route::{VERSION,MODULE,ACTION};
+use sync::handler::headers;
+use sync::handler::headers::NORMAL_REQUEST_SIZE;
 use p2p::{ChannelBuffer,  Mgr};
 
 const HASH_LENGTH: usize = 32;
@@ -85,11 +87,14 @@ pub fn receive_req(p2p: Arc<Mgr>, chain_info: &BlockChainInfo, hash: u64) {
 }
 
 pub fn receive_res(
-    p2p: Arc<Mgr>, 
-    node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>, 
-    hash: u64, 
-    cb_in: ChannelBuffer
-) {
+    p2p: Arc<Mgr>,
+    chain_info: &BlockChainInfo,
+    node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
+    synced_number: Arc<RwLock<u64>>,
+    hash: u64,
+    cb_in: ChannelBuffer,
+)
+{
     trace!(target: "sync", "status/receive_res");
     match node_info.try_write() {
         Ok(mut write) => {
@@ -112,21 +117,9 @@ pub fn receive_res(
                     node_info.total_difficulty = U256::from(total_difficulty);
                     p2p.update_node(&hash);
 
-
-
-                    // if node.total_difficulty > chain_info.total_difficulty
-                    //     && node.block_num - REQUEST_SIZE as u64 >= chain_info.best_block_number
-                    // {
-                        // let start = if start > 3 {
-                        //     start - 3
-                        // } else if chain_info.best_block_number > 3 {
-                        //     chain_info.best_block_number - 3
-                        // } else {
-                        //     1
-                        // };
-
-
-
+                    if chain_info.total_difficulty > node_info.total_difficulty {
+                        headers::prepare_send(p2p.clone(), hash, synced_number.clone());
+                    }
                 }
                 None => {
                     // TODO:

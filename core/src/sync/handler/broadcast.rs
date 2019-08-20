@@ -24,6 +24,7 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 use std::sync::RwLock;
+use std::collections::HashMap;
 use lru_cache::LruCache;
 use client::{BlockChainClient, BlockId, BlockImportError};
 use types::error::{BlockError, ImportError};
@@ -38,6 +39,7 @@ use p2p::Mgr;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
+use sync::node_info::NodeInfo;
 
 const MAX_NEW_BLOCK_AGE: u64 = 20;
 const MAX_RE_BROADCAST: usize = 10;
@@ -183,6 +185,7 @@ pub fn receive_tx(
     local_best_block_num: Arc<RwLock<u64>>,
     network_best_block_num: Arc<RwLock<u64>>,
     cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
+    node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
 )
 {
     trace!(target: "sync", "broadcast/receive_tx");
@@ -239,10 +242,9 @@ pub fn receive_tx(
 
         /// re-broadcast tx
         let mut node_count = 0;
-        let active_nodes = &p2p.get_active_nodes();
-        if active_nodes.len() > 0 {
-            for node in active_nodes.iter() {
-                if (node.block_num + 4 >= nbbn) {
+        if let Ok(nodes) = node_info.try_read() {
+            for (_node_hash, node) in (*nodes).iter() {
+                if (node.block_number + 4 >= nbbn) {
                     // send(node.get_hash(), cb);
                     node_count += 1;
                     if node_count > MAX_RE_BROADCAST {

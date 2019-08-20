@@ -23,11 +23,10 @@ use std::mem;
 use std::time::{ SystemTime};
 use std::sync::{RwLock,Arc};
 use std::collections::{HashMap};
-use client::BlockId;
 use engine::unity_engine::UnityEngine;
 use header::{Header as BlockHeader,Seal};
 use acore_bytes::to_hex;
-use client::BlockChainInfo;
+use client::{BlockChainClient, BlockId};
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
@@ -38,33 +37,27 @@ use sync::handler::bodies;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
-use sync::storage::{ SyncStorage};
-use sync::helper::{Wrapper,WithStatus};
+use sync::header_wrapper::{HeaderWrapper};
 
-const BACKWARD_SYNC_STEP: u64 = 64;
-pub const REQUEST_SIZE: u32 = 64;
-const LARGE_REQUEST_SIZE: u64 = 48;
+pub const NORMAL_REQUEST_SIZE: u32 = 24;
+const LARGE_REQUEST_SIZE: u32 = 48;
 
-pub fn get_working_nodes(ws: Arc<RwLock<HashMap<u64, Wrapper>>>) -> Vec<u64> {
-    let mut working_nodes = Vec::new();
-    if let Ok(wrappers) = ws.read() {
-        working_nodes = wrappers
-            .iter()
-            .filter(|(_, v)| v.with_status.value() == 0)
-            .map(|(k, _)| k)
-            .cloned()
-            .collect();
+pub fn prepare_send(p2p: Arc<Mgr>, hash: u64, synced_number: Arc<RwLock<u64>> /*mode:Mode*/) {
+    // TODO mode match
+    if let Ok(synced_number) = synced_number.read() {
+        let start = if *synced_number > 3 {
+            *synced_number - 3
+        } else {
+            1
+        };
+        let size = NORMAL_REQUEST_SIZE;
+
+        send(p2p.clone(), hash, start, size);
     }
-    working_nodes
 }
 
-pub fn send(
-    p2p: Arc<Mgr>,
-    hash: u64,
-    start: u64,
-    chain_info: &BlockChainInfo,
-){ 
-    debug!(target:"sync","headers.rs/send: start {}, size: {}, node hash: {}", start, REQUEST_SIZE, hash);
+fn send(p2p: Arc<Mgr>, hash: u64, start: u64, size: u32) {
+    debug!(target:"sync","headers.rs/send: start {}, size: {}, node hash: {}", start, size, hash);
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
     cb.head.ctrl = MODULE::SYNC.value();
@@ -75,7 +68,7 @@ pub fn send(
     cb.body.put_slice(&from_buf);
 
     let mut size_buf = [0u8; 4];
-    BigEndian::write_u32(&mut size_buf, REQUEST_SIZE);
+    BigEndian::write_u32(&mut size_buf, size);
     cb.body.put_slice(&size_buf);
 
     cb.head.len = cb.body.len() as u32;
@@ -86,7 +79,7 @@ pub fn send(
 //     p2p: Arc<Mgr>,
 //     start: u64,
 //     chain_info: &BlockChainInfo,
-//     ws: Arc<RwLock<HashMap<u64, Wrapper>>>,
+//     ws: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,
 // )
 // {
 //     let working_nodes = get_working_nodes(ws);
@@ -123,10 +116,8 @@ pub fn send(
 //     }
 // }
 
-pub fn receive_req(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
+pub fn receive_req(p2p: Arc<Mgr>, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
     trace!(target: "sync", "headers/receive_req");
-
-    let client = SyncStorage::get_block_chain();
 
     let mut res = ChannelBuffer::new();
 
@@ -140,49 +131,55 @@ pub fn receive_req(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
     let from = from.read_u64::<BigEndian>().unwrap_or(1);
     let (mut size, _) = req_body_rest.split_at(mem::size_of::<u32>());
     let size = size.read_u32::<BigEndian>().unwrap_or(1);
+
     let chain_info = client.chain_info();
     let last = chain_info.best_block_number;
 
     let mut header_count = 0;
     let number = from;
     let mut data = Vec::new();
-    while number + header_count <= last && header_count < size.into() {
-        match client.block_header(BlockId::Number(number + header_count)) {
-            Some(hdr) => {
-                data.append(&mut hdr.into_inner());
-                header_count += 1;
+
+    if size <= LARGE_REQUEST_SIZE {
+        for i in from..(from + size as u64) {
+            match client.block_header(BlockId::Number(i)) {
+                Some(hdr) => {
+                    data.append(&mut hdr.into_inner());
+                }
+                None => {
+                    break;
+                }
             }
-            None => {}
         }
+
+        if data.len() > 0 {
+            let mut rlp = RlpStream::new_list(header_count as usize);
+            rlp.append_raw(&data, header_count as usize);
+            res_body.put_slice(rlp.as_raw());
+        }
+
+        res.body.put_slice(res_body.as_slice());
+        res.head.len = res.body.len() as u32;
+
+        p2p.update_node(&hash);
+        p2p.send(p2p.clone(), hash, res);
+    } else {
+        warn!(target:"sync","headers/receive_req max headers size requested");
+        return;
     }
-
-    if header_count > 0 {
-        let mut rlp = RlpStream::new_list(header_count as usize);
-
-        rlp.append_raw(&data, header_count as usize);
-        res_body.put_slice(rlp.as_raw());
-    }
-
-    res.body.put_slice(res_body.as_slice());
-    res.head.len = res.body.len() as u32;
-
-    p2p.update_node(&hash);
-
-    p2p.send(p2p.clone(), hash, res);
 }
 
 pub fn receive_res(
     p2p: Arc<Mgr>,
     hash: u64,
     cb_in: ChannelBuffer,
-    hws: Arc<RwLock<HashMap<u64, Wrapper>>>,
+    hws: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,
 )
 {
     trace!(target: "sync", "headers/receive_res");
 
     let rlp = UntrustedRlp::new(cb_in.body.as_slice());
     let mut prev_header = BlockHeader::new();
-    let mut hw = Wrapper::new();
+    let mut hw = HeaderWrapper::new();
     let mut headers = Vec::new();
     let mut hashes = Vec::new();
     for header_rlp in rlp.iter() {
@@ -237,14 +234,13 @@ pub fn receive_res(
     }
 
     if !headers.is_empty() {
-        hw.data = headers;
-        hw.with_status = WithStatus::GetHeader;
+        hw.headers = headers;
         hw.timestamp = SystemTime::now();
         p2p.update_node(&hash);
-        if let Ok(mut hws) = hws.write() {
+        if let Ok(mut hws) = hws.try_write() {
             hws.insert(hash.clone(), hw);
+            bodies::send(p2p.clone(), hash, hashes);
         }
-        bodies::send(p2p.clone(), hash, hashes);
     } else {
         debug!(target: "sync", "Came too late............");
     }
