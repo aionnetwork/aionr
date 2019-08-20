@@ -356,7 +356,6 @@ impl Mgr {
     }
 
     /// shutdown p2p instance
-    // TODO: test
     pub fn shutdown(&self) {
         // let runtime = self.runtime.clone();
         // match runtime.shutdown_now().wait(){
@@ -402,6 +401,7 @@ impl Mgr {
         }
     }
 
+    /// get copy of active nodes as vec
     pub fn get_active_nodes(&self) -> Vec<Node> {
         let mut active_nodes: Vec<Node> = Vec::new();
         if let Ok(read) = &self.nodes.try_read() {
@@ -414,6 +414,7 @@ impl Mgr {
         active_nodes
     }
 
+    /// get randome active node hash
     pub fn get_random_active_node_hash(&self) -> Option<u64> {
         let active: Vec<Node> = self.get_active_nodes();
         let len: usize = active.len();
@@ -425,6 +426,7 @@ impl Mgr {
         }
     }
 
+    /// get random active node
     pub fn get_random_active_node(&self, filter: &[u64]) -> Option<Node> {
         let active: Vec<Node> = self.get_active_nodes();
         let free_node: Vec<_> = active
@@ -441,6 +443,7 @@ impl Mgr {
         }
     }
 
+    /// get total active nodes count
     pub fn get_active_nodes_len(&self) -> u32 {
         let mut len: u32 = 0;
         if let Ok(read) = &self.nodes.try_read() {
@@ -453,6 +456,7 @@ impl Mgr {
         len
     }
 
+    /// get node by hash
     pub fn get_node(&self, hash: &u64) -> Option<Node> {
         match &self.nodes.read() {
             Ok(read) => {
@@ -494,7 +498,7 @@ impl Mgr {
                             ACTION::HANDSHAKERES => handshake::receive_res(p2p, hash, cb),
                             ACTION::ACTIVENODESREQ => active_nodes::receive_req(p2p, hash),
                             ACTION::ACTIVENODESRES => active_nodes::receive_res(p2p, hash, cb),
-                            ACTION::DISCONNECT => {},
+                            ACTION::DISCONNECT => {}
                             _ => error!(target: "p2p", "invalid action {}", cb.head.action),
                         };
                     }
@@ -509,6 +513,7 @@ impl Mgr {
     }
 }
 
+/// helper function for config inbound & outbound stream
 fn config_stream(stream: &TcpStream) {
     stream
         .set_recv_buffer_size(1 << 24)
@@ -518,6 +523,7 @@ fn config_stream(stream: &TcpStream) {
         .expect("set_keepalive failed");
 }
 
+/// helper function for tokio io frame
 fn split_frame(
     socket: TcpStream,
 ) -> (

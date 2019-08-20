@@ -26,8 +26,4 @@ use p2p::Mgr;
 #[test]
 fn test_mainnet() {
     println!("test p2p");
-
-
-
-
 }

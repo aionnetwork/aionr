@@ -551,4 +551,7 @@ impl Callable for Sync {
             ACTION::UNKNOWN => (),
         };
     }
+    fn disconnect(&self, hash: u64) {
+        // TODO
+    }
 }

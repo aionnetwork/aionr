@@ -41,7 +41,6 @@ pub const REVISION_PREFIX: &str = "r-";
 pub const IP_LENGTH: usize = 8;
 pub const DIFFICULTY_LENGTH: usize = 16;
 
-
 fn calculate_hash<T: Hash>(t: &T) -> u64 {
     let mut s = DefaultHasher::new();
     t.hash(&mut s);
@@ -211,11 +210,9 @@ pub struct Node {
     pub connection: Connection,
     pub if_seed: bool,
     pub update: SystemTime,
-
 }
 
 impl Node {
-
     // construct inbound node
     pub fn new_outbound(
         sa: SocketAddr,
