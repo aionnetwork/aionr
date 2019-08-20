@@ -48,16 +48,16 @@ use lru_cache::LruCache;
 use rlp::UntrustedRlp;
 use tokio::runtime::Runtime;
 use tokio::timer::Interval;
-use bytes::BufMut;
-use byteorder::{BigEndian,ByteOrder};
+//use bytes::BufMut;
+//use byteorder::{BigEndian,ByteOrder};
 
-use p2p::Node;
+//use p2p::Node;
 use p2p::ChannelBuffer;
 use p2p::Config;
 use p2p::Mgr;
 use p2p::Callable;
-use sync::route::VERSION;
-use sync::route::MODULE;
+//use sync::route::VERSION;
+//use sync::route::MODULE;
 use sync::route::ACTION;
 use sync::handler::status;
 use sync::handler::bodies;
@@ -94,10 +94,8 @@ pub struct Sync {
     runtime: Arc<Runtime>,
     p2p: Arc<Mgr>,
 
-    /// TODO: avoid the same type req to one node
-    /// working_nodes : Arc<RwLock<HashSet<u64>>>,
-    /// collection of sent wrappers
-    queue: Arc<RwLock<BTreeMap<u64, Wrapper>>>,
+    /// collection of sent queue
+    queue: Arc<RwLock<HashMap<u64, Wrapper>>>,
 
     /// local best td
     local_best_td: Arc<RwLock<U256>>,
@@ -115,7 +113,10 @@ pub struct Sync {
     cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 
     /// cache block hash which has been committed and broadcasted
-    cached_block_hashes:  Arc<Mutex<LruCache<H256, u8>>>  
+    cached_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
+
+    /// cache block num which has been verified
+    cached_synced_block_num: Arc<RwLock<u64>>,
 }
 
 impl Sync {
@@ -128,7 +129,7 @@ impl Sync {
             client,
             p2p: Arc::new(Mgr::new(config)),
             runtime: Arc::new(Runtime::new().expect("tokio runtime")),
-            queue: Arc::new(RwLock::new(BTreeMap::new())),
+            queue: Arc::new(RwLock::new(HashMap::new())),
 
             local_best_td: Arc::new(RwLock::new(local_best_td)),
             local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
@@ -136,6 +137,7 @@ impl Sync {
             network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
             cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
             cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
+            cached_synced_block_num: Arc::new(RwLock::new(local_best_block_number)),
         }
     }
 
@@ -144,11 +146,11 @@ impl Sync {
         let runtime = self.runtime.clone();
         let executor = Arc::new(runtime.executor());
         let nodes = self.p2p.nodes.clone();
-
-        // init p2p
         let p2p = self.p2p.clone();
+
+        // init p2p;
         let p2p_0 = p2p.clone();
-        p2p.run(p2p_0, sync.clone());
+        p2p_0.run(p2p_0.clone(), sync.clone());
 
         // interval statisics
         // let executor_statisics = executor.clone();
@@ -221,15 +223,16 @@ impl Sync {
         executor_status.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_STATUS))
                 .for_each(move |_| {
-                    // make it constant
-                    if let Some(hash) = p2p_1.get_random_active_node_hash() {
-                        let mut cb = ChannelBuffer::new();
-                        cb.head.ver = VERSION::V0.value();
-                        cb.head.ctrl = MODULE::SYNC.value();
-                        cb.head.action = ACTION::STATUSREQ.value();
-                        cb.head.len = 0;
-                        p2p_1.send(p2p_1.clone(), hash, cb);
-                    }
+                    //                    // make it constant
+                    //                    if let Some(hash) = p2p_1.get_random_active_node_hash() {
+                    //                        let mut cb = ChannelBuffer::new();
+                    //                        cb.head.ver = VERSION::V0.value();
+                    //                        cb.head.ctrl = MODULE::SYNC.value();
+                    //                        cb.head.action = ACTION::STATUSREQ.value();
+                    //                        cb.head.len = 0;
+                    //                        p2p_1.send(p2p_1.clone(), hash, cb);
+                    //                    }
+                    status::send_random(p2p_1.clone());
 
                     // p2p.get_node_by_td(10);
                     Ok(())
@@ -238,92 +241,73 @@ impl Sync {
         );
 
         let executor_headers = executor.clone();
-        let wrappers1 = self.queue.clone();
+        let queue1 = self.queue.clone();
         let client = self.client.clone();
+        let synced_number = self.cached_synced_block_num.clone();
         let p2p_2 = p2p.clone();
         executor_headers.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_HEADERS))
                 .for_each(move |_| {
                     // make it constant
                     let chain_info = client.chain_info();
-                    let mut max = 0u64;
-                    if let Ok(read) = wrappers1.read() {
-                        max = read.keys().last().map_or(0u64, |x| x.clone());
-                    };
-                    if max < chain_info.best_block_number + HEADERS_CAPACITY {
-                        if let Some(node) = p2p_2.get_random_active_node() {
-                            if node.total_difficulty > chain_info.total_difficulty
-                                && node.block_num - REQUEST_SIZE as u64
-                                    >= chain_info.best_block_number
-                            {
-                                let start = if max != 0 {
-                                    max
-                                } else if chain_info.best_block_number > 3 {
-                                    chain_info.best_block_number - 3
-                                } else {
-                                    1
-                                };
-
-                                headers::send(p2p_2.clone(), start, node.get_hash());
-                            }
-                        }
+                    if let Ok(start) = synced_number.read() {
+                        headers::send(p2p_2.clone(), *start, &chain_info, queue1.clone());
                     }
                     //                     p2p.get_node_by_td(10);
                     Ok(())
                 })
                 .map_err(|err| error!(target: "p2p", "executor headers: {:?}", err)),
         );
-        let executor_bodies = executor.clone();
-        let wrappers2 = self.queue.clone();
-        let p2p_3 = p2p.clone();
-        executor_bodies.spawn(
-            Interval::new(Instant::now(), Duration::from_secs(INTERVAL_BODIES))
-                .for_each(move |_| {
-                    if let Ok(mut wrappers) = wrappers2.try_write() {
-                        if let Some((num, wrapper)) = wrappers
-                            .clone()
-                            .iter()
-                            .filter(|(_, w)| {
-                                match w.with_status {
-                                    WithStatus::GetHeader(_) => true,
-                                    _ => false,
-                                }
-                            })
-                            .next()
-                        {
-                            match wrapper.with_status {
-                                WithStatus::GetHeader(ref hw) => {
-                                    let mut cb = ChannelBuffer::new();
-                                    cb.head.ver = VERSION::V0.value();
-                                    cb.head.ctrl = MODULE::SYNC.value();
-                                    cb.head.action = ACTION::BODIESREQ.value();
-                                    for h in hw.clone() {
-                                        let rlp = UntrustedRlp::new(&h);
-                                        let header: Header =
-                                            rlp.as_val().expect("should not be err");
-                                        cb.body.put_slice(&header.hash());
-                                    }
-                                    cb.head.len = cb.body.len() as u32;
-                                    p2p_3.send(p2p_3.clone(), num.clone(), cb);
-                                    if let Some(w) = wrappers.get_mut(num) {
-                                        (*w).timestamp = SystemTime::now();
-                                        (*w).with_status = WithStatus::WaitForBody(hw.clone());
-                                    };
-                                }
-                                _ => (),
-                            };
-                        }
-                    }
-                    Ok(())
-                })
-                .map_err(|err| error!(target: "p2p", "executor bodies: {:?}", err)),
-        );
+
+        //        let executor_bodies = executor.clone();
+        //        let queue2 = self.queue.clone();
+        //        let p2p_3 = p2p.clone();
+        //        executor_bodies.spawn(
+        //            Interval::new(Instant::now(), Duration::from_secs(INTERVAL_BODIES))
+        //                .for_each(move |_| {
+        //                    if let Ok(mut queue) = queue2.try_write() {
+        //                        if let Some((num, wrapper)) = queue
+        //                            .clone()
+        //                            .iter()
+        //                            .filter(|(_, w)| {
+        //                                w.with_status.value() == 0
+        //                            })
+        //                            .next()
+        //                            {
+        //                                match wrapper.with_status {
+        //                                    WithStatus::GetHeader(ref hw) => {
+        //                                        let mut cb = ChannelBuffer::new();
+        //                                        cb.head.ver = VERSION::V0.value();
+        //                                        cb.head.ctrl = MODULE::SYNC.value();
+        //                                        cb.head.action = ACTION::BODIESREQ.value();
+        //                                        for h in hw.clone() {
+        //                                            let rlp = UntrustedRlp::new(&h);
+        //                                            let header: Header =
+        //                                                rlp.as_val().expect("should not be err");
+        //                                            cb.body.put_slice(&header.hash());
+        //                                        }
+        //                                        cb.head.len = cb.body.len() as u32;
+        //                                        p2p_3.send(p2p_3.clone(), num.clone(), cb);
+        //                                        if let Some(w) = queue.get_mut(num) {
+        //                                            (*w).timestamp = SystemTime::now();
+        //                                            (*w).with_status = WithStatus::WaitForBody(hw.clone());
+        //                                        };
+        //                                    }
+        //                                    _ => (),
+        //                                };
+        //                            }
+        //                    }
+        //                    Ok(())
+        //                })
+        //                .map_err(|err| error!(target: "p2p", "executor bodies: {:?}", err)),
+        //        );
+
         //        let executor_import = executor.clone();
         //        executor_bodies.spawn(
         //            Interval::new(Instant::now(), Duration::from_secs(INTERVAL_BODIES))
         //                .for_each(move |_| {
-        //                    if let Ok(mut wrappers) = wrappers2.try_write(){
-        //                        if let Some((num,wrapper)) = wrappers.clone()
+        //                    if let Ok(mut queue) = queue2.try_write(){
+        //                        if let Some((num,wrapper)) = queue.clone()
         //                            .iter()
         //                            .filter(|(_,w)| match w.with_status { WithStatus::GetHeader(_) => true, _ => false })
         //                            .next()
@@ -341,7 +325,7 @@ impl Sync {
         //                                        }
         //                                        cb.head.len = cb.body.len() as u32;
         //                                        send(num,cb,nodes_bodies.clone());
-        //                                        if let Some(w) =wrappers.get_mut(num){
+        //                                        if let Some(w) =queue.get_mut(num){
         //                                            (*w).timestamp = SystemTime::now();
         //                                            (*w).with_status = WithStatus::WaitForBody(hw.clone());
         //                                        };
@@ -363,7 +347,6 @@ impl Sync {
         p2p.shutdown();
     }
 }
-
 
 pub trait SyncProvider: Send + ::std::marker::Sync {
     /// Get sync status
@@ -548,8 +531,7 @@ impl ChainNotify for Sync {
 }
 
 impl Callable for Sync {
-    fn handle(&self, hash:u64, cb:ChannelBuffer){
-
+    fn handle(&self, hash: u64, cb: ChannelBuffer) {
         let p2p = self.p2p.clone();
         match ACTION::from(cb.head.action) {
             ACTION::STATUSREQ => {

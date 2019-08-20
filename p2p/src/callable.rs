@@ -23,4 +23,6 @@ use msg::ChannelBuffer;
 
 pub trait Callable: Sync + Send {
     fn handle(&self, hash: u64, cb: ChannelBuffer);
+    // signal to external (sync) for disconnect event
+    fn disconnect(&self, hash: u64);
 }

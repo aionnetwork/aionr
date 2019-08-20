@@ -24,7 +24,6 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 use std::sync::RwLock;
-use std::collections::HashMap;
 use lru_cache::LruCache;
 use client::{BlockChainClient, BlockId, BlockImportError};
 use types::error::{BlockError, ImportError};
@@ -179,18 +178,19 @@ pub fn receive_block(node: &mut Node, req: ChannelBuffer) {
 
 pub fn receive_tx(
     p2p: Arc<Mgr>,
-    hash: u64, 
-    cb: ChannelBuffer, 
+    hash: u64,
+    cb: ChannelBuffer,
     local_best_block_num: Arc<RwLock<u64>>,
     network_best_block_num: Arc<RwLock<u64>>,
-    cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>
-) {
+    cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
+)
+{
     trace!(target: "sync", "broadcast/receive_tx");
 
     // ignore when local is away from full synced
     let lbbn: u64 = *local_best_block_num.read().unwrap();
-    let nbbn: u64 = *network_best_block_num.read().unwrap(); 
-   
+    let nbbn: u64 = *network_best_block_num.read().unwrap();
+
     if lbbn + 4 < nbbn {
         return;
     }
@@ -208,18 +208,17 @@ pub fn receive_tx(
                         if !lock.contains_key(&hash) {
                             transactions.push(tx);
                             lock.insert(hash, 0);
-                        } 
+                        }
                     }
                 }
             }
-        }, 
+        }
         Err(err) => {
             error!(target: "sync", "broadcast/receive_tx: {:?}", err);
         }
     }
 
     if transactions.len() > 0 {
-
         // TODO:
         // client.import_queued_transactions(transactions);
         // match nodes.try_write() {
@@ -232,18 +231,18 @@ pub fn receive_tx(
         //                 // TODO:
         //             }
         //         }
-        //     }, 
+        //     },
         //     Err(err) => {
         //         error!(target: "sync", "broadcast/receive_tx: {:?}", err);
         //     }
         // }
 
-        /// re-broadcast tx    
+        /// re-broadcast tx
         let mut node_count = 0;
         let active_nodes = &p2p.get_active_nodes();
         if active_nodes.len() > 0 {
-            for node in active_nodes.iter(){
-                if(node.block_num + 4 >= nbbn) {
+            for node in active_nodes.iter() {
+                if (node.block_num + 4 >= nbbn) {
                     // send(node.get_hash(), cb);
                     node_count += 1;
                     if node_count > MAX_RE_BROADCAST {
@@ -251,7 +250,7 @@ pub fn receive_tx(
                         return;
                     } else {
                         thread::sleep(Duration::from_millis(50));
-                    }    
+                    }
                 }
             }
         }

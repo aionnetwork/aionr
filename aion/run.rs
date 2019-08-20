@@ -85,7 +85,6 @@ pub struct RunCmd {
 }
 
 pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
-    
     // load spec
     let spec = cmd.spec.spec()?;
 
@@ -161,7 +160,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     client_config.stake_contract = cmd.stake_conf.contract;
 
     let (id, binding) = &cmd.net_conf.get_id_and_binding();
-    
+
     info!(target: "run","          id: {}", &id);
     info!(target: "run","     binding: {}", &binding);
 
@@ -208,7 +207,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
           if cmd.ipc_conf.enabled { "y" } else { "n" },
     );
 
-    let sync = Arc::new(Sync::new(cmd.net_conf.clone(), client.clone()));   
+    let sync = Arc::new(Sync::new(cmd.net_conf.clone(), client.clone()));
     sync.run(sync.clone());
 
     // start rpc server
@@ -332,7 +331,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // close/drop this stuff as soon as exit detected.
     // drop((sync, chain_notify));
     drop(sync);
-
 
     thread::sleep(Duration::from_secs(5));
 
