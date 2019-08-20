@@ -20,9 +20,9 @@
  ******************************************************************************/
 
 use std::sync::{RwLock,Arc};
-use std::collections::{HashMap,BTreeMap};
+use std::collections::{HashMap};
 use block::Block;
-use client::{BlockId,BlockChainInfo};
+use client::{BlockId};
 use header::{Seal,Header};
 use aion_types::H256;
 use bytes::BufMut;
@@ -34,9 +34,7 @@ use p2p::Mgr;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
-use sync::event::SyncEvent;
 use sync::helper::{Wrapper,WithStatus};
-use sync::storage::BlocksWrapper;
 use sync::storage::SyncStorage;
 use sync::handler::headers;
 use sync::handler::headers::REQUEST_SIZE;
@@ -101,7 +99,6 @@ pub fn receive_res(
     hash: u64,
     cb_in: ChannelBuffer,
     queue: Arc<RwLock<HashMap<u64, Wrapper>>>,
-    chain_info: BlockChainInfo,
 )
 {
     trace!(target: "sync", "bodies/receive_res");
@@ -159,16 +156,7 @@ pub fn receive_res(
                                         bodies.len(),
                                     );
                             // TODO: punish the node
-                            //                                wrappers.remove(num);
-                            //
-                            //                                let rlp = UntrustedRlp::new(&headers[0]);
-                            //                                let header: Header = rlp.as_val().expect("should be a head");
-                            //
-                            //
-                            //                                headers::send(p2p.clone(), header.number(), &chain_info,queue.clone());
-                            //                                break;
-                            //
-                            //
+
                             blocks.clear();
                         }
 

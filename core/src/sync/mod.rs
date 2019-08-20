@@ -48,16 +48,16 @@ use lru_cache::LruCache;
 use rlp::UntrustedRlp;
 use tokio::runtime::Runtime;
 use tokio::timer::Interval;
-use bytes::BufMut;
-use byteorder::{BigEndian,ByteOrder};
+//use bytes::BufMut;
+//use byteorder::{BigEndian,ByteOrder};
 
-use p2p::Node;
+//use p2p::Node;
 use p2p::ChannelBuffer;
 use p2p::Config;
 use p2p::Mgr;
 use p2p::Callable;
-use sync::route::VERSION;
-use sync::route::MODULE;
+//use sync::route::VERSION;
+//use sync::route::MODULE;
 use sync::route::ACTION;
 use sync::handler::status;
 use sync::handler::bodies;
@@ -93,8 +93,6 @@ pub struct Sync {
     runtime: Arc<Runtime>,
     p2p: Arc<Mgr>,
 
-    /// TODO: avoid the same type req to one node
-    /// working_nodes : Arc<RwLock<HashSet<u64>>>,
     /// collection of sent queue
     queue: Arc<RwLock<HashMap<u64, Wrapper>>>,
 
@@ -115,6 +113,9 @@ pub struct Sync {
 
     /// cache block hash which has been committed and broadcasted
     cached_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
+
+    /// cache block num which has been verified
+    cached_synced_block_num: Arc<RwLock<u64>>,
 }
 
 impl Sync {
@@ -135,6 +136,7 @@ impl Sync {
             network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
             cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
             cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
+            cached_synced_block_num: Arc::new(RwLock::new(local_best_block_number)),
         }
     }
 
@@ -155,15 +157,16 @@ impl Sync {
         executor_status.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_STATUS))
                 .for_each(move |_| {
-                    // make it constant
-                    if let Some(hash) = p2p_1.get_random_active_node_hash() {
-                        let mut cb = ChannelBuffer::new();
-                        cb.head.ver = VERSION::V0.value();
-                        cb.head.ctrl = MODULE::SYNC.value();
-                        cb.head.action = ACTION::STATUSREQ.value();
-                        cb.head.len = 0;
-                        p2p_1.send(p2p_1.clone(), hash, cb);
-                    }
+                    //                    // make it constant
+                    //                    if let Some(hash) = p2p_1.get_random_active_node_hash() {
+                    //                        let mut cb = ChannelBuffer::new();
+                    //                        cb.head.ver = VERSION::V0.value();
+                    //                        cb.head.ctrl = MODULE::SYNC.value();
+                    //                        cb.head.action = ACTION::STATUSREQ.value();
+                    //                        cb.head.len = 0;
+                    //                        p2p_1.send(p2p_1.clone(), hash, cb);
+                    //                    }
+                    status::send_random(p2p_1.clone());
 
                     // p2p.get_node_by_td(10);
                     Ok(())
@@ -174,18 +177,15 @@ impl Sync {
         let executor_headers = executor.clone();
         let queue1 = self.queue.clone();
         let client = self.client.clone();
+        let synced_number = self.cached_synced_block_num.clone();
         let p2p_2 = p2p.clone();
         executor_headers.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_HEADERS))
                 .for_each(move |_| {
                     // make it constant
                     let chain_info = client.chain_info();
-                    let mut max = 0u64;
-                    if let Ok(read) = queue1.read() {
-                        max = read.keys().last().map_or(0u64, |x| x.clone());
-                    };
-                    if max < chain_info.best_block_number + HEADERS_CAPACITY {
-                        headers::send(p2p_2.clone(), max, &chain_info, queue1.clone());
+                    if let Ok(start) = synced_number.read() {
+                        headers::send(p2p_2.clone(), *start, &chain_info, queue1.clone());
                     }
                     //                     p2p.get_node_by_td(10);
                     Ok(())
@@ -478,9 +478,7 @@ impl Callable for Sync {
             ACTION::HEADERSREQ => headers::receive_req(p2p, hash, cb),
             ACTION::HEADERSRES => headers::receive_res(p2p, hash, cb, self.queue.clone()),
             ACTION::BODIESREQ => bodies::receive_req(p2p, hash, cb),
-            ACTION::BODIESRES => {
-                bodies::receive_res(p2p, hash, cb, self.queue.clone(), self.client.chain_info())
-            }
+            ACTION::BODIESRES => bodies::receive_res(p2p, hash, cb, self.queue.clone()),
             ACTION::BROADCASTTX => (),
             ACTION::BROADCASTBLOCK => (),
             // TODO: kill the node

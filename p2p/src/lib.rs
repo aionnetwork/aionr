@@ -52,14 +52,12 @@ mod callable;
 use std::io;
 use std::sync::Arc;
 use std::collections::VecDeque;
-use std::collections::BTreeMap;
 use std::collections::HashMap;
 use std::sync::{Mutex,RwLock};
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::Instant;
 use std::net::SocketAddr;
-use lru_cache::LruCache;
 use rand::random;
 use futures::sync::mpsc;
 use futures::{Future, Stream};
@@ -78,7 +76,6 @@ use state::STATE;
 use handler::handshake;
 use handler::active_nodes;
 use node::TempNode;
-use aion_types::H256;
 
 pub use msg::ChannelBuffer;
 pub use node::Node;
@@ -315,7 +312,6 @@ impl Mgr {
                                 // construct node instance and store it
                                 let (tx, rx) = mpsc::channel(409600);
                                 let node = Node::new_outbound(ts.peer_addr().unwrap(), tx, temp_node.id, temp_node.if_seed);
-                                let id = node.id.clone();
                                 if let Ok(mut write) = p2p_outbound_0.nodes.try_write() {
                                     if !write.contains_key(&hash) {
                                         let id = node.get_id_string();
@@ -329,18 +325,10 @@ impl Mgr {
                                 // binding io futures
                                 let (sink, stream) = split_frame(ts);
                                 let read = stream.for_each(move |cb| {
-                                    if let Some(node) = p2p_outbound_0.get_node(&hash) {
-                                        // handle(
-                                        //     hash.clone(),
-                                        //     cb,
-                                        //     config_outbound_4,
-                                        //     handlers_out3.clone(),
-                                        //     temp_outbound_2,
-                                        //     nodes_outbound_5.clone(),
-                                        //     headers_out.clone(),
-                                        // );
-                                        Self::handle(p2p_outbound_0.clone(),hash.clone(),cb,callback_out.clone())
-                                    }
+
+
+                                    Self::handle(p2p_outbound_0.clone(),hash.clone(),cb,callback_out.clone());
+
                                     Ok(())
                                 }).map_err(move|err|{error!(target: "p2p", "read: {:?}", err)});
                                 executor_outbound_1.spawn(read.then(|_|{ Ok(()) }));
@@ -397,7 +385,6 @@ impl Mgr {
 
                 // counters
                 let executor_inbound_1 = executor_inbound_0.clone();
-                let executor_inbound_2 = executor_inbound_0.clone();
 
                 // config stream
                 config_stream(&ts);
@@ -421,20 +408,7 @@ impl Mgr {
                 // binding io futures
                 let (sink, stream) = split_frame(ts);
                 let read = stream.for_each(move |cb| {
-                    if let Some(node) = p2p_inbound_0.get_node(&hash) {
-                        // handle(
-                        //     hash,
-                        //     cb,
-                        //     config_inbound_2,
-                        //     handlers_in1.clone(),
-                        //     temp_inbound_2,
-                        //     nodes_inbound_3,
-                        //     headers_in.clone(),
-                        Self::handle(p2p_inbound_0.clone(),hash.clone(),cb,callback_in.clone())
-
-
-                        // );
-                    }
+                    Self::handle(p2p_inbound_0.clone(),hash.clone(),cb,callback_in.clone());
                     Ok(())
                 });
                 executor_inbound_0.spawn(read.then(|_| { Ok(()) }));
@@ -462,7 +436,7 @@ impl Mgr {
     }
 
     /// rechieve a random node with td >= target_td
-    pub fn get_node_by_td(&self, target_td: u64) -> u64 { 120 }
+    pub fn get_node_by_td(&self, _target_td: u64) -> u64 { 120 }
 
     /// send msg
     pub fn send(&self, p2p: Arc<Mgr>, hash: u64, cb: ChannelBuffer) {

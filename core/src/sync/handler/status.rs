@@ -21,14 +21,12 @@
 
 use std::mem;
 use std::sync::Arc;
-use std::sync::RwLock;
-use std::collections::HashMap;
 use aion_types::{H256, U256};
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use sync::route::{VERSION,MODULE,ACTION};
 use sync::storage::SyncStorage;
-use p2p::{ChannelBuffer, Node, Mgr};
+use p2p::{ChannelBuffer,  Mgr};
 
 const HASH_LENGTH: usize = 32;
 

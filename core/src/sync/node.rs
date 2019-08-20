@@ -18,13 +18,14 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
+use aion_types::H256;
 use p2p::Node;
+//use p2p::Mode;
 
-struct SyncNode {
-    inner: Node
+struct NodeInfo {
+    td: H256,
+    bn: u64,
+    block_hash: H256, //mode: Mode
 }
 
-impl SyncNode {
-    
-}
+impl NodeInfo {}

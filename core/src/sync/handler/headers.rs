@@ -20,9 +20,9 @@
  ******************************************************************************/
 
 use std::mem;
-use std::time::{Duration, SystemTime};
+use std::time::{ SystemTime};
 use std::sync::{RwLock,Arc};
-use std::collections::{HashMap,BTreeMap};
+use std::collections::{HashMap};
 use client::BlockId;
 use engine::unity_engine::UnityEngine;
 use header::{Header as BlockHeader,Seal};
@@ -48,7 +48,12 @@ const LARGE_REQUEST_SIZE: u64 = 48;
 pub fn get_working_nodes(ws: Arc<RwLock<HashMap<u64, Wrapper>>>) -> Vec<u64> {
     let mut working_nodes = Vec::new();
     if let Ok(wrappers) = ws.read() {
-        working_nodes = wrappers.keys().cloned().collect();
+        working_nodes = wrappers
+            .iter()
+            .filter(|(_, v)| v.with_status.value() == 0)
+            .map(|(k, _)| k)
+            .cloned()
+            .collect();
     }
     working_nodes
 }
