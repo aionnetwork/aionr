@@ -36,22 +36,22 @@ use p2p::{ChannelBuffer,  Mgr};
 
 const HASH_LENGTH: usize = 32;
 
-pub fn send_random(p2p: Arc<Mgr>) {
+pub fn send_random(p2p: Mgr) {
     if let Some(hash) = p2p.get_random_active_node_hash() {
-        send(hash, p2p.clone())
+        send(p2p, hash)
     }
 }
 
-pub fn send(hash: u64, p2p: Arc<Mgr>) {
+pub fn send(p2p: Mgr, hash: u64) {
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
     cb.head.ctrl = MODULE::SYNC.value();
     cb.head.action = ACTION::STATUSREQ.value();
     cb.head.len = 0;
-    p2p.send(p2p.clone(), hash, cb);
+    let mut p2p_0 = p2p.send(hash, cb);
 }
 
-pub fn receive_req(p2p: Arc<Mgr>, chain_info: &BlockChainInfo, hash: u64) {
+pub fn receive_req(p2p: Mgr, chain_info: &BlockChainInfo, hash: u64) {
     debug!(target: "sync", "status/receive_req");
 
     let mut cb = ChannelBuffer::new();
@@ -84,11 +84,11 @@ pub fn receive_req(p2p: Arc<Mgr>, chain_info: &BlockChainInfo, hash: u64) {
     trace!(target:"sync", "status res bc body len: {}", cb.head.len);
 
     p2p.update_node(&hash);
-    p2p.send(p2p.clone(), hash, cb);
+    p2p.send(hash, cb);
 }
 
 pub fn receive_res(
-    p2p: Arc<Mgr>,
+    p2p: Mgr,
     chain_info: &BlockChainInfo,
     node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
     hws: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,

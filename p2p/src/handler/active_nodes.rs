@@ -36,9 +36,7 @@ use route::MODULE;
 use route::ACTION;
 use super::super::Mgr;
 
-pub fn send(
-    p2p: Arc<Mgr>
-) {
+pub fn send(p2p: Mgr) {
     let active: Vec<Node> = p2p.get_active_nodes();
     let len: usize = active.len();
     if len > 0 {
@@ -46,22 +44,18 @@ pub fn send(
         let hash = active[random].get_hash();
         debug!(target: "p2p", "active_nodes/send:  hash {}", &hash);
         p2p.send(
-            p2p.clone(),
             hash,
             ChannelBuffer::new1(
                 VERSION::V0.value(),
                 MODULE::P2P.value(),
                 ACTION::ACTIVENODESREQ.value(),
                 0,
-            )
+            ),
         );
     }
 }
 
-pub fn receive_req(
-    p2p: Arc<Mgr>,
-    hash: u64 
-) {
+pub fn receive_req(p2p: Mgr, hash: u64) {
     debug!(target: "p2p", "active_nodes/receive_req");
 
     let mut cb_out = ChannelBuffer::new();
@@ -96,24 +90,27 @@ pub fn receive_req(
     }
     cb_out.body.put_slice(res_body.as_slice());
     cb_out.head.len = cb_out.body.len() as u32;
-    p2p.send(p2p.clone(), hash, cb_out);
+    p2p.send(hash, cb_out);
 }
 
-pub fn receive_res(
-    p2p: Arc<Mgr>,
-    hash: u64,
-    cb_in: ChannelBuffer,
-){
+pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     debug!(target: "p2p", "active_nodes/receive_res");
 
     let (node_count, rest) = cb_in.body.split_at(1);
     let mut temp_list = Vec::new();
     if node_count[0] > 0 {
+        let (local_ip, port) = p2p.config.get_ip_and_port();
+
         // TODO: update node status with healthy active nodes msg
         // TODO: max active nodes filter
         for _i in 0..node_count[0] as u32 {
             let (id, rest) = rest.split_at(NODE_ID_LENGTH);
             let (ip, rest) = rest.split_at(IP_LENGTH);
+
+            if local_ip.as_bytes() == ip {
+                continue;
+            }
+
             let (mut port, rest) = rest.split_at(mem::size_of::<u32>());
 
             let mut temp = TempNode::default();

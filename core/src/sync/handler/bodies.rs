@@ -42,7 +42,7 @@ use sync::handler::headers;
 
 const HASH_LEN: usize = 32;
 
-pub fn send(p2p: Arc<Mgr>, hash: u64, hashes: Vec<u8>) {
+pub fn send(p2p: Mgr, hash: u64, hashes: Vec<u8>) {
     trace!(target: "sync", "bodies/send req");
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
@@ -50,10 +50,10 @@ pub fn send(p2p: Arc<Mgr>, hash: u64, hashes: Vec<u8>) {
     cb.head.action = ACTION::BODIESREQ.value();
     cb.body = hashes;
     cb.head.len = cb.body.len() as u32;
-    p2p.send(p2p.clone(), hash.clone(), cb);
+    p2p.send(hash.clone(), cb);
 }
 
-pub fn receive_req(p2p: Arc<Mgr>, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
+pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
     trace!(target: "sync", "bodies/receive_req");
 
     let mut res = ChannelBuffer::new();
@@ -91,12 +91,11 @@ pub fn receive_req(p2p: Arc<Mgr>, hash: u64, client: Arc<BlockChainClient>, cb_i
     res.head.len = res.body.len() as u32;
 
     p2p.update_node(&hash);
-
-    p2p.send(p2p.clone(), hash, res);
+    p2p.send(hash, res);
 }
 
 pub fn receive_res(
-    p2p: Arc<Mgr>,
+    p2p: Mgr,
     hash: u64,
     cb_in: ChannelBuffer,
     hws: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,

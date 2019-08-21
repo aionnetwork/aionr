@@ -36,7 +36,6 @@ extern crate uuid;
 extern crate aion_version as version;
 extern crate bytes;
 extern crate byteorder;
-extern crate lru_cache;
 
 #[cfg(test)]
 mod test;
@@ -53,15 +52,20 @@ use std::io;
 use std::sync::Arc;
 use std::collections::VecDeque;
 use std::collections::HashMap;
-use std::sync::{Mutex,RwLock};
+use std::sync::Mutex;
+use std::sync::RwLock;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::Instant;
+use std::net::Shutdown;
 use std::net::SocketAddr;
 use rand::random;
+use futures::prelude::*;
 use futures::sync::mpsc;
 use futures::{Future, Stream};
 use futures::lazy;
+use futures::sync::oneshot;
+use futures::sync::oneshot::Sender;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
@@ -82,16 +86,18 @@ pub use node::Node;
 pub use config::Config;
 pub use callable::Callable;
 
-const INTERVAL_STATISICS: u64 = 5;
 const INTERVAL_OUTBOUND_CONNECT: u64 = 10;
 const INTERVAL_TIMEOUT: u64 = 5;
 const INTERVAL_ACTIVE_NODES: u64 = 3;
 const TIMEOUT_MAX: u64 = 30;
 const TEMP_MAX: usize = 64;
 
+#[derive(Clone)]
 pub struct Mgr {
     /// threading
-    runtime: Arc<Runtime>,
+    //runtime: Arc<Runtime>,
+    //runtime: Runtime,
+    shutdown_hook: Arc<RwLock<Option<Sender<()>>>>,
     /// config
     config: Arc<Config>,
     /// temp queue storing seeds and active nodes queried from other nodes
@@ -101,9 +107,9 @@ pub struct Mgr {
 }
 
 impl Mgr {
-    /// construct p2p instance
+    /// constructor
     pub fn new(config: Arc<Config>) -> Mgr {
-        // construct seeds
+        // load seeds
         let mut temp_queue = VecDeque::<TempNode>::with_capacity(TEMP_MAX);
         for boot_node_str in config.boot_nodes.clone() {
             info!(target: "run", "        seed: {}", &boot_node_str);
@@ -112,7 +118,9 @@ impl Mgr {
 
         // return instance
         Mgr {
-            runtime: Arc::new(Runtime::new().expect("tokio runtime")),
+            // runtime: Arc::new(Runtime::new().expect("tokio runtime")),
+            //runtime: Runtime::new().expect("tokio runtime"),
+            shutdown_hook: Arc::new(RwLock::new(None)),
             config,
             temp: Arc::new(Mutex::new(temp_queue)),
             nodes: Arc::new(RwLock::new(HashMap::new())),
@@ -120,9 +128,10 @@ impl Mgr {
     }
 
     /// run p2p instance
-    pub fn run(&self, p2p: Arc<Mgr>, callback: Arc<Callable>) {
+    pub fn run(&mut self, callback: Arc<Callable>) {
         // init
-        let executor = Arc::new(self.runtime.executor());
+        let mut rt = Runtime::new().unwrap();
+        let executor = rt.executor();
         let binding: SocketAddr = self
             .config
             .get_id_and_binding()
@@ -137,12 +146,13 @@ impl Mgr {
         // interval timeout
         let executor_timeout = executor.clone();
         let callback_timeout = callback.clone();
-        let p2p_timeout = p2p.clone();
+        let p2p_timeout = self.clone();
         executor_timeout.spawn(
             Interval::new(
                 Instant::now(),
                 Duration::from_secs(INTERVAL_TIMEOUT)
             ).for_each(move|_|{
+
                 let now = SystemTime::now();
                 let mut index: Vec<u64> = vec![];
                 if let Ok(mut write) = p2p_timeout.nodes.try_write(){
@@ -177,7 +187,7 @@ impl Mgr {
         // interval outbound
         let executor_outbound = executor.clone();
         let executor_outbound_0 = executor_outbound.clone();
-        let p2p_outbound = p2p.clone();
+        let p2p_outbound = self.clone();
         executor_outbound.spawn(
             Interval::new(
                 Instant::now(),
@@ -239,13 +249,21 @@ impl Mgr {
                                 debug!(target: "p2p", "connected to: {}", &temp_node.addr.to_string());
 
                                 let p2p_outbound_1 = p2p_outbound_0.clone();
+                                let p2p_outbound_2 = p2p_outbound_0.clone();
 
                                 // config stream
                                 config_stream(&ts);
 
                                 // construct node instance and store it
                                 let (tx, rx) = mpsc::channel(409600);
-                                let node = Node::new_outbound(ts.peer_addr().unwrap(), tx, temp_node.id, temp_node.if_seed);
+                                let ts_0 = ts.try_clone().unwrap();
+                                let node = Node::new_outbound(
+                                    ts.peer_addr().unwrap(), 
+                                    ts_0,
+                                    tx, 
+                                    temp_node.id, 
+                                    temp_node.if_seed
+                                );
                                 if let Ok(mut write) = p2p_outbound_0.nodes.try_write() {
                                     if !write.contains_key(&hash) {
                                         let id = node.get_id_string();
@@ -259,12 +277,10 @@ impl Mgr {
                                 // binding io futures
                                 let (sink, stream) = split_frame(ts);
                                 let read = stream.for_each(move |cb| {
-
-
-                                    Self::handle(p2p_outbound_0.clone(),hash.clone(),cb,callback_out.clone());
-
+                                    p2p_outbound_2.handle(hash.clone(),cb,callback_out.clone());
                                     Ok(())
                                 }).map_err(move|err|{error!(target: "p2p", "read: {:?}", err)});
+
                                 executor_outbound_1.spawn(read.then(|_|{ Ok(()) }));
                                 let write = sink.send_all(
                                     rx.map_err(|()| io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")),
@@ -287,7 +303,7 @@ impl Mgr {
 
         // interval active nodes
         let executor_active_nodes = executor.clone();
-        let p2p_active_nodes = p2p.clone();
+        let p2p_active_nodes = self.clone();
         executor_active_nodes.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_ACTIVE_NODES))
                 .for_each(move |_| {
@@ -299,16 +315,17 @@ impl Mgr {
         );
 
         // interval inbound
-        let executor_inbound = executor.clone();
-        let executor_inbound_0 = executor_inbound.clone();
-        let p2p_inbound = p2p.clone();
+        let executor_inbound_0 = executor.clone();
+        let executor_inbound_1 = executor.clone();
+        let p2p_inbound = self.clone();
         let listener = TcpListener::bind(&binding).expect("binding failed");
         let server = listener
             .incoming()
             .for_each(move |ts: TcpStream| {
-
+                
                 // counters
                 let p2p_inbound_0 = p2p_inbound.clone();
+                let p2p_inbound_1 = p2p_inbound.clone();
                 let callback_in = callback_in.clone();
 
                 // TODO: black list check
@@ -317,16 +334,19 @@ impl Mgr {
                     return Ok(());
                 }
 
-                // counters
-                let executor_inbound_1 = executor_inbound_0.clone();
-
                 // config stream
                 config_stream(&ts);
 
                 // construct node instance and store it
                 let (tx, rx) = mpsc::channel(409600);
                 let addr = ts.peer_addr().unwrap();
-                let node = Node::new_inbound(addr, tx, false);
+                let ts_0 = ts.try_clone().unwrap();
+                let node = Node::new_inbound(
+                    addr, 
+                    ts_0,
+                    tx, 
+                    false
+                );
                 let hash = node.get_hash();
 
                 if let Ok(mut write) = p2p_inbound.nodes.try_write() {
@@ -342,7 +362,7 @@ impl Mgr {
                 // binding io futures
                 let (sink, stream) = split_frame(ts);
                 let read = stream.for_each(move |cb| {
-                    Self::handle(p2p_inbound_0.clone(),hash.clone(),cb,callback_in.clone());
+                    p2p_inbound_1.handle(hash.clone(),cb,callback_in.clone());
                     Ok(())
                 });
                 executor_inbound_0.spawn(read.then(|_| { Ok(()) }));
@@ -352,29 +372,62 @@ impl Mgr {
                 executor_inbound_1.spawn(write.then(|_| { Ok(()) }));
                 Ok(())
             }).map_err(|err| error!(target: "p2p", "executor server: {:?}", err));
-        executor_inbound.spawn(server);
+
+        // bind shutdown hook
+        let (tx, rx) = oneshot::channel::<()>();
+        {
+            match self.shutdown_hook.write() {
+                Ok(mut guard) => *guard = Some(tx),
+                Err(_error) => {}
+            }
+        }
+
+        rt.block_on(rx.map_err(|_| ())).unwrap();
+        rt.shutdown_now().wait().unwrap();
+        drop(server);
+        drop(executor_timeout);
+        drop(executor_active_nodes);
+        drop(executor_outbound);
+        drop(executor);
+        debug!(target:"p2p", "shutdown executors");
     }
 
-    /// shutdown p2p instance
+    /// shutdown routine
     pub fn shutdown(&self) {
-        // let runtime = self.runtime.clone();
-        // match runtime.shutdown_now().wait(){
-        //     Ok(_) => {
-        //         info!(target: "p2p", "shutdown");
-        //     },
-        //     Err(err) => {
-        //         error!(target: "p2p", "shutdown failed: {:?}", err);
-        //     }
-        // }
+        if let Ok(mut lock) = self.nodes.write() {
+            for (_hash, mut node) in lock.iter_mut() {
+                match node.ts.shutdown(Shutdown::Both) {
+                    Ok(_) => {
+                        trace!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
+                    }
+                    Err(_err) => {}
+                }
+            }
+            lock.clear();
+        }
+
+        if let Ok(mut lock) = self.shutdown_hook.write() {
+            if lock.is_some() {
+                let tx = lock.take().unwrap();
+                match tx.send(()) {
+                    Ok(_) => {
+                        debug!(target: "p2p", "shutdown signal sent");
+                    }
+                    Err(err) => {
+                        error!(target: "p2p", "shutdown: {:?}", err);
+                    }
+                }
+            }
+        }
     }
 
     /// rechieve a random node with td >= target_td
     pub fn get_node_by_td(&self, _target_td: u64) -> u64 { 120 }
 
     /// send msg
-    pub fn send(&self, p2p: Arc<Mgr>, hash: u64, cb: ChannelBuffer) {
-        // TODO: solve issue msg lost
-        match p2p.nodes.try_write() {
+    pub fn send(&self, hash: u64, cb: ChannelBuffer) {
+        let mut nodes = &self.nodes;
+        match nodes.try_write() {
             Ok(mut lock) => {
                 let mut flag = true;
                 if let Some(node) = lock.get(&hash) {
@@ -475,6 +528,8 @@ impl Mgr {
         }
     }
 
+    /// refresh node timestamp in order to keep target in loop
+    /// otherwise, target will be timeout and removed
     pub fn update_node(&self, hash: &u64) {
         if let Ok(mut nodes) = self.nodes.write() {
             if let Some(mut node) = nodes.get_mut(hash) {
@@ -487,8 +542,9 @@ impl Mgr {
 
     /// messages with module code other than p2p module
     /// should flow into external handlers
-    fn handle(p2p: Arc<Mgr>, hash: u64, cb: ChannelBuffer, callable: Arc<Callable>) {
+    fn handle(&self, hash: u64, cb: ChannelBuffer, callable: Arc<Callable>) {
         trace!(target: "p2p", "handle: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
+        let p2p = self.clone();
         match VERSION::from(cb.head.ver) {
             VERSION::V0 => {
                 match MODULE::from(cb.head.ctrl) {

@@ -42,7 +42,7 @@ use super::super::Mgr;
 const VERSION: &str = "02";
 
 // TODO: validate len
-pub fn send(p2p: Arc<Mgr>, hash: u64) {
+pub fn send(p2p: Mgr, hash: u64) {
     debug!(target: "p2p", "handshake/send");
 
     // header
@@ -81,13 +81,13 @@ pub fn send(p2p: Arc<Mgr>, hash: u64) {
     req.head.len = req.body.len() as u32;
 
     // send
-    p2p.send(p2p.clone(), hash, req);
+    p2p.send(hash, req);
 }
 
 /// 1. decode handshake msg
 /// 2. validate and prove incoming connection to active
 /// 3. acknowledge sender if it is proved
-pub fn receive_req(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
+pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     debug!(target: "p2p", "handshake/receive_req");
 
     let (node_id, req_body_rest) = cb_in.body.split_at(NODE_ID_LENGTH);
@@ -147,7 +147,7 @@ pub fn receive_req(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
 
 /// 1. decode handshake res msg
 /// 2. update outbound node to active
-pub fn receive_res(p2p: Arc<Mgr>, hash: u64, cb_in: ChannelBuffer) {
+pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     debug!(target: "p2p", "handshake/receive_res");
 
     let (_, revision) = cb_in.body.split_at(1);

@@ -308,7 +308,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // Handle exit
     wait_for_exit();
 
-    info!(target: "run","Finishing work, please wait...");
+    info!(target: "run","shutdowning ...");
 
     // close pool
     let _ = close_transaction_pool.send(());
@@ -327,12 +327,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         ipc_server.unwrap().close();
     }
 
-    // sync.stop_network();
-    // close/drop this stuff as soon as exit detected.
-    // drop((sync, chain_notify));
-    drop(sync);
-
-    thread::sleep(Duration::from_secs(5));
+    sync.shutdown();
 
     runtime_rpc
         .shutdown_now()
@@ -359,8 +354,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .wait()
         .expect("Failed to shutdown pos invoker!");
 
-    info!(target: "run","Shutdown.");
-
+    info!(target: "run","shutdown completed");
     Ok(weak_client)
 }
 

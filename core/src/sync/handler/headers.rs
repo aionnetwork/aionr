@@ -44,7 +44,7 @@ use sync::wrappers::{HeaderWrapper};
 pub const NORMAL_REQUEST_SIZE: u32 = 24;
 const LARGE_REQUEST_SIZE: u32 = 48;
 
-pub fn prepare_send(p2p: Arc<Mgr>, hash: u64, best_num: u64 /*mode:Mode*/) {
+pub fn prepare_send(p2p: Mgr, hash: u64, best_num: u64 /*mode:Mode*/) {
     // TODO mode match
     let start = if best_num > 3 { best_num - 3 } else { 1 };
     let size = NORMAL_REQUEST_SIZE;
@@ -52,7 +52,7 @@ pub fn prepare_send(p2p: Arc<Mgr>, hash: u64, best_num: u64 /*mode:Mode*/) {
     send(p2p.clone(), hash, start, size);
 }
 
-fn send(p2p: Arc<Mgr>, hash: u64, start: u64, size: u32) {
+fn send(p2p: Mgr, hash: u64, start: u64, size: u32) {
     debug!(target:"sync","headers.rs/send: start {}, size: {}, node hash: {}", start, size, hash);
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
@@ -68,7 +68,7 @@ fn send(p2p: Arc<Mgr>, hash: u64, start: u64, size: u32) {
     cb.body.put_slice(&size_buf);
 
     cb.head.len = cb.body.len() as u32;
-    p2p.send(p2p.clone(), hash, cb);
+    p2p.send(hash, cb);
 }
 
 // pub fn send(
@@ -112,7 +112,7 @@ fn send(p2p: Arc<Mgr>, hash: u64, start: u64, size: u32) {
 //     }
 // }
 
-pub fn receive_req(p2p: Arc<Mgr>, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
+pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
     trace!(target: "sync", "headers/receive_req");
 
     let mut res = ChannelBuffer::new();
@@ -157,7 +157,7 @@ pub fn receive_req(p2p: Arc<Mgr>, hash: u64, client: Arc<BlockChainClient>, cb_i
         res.head.len = res.body.len() as u32;
 
         p2p.update_node(&hash);
-        p2p.send(p2p.clone(), hash, res);
+        p2p.send(hash, res);
     } else {
         warn!(target:"sync","headers/receive_req max headers size requested");
         return;
@@ -165,7 +165,7 @@ pub fn receive_req(p2p: Arc<Mgr>, hash: u64, client: Arc<BlockChainClient>, cb_i
 }
 
 pub fn receive_res(
-    p2p: Arc<Mgr>,
+    p2p: Mgr,
     hash: u64,
     cb_in: ChannelBuffer,
     hws: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,
@@ -252,6 +252,8 @@ pub fn receive_res(
         if let Ok(mut hws) = hws.try_write() {
             hws.insert(hash.clone(), hw);
             bodies::send(p2p.clone(), hash, hashes);
+        } else {
+            println!("!!!!!!!!!!!!!")
         }
     } else {
         debug!(target: "sync", "Came too late............");

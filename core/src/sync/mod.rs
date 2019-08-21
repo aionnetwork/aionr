@@ -36,6 +36,8 @@ use std::time::Instant;
 use std::time::SystemTime;
 use std::collections::BTreeMap;
 use std::collections::HashMap;
+use std::thread;
+use std::ptr;
 use rustc_hex::ToHex;
 use client::BlockChainClient;
 use client::BlockId;
@@ -93,7 +95,7 @@ pub struct Sync {
     config: Arc<Config>,
     client: Arc<BlockChainClient>,
     runtime: Arc<Runtime>,
-    p2p: Arc<Mgr>,
+    p2p: Mgr,
 
     /// collection of headers wrappers
     headers: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,
@@ -137,7 +139,7 @@ impl Sync {
         Sync {
             config: config.clone(),
             client,
-            p2p: Arc::new(Mgr::new(config)),
+            p2p: Mgr::new(config),
             runtime: Arc::new(Runtime::new().expect("tokio runtime")),
             headers: Arc::new(RwLock::new(HashMap::new())),
             blocks: Arc::new(RwLock::new(HashMap::new())),
@@ -158,12 +160,13 @@ impl Sync {
         // counters
         let runtime = self.runtime.clone();
         let executor = Arc::new(runtime.executor());
-        let nodes = self.p2p.nodes.clone();
-        let p2p = self.p2p.clone();
 
         // init p2p;
-        let p2p_0 = p2p.clone();
-        p2p_0.run(p2p_0.clone(), sync.clone());
+        let mut p2p = &self.p2p.clone();
+        let mut p2p_0 = p2p.clone();
+        thread::spawn(move || {
+            p2p_0.run(sync.clone());
+        });
 
         // interval statisics
         //         let executor_statisics = executor.clone();
@@ -341,12 +344,7 @@ impl Sync {
         //        );
     }
 
-    pub fn shutdown(&self) {
-        // SyncMgr::disable();
-        // TODO: update proper ways to clear up threads and connections on p2p layer
-        let p2p = self.p2p.clone();
-        p2p.shutdown();
-    }
+    pub fn shutdown(&self) { &self.p2p.shutdown(); }
 }
 
 pub trait SyncProvider: Send + ::std::marker::Sync {
