@@ -22,7 +22,7 @@
 use std::sync::{RwLock,Arc};
 use std::collections::{HashMap};
 use block::Block;
-use client::{BlockId,BlockChainClient};
+use client::{BlockId,BlockChainClient,BlockChainInfo};
 use header::{Seal,Header};
 use aion_types::H256;
 use bytes::BufMut;
@@ -34,7 +34,7 @@ use p2p::Mgr;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
-use sync::header_wrapper::{HeaderWrapper};
+use sync::wrappers::{HeaderWrapper,BlockWrapper};
 use sync::handler::headers;
 //use sync::handler::headers;
 //use sync::handler::headers::REQUEST_SIZE;
@@ -98,7 +98,7 @@ pub fn receive_res(
     hash: u64,
     cb_in: ChannelBuffer,
     hws: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,
-    synced_number: Arc<RwLock<u64>>,
+    chain_info: BlockChainInfo,
 )
 {
     trace!(target: "sync", "bodies/receive_res");
@@ -167,7 +167,7 @@ pub fn receive_res(
                     {
                         // TODO: MODE NORMAL / THUNDER
 
-                        headers::prepare_send(p2p.clone(), hash, synced_number.clone());
+                        headers::prepare_send(p2p.clone(), hash, chain_info.best_block_number);
                     }
                 }
             } else {

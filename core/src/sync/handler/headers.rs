@@ -37,23 +37,17 @@ use sync::handler::bodies;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
-use sync::header_wrapper::{HeaderWrapper};
+use sync::wrappers::{HeaderWrapper};
 
 pub const NORMAL_REQUEST_SIZE: u32 = 24;
 const LARGE_REQUEST_SIZE: u32 = 48;
 
-pub fn prepare_send(p2p: Arc<Mgr>, hash: u64, synced_number: Arc<RwLock<u64>> /*mode:Mode*/) {
+pub fn prepare_send(p2p: Arc<Mgr>, hash: u64, best_num: u64 /*mode:Mode*/) {
     // TODO mode match
-    if let Ok(synced_number) = synced_number.read() {
-        let start = if *synced_number > 3 {
-            *synced_number - 3
-        } else {
-            1
-        };
-        let size = NORMAL_REQUEST_SIZE;
+    let start = if best_num > 3 { best_num - 3 } else { 1 };
+    let size = NORMAL_REQUEST_SIZE;
 
-        send(p2p.clone(), hash, start, size);
-    }
+    send(p2p.clone(), hash, start, size);
 }
 
 fn send(p2p: Arc<Mgr>, hash: u64, start: u64, size: u32) {

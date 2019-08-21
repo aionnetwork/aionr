@@ -90,7 +90,6 @@ pub fn receive_res(
     p2p: Arc<Mgr>,
     chain_info: &BlockChainInfo,
     node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
-    synced_number: Arc<RwLock<u64>>,
     hash: u64,
     cb_in: ChannelBuffer,
 )
@@ -118,7 +117,7 @@ pub fn receive_res(
                     p2p.update_node(&hash);
 
                     if chain_info.total_difficulty > node_info.total_difficulty {
-                        headers::prepare_send(p2p.clone(), hash, synced_number.clone());
+                        headers::prepare_send(p2p.clone(), hash, chain_info.best_block_number);
                     }
                 }
                 None => {
