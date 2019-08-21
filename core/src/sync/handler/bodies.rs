@@ -19,7 +19,7 @@
  *
  ******************************************************************************/
 
-use std::sync::{RwLock,Arc};
+use std::sync::{RwLock,Arc,Mutex};
 use std::collections::{HashMap};
 use block::Block;
 use client::{BlockId,BlockChainClient,BlockChainInfo};
@@ -28,6 +28,7 @@ use aion_types::H256;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use std::time::SystemTime;
+use lru_cache::LruCache;
 use p2p::ChannelBuffer;
 use p2p::Node;
 use p2p::Mgr;
@@ -42,6 +43,7 @@ use sync::handler::headers;
 const HASH_LEN: usize = 32;
 
 pub fn send(p2p: Arc<Mgr>, hash: u64, hashes: Vec<u8>) {
+    trace!(target: "sync", "bodies/send req");
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
     cb.head.ctrl = MODULE::SYNC.value();
@@ -99,12 +101,13 @@ pub fn receive_res(
     cb_in: ChannelBuffer,
     hws: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,
     chain_info: BlockChainInfo,
+    downloaded_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 )
 {
     trace!(target: "sync", "bodies/receive_res");
     if cb_in.body.len() > 0 {
         if let Ok(mut wrappers) = hws.write() {
-            if let Some(mut wrapper) = wrappers.get_mut(&hash) {
+            if let Some(mut wrapper) = wrappers.remove(&hash) {
                 let headers = wrapper.headers.clone();
                 if !headers.is_empty() {
                     let rlp = UntrustedRlp::new(cb_in.body.as_slice());
@@ -136,15 +139,14 @@ pub fn receive_res(
                                 transactions: bodies[i].clone(),
                             };
                             blocks.push(block.rlp_bytes(Seal::Without));
-                            //                                        if let Ok(mut downloaded_block_hashes) =
-                            //                                        SyncStorage::get_downloaded_block_hashes().lock()
+                            if let Ok(mut downloaded_block_hashes) = downloaded_block_hashes.lock()
                             {
-                                //                                                let hash = block.header.hash();
-                                //                                                if !downloaded_block_hashes.contains_key(&hash) {
-                                //                                                    downloaded_block_hashes.insert(hash, 0);
-                                //                                                } else {
-                                //                                                    trace!(target: "sync", "downloaded_block_hashes: {}.", hash);
-                                //                                                }
+                                let hash = block.header.hash();
+                                if !downloaded_block_hashes.contains_key(&hash) {
+                                    downloaded_block_hashes.insert(hash, 0);
+                                } else {
+                                    trace!(target: "sync", "downloaded_block_hashes: {}.", hash);
+                                }
                             }
                         }
                     } else {

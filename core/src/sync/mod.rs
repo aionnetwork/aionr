@@ -81,7 +81,7 @@ const STATUS_REQ_INTERVAL: u64 = 2;
 const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
 const BLOCKS_IMPORT_INTERVAL: u64 = 50;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
-const INTERVAL_STATUS: u64 = 500;
+const INTERVAL_STATUS: u64 = 5000;
 const INTERVAL_HEADERS: u64 = 2;
 const INTERVAL_BODIES: u64 = 2;
 const INTERVAL_STATISICS: u64 = 5;
@@ -550,7 +550,8 @@ impl Callable for Sync {
             ACTION::STATUSRES => {
                 let chain_info = &self.client.chain_info();
                 let node_info = self.node_info.clone();
-                status::receive_res(p2p, chain_info, node_info, hash, cb)
+                let headers = self.headers.clone();
+                status::receive_res(p2p, chain_info, node_info, headers, hash, cb)
             }
             ACTION::HEADERSREQ => {
                 let client = self.client.clone();
@@ -570,7 +571,8 @@ impl Callable for Sync {
                 let headers = self.headers.clone();
                 //                let blocks = self.blocks.clone();
                 let chain_info = self.client.chain_info();
-                bodies::receive_res(p2p, hash, cb, headers, chain_info)
+                let downloaded_hashes = self.cached_downloaded_block_hashes.clone();
+                bodies::receive_res(p2p, hash, cb, headers, chain_info, downloaded_hashes)
             }
             ACTION::BROADCASTTX => (),
             ACTION::BROADCASTBLOCK => (),
