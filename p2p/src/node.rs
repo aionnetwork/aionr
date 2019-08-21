@@ -24,6 +24,7 @@ use std::time::SystemTime;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::hash_set::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
 use uuid::Uuid;
@@ -65,6 +66,10 @@ pub struct Node {
     pub connection: Connection,
     pub if_seed: bool,
     pub update: SystemTime,
+
+    /// storage for msg in & out routes
+    /// since most of msg in pair mode: request & response
+    pub tokens: HashSet<u32>,
     
 }
 
@@ -84,6 +89,7 @@ impl Node {
             net_id: 0,
             addr: IpAddr::parse(sa),
             genesis_hash: H256::default(),
+
             if_boot: false,
             revision: [b' '; MAX_REVISION_LENGTH],
             ts: Arc::new(ts),
@@ -92,6 +98,8 @@ impl Node {
             connection: Connection::OUTBOUND,
             if_seed,
             update: SystemTime::now(),
+
+            tokens: HashSet::new(),
         }
     }
 
@@ -108,6 +116,7 @@ impl Node {
             net_id: 0,
             addr: IpAddr::parse(sa),
             genesis_hash: H256::default(),
+            
             if_boot: false,
             revision: [b' '; MAX_REVISION_LENGTH],
             ts: Arc::new(ts),
@@ -116,6 +125,8 @@ impl Node {
             connection: Connection::INBOUND,
             if_seed,
             update: SystemTime::now(),
+
+            tokens: HashSet::new(),
         }
     }
 

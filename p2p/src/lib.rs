@@ -103,12 +103,16 @@ pub struct Mgr {
     /// temp queue storing seeds and active nodes queried from other nodes
     temp: Arc<Mutex<VecDeque<TempNode>>>,
     /// nodes
-    pub nodes: Arc<RwLock<HashMap<u64, Node>>>,
+    nodes: Arc<RwLock<HashMap<u64, Node>>>,
+    /// tokens rule
+    tokens_rule: Arc<HashMap<u32, u32>>
+
 }
 
 impl Mgr {
+
     /// constructor
-    pub fn new(config: Arc<Config>) -> Mgr {
+    pub fn new(config: Arc<Config>, tokens_pairs: Vec<[u32;2]>) -> Mgr {
 
         // load seeds
         let mut temp_queue = VecDeque::<TempNode>::with_capacity(TEMP_MAX);
@@ -117,15 +121,34 @@ impl Mgr {
             temp_queue.push_back(TempNode::new_from_str(boot_node_str.to_string()));
         }
 
-        // return instance
+        // parse token rules
+        let mut tokens_rule: HashMap<u32, u32> = HashMap::new();
+        for pair in tokens_pairs {
+            if pair[0] != pair[1]{
+                if !tokens_rule.contains_key(&pair[0]) {
+                    tokens_rule.insert(pair[0], pair[1]);
+                } 
+                if !tokens_rule.contains_key(&pair[1]) {
+                    tokens_rule.insert(pair[1], pair[0]);
+                } 
+            }
+        }
+
         Mgr {
-            // runtime: Arc::new(Runtime::new().expect("tokio runtime")),
-            //runtime: Runtime::new().expect("tokio runtime"),
             shutdown_hook: Arc::new(RwLock::new(None)),   
             config,
             temp: Arc::new(Mutex::new(temp_queue)),
             nodes: Arc::new(RwLock::new(HashMap::new())),
+            tokens_rule: Arc::new(tokens_rule),
         }
+    }
+
+    /// verify inbound msg route through token collection
+    /// 1. pass in incoming msg route through token rules against token collection on indivisual node
+    /// 2. return 
+    /// 3. should 
+    pub fn token_check(&self, ){
+
     }
 
     /// run p2p instance
@@ -388,6 +411,7 @@ impl Mgr {
             }
         }
 
+        // clear
         rt.block_on(rx.map_err(|_|())).unwrap();
         rt.shutdown_now().wait().unwrap();
         drop(server);
@@ -568,6 +592,9 @@ impl Mgr {
                         };
                     }
                     MODULE::EXTERNAL => {
+
+
+
                         callable.handle(hash, cb);
                     }
                 }

@@ -130,10 +130,15 @@ impl Sync {
         let local_best_td: U256 = client.chain_info().total_difficulty;
         let local_best_block_number: u64 = client.chain_info().best_block_number;
         let config = Arc::new(config);
+
+        let mut token_rules: Vec<[u32; 2]> = vec![];
+        
+
+
         Sync {
             config: config.clone(),
             client,
-            p2p: Mgr::new(config),
+            p2p: Mgr::new(config, token_rules),
             runtime: Arc::new(Runtime::new().expect("tokio runtime")),
             headers: Arc::new(RwLock::new(HashMap::new())),
             node_info: Arc::new(RwLock::new(HashMap::new())),
