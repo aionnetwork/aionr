@@ -116,6 +116,12 @@ pub struct Sync {
     /// network best block number
     network_best_block_number: Arc<RwLock<u64>>,
 
+    /// cache block hashes which have been downloaded
+    cached_downloaded_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
+
+    /// cache block hashes which have been imported
+    cached_imported_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
+
     /// cache tx hash which has been stored and broadcasted
     cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 
@@ -141,6 +147,8 @@ impl Sync {
             local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
             network_best_td: Arc::new(RwLock::new(local_best_td)),
             network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
+            cached_downloaded_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
+            cached_imported_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
             cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
             cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
         }
@@ -550,7 +558,9 @@ impl Callable for Sync {
             }
             ACTION::HEADERSRES => {
                 let headers = self.headers.clone();
-                headers::receive_res(p2p, hash, cb, headers)
+                let downloaded_hashes = self.cached_downloaded_block_hashes.clone();
+                let imported_hashes = self.cached_imported_block_hashes.clone();
+                headers::receive_res(p2p, hash, cb, headers, downloaded_hashes, imported_hashes)
             }
             ACTION::BODIESREQ => {
                 let client = self.client.clone();

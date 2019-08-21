@@ -21,15 +21,17 @@
 
 use std::mem;
 use std::time::{ SystemTime};
-use std::sync::{RwLock,Arc};
+use std::sync::{RwLock,Arc,Mutex};
 use std::collections::{HashMap};
 use engine::unity_engine::UnityEngine;
 use header::{Header as BlockHeader,Seal};
 use acore_bytes::to_hex;
+use aion_types::H256;
 use client::{BlockChainClient, BlockId};
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
+use lru_cache::LruCache;
 use p2p::ChannelBuffer;
 use p2p::Node;
 use p2p::Mgr;
@@ -167,6 +169,8 @@ pub fn receive_res(
     hash: u64,
     cb_in: ChannelBuffer,
     hws: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,
+    cached_downloaded_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
+    cached_imported_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 )
 {
     trace!(target: "sync", "headers/receive_res");
@@ -196,7 +200,8 @@ pub fn receive_res(
                         );
                         break;
                     } else {
-                        //                        let hash = header.hash();
+                        let block_hash = header.hash();
+
                         //                        let number = header.number();
 
                         // Skip staged block header
@@ -207,13 +212,26 @@ pub fn receive_res(
                         //                                break;
                         //                            }
                         //                        }
+                        // TODO: to do better
+                        let is_downloaded =
+                            if let Ok(mut hashes) = cached_downloaded_block_hashes.lock() {
+                                hashes.contains_key(&block_hash)
+                            } else {
+                                warn!(target: "sync", "downloaded_block_hashes lock failed");
+                                false
+                            };
+                        let is_imported =
+                            if let Ok(mut hashes) = cached_imported_block_hashes.lock() {
+                                hashes.contains_key(&block_hash)
+                            } else {
+                                warn!(target: "sync", "imported_block_hashes lock failed");
+                                false
+                            };
 
-                        //                        if !SyncStorage::is_downloaded_block_hashes(&hash)
-                        //                            && !SyncStorage::is_imported_block_hash(&hash)
-                        //                        {
-                        hashes.put_slice(&header.hash());
-                        headers.push(header.clone().rlp(Seal::Without));
-                        //                        }
+                        if !is_downloaded && !is_imported {
+                            hashes.put_slice(&block_hash);
+                            headers.push(header.clone().rlp(Seal::Without));
+                        }
                     }
                     prev_header = header;
                 }
