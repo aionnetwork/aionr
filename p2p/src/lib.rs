@@ -96,7 +96,7 @@ const TEMP_MAX: usize = 64;
 pub struct Mgr {
     /// threading
     //runtime: Arc<Runtime>,
-    //runtime: Runtime,   
+    //runtime: Runtime,
     shutdown_hook: Arc<RwLock<Option<Sender<()>>>>,
     /// config
     config: Arc<Config>,
@@ -105,15 +105,12 @@ pub struct Mgr {
     /// nodes
     nodes: Arc<RwLock<HashMap<u64, Node>>>,
     /// tokens rule
-    tokens_rule: Arc<HashMap<u32, u32>>
-
+    tokens_rule: Arc<HashMap<u32, u32>>,
 }
 
 impl Mgr {
-
     /// constructor
-    pub fn new(config: Arc<Config>, tokens_pairs: Vec<[u32;2]>) -> Mgr {
-
+    pub fn new(config: Arc<Config>, tokens_pairs: Vec<[u32; 2]>) -> Mgr {
         // load seeds
         let mut temp_queue = VecDeque::<TempNode>::with_capacity(TEMP_MAX);
         for boot_node_str in config.boot_nodes.clone() {
@@ -124,18 +121,18 @@ impl Mgr {
         // parse token rules
         let mut tokens_rule: HashMap<u32, u32> = HashMap::new();
         for pair in tokens_pairs {
-            if pair[0] != pair[1]{
+            if pair[0] != pair[1] {
                 if !tokens_rule.contains_key(&pair[0]) {
                     tokens_rule.insert(pair[0], pair[1]);
-                } 
+                }
                 if !tokens_rule.contains_key(&pair[1]) {
                     tokens_rule.insert(pair[1], pair[0]);
-                } 
+                }
             }
         }
 
         Mgr {
-            shutdown_hook: Arc::new(RwLock::new(None)),   
+            shutdown_hook: Arc::new(RwLock::new(None)),
             config,
             temp: Arc::new(Mutex::new(temp_queue)),
             nodes: Arc::new(RwLock::new(HashMap::new())),
@@ -145,15 +142,12 @@ impl Mgr {
 
     /// verify inbound msg route through token collection
     /// 1. pass in incoming msg route through token rules against token collection on indivisual node
-    /// 2. return 
-    /// 3. should 
-    pub fn token_check(&self, ){
-
-    }
+    /// 2. return
+    /// 3. should
+    pub fn token_check(&self) {}
 
     /// run p2p instance
     pub fn run(&mut self, callback: Arc<Callable>) {
-
         // init
         let mut rt = Runtime::new().unwrap();
         let executor = rt.executor();
@@ -283,10 +277,10 @@ impl Mgr {
                                 let (tx, rx) = mpsc::channel(409600);
                                 let ts_0 = ts.try_clone().unwrap();
                                 let node = Node::new_outbound(
-                                    ts.peer_addr().unwrap(), 
+                                    ts.peer_addr().unwrap(),
                                     ts_0,
-                                    tx, 
-                                    temp_node.id, 
+                                    tx,
+                                    temp_node.id,
                                     temp_node.if_seed
                                 );
                                 if let Ok(mut write) = p2p_outbound_0.nodes.try_write() {
@@ -331,24 +325,22 @@ impl Mgr {
         let p2p_active_nodes = self.clone();
         executor_active_nodes.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_ACTIVE_NODES))
-            .for_each(move |_| {
-
-                let p2p_active_nodes_0 = p2p_active_nodes.clone();
-                active_nodes::send(p2p_active_nodes_0);
-                Ok(())
-            })
-            .map_err(|err| error!(target: "p2p", "executor active nodes: {:?}", err))
+                .for_each(move |_| {
+                    let p2p_active_nodes_0 = p2p_active_nodes.clone();
+                    active_nodes::send(p2p_active_nodes_0);
+                    Ok(())
+                })
+                .map_err(|err| error!(target: "p2p", "executor active nodes: {:?}", err)),
         );
 
         // interval inbound
         let executor_inbound_0 = executor.clone();
         let executor_inbound_1 = executor.clone();
         let p2p_inbound = self.clone();
-        let listener = TcpListener::bind(&binding).expect("binding failed");     
+        let listener = TcpListener::bind(&binding).expect("binding failed");
         let server = listener
             .incoming()
             .for_each(move |ts: TcpStream| {
-                
                 // counters
                 let p2p_inbound_0 = p2p_inbound.clone();
                 let p2p_inbound_1 = p2p_inbound.clone();
@@ -368,9 +360,9 @@ impl Mgr {
                 let addr = ts.peer_addr().unwrap();
                 let ts_0 = ts.try_clone().unwrap();
                 let node = Node::new_inbound(
-                    addr, 
+                    addr,
                     ts_0,
-                    tx, 
+                    tx,
                     false
                 );
                 let hash = node.get_hash();
@@ -399,20 +391,17 @@ impl Mgr {
                 Ok(())
             }).map_err(|err| error!(target: "p2p", "executor server: {:?}", err));
 
-        
         // bind shutdown hook
         let (tx, rx) = oneshot::channel::<()>();
         {
             match self.shutdown_hook.write() {
-                Ok(mut guard) => {
-                    *guard = Some(tx) 
-                },
+                Ok(mut guard) => *guard = Some(tx),
                 Err(_error) => {}
             }
         }
 
         // clear
-        rt.block_on(rx.map_err(|_|())).unwrap();
+        rt.block_on(rx.map_err(|_| ())).unwrap();
         rt.shutdown_now().wait().unwrap();
         drop(server);
         drop(executor_timeout);
@@ -429,9 +418,8 @@ impl Mgr {
                 match node.ts.shutdown(Shutdown::Both) {
                     Ok(_) => {
                         trace!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
-                    }, 
-                    Err(_err) => {
                     }
+                    Err(_err) => {}
                 }
             }
             lock.clear();
@@ -443,15 +431,13 @@ impl Mgr {
                 match tx.send(()) {
                     Ok(_) => {
                         debug!(target: "p2p", "shutdown signal sent");
-                    },
+                    }
                     Err(err) => {
                         error!(target: "p2p", "shutdown: {:?}", err);
                     }
                 }
-            } 
+            }
         }
-
-        
     }
 
     /// rechieve a random node with td >= target_td
@@ -562,7 +548,7 @@ impl Mgr {
     }
 
     /// refresh node timestamp in order to keep target in loop
-    /// otherwise, target will be timeout and removed 
+    /// otherwise, target will be timeout and removed
     pub fn update_node(&self, hash: &u64) {
         if let Ok(mut nodes) = self.nodes.write() {
             if let Some(mut node) = nodes.get_mut(hash) {
@@ -592,9 +578,6 @@ impl Mgr {
                         };
                     }
                     MODULE::EXTERNAL => {
-
-
-
                         callable.handle(hash, cb);
                     }
                 }
@@ -604,7 +587,6 @@ impl Mgr {
         };
     }
 }
-
 
 /// helper function for config inbound & outbound stream
 fn config_stream(stream: &TcpStream) {

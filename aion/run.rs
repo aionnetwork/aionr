@@ -354,7 +354,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .wait()
         .expect("Failed to shutdown pos invoker!");
 
-    info!(target: "run","shutdown completed");    
+    info!(target: "run","shutdown completed");
     Ok(weak_client)
 }
 

@@ -42,7 +42,6 @@ pub const PROTOCOL_LENGTH: usize = 6;
 pub const MAX_REVISION_LENGTH: usize = 24;
 pub const REVISION_PREFIX: &str = "r-";
 pub const IP_LENGTH: usize = 8;
-pub const DIFFICULTY_LENGTH: usize = 16;
 
 fn calculate_hash<T: Hash>(t: &T) -> u64 {
     let mut s = DefaultHasher::new();
@@ -70,7 +69,6 @@ pub struct Node {
     /// storage for msg in & out routes
     /// since most of msg in pair mode: request & response
     pub tokens: HashSet<u32>,
-    
 }
 
 impl Node {
@@ -105,18 +103,19 @@ impl Node {
 
     // construct outbound node
     pub fn new_inbound(
-        sa: SocketAddr, 
+        sa: SocketAddr,
         ts: TcpStream,
-        tx: mpsc::Sender<ChannelBuffer>, 
-        if_seed: bool
-    ) -> Node {
+        tx: mpsc::Sender<ChannelBuffer>,
+        if_seed: bool,
+    ) -> Node
+    {
         Node {
             hash: 0,
             id: [b'0'; NODE_ID_LENGTH],
             net_id: 0,
             addr: IpAddr::parse(sa),
             genesis_hash: H256::default(),
-            
+
             if_boot: false,
             revision: [b' '; MAX_REVISION_LENGTH],
             ts: Arc::new(ts),
@@ -224,7 +223,6 @@ pub struct TempNode {
 }
 
 impl TempNode {
-    
     // TODO: remove in future
     pub fn default() -> TempNode {
         TempNode {

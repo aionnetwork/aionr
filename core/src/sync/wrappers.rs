@@ -35,3 +35,18 @@ impl HeaderWrapper {
         }
     }
 }
+
+#[derive(Clone, PartialEq)]
+pub struct BlockWrapper {
+    pub timestamp: SystemTime,
+    pub blocks: Vec<Vec<u8>>,
+}
+
+impl BlockWrapper {
+    pub fn new() -> Self {
+        BlockWrapper {
+            timestamp: SystemTime::now(),
+            blocks: Vec::new(),
+        }
+    }
+}

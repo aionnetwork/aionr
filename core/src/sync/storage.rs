@@ -26,7 +26,7 @@ use std::time::SystemTime;
 use block::Block;
 use client::{BlockChainClient, BlockChainInfo, BlockQueueInfo};
 use header::Header;
-use sync::header_wrapper::HeaderWrapper;
+use sync::wrappers::HeaderWrapper;
 use aion_types::{H256, U256};
 use lru_cache::LruCache;
 use crate_state::Storage;

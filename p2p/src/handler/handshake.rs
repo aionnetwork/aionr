@@ -42,10 +42,7 @@ use super::super::Mgr;
 const VERSION: &str = "02";
 
 // TODO: validate len
-pub fn send(
-    p2p: Mgr, 
-    hash: u64
-) {
+pub fn send(p2p: Mgr, hash: u64) {
     debug!(target: "p2p", "handshake/send");
 
     // header
@@ -90,11 +87,7 @@ pub fn send(
 /// 1. decode handshake msg
 /// 2. validate and prove incoming connection to active
 /// 3. acknowledge sender if it is proved
-pub fn receive_req(
-    p2p: Mgr, 
-    hash: u64, 
-    cb_in: ChannelBuffer
-) {
+pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     debug!(target: "p2p", "handshake/receive_req");
 
     let (node_id, req_body_rest) = cb_in.body.split_at(NODE_ID_LENGTH);
