@@ -72,7 +72,6 @@ fn send(p2p: Mgr, hash: u64, start: u64, size: u32) {
     cb.body.put_slice(&size_buf);
 
     cb.head.len = cb.body.len() as u32;
-
     p2p.send(hash, cb);
 }
 

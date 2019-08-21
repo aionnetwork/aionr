@@ -179,7 +179,7 @@ pub fn receive_block(node: &mut Node, req: ChannelBuffer) {
 }
 
 pub fn receive_tx(
-    p2p: Arc<Mgr>,
+    p2p: Mgr,
     hash: u64,
     cb: ChannelBuffer,
     local_best_block_num: Arc<RwLock<u64>>,

@@ -22,12 +22,14 @@
 use std::fmt;
 use std::time::SystemTime;
 use std::net::SocketAddr;
+use std::sync::Arc;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
 use uuid::Uuid;
 use futures::sync::mpsc;
 use aion_types::H256;
+use tokio::net::TcpStream;
 use super::msg::*;
 use super::state::STATE;
 
@@ -45,6 +47,107 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
     let mut s = DefaultHasher::new();
     t.hash(&mut s);
     s.finish()
+}
+
+#[derive(Clone)]
+pub struct Node {
+    pub hash: u64,
+    pub id: [u8; NODE_ID_LENGTH],
+    pub net_id: u32,
+    pub addr: IpAddr,
+    pub genesis_hash: H256,
+
+    pub if_boot: bool,
+    pub revision: [u8; MAX_REVISION_LENGTH],
+    pub ts: Arc<TcpStream>,
+    pub tx: mpsc::Sender<ChannelBuffer>,
+    pub state: STATE,
+    pub connection: Connection,
+    pub if_seed: bool,
+    pub update: SystemTime,
+    
+}
+
+impl Node {
+    // construct inbound node
+    pub fn new_outbound(
+        sa: SocketAddr,
+        ts: TcpStream,
+        tx: mpsc::Sender<ChannelBuffer>,
+        id: [u8; NODE_ID_LENGTH],
+        if_seed: bool,
+    ) -> Node
+    {
+        Node {
+            hash: 0,
+            id,
+            net_id: 0,
+            addr: IpAddr::parse(sa),
+            genesis_hash: H256::default(),
+            if_boot: false,
+            revision: [b' '; MAX_REVISION_LENGTH],
+            ts: Arc::new(ts),
+            tx,
+            state: STATE::CONNECTED,
+            connection: Connection::OUTBOUND,
+            if_seed,
+            update: SystemTime::now(),
+        }
+    }
+
+    // construct outbound node
+    pub fn new_inbound(
+        sa: SocketAddr, 
+        ts: TcpStream,
+        tx: mpsc::Sender<ChannelBuffer>, 
+        if_seed: bool
+    ) -> Node {
+        Node {
+            hash: 0,
+            id: [b'0'; NODE_ID_LENGTH],
+            net_id: 0,
+            addr: IpAddr::parse(sa),
+            genesis_hash: H256::default(),
+            if_boot: false,
+            revision: [b' '; MAX_REVISION_LENGTH],
+            ts: Arc::new(ts),
+            tx,
+            state: STATE::CONNECTED,
+            connection: Connection::INBOUND,
+            if_seed,
+            update: SystemTime::now(),
+        }
+    }
+
+    pub fn get_hash(&self) -> u64 {
+        let ip = self.addr.get_ip();
+        let hash: u64 = calculate_hash(&ip);
+        trace!(target: "p2p", "node/get_hash: {}", &hash);
+        hash
+    }
+
+    pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
+
+    pub fn update(&mut self) {
+        debug!(target: "p2p", "node timestamp updated");
+        self.update = SystemTime::now();
+    }
+}
+
+pub fn convert_ip_string(ip_str: String) -> [u8; 8] {
+    let mut ip: [u8; 8] = [0u8; 8];
+    let ip_vec: Vec<&str> = ip_str.split(".").collect();
+    if ip_vec.len() == 4 {
+        ip[0] = 0;
+        ip[1] = ip_vec[0].parse::<u8>().unwrap_or(0);
+        ip[2] = 0;
+        ip[3] = ip_vec[1].parse::<u8>().unwrap_or(0);
+        ip[4] = 0;
+        ip[5] = ip_vec[2].parse::<u8>().unwrap_or(0);
+        ip[6] = 0;
+        ip[7] = ip_vec[3].parse::<u8>().unwrap_or(0);
+    }
+    ip
 }
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
@@ -186,97 +289,6 @@ impl fmt::Display for Connection {
         };
         write!(f, "{}", printable)
     }
-}
-
-#[derive(Clone)]
-pub struct Node {
-    pub hash: u64,
-    pub id: [u8; NODE_ID_LENGTH],
-    pub net_id: u32,
-    pub addr: IpAddr,
-    pub genesis_hash: H256,
-
-    pub if_boot: bool,
-    pub revision: [u8; MAX_REVISION_LENGTH],
-    pub tx: mpsc::Sender<ChannelBuffer>,
-    pub state: STATE,
-    pub connection: Connection,
-    pub if_seed: bool,
-    pub update: SystemTime,
-}
-
-impl Node {
-    // construct inbound node
-    pub fn new_outbound(
-        sa: SocketAddr,
-        tx: mpsc::Sender<ChannelBuffer>,
-        id: [u8; NODE_ID_LENGTH],
-        if_seed: bool,
-    ) -> Node
-    {
-        Node {
-            hash: 0,
-            id,
-            net_id: 0,
-            addr: IpAddr::parse(sa),
-            genesis_hash: H256::default(),
-            if_boot: false,
-            revision: [b' '; MAX_REVISION_LENGTH],
-            tx,
-            state: STATE::CONNECTED,
-            connection: Connection::OUTBOUND,
-            if_seed,
-            update: SystemTime::now(),
-        }
-    }
-
-    // construct outbound node
-    pub fn new_inbound(sa: SocketAddr, tx: mpsc::Sender<ChannelBuffer>, if_seed: bool) -> Node {
-        Node {
-            hash: 0,
-            id: [b'0'; NODE_ID_LENGTH],
-            net_id: 0,
-            addr: IpAddr::parse(sa),
-            genesis_hash: H256::default(),
-            if_boot: false,
-            revision: [b' '; MAX_REVISION_LENGTH],
-            tx,
-            state: STATE::CONNECTED,
-            connection: Connection::INBOUND,
-            if_seed,
-            update: SystemTime::now(),
-        }
-    }
-
-    pub fn get_hash(&self) -> u64 {
-        let ip = self.addr.get_ip();
-        let hash: u64 = calculate_hash(&ip);
-        trace!(target: "p2p", "node/get_hash: {}", &hash);
-        hash
-    }
-
-    pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
-
-    pub fn update(&mut self) {
-        debug!(target: "p2p", "node timestamp updated");
-        self.update = SystemTime::now();
-    }
-}
-
-pub fn convert_ip_string(ip_str: String) -> [u8; 8] {
-    let mut ip: [u8; 8] = [0u8; 8];
-    let ip_vec: Vec<&str> = ip_str.split(".").collect();
-    if ip_vec.len() == 4 {
-        ip[0] = 0;
-        ip[1] = ip_vec[0].parse::<u8>().unwrap_or(0);
-        ip[2] = 0;
-        ip[3] = ip_vec[1].parse::<u8>().unwrap_or(0);
-        ip[4] = 0;
-        ip[5] = ip_vec[2].parse::<u8>().unwrap_or(0);
-        ip[6] = 0;
-        ip[7] = ip_vec[3].parse::<u8>().unwrap_or(0);
-    }
-    ip
 }
 
 // TODO

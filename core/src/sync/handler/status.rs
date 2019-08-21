@@ -37,16 +37,17 @@ const HASH_LENGTH: usize = 32;
 
 pub fn send_random(p2p: Mgr) {
     if let Some(hash) = p2p.get_random_active_node_hash() {
-        send(hash, p2p)
+        send(p2p, hash)
     }
 }
 
-pub fn send(hash: u64, p2p: Mgr) {
+pub fn send(p2p: Mgr, hash: u64) {
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
     cb.head.ctrl = MODULE::SYNC.value();
     cb.head.action = ACTION::STATUSREQ.value();
     cb.head.len = 0;
+    let mut p2p_0 = 
     p2p.send(hash, cb);
 }
 

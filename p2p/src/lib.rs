@@ -57,6 +57,7 @@ use std::sync::RwLock;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::Instant;
+use std::net::Shutdown;
 use std::net::SocketAddr;
 use rand::random;
 use futures::prelude::*;
@@ -95,7 +96,7 @@ const TEMP_MAX: usize = 64;
 pub struct Mgr {
     /// threading
     //runtime: Arc<Runtime>,
-    //runtime: Runtime,
+    //runtime: Runtime,   
     shutdown_hook: Arc<RwLock<Option<Sender<()>>>>,
     /// config
     config: Arc<Config>,
@@ -106,7 +107,7 @@ pub struct Mgr {
 }
 
 impl Mgr {
-    /// construct p2p instance
+    /// constructor
     pub fn new(config: Arc<Config>) -> Mgr {
 
         // load seeds
@@ -120,7 +121,7 @@ impl Mgr {
         Mgr {
             // runtime: Arc::new(Runtime::new().expect("tokio runtime")),
             //runtime: Runtime::new().expect("tokio runtime"),
-            shutdown_hook: Arc::new(RwLock::new(None)),
+            shutdown_hook: Arc::new(RwLock::new(None)),   
             config,
             temp: Arc::new(Mutex::new(temp_queue)),
             nodes: Arc::new(RwLock::new(HashMap::new())),
@@ -153,6 +154,7 @@ impl Mgr {
                 Instant::now(),
                 Duration::from_secs(INTERVAL_TIMEOUT)
             ).for_each(move|_|{
+
                 let now = SystemTime::now();
                 let mut index: Vec<u64> = vec![];
                 if let Ok(mut write) = p2p_timeout.nodes.try_write(){
@@ -256,7 +258,14 @@ impl Mgr {
 
                                 // construct node instance and store it
                                 let (tx, rx) = mpsc::channel(409600);
-                                let node = Node::new_outbound(ts.peer_addr().unwrap(), tx, temp_node.id, temp_node.if_seed);
+                                let ts_0 = ts.try_clone().unwrap();
+                                let node = Node::new_outbound(
+                                    ts.peer_addr().unwrap(), 
+                                    ts_0,
+                                    tx, 
+                                    temp_node.id, 
+                                    temp_node.if_seed
+                                );
                                 if let Ok(mut write) = p2p_outbound_0.nodes.try_write() {
                                     if !write.contains_key(&hash) {
                                         let id = node.get_id_string();
@@ -273,6 +282,7 @@ impl Mgr {
                                     p2p_outbound_2.handle(hash.clone(),cb,callback_out.clone());
                                     Ok(())
                                 }).map_err(move|err|{error!(target: "p2p", "read: {:?}", err)});
+
                                 executor_outbound_1.spawn(read.then(|_|{ Ok(()) }));
                                 let write = sink.send_all(
                                     rx.map_err(|()| io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")),
@@ -298,23 +308,24 @@ impl Mgr {
         let p2p_active_nodes = self.clone();
         executor_active_nodes.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_ACTIVE_NODES))
-                .for_each(move |_| {
-                    let p2p_active_nodes_0 = p2p_active_nodes.clone();
-                    active_nodes::send(p2p_active_nodes_0);
-                    Ok(())
-                })
-                .map_err(|err| error!(target: "p2p", "executor active nodes: {:?}", err)),
+            .for_each(move |_| {
+
+                let p2p_active_nodes_0 = p2p_active_nodes.clone();
+                active_nodes::send(p2p_active_nodes_0);
+                Ok(())
+            })
+            .map_err(|err| error!(target: "p2p", "executor active nodes: {:?}", err))
         );
 
         // interval inbound
-        let executor_inbound = executor.clone();
-        let executor_inbound_0 = executor_inbound.clone();
+        let executor_inbound_0 = executor.clone();
+        let executor_inbound_1 = executor.clone();
         let p2p_inbound = self.clone();
-        let listener = TcpListener::bind(&binding).expect("binding failed");
+        let listener = TcpListener::bind(&binding).expect("binding failed");     
         let server = listener
             .incoming()
             .for_each(move |ts: TcpStream| {
-
+                
                 // counters
                 let p2p_inbound_0 = p2p_inbound.clone();
                 let p2p_inbound_1 = p2p_inbound.clone();
@@ -326,16 +337,19 @@ impl Mgr {
                     return Ok(());
                 }
 
-                // counters
-                let executor_inbound_1 = executor_inbound_0.clone();
-
                 // config stream
                 config_stream(&ts);
 
                 // construct node instance and store it
                 let (tx, rx) = mpsc::channel(409600);
                 let addr = ts.peer_addr().unwrap();
-                let node = Node::new_inbound(addr, tx, false);
+                let ts_0 = ts.try_clone().unwrap();
+                let node = Node::new_inbound(
+                    addr, 
+                    ts_0,
+                    tx, 
+                    false
+                );
                 let hash = node.get_hash();
 
                 if let Ok(mut write) = p2p_inbound.nodes.try_write() {
@@ -361,20 +375,58 @@ impl Mgr {
                 executor_inbound_1.spawn(write.then(|_| { Ok(()) }));
                 Ok(())
             }).map_err(|err| error!(target: "p2p", "executor server: {:?}", err));
-        executor_inbound.spawn(server);
 
-        // init signal
+        
+        // bind shutdown hook
         let (tx, rx) = oneshot::channel::<()>();
-        self.shutdown_hook = Arc::new(RwLock::new(Some(tx)));
-        rt.block_on(rx.map_err(|_| ())).unwrap();
+        {
+            match self.shutdown_hook.write() {
+                Ok(mut guard) => {
+                    *guard = Some(tx) 
+                },
+                Err(_error) => {}
+            }
+        }
+
+        rt.block_on(rx.map_err(|_|())).unwrap();
         rt.shutdown_now().wait().unwrap();
+        drop(server);
+        drop(executor_timeout);
+        drop(executor_active_nodes);
+        drop(executor_outbound);
+        drop(executor);
+        debug!(target:"p2p", "shutdown executors");
     }
 
-    pub fn shutdown(self) {
-        let mut lock = self.shutdown_hook.write().unwrap();
-            if let Some(tx) = lock.take() {
-                tx.send(());
+    /// shutdown routine
+    pub fn shutdown(&self) {
+        if let Ok(mut lock) = self.nodes.write() {
+            for (_hash, mut node) in lock.iter_mut() {
+                match node.ts.shutdown(Shutdown::Both) {
+                    Ok(_) => {
+                        trace!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
+                    }, 
+                    Err(_err) => {
+                    }
+                }
             }
+            lock.clear();
+        }
+
+        if let Ok(mut lock) = self.shutdown_hook.write() {
+            if lock.is_some() {
+                let tx = lock.take().unwrap();
+                match tx.send(()) {
+                    Ok(_) => {
+                        debug!(target: "p2p", "shutdown signal sent");
+                    },
+                    Err(err) => {
+                        error!(target: "p2p", "shutdown: {:?}", err);
+                    }
+                }
+            } 
+        }
+
         
     }
 
@@ -383,7 +435,6 @@ impl Mgr {
 
     /// send msg
     pub fn send(&self, hash: u64, cb: ChannelBuffer) {
-        let mut p2p = &self.clone();
         let mut nodes = &self.nodes;
         match nodes.try_write() {
             Ok(mut lock) => {
@@ -486,6 +537,8 @@ impl Mgr {
         }
     }
 
+    /// refresh node timestamp in order to keep target in loop
+    /// otherwise, target will be timeout and removed 
     pub fn update_node(&self, hash: &u64) {
         if let Ok(mut nodes) = self.nodes.write() {
             if let Some(mut node) = nodes.get_mut(hash) {
@@ -524,6 +577,7 @@ impl Mgr {
         };
     }
 }
+
 
 /// helper function for config inbound & outbound stream
 fn config_stream(stream: &TcpStream) {
