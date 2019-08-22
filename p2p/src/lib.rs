@@ -141,17 +141,17 @@ impl Mgr {
     }
 
     /// verify inbound msg route through token collection
-    /// token_pair: [u32, u32] 
+    /// token_pair: [u32, u32]
     /// token_pair[0]: flag_token, set on indivisual node tokens collection when sending msg
     /// token_pair[1]: clear_token, check on indivisual node when receiving msg
-    /// 1. pass in clear_token from incoming msg route(ChannelBuffer::HEAD::get_route) 
+    /// 1. pass in clear_token from incoming msg route(ChannelBuffer::HEAD::get_route)
     ///    through token rules against token collection on indivisual node
     /// 2. return true if exsit flag_token and remove it   
     /// 3. return false if not exist flag_token
     pub fn token_check(&self, clear_token: u32, node: &mut Node) -> bool {
         match &self.tokens_pairs.get(&clear_token) {
             Some(&flag_token) => return node.tokens.remove(&flag_token),
-            None => return false
+            None => return false,
         }
     }
 
@@ -169,7 +169,7 @@ impl Mgr {
                             // add flag token
                             node.tokens.insert(route);
                             trace!(target: "p2p", "p2p/send: {}", node.addr.get_ip());
-                        },
+                        }
                         Err(err) => {
                             flag = false;
                             error!(target: "p2p", "p2p/send: ip:{} err:{}", node.addr.get_ip(), err);
@@ -381,7 +381,6 @@ impl Mgr {
             .incoming()
             .for_each(move |ts: TcpStream| {
                 // counters
-                let p2p_inbound_0 = p2p_inbound.clone();
                 let p2p_inbound_1 = p2p_inbound.clone();
                 let callback_in = callback_in.clone();
 
@@ -585,8 +584,7 @@ impl Mgr {
                         };
                     }
                     MODULE::EXTERNAL => {
-                    
-                        // verify if flag token has been set     
+                        // verify if flag token has been set
                         if let Ok(mut lock) = self.nodes.write() {
                             if let Some(mut node) = lock.get_mut(&hash) {
                                 let clear_token = cb.head.get_route();
@@ -636,26 +634,27 @@ mod tests {
     use node::Node;
     use config::Config;
 
-    #[test] 
+    #[test]
     pub fn test_tokens() {
-
-        
         let addr = "168.62.170.146:30303".parse::<SocketAddr>().unwrap();
         let stream = TcpStream::connect(&addr);
         let _ = stream.map(move |ts| {
-
             let mut tokens_rules: Vec<[u32; 2]> = vec![];
-            let flat_token_0: u32  = (0 << 16) + (0 << 8) + 0;
-            let clear_token_0: u32 = (0 << 16) + (0 << 8) + 1;  
+            let flat_token_0: u32 = (0 << 16) + (0 << 8) + 0;
+            let clear_token_0: u32 = (0 << 16) + (0 << 8) + 1;
             tokens_rules.push([flat_token_0, clear_token_0]);
             let p2p = Mgr::new(Arc::new(Config::new()), tokens_rules);
-            
+
             let (tx, _rx) = mpsc::channel(409600);
             let mut node = Node::new_outbound(
                 ts,
-                tx, 
-                [0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00],
-                false
+                tx,
+                [
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                ],
+                false,
             );
             node.tokens.insert(flat_token_0);
 
@@ -665,10 +664,10 @@ mod tests {
             if let Ok(mut lock) = nodes_0.write() {
                 lock.insert(node_hash.clone(), node);
             }
-            
+
             let nodes_1 = p2p.nodes.clone();
             if let Ok(mut lock) = nodes_1.write() {
-                if let Some(mut node) = lock.get_mut(&node_hash){
+                if let Some(mut node) = lock.get_mut(&node_hash) {
                     p2p.token_check(clear_token_0, node);
                     assert_eq!(node.tokens.len(), 0);
                 }

@@ -20,7 +20,6 @@
  ******************************************************************************/
 
 use std::mem;
-use std::sync::Arc;
 use bytes::BufMut;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;

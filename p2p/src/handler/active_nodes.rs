@@ -20,7 +20,6 @@
  ******************************************************************************/
 
 use std::mem;
-use std::sync::Arc;
 use bytes::BufMut;
 use byteorder::BigEndian;
 use byteorder::ByteOrder;
@@ -99,7 +98,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     let (node_count, rest) = cb_in.body.split_at(1);
     let mut temp_list = Vec::new();
     if node_count[0] > 0 {
-        let (local_ip, port) = p2p.config.get_ip_and_port();
+        let (local_ip, _) = p2p.config.get_ip_and_port();
 
         // TODO: update node status with healthy active nodes msg
         // TODO: max active nodes filter
@@ -111,7 +110,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
                 continue;
             }
 
-            let (mut port, rest) = rest.split_at(mem::size_of::<u32>());
+            let (mut port, _) = rest.split_at(mem::size_of::<u32>());
 
             let mut temp = TempNode::default();
             temp.addr.ip.copy_from_slice(ip);
