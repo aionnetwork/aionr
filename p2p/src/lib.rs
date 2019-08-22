@@ -49,6 +49,7 @@ mod handler;
 mod callable;
 
 use std::io;
+use std::fmt;
 use std::sync::Arc;
 use std::collections::VecDeque;
 use std::collections::HashMap;
@@ -205,6 +206,62 @@ impl Mgr {
 
         let callback_in = callback.clone();
         let callback_out = callback.clone();
+
+        // interval statisics
+        let executor_statisics = executor.clone();
+        let p2p_statisics = self.clone();
+        executor_statisics.spawn(
+            Interval::new(
+                Instant::now(),
+                Duration::from_secs(5)
+            ).for_each(move |_| {
+                match p2p_statisics.nodes.try_read() {
+                    Ok(nodes) => {
+                        let mut total: usize = 0;
+                        let mut active: usize = 0;
+                        if nodes.len() > 0 {
+                            let mut active_nodes = vec![];
+                            let mut output: Vec<String> = vec![];
+                            output.push(String::from("{:-^127}/n"));
+                            output.push(String::from("                    addr                 rev      conn  seed"));
+                            output.push(String::from("{:-^127}"));
+
+                            for (_hash, node) in nodes.iter(){
+                                total += 1;
+                                if node.state == STATE::ACTIVE {
+                                    active += 1;
+                                    active_nodes.push(node.clone());
+                                }
+                            }
+
+                            if active_nodes.len() > 0 {
+                                for node in active_nodes.iter() {
+                                    output.push(
+                                        format!(
+                                            "{:>24}{:>20}{:>10}{:>6}",
+                                            node.addr.to_formatted_string(),
+                                            String::from_utf8_lossy(&node.revision).trim(),
+                                            format!("{}",node.connection),
+                                            match node.if_seed{
+                                                true => "y",
+                                                _ => " "
+                                            }
+                                        )
+                                    );
+                                }
+                            }
+                            output.push(String::from("{:-^127}"));
+                        }
+                        println!(output.connect("").to_string());
+                        info!(target: "p2p", "total/active {}/{}", total, active);
+                    },
+                    Err(err) => {
+                        warn!(target:"p2p", "executor statisics: try read {:?}", err);
+                    }
+                }
+                Ok(())
+            }).map_err(|err| error!(target: "p2p", "executor statisics: {:?}", err))
+        );
 
         // interval timeout
         let executor_timeout = executor.clone();
@@ -381,7 +438,6 @@ impl Mgr {
             .incoming()
             .for_each(move |ts: TcpStream| {
                 // counters
-                let p2p_inbound_0 = p2p_inbound.clone();
                 let p2p_inbound_1 = p2p_inbound.clone();
                 let callback_in = callback_in.clone();
 
