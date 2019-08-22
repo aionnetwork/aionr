@@ -31,7 +31,6 @@ pub struct Head {
 }
 
 impl Head {
-
     pub fn new() -> Head {
         Head {
             ver: VERSION::V2.value(),
@@ -52,7 +51,7 @@ impl Head {
 
     /// get route
     pub fn get_route(&self) -> u32 {
-        return ((self.ver as u32) << 16) + ((self.ctrl as u32) << 8) + (self.action as u32) 
+        return ((self.ver as u32) << 16) + ((self.ctrl as u32) << 8) + (self.action as u32);
     }
 }
 
@@ -91,14 +90,13 @@ mod tests {
     use route::MODULE;
     use route::ACTION;
 
-    #[test] 
+    #[test]
     pub fn test_head() {
-        
         let mut head = Head::new();
 
         head.ver = VERSION::V0.value();
         head.ctrl = MODULE::P2P.value();
-        
+
         head.action = ACTION::HANDSHAKEREQ.value();
         assert_eq!(head.get_route(), 1);
         head.action = ACTION::HANDSHAKERES.value();
@@ -118,6 +116,5 @@ mod tests {
         head.action = ACTION::ACTIVENODESRES.value();
         assert_eq!(head.get_route(), 65542);
     }
-
 
 }

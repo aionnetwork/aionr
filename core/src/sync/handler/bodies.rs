@@ -19,26 +19,20 @@
  *
  ******************************************************************************/
 
-use std::sync::{RwLock,Arc,Mutex};
-use std::collections::{HashMap};
-use block::Block;
-use client::{BlockId,BlockChainClient,BlockChainInfo};
-use header::{Seal,Header};
+use std::sync::{Arc, Mutex};
+// use block::Block;
+use client::{BlockId, BlockChainClient, BlockChainInfo};
 use aion_types::H256;
 use bytes::BufMut;
-use rlp::{RlpStream, UntrustedRlp};
-use std::time::SystemTime;
+use rlp::RlpStream;
 use lru_cache::LruCache;
 use p2p::ChannelBuffer;
-use p2p::Node;
 use p2p::Mgr;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
-use sync::wrappers::{HeaderWrapper,BlockWrapper};
-use sync::handler::headers;
-//use sync::handler::headers;
-//use sync::handler::headers::REQUEST_SIZE;
+// use sync::wrappers::{HeaderWrapper, BlockWrapper};
+// use sync::handler::headers;
 
 const HASH_LEN: usize = 32;
 
@@ -95,85 +89,85 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
 }
 
 pub fn receive_res(
-    p2p: Mgr,
-    hash: u64,
-    cb_in: ChannelBuffer,
-    hws: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,
-    chain_info: BlockChainInfo,
-    downloaded_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
+    _p2p: Mgr,
+    _hash: u64,
+    _cb_in: ChannelBuffer,
+    _chain_info: BlockChainInfo,
+    _downloaded_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 )
 {
-    trace!(target: "sync", "bodies/receive_res");
-    if cb_in.body.len() > 0 {
-        if let Ok(mut wrappers) = hws.write() {
-            if let Some(mut wrapper) = wrappers.remove(&hash) {
-                let headers = wrapper.headers.clone();
-                if !headers.is_empty() {
-                    let rlp = UntrustedRlp::new(cb_in.body.as_slice());
+    // trace!(target: "sync", "bodies/receive_res");
+    // if cb_in.body.len() > 0 {
+    //     // To remove
+    //     let hws: RwLock<HashMap<u64, HeaderWrapper>> = RwLock::new(HashMap::new());
+    //     if let Ok(mut wrappers) = hws.write() {
+    //         if let Some(mut wrapper) = wrappers.remove(&hash) {
+    //             let headers = wrapper.headers.clone();
+    //             if !headers.is_empty() {
+    //                 let rlp = UntrustedRlp::new(cb_in.body.as_slice());
 
-                    let mut bodies = Vec::new();
-                    let mut blocks = Vec::new();
-                    for block_bodies in rlp.iter() {
-                        for block_body in block_bodies.iter() {
-                            let mut transactions = Vec::new();
-                            if !block_body.is_empty() {
-                                for transaction_rlp in block_body.iter() {
-                                    if !transaction_rlp.is_empty() {
-                                        if let Ok(transaction) = transaction_rlp.as_val() {
-                                            transactions.push(transaction);
-                                        }
-                                    }
-                                }
-                            }
-                            bodies.push(transactions);
-                        }
-                    }
+    //                 let mut bodies = Vec::new();
+    //                 let mut blocks = Vec::new();
+    //                 for block_bodies in rlp.iter() {
+    //                     for block_body in block_bodies.iter() {
+    //                         let mut transactions = Vec::new();
+    //                         if !block_body.is_empty() {
+    //                             for transaction_rlp in block_body.iter() {
+    //                                 if !transaction_rlp.is_empty() {
+    //                                     if let Ok(transaction) = transaction_rlp.as_val() {
+    //                                         transactions.push(transaction);
+    //                                     }
+    //                                 }
+    //                             }
+    //                         }
+    //                         bodies.push(transactions);
+    //                     }
+    //                 }
 
-                    if headers.len() == bodies.len() {
-                        for i in 0..headers.len() {
-                            let rlp = UntrustedRlp::new(&headers[i]);
-                            let header: Header = rlp.as_val().expect("should be a head");
-                            let block = Block {
-                                header,
-                                transactions: bodies[i].clone(),
-                            };
-                            blocks.push(block.rlp_bytes(Seal::Without));
-                            if let Ok(mut downloaded_block_hashes) = downloaded_block_hashes.lock()
-                            {
-                                let hash = block.header.hash();
-                                if !downloaded_block_hashes.contains_key(&hash) {
-                                    downloaded_block_hashes.insert(hash, 0);
-                                } else {
-                                    trace!(target: "sync", "downloaded_block_hashes: {}.", hash);
-                                }
-                            }
-                        }
-                    } else {
-                        debug!(
-                                        target: "sync",
-                                        "Count mismatch, headers count: {}, bodies count: {}",
-                                        headers.len(),
-                                        bodies.len(),
-                                    );
-                        // TODO: punish the node
+    //                 if headers.len() == bodies.len() {
+    //                     for i in 0..headers.len() {
+    //                         let header = &headers[i];
+    //                         let block = Block {
+    //                             header,
+    //                             transactions: bodies[i].clone(),
+    //                         };
+    //                         blocks.push(block.rlp_bytes(Seal::Without));
+    //                         if let Ok(mut downloaded_block_hashes) = downloaded_block_hashes.lock()
+    //                         {
+    //                             let hash = block.header.hash();
+    //                             if !downloaded_block_hashes.contains_key(&hash) {
+    //                                 downloaded_block_hashes.insert(hash, 0);
+    //                             } else {
+    //                                 trace!(target: "sync", "downloaded_block_hashes: {}.", hash);
+    //                             }
+    //                         }
+    //                     }
+    //                 } else {
+    //                     debug!(
+    //                                     target: "sync",
+    //                                     "Count mismatch, headers count: {}, bodies count: {}",
+    //                                     headers.len(),
+    //                                     bodies.len(),
+    //                                 );
+    //                     // TODO: punish the node
 
-                        blocks.clear();
-                    }
+    //                     blocks.clear();
+    //                 }
 
-                    if !blocks.is_empty() {
-                        p2p.update_node(&hash);
-                        //TODO import block
-                    }
+    //                 if !blocks.is_empty() {
+    //                     p2p.update_node(&hash);
+    //                     //TODO import block
+    //                 }
 
-                    {
-                        // TODO: MODE NORMAL / THUNDER
+    //                 {
+    //                     // TODO: MODE NORMAL / THUNDER
 
-                        headers::prepare_send(p2p.clone(), hash, chain_info.best_block_number);
-                    }
-                }
-            } else {
-                error!(target:"sync","bodies: should not be reached!!")
-            }
-        }
-    }
+    //                     headers::prepare_send(p2p.clone(), hash, chain_info.best_block_number);
+    //                 }
+    //             }
+    //         } else {
+    //             error!(target:"sync","bodies: should not be reached!!")
+    //         }
+    //     }
+    // }
 }

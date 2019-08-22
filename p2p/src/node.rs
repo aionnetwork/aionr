@@ -101,12 +101,7 @@ impl Node {
     }
 
     // construct outbound node
-    pub fn new_inbound(
-        ts: TcpStream,
-        tx: mpsc::Sender<ChannelBuffer>,
-        if_seed: bool,
-    ) -> Node
-    {
+    pub fn new_inbound(ts: TcpStream, tx: mpsc::Sender<ChannelBuffer>, if_seed: bool) -> Node {
         Node {
             hash: 0,
             id: [b'0'; NODE_ID_LENGTH],
@@ -248,7 +243,7 @@ impl TempNode {
     //     calculate_hash(&text)
     // }
 
-    pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
+    // pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
 
     // construct node from seed config
     // constrait check

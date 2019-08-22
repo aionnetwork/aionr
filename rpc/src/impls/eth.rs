@@ -42,7 +42,7 @@ use acore::log_entry::LogEntry;
 use acore::miner::MinerService;
 use acore::miner::external::ExternalMinerService;
 use acore::transaction::SignedTransaction;
-use acore::blockchain::BlockReceipts;
+// use acore::blockchain::BlockReceipts;
 use solidity::compile;
 
 use jsonrpc_core::{BoxFuture, Result};
@@ -52,11 +52,11 @@ use jsonrpc_macros::Trailing;
 use helpers::{errors, limit_logs, fake_sign};
 use helpers::dispatch::{FullDispatcher, default_gas_price};
 use helpers::accounts::unwrap_provider;
-use traits::{Eth, Pb};
+use traits::Eth;
 use types::{
     Block, BlockTransactions, BlockNumber, Bytes, SyncStatus, Transaction, CallRequest, Index,
-    Filter, Log, Receipt, Work, Contract, ContractInfo, Abi, AbiIO, SyncInfo, AcitvePeerInfo, PbSyncInfo,
-    SimpleReceipt, SimpleReceiptLog,
+Filter, Log, Receipt, Work, Contract, ContractInfo, Abi, AbiIO /*, SyncInfo, AcitvePeerInfo, PbSyncInfo,
+                                                               SimpleReceipt, SimpleReceiptLog,*/
 };
 
 // const EXTRA_INFO_PROOF: &'static str = "Object exists in in blockchain (fetched earlier), extra_info is always available if object exists; qed";
@@ -70,7 +70,7 @@ where
     EM: ExternalMinerService,
 {
     client: Arc<C>,
-    sync: Arc<S>,
+    _sync: Arc<S>,
     accounts: Option<Arc<AccountProvider>>,
     miner: Arc<M>,
     external_miner: Arc<EM>,
@@ -96,7 +96,7 @@ where
     {
         EthClient {
             client: client.clone(),
-            sync: sync.clone(),
+            _sync: sync.clone(),
             miner: miner.clone(),
             accounts: accounts.clone(),
             external_miner: em.clone(),
@@ -231,30 +231,34 @@ where
     EM: ExternalMinerService + 'static,
 {
     fn protocol_version(&self) -> Result<String> {
-        let version = self.sync.status().protocol_version.to_owned();
-        Ok(format!("{}", version))
+        // TODO
+        // let version = self.sync.status().protocol_version.to_owned();
+        // Ok(format!("{}", version))
+        unimplemented!()
     }
 
     fn syncing(&self) -> Result<SyncStatus> {
-        let status = self.sync.status();
-        let client = &self.client;
+        // TODO
+        // let status = self.sync.status();
+        // let client = &self.client;
 
-        let chain_info = client.chain_info();
-        let current_block = chain_info.best_block_number;
-        let highest_block = status.highest_block_number.unwrap_or(0u64);
+        // let chain_info = client.chain_info();
+        // let current_block = chain_info.best_block_number;
+        // let highest_block = status.highest_block_number.unwrap_or(0u64);
 
-        // refer to java's impl: AionImpl.java isSyncComplete.
-        if (current_block + 5) < highest_block {
-            let info = SyncInfo {
-                // to comply with java's impl, return hex string.
-                starting_block: format!("{:#x}", status.start_block_number),
-                current_block: format!("{:#x}", current_block),
-                highest_block: format!("{:#x}", highest_block),
-            };
-            Ok(SyncStatus::Info(info))
-        } else {
-            Ok(SyncStatus::None)
-        }
+        // // refer to java's impl: AionImpl.java isSyncComplete.
+        // if (current_block + 5) < highest_block {
+        //     let info = SyncInfo {
+        //         // to comply with java's impl, return hex string.
+        //         starting_block: format!("{:#x}", status.start_block_number),
+        //         current_block: format!("{:#x}", current_block),
+        //         highest_block: format!("{:#x}", highest_block),
+        //     };
+        //     Ok(SyncStatus::Info(info))
+        // } else {
+        //     Ok(SyncStatus::None)
+        // }
+        unimplemented!()
     }
 
     fn author(&self) -> Result<H256> { Ok(H256::from(self.miner.author())) }
@@ -712,154 +716,5 @@ where
             _ => return Err(errors::compilation_failed("Compilation failed".to_string())),
         }
         Ok(contract_result)
-    }
-}
-
-impl<C, S: ?Sized, M, EM> Pb for EthClient<C, S, M, EM>
-where
-    C: MiningBlockChainClient,
-    S: SyncProvider,
-    M: MinerService,
-    EM: ExternalMinerService,
-{
-    fn balance(&self, address: Address) -> U256 {
-        let id = BlockNumber::default();
-        self.client
-            .balance(&address, id.into())
-            .unwrap_or(U256::from(0))
-    }
-
-    fn transaction_by_hash(&self, txhash: H256) -> Option<Transaction> {
-        let block_number = self.client.chain_info().best_block_number;
-        let tx = self.transaction(TransactionId::Hash(txhash)).unwrap_or(
-            self.miner
-                .transaction(block_number, &txhash)
-                .map(|t| Transaction::from_pending(t)),
-        );
-        tx
-    }
-
-    fn nonce(&self, address: Address) -> U256 {
-        let id = BlockNumber::default();
-        self.client
-            .nonce(&address, id.into())
-            .unwrap_or(U256::from(0))
-    }
-
-    fn blocknumber(&self) -> U256 { U256::from(self.client.chain_info().best_block_number) }
-
-    fn block_by_number(&self, number: i64, include_txs: bool) -> Option<Block> {
-        let id = match number {
-            -1 => BlockId::Latest,
-            0 => BlockId::Earliest,
-            number if number > 0 => BlockId::Number(number as u64),
-            _ => {
-                return None;
-            }
-        };
-        match self.block(id, include_txs) {
-            Ok(t) => t,
-            Err(_) => None,
-        }
-    }
-
-    fn get_active_nodes(&self) -> Vec<AcitvePeerInfo> {
-        self.sync
-            .active()
-            .into_iter()
-            .map(|node| {
-                AcitvePeerInfo {
-                    highest_block_number: node.highest_block_number,
-                    id: node.id,
-                    ip: node.ip,
-                }
-            })
-            .collect()
-    }
-
-    fn get_sync(&self) -> PbSyncInfo {
-        let status = self.sync.status();
-        let queue_info = self.client.queue_info();
-        let best_block_number = self.client.chain_info().best_block_number;
-        PbSyncInfo {
-            syncing: status.is_syncing(queue_info),
-            chain_best_number: best_block_number,
-            network_best_number: status.highest_block_number.unwrap_or(best_block_number),
-            starting_block: status.start_block_number,
-            max_import_block: 24,
-        }
-    }
-
-    fn transaction_receipt(&self, txhash: H256) -> Option<Receipt> {
-        self.client
-            .transaction_receipt(TransactionId::Hash(txhash))
-            .map(|r| r.into())
-    }
-
-    fn block_receipt(&self, number: i64) -> Vec<SimpleReceipt> {
-        let decode = |br: BlockReceipts| {
-            br.receipts
-                .iter()
-                .map(|re| {
-                    let logs = re
-                        .logs()
-                        .iter()
-                        .map(|log| {
-                            SimpleReceiptLog {
-                                address: log.address.clone(),
-                                topics: log.topics.clone(),
-                                data: log.data.clone().into(),
-                            }
-                        })
-                        .collect();
-                    SimpleReceipt {
-                        logs,
-                    }
-                })
-                .collect::<Vec<_>>()
-        };
-        let id = match number {
-            -1 => BlockId::Latest,
-            0 => BlockId::Earliest,
-            number if number > 0 => BlockId::Number(number as u64),
-            _ => {
-                return vec![];
-            }
-        };
-        if let Some(blk_hash) = self.client.block_hash(id) {
-            if let Some(raw_data) = self.client.block_receipts(&blk_hash) {
-                match UntrustedRlp::new(&raw_data.to_vec())
-                    .as_val()
-                    .and_then(|br| Ok(decode(br)))
-                {
-                    Ok(res) => res,
-                    _ => vec![],
-                }
-            } else {
-                vec![]
-            }
-        } else {
-            vec![]
-        }
-    }
-
-    fn pb_send_transaction(&self, raw: Bytes) -> Option<H256> {
-        match UntrustedRlp::new(&raw.into_vec()).as_val() {
-            Err(_) => None,
-            Ok(tx) => {
-                match SignedTransaction::new(tx) {
-                    Err(_) => None,
-                    Ok(tx) => {
-                        let hash = tx.hash().clone();
-                        let _ = FullDispatcher::dispatch_transaction(
-                            &*self.client,
-                            &*self.miner,
-                            tx.into(),
-                        );
-                        Some(hash)
-                    }
-                }
-            }
-        }
     }
 }

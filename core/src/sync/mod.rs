@@ -19,42 +19,33 @@
  *
  ******************************************************************************/
 
-mod event;
 mod handler;
 mod route;
 mod wrappers;
-mod storage;
 mod node_info;
 #[cfg(test)]
 mod test;
 
-use std::sync::RwLock;
-use std::sync::Arc;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 use std::time::Instant;
-use std::time::SystemTime;
-use std::collections::BTreeMap;
-use std::collections::HashMap;
+// use std::time::SystemTime;
+use std::collections::{HashMap, VecDeque};
 use std::thread;
-use std::ptr;
-use rustc_hex::ToHex;
 use client::BlockChainClient;
-use client::BlockId;
-use client::BlockStatus;
+// use client::BlockId;
+// use client::BlockStatus;
 use client::ChainNotify;
-use transaction::UnverifiedTransaction;
+// use transaction::UnverifiedTransaction;
 use aion_types::{H256,U256};
 use futures::Future;
 use futures::Stream;
 use lru_cache::LruCache;
-use rlp::UntrustedRlp;
 use tokio::runtime::Runtime;
 use tokio::timer::Interval;
 //use bytes::BufMut;
 //use byteorder::{BigEndian,ByteOrder};
 
-//use p2p::Node;
 use p2p::ChannelBuffer;
 use p2p::Config;
 use p2p::Mgr;
@@ -70,52 +61,42 @@ use sync::handler::headers;
 use sync::wrappers::{HeaderWrapper, BlockWrapper};
 use sync::node_info::NodeInfo;
 
-use sync::storage::ActivePeerInfo;
-use sync::storage::PeerInfo;
-use sync::storage::SyncState;
-use sync::storage::SyncStatus;
-use sync::storage::SyncStorage;
-use sync::storage::TransactionStats;
-
-const HEADERS_CAPACITY: u64 = 256;
-const STATUS_REQ_INTERVAL: u64 = 2;
-const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
-const BLOCKS_IMPORT_INTERVAL: u64 = 50;
-const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
+const _HEADERS_CAPACITY: u64 = 256;
+const _STATUS_REQ_INTERVAL: u64 = 2;
+const _BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
+const _BLOCKS_IMPORT_INTERVAL: u64 = 50;
+const _BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const INTERVAL_STATUS: u64 = 5000;
-const INTERVAL_HEADERS: u64 = 2;
-const INTERVAL_BODIES: u64 = 2;
-const INTERVAL_STATISICS: u64 = 5;
 
 const MAX_TX_CACHE: usize = 20480;
 const MAX_BLOCK_CACHE: usize = 32;
 
 pub struct Sync {
-    config: Arc<Config>,
+    _config: Arc<Config>,
     client: Arc<BlockChainClient>,
     runtime: Arc<Runtime>,
     p2p: Mgr,
 
     /// collection of headers wrappers
-    headers: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,
+    headers: Mutex<VecDeque<HeaderWrapper>>,
 
-    /// collection of headers wrappers
-    blocks: Arc<RwLock<HashMap<u64, BlockWrapper>>>,
+    /// collection of blocks wrappers
+    _blocks: Mutex<VecDeque<BlockWrapper>>,
 
     /// active nodes info
     node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
 
     /// local best td
-    local_best_td: Arc<RwLock<U256>>,
+    _local_best_td: Arc<RwLock<U256>>,
 
     /// local best block number
-    local_best_block_number: Arc<RwLock<u64>>,
+    _local_best_block_number: Arc<RwLock<u64>>,
 
     /// network best td
-    network_best_td: Arc<RwLock<U256>>,
+    _network_best_td: Arc<RwLock<U256>>,
 
     /// network best block number
-    network_best_block_number: Arc<RwLock<u64>>,
+    _network_best_block_number: Arc<RwLock<u64>>,
 
     /// cache block hashes which have been downloaded
     cached_downloaded_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
@@ -124,10 +105,10 @@ pub struct Sync {
     cached_imported_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 
     /// cache tx hash which has been stored and broadcasted
-    cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
+    _cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 
     /// cache block hash which has been committed and broadcasted
-    cached_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
+    _cached_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 }
 
 impl Sync {
@@ -138,35 +119,46 @@ impl Sync {
 
         let mut token_rules: Vec<[u32; 2]> = vec![];
         token_rules.push([
-            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8) + ACTION::STATUSREQ.value() as u32,  
-            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8) + ACTION::STATUSRES.value() as u32,
+            ((VERSION::V0.value() as u32) << 16)
+                + ((MODULE::SYNC.value() as u32) << 8)
+                + ACTION::STATUSREQ.value() as u32,
+            ((VERSION::V0.value() as u32) << 16)
+                + ((MODULE::SYNC.value() as u32) << 8)
+                + ACTION::STATUSRES.value() as u32,
         ]);
         token_rules.push([
-            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8) + ACTION::HEADERSREQ.value() as u32,  
-            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8) + ACTION::HEADERSRES.value() as u32,
+            ((VERSION::V0.value() as u32) << 16)
+                + ((MODULE::SYNC.value() as u32) << 8)
+                + ACTION::HEADERSREQ.value() as u32,
+            ((VERSION::V0.value() as u32) << 16)
+                + ((MODULE::SYNC.value() as u32) << 8)
+                + ACTION::HEADERSRES.value() as u32,
         ]);
         token_rules.push([
-            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8) + ACTION::BODIESREQ.value() as u32,  
-            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8) + ACTION::BODIESRES.value() as u32,
+            ((VERSION::V0.value() as u32) << 16)
+                + ((MODULE::SYNC.value() as u32) << 8)
+                + ACTION::BODIESREQ.value() as u32,
+            ((VERSION::V0.value() as u32) << 16)
+                + ((MODULE::SYNC.value() as u32) << 8)
+                + ACTION::BODIESRES.value() as u32,
         ]);
 
         Sync {
-            config: config.clone(),
+            _config: config.clone(),
             client,
             p2p: Mgr::new(config, token_rules),
             runtime: Arc::new(Runtime::new().expect("tokio runtime")),
-            headers: Arc::new(RwLock::new(HashMap::new())),
-            blocks: Arc::new(RwLock::new(HashMap::new())),
+            headers: Mutex::new(VecDeque::new()),
+            _blocks: Mutex::new(VecDeque::new()),
             node_info: Arc::new(RwLock::new(HashMap::new())),
-
-            local_best_td: Arc::new(RwLock::new(local_best_td)),
-            local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
-            network_best_td: Arc::new(RwLock::new(local_best_td)),
-            network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
+            _local_best_td: Arc::new(RwLock::new(local_best_td)),
+            _local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
+            _network_best_td: Arc::new(RwLock::new(local_best_td)),
+            _network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
             cached_downloaded_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
             cached_imported_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
-            cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
-            cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
+            _cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
+            _cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
         }
     }
 
@@ -176,7 +168,7 @@ impl Sync {
         let executor = Arc::new(runtime.executor());
 
         // init p2p;
-        let mut p2p = &self.p2p.clone();
+        let p2p = &self.p2p.clone();
         let mut p2p_0 = p2p.clone();
         thread::spawn(move || {
             p2p_0.run(sync.clone());
@@ -362,89 +354,89 @@ impl Sync {
 }
 
 pub trait SyncProvider: Send + ::std::marker::Sync {
-    /// Get sync status
-    fn status(&self) -> SyncStatus;
+    // /// Get sync status
+    // fn status(&self) -> SyncStatus;
 
-    /// Get peers information
-    fn peers(&self) -> Vec<PeerInfo>;
+    // /// Get peers information
+    // fn peers(&self) -> Vec<PeerInfo>;
 
     /// Get the enode if available.
     fn enode(&self) -> Option<String>;
 
-    /// Returns propagation count for pending transactions.
-    fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats>;
+    // /// Returns propagation count for pending transactions.
+    // fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats>;
 
-    /// Get active nodes
-    fn active(&self) -> Vec<ActivePeerInfo>;
+    // /// Get active nodes
+    // fn active(&self) -> Vec<ActivePeerInfo>;
 }
 
 impl SyncProvider for Sync {
-    /// Get sync status
-    fn status(&self) -> SyncStatus {
-        // TODO:  only set start_block_number/highest_block_number.
-        SyncStatus {
-            state: SyncState::Idle,
-            protocol_version: 0,
-            network_id: 256,
-            start_block_number: self.client.chain_info().best_block_number,
-            last_imported_block_number: None,
-            highest_block_number: match self.network_best_block_number.read() {
-                Ok(number) => Some(*number),
-                Err(_) => None,
-            },
-            blocks_received: 0,
-            blocks_total: 0,
-            //num_peers: { get_nodes_count(ALIVE.value()) },
-            num_peers: 0,
-            num_active_peers: 0,
-        }
-    }
+    // /// Get sync status
+    // fn status(&self) -> SyncStatus {
+    //     // TODO:  only set start_block_number/highest_block_number.
+    //     SyncStatus {
+    //         state: SyncState::Idle,
+    //         protocol_version: 0,
+    //         network_id: 256,
+    //         start_block_number: self.client.chain_info().best_block_number,
+    //         last_imported_block_number: None,
+    //         highest_block_number: match self.network_best_block_number.read() {
+    //             Ok(number) => Some(*number),
+    //             Err(_) => None,
+    //         },
+    //         blocks_received: 0,
+    //         blocks_total: 0,
+    //         //num_peers: { get_nodes_count(ALIVE.value()) },
+    //         num_peers: 0,
+    //         num_active_peers: 0,
+    //     }
+    // }
 
-    /// Get sync peers
-    fn peers(&self) -> Vec<PeerInfo> {
-        // let mut peer_info_list = Vec::new();
-        // let peer_nodes = get_all_nodes();
-        // for peer in peer_nodes.iter() {
-        //     let peer_info = PeerInfo {
-        //         id: Some(peer.get_node_id()),
-        //     };
-        //     peer_info_list.push(peer_info);
-        // }
-        // peer_info_list
-        Vec::new()
-    }
+    // /// Get sync peers
+    // fn peers(&self) -> Vec<PeerInfo> {
+    // let mut peer_info_list = Vec::new();
+    // let peer_nodes = get_all_nodes();
+    // for peer in peer_nodes.iter() {
+    //     let peer_info = PeerInfo {
+    //         id: Some(peer.get_node_id()),
+    //     };
+    //     peer_info_list.push(peer_info);
+    // }
+    // peer_info_list
+    //     Vec::new()
+    // }
 
     fn enode(&self) -> Option<String> {
         // Some(get_local_node().get_node_id())
         None
     }
 
-    fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats> { BTreeMap::new() }
+    // fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats> { BTreeMap::new() }
 
-    fn active(&self) -> Vec<ActivePeerInfo> {
-        // let nodes = &self.p2p.get_active_nodes();
-        // nodes
-        //     .into_iter()
-        //     .map(|node| {
-        //         ActivePeerInfo {
-        //             highest_block_number: node.block_num,
-        //             id: node.id.to_hex(),
-        //             ip: node.addr.ip.to_hex(),
-        //         }
-        //     })
-        //     .collect()
-        vec![]
-    }
+    // fn active(&self) -> Vec<ActivePeerInfo> {
+    // let nodes = &self.p2p.get_active_nodes();
+    // nodes
+    //     .into_iter()
+    //     .map(|node| {
+    //         ActivePeerInfo {
+    //             highest_block_number: node.block_num,
+    //             id: node.id.to_hex(),
+    //             ip: node.addr.ip.to_hex(),
+    //         }
+    //     })
+    //     .collect()
+    //     vec![]
+    // }
 }
 
 impl ChainNotify for Sync {
     fn new_blocks(
         &self,
-        imported: Vec<H256>,
+        _imported: Vec<H256>,
         _invalid: Vec<H256>,
-        enacted: Vec<H256>,
+        _enacted: Vec<H256>,
         _retracted: Vec<H256>,
-        sealed: Vec<H256>,
+        _sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
         _duration: u64,
     )
@@ -453,69 +445,69 @@ impl ChainNotify for Sync {
         //     return;
         // }
 
-        if !imported.is_empty() {
-            let client = self.client.clone();
-            let chain_info = client.chain_info();
-            let min_imported_block_number = chain_info.best_block_number + 1;
-            let mut max_imported_block_number = 0;
-            for hash in imported.iter() {
-                let block_id = BlockId::Hash(*hash);
-                if client.block_status(block_id) == BlockStatus::InChain {
-                    if let Some(block_number) = client.block_number(block_id) {
-                        if max_imported_block_number < block_number {
-                            max_imported_block_number = block_number;
-                        }
-                    }
-                }
-            }
+        // if !imported.is_empty() {
+        //     let client = self.client.clone();
+        //     let chain_info = client.chain_info();
+        //     let min_imported_block_number = chain_info.best_block_number + 1;
+        //     let mut max_imported_block_number = 0;
+        //     for hash in imported.iter() {
+        //         let block_id = BlockId::Hash(*hash);
+        //         if client.block_status(block_id) == BlockStatus::InChain {
+        //             if let Some(block_number) = client.block_number(block_id) {
+        //                 if max_imported_block_number < block_number {
+        //                     max_imported_block_number = block_number;
+        //                 }
+        //             }
+        //         }
+        //     }
 
-            // The imported blocks are not new or not yet in chain. Do not notify in this case.
-            if max_imported_block_number < min_imported_block_number {
-                return;
-            }
+        //     // The imported blocks are not new or not yet in chain. Do not notify in this case.
+        //     if max_imported_block_number < min_imported_block_number {
+        //         return;
+        //     }
 
-            let synced_block_number = chain_info.best_block_number;
-            if max_imported_block_number <= synced_block_number {
-                let mut hashes = Vec::new();
-                for block_number in max_imported_block_number..synced_block_number + 1 {
-                    let block_id = BlockId::Number(block_number);
-                    if let Some(block_hash) = client.block_hash(block_id) {
-                        hashes.push(block_hash);
-                    }
-                }
-                if hashes.len() > 0 {
-                    SyncStorage::remove_imported_block_hashes(hashes);
-                }
-            }
+        //     let synced_block_number = chain_info.best_block_number;
+        //     if max_imported_block_number <= synced_block_number {
+        //         let mut hashes = Vec::new();
+        //         for block_number in max_imported_block_number..synced_block_number + 1 {
+        //             let block_id = BlockId::Number(block_number);
+        //             if let Some(block_hash) = client.block_hash(block_id) {
+        //                 hashes.push(block_hash);
+        //             }
+        //         }
+        //         if hashes.len() > 0 {
+        //             SyncStorage::remove_imported_block_hashes(hashes);
+        //         }
+        //     }
 
-            SyncStorage::set_synced_block_number(max_imported_block_number);
+        //     SyncStorage::set_synced_block_number(max_imported_block_number);
 
-            for block_number in min_imported_block_number..max_imported_block_number + 1 {
-                let block_id = BlockId::Number(block_number);
-                if let Some(blk) = client.block(block_id) {
-                    let block_hash = blk.hash();
-                    // import::import_staged_blocks(&block_hash);
-                    if let Some(time) = SyncStorage::get_requested_time(&block_hash) {
-                        info!(target: "sync",
-                            "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
-                            block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
-                    }
-                }
-            }
-        }
+        //     for block_number in min_imported_block_number..max_imported_block_number + 1 {
+        //         let block_id = BlockId::Number(block_number);
+        //         if let Some(blk) = client.block(block_id) {
+        //             let block_hash = blk.hash();
+        //             // import::import_staged_blocks(&block_hash);
+        //             if let Some(time) = SyncStorage::get_requested_time(&block_hash) {
+        //                 info!(target: "sync",
+        //                     "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
+        //                     block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
+        //             }
+        //         }
+        //     }
+        // }
 
-        if enacted.is_empty() {
-            for hash in enacted.iter() {
-                debug!(target: "sync", "enacted hash: {:?}", hash);
-                // import::import_staged_blocks(&hash);
-            }
-        }
+        // if enacted.is_empty() {
+        //     for hash in enacted.iter() {
+        //         debug!(target: "sync", "enacted hash: {:?}", hash);
+        //         // import::import_staged_blocks(&hash);
+        //     }
+        // }
 
-        if !sealed.is_empty() {
-            debug!(target: "sync", "Propagating blocks...");
-            SyncStorage::insert_imported_block_hashes(sealed.clone());
-            // broadcast::propagate_blocks(sealed.index(0), SyncStorage::get_block_chain());
-        }
+        // if !sealed.is_empty() {
+        //     debug!(target: "sync", "Propagating blocks...");
+        //     SyncStorage::insert_imported_block_hashes(sealed.clone());
+        //     // broadcast::propagate_blocks(sealed.index(0), SyncStorage::get_block_chain());
+        // }
     }
 
     fn start(&self) {
@@ -528,23 +520,23 @@ impl ChainNotify for Sync {
 
     fn broadcast(&self, _message: Vec<u8>) {}
 
-    fn transactions_received(&self, transactions: &[Vec<u8>]) {
-        if transactions.len() == 1 {
-            let transaction_rlp = transactions[0].clone();
-            if let Ok(tx) = UntrustedRlp::new(&transaction_rlp).as_val() {
-                let transaction: UnverifiedTransaction = tx;
-                let hash = transaction.hash();
-                let sent_transaction_hashes_mutex = SyncStorage::get_sent_transaction_hashes();
-                let mut lock = sent_transaction_hashes_mutex.lock();
+    fn transactions_received(&self, _transactions: &[Vec<u8>]) {
+        // if transactions.len() == 1 {
+        //     let transaction_rlp = transactions[0].clone();
+        //     if let Ok(tx) = UntrustedRlp::new(&transaction_rlp).as_val() {
+        //         let transaction: UnverifiedTransaction = tx;
+        //         let hash = transaction.hash();
+        //         let sent_transaction_hashes_mutex = SyncStorage::get_sent_transaction_hashes();
+        //         let mut lock = sent_transaction_hashes_mutex.lock();
 
-                if let Ok(ref mut sent_transaction_hashes) = lock {
-                    if !sent_transaction_hashes.contains_key(hash) {
-                        sent_transaction_hashes.insert(hash.clone(), 0);
-                        SyncStorage::insert_received_transaction(transaction_rlp);
-                    }
-                }
-            }
-        }
+        //         if let Ok(ref mut sent_transaction_hashes) = lock {
+        //             if !sent_transaction_hashes.contains_key(hash) {
+        //                 sent_transaction_hashes.insert(hash.clone(), 0);
+        //                 SyncStorage::insert_received_transaction(transaction_rlp);
+        //             }
+        //         }
+        //     }
+        // }
     }
 }
 
@@ -562,29 +554,33 @@ impl Callable for Sync {
             ACTION::STATUSRES => {
                 let chain_info = &self.client.chain_info();
                 let node_info = self.node_info.clone();
-                let headers = self.headers.clone();
-                status::receive_res(p2p, chain_info, node_info, headers, hash, cb)
+                status::receive_res(p2p, chain_info, node_info, hash, cb)
             }
             ACTION::HEADERSREQ => {
                 let client = self.client.clone();
                 headers::receive_req(p2p, hash, client, cb)
             }
             ACTION::HEADERSRES => {
-                let headers = self.headers.clone();
                 let downloaded_hashes = self.cached_downloaded_block_hashes.clone();
                 let imported_hashes = self.cached_imported_block_hashes.clone();
-                headers::receive_res(p2p, hash, cb, headers, downloaded_hashes, imported_hashes)
+                headers::receive_res(
+                    p2p,
+                    hash,
+                    cb,
+                    &self.headers,
+                    downloaded_hashes,
+                    imported_hashes,
+                )
             }
             ACTION::BODIESREQ => {
                 let client = self.client.clone();
                 bodies::receive_req(p2p, hash, client, cb)
             }
             ACTION::BODIESRES => {
-                let headers = self.headers.clone();
-                //                let blocks = self.blocks.clone();
+                // let blocks = self.blocks.clone();
                 let chain_info = self.client.chain_info();
                 let downloaded_hashes = self.cached_downloaded_block_hashes.clone();
-                bodies::receive_res(p2p, hash, cb, headers, chain_info, downloaded_hashes)
+                bodies::receive_res(p2p, hash, cb, chain_info, downloaded_hashes)
             }
             ACTION::BROADCASTTX => (),
             ACTION::BROADCASTBLOCK => (),
@@ -592,12 +588,15 @@ impl Callable for Sync {
             ACTION::UNKNOWN => (),
         };
     }
+
     fn disconnect(&self, hash: u64) {
         if let Ok(mut node_info) = self.node_info.write() {
             node_info.remove(&hash);
         }
-        if let Ok(mut headers) = self.headers.write() {
-            headers.remove(&hash);
-        }
+
+        // TODO-SYNC: remove downloaded headers with given node hash
+        // if let Ok(mut headers) = self.headers.write() {
+        //     headers.remove(&hash);
+        // }
     }
 }

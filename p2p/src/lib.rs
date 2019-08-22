@@ -49,7 +49,6 @@ mod handler;
 mod callable;
 
 use std::io;
-use std::fmt;
 use std::sync::Arc;
 use std::collections::VecDeque;
 use std::collections::HashMap;
@@ -127,8 +126,12 @@ impl Mgr {
         }
 
         tokens_rule.insert(
-            ((VERSION::V0.value() as u32) << 16) + ((MODULE::P2P.value() as u32) << 8) + ACTION::ACTIVENODESRES.value() as u32,  
-            ((VERSION::V0.value() as u32) << 16) + ((MODULE::P2P.value() as u32) << 8) + ACTION::ACTIVENODESREQ.value() as u32,
+            ((VERSION::V0.value() as u32) << 16)
+                + ((MODULE::P2P.value() as u32) << 8)
+                + ACTION::ACTIVENODESRES.value() as u32,
+            ((VERSION::V0.value() as u32) << 16)
+                + ((MODULE::P2P.value() as u32) << 8)
+                + ACTION::ACTIVENODESREQ.value() as u32,
         );
 
         Mgr {
@@ -141,17 +144,18 @@ impl Mgr {
     }
 
     /// verify inbound msg route through token collection
-    /// token_pair: [u32, u32] 
-    /// token_pair[0]: send_token, set on indivisual node tokens collection when sending msg
-    /// token_pair[1]: receive_token, check on indivisual node when receiving msg
-    /// 1. pass in receive_token from incoming msg route(ChannelBuffer::HEAD::get_route) 
+    /// token_pair: [u32, u32]
+    /// token_pair[0]: flag_token, set on indivisual node tokens collection when sending msg
+    /// token_pair[1]: clear_token, check on indivisual node when receiving msg
+    /// 1. pass in clear_token from incoming msg route(ChannelBuffer::HEAD::get_route)
     ///    through token rules against token collection on indivisual node
     /// 2. return true if exsit send_token and remove it   
     /// 3. return false if not exist flag_token
+    /// 4. always return true if there is no token rule applied
     pub fn token_check(&self, clear_token: u32, node: &mut Node) -> bool {
         match &self.tokens_rule.get(&clear_token) {
             Some(&flag_token) => node.tokens.remove(&flag_token),
-            None => true
+            None => true,
         }
     }
 
@@ -170,7 +174,7 @@ impl Mgr {
                             // add flag token
                             node.tokens.insert(route);
                             trace!(target: "p2p", "p2p/send: {}", node.addr.get_ip());
-                        },
+                        }
                         Err(err) => {
                             flag = false;
                             error!(target: "p2p", "p2p/send: ip:{} err:{}", node.addr.get_ip(), err);
@@ -211,52 +215,51 @@ impl Mgr {
         let executor_statisics = executor.clone();
         let p2p_statisics = self.clone();
         executor_statisics.spawn(
-            Interval::new(
-                Instant::now(),
-                Duration::from_secs(5)
-            ).for_each(move |_| {
-                match p2p_statisics.nodes.try_read() {
-                    Ok(nodes) => {
-                        let mut total: usize = 0;
-                        let mut active: usize = 0;
-                        if nodes.len() > 0 {
-                            let mut active_nodes = vec![];
-                            let mut output: Vec<String> = vec![];
-                            output.push(String::from("                    addr                 rev      conn  seed"));
-                            for (_hash, node) in nodes.iter(){
-                                total += 1;
-                                if node.state == STATE::ACTIVE {
-                                    active += 1;
-                                    active_nodes.push(node.clone());
+            Interval::new(Instant::now(), Duration::from_secs(5))
+                .for_each(move |_| {
+                    match p2p_statisics.nodes.try_read() {
+                        Ok(nodes) => {
+                            let mut total: usize = 0;
+                            let mut active: usize = 0;
+                            if nodes.len() > 0 {
+                                let mut active_nodes = vec![];
+                                let mut output: Vec<String> = vec![];
+                                output.push(String::from(
+                                    "                    addr                 rev      conn  seed",
+                                ));
+                                for (_hash, node) in nodes.iter() {
+                                    total += 1;
+                                    if node.state == STATE::ACTIVE {
+                                        active += 1;
+                                        active_nodes.push(node.clone());
+                                    }
                                 }
-                            }
 
-                            if active_nodes.len() > 0 {
-                                for node in active_nodes.iter() {
-                                    output.push(
-                                        format!(
+                                if active_nodes.len() > 0 {
+                                    for node in active_nodes.iter() {
+                                        output.push(format!(
                                             "{:>24}{:>20}{:>10}{:>6}",
                                             node.addr.to_formatted_string(),
                                             String::from_utf8_lossy(&node.revision).trim(),
-                                            format!("{}",node.connection),
-                                            match node.if_seed{
+                                            format!("{}", node.connection),
+                                            match node.if_seed {
                                                 true => "y",
-                                                _ => " "
+                                                _ => " ",
                                             }
-                                        )
-                                    );
+                                        ));
+                                    }
                                 }
+                                println!("{}", output.join("\n"));
                             }
-                            println!("{}", output.connect("\n"));
+                            info!(target: "p2p", "total/active {}/{}", total, active);
                         }
-                        info!(target: "p2p", "total/active {}/{}", total, active);
-                    },
-                    Err(err) => {
-                        warn!(target:"p2p", "executor statisics: try read {:?}", err);
+                        Err(err) => {
+                            warn!(target:"p2p", "executor statisics: try read {:?}", err);
+                        }
                     }
-                }
-                Ok(())
-            }).map_err(|err| error!(target: "p2p", "executor statisics: {:?}", err))
+                    Ok(())
+                })
+                .map_err(|err| error!(target: "p2p", "executor statisics: {:?}", err)),
         );
 
         // interval timeout
@@ -502,7 +505,6 @@ impl Mgr {
 
     /// shutdown routine
     pub fn shutdown(&self) {
-
         if let Ok(mut lock) = self.shutdown_hook.write() {
             if lock.is_some() {
                 let tx = lock.take().unwrap();
@@ -528,8 +530,6 @@ impl Mgr {
             }
             lock.clear();
         }
-
-        
     }
 
     /// rechieve a random node with td >= target_td
@@ -624,12 +624,11 @@ impl Mgr {
     /// messages with module code other than p2p module
     /// should flow into external handlers
     fn handle(&self, hash: u64, cb: ChannelBuffer, callable: Arc<Callable>) {
-        
         let p2p = self.clone();
         debug!(target: "p2p", "handle: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
         // verify if flag token has been set
-        let mut pass = false;  
-        {   
+        let mut pass = false;
+        {
             if let Ok(mut lock) = self.nodes.write() {
                 if let Some(mut node) = lock.get_mut(&hash) {
                     let clear_token = cb.head.get_route();
@@ -652,12 +651,12 @@ impl Mgr {
                                 _ => error!(target: "p2p", "invalid action {}", cb.head.action),
                             };
                         }
-                        MODULE::EXTERNAL => callable.handle(hash, cb)
+                        MODULE::EXTERNAL => callable.handle(hash, cb),
                     }
                 }
                 //VERSION::V1 => handshake::send(p2p, hash),
                 _ => error!(target: "p2p", "invalid version code"),
-            }; 
+            };
         } else {
             warn!(target: "p2p", "handle: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
         }
@@ -696,26 +695,27 @@ mod tests {
     use node::Node;
     use config::Config;
 
-    #[test] 
+    #[test]
     pub fn test_tokens() {
-
-        
         let addr = "168.62.170.146:30303".parse::<SocketAddr>().unwrap();
         let stream = TcpStream::connect(&addr);
         let _ = stream.map(move |ts| {
-
             let mut tokens_rules: Vec<[u32; 2]> = vec![];
-            let flat_token_0: u32  = (0 << 16) + (0 << 8) + 0;
-            let clear_token_0: u32 = (0 << 16) + (0 << 8) + 1;  
+            let flat_token_0: u32 = (0 << 16) + (0 << 8) + 0;
+            let clear_token_0: u32 = (0 << 16) + (0 << 8) + 1;
             tokens_rules.push([flat_token_0, clear_token_0]);
             let p2p = Mgr::new(Arc::new(Config::new()), tokens_rules);
-            
+
             let (tx, _rx) = mpsc::channel(409600);
             let mut node = Node::new_outbound(
                 ts,
-                tx, 
-                [0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00],
-                false
+                tx,
+                [
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                ],
+                false,
             );
             node.tokens.insert(flat_token_0);
 
@@ -725,10 +725,10 @@ mod tests {
             if let Ok(mut lock) = nodes_0.write() {
                 lock.insert(node_hash.clone(), node);
             }
-            
+
             let nodes_1 = p2p.nodes.clone();
             if let Ok(mut lock) = nodes_1.write() {
-                if let Some(mut node) = lock.get_mut(&node_hash){
+                if let Some(mut node) = lock.get_mut(&node_hash) {
                     p2p.token_check(clear_token_0, node);
                     assert_eq!(node.tokens.len(), 0);
                 }

@@ -24,24 +24,10 @@
 #[derive(Debug, PartialEq)]
 pub enum VERSION {
     V0,
-    V1,
 }
 
 impl VERSION {
-    pub fn value(&self) -> u16 {
-        match self {
-            VERSION::V0 => 0u16,
-            VERSION::V1 => 1u16,
-        }
-    }
-
-    pub fn from(value: u16) -> VERSION {
-        match value {
-            0 => VERSION::V0,
-            1 => VERSION::V1,
-            _ => VERSION::V1,
-        }
-    }
+    pub fn value(&self) -> u16 { 0u16 }
 }
 
 #[derive(Debug, PartialEq)]
