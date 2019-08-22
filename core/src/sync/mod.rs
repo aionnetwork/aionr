@@ -208,7 +208,7 @@ impl Sync {
                                          })
                                      .iter()
                                 {
-                                     if let Some((addr, revision, connection, seed)) = active_nodes.remove(*hash) {
+                                     if let Some((addr, revision, connection, seed)) = active_nodes.get(*hash) {
                                          info!(target: "sync",
                                                "{:>18}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}",
                                                info.total_difficulty,
@@ -222,18 +222,6 @@ impl Sync {
                                      }
                                  }
                              }
-                         for (_hash,(addr,revision,connection,seed)) in active_nodes{
-                             info!(target: "sync",
-                                   "{:>18}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}",
-                                   0,
-                                   0,
-                                   0,
-                                   addr,
-                                   revision,
-                                   connection,
-                                   seed
-                             );
-                         }
                      }
 
                      info!(target: "sync", "{:-^127}", "");

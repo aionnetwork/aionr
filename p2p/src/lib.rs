@@ -214,53 +214,6 @@ impl Mgr {
         // interval statisics
         let executor_statisics = executor.clone();
         let p2p_statisics = self.clone();
-        executor_statisics.spawn(
-            Interval::new(Instant::now(), Duration::from_secs(5))
-                .for_each(move |_| {
-                    match p2p_statisics.nodes.try_read() {
-                        Ok(nodes) => {
-                            let mut total: usize = 0;
-                            let mut active: usize = 0;
-                            if nodes.len() > 0 {
-                                let mut active_nodes = vec![];
-                                let mut output: Vec<String> = vec![];
-                                output.push(String::from(
-                                    "                    addr                 rev      conn  seed",
-                                ));
-                                for (_hash, node) in nodes.iter() {
-                                    total += 1;
-                                    if node.state == STATE::ACTIVE {
-                                        active += 1;
-                                        active_nodes.push(node.clone());
-                                    }
-                                }
-
-                                if active_nodes.len() > 0 {
-                                    for node in active_nodes.iter() {
-                                        output.push(format!(
-                                            "{:>24}{:>20}{:>10}{:>6}",
-                                            node.addr.to_formatted_string(),
-                                            String::from_utf8_lossy(&node.revision).trim(),
-                                            format!("{}", node.connection),
-                                            match node.if_seed {
-                                                true => "y",
-                                                _ => " ",
-                                            }
-                                        ));
-                                    }
-                                }
-                                println!("{}", output.join("\n"));
-                            }
-                            info!(target: "p2p", "total/active {}/{}", total, active);
-                        }
-                        Err(err) => {
-                            warn!(target:"p2p", "executor statisics: try read {:?}", err);
-                        }
-                    }
-                    Ok(())
-                })
-                .map_err(|err| error!(target: "p2p", "executor statisics: {:?}", err)),
-        );
 
         // interval timeout
         let executor_timeout = executor.clone();
