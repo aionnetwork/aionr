@@ -33,7 +33,6 @@ use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use lru_cache::LruCache;
 use p2p::{ChannelBuffer, Mgr, Node};
-use sync::handler::bodies;
 use sync::route::{VERSION, MODULE, ACTION};
 use sync::wrappers::{HeaderWrapper};
 use sync::node_info::NodeInfo;
@@ -142,8 +141,6 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
     let from = from.read_u64::<BigEndian>().unwrap_or(1);
     let (mut size, _) = req_body_rest.split_at(mem::size_of::<u32>());
     let size = size.read_u32::<BigEndian>().unwrap_or(1);
-
-    let header_count = 0;
     let mut data = Vec::new();
 
     if size <= LARGE_REQUEST_SIZE {
@@ -159,8 +156,8 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
         }
 
         if data.len() > 0 {
-            let mut rlp = RlpStream::new_list(header_count as usize);
-            rlp.append_raw(&data, header_count as usize);
+            let mut rlp = RlpStream::new_list(data.len() as usize);
+            rlp.append_raw(&data, data.len() as usize);
             res_body.put_slice(rlp.as_raw());
         }
 
@@ -190,7 +187,8 @@ pub fn receive_res(
     let mut prev_header = Header::new();
     let mut header_wrapper = HeaderWrapper::new();
     let mut headers = Vec::new();
-    let mut hashes = Vec::new();
+    // let mut hashes = Vec::new();
+
     for header_rlp in rlp.iter() {
         if let Ok(header) = header_rlp.as_val() {
             let result = UnityEngine::validate_block_header(&header);
@@ -213,16 +211,16 @@ pub fn receive_res(
                     } else {
                         let block_hash = header.hash();
 
-                        //                        let number = header.number();
+                        // let number = header.number();
 
                         // Skip staged block header
-                        //                        if node.mode == Mode::THUNDER {
-                        //                            if SyncStorage::is_staged_block_hash(hash) {
-                        //                                debug!(target: "sync", "Skip staged block header #{}: {:?}", number, hash);
-                        //                                // hw.headers.push(header.clone());
-                        //                                break;
-                        //                            }
-                        //                        }
+                        // if node.mode == Mode::THUNDER {
+                        //     if SyncStorage::is_staged_block_hash(hash) {
+                        //         debug!(target: "sync", "Skip staged block header #{}: {:?}", number, hash);
+                        //         // hw.headers.push(header.clone());
+                        //         break;
+                        //     }
+                        // }
                         // TODO: to do better
                         let is_downloaded =
                             if let Ok(mut hashes) = cached_downloaded_block_hashes.lock() {
@@ -240,7 +238,7 @@ pub fn receive_res(
                             };
 
                         if !is_downloaded && !is_imported {
-                            hashes.put_slice(&block_hash);
+                            // hashes.put_slice(&block_hash);
                             headers.push(header.clone());
                         }
                     }
@@ -263,7 +261,7 @@ pub fn receive_res(
         p2p.update_node(&hash);
         if let Ok(mut downloaded_headers) = downloaded_headers.lock() {
             downloaded_headers.push_back(header_wrapper);
-            bodies::send(p2p.clone(), hash, hashes);
+        // bodies::send(p2p.clone(), hash, hashes);
         } else {
             println!("!!!!!!!!!!!!!")
         }

@@ -37,14 +37,7 @@ pub fn send_random(p2p: Mgr, node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>) {
         if let Ok(mut node_info) = node_info.write() {
             if !node_info.contains_key(&hash) {
                 trace!(target: "sync", "new node info: hash:{}", hash);
-                node_info.insert(
-                    hash,
-                    NodeInfo {
-                        block_hash: H256::zero(),
-                        block_number: 0,
-                        total_difficulty: U256::zero(),
-                    },
-                );
+                node_info.insert(hash, NodeInfo::new());
             }
         }
         send(p2p, hash)

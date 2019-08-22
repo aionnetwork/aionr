@@ -203,7 +203,7 @@ impl Sync {
                                          if a.1.total_difficulty != b.1.total_difficulty {
                                              b.1.total_difficulty.cmp(&a.1.total_difficulty)
                                          } else {
-                                             b.1.block_number.cmp(&a.1.block_number)
+                                             b.1.best_block_number.cmp(&a.1.best_block_number)
                                          })
                                      .iter()
                                 {
@@ -211,8 +211,8 @@ impl Sync {
                                          info!(target: "sync",
                                                "{:>18}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}",
                                                info.total_difficulty,
-                                               info.block_number,
-                                               format!("{}", info.block_hash),
+                                               info.best_block_number,
+                                               format!("{}", info.best_block_hash),
                                                addr,
                                                revision,
                                                connection,
@@ -233,10 +233,11 @@ impl Sync {
         // status thread
         let p2p_status = p2p.clone();
         let executor_status = executor.clone();
+        let node_info_status = self.node_info.clone();
         executor_status.spawn(
             Interval::new(Instant::now(), Duration::from_millis(INTERVAL_STATUS))
                 .for_each(move |_| {
-                    status::send_random(p2p_status.clone());
+                    status::send_random(p2p_status.clone(), node_info_status.clone());
                     Ok(())
                 })
                 .map_err(|err| error!(target: "p2p", "executor status: {:?}", err)),

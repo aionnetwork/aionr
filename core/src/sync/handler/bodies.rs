@@ -36,7 +36,7 @@ use sync::route::ACTION;
 
 const HASH_LEN: usize = 32;
 
-pub fn send(p2p: Mgr, hash: u64, hashes: Vec<u8>) {
+pub fn _send(p2p: Mgr, hash: u64, hashes: Vec<u8>) {
     trace!(target: "sync", "bodies/send req");
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
