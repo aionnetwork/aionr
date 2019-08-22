@@ -211,10 +211,6 @@ impl Mgr {
         let callback_in = callback.clone();
         let callback_out = callback.clone();
 
-        // interval statisics
-        let executor_statisics = executor.clone();
-        let p2p_statisics = self.clone();
-
         // interval timeout
         let executor_timeout = executor.clone();
         let callback_timeout = callback.clone();

@@ -187,7 +187,7 @@ impl Sync {
                  Instant::now(),
                  Duration::from_secs(INTERVAL_STATISICS)
              ).for_each(move |_| {
-                 let (total_len,mut active_nodes) = p2p_statics.get_statics_info();
+                 let (total_len,active_nodes) = p2p_statics.get_statics_info();
                  {
                      let active_len = active_nodes.len();
                      info!(target: "sync", "total/active {}/{}", total_len, active_len);
