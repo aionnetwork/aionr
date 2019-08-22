@@ -24,6 +24,7 @@ use std::time::SystemTime;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::collections::hash_map::DefaultHasher;
+use std::collections::hash_set::HashSet;
 use std::hash::Hash;
 use std::hash::Hasher;
 use uuid::Uuid;
@@ -41,7 +42,6 @@ pub const PROTOCOL_LENGTH: usize = 6;
 pub const MAX_REVISION_LENGTH: usize = 24;
 pub const REVISION_PREFIX: &str = "r-";
 pub const IP_LENGTH: usize = 8;
-pub const DIFFICULTY_LENGTH: usize = 16;
 
 fn calculate_hash<T: Hash>(t: &T) -> u64 {
     let mut s = DefaultHasher::new();
@@ -65,12 +65,15 @@ pub struct Node {
     pub connection: Connection,
     pub if_seed: bool,
     pub update: SystemTime,
+
+    /// storage for msg out routes as flag tokens
+    /// clear on incoming paired clear_token received
+    pub tokens: HashSet<u32>,
 }
 
 impl Node {
     // construct inbound node
     pub fn new_outbound(
-        sa: SocketAddr,
         ts: TcpStream,
         tx: mpsc::Sender<ChannelBuffer>,
         id: [u8; NODE_ID_LENGTH],
@@ -81,8 +84,9 @@ impl Node {
             hash: 0,
             id,
             net_id: 0,
-            addr: IpAddr::parse(sa),
+            addr: IpAddr::parse(ts.peer_addr().unwrap()),
             genesis_hash: H256::default(),
+
             if_boot: false,
             revision: [b' '; MAX_REVISION_LENGTH],
             ts: Arc::new(ts),
@@ -91,23 +95,20 @@ impl Node {
             connection: Connection::OUTBOUND,
             if_seed,
             update: SystemTime::now(),
+
+            tokens: HashSet::new(),
         }
     }
 
     // construct outbound node
-    pub fn new_inbound(
-        sa: SocketAddr,
-        ts: TcpStream,
-        tx: mpsc::Sender<ChannelBuffer>,
-        if_seed: bool,
-    ) -> Node
-    {
+    pub fn new_inbound(ts: TcpStream, tx: mpsc::Sender<ChannelBuffer>, if_seed: bool) -> Node {
         Node {
             hash: 0,
             id: [b'0'; NODE_ID_LENGTH],
             net_id: 0,
-            addr: IpAddr::parse(sa),
+            addr: IpAddr::parse(ts.peer_addr().unwrap()),
             genesis_hash: H256::default(),
+
             if_boot: false,
             revision: [b' '; MAX_REVISION_LENGTH],
             ts: Arc::new(ts),
@@ -116,6 +117,8 @@ impl Node {
             connection: Connection::INBOUND,
             if_seed,
             update: SystemTime::now(),
+
+            tokens: HashSet::new(),
         }
     }
 

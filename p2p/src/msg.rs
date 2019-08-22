@@ -39,7 +39,7 @@ impl Head {
             len: 0,
         }
     }
-    // temporiy name it for it now
+    /// temporiy name it for it now
     pub fn new1(ver: u16, ctrl: u8, action: u8, len: u32) -> Head {
         Head {
             ver,
@@ -47,6 +47,11 @@ impl Head {
             action,
             len,
         }
+    }
+
+    /// get route
+    pub fn get_route(&self) -> u32 {
+        return ((self.ver as u32) << 16) + ((self.ctrl as u32) << 8) + (self.action as u32);
     }
 }
 
@@ -74,4 +79,42 @@ impl ChannelBuffer {
     pub fn to_route(ver: u16, ctrl: u8, action: u8) -> u32 {
         ((ver as u32) << 16) + ((ctrl as u32) << 8) + (action as u32)
     }
+}
+
+// TODO
+#[cfg(test)]
+mod tests {
+
+    use msg::Head;
+    use route::VERSION;
+    use route::MODULE;
+    use route::ACTION;
+
+    #[test]
+    pub fn test_head() {
+        let mut head = Head::new();
+
+        head.ver = VERSION::V0.value();
+        head.ctrl = MODULE::P2P.value();
+
+        head.action = ACTION::HANDSHAKEREQ.value();
+        assert_eq!(head.get_route(), 1);
+        head.action = ACTION::HANDSHAKERES.value();
+        assert_eq!(head.get_route(), 2);
+        head.action = ACTION::ACTIVENODESREQ.value();
+        assert_eq!(head.get_route(), 5);
+        head.action = ACTION::ACTIVENODESRES.value();
+        assert_eq!(head.get_route(), 6);
+
+        head.ver = VERSION::V1.value();
+        head.action = ACTION::HANDSHAKEREQ.value();
+        assert_eq!(head.get_route(), 65537);
+        head.action = ACTION::HANDSHAKERES.value();
+        assert_eq!(head.get_route(), 65538);
+        head.action = ACTION::ACTIVENODESREQ.value();
+        assert_eq!(head.get_route(), 65541);
+        head.action = ACTION::ACTIVENODESRES.value();
+        assert_eq!(head.get_route(), 65542);
+    }
+
 }
