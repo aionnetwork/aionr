@@ -287,7 +287,7 @@ fn filter_nodes_to_sync_headers(
                         &node_info.total_difficulty > local_total_diff
                             && node_info.last_headers_request_time
                                 + Duration::from_millis(REQUEST_COOLDOWN)
-                                >= time_now
+                                <= time_now
                     })
                 })
                 .collect()
