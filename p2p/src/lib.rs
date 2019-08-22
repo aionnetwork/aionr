@@ -105,7 +105,7 @@ pub struct Mgr {
     /// nodes
     nodes: Arc<RwLock<HashMap<u64, Node>>>,
     /// tokens rule
-    tokens_pairs: Arc<HashMap<u32, u32>>,
+    tokens_rule: Arc<HashMap<u32, u32>>,
 }
 
 impl Mgr {
@@ -121,22 +121,25 @@ impl Mgr {
         // parse token rules
         let mut tokens_rule: HashMap<u32, u32> = HashMap::new();
         for pair in tokens_pairs {
-            if pair[0] != pair[1] {
-                if !tokens_rule.contains_key(&pair[0]) {
-                    tokens_rule.insert(pair[0], pair[1]);
-                }
-                if !tokens_rule.contains_key(&pair[1]) {
-                    tokens_rule.insert(pair[1], pair[0]);
-                }
-            }
+            // pair[1]: receive token, pair[0]: send token
+            tokens_rule.insert(pair[1], pair[0]);
         }
+
+        tokens_rule.insert(
+            ((VERSION::V0.value() as u32) << 16)
+                + ((MODULE::P2P.value() as u32) << 8)
+                + ACTION::ACTIVENODESRES.value() as u32,
+            ((VERSION::V0.value() as u32) << 16)
+                + ((MODULE::P2P.value() as u32) << 8)
+                + ACTION::ACTIVENODESREQ.value() as u32,
+        );
 
         Mgr {
             shutdown_hook: Arc::new(RwLock::new(None)),
             config,
             temp: Arc::new(Mutex::new(temp_queue)),
             nodes: Arc::new(RwLock::new(HashMap::new())),
-            tokens_pairs: Arc::new(tokens_rule),
+            tokens_rule: Arc::new(tokens_rule),
         }
     }
 
@@ -146,18 +149,20 @@ impl Mgr {
     /// token_pair[1]: clear_token, check on indivisual node when receiving msg
     /// 1. pass in clear_token from incoming msg route(ChannelBuffer::HEAD::get_route)
     ///    through token rules against token collection on indivisual node
-    /// 2. return true if exsit flag_token and remove it
+    /// 2. return true if exsit send_token and remove it
     /// 3. return false if not exist flag_token
+    /// 4. always return true if there is no token rule applied
     pub fn token_check(&self, clear_token: u32, node: &mut Node) -> bool {
-        match &self.tokens_pairs.get(&clear_token) {
-            Some(&flag_token) => return node.tokens.remove(&flag_token),
-            None => return false,
+        match &self.tokens_rule.get(&clear_token) {
+            Some(&flag_token) => node.tokens.remove(&flag_token),
+            None => true,
         }
     }
 
     /// send msg
     pub fn send(&self, hash: u64, cb: ChannelBuffer) {
         let nodes = &self.nodes;
+        trace!(target: "p2p", "send: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
         match nodes.try_write() {
             Ok(mut lock) => {
                 let mut flag = true;
@@ -205,6 +210,57 @@ impl Mgr {
 
         let callback_in = callback.clone();
         let callback_out = callback.clone();
+
+        // interval statisics
+        let executor_statisics = executor.clone();
+        let p2p_statisics = self.clone();
+        executor_statisics.spawn(
+            Interval::new(Instant::now(), Duration::from_secs(5))
+                .for_each(move |_| {
+                    match p2p_statisics.nodes.try_read() {
+                        Ok(nodes) => {
+                            let mut total: usize = 0;
+                            let mut active: usize = 0;
+                            if nodes.len() > 0 {
+                                let mut active_nodes = vec![];
+                                let mut output: Vec<String> = vec![];
+                                output.push(String::from(
+                                    "                    addr                 rev      conn  seed",
+                                ));
+                                for (_hash, node) in nodes.iter() {
+                                    total += 1;
+                                    if node.state == STATE::ACTIVE {
+                                        active += 1;
+                                        active_nodes.push(node.clone());
+                                    }
+                                }
+
+                                if active_nodes.len() > 0 {
+                                    for node in active_nodes.iter() {
+                                        output.push(format!(
+                                            "{:>24}{:>20}{:>10}{:>6}",
+                                            node.addr.to_formatted_string(),
+                                            String::from_utf8_lossy(&node.revision).trim(),
+                                            format!("{}", node.connection),
+                                            match node.if_seed {
+                                                true => "y",
+                                                _ => " ",
+                                            }
+                                        ));
+                                    }
+                                }
+                                println!("{}", output.join("\n"));
+                            }
+                            info!(target: "p2p", "total/active {}/{}", total, active);
+                        }
+                        Err(err) => {
+                            warn!(target:"p2p", "executor statisics: try read {:?}", err);
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|err| error!(target: "p2p", "executor statisics: {:?}", err)),
+        );
 
         // interval timeout
         let executor_timeout = executor.clone();
@@ -449,18 +505,6 @@ impl Mgr {
 
     /// shutdown routine
     pub fn shutdown(&self) {
-        if let Ok(mut lock) = self.nodes.write() {
-            for (_hash, mut node) in lock.iter_mut() {
-                match node.ts.shutdown(Shutdown::Both) {
-                    Ok(_) => {
-                        trace!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
-                    }
-                    Err(_err) => {}
-                }
-            }
-            lock.clear();
-        }
-
         if let Ok(mut lock) = self.shutdown_hook.write() {
             if lock.is_some() {
                 let tx = lock.take().unwrap();
@@ -473,6 +517,18 @@ impl Mgr {
                     }
                 }
             }
+        }
+
+        if let Ok(mut lock) = self.nodes.write() {
+            for (_hash, mut node) in lock.iter_mut() {
+                match node.ts.shutdown(Shutdown::Both) {
+                    Ok(_) => {
+                        trace!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
+                    }
+                    Err(_err) => {}
+                }
+            }
+            lock.clear();
         }
     }
 
@@ -581,7 +637,7 @@ impl Mgr {
     /// refresh node timestamp in order to keep target in loop
     /// otherwise, target will be timeout and removed
     pub fn update_node(&self, hash: &u64) {
-        if let Ok(mut nodes) = self.nodes.write() {
+        if let Ok(mut nodes) = self.nodes.try_write() {
             if let Some(mut node) = nodes.get_mut(hash) {
                 node.update();
             } else {
@@ -593,37 +649,42 @@ impl Mgr {
     /// messages with module code other than p2p module
     /// should flow into external handlers
     fn handle(&self, hash: u64, cb: ChannelBuffer, callable: Arc<Callable>) {
-        trace!(target: "p2p", "handle: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
         let p2p = self.clone();
-        match VERSION::from(cb.head.ver) {
-            VERSION::V0 => {
-                match MODULE::from(cb.head.ctrl) {
-                    MODULE::P2P => {
-                        match ACTION::from(cb.head.action) {
-                            ACTION::HANDSHAKEREQ => handshake::receive_req(p2p, hash, cb),
-                            ACTION::HANDSHAKERES => handshake::receive_res(p2p, hash, cb),
-                            ACTION::ACTIVENODESREQ => active_nodes::receive_req(p2p, hash),
-                            ACTION::ACTIVENODESRES => active_nodes::receive_res(p2p, hash, cb),
-                            ACTION::DISCONNECT => {}
-                            _ => error!(target: "p2p", "invalid action {}", cb.head.action),
-                        };
-                    }
-                    MODULE::EXTERNAL => {
-                        // verify if flag token has been set
-                        if let Ok(mut lock) = self.nodes.write() {
-                            if let Some(mut node) = lock.get_mut(&hash) {
-                                let clear_token = cb.head.get_route();
-                                if self.token_check(clear_token, node) {
-                                    callable.handle(hash, cb);
-                                }
-                            }
-                        }
-                    }
+        debug!(target: "p2p", "handle: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
+        // verify if flag token has been set
+        let mut pass = false;
+        {
+            if let Ok(mut lock) = self.nodes.write() {
+                if let Some(mut node) = lock.get_mut(&hash) {
+                    let clear_token = cb.head.get_route();
+                    pass = self.token_check(clear_token, node);
                 }
             }
-            //VERSION::V1 => handshake::send(p2p, hash),
-            _ => error!(target: "p2p", "invalid version code"),
-        };
+        }
+
+        if pass {
+            match VERSION::from(cb.head.ver) {
+                VERSION::V0 => {
+                    match MODULE::from(cb.head.ctrl) {
+                        MODULE::P2P => {
+                            match ACTION::from(cb.head.action) {
+                                ACTION::HANDSHAKEREQ => handshake::receive_req(p2p, hash, cb),
+                                ACTION::HANDSHAKERES => handshake::receive_res(p2p, hash, cb),
+                                ACTION::ACTIVENODESREQ => active_nodes::receive_req(p2p, hash),
+                                ACTION::ACTIVENODESRES => active_nodes::receive_res(p2p, hash, cb),
+                                ACTION::DISCONNECT => {}
+                                _ => error!(target: "p2p", "invalid action {}", cb.head.action),
+                            };
+                        }
+                        MODULE::EXTERNAL => callable.handle(hash, cb),
+                    }
+                }
+                //VERSION::V1 => handshake::send(p2p, hash),
+                _ => error!(target: "p2p", "invalid version code"),
+            };
+        } else {
+            warn!(target: "p2p", "handle: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
+        }
     }
 }
 
