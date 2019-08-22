@@ -59,8 +59,8 @@ use p2p::ChannelBuffer;
 use p2p::Config;
 use p2p::Mgr;
 use p2p::Callable;
-//use sync::route::VERSION;
-//use sync::route::MODULE;
+use sync::route::VERSION;
+use sync::route::MODULE;
 use sync::route::ACTION;
 use sync::handler::status;
 use sync::handler::bodies;
@@ -69,7 +69,6 @@ use sync::handler::headers;
 // use sync::handler::import;
 use sync::wrappers::{HeaderWrapper, BlockWrapper};
 use sync::node_info::NodeInfo;
-use header::Header;
 
 use sync::storage::ActivePeerInfo;
 use sync::storage::PeerInfo;
@@ -138,6 +137,18 @@ impl Sync {
         let config = Arc::new(config);
 
         let mut token_rules: Vec<[u32; 2]> = vec![];
+        token_rules.push([
+            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8) + ACTION::STATUSREQ.value() as u32,  
+            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8) + ACTION::STATUSRES.value() as u32,
+        ]);
+        token_rules.push([
+            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8) + ACTION::HEADERSREQ.value() as u32,  
+            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8) + ACTION::HEADERSRES.value() as u32,
+        ]);
+        token_rules.push([
+            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8) + ACTION::BODIESREQ.value() as u32,  
+            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8) + ACTION::BODIESRES.value() as u32,
+        ]);
 
         Sync {
             config: config.clone(),

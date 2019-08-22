@@ -114,7 +114,6 @@ pub fn receive_res(
                 node_info.block_hash = bh;
                 node_info.block_number = best_block_num;
                 node_info.total_difficulty = td;
-                println!("orz{}", node_info.total_difficulty);
                 p2p.update_node(&hash);
 
                 if chain_info.total_difficulty < node_info.total_difficulty {
