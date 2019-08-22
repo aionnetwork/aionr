@@ -20,16 +20,20 @@
  ******************************************************************************/
 
 use std::time::SystemTime;
+use header::Header;
+use block::Block;
 
 #[derive(Clone, PartialEq)]
 pub struct HeaderWrapper {
+    pub node_hash: u64,
     pub timestamp: SystemTime,
-    pub headers: Vec<Vec<u8>>,
+    pub headers: Vec<Header>,
 }
 
 impl HeaderWrapper {
     pub fn new() -> Self {
         HeaderWrapper {
+            node_hash: 0,
             timestamp: SystemTime::now(),
             headers: Vec::new(),
         }
@@ -38,15 +42,17 @@ impl HeaderWrapper {
 
 #[derive(Clone, PartialEq)]
 pub struct BlockWrapper {
+    pub node_hash: u64,
     pub timestamp: SystemTime,
-    pub blocks: Vec<Vec<u8>>,
+    pub blocks: Vec<Block>,
 }
 
-impl BlockWrapper {
-    pub fn new() -> Self {
-        BlockWrapper {
-            timestamp: SystemTime::now(),
-            blocks: Vec::new(),
-        }
-    }
-}
+// impl BlockWrapper {
+//     pub fn new() -> Self {
+//         BlockWrapper {
+//             node_hash: 0,
+//             timestamp: SystemTime::now(),
+//             blocks: Vec::new(),
+//         }
+//     }
+// }

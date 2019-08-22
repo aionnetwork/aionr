@@ -20,11 +20,11 @@
  ******************************************************************************/
 
 use std::mem;
-use std::time::{ SystemTime};
-use std::sync::{RwLock,Arc,Mutex};
-use std::collections::{HashMap};
+use std::time::{SystemTime};
+use std::sync::{Arc, Mutex};
+use std::collections::{VecDeque};
 use engine::unity_engine::UnityEngine;
-use header::{Header as BlockHeader,Seal};
+use header::Header;
 use acore_bytes::to_hex;
 use aion_types::H256;
 use client::{BlockChainClient, BlockId};
@@ -32,13 +32,9 @@ use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use lru_cache::LruCache;
-use p2p::ChannelBuffer;
-use p2p::Node;
-use p2p::Mgr;
+use p2p::{ChannelBuffer, Mgr};
 use sync::handler::bodies;
-use sync::route::VERSION;
-use sync::route::MODULE;
-use sync::route::ACTION;
+use sync::route::{VERSION, MODULE, ACTION};
 use sync::wrappers::{HeaderWrapper};
 
 pub const NORMAL_REQUEST_SIZE: u32 = 24;
@@ -128,11 +124,7 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
     let (mut size, _) = req_body_rest.split_at(mem::size_of::<u32>());
     let size = size.read_u32::<BigEndian>().unwrap_or(1);
 
-    let chain_info = client.chain_info();
-    let last = chain_info.best_block_number;
-
-    let mut header_count = 0;
-    let number = from;
+    let header_count = 0;
     let mut data = Vec::new();
 
     if size <= LARGE_REQUEST_SIZE {
@@ -168,7 +160,7 @@ pub fn receive_res(
     p2p: Mgr,
     hash: u64,
     cb_in: ChannelBuffer,
-    hws: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,
+    downloaded_headers: &Mutex<VecDeque<HeaderWrapper>>,
     cached_downloaded_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
     cached_imported_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 )
@@ -176,8 +168,8 @@ pub fn receive_res(
     trace!(target: "sync", "headers/receive_res");
 
     let rlp = UntrustedRlp::new(cb_in.body.as_slice());
-    let mut prev_header = BlockHeader::new();
-    let mut hw = HeaderWrapper::new();
+    let mut prev_header = Header::new();
+    let mut header_wrapper = HeaderWrapper::new();
     let mut headers = Vec::new();
     let mut hashes = Vec::new();
     for header_rlp in rlp.iter() {
@@ -230,7 +222,7 @@ pub fn receive_res(
 
                         if !is_downloaded && !is_imported {
                             hashes.put_slice(&block_hash);
-                            headers.push(header.clone().rlp(Seal::Without));
+                            headers.push(header.clone());
                         }
                     }
                     prev_header = header;
@@ -246,11 +238,12 @@ pub fn receive_res(
     }
 
     if !headers.is_empty() {
-        hw.headers = headers;
-        hw.timestamp = SystemTime::now();
+        header_wrapper.node_hash = hash;
+        header_wrapper.headers = headers;
+        header_wrapper.timestamp = SystemTime::now();
         p2p.update_node(&hash);
-        if let Ok(mut hws) = hws.try_write() {
-            hws.insert(hash.clone(), hw);
+        if let Ok(mut downloaded_headers) = downloaded_headers.lock() {
+            downloaded_headers.push_back(header_wrapper);
             bodies::send(p2p.clone(), hash, hashes);
         } else {
             println!("!!!!!!!!!!!!!")

@@ -28,7 +28,7 @@ use acore::account_provider::AccountProvider;
 use acore::client::Client;
 use acore::miner::external::ExternalMiner;
 use acore::miner::Miner;
-use acore::sync::SyncProvider;
+// use acore::sync::SyncProvider;
 use aion_rpc::dispatch::{DynamicGasPrice, FullDispatcher};
 use aion_rpc::informant::{ActivityNotifier, ClientNotifier};
 use aion_rpc::Metadata;
@@ -166,28 +166,28 @@ impl FullDependencies {
         &self,
         handler: &mut MetaIoHandler<Metadata, S>,
         apis: &HashSet<Api>,
-        for_generic_pubsub: bool,
+        _for_generic_pubsub: bool,
     ) where
         S: core::Middleware<Metadata>,
     {
         use aion_rpc::dispatch;
         use aion_rpc::impls::*;
         use aion_rpc::traits::*;
-        macro_rules! add_signing_methods {
-            ($namespace:ident, $handler:expr, $deps:expr, $nonces:expr) => {{
-                let deps = &$deps;
-                let dispatcher = FullDispatcher::new(
-                    deps.client.clone(),
-                    deps.miner.clone(),
-                    $nonces,
-                    deps.dynamic_gas_price.clone(),
-                );
-                $handler.extend_with($namespace::to_delegate(SigningClient::new(
-                    &deps.account_store,
-                    dispatcher,
-                )))
-            }};
-        }
+        // macro_rules! add_signing_methods {
+        //     ($namespace:ident, $handler:expr, $deps:expr, $nonces:expr) => {{
+        //         let deps = &$deps;
+        //         let dispatcher = FullDispatcher::new(
+        //             deps.client.clone(),
+        //             deps.miner.clone(),
+        //             $nonces,
+        //             deps.dynamic_gas_price.clone(),
+        //         );
+        //         $handler.extend_with($namespace::to_delegate(SigningClient::new(
+        //             &deps.account_store,
+        //             dispatcher,
+        //         )))
+        //     }};
+        // }
 
         let nonces = Arc::new(Mutex::new(dispatch::Reservations::new(
             self.executor.clone(),

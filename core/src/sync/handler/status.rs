@@ -20,24 +20,34 @@
  ******************************************************************************/
 
 use std::mem;
-use std::sync::Arc;
-use std::sync::RwLock;
+use std::sync::{Arc, RwLock};
 use std::collections::HashMap;
 use aion_types::{H256, U256};
 use types::blockchain::info::BlockChainInfo;
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
-use sync::wrappers::HeaderWrapper;
 use sync::node_info::NodeInfo;
 use sync::route::{VERSION,MODULE,ACTION};
 use sync::handler::headers;
-use sync::handler::headers::NORMAL_REQUEST_SIZE;
 use p2p::{ChannelBuffer,  Mgr};
 
 const HASH_LENGTH: usize = 32;
 
-pub fn send_random(p2p: Mgr) {
+pub fn send_random(p2p: Mgr, node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>) {
     if let Some(hash) = p2p.get_random_active_node_hash() {
+        if let Ok(mut node_info) = node_info.write() {
+            if !node_info.contains_key(&hash) {
+                trace!(target: "sync", "new node info: hash:{}", hash);
+                node_info.insert(
+                    hash,
+                    NodeInfo {
+                        block_hash: H256::zero(),
+                        block_number: 0,
+                        total_difficulty: U256::zero(),
+                    },
+                );
+            }
+        }
         send(p2p, hash)
     }
 }
@@ -48,7 +58,7 @@ pub fn send(p2p: Mgr, hash: u64) {
     cb.head.ctrl = MODULE::SYNC.value();
     cb.head.action = ACTION::STATUSREQ.value();
     cb.head.len = 0;
-    let mut p2p_0 = p2p.send(hash, cb);
+    let mut _p2p_0 = p2p.send(hash, cb);
 }
 
 pub fn receive_req(p2p: Mgr, chain_info: &BlockChainInfo, hash: u64) {
@@ -91,74 +101,43 @@ pub fn receive_res(
     p2p: Mgr,
     chain_info: &BlockChainInfo,
     node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
-    hws: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,
     hash: u64,
     cb_in: ChannelBuffer,
 )
 {
     trace!(target: "sync", "status/receive_res");
-    match node_info.try_write() {
-        Ok(mut write) => {
-            trace!(target: "sync", "cb_body_len{}",cb_in.head.len);
-            let (mut best_block_num, req_body_rest) = cb_in.body.split_at(mem::size_of::<u64>());
-            let best_block_num = best_block_num.read_u64::<BigEndian>().unwrap_or(0);
-            let (mut total_difficulty_len, req_body_rest) =
-                req_body_rest.split_at(mem::size_of::<u8>());
-            let total_difficulty_len = total_difficulty_len.read_u8().unwrap_or(0) as usize;
-            let (total_difficulty, req_body_rest) = req_body_rest.split_at(total_difficulty_len);
-            let (best_hash, req_body_rest) = req_body_rest.split_at(HASH_LENGTH);
-            let (_genesis_hash, _) = req_body_rest.split_at(HASH_LENGTH);
-            let td = U256::from(total_difficulty);
-            let bh = H256::from(best_hash);
-            if let Some(mut node_info) = write.get_mut(&hash) {
-                node_info.block_hash = bh;
-                node_info.block_number = best_block_num;
-                node_info.total_difficulty = td;
-                println!("orz{}", node_info.total_difficulty);
-                p2p.update_node(&hash);
+    trace!(target: "sync", "cb_body_len{}",cb_in.head.len);
+    let (mut best_block_num, req_body_rest) = cb_in.body.split_at(mem::size_of::<u64>());
+    let best_block_num = best_block_num.read_u64::<BigEndian>().unwrap_or(0);
+    let (mut total_difficulty_len, req_body_rest) = req_body_rest.split_at(mem::size_of::<u8>());
+    let total_difficulty_len = total_difficulty_len.read_u8().unwrap_or(0) as usize;
+    let (total_difficulty, req_body_rest) = req_body_rest.split_at(total_difficulty_len);
+    let (best_hash, req_body_rest) = req_body_rest.split_at(HASH_LENGTH);
+    let (_genesis_hash, _) = req_body_rest.split_at(HASH_LENGTH);
+    let td = U256::from(total_difficulty);
+    let bh = H256::from(best_hash);
 
-                if chain_info.total_difficulty < node_info.total_difficulty {
-                    if let Ok(wrappers) = hws.read() {
-                        if wrappers.keys().find(|x| **x == hash).is_none() {
-                            headers::prepare_send(p2p.clone(), hash, chain_info.best_block_number);
-                        }
-                    } else {
-                        println!("ininin");
-                    }
+    {
+        if let Ok(mut node_info_write) = node_info.write() {
+            trace!(target: "sync", "update node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, bh, td);
+            match node_info_write.get_mut(&hash) {
+                Some(mut info) => {
+                    info.total_difficulty = td;
+                    info.block_number = best_block_num;
+                    info.block_hash = bh;
                 }
-                return;
-            }
-            {
-                // TODO:
-
-                trace!(target: "sync", "new node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, bh, td);
-
-                write.insert(
-                    hash,
-                    NodeInfo {
-                        block_hash: bh,
-                        block_number: best_block_num,
-                        total_difficulty: td,
-                    },
-                );
-                p2p.update_node(&hash);
-
-                if chain_info.total_difficulty < td {
-                    if let Ok(wrappers) = hws.read() {
-                        if wrappers.keys().find(|x| **x == hash).is_none() {
-                            headers::prepare_send(p2p.clone(), hash, chain_info.best_block_number);
-                        }
-                    } else {
-                        println!("ininin");
-                    }
+                None => {
+                    // TODO: panish node
                 }
-                warn!(target: "sync", "status/res cannot get node info with hash:{}" ,hash);
-            }
-        }
-        Err(err) => {
-            //TODO:
-
+            };
+        } else {
             warn!(target: "sync", "status/res cannot get node info map");
         }
+    }
+
+    p2p.update_node(&hash);
+
+    if chain_info.total_difficulty < td {
+        headers::prepare_send(p2p.clone(), hash, chain_info.best_block_number);
     }
 }

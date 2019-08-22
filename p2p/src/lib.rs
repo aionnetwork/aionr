@@ -381,7 +381,6 @@ impl Mgr {
             .incoming()
             .for_each(move |ts: TcpStream| {
                 // counters
-                let p2p_inbound_0 = p2p_inbound.clone();
                 let p2p_inbound_1 = p2p_inbound.clone();
                 let callback_in = callback_in.clone();
 
