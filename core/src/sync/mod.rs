@@ -23,6 +23,7 @@ mod handler;
 mod route;
 mod wrappers;
 mod node_info;
+mod storage;
 #[cfg(test)]
 mod test;
 
@@ -30,7 +31,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 use std::time::Instant;
 // use std::time::SystemTime;
-use std::collections::{HashMap, VecDeque};
+use std::collections::HashMap;
 use std::thread;
 use client::BlockChainClient;
 // use client::BlockId;
@@ -59,17 +60,17 @@ use sync::handler::bodies;
 use sync::handler::headers;
 // use sync::handler::broadcast;
 // use sync::handler::import;
-use sync::wrappers::{HeaderWrapper, BlockWrapper};
 use sync::node_info::NodeInfo;
+use sync::storage::SyncStorage;
 
 // const HEADERS_CAPACITY: u64 = 256;
 // const STATUS_REQ_INTERVAL: u64 = 2;
 // const BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
 // const BLOCKS_IMPORT_INTERVAL: u64 = 50;
 // const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
-const INTERVAL_STATUS: u64 = 5000;
-// const INTERVAL_HEADERS: u64 = 2;
-// const INTERVAL_BODIES: u64 = 2;
+const INTERVAL_STATUS: u64 = 1000;
+const INTERVAL_HEADERS: u64 = 100;
+// const INTERVAL_BODIES: u64 = 1000;
 // const INTERVAL_STATISICS: u64 = 5;
 
 const MAX_TX_CACHE: usize = 20480;
@@ -77,15 +78,15 @@ const MAX_BLOCK_CACHE: usize = 32;
 
 pub struct Sync {
     _config: Arc<Config>,
+
     client: Arc<BlockChainClient>,
+
     runtime: Arc<Runtime>,
+
     p2p: Mgr,
 
-    /// collection of headers wrappers
-    headers: Mutex<VecDeque<HeaderWrapper>>,
-
-    /// collection of blocks wrappers
-    _blocks: Mutex<VecDeque<BlockWrapper>>,
+    /// Sync local storage cache
+    storage: SyncStorage,
 
     /// active nodes info
     node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
@@ -128,8 +129,7 @@ impl Sync {
             client,
             p2p: Mgr::new(config, token_rules),
             runtime: Arc::new(Runtime::new().expect("tokio runtime")),
-            headers: Mutex::new(VecDeque::new()),
-            _blocks: Mutex::new(VecDeque::new()),
+            storage: SyncStorage::new(),
             node_info: Arc::new(RwLock::new(HashMap::new())),
             _local_best_td: Arc::new(RwLock::new(local_best_td)),
             _local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
@@ -219,12 +219,33 @@ impl Sync {
         //         );
 
         // interval status
-        let p2p_1 = p2p.clone();
+        let p2p_status = p2p.clone();
         let executor_status = executor.clone();
         executor_status.spawn(
             Interval::new(Instant::now(), Duration::from_millis(INTERVAL_STATUS))
                 .for_each(move |_| {
-                    status::send_random(p2p_1.clone());
+                    status::send_random(p2p_status.clone());
+                    Ok(())
+                })
+                .map_err(|err| error!(target: "p2p", "executor status: {:?}", err)),
+        );
+
+        let p2p_header = p2p.clone();
+        let executor_header = executor.clone();
+        let node_info_header = self.node_info.clone();
+        let client_header = self.client.clone();
+        executor_header.spawn(
+            Interval::new(Instant::now(), Duration::from_millis(INTERVAL_HEADERS))
+                .for_each(move |_| {
+                    let chain_info = client_header.chain_info();
+                    let local_total_diff: U256 = chain_info.total_difficulty;
+                    let local_best_block_number: u64 = chain_info.best_block_number;
+                    headers::sync_headers(
+                        p2p_header.clone(),
+                        node_info_header.clone(),
+                        &local_total_diff,
+                        local_best_block_number,
+                    );
                     Ok(())
                 })
                 .map_err(|err| error!(target: "p2p", "executor status: {:?}", err)),
@@ -531,11 +552,7 @@ impl Callable for Sync {
                 let chain_info = &self.client.chain_info();
                 status::receive_req(p2p, chain_info, hash)
             }
-            ACTION::STATUSRES => {
-                let chain_info = &self.client.chain_info();
-                let node_info = self.node_info.clone();
-                status::receive_res(p2p, chain_info, node_info, hash, cb)
-            }
+            ACTION::STATUSRES => status::receive_res(p2p, self.node_info.clone(), hash, cb),
             ACTION::HEADERSREQ => {
                 let client = self.client.clone();
                 headers::receive_req(p2p, hash, client, cb)
@@ -547,7 +564,7 @@ impl Callable for Sync {
                     p2p,
                     hash,
                     cb,
-                    &self.headers,
+                    self.storage.downloaded_headers(),
                     downloaded_hashes,
                     imported_hashes,
                 )

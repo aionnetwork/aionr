@@ -18,17 +18,30 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use aion_types::H256;
-use aion_types::U256;
-//use p2p::Mode;
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use aion_types::{H256, U256};
 
 pub struct NodeInfo {
     /// node total difficulty
     pub total_difficulty: U256,
     /// node best block number
-    pub block_number: u64,
+    pub best_block_number: u64,
     /// node best block hash
-    pub block_hash: H256,
+    pub best_block_hash: H256,
+    /// last headers request time
+    pub last_headers_request_time: SystemTime,
     // node mode
     //mode: Mode
+}
+
+impl NodeInfo {
+    pub fn new() -> Self {
+        NodeInfo {
+            total_difficulty: U256::from(0u64),
+            best_block_number: 0u64,
+            best_block_hash: H256::default(),
+            last_headers_request_time: UNIX_EPOCH,
+        }
+    }
 }

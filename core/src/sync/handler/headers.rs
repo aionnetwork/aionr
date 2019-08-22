@@ -20,27 +20,46 @@
  ******************************************************************************/
 
 use std::mem;
-use std::time::{SystemTime};
-use std::sync::{Arc, Mutex};
-use std::collections::{VecDeque};
+use std::time::{SystemTime, Duration};
+use std::sync::{Arc, RwLock, Mutex};
+use std::collections::{HashMap, VecDeque};
 use engine::unity_engine::UnityEngine;
 use header::Header;
 use acore_bytes::to_hex;
-use aion_types::H256;
+use aion_types::{H256, U256};
 use client::{BlockChainClient, BlockId};
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use lru_cache::LruCache;
-use p2p::{ChannelBuffer, Mgr};
+use p2p::{ChannelBuffer, Mgr, Node};
 use sync::handler::bodies;
 use sync::route::{VERSION, MODULE, ACTION};
 use sync::wrappers::{HeaderWrapper};
+use sync::node_info::NodeInfo;
+use rand::{thread_rng, Rng};
 
 pub const NORMAL_REQUEST_SIZE: u32 = 24;
 const LARGE_REQUEST_SIZE: u32 = 48;
+const REQUEST_COOLDOWN: u64 = 5000;
 
-pub fn prepare_send(p2p: Mgr, hash: u64, best_num: u64 /*mode:Mode*/) {
+pub fn sync_headers(
+    p2p: Mgr,
+    nodes_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
+    local_total_diff: &U256,
+    local_best_block_number: u64,
+)
+{
+    let active_nodes = p2p.get_active_nodes();
+    let candidates: Vec<Node> =
+        filter_nodes_to_sync_headers(active_nodes, nodes_info, local_total_diff);
+    if let Some(candidate) = pick_random_node(&candidates) {
+        let candidate_hash = candidate.get_hash();
+        prepare_send(p2p, candidate_hash, local_best_block_number);
+    }
+}
+
+fn prepare_send(p2p: Mgr, hash: u64, best_num: u64 /*mode:Mode*/) {
     // TODO mode match
     let start = if best_num > 3 { best_num - 3 } else { 1 };
     let size = NORMAL_REQUEST_SIZE;
@@ -250,5 +269,42 @@ pub fn receive_res(
         }
     } else {
         debug!(target: "sync", "Came too late............");
+    }
+}
+
+fn filter_nodes_to_sync_headers(
+    nodes: Vec<Node>,
+    nodes_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
+    local_total_diff: &U256,
+) -> Vec<Node>
+{
+    let time_now = SystemTime::now();
+    match nodes_info.read() {
+        Ok(nodes_info_read) => {
+            nodes
+                .into_iter()
+                .filter(|node| {
+                    let node_hash = node.get_hash();
+                    nodes_info_read.get(&node_hash).map_or(false, |node_info| {
+                        &node_info.total_difficulty > local_total_diff
+                            && node_info.last_headers_request_time
+                                + Duration::from_millis(REQUEST_COOLDOWN)
+                                >= time_now
+                    })
+                })
+                .collect()
+        }
+        Err(_) => Vec::new(),
+    }
+}
+
+fn pick_random_node(nodes: &Vec<Node>) -> Option<Node> {
+    let count = nodes.len();
+    if count > 0 {
+        let mut rng = thread_rng();
+        let random_index: usize = rng.gen_range(0, count);
+        Some(nodes[random_index].clone())
+    } else {
+        None
     }
 }

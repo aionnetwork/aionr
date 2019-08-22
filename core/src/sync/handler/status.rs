@@ -28,7 +28,6 @@ use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use sync::node_info::NodeInfo;
 use sync::route::{VERSION,MODULE,ACTION};
-use sync::handler::headers;
 use p2p::{ChannelBuffer,  Mgr};
 
 const HASH_LENGTH: usize = 32;
@@ -86,7 +85,6 @@ pub fn receive_req(p2p: Mgr, chain_info: &BlockChainInfo, hash: u64) {
 
 pub fn receive_res(
     p2p: Mgr,
-    chain_info: &BlockChainInfo,
     node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
     hash: u64,
     cb_in: ChannelBuffer,
@@ -104,27 +102,17 @@ pub fn receive_res(
     let td = U256::from(total_difficulty);
     let bh = H256::from(best_hash);
 
-    {
-        if let Ok(mut node_info_write) = node_info.write() {
-            if !node_info_write.contains_key(&hash) {
-                trace!(target: "sync", "new node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, bh, td);
-            }
-            node_info_write.insert(
-                hash,
-                NodeInfo {
-                    block_hash: bh,
-                    block_number: best_block_num,
-                    total_difficulty: td,
-                },
-            );
-        } else {
-            warn!(target: "sync", "status/res cannot get node info map");
+    if let Ok(mut node_info_write) = node_info.write() {
+        if !node_info_write.contains_key(&hash) {
+            trace!(target: "sync", "new node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, bh, td);
         }
+        let mut info = node_info_write.entry(hash).or_insert(NodeInfo::new());
+        info.best_block_hash = bh;
+        info.best_block_number = best_block_num;
+        info.total_difficulty = td;
+    } else {
+        warn!(target: "sync", "status/res cannot get node info map");
     }
 
     p2p.update_node(&hash);
-
-    if chain_info.total_difficulty < td {
-        headers::prepare_send(p2p.clone(), hash, chain_info.best_block_number);
-    }
 }

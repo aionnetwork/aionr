@@ -61,6 +61,7 @@ transient-hashmap = "0.4"
 macros = { path = "../util/macros" }
 futures = "0.1.6"
 tokio = "0.1.11"
+rand = "0.5.5"
 
 [dev-dependencies]
 tempdir = "*"
