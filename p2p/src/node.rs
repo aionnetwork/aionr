@@ -66,15 +66,14 @@ pub struct Node {
     pub if_seed: bool,
     pub update: SystemTime,
 
-    /// storage for msg in & out routes
-    /// since most of msg in pair mode: request & response
+    /// storage for msg out routes as flag tokens
+    /// clear on incoming paired clear_token received
     pub tokens: HashSet<u32>,
 }
 
 impl Node {
     // construct inbound node
     pub fn new_outbound(
-        sa: SocketAddr,
         ts: TcpStream,
         tx: mpsc::Sender<ChannelBuffer>,
         id: [u8; NODE_ID_LENGTH],
@@ -85,7 +84,7 @@ impl Node {
             hash: 0,
             id,
             net_id: 0,
-            addr: IpAddr::parse(sa),
+            addr: IpAddr::parse(ts.peer_addr().unwrap()),
             genesis_hash: H256::default(),
 
             if_boot: false,
@@ -103,7 +102,6 @@ impl Node {
 
     // construct outbound node
     pub fn new_inbound(
-        sa: SocketAddr,
         ts: TcpStream,
         tx: mpsc::Sender<ChannelBuffer>,
         if_seed: bool,
@@ -113,7 +111,7 @@ impl Node {
             hash: 0,
             id: [b'0'; NODE_ID_LENGTH],
             net_id: 0,
-            addr: IpAddr::parse(sa),
+            addr: IpAddr::parse(ts.peer_addr().unwrap()),
             genesis_hash: H256::default(),
 
             if_boot: false,
