@@ -317,7 +317,6 @@ impl Mgr {
                                 let (tx, rx) = mpsc::channel(409600);
                                 let ts_0 = ts.try_clone().unwrap();
                                 let node = Node::new_outbound(
-                                    ts.peer_addr().unwrap(),
                                     ts_0,
                                     tx,
                                     temp_node.id,
@@ -397,10 +396,8 @@ impl Mgr {
 
                 // construct node instance and store it
                 let (tx, rx) = mpsc::channel(409600);
-                let addr = ts.peer_addr().unwrap();
                 let ts_0 = ts.try_clone().unwrap();
                 let node = Node::new_inbound(
-                    addr,
                     ts_0,
                     tx,
                     false
@@ -631,16 +628,54 @@ fn split_frame(
 mod tests {
 
     use std::sync::Arc;
+    use std::net::SocketAddr;
+    use futures::Future;
+    use tokio::net::TcpStream;
+    use futures::sync::mpsc;
     use Mgr;
+    use node::Node;
     use config::Config;
 
     #[test] 
     pub fn test_tokens() {
 
-        let mut tokens_pairs: Vec<[u32; 2]> = vec![];
-        let p2p = Mgr::new(Arc::new(Config::new()), tokens_pairs);
-        //TODO: check if turn tx of Node as Option
-        // otherwise cannot test route permission 
+        
+        let addr = "168.62.170.146:30303".parse::<SocketAddr>().unwrap();
+        let stream = TcpStream::connect(&addr);
+        let _ = stream.map(move |ts| {
+
+            let mut tokens_rules: Vec<[u32; 2]> = vec![];
+            let flat_token_0: u32  = (0 << 16) + (0 << 8) + 0;
+            let clear_token_0: u32 = (0 << 16) + (0 << 8) + 1;  
+            tokens_rules.push([flat_token_0, clear_token_0]);
+            let p2p = Mgr::new(Arc::new(Config::new()), tokens_rules);
+            
+            let (tx, _rx) = mpsc::channel(409600);
+            let mut node = Node::new_outbound(
+                ts,
+                tx, 
+                [0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00],
+                false
+            );
+            node.tokens.insert(flat_token_0);
+
+            let node_hash = node.get_hash();
+
+            let nodes_0 = p2p.nodes.clone();
+            if let Ok(mut lock) = nodes_0.write() {
+                lock.insert(node_hash.clone(), node);
+            }
+            
+            let nodes_1 = p2p.nodes.clone();
+            if let Ok(mut lock) = nodes_1.write() {
+                if let Some(mut node) = lock.get_mut(&node_hash){
+                    p2p.token_check(clear_token_0, node);
+                    assert_eq!(node.tokens.len(), 0);
+                }
+            }
+
+            p2p.shutdown();
+        });
     }
 
 }
