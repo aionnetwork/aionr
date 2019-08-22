@@ -105,7 +105,7 @@ pub struct Mgr {
     /// nodes
     nodes: Arc<RwLock<HashMap<u64, Node>>>,
     /// tokens rule
-    tokens_rule: Arc<HashMap<u32, u32>>,
+    tokens_pairs: Arc<HashMap<u32, u32>>,
 }
 
 impl Mgr {
@@ -136,15 +136,59 @@ impl Mgr {
             config,
             temp: Arc::new(Mutex::new(temp_queue)),
             nodes: Arc::new(RwLock::new(HashMap::new())),
-            tokens_rule: Arc::new(tokens_rule),
+            tokens_pairs: Arc::new(tokens_rule),
         }
     }
 
     /// verify inbound msg route through token collection
-    /// 1. pass in incoming msg route through token rules against token collection on indivisual node
-    /// 2. return
-    /// 3. should
-    pub fn token_check(&self) {}
+    /// token_pair: [u32, u32] 
+    /// token_pair[0]: flag_token, set on indivisual node tokens collection when sending msg
+    /// token_pair[1]: clear_token, check on indivisual node when receiving msg
+    /// 1. pass in clear_token from incoming msg route(ChannelBuffer::HEAD::get_route) 
+    ///    through token rules against token collection on indivisual node
+    /// 2. return true if exsit flag_token and remove it   
+    /// 3. return false if not exist flag_token
+    pub fn token_check(&self, clear_token: u32, node: &mut Node) -> bool {
+        match &self.tokens_pairs.get(&clear_token) {
+            Some(&flag_token) => return node.tokens.remove(&flag_token),
+            None => return false
+        }
+    }
+
+    /// send msg
+    pub fn send(&self, hash: u64, cb: ChannelBuffer) {
+        let nodes = &self.nodes;
+        match nodes.try_write() {
+            Ok(mut lock) => {
+                let mut flag = true;
+                if let Some(mut node) = lock.get_mut(&hash) {
+                    let mut tx = node.tx.clone();
+                    let route = cb.head.get_route();
+                    match tx.try_send(cb) {
+                        Ok(_) => {
+                            // add flag token
+                            node.tokens.insert(route);
+                            trace!(target: "p2p", "p2p/send: {}", node.addr.get_ip());
+                        },
+                        Err(err) => {
+                            flag = false;
+                            error!(target: "p2p", "p2p/send: ip:{} err:{}", node.addr.get_ip(), err);
+                        }
+                    }
+                } else {
+                    warn!(target:"p2p", "send: node not found hash {}", hash);
+                }
+                if !flag {
+                    if let Some(node) = lock.remove(&hash) {
+                        trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
+                    }
+                }
+            }
+            Err(err) => {
+                warn!(target:"p2p", "send: nodes read {:?}", err);
+            }
+        }
+    }
 
     /// run p2p instance
     pub fn run(&mut self, callback: Arc<Callable>) {
@@ -179,10 +223,6 @@ impl Mgr {
                         if now.duration_since(node.update).expect("SystemTime::duration_since failed").as_secs() >= TIMEOUT_MAX {
                             index.push(*hash);
                         }
-                        // resend handshake
-                        // else if node.state == STATE::CONNECTED && node.connection == Connection::INBOUND {
-                        //     handshake::send(&hash, node.id, net_id, ip, port, nodes_outbound_6);
-                        // }
                     }
 
                     for i in 0 .. index.len() {
@@ -443,36 +483,6 @@ impl Mgr {
     /// rechieve a random node with td >= target_td
     pub fn get_node_by_td(&self, _target_td: u64) -> u64 { 120 }
 
-    /// send msg
-    pub fn send(&self, hash: u64, cb: ChannelBuffer) {
-        let mut nodes = &self.nodes;
-        match nodes.try_write() {
-            Ok(mut lock) => {
-                let mut flag = true;
-                if let Some(node) = lock.get(&hash) {
-                    let mut tx = node.tx.clone();
-                    match tx.try_send(cb) {
-                        Ok(_) => trace!(target: "p2p", "p2p/send: {}", node.addr.get_ip()),
-                        Err(err) => {
-                            flag = false;
-                            error!(target: "p2p", "p2p/send ip:{} err:{}", node.addr.get_ip(), err);
-                        }
-                    }
-                } else {
-                    warn!(target:"p2p", "send: node not found hash {}", hash);
-                }
-                if !flag {
-                    if let Some(node) = lock.remove(&hash) {
-                        trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
-                    }
-                }
-            }
-            Err(err) => {
-                warn!(target:"p2p", "send: nodes read {:?}", err);
-            }
-        }
-    }
-
     /// get copy of active nodes as vec
     pub fn get_active_nodes(&self) -> Vec<Node> {
         let mut active_nodes: Vec<Node> = Vec::new();
@@ -578,7 +588,16 @@ impl Mgr {
                         };
                     }
                     MODULE::EXTERNAL => {
-                        callable.handle(hash, cb);
+                    
+                        // verify if flag token has been set     
+                        if let Ok(mut lock) = self.nodes.write() {
+                            if let Some(mut node) = lock.get_mut(&hash) {
+                                let clear_token = cb.head.get_route();
+                                if self.token_check(clear_token, node) {
+                                    callable.handle(hash, cb);
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -588,7 +607,7 @@ impl Mgr {
     }
 }
 
-/// helper function for config inbound & outbound stream
+/// helper function for setting inbound & outbound stream
 fn config_stream(stream: &TcpStream) {
     stream
         .set_recv_buffer_size(1 << 24)
@@ -606,4 +625,22 @@ fn split_frame(
     stream::SplitStream<Framed<TcpStream, Codec>>,
 ) {
     Codec.framed(socket).split()
+}
+
+#[cfg(test)]
+mod tests {
+
+    use std::sync::Arc;
+    use Mgr;
+    use config::Config;
+
+    #[test] 
+    pub fn test_tokens() {
+
+        let mut tokens_pairs: Vec<[u32; 2]> = vec![];
+        let p2p = Mgr::new(Arc::new(Config::new()), tokens_pairs);
+        //TODO: check if turn tx of Node as Option
+        // otherwise cannot test route permission 
+    }
+
 }
