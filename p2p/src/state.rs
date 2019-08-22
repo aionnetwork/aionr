@@ -45,7 +45,7 @@ impl STATE {
 #[cfg(test)]
 mod tests {
 
-    use states::STATE;
+    use state::STATE;
 
     #[test]
     fn equal() {

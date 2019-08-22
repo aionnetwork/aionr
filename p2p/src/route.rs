@@ -93,11 +93,10 @@ pub enum ACTION {
     DISCONNECT,
     HANDSHAKEREQ,
     HANDSHAKERES,
-    PING,
-    PONG,
+    // PING,
+    // PONG,
     ACTIVENODESREQ,
     ACTIVENODESRES,
-    CONNECT,
     UNKNOWN,
 }
 
@@ -107,11 +106,10 @@ impl ACTION {
             ACTION::DISCONNECT => 0u8,
             ACTION::HANDSHAKEREQ => 1u8,
             ACTION::HANDSHAKERES => 2u8,
-            ACTION::PING => 3u8,
-            ACTION::PONG => 4u8,
+            // ACTION::PING => 3u8,
+            // ACTION::PONG => 4u8,
             ACTION::ACTIVENODESREQ => 5u8,
             ACTION::ACTIVENODESRES => 6u8,
-            ACTION::CONNECT => 7u8,
             ACTION::UNKNOWN => 255u8,
         }
     }
@@ -120,11 +118,10 @@ impl ACTION {
             0 => ACTION::DISCONNECT,
             1 => ACTION::HANDSHAKEREQ,
             2 => ACTION::HANDSHAKERES,
-            3 => ACTION::PING,
-            4 => ACTION::PONG,
+            // 3 => ACTION::PING,
+            // 4 => ACTION::PONG,
             5 => ACTION::ACTIVENODESREQ,
             6 => ACTION::ACTIVENODESRES,
-            7 => ACTION::CONNECT,
             _ => ACTION::UNKNOWN,
         }
     }
@@ -156,14 +153,6 @@ mod tests {
             from(
                 VERSION::V0.value(),
                 MODULE::P2P.value(),
-                ACTION::DISCONNECT.value()
-            ),
-            [0x00, 0x00, 0x00, 0x00]
-        );
-        assert_eq!(
-            from(
-                VERSION::V0.value(),
-                MODULE::P2P.value(),
                 ACTION::HANDSHAKEREQ.value()
             ),
             [0x00, 0x00, 0x00, 0x01]
@@ -180,22 +169,6 @@ mod tests {
             from(
                 VERSION::V0.value(),
                 MODULE::P2P.value(),
-                ACTION::PING.value()
-            ),
-            [0x00, 0x00, 0x00, 0x03]
-        );
-        assert_eq!(
-            from(
-                VERSION::V0.value(),
-                MODULE::P2P.value(),
-                ACTION::PONG.value()
-            ),
-            [0x00, 0x00, 0x00, 0x04]
-        );
-        assert_eq!(
-            from(
-                VERSION::V0.value(),
-                MODULE::P2P.value(),
                 ACTION::ACTIVENODESREQ.value()
             ),
             [0x00, 0x00, 0x00, 0x05]
@@ -207,14 +180,6 @@ mod tests {
                 ACTION::ACTIVENODESRES.value()
             ),
             [0x00, 0x00, 0x00, 0x06]
-        );
-        assert_eq!(
-            from(
-                VERSION::V0.value(),
-                MODULE::P2P.value(),
-                ACTION::CONNECT.value()
-            ),
-            [0x00, 0x00, 0x00, 0x07]
         );
         assert_eq!(
             from(
@@ -270,14 +235,10 @@ mod tests {
 
     #[test]
     fn test_action_equal() {
-        assert_eq!(ACTION::DISCONNECT, ACTION::DISCONNECT);
         assert_eq!(ACTION::HANDSHAKEREQ, ACTION::HANDSHAKEREQ);
         assert_eq!(ACTION::HANDSHAKERES, ACTION::HANDSHAKERES);
-        assert_eq!(ACTION::PING, ACTION::PING);
-        assert_eq!(ACTION::PONG, ACTION::PONG);
         assert_eq!(ACTION::ACTIVENODESREQ, ACTION::ACTIVENODESREQ);
         assert_eq!(ACTION::ACTIVENODESRES, ACTION::ACTIVENODESRES);
-        assert_eq!(ACTION::CONNECT, ACTION::CONNECT);
         assert_eq!(ACTION::UNKNOWN, ACTION::UNKNOWN);
     }
 
@@ -286,24 +247,17 @@ mod tests {
         assert_eq!(ACTION::DISCONNECT.value(), 0);
         assert_eq!(ACTION::HANDSHAKEREQ.value(), 1);
         assert_eq!(ACTION::HANDSHAKERES.value(), 2);
-        assert_eq!(ACTION::PING.value(), 3);
-        assert_eq!(ACTION::PONG.value(), 4);
         assert_eq!(ACTION::ACTIVENODESREQ.value(), 5);
         assert_eq!(ACTION::ACTIVENODESRES.value(), 6);
-        assert_eq!(ACTION::CONNECT.value(), 7);
         assert_eq!(ACTION::UNKNOWN.value(), 255);
     }
 
     #[test]
     fn test_action_from() {
-        assert_eq!(ACTION::DISCONNECT, ACTION::from(0));
         assert_eq!(ACTION::HANDSHAKEREQ, ACTION::from(1));
         assert_eq!(ACTION::HANDSHAKERES, ACTION::from(2));
-        assert_eq!(ACTION::PING, ACTION::from(3));
-        assert_eq!(ACTION::PONG, ACTION::from(4));
         assert_eq!(ACTION::ACTIVENODESREQ, ACTION::from(5));
         assert_eq!(ACTION::ACTIVENODESRES, ACTION::from(6));
-        assert_eq!(ACTION::CONNECT, ACTION::from(7));
         assert_eq!(ACTION::UNKNOWN, ACTION::from(8));
         assert_eq!(ACTION::UNKNOWN, ACTION::from(255));
     }
