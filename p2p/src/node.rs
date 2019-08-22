@@ -132,6 +132,8 @@ impl Node {
         debug!(target: "p2p", "node timestamp updated");
         self.update = SystemTime::now();
     }
+
+    pub fn is_active(&self) -> bool { self.state == STATE::ACTIVE }
 }
 
 pub fn convert_ip_string(ip_str: String) -> [u8; 8] {

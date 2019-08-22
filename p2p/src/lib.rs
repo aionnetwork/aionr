@@ -258,10 +258,10 @@ impl Mgr {
                                 let (tx, rx) = mpsc::channel(409600);
                                 let ts_0 = ts.try_clone().unwrap();
                                 let node = Node::new_outbound(
-                                    ts.peer_addr().unwrap(), 
+                                    ts.peer_addr().unwrap(),
                                     ts_0,
-                                    tx, 
-                                    temp_node.id, 
+                                    tx,
+                                    temp_node.id,
                                     temp_node.if_seed
                                 );
                                 if let Ok(mut write) = p2p_outbound_0.nodes.try_write() {
@@ -322,7 +322,7 @@ impl Mgr {
         let server = listener
             .incoming()
             .for_each(move |ts: TcpStream| {
-                
+
                 // counters
                 let p2p_inbound_0 = p2p_inbound.clone();
                 let p2p_inbound_1 = p2p_inbound.clone();
@@ -342,9 +342,9 @@ impl Mgr {
                 let addr = ts.peer_addr().unwrap();
                 let ts_0 = ts.try_clone().unwrap();
                 let node = Node::new_inbound(
-                    addr, 
+                    addr,
                     ts_0,
-                    tx, 
+                    tx,
                     false
                 );
                 let hash = node.get_hash();
@@ -494,6 +494,31 @@ impl Mgr {
         } else {
             None
         }
+    }
+    /// get total nodes count
+    pub fn get_statics_info(&self) -> (usize, HashMap<u64, (String, String, String, &str)>) {
+        let mut len = 0;
+        let mut statics_info = HashMap::new();
+        if let Ok(read) = self.nodes.try_read() {
+            len = read.len();
+            for node in read.values() {
+                if node.state == STATE::ACTIVE {
+                    statics_info.insert(
+                        node.get_hash(),
+                        (
+                            node.addr.to_formatted_string(),
+                            format!("{}", String::from_utf8_lossy(&node.revision).trim()),
+                            format!("{}", node.connection),
+                            match node.if_seed {
+                                true => "y",
+                                _ => " ",
+                            },
+                        ),
+                    );
+                }
+            }
+        }
+        (len, statics_info)
     }
 
     /// get total active nodes count
