@@ -73,7 +73,7 @@ extern crate equihash;
 extern crate vms;
 extern crate futures;
 extern crate tokio;
-extern crate state as crate_state;
+// extern crate state as crate_state;
 extern crate tiny_keccak;
 extern crate num_bigint;
 extern crate bytebuffer;

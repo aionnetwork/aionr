@@ -33,7 +33,6 @@ use p2p::get_node;
 use p2p::get_nodes_count_all_modes;
 use p2p::remove_peer;
 use p2p::Mode;
-use sync::storage::SyncStorage;
 use sync::handler::headers;
 
 pub fn import_staged_blocks(hash: &H256) {
@@ -162,11 +161,11 @@ pub fn import_blocks(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
                     //                    }
                     //                    update_node_with_mode(node.node_hash, &node);
                     //                    if node.mode == Mode::NORMAL || node.mode == Mode::THUNDER {
-                    if SyncStorage::get_synced_block_number() + 8
-                        < SyncStorage::get_network_best_block_number()
-                    {
-                        headers::get_headers_from_node(&mut node);
-                    }
+                    // if SyncStorage::get_synced_block_number() + 8
+                    //     < SyncStorage::get_network_best_block_number()
+                    // {
+                    //     headers::get_headers_from_node(&mut node);
+                    // }
                     //                    }
                     continue;
                 }
@@ -190,7 +189,7 @@ pub fn import_blocks(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
                     hash, number, parent, node.get_node_id(), node.mode, node.synced_block_num);
 
                     let result = client.import_block(block.clone());
-                    SyncStorage::insert_requested_time(hash);
+                    // SyncStorage::insert_requested_time(hash);
                     match result {
                         Ok(_)
                         | Err(BlockImportError::Import(ImportError::AlreadyInChain))
@@ -305,77 +304,77 @@ pub fn import_blocks(hash: u64, nodes: Arc<RwLock<HashMap<u64, Node>>>) {
                                 break;
                             }
 
-                            if number > SyncStorage::get_synced_block_number() {
-                                // put into staging...
-                                if let Ok(mut staged_blocks) =
-                                    SyncStorage::get_staged_blocks().lock()
-                                {
-                                    if staged_blocks.len() < 32
-                                        && !staged_blocks.contains_key(&parent)
-                                    {
-                                        let blocks_to_stage =
-                                            blocks_to_import.clone().split_off(offset - 1);
-                                        let max_staged_block_number =
-                                            number + blocks_to_stage.len() as u64 - 1;
-                                        info!(target: "sync", "Staged blocks from {} to {} with parent: {}", number, max_staged_block_number, parent);
-                                        debug!(target: "sync", "cache size: {}", staged_blocks.len());
+                            // if number > SyncStorage::get_synced_block_number() {
+                            //     // put into staging...
+                            //     if let Ok(mut staged_blocks) =
+                            //         SyncStorage::get_staged_blocks().lock()
+                            //     {
+                            //         if staged_blocks.len() < 32
+                            //             && !staged_blocks.contains_key(&parent)
+                            //         {
+                            //             let blocks_to_stage =
+                            //                 blocks_to_import.clone().split_off(offset - 1);
+                            //             let max_staged_block_number =
+                            //                 number + blocks_to_stage.len() as u64 - 1;
+                            //             info!(target: "sync", "Staged blocks from {} to {} with parent: {}", number, max_staged_block_number, parent);
+                            //             debug!(target: "sync", "cache size: {}", staged_blocks.len());
 
-                                        let mut staged_block_hashes = Vec::new();
-                                        for block in blocks_to_import.iter() {
-                                            let block_view = BlockView::new(block);
-                                            let hash = block_view.header_view().hash();
-                                            staged_block_hashes.push(hash);
-                                        }
+                            //             let mut staged_block_hashes = Vec::new();
+                            //             for block in blocks_to_import.iter() {
+                            //                 let block_view = BlockView::new(block);
+                            //                 let hash = block_view.header_view().hash();
+                            //                 staged_block_hashes.push(hash);
+                            //             }
 
-                                        SyncStorage::insert_staged_block_hashes(
-                                            staged_block_hashes,
-                                        );
+                            //             SyncStorage::insert_staged_block_hashes(
+                            //                 staged_block_hashes,
+                            //             );
 
-                                        staged_blocks.insert(parent, blocks_to_stage);
+                            //             staged_blocks.insert(parent, blocks_to_stage);
 
-                                        if max_staged_block_number
-                                            > SyncStorage::get_max_staged_block_number()
-                                        {
-                                            SyncStorage::set_max_staged_block_number(
-                                                max_staged_block_number,
-                                            );
-                                        }
-                                    } else {
-                                        node.synced_block_num =
-                                            client.chain_info().best_block_number;
-                                        node.mode = Mode::THUNDER;
-                                        update_node_with_mode(node.node_hash, &node);
-                                    }
-                                    break;
-                                }
-                            } else {
-                                node.current_total_difficulty = U256::from(0);
-                                node.current_pow_total_difficulty = U256::from(0);
-                                node.current_pos_total_difficulty = U256::from(0);
-                                node.synced_block_num = number;
+                            //             if max_staged_block_number
+                            //                 > SyncStorage::get_max_staged_block_number()
+                            //             {
+                            //                 SyncStorage::set_max_staged_block_number(
+                            //                     max_staged_block_number,
+                            //                 );
+                            //             }
+                            //         } else {
+                            //             node.synced_block_num =
+                            //                 client.chain_info().best_block_number;
+                            //             node.mode = Mode::THUNDER;
+                            //             update_node_with_mode(node.node_hash, &node);
+                            //         }
+                            //         break;
+                            //     }
+                            // } else {
+                            //     node.current_total_difficulty = U256::from(0);
+                            //     node.current_pow_total_difficulty = U256::from(0);
+                            //     node.current_pos_total_difficulty = U256::from(0);
+                            //     node.synced_block_num = number;
 
-                                if node.target_total_difficulty
-                                    < SyncStorage::get_network_total_diff()
-                                {
-                                    remove_peer(node.node_hash);
-                                }
-                                //                                match node.mode {
-                                //                                    Mode::LIGHTNING | Mode::THUNDER => {
-                                //                                        warn!(target: "sync", "Unknown block: #{}, node {} run in NORMAL mode now.", number, node.get_node_id());
-                                //                                        node.mode = Mode::NORMAL;
-                                //                                    }
-                                //                                    Mode::FORWARD | Mode::NORMAL => {
-                                //                                        warn!(target: "sync", "Unknown block: #{}, node {} run in BACKWARD mode now.", number, node.get_node_id());
-                                //                                        node.mode = Mode::BACKWARD;
-                                //                                        node.last_request_num = 0;
-                                //                                    }
-                                //                                    Mode::BACKWARD => {
-                                //                                        warn!(target: "sync", "Unknown block: #{}, node {} run in BACKWARD mode.", number, node.get_node_id());
-                                //                                    }
-                                //                                }
-                                update_node_with_mode(node.node_hash, &node);
-                                break;
-                            }
+                            //     if node.target_total_difficulty
+                            //         < SyncStorage::get_network_total_diff()
+                            //     {
+                            //         remove_peer(node.node_hash);
+                            //     }
+                            //     //                                match node.mode {
+                            //     //                                    Mode::LIGHTNING | Mode::THUNDER => {
+                            //     //                                        warn!(target: "sync", "Unknown block: #{}, node {} run in NORMAL mode now.", number, node.get_node_id());
+                            //     //                                        node.mode = Mode::NORMAL;
+                            //     //                                    }
+                            //     //                                    Mode::FORWARD | Mode::NORMAL => {
+                            //     //                                        warn!(target: "sync", "Unknown block: #{}, node {} run in BACKWARD mode now.", number, node.get_node_id());
+                            //     //                                        node.mode = Mode::BACKWARD;
+                            //     //                                        node.last_request_num = 0;
+                            //     //                                    }
+                            //     //                                    Mode::BACKWARD => {
+                            //     //                                        warn!(target: "sync", "Unknown block: #{}, node {} run in BACKWARD mode.", number, node.get_node_id());
+                            //     //                                    }
+                            //     //                                }
+                            //     update_node_with_mode(node.node_hash, &node);
+                            //     break;
+                            // }
                         }
                         Err(e) => {
                             if !node.is_over_repeated_threshold() {

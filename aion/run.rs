@@ -24,7 +24,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
-use acore::client::{Client, DatabaseCompactionProfile, VMType, ChainNotify};
+use acore::client::{Client, DatabaseCompactionProfile, VMType /*, ChainNotify*/
+};
 use acore::miner::external::ExternalMiner;
 use acore::miner::{Miner, MinerOptions, MinerService};
 use acore::service::{ClientService, run_miner, run_staker, pos_sealing, run_transaction_pool};
