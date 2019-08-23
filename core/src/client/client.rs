@@ -1082,7 +1082,7 @@ impl BlockChainClient for Client {
         };
         // construct fake transaction
         let mut call_data = Vec::new();
-        call_data.append(&mut AbiToken::STRING(String::from("getVote")).encode());
+        call_data.append(&mut AbiToken::STRING(String::from("getTotalStake")).encode());
         call_data.append(&mut AbiToken::ADDRESS(a.to_owned().into()).encode());
         let tx = Transaction::new(
             0.into(),
