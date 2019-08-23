@@ -159,7 +159,7 @@ impl Mgr {
     }
 
     /// send msg
-    pub fn send(&self, hash: u64, cb: ChannelBuffer) {
+    pub fn send(&self, hash: u64, cb: ChannelBuffer) -> bool {
         let nodes = &self.nodes;
         trace!(target: "p2p", "send: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
         match nodes.try_write() {
@@ -181,15 +181,18 @@ impl Mgr {
                     }
                 } else {
                     warn!(target:"p2p", "send: node not found hash {}", hash);
+                    return false;
                 }
                 if !flag {
                     if let Some(node) = lock.remove(&hash) {
                         trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
                     }
                 }
+                flag
             }
             Err(err) => {
                 warn!(target:"p2p", "send: nodes read {:?}", err);
+                false
             }
         }
     }
