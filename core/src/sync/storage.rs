@@ -63,7 +63,7 @@ impl SyncStorage {
         &self.downloaded_headers
     }
 
-    pub fn _downloaded_blocks(&self) -> &Mutex<VecDeque<BlocksWrapper>> { &self.downloaded_blocks }
+    pub fn downloaded_blocks(&self) -> &Mutex<VecDeque<BlocksWrapper>> { &self.downloaded_blocks }
 
     pub fn insert_downloaded_blocks(&self, blocks_wrapper: BlocksWrapper) {
         if let Ok(mut downloaded_blocks) = self.downloaded_blocks.lock() {
@@ -81,8 +81,20 @@ impl SyncStorage {
         if let Ok(mut downloaded_blocks_hashes) = self.downloaded_blocks_hashes.lock() {
             downloaded_blocks_hashes.contains_key(hash)
         } else {
-            warn!(target: "sync", "downloaded_block_hashes lock failed");
+            warn!(target: "sync", "downloaded_blocks_hashes lock failed");
             false
+        }
+    }
+
+    pub fn insert_imported_block_hashes(&self, hashes: Vec<H256>) {
+        if let Ok(mut imported_blocks_hashes) = self.imported_blocks_hashes.lock() {
+            for hash in hashes {
+                if !imported_blocks_hashes.contains_key(&hash) {
+                    imported_blocks_hashes.insert(hash, 0);
+                }
+            }
+        } else {
+            warn!(target: "sync", "imported_blocks_hashes lock failed");
         }
     }
 
@@ -90,7 +102,7 @@ impl SyncStorage {
         if let Ok(mut imported_blocks_hashes) = self.imported_blocks_hashes.lock() {
             imported_blocks_hashes.contains_key(hash)
         } else {
-            warn!(target: "sync", "imported_block_hashes lock failed");
+            warn!(target: "sync", "imported_blocks_hashes lock failed");
             false
         }
     }
