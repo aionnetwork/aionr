@@ -45,6 +45,8 @@ use futures::Stream;
 use lru_cache::LruCache;
 use tokio::runtime::Runtime;
 use tokio::timer::Interval;
+use futures::sync::oneshot;
+use futures::sync::oneshot::Sender;
 // use bytes::BufMut;
 //use byteorder::{BigEndian,ByteOrder};
 
@@ -80,7 +82,7 @@ pub struct Sync {
 
     client: Arc<BlockChainClient>,
 
-    runtime: Arc<Runtime>,
+    shutdown_hook: Arc<RwLock<Option<Sender<()>>>>,
 
     p2p: Mgr,
 
@@ -135,7 +137,7 @@ impl Sync {
             _config: config.clone(),
             client,
             p2p: Mgr::new(config, token_rules),
-            runtime: Arc::new(Runtime::new().expect("tokio runtime")),
+            shutdown_hook: Arc::new(RwLock::new(None)),
             storage: Arc::new(SyncStorage::new()),
             node_info: Arc::new(RwLock::new(HashMap::new())),
             _local_best_td: Arc::new(RwLock::new(local_best_td)),
@@ -149,8 +151,8 @@ impl Sync {
 
     pub fn run(&self, sync: Arc<Sync>) {
         // counters
-        let runtime = self.runtime.clone();
-        let executor = Arc::new(runtime.executor());
+        let mut runtime = Runtime::new().expect("new sync runtime failed!");
+        let executor = runtime.executor();
 
         // init p2p;
         let p2p = &self.p2p.clone();
@@ -191,9 +193,9 @@ impl Sync {
                                     {
                                         if let Some((addr, revision, connection, seed)) = active_nodes.get(*hash) {
                                             info!(target: "sync",
-                                                  "{:>18}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}",
-                                                  info.total_difficulty,
-                                                  info.best_block_number,
+                                                  "{:>16}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}",
+                                                  format!("{}",info.total_difficulty),
+                                            format!("{}",info.best_block_number),
                                                   format!("{}", info.best_block_hash),
                                                   addr,
                                                   revision,
@@ -387,12 +389,42 @@ impl Sync {
         //                })
         //                .map_err(|err| error!(target: "sync", "executor status: {:?}", err)),
         //        );
+
+        // bind shutdown hook
+        let (tx, rx) = oneshot::channel::<()>();
+        {
+            match self.shutdown_hook.write() {
+                Ok(mut guard) => *guard = Some(tx),
+                Err(_error) => {}
+            }
+        }
+
+        // clear
+        drop(executor_statics);
+        drop(executor_status);
+        drop(executor_header);
+        drop(executor_body);
+        drop(executor);
+        runtime.block_on(rx.map_err(|_| ())).unwrap();
+        runtime.shutdown_now().wait().unwrap();
+        debug!(target:"sync", "shutdown executors");
     }
 
     pub fn shutdown(&self) {
         &self.p2p.shutdown();
-        //        let runtime = self.runtime.clone();
-        //        runtime.shutdown_now();
+        if let Ok(mut lock) = self.shutdown_hook.write() {
+            if lock.is_some() {
+                let tx = lock.take().unwrap();
+                match tx.send(()) {
+                    Ok(_) => {
+                        debug!(target: "sync", "shutdown signal sent");
+                    }
+                    Err(err) => {
+                        error!(target: "sync", "shutdown: {:?}", err);
+                    }
+                }
+            }
+        }
     }
 }
 
