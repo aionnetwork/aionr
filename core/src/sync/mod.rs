@@ -70,7 +70,7 @@ const _BLOCKS_IMPORT_INTERVAL: u64 = 50;
 const _BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const INTERVAL_STATUS: u64 = 5000;
 const INTERVAL_HEADERS: u64 = 100;
-// const INTERVAL_BODIES: u64 = 2;
+const INTERVAL_BODIES: u64 = 100;
 const INTERVAL_STATISICS: u64 = 5;
 const MAX_TX_CACHE: usize = 20480;
 const MAX_BLOCK_CACHE: usize = 32;
@@ -101,12 +101,6 @@ pub struct Sync {
 
     /// network best block number
     _network_best_block_number: Arc<RwLock<u64>>,
-
-    /// cache block hashes which have been downloaded
-    cached_downloaded_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
-
-    /// cache block hashes which have been imported
-    cached_imported_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 
     /// cache tx hash which has been stored and broadcasted
     _cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
@@ -158,8 +152,6 @@ impl Sync {
             _local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
             _network_best_td: Arc::new(RwLock::new(local_best_td)),
             _network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
-            cached_downloaded_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
-            cached_imported_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
             _cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
             _cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
         }
@@ -262,7 +254,20 @@ impl Sync {
                     );
                     Ok(())
                 })
-                .map_err(|err| error!(target: "sync", "executor status: {:?}", err)),
+                .map_err(|err| error!(target: "sync", "executor header: {:?}", err)),
+        );
+
+        // sync headers thread
+        let p2p_body = p2p.clone();
+        let executor_body = executor.clone();
+        let storage_body = self.storage.clone();
+        executor_body.spawn(
+            Interval::new(Instant::now(), Duration::from_millis(INTERVAL_BODIES))
+                .for_each(move |_| {
+                    bodies::sync_bodies(p2p_body.clone(), storage_body.clone());
+                    Ok(())
+                })
+                .map_err(|err| error!(target: "sync", "executor body: {:?}", err)),
         );
 
         //        let executor_headers = executor.clone();
@@ -575,28 +580,12 @@ impl Callable for Sync {
                 let client = self.client.clone();
                 headers::receive_req(p2p, hash, client, cb)
             }
-            ACTION::HEADERSRES => {
-                let downloaded_hashes = self.cached_downloaded_block_hashes.clone();
-                let imported_hashes = self.cached_imported_block_hashes.clone();
-                headers::receive_res(
-                    p2p,
-                    hash,
-                    cb,
-                    self.storage.clone(),
-                    downloaded_hashes,
-                    imported_hashes,
-                )
-            }
+            ACTION::HEADERSRES => headers::receive_res(p2p, hash, cb, self.storage.clone()),
             ACTION::BODIESREQ => {
                 let client = self.client.clone();
                 bodies::receive_req(p2p, hash, client, cb)
             }
-            ACTION::BODIESRES => {
-                // let blocks = self.blocks.clone();
-                let chain_info = self.client.chain_info();
-                let downloaded_hashes = self.cached_downloaded_block_hashes.clone();
-                bodies::receive_res(p2p, hash, cb, chain_info, downloaded_hashes)
-            }
+            ACTION::BODIESRES => bodies::receive_res(p2p, hash, cb, self.storage.clone()),
             ACTION::BROADCASTTX => (),
             ACTION::BROADCASTBLOCK => (),
             // TODO: kill the node

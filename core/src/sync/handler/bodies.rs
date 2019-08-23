@@ -20,23 +20,68 @@
  ******************************************************************************/
 
 use std::sync::{Arc, Mutex};
-// use block::Block;
-use client::{BlockId, BlockChainClient, BlockChainInfo};
+use std::time::SystemTime;
+use std::collections::VecDeque;
+use block::Block;
+use client::{BlockId, BlockChainClient};
 use aion_types::H256;
 use bytes::BufMut;
-use rlp::RlpStream;
-use lru_cache::LruCache;
+use rlp::{RlpStream, UntrustedRlp};
 use p2p::ChannelBuffer;
 use p2p::Mgr;
 use sync::route::VERSION;
 use sync::route::MODULE;
 use sync::route::ACTION;
-// use sync::wrappers::{HeaderWrapper, BlockWrapper};
-// use sync::handler::headers;
+use sync::storage::SyncStorage;
+use sync::wrappers::{HeadersWrapper, BlocksWrapper};
+use header::Header;
 
 const HASH_LEN: usize = 32;
 
-pub fn _send(p2p: Mgr, hash: u64, hashes: Vec<u8>) {
+pub fn sync_bodies(p2p: Mgr, storage: Arc<SyncStorage>) {
+    let downloaded_headers: &Mutex<VecDeque<HeadersWrapper>> = storage.downloaded_headers();
+    // Get all downloaded headers
+    let mut headers_wrappers: Vec<HeadersWrapper> = Vec::new();
+    if let Ok(mut downloaded_headers) = downloaded_headers.lock() {
+        while let Some(headers_wrapper) = downloaded_headers.pop_front() {
+            headers_wrappers.push(headers_wrapper);
+        }
+    }
+
+    // For each batch of downloaded headers, try to get bodies from the corresponding node
+    for headers_wrapper in headers_wrappers {
+        let mut hashes: Vec<u8> = Vec::new(); // headers' hashes to request bodies
+        let mut headers_requested: Vec<Header> = Vec::new(); // headers request record
+        for header in &headers_wrapper.headers {
+            let hash = header.hash();
+            if !storage.is_block_hash_downloaded(&hash) && !storage.is_block_hash_imported(&hash) {
+                hashes.put_slice(&hash);
+                headers_requested.push(header.clone());
+            }
+        }
+
+        if hashes.len() == 0 {
+            continue;
+        }
+
+        if let Ok(mut headers_with_bodies_requested) =
+            storage.headers_with_bodies_requested().lock()
+        {
+            let node_hash = headers_wrapper.node_hash;
+            if !headers_with_bodies_requested.contains_key(&node_hash) {
+                send(p2p.clone(), node_hash.clone(), hashes);
+
+                let mut headers_wrapper_record = headers_wrapper.clone();
+                headers_wrapper_record.timestamp = SystemTime::now();
+                headers_wrapper_record.headers.clear();
+                headers_wrapper_record.headers.extend(headers_requested);
+                headers_with_bodies_requested.insert(node_hash, headers_wrapper_record);
+            }
+        }
+    }
+}
+
+pub fn send(p2p: Mgr, hash: u64, hashes: Vec<u8>) {
     trace!(target: "sync", "bodies/send req");
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
@@ -44,7 +89,7 @@ pub fn _send(p2p: Mgr, hash: u64, hashes: Vec<u8>) {
     cb.head.action = ACTION::BODIESREQ.value();
     cb.body = hashes;
     cb.head.len = cb.body.len() as u32;
-    p2p.send(hash.clone(), cb);
+    p2p.send(hash, cb);
 }
 
 pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
@@ -88,86 +133,85 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
     p2p.send(hash, res);
 }
 
-pub fn receive_res(
-    _p2p: Mgr,
-    _hash: u64,
-    _cb_in: ChannelBuffer,
-    _chain_info: BlockChainInfo,
-    _downloaded_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
-)
-{
-    // trace!(target: "sync", "bodies/receive_res");
-    // if cb_in.body.len() > 0 {
-    //     // To remove
-    //     let hws: RwLock<HashMap<u64, HeaderWrapper>> = RwLock::new(HashMap::new());
-    //     if let Ok(mut wrappers) = hws.write() {
-    //         if let Some(mut wrapper) = wrappers.remove(&hash) {
-    //             let headers = wrapper.headers.clone();
-    //             if !headers.is_empty() {
-    //                 let rlp = UntrustedRlp::new(cb_in.body.as_slice());
+pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncStorage>) {
+    trace!(target: "sync", "bodies/receive_res");
 
-    //                 let mut bodies = Vec::new();
-    //                 let mut blocks = Vec::new();
-    //                 for block_bodies in rlp.iter() {
-    //                     for block_body in block_bodies.iter() {
-    //                         let mut transactions = Vec::new();
-    //                         if !block_body.is_empty() {
-    //                             for transaction_rlp in block_body.iter() {
-    //                                 if !transaction_rlp.is_empty() {
-    //                                     if let Ok(transaction) = transaction_rlp.as_val() {
-    //                                         transactions.push(transaction);
-    //                                     }
-    //                                 }
-    //                             }
-    //                         }
-    //                         bodies.push(transactions);
-    //                     }
-    //                 }
+    // end if no body
+    if cb_in.body.len() <= 0 {
+        return;
+    }
 
-    //                 if headers.len() == bodies.len() {
-    //                     for i in 0..headers.len() {
-    //                         let header = &headers[i];
-    //                         let block = Block {
-    //                             header,
-    //                             transactions: bodies[i].clone(),
-    //                         };
-    //                         blocks.push(block.rlp_bytes(Seal::Without));
-    //                         if let Ok(mut downloaded_block_hashes) = downloaded_block_hashes.lock()
-    //                         {
-    //                             let hash = block.header.hash();
-    //                             if !downloaded_block_hashes.contains_key(&hash) {
-    //                                 downloaded_block_hashes.insert(hash, 0);
-    //                             } else {
-    //                                 trace!(target: "sync", "downloaded_block_hashes: {}.", hash);
-    //                             }
-    //                         }
-    //                     }
-    //                 } else {
-    //                     debug!(
-    //                                     target: "sync",
-    //                                     "Count mismatch, headers count: {}, bodies count: {}",
-    //                                     headers.len(),
-    //                                     bodies.len(),
-    //                                 );
-    //                     // TODO: punish the node
+    // get bodies request records. End if no record found
+    let headers_wrapper_record = match storage.headers_with_bodies_requested_for_node(&node_hash) {
+        Some(headers_wrapper) => headers_wrapper,
+        None => {
+            return;
+        }
+    };
+    let headers = headers_wrapper_record.headers;
+    if headers.is_empty() {
+        return;
+    }
 
-    //                     blocks.clear();
-    //                 }
+    // parse bodies
+    let rlp = UntrustedRlp::new(cb_in.body.as_slice());
+    let mut bodies = Vec::new();
+    for block_bodies in rlp.iter() {
+        for block_body in block_bodies.iter() {
+            let mut transactions = Vec::new();
+            if !block_body.is_empty() {
+                for transaction_rlp in block_body.iter() {
+                    if !transaction_rlp.is_empty() {
+                        if let Ok(transaction) = transaction_rlp.as_val() {
+                            transactions.push(transaction);
+                        }
+                    }
+                }
+            }
+            bodies.push(transactions);
+        }
+    }
 
-    //                 if !blocks.is_empty() {
-    //                     p2p.update_node(&hash);
-    //                     //TODO import block
-    //                 }
+    // match bodies with headers
+    let mut blocks = Vec::new();
+    if headers.len() == bodies.len() {
+        for i in 0..headers.len() {
+            let block = Block {
+                header: headers[i].clone(),
+                transactions: bodies[i].clone(),
+            };
+            if let Ok(mut downloaded_block_hashes) = storage.downloaded_blocks_hashes().lock() {
+                let hash = block.header.hash();
+                if !downloaded_block_hashes.contains_key(&hash) {
+                    blocks.push(block);
+                    downloaded_block_hashes.insert(hash, 0);
+                } else {
+                    trace!(target: "sync", "downloaded_block_hashes: {}.", hash);
+                }
+            }
+        }
+    } else {
+        debug!(
+            target: "sync",
+            "Count mismatch, headers count: {}, bodies count: {}, node id hash: {}",
+            headers.len(),
+            bodies.len(),
+            node_hash
+        );
+    }
 
-    //                 {
-    //                     // TODO: MODE NORMAL / THUNDER
+    // end if no block to download
+    if blocks.is_empty() {
+        return;
+    }
 
-    //                     headers::prepare_send(p2p.clone(), hash, chain_info.best_block_number);
-    //                 }
-    //             }
-    //         } else {
-    //             error!(target:"sync","bodies: should not be reached!!")
-    //         }
-    //     }
-    // }
+    // Save blocks
+    let mut blocks_wrapper = BlocksWrapper::new();
+    blocks_wrapper.node_hash = node_hash;
+    blocks_wrapper.blocks.extend(blocks);
+    storage.insert_downloaded_blocks(blocks_wrapper);
+
+    // TODO: maybe we should consider reset the header request cooldown here
+
+    p2p.update_node(&node_hash);
 }

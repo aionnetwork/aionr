@@ -24,15 +24,15 @@ use header::Header;
 use block::Block;
 
 #[derive(Clone, PartialEq)]
-pub struct HeaderWrapper {
+pub struct HeadersWrapper {
     pub node_hash: u64,
     pub timestamp: SystemTime,
     pub headers: Vec<Header>,
 }
 
-impl HeaderWrapper {
+impl HeadersWrapper {
     pub fn new() -> Self {
-        HeaderWrapper {
+        HeadersWrapper {
             node_hash: 0,
             timestamp: SystemTime::now(),
             headers: Vec::new(),
@@ -41,18 +41,18 @@ impl HeaderWrapper {
 }
 
 #[derive(Clone, PartialEq)]
-pub struct BlockWrapper {
+pub struct BlocksWrapper {
     pub node_hash: u64,
     pub timestamp: SystemTime,
     pub blocks: Vec<Block>,
 }
 
-// impl BlockWrapper {
-//     pub fn new() -> Self {
-//         BlockWrapper {
-//             node_hash: 0,
-//             timestamp: SystemTime::now(),
-//             blocks: Vec::new(),
-//         }
-//     }
-// }
+impl BlocksWrapper {
+    pub fn new() -> Self {
+        BlocksWrapper {
+            node_hash: 0,
+            timestamp: SystemTime::now(),
+            blocks: Vec::new(),
+        }
+    }
+}

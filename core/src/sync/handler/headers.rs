@@ -26,15 +26,14 @@ use std::collections::{HashMap, VecDeque};
 use engine::unity_engine::UnityEngine;
 use header::Header;
 use acore_bytes::to_hex;
-use aion_types::{H256, U256};
+use aion_types::U256;
 use client::{BlockChainClient, BlockId};
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
-use lru_cache::LruCache;
 use p2p::{ChannelBuffer, Mgr, Node};
 use sync::route::{VERSION, MODULE, ACTION};
-use sync::wrappers::{HeaderWrapper};
+use sync::wrappers::{HeadersWrapper};
 use sync::node_info::NodeInfo;
 use sync::storage::SyncStorage;
 use rand::{thread_rng, Rng};
@@ -90,7 +89,7 @@ fn send(p2p: Mgr, hash: u64, start: u64, size: u32) {
 //     p2p: Arc<Mgr>,
 //     start: u64,
 //     chain_info: &BlockChainInfo,
-//     ws: Arc<RwLock<HashMap<u64, HeaderWrapper>>>,
+//     ws: Arc<RwLock<HashMap<u64, HeadersWrapper>>>,
 // )
 // {
 //     let working_nodes = get_working_nodes(ws);
@@ -173,24 +172,15 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
     }
 }
 
-pub fn receive_res(
-    p2p: Mgr,
-    hash: u64,
-    cb_in: ChannelBuffer,
-    storage: Arc<SyncStorage>,
-    cached_downloaded_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
-    cached_imported_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
-)
-{
+pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncStorage>) {
     trace!(target: "sync", "headers/receive_res");
 
-    let downloaded_headers: &Mutex<VecDeque<HeaderWrapper>> = storage.downloaded_headers();
+    let downloaded_headers: &Mutex<VecDeque<HeadersWrapper>> = storage.downloaded_headers();
 
     let rlp = UntrustedRlp::new(cb_in.body.as_slice());
     let mut prev_header = Header::new();
-    let mut header_wrapper = HeaderWrapper::new();
+    let mut header_wrapper = HeadersWrapper::new();
     let mut headers = Vec::new();
-    // let mut hashes = Vec::new();
 
     for header_rlp in rlp.iter() {
         if let Ok(header) = header_rlp.as_val() {
@@ -224,24 +214,11 @@ pub fn receive_res(
                         //         break;
                         //     }
                         // }
-                        // TODO: to do better
-                        let is_downloaded =
-                            if let Ok(mut hashes) = cached_downloaded_block_hashes.lock() {
-                                hashes.contains_key(&block_hash)
-                            } else {
-                                warn!(target: "sync", "downloaded_block_hashes lock failed");
-                                false
-                            };
-                        let is_imported =
-                            if let Ok(mut hashes) = cached_imported_block_hashes.lock() {
-                                hashes.contains_key(&block_hash)
-                            } else {
-                                warn!(target: "sync", "imported_block_hashes lock failed");
-                                false
-                            };
 
-                        if !is_downloaded && !is_imported {
-                            // hashes.put_slice(&block_hash);
+                        // ignore the block if its body is already downloaded or imported
+                        if !storage.is_block_hash_downloaded(&block_hash)
+                            && !storage.is_block_hash_imported(&block_hash)
+                        {
                             headers.push(header.clone());
                         }
                     }
@@ -264,7 +241,6 @@ pub fn receive_res(
         p2p.update_node(&hash);
         if let Ok(mut downloaded_headers) = downloaded_headers.lock() {
             downloaded_headers.push_back(header_wrapper);
-        // bodies::send(p2p.clone(), hash, hashes);
         } else {
             println!("!!!!!!!!!!!!!")
         }
@@ -273,6 +249,7 @@ pub fn receive_res(
     }
 }
 
+/// Filter candidates to sync from based on total difficulty and syncing cool down
 fn filter_nodes_to_sync_headers(
     nodes: Vec<Node>,
     nodes_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
@@ -299,6 +276,7 @@ fn filter_nodes_to_sync_headers(
     }
 }
 
+/// Pick a random node
 fn pick_random_node(nodes: &Vec<Node>) -> Option<Node> {
     let count = nodes.len();
     if count > 0 {
