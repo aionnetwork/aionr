@@ -85,7 +85,7 @@ pub struct Sync {
     p2p: Mgr,
 
     /// Sync local storage cache
-    storage: SyncStorage,
+    storage: Arc<SyncStorage>,
 
     /// active nodes info
     node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
@@ -152,7 +152,7 @@ impl Sync {
             client,
             p2p: Mgr::new(config, token_rules),
             runtime: Arc::new(Runtime::new().expect("tokio runtime")),
-            storage: SyncStorage::new(),
+            storage: Arc::new(SyncStorage::new()),
             node_info: Arc::new(RwLock::new(HashMap::new())),
             _local_best_td: Arc::new(RwLock::new(local_best_td)),
             _local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
@@ -582,7 +582,7 @@ impl Callable for Sync {
                     p2p,
                     hash,
                     cb,
-                    self.storage.downloaded_headers(),
+                    self.storage.clone(),
                     downloaded_hashes,
                     imported_hashes,
                 )
