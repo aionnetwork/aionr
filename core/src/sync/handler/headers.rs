@@ -187,8 +187,6 @@ pub fn receive_res(
     let mut prev_header = Header::new();
     let mut header_wrapper = HeaderWrapper::new();
     let mut headers = Vec::new();
-    // let mut hashes = Vec::new();
-
     for header_rlp in rlp.iter() {
         if let Ok(header) = header_rlp.as_val() {
             let result = UnityEngine::validate_block_header(&header);
@@ -238,7 +236,6 @@ pub fn receive_res(
                             };
 
                         if !is_downloaded && !is_imported {
-                            // hashes.put_slice(&block_hash);
                             headers.push(header.clone());
                         }
                     }
@@ -261,7 +258,6 @@ pub fn receive_res(
         p2p.update_node(&hash);
         if let Ok(mut downloaded_headers) = downloaded_headers.lock() {
             downloaded_headers.push_back(header_wrapper);
-        // bodies::send(p2p.clone(), hash, hashes);
         } else {
             println!("!!!!!!!!!!!!!")
         }

@@ -19,7 +19,7 @@
  *
  ******************************************************************************/
 
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashMap};
 use std::sync::Mutex;
 
 use sync::wrappers::{HeaderWrapper, BlockWrapper};
@@ -30,6 +30,9 @@ pub struct SyncStorage {
 
     /// Downloaded blocks wrappers
     pub downloaded_blocks: Mutex<VecDeque<BlockWrapper>>,
+
+    /// headers wrappers map for coming bodies
+    pub headers_with_bodies_request: Mutex<HashMap<u64, HeaderWrapper>>,
 }
 
 impl SyncStorage {
@@ -37,6 +40,7 @@ impl SyncStorage {
         SyncStorage {
             downloaded_headers: Mutex::new(VecDeque::new()),
             downloaded_blocks: Mutex::new(VecDeque::new()),
+            headers_with_bodies_request: Mutex::new(HashMap::new()),
         }
     }
 

@@ -125,13 +125,12 @@ impl Mgr {
             tokens_rule.insert(pair[1], pair[0]);
         }
 
+        let p2p_rule_base =
+            ((VERSION::V0.value() as u32) << 16) + ((MODULE::P2P.value() as u32) << 8);
+
         tokens_rule.insert(
-            ((VERSION::V0.value() as u32) << 16)
-                + ((MODULE::P2P.value() as u32) << 8)
-                + ACTION::ACTIVENODESRES.value() as u32,
-            ((VERSION::V0.value() as u32) << 16)
-                + ((MODULE::P2P.value() as u32) << 8)
-                + ACTION::ACTIVENODESREQ.value() as u32,
+            p2p_rule_base + ACTION::ACTIVENODESRES.value() as u32,
+            p2p_rule_base + ACTION::ACTIVENODESREQ.value() as u32,
         );
 
         Mgr {

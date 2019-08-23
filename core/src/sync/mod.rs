@@ -31,8 +31,8 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 use std::time::Instant;
 use itertools::Itertools;
-// use std::time::SystemTime;
-use std::collections::HashMap;
+use std::time::SystemTime;
+use std::collections::{HashMap};
 use std::thread;
 use client::BlockChainClient;
 // use client::BlockId;
@@ -45,7 +45,7 @@ use futures::Stream;
 use lru_cache::LruCache;
 use tokio::runtime::Runtime;
 use tokio::timer::Interval;
-//use bytes::BufMut;
+use bytes::BufMut;
 //use byteorder::{BigEndian,ByteOrder};
 
 use p2p::ChannelBuffer;
@@ -70,7 +70,7 @@ const _BLOCKS_IMPORT_INTERVAL: u64 = 50;
 const _BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const INTERVAL_STATUS: u64 = 5000;
 const INTERVAL_HEADERS: u64 = 100;
-// const INTERVAL_BODIES: u64 = 2;
+const INTERVAL_BODIES: u64 = 2;
 const INTERVAL_STATISICS: u64 = 5;
 const MAX_TX_CACHE: usize = 20480;
 const MAX_BLOCK_CACHE: usize = 32;
@@ -85,7 +85,7 @@ pub struct Sync {
     p2p: Mgr,
 
     /// Sync local storage cache
-    storage: SyncStorage,
+    storage: Arc<SyncStorage>,
 
     /// active nodes info
     node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
@@ -122,29 +122,19 @@ impl Sync {
         let config = Arc::new(config);
 
         let mut token_rules: Vec<[u32; 2]> = vec![];
+        let sync_rule_base =
+            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8);
         token_rules.push([
-            ((VERSION::V0.value() as u32) << 16)
-                + ((MODULE::SYNC.value() as u32) << 8)
-                + ACTION::STATUSREQ.value() as u32,
-            ((VERSION::V0.value() as u32) << 16)
-                + ((MODULE::SYNC.value() as u32) << 8)
-                + ACTION::STATUSRES.value() as u32,
+            sync_rule_base + ACTION::STATUSREQ.value() as u32,
+            sync_rule_base + ACTION::STATUSRES.value() as u32,
         ]);
         token_rules.push([
-            ((VERSION::V0.value() as u32) << 16)
-                + ((MODULE::SYNC.value() as u32) << 8)
-                + ACTION::HEADERSREQ.value() as u32,
-            ((VERSION::V0.value() as u32) << 16)
-                + ((MODULE::SYNC.value() as u32) << 8)
-                + ACTION::HEADERSRES.value() as u32,
+            sync_rule_base + ACTION::HEADERSREQ.value() as u32,
+            sync_rule_base + ACTION::HEADERSRES.value() as u32,
         ]);
         token_rules.push([
-            ((VERSION::V0.value() as u32) << 16)
-                + ((MODULE::SYNC.value() as u32) << 8)
-                + ACTION::BODIESREQ.value() as u32,
-            ((VERSION::V0.value() as u32) << 16)
-                + ((MODULE::SYNC.value() as u32) << 8)
-                + ACTION::BODIESRES.value() as u32,
+            sync_rule_base + ACTION::BODIESREQ.value() as u32,
+            sync_rule_base + ACTION::BODIESRES.value() as u32,
         ]);
 
         Sync {
@@ -152,7 +142,7 @@ impl Sync {
             client,
             p2p: Mgr::new(config, token_rules),
             runtime: Arc::new(Runtime::new().expect("tokio runtime")),
-            storage: SyncStorage::new(),
+            storage: Arc::new(SyncStorage::new()),
             node_info: Arc::new(RwLock::new(HashMap::new())),
             _local_best_td: Arc::new(RwLock::new(local_best_td)),
             _local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
@@ -182,53 +172,53 @@ impl Sync {
         let executor_statics = executor.clone();
         let p2p_statics = p2p.clone();
         executor_statics.spawn(
-             Interval::new(
-                 Instant::now(),
-                 Duration::from_secs(INTERVAL_STATISICS)
-             ).for_each(move |_| {
-                 let (total_len,active_nodes) = p2p_statics.get_statics_info();
-                 {
-                     let active_len = active_nodes.len();
-                     info!(target: "sync", "total/active {}/{}", total_len, active_len);
+            Interval::new(
+                Instant::now(),
+                Duration::from_secs(INTERVAL_STATISICS)
+            ).for_each(move |_| {
+                let (total_len, active_nodes) = p2p_statics.get_statics_info();
+                {
+                    let active_len = active_nodes.len();
+                    info!(target: "sync", "total/active {}/{}", total_len, active_len);
 
-                     info!(target: "sync", "{:-^127}", "");
-                     info!(target: "sync", "              td         bn          bh                    addr                 rev      conn  seed");
-                     info!(target: "sync", "{:-^127}", "");
+                    info!(target: "sync", "{:-^127}", "");
+                    info!(target: "sync", "              td         bn          bh                    addr                 rev      conn  seed");
+                    info!(target: "sync", "{:-^127}", "");
 
-                     if active_len > 0 {
-                         if let Ok(nodes) = node_info.read()
-                             {
-                                 for (hash, info) in nodes.iter()
-                                     .sorted_by(|a, b|
-                                         if a.1.total_difficulty != b.1.total_difficulty {
-                                             b.1.total_difficulty.cmp(&a.1.total_difficulty)
-                                         } else {
-                                             b.1.best_block_number.cmp(&a.1.best_block_number)
-                                         })
-                                     .iter()
-                                {
-                                     if let Some((addr, revision, connection, seed)) = active_nodes.get(*hash) {
-                                         info!(target: "sync",
-                                               "{:>18}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}",
-                                               info.total_difficulty,
-                                               info.best_block_number,
-                                               format!("{}", info.best_block_hash),
-                                               addr,
-                                               revision,
-                                               connection,
-                                               seed
-                                         );
-                                     }
-                                 }
-                             }
-                     }
+                    if active_len > 0 {
+                        if let Ok(nodes) = node_info.read()
+                            {
+                                for (hash, info) in nodes.iter()
+                                    .sorted_by(|a, b|
+                                        if a.1.total_difficulty != b.1.total_difficulty {
+                                            b.1.total_difficulty.cmp(&a.1.total_difficulty)
+                                        } else {
+                                            b.1.best_block_number.cmp(&a.1.best_block_number)
+                                        })
+                                    .iter()
+                                    {
+                                        if let Some((addr, revision, connection, seed)) = active_nodes.get(*hash) {
+                                            info!(target: "sync",
+                                                  "{:>18}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}",
+                                                  info.total_difficulty,
+                                                  info.best_block_number,
+                                                  format!("{}", info.best_block_hash),
+                                                  addr,
+                                                  revision,
+                                                  connection,
+                                                  seed
+                                            );
+                                        }
+                                    }
+                            }
+                    }
 
-                     info!(target: "sync", "{:-^127}", "");
-                 }
+                    info!(target: "sync", "{:-^127}", "");
+                }
 
-                 Ok(())
-             }).map_err(|err| error!(target: "sync", "executor statics: {:?}", err))
-         );
+                Ok(())
+            }).map_err(|err| error!(target: "sync", "executor statics: {:?}", err))
+        );
 
         // status thread
         let p2p_status = p2p.clone();
@@ -284,48 +274,77 @@ impl Sync {
         //                .map_err(|err| error!(target: "sync", "executor headers: {:?}", err)),
         //        );
 
-        //        let executor_bodies = executor.clone();
-        //        let queue2 = self.queue.clone();
-        //        let p2p_3 = p2p.clone();
-        //        executor_bodies.spawn(
-        //            Interval::new(Instant::now(), Duration::from_secs(INTERVAL_BODIES))
-        //                .for_each(move |_| {
-        //                    if let Ok(mut queue) = queue2.try_write() {
-        //                        if let Some((num, wrapper)) = queue
-        //                            .clone()
-        //                            .iter()
-        //                            .filter(|(_, w)| {
-        //                                w.with_status.value() == 0
-        //                            })
-        //                            .next()
-        //                            {
-        //                                match wrapper.with_status {
-        //                                    WithStatus::GetHeader(ref hw) => {
-        //                                        let mut cb = ChannelBuffer::new();
-        //                                        cb.head.ver = VERSION::V0.value();
-        //                                        cb.head.ctrl = MODULE::SYNC.value();
-        //                                        cb.head.action = ACTION::BODIESREQ.value();
-        //                                        for h in hw.clone() {
-        //                                            let rlp = UntrustedRlp::new(&h);
-        //                                            let header: Header =
-        //                                                rlp.as_val().expect("should not be err");
-        //                                            cb.body.put_slice(&header.hash());
-        //                                        }
-        //                                        cb.head.len = cb.body.len() as u32;
-        //                                        p2p_3.send(p2p_3.clone(), num.clone(), cb);
-        //                                        if let Some(w) = queue.get_mut(num) {
-        //                                            (*w).timestamp = SystemTime::now();
-        //                                            (*w).with_status = WithStatus::WaitForBody(hw.clone());
-        //                                        };
-        //                                    }
-        //                                    _ => (),
-        //                                };
-        //                            }
-        //                    }
-        //                    Ok(())
-        //                })
-        //                .map_err(|err| error!(target: "sync", "executor bodies: {:?}", err)),
-        //        );
+        let executor_bodies = executor.clone();
+        let storage = self.storage.clone();
+        let cached_downloaded = self.cached_downloaded_block_hashes.clone();
+        let cached_imported = self.cached_imported_block_hashes.clone();
+        let p2p_3 = p2p.clone();
+        executor_bodies.spawn(
+            Interval::new(Instant::now(), Duration::from_secs(INTERVAL_BODIES))
+                .for_each(move |_| {
+                    let mut req = ChannelBuffer::new();
+                    req.head.ver = VERSION::V0.value();
+                    req.head.ctrl = MODULE::SYNC.value();
+                    req.head.action = ACTION::BODIESREQ.value();
+
+                    let mut hws = Vec::new();
+                    if let Ok(mut downloaded_headers) = storage.downloaded_headers.try_lock() {
+                        while let Some(hw) = downloaded_headers.pop_front() {
+                            if !hw.headers.is_empty() {
+                                hws.push(hw);
+                            }
+                        }
+                    }
+                    for hw in hws.iter() {
+                        let mut req = req.clone();
+                        req.body.clear();
+
+                        let mut header_requested = Vec::new();
+                        for header in hw.headers.iter() {
+                            let is_downloaded = if let Ok(mut hashes) = cached_downloaded.lock() {
+                                hashes.contains_key(&header.hash())
+                            } else {
+                                warn!(target: "sync", "downloaded_block_hashes lock failed");
+                                false
+                            };
+                            let is_imported = if let Ok(mut hashes) = cached_imported.lock() {
+                                hashes.contains_key(&header.hash())
+                            } else {
+                                warn!(target: "sync", "imported_block_hashes lock failed");
+                                false
+                            };
+                            if !is_downloaded && !is_imported {
+                                req.body.put_slice(&header.hash());
+                                header_requested.push(header.clone());
+                            }
+                        }
+
+                        let body_len = req.body.len();
+                        if body_len > 0 {
+                            if let Ok(ref mut headers_with_bodies_requested) =
+                                storage.headers_with_bodies_request.lock()
+                            {
+                                if !headers_with_bodies_requested.contains_key(&hw.node_hash) {
+                                    req.head.len = body_len as u32;
+                                    println!("hash:{}", hw.node_hash);
+                                    p2p_3.send(hw.node_hash, req);
+
+                                    trace!(target: "sync", "Sync blocks bodies req sent...");
+                                    let mut hw = hw.clone();
+                                    hw.timestamp = SystemTime::now();
+                                    hw.headers.clear();
+                                    hw.headers.extend(header_requested);
+                                    headers_with_bodies_requested.insert(hw.node_hash, hw);
+                                } else {
+                                    println!("node is busy")
+                                }
+                            }
+                        }
+                    }
+                    Ok(())
+                })
+                .map_err(|err| error!(target: "sync", "executor bodies: {:?}", err)),
+        );
 
         //        let executor_import = executor.clone();
         //        executor_bodies.spawn(
@@ -609,9 +628,9 @@ impl Callable for Sync {
             node_info.remove(&hash);
         }
 
+        if let Ok(mut headers) = self.storage.headers_with_bodies_request.lock() {
+            headers.remove(&hash);
+        }
         // TODO-SYNC: remove downloaded headers with given node hash
-        // if let Ok(mut headers) = self.headers.write() {
-        //     headers.remove(&hash);
-        // }
     }
 }
