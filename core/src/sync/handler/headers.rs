@@ -51,10 +51,15 @@ pub fn sync_headers(
 {
     let active_nodes = p2p.get_active_nodes();
     let candidates: Vec<Node> =
-        filter_nodes_to_sync_headers(active_nodes, nodes_info, local_total_diff);
+        filter_nodes_to_sync_headers(active_nodes, nodes_info.clone(), local_total_diff);
     if let Some(candidate) = pick_random_node(&candidates) {
         let candidate_hash = candidate.get_hash();
         prepare_send(p2p, candidate_hash, local_best_block_number);
+        if let Ok(mut node_info_write) = nodes_info.write() {
+            if let Some(node_info_mut) = node_info_write.get_mut(&candidate_hash) {
+                node_info_mut.last_headers_request_time = SystemTime::now();
+            }
+        }
     }
 }
 

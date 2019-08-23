@@ -18,10 +18,8 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
-use std::collections::{HashMap, VecDeque};
-use std::sync::{Mutex /*, RwLock*/
-};
+use std::collections::{VecDeque, HashMap};
+use std::sync::Mutex;
 
 use lru_cache::LruCache;
 
