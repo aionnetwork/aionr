@@ -54,24 +54,25 @@ pub fn sync_headers(
         filter_nodes_to_sync_headers(active_nodes, nodes_info.clone(), local_total_diff);
     if let Some(candidate) = pick_random_node(&candidates) {
         let candidate_hash = candidate.get_hash();
-        prepare_send(p2p, candidate_hash, local_best_block_number);
-        if let Ok(mut node_info_write) = nodes_info.write() {
-            if let Some(node_info_mut) = node_info_write.get_mut(&candidate_hash) {
-                node_info_mut.last_headers_request_time = SystemTime::now();
+        if prepare_send(p2p, candidate_hash, local_best_block_number) {
+            if let Ok(mut node_info_write) = nodes_info.write() {
+                if let Some(node_info_mut) = node_info_write.get_mut(&candidate_hash) {
+                    node_info_mut.last_headers_request_time = SystemTime::now();
+                }
             }
         }
     }
 }
 
-fn prepare_send(p2p: Mgr, hash: u64, best_num: u64 /*mode:Mode*/) {
+fn prepare_send(p2p: Mgr, hash: u64, best_num: u64 /*mode:Mode*/) -> bool {
     // TODO mode match
     let start = if best_num > 3 { best_num - 3 } else { 1 };
     let size = NORMAL_REQUEST_SIZE;
 
-    send(p2p.clone(), hash, start, size);
+    send(p2p.clone(), hash, start, size)
 }
 
-fn send(p2p: Mgr, hash: u64, start: u64, size: u32) {
+fn send(p2p: Mgr, hash: u64, start: u64, size: u32) -> bool {
     debug!(target:"sync","headers.rs/send: start {}, size: {}, node hash: {}", start, size, hash);
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
@@ -87,7 +88,7 @@ fn send(p2p: Mgr, hash: u64, start: u64, size: u32) {
     cb.body.put_slice(&size_buf);
 
     cb.head.len = cb.body.len() as u32;
-    p2p.send(hash, cb);
+    p2p.send(hash, cb)
 }
 
 // pub fn send(
