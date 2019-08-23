@@ -601,7 +601,7 @@ impl Callable for Sync {
                     p2p,
                     hash,
                     cb,
-                    self.storage.downloaded_headers(),
+                    self.storage.clone(),
                     downloaded_hashes,
                     imported_hashes,
                 )

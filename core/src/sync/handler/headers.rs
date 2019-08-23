@@ -36,6 +36,7 @@ use p2p::{ChannelBuffer, Mgr, Node};
 use sync::route::{VERSION, MODULE, ACTION};
 use sync::wrappers::{HeaderWrapper};
 use sync::node_info::NodeInfo;
+use sync::storage::SyncStorage;
 use rand::{thread_rng, Rng};
 
 pub const NORMAL_REQUEST_SIZE: u32 = 24;
@@ -181,12 +182,14 @@ pub fn receive_res(
     p2p: Mgr,
     hash: u64,
     cb_in: ChannelBuffer,
-    downloaded_headers: &Mutex<VecDeque<HeaderWrapper>>,
+    storage: Arc<SyncStorage>,
     cached_downloaded_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
     cached_imported_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 )
 {
     trace!(target: "sync", "headers/receive_res");
+
+    let downloaded_headers: &Mutex<VecDeque<HeaderWrapper>> = storage.downloaded_headers();
 
     let rlp = UntrustedRlp::new(cb_in.body.as_slice());
     let mut prev_header = Header::new();
