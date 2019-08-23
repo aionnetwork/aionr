@@ -34,10 +34,7 @@ use itertools::Itertools;
 // use std::time::SystemTime;
 use std::collections::{HashMap};
 use std::thread;
-use client::BlockChainClient;
-// use client::BlockId;
-// use client::BlockStatus;
-use client::ChainNotify;
+use client::{BlockId, BlockChainClient, BlockStatus, ChainNotify};
 // use transaction::UnverifiedTransaction;
 use aion_types::{H256,U256};
 use futures::Future;
@@ -59,7 +56,7 @@ use sync::handler::status;
 use sync::handler::bodies;
 use sync::handler::headers;
 // use sync::handler::broadcast;
-// use sync::handler::import;
+use sync::handler::import;
 use sync::node_info::NodeInfo;
 use sync::storage::SyncStorage;
 
@@ -247,7 +244,7 @@ impl Sync {
                 .map_err(|err| error!(target: "sync", "executor header: {:?}", err)),
         );
 
-        // sync headers thread
+        // sync bodies thread
         let p2p_body = p2p.clone();
         let executor_body = executor.clone();
         let storage_body = self.storage.clone();
@@ -258,6 +255,19 @@ impl Sync {
                     Ok(())
                 })
                 .map_err(|err| error!(target: "sync", "executor body: {:?}", err)),
+        );
+
+        // import thread
+        let executor_import = executor.clone();
+        let client_import = self.client.clone();
+        let storage_import = self.storage.clone();
+        executor_import.spawn(
+            Interval::new(Instant::now(), Duration::from_millis(INTERVAL_BODIES))
+                .for_each(move |_| {
+                    import::import_blocks(client_import.clone(), storage_import.clone());
+                    Ok(())
+                })
+                .map_err(|err| error!(target: "sync", "executor import: {:?}", err)),
         );
 
         //        let executor_headers = executor.clone();
@@ -475,11 +485,11 @@ impl SyncProvider for Sync {
 impl ChainNotify for Sync {
     fn new_blocks(
         &self,
-        _imported: Vec<H256>,
+        imported: Vec<H256>,
         _invalid: Vec<H256>,
         _enacted: Vec<H256>,
         _retracted: Vec<H256>,
-        _sealed: Vec<H256>,
+        sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
         _duration: u64,
     )
@@ -488,69 +498,66 @@ impl ChainNotify for Sync {
         //     return;
         // }
 
-        // if !imported.is_empty() {
-        //     let client = self.client.clone();
-        //     let chain_info = client.chain_info();
-        //     let min_imported_block_number = chain_info.best_block_number + 1;
-        //     let mut max_imported_block_number = 0;
-        //     for hash in imported.iter() {
-        //         let block_id = BlockId::Hash(*hash);
-        //         if client.block_status(block_id) == BlockStatus::InChain {
-        //             if let Some(block_number) = client.block_number(block_id) {
-        //                 if max_imported_block_number < block_number {
-        //                     max_imported_block_number = block_number;
-        //                 }
-        //             }
-        //         }
-        //     }
+        // TODO: to think whether we still need to do the following or not.
+        if !imported.is_empty() {
+            let client = self.client.clone();
+            let chain_info = client.chain_info();
+            let min_imported_block_number = chain_info.best_block_number + 1;
+            let mut max_imported_block_number = 0;
+            for hash in imported {
+                let block_id = BlockId::Hash(hash);
+                if client.block_status(block_id) == BlockStatus::InChain {
+                    if let Some(block_number) = client.block_number(block_id) {
+                        if max_imported_block_number < block_number {
+                            max_imported_block_number = block_number;
+                        }
+                    }
+                }
+            }
 
-        //     // The imported blocks are not new or not yet in chain. Do not notify in this case.
-        //     if max_imported_block_number < min_imported_block_number {
-        //         return;
-        //     }
+            // The imported blocks are not new or not yet in chain. Do not notify in this case.
+            if max_imported_block_number < min_imported_block_number {
+                return;
+            }
 
-        //     let synced_block_number = chain_info.best_block_number;
-        //     if max_imported_block_number <= synced_block_number {
-        //         let mut hashes = Vec::new();
-        //         for block_number in max_imported_block_number..synced_block_number + 1 {
-        //             let block_id = BlockId::Number(block_number);
-        //             if let Some(block_hash) = client.block_hash(block_id) {
-        //                 hashes.push(block_hash);
-        //             }
-        //         }
-        //         if hashes.len() > 0 {
-        //             SyncStorage::remove_imported_block_hashes(hashes);
-        //         }
-        //     }
+            // TODO: to understand why we need to do this
+            // let synced_block_number = chain_info.best_block_number;
+            // if max_imported_block_number <= synced_block_number {
+            //     let mut hashes = Vec::new();
+            //     for block_number in max_imported_block_number..synced_block_number + 1 {
+            //         let block_id = BlockId::Number(block_number);
+            //         if let Some(block_hash) = client.block_hash(block_id) {
+            //             hashes.push(block_hash);
+            //         }
+            //     }
+            //     if hashes.len() > 0 {
+            //         SyncStorage::remove_imported_block_hashes(hashes);
+            //     }
+            // }
 
-        //     SyncStorage::set_synced_block_number(max_imported_block_number);
+            for block_number in min_imported_block_number..max_imported_block_number + 1 {
+                let block_id = BlockId::Number(block_number);
+                if let Some(blk) = client.block(block_id) {
+                    let block_hash = blk.hash();
+                    info!(target: "sync",
+                            "New block #{} {}, with {} txs added in chain.",
+                            block_number, block_hash, blk.transactions_count());
+                    // import::import_staged_blocks(&block_hash);
+                    // if let Some(time) = SyncStorage::get_requested_time(&block_hash) {
+                    //     info!(target: "sync",
+                    //         "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
+                    //         block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
+                    // }
+                }
+            }
+        }
 
-        //     for block_number in min_imported_block_number..max_imported_block_number + 1 {
-        //         let block_id = BlockId::Number(block_number);
-        //         if let Some(blk) = client.block(block_id) {
-        //             let block_hash = blk.hash();
-        //             // import::import_staged_blocks(&block_hash);
-        //             if let Some(time) = SyncStorage::get_requested_time(&block_hash) {
-        //                 info!(target: "sync",
-        //                     "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
-        //                     block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
-        //             }
-        //         }
-        //     }
-        // }
-
-        // if enacted.is_empty() {
-        //     for hash in enacted.iter() {
-        //         debug!(target: "sync", "enacted hash: {:?}", hash);
-        //         // import::import_staged_blocks(&hash);
-        //     }
-        // }
-
-        // if !sealed.is_empty() {
-        //     debug!(target: "sync", "Propagating blocks...");
-        //     SyncStorage::insert_imported_block_hashes(sealed.clone());
-        //     // broadcast::propagate_blocks(sealed.index(0), SyncStorage::get_block_chain());
-        // }
+        if !sealed.is_empty() {
+            debug!(target: "sync", "Propagating blocks...");
+            self.storage.insert_imported_block_hashes(sealed.clone());
+            // TODO: enable broadcast after implemention done
+            // broadcast::propagate_blocks(sealed.index(0), SyncStorage::get_block_chain());
+        }
     }
 
     fn start(&self) {
