@@ -66,13 +66,11 @@ use sync::storage::SyncStorage;
 pub fn import_blocks(client: Arc<BlockChainClient>, storage: Arc<SyncStorage>) {
     // Get downloaded blocks
     let mut downloaded_blocks = Vec::new();
-    if let Ok(mut blocks_wrappers) = storage.downloaded_blocks().lock() {
-        while let Some(blocks_wrapper) = blocks_wrappers.pop_front() {
-            downloaded_blocks.push(blocks_wrapper);
-        }
-    } else {
-        warn!(target: "sync", "import_block fail to get downloaded blocks.");
+    let mut blocks_wrappers = storage.downloaded_blocks().lock();
+    while let Some(blocks_wrapper) = blocks_wrappers.pop_front() {
+        downloaded_blocks.push(blocks_wrapper);
     }
+    drop(blocks_wrappers);
 
     // Import blocks for each batch
     for blocks_wrapper in downloaded_blocks {

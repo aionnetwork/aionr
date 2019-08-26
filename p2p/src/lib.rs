@@ -162,7 +162,8 @@ impl Mgr {
     pub fn send(&self, hash: u64, cb: ChannelBuffer) -> bool {
         let nodes = &self.nodes;
         trace!(target: "p2p", "send: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
-        match nodes.try_write() {
+        // TODO: need more thoughts on write or try_write
+        match nodes.write() {
             Ok(mut lock) => {
                 let mut flag = true;
                 if let Some(mut node) = lock.get_mut(&hash) {

@@ -27,7 +27,7 @@ mod storage;
 #[cfg(test)]
 mod test;
 
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 use itertools::Itertools;
@@ -44,6 +44,7 @@ use tokio::runtime::Runtime;
 use tokio::timer::Interval;
 use futures::sync::oneshot;
 use futures::sync::oneshot::Sender;
+use parking_lot::{Mutex, RwLock};
 // use bytes::BufMut;
 //use byteorder::{BigEndian,ByteOrder};
 
@@ -180,13 +181,12 @@ impl Sync {
 
                     if active_len > 0 {
                         let mut nodes_info = HashMap::new();
-                        if let Ok(nodes) = node_info.read() {
-                            for (hash, info_lock) in nodes.iter() {
-                                if let Ok(info) = info_lock.read() {
-                                    nodes_info.insert(hash.clone(), info.clone());
-                                }
-                            }
+                        let nodes = node_info.read();
+                        for (hash, info_lock) in nodes.iter() {
+                            let info = info_lock.read();
+                            nodes_info.insert(hash.clone(), info.clone());
                         }
+                        drop(nodes);
 
 
                         for (hash, info) in nodes_info.iter()
@@ -285,10 +285,8 @@ impl Sync {
         // bind shutdown hook
         let (tx, rx) = oneshot::channel::<()>();
         {
-            match self.shutdown_hook.write() {
-                Ok(mut guard) => *guard = Some(tx),
-                Err(_error) => {}
-            }
+            let mut guard = self.shutdown_hook.write();
+            *guard = Some(tx);
         }
 
         // clear
@@ -305,16 +303,15 @@ impl Sync {
     pub fn shutdown(&self) {
         &self.p2p.shutdown();
         info!(target:"sync", "sync shutdown start");
-        if let Ok(mut lock) = self.shutdown_hook.write() {
-            if lock.is_some() {
-                let tx = lock.take().unwrap();
-                match tx.send(()) {
-                    Ok(_) => {
-                        debug!(target: "sync", "shutdown signal sent");
-                    }
-                    Err(err) => {
-                        error!(target: "sync", "shutdown: {:?}", err);
-                    }
+        let mut lock = self.shutdown_hook.write();
+        if lock.is_some() {
+            let tx = lock.take().unwrap();
+            match tx.send(()) {
+                Ok(_) => {
+                    debug!(target: "sync", "shutdown signal sent");
+                }
+                Err(err) => {
+                    error!(target: "sync", "shutdown: {:?}", err);
                 }
             }
         }
@@ -537,16 +534,16 @@ impl Callable for Sync {
     }
 
     fn disconnect(&self, hash: u64) {
-        if let Ok(mut node_info) = self.node_info.write() {
-            node_info.remove(&hash);
-        }
+        let mut node_info = self.node_info.write();
+        node_info.remove(&hash);
+        drop(node_info);
 
-        if let Ok(mut headers) = self.storage.headers_with_bodies_requested().lock() {
-            headers.remove(&hash);
-        }
+        let mut headers = self.storage.headers_with_bodies_requested().lock();
+        headers.remove(&hash);
+        drop(headers);
+
         // TODO-SYNC: remove downloaded headers with given node hash
-        if let Ok(mut headers) = self.storage.downloaded_headers().lock() {
-            headers.retain(|x| x.node_hash != hash);
-        }
+        let mut headers = self.storage.downloaded_headers().lock();
+        headers.retain(|x| x.node_hash != hash);
     }
 }

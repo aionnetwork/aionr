@@ -21,8 +21,11 @@
 
 use std::mem;
 use std::time::{SystemTime, Duration};
-use std::sync::{Arc, RwLock, Mutex};
+use std::sync::Arc;
 use std::collections::{HashMap, VecDeque};
+
+use parking_lot::{Mutex, RwLock};
+
 use engine::unity_engine::UnityEngine;
 use header::Header;
 use acore_bytes::to_hex;
@@ -50,17 +53,19 @@ pub fn sync_headers(
 )
 {
     let active_nodes = p2p.get_active_nodes();
+    // Filter nodes. Only sync from nodes with higher total difficulty and with a cooldown restriction.
     let candidates: Vec<Node> =
         filter_nodes_to_sync_headers(active_nodes, nodes_info.clone(), local_total_diff);
+    // Pick a random node among all candidates
     if let Some(candidate) = pick_random_node(&candidates) {
         let candidate_hash = candidate.get_hash();
-        if let Ok(nodes_info_read) = nodes_info.read() {
-            if let Some(node_info_lock) = nodes_info_read.get(&candidate_hash) {
-                if let Ok(mut node_info) = node_info_lock.write() {
-                    if prepare_send(p2p, candidate_hash, &*node_info, local_best_block_number) {
-                        node_info.last_headers_request_time = SystemTime::now();
-                    }
-                }
+        let nodes_info_read = nodes_info.read();
+        if let Some(node_info_lock) = nodes_info_read.get(&candidate_hash) {
+            let mut node_info = node_info_lock.write();
+            // Send header request
+            if prepare_send(p2p, candidate_hash, &node_info, local_best_block_number) {
+                // Update cooldown time after request succesfully sent
+                node_info.last_headers_request_time = SystemTime::now();
             }
         }
     }
@@ -253,11 +258,8 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
         header_wrapper.headers = headers;
         header_wrapper.timestamp = SystemTime::now();
         p2p.update_node(&hash);
-        if let Ok(mut downloaded_headers) = downloaded_headers.lock() {
-            downloaded_headers.push_back(header_wrapper);
-        } else {
-            println!("!!!!!!!!!!!!!")
-        }
+        let mut downloaded_headers = downloaded_headers.lock();
+        downloaded_headers.push_back(header_wrapper);
     } else {
         debug!(target: "sync", "Came too late............");
     }
@@ -271,29 +273,22 @@ fn filter_nodes_to_sync_headers(
 ) -> Vec<Node>
 {
     let time_now = SystemTime::now();
-    match nodes_info.read() {
-        Ok(nodes_info_read) => {
-            nodes
-                .into_iter()
-                .filter(|node| {
-                    let node_hash = node.get_hash();
-                    nodes_info_read
-                        .get(&node_hash)
-                        .map_or(false, |node_info_lock| {
-                            if let Ok(node_info) = node_info_lock.read() {
-                                &node_info.total_difficulty > local_total_diff
-                                    && node_info.last_headers_request_time
-                                        + Duration::from_millis(REQUEST_COOLDOWN)
-                                        <= time_now
-                            } else {
-                                false
-                            }
-                        })
+    let nodes_info_read = nodes_info.read();
+    nodes
+        .into_iter()
+        .filter(|node| {
+            let node_hash = node.get_hash();
+            nodes_info_read
+                .get(&node_hash)
+                .map_or(false, |node_info_lock| {
+                    let node_info = node_info_lock.read();
+                    &node_info.total_difficulty > local_total_diff
+                        && node_info.last_headers_request_time
+                            + Duration::from_millis(REQUEST_COOLDOWN)
+                            <= time_now
                 })
-                .collect()
-        }
-        Err(_) => Vec::new(),
-    }
+        })
+        .collect()
 }
 
 /// Pick a random node
