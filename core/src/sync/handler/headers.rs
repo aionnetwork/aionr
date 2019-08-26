@@ -44,7 +44,7 @@ const REQUEST_COOLDOWN: u64 = 5000;
 
 pub fn sync_headers(
     p2p: Mgr,
-    nodes_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
+    nodes_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
     local_total_diff: &U256,
     local_best_block_number: u64,
 )
@@ -54,17 +54,25 @@ pub fn sync_headers(
         filter_nodes_to_sync_headers(active_nodes, nodes_info.clone(), local_total_diff);
     if let Some(candidate) = pick_random_node(&candidates) {
         let candidate_hash = candidate.get_hash();
-        if prepare_send(p2p, candidate_hash, local_best_block_number) {
-            if let Ok(mut node_info_write) = nodes_info.write() {
-                if let Some(node_info_mut) = node_info_write.get_mut(&candidate_hash) {
-                    node_info_mut.last_headers_request_time = SystemTime::now();
+        if let Ok(nodes_info_read) = nodes_info.read() {
+            if let Some(node_info_lock) = nodes_info_read.get(&candidate_hash) {
+                if let Ok(mut node_info) = node_info_lock.write() {
+                    if prepare_send(p2p, candidate_hash, &*node_info, local_best_block_number) {
+                        node_info.last_headers_request_time = SystemTime::now();
+                    }
                 }
             }
         }
     }
 }
 
-fn prepare_send(p2p: Mgr, hash: u64, best_num: u64 /*mode:Mode*/) -> bool {
+fn prepare_send(
+    p2p: Mgr,
+    hash: u64,
+    mut _node_info: &NodeInfo,
+    best_num: u64, /*mode:Mode*/
+) -> bool
+{
     // TODO mode match
     let start = if best_num > 3 { best_num - 3 } else { 1 };
     let size = NORMAL_REQUEST_SIZE;
@@ -258,7 +266,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
 /// Filter candidates to sync from based on total difficulty and syncing cool down
 fn filter_nodes_to_sync_headers(
     nodes: Vec<Node>,
-    nodes_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
+    nodes_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
     local_total_diff: &U256,
 ) -> Vec<Node>
 {
@@ -269,12 +277,18 @@ fn filter_nodes_to_sync_headers(
                 .into_iter()
                 .filter(|node| {
                     let node_hash = node.get_hash();
-                    nodes_info_read.get(&node_hash).map_or(false, |node_info| {
-                        &node_info.total_difficulty > local_total_diff
-                            && node_info.last_headers_request_time
-                                + Duration::from_millis(REQUEST_COOLDOWN)
-                                <= time_now
-                    })
+                    nodes_info_read
+                        .get(&node_hash)
+                        .map_or(false, |node_info_lock| {
+                            if let Ok(node_info) = node_info_lock.read() {
+                                &node_info.total_difficulty > local_total_diff
+                                    && node_info.last_headers_request_time
+                                        + Duration::from_millis(REQUEST_COOLDOWN)
+                                        <= time_now
+                            } else {
+                                false
+                            }
+                        })
                 })
                 .collect()
         }

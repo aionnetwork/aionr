@@ -87,7 +87,7 @@ pub struct Sync {
     storage: Arc<SyncStorage>,
 
     /// active nodes info
-    node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
+    node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
 
     /// local best td
     _local_best_td: Arc<RwLock<U256>>,
@@ -181,8 +181,10 @@ impl Sync {
                     if active_len > 0 {
                         let mut nodes_info = HashMap::new();
                         if let Ok(nodes) = node_info.read() {
-                            for (hash, info) in nodes.iter() {
-                                nodes_info.insert(hash.clone(), info.clone());
+                            for (hash, info_lock) in nodes.iter() {
+                                if let Ok(info) = info_lock.read() {
+                                    nodes_info.insert(hash.clone(), info.clone());
+                                }
                             }
                         }
 

@@ -32,12 +32,12 @@ use p2p::{ChannelBuffer,  Mgr};
 
 const HASH_LENGTH: usize = 32;
 
-pub fn send_random(p2p: Mgr, node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>) {
+pub fn send_random(p2p: Mgr, node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>) {
     if let Some(hash) = p2p.get_random_active_node_hash() {
         if let Ok(mut node_info) = node_info.write() {
             if !node_info.contains_key(&hash) {
                 trace!(target: "sync", "new node info: hash:{}", hash);
-                node_info.insert(hash, NodeInfo::new());
+                node_info.insert(hash, RwLock::new(NodeInfo::new()));
             }
         }
         send(p2p, hash)
@@ -91,7 +91,7 @@ pub fn receive_req(p2p: Mgr, chain_info: &BlockChainInfo, hash: u64) {
 
 pub fn receive_res(
     p2p: Mgr,
-    node_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
+    node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
     hash: u64,
     cb_in: ChannelBuffer,
 )
@@ -108,14 +108,19 @@ pub fn receive_res(
     let td = U256::from(total_difficulty);
     let bh = H256::from(best_hash);
 
+    // TODO: improve this
     if let Ok(mut node_info_write) = node_info.write() {
         if !node_info_write.contains_key(&hash) {
             trace!(target: "sync", "new node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, bh, td);
         }
-        let mut info = node_info_write.entry(hash).or_insert(NodeInfo::new());
-        info.best_block_hash = bh;
-        info.best_block_number = best_block_num;
-        info.total_difficulty = td;
+        let info_lock = node_info_write
+            .entry(hash)
+            .or_insert(RwLock::new(NodeInfo::new()));
+        if let Ok(mut info) = info_lock.write() {
+            info.best_block_hash = bh;
+            info.best_block_number = best_block_num;
+            info.total_difficulty = td;
+        }
     } else {
         warn!(target: "sync", "status/res cannot get node info map");
     }
