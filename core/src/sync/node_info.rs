@@ -22,6 +22,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use aion_types::{H256, U256};
 
+#[derive(Clone)]
 pub struct NodeInfo {
     /// node total difficulty
     pub total_difficulty: U256,

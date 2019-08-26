@@ -162,6 +162,7 @@ impl Sync {
         let node_info = self.node_info.clone();
         let executor_statics = executor.clone();
         let p2p_statics = p2p.clone();
+        let client_statics = self.client.clone();
         executor_statics.spawn(
             Interval::new(
                 Instant::now(),
@@ -169,38 +170,44 @@ impl Sync {
             ).for_each(move |_| {
                 let (total_len, active_nodes) = p2p_statics.get_statics_info();
                 {
+                    let local_best_number = client_statics.chain_info().best_block_number;
                     let active_len = active_nodes.len();
-                    info!(target: "sync", "total/active {}/{}", total_len, active_len);
+                    info!(target: "sync", "total/active {}/{}  ,local_best_num {}", total_len, active_len, local_best_number);
 
                     info!(target: "sync", "{:-^127}", "");
-                    info!(target: "sync", "              td         bn          bh                    addr                 rev      conn  seed");
+                    info!(target: "sync", "                              td         bn          bh                    addr                 rev      conn  seed");
                     info!(target: "sync", "{:-^127}", "");
 
                     if active_len > 0 {
-                        if let Ok(nodes) = node_info.read()
+                        let mut nodes_info = HashMap::new();
+                        if let Ok(nodes) = node_info.read() {
+                            for (hash, info) in nodes.iter() {
+                                nodes_info.insert(hash.clone(), info.clone());
+                            }
+                        }
+
+
+                        for (hash, info) in nodes_info.iter()
+                            .sorted_by(|a, b|
+                                if a.1.total_difficulty != b.1.total_difficulty {
+                                    b.1.total_difficulty.cmp(&a.1.total_difficulty)
+                                } else {
+                                    b.1.best_block_number.cmp(&a.1.best_block_number)
+                                })
+                            .iter()
                             {
-                                for (hash, info) in nodes.iter()
-                                    .sorted_by(|a, b|
-                                        if a.1.total_difficulty != b.1.total_difficulty {
-                                            b.1.total_difficulty.cmp(&a.1.total_difficulty)
-                                        } else {
-                                            b.1.best_block_number.cmp(&a.1.best_block_number)
-                                        })
-                                    .iter()
-                                    {
-                                        if let Some((addr, revision, connection, seed)) = active_nodes.get(*hash) {
-                                            info!(target: "sync",
-                                                  "{:>16}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}",
-                                                  format!("{}",info.total_difficulty),
-                                            format!("{}",info.best_block_number),
-                                                  format!("{}", info.best_block_hash),
-                                                  addr,
-                                                  revision,
-                                                  connection,
-                                                  seed
-                                            );
-                                        }
-                                    }
+                                if let Some((addr, revision, connection, seed)) = active_nodes.get(*hash) {
+                                    info!(target: "sync",
+                                          "{:>32}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}",
+                                          format!("{}", info.total_difficulty),
+                                          format!("{}", info.best_block_number),
+                                          format!("{}", info.best_block_hash),
+                                          addr,
+                                          revision,
+                                          connection,
+                                          seed
+                                    );
+                                }
                             }
                     }
 
@@ -272,134 +279,6 @@ impl Sync {
                 .map_err(|err| error!(target: "sync", "executor import: {:?}", err)),
         );
 
-        //        let executor_headers = executor.clone();
-        //        let queue1 = self.queue.clone();
-        //        let client = self.client.clone();
-        //        let synced_number = self.cached_synced_block_num.clone();
-        //        let p2p_2 = p2p.clone();
-        //        executor_headers.spawn(
-        //            Interval::new(Instant::now(), Duration::from_secs(INTERVAL_HEADERS))
-        //                .for_each(move |_| {
-        //                    // make it constant
-        //                    let chain_info = client.chain_info();
-        //                    if let Ok(start) = synced_number.read() {
-        //                        headers::send(p2p_2.clone(), *start, &chain_info, queue1.clone());
-        //                    }
-        //                    //                     p2p.get_node_by_td(10);
-        //                    Ok(())
-        //                })
-        //                .map_err(|err| error!(target: "sync", "executor headers: {:?}", err)),
-        //        );
-
-        // let executor_bodies = executor.clone();
-        // let storage = self.storage.clone();
-        // let cached_downloaded = self.cached_downloaded_block_hashes.clone();
-        // let cached_imported = self.cached_imported_block_hashes.clone();
-        // let p2p_3 = p2p.clone();
-        // executor_bodies.spawn(
-        //     Interval::new(Instant::now(), Duration::from_secs(INTERVAL_BODIES))
-        //         .for_each(move |_| {
-        //             let mut req = ChannelBuffer::new();
-        //             req.head.ver = VERSION::V0.value();
-        //             req.head.ctrl = MODULE::SYNC.value();
-        //             req.head.action = ACTION::BODIESREQ.value();
-
-        //             let mut hws = Vec::new();
-        //             if let Ok(mut downloaded_headers) = storage.downloaded_headers.try_lock() {
-        //                 while let Some(hw) = downloaded_headers.pop_front() {
-        //                     if !hw.headers.is_empty() {
-        //                         hws.push(hw);
-        //                     }
-        //                 }
-        //             }
-        //             for hw in hws.iter() {
-        //                 let mut req = req.clone();
-        //                 req.body.clear();
-
-        //                 let mut header_requested = Vec::new();
-        //                 for header in hw.headers.iter() {
-        //                     let is_downloaded = if let Ok(mut hashes) = cached_downloaded.lock() {
-        //                         hashes.contains_key(&header.hash())
-        //                     } else {
-        //                         warn!(target: "sync", "downloaded_block_hashes lock failed");
-        //                         false
-        //                     };
-        //                     let is_imported = if let Ok(mut hashes) = cached_imported.lock() {
-        //                         hashes.contains_key(&header.hash())
-        //                     } else {
-        //                         warn!(target: "sync", "imported_block_hashes lock failed");
-        //                         false
-        //                     };
-        //                     if !is_downloaded && !is_imported {
-        //                         req.body.put_slice(&header.hash());
-        //                         header_requested.push(header.clone());
-        //                     }
-        //                 }
-
-        //                 let body_len = req.body.len();
-        //                 if body_len > 0 {
-        //                     if let Ok(ref mut headers_with_bodies_requested) =
-        //                         storage.headers_with_bodies_request.lock()
-        //                     {
-        //                         if !headers_with_bodies_requested.contains_key(&hw.node_hash) {
-        //                             req.head.len = body_len as u32;
-        //                             println!("hash:{}", hw.node_hash);
-        //                             p2p_3.send(hw.node_hash, req);
-
-        //                             trace!(target: "sync", "Sync blocks bodies req sent...");
-        //                             let mut hw = hw.clone();
-        //                             hw.timestamp = SystemTime::now();
-        //                             hw.headers.clear();
-        //                             hw.headers.extend(header_requested);
-        //                             headers_with_bodies_requested.insert(hw.node_hash, hw);
-        //                         } else {
-        //                             println!("node is busy")
-        //                         }
-        //                     }
-        //                 }
-        //             }
-        //             Ok(())
-        //         })
-        //         .map_err(|err| error!(target: "sync", "executor bodies: {:?}", err)),
-        // );
-
-        //        let executor_import = executor.clone();
-        //        executor_bodies.spawn(
-        //            Interval::new(Instant::now(), Duration::from_secs(INTERVAL_BODIES))
-        //                .for_each(move |_| {
-        //                    if let Ok(mut queue) = queue2.try_write(){
-        //                        if let Some((num,wrapper)) = queue.clone()
-        //                            .iter()
-        //                            .filter(|(_,w)| match w.with_status { WithStatus::GetHeader(_) => true, _ => false })
-        //                            .next()
-        //                            {
-        //                                match wrapper.with_status {
-        //                                    WithStatus::GetHeader(ref hw) => {
-        //                                        let mut cb = ChannelBuffer::new();
-        //                                        cb.head.ver = VERSION::V0.value();
-        //                                        cb.head.ctrl = MODULE::SYNC.value();
-        //                                        cb.head.action = ACTION::BODIESREQ.value();
-        //                                        for h in hw.clone() {
-        //                                            let rlp = UntrustedRlp::new(&h);
-        //                                            let header:Header = rlp.as_val().expect("should not be err");
-        //                                            cb.body.put_slice(&header.hash());
-        //                                        }
-        //                                        cb.head.len = cb.body.len() as u32;
-        //                                        send(num,cb,nodes_bodies.clone());
-        //                                        if let Some(w) =queue.get_mut(num){
-        //                                            (*w).timestamp = SystemTime::now();
-        //                                            (*w).with_status = WithStatus::WaitForBody(hw.clone());
-        //                                        };
-        //                                    }
-        //                                    _ => ()
-        //                                };
-        //                            }
-        //                    }
-        //                    Ok(())
-        //                })
-        //                .map_err(|err| error!(target: "sync", "executor status: {:?}", err)),
-        //        );
-
         // bind shutdown hook
         let (tx, rx) = oneshot::channel::<()>();
         {
@@ -411,13 +290,19 @@ impl Sync {
 
         // clear
         drop(executor_statics);
+        info!(target: "sync" , "executor_statics dropped!");
         drop(executor_status);
+        info!(target: "sync" , "executor_status dropped!");
         drop(executor_header);
+        info!(target: "sync" , "executor_headers dropped!");
         drop(executor_body);
+        info!(target: "sync" , "executor_body dropped!");
         drop(executor);
+        info!(target: "sync" , "executor dropped!");
+
         runtime.block_on(rx.map_err(|_| ())).unwrap();
         runtime.shutdown_now().wait().unwrap();
-        debug!(target:"sync", "shutdown executors");
+        info!(target:"sync", "sync shutdown");
     }
 
     pub fn shutdown(&self) {
@@ -660,5 +545,8 @@ impl Callable for Sync {
             headers.remove(&hash);
         }
         // TODO-SYNC: remove downloaded headers with given node hash
+        if let Ok(mut headers) = self.storage.downloaded_headers().lock() {
+            headers.retain(|x| x.node_hash != hash);
+        }
     }
 }

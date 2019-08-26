@@ -444,14 +444,19 @@ impl Mgr {
         }
 
         // clear
+        drop(server);
+        info!(target: "p2p" , "server dropped!");
+        drop(executor_timeout);
+        info!(target: "p2p" , "executor_timeout dropped!");
+        drop(executor_active_nodes);
+        info!(target: "p2p" , "executor_active_nodes dropped!");
+        drop(executor_outbound);
+        info!(target: "p2p" , "executor_outbound dropped!");
+        drop(executor);
+        info!(target:"p2p", "executors dropped!");
         rt.block_on(rx.map_err(|_| ())).unwrap();
         rt.shutdown_now().wait().unwrap();
-        drop(server);
-        drop(executor_timeout);
-        drop(executor_active_nodes);
-        drop(executor_outbound);
-        drop(executor);
-        debug!(target:"p2p", "shutdown executors");
+        info!(target: "p2p" , "p2p shutdown!");
     }
 
     /// shutdown routine

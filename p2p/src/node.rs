@@ -125,7 +125,7 @@ impl Node {
     pub fn get_hash(&self) -> u64 {
         let ip = self.addr.get_ip();
         let hash: u64 = calculate_hash(&ip);
-        trace!(target: "p2p", "node/get_hash: {}", &hash);
+        //        trace!(target: "p2p", "node/get_hash: {}", &hash);
         hash
     }
 
