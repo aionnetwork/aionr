@@ -209,7 +209,9 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     );
 
     let sync = Arc::new(Sync::new(cmd.net_conf.clone(), client.clone()));
+    let sync_notify = sync.clone();
     sync.run(sync.clone());
+    client.add_notify(sync_notify);
 
     // start rpc server
     let runtime_rpc = tokio::runtime::Builder::new()

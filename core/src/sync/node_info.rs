@@ -19,8 +19,28 @@
  *
  ******************************************************************************/
 use std::time::{SystemTime, UNIX_EPOCH};
-
 use aion_types::{H256, U256};
+
+#[derive(Clone, PartialEq)]
+pub enum Mode {
+    NORMAL,
+    //    BACKWARD,
+    //    FORWARD,
+    //    LIGHTNING,
+    //    THUNDER,
+}
+
+impl Mode {
+    pub fn to_str(&self) -> &str {
+        match *self {
+            Mode::NORMAL => "NORMAL",
+            //            Mode::BACKWARD => "BACKWARD",
+            //            Mode::FORWARD => "FORWARD",
+            //            Mode::LIGHTNING => "LIGHTNING",
+            //            Mode::THUNDER => "THUNDER",
+        }
+    }
+}
 
 #[derive(Clone)]
 pub struct NodeInfo {
@@ -32,8 +52,8 @@ pub struct NodeInfo {
     pub best_block_hash: H256,
     /// last headers request time
     pub last_headers_request_time: SystemTime,
-    // node mode
-    //mode: Mode
+    ///node mode
+    pub mode: Mode,
 }
 
 impl NodeInfo {
@@ -43,6 +63,7 @@ impl NodeInfo {
             best_block_number: 0u64,
             best_block_hash: H256::default(),
             last_headers_request_time: UNIX_EPOCH,
+            mode: Mode::NORMAL,
         }
     }
 }

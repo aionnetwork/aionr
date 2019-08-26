@@ -175,7 +175,7 @@ impl Sync {
                     info!(target: "sync", "total/active {}/{}  ,local_best_num {}", total_len, active_len, local_best_number);
 
                     info!(target: "sync", "{:-^127}", "");
-                    info!(target: "sync", "                              td         bn          bh                    addr                 rev      conn  seed");
+                    info!(target: "sync", "                              td         bn          bh                    addr                 rev      conn  seed       mode");
                     info!(target: "sync", "{:-^127}", "");
 
                     if active_len > 0 {
@@ -198,14 +198,15 @@ impl Sync {
                             {
                                 if let Some((addr, revision, connection, seed)) = active_nodes.get(*hash) {
                                     info!(target: "sync",
-                                          "{:>32}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}",
+                                          "{:>32}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}{:>11}",
                                           format!("{}", info.total_difficulty),
                                           format!("{}", info.best_block_number),
                                           format!("{}", info.best_block_hash),
                                           addr,
                                           revision,
                                           connection,
-                                          seed
+                                          seed,
+                                          info.mode.to_str()
                                     );
                                 }
                             }
@@ -290,23 +291,18 @@ impl Sync {
 
         // clear
         drop(executor_statics);
-        info!(target: "sync" , "executor_statics dropped!");
         drop(executor_status);
-        info!(target: "sync" , "executor_status dropped!");
         drop(executor_header);
-        info!(target: "sync" , "executor_headers dropped!");
         drop(executor_body);
-        info!(target: "sync" , "executor_body dropped!");
         drop(executor);
-        info!(target: "sync" , "executor dropped!");
 
         runtime.block_on(rx.map_err(|_| ())).unwrap();
         runtime.shutdown_now().wait().unwrap();
-        info!(target:"sync", "sync shutdown");
     }
 
     pub fn shutdown(&self) {
         &self.p2p.shutdown();
+        info!(target:"sync", "sync shutdown start");
         if let Ok(mut lock) = self.shutdown_hook.write() {
             if lock.is_some() {
                 let tx = lock.take().unwrap();
@@ -320,6 +316,7 @@ impl Sync {
                 }
             }
         }
+        info!(target:"sync", "sync shutdown finished");
     }
 }
 
@@ -400,6 +397,7 @@ impl SyncProvider for Sync {
 }
 
 impl ChainNotify for Sync {
+    // TODO: this function, which has registered in client notify, doesn't work
     fn new_blocks(
         &self,
         imported: Vec<H256>,
