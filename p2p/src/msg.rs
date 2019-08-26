@@ -69,7 +69,6 @@ impl ChannelBuffer {
             body: Vec::new(),
         }
     }
-
     // temporiy name it for it now
     pub fn new1(ver: u16, ctrl: u8, action: u8, len: u32) -> ChannelBuffer {
         ChannelBuffer {

@@ -37,13 +37,16 @@ use rlp::{RlpStream, UntrustedRlp};
 use p2p::{ChannelBuffer, Mgr, Node};
 use sync::route::{VERSION, MODULE, ACTION};
 use sync::wrappers::{HeadersWrapper};
-use sync::node_info::NodeInfo;
+use sync::node_info::{NodeInfo, Mode};
 use sync::storage::SyncStorage;
 use rand::{thread_rng, Rng};
 
-pub const NORMAL_REQUEST_SIZE: u32 = 24;
-const LARGE_REQUEST_SIZE: u32 = 48;
+const NORMAL_REQUEST_SIZE: u32 = 24;
+const LARGE_REQUEST_SIZE: u32 = 40;
 const REQUEST_COOLDOWN: u64 = 5000;
+const BACKWARD_SYNC_STEP: u64 = NORMAL_REQUEST_SIZE as u64 * 6 - 1;
+const FAR_OVERLAPPING_BLOCKS: u64 = 3;
+const CLOSE_OVERLAPPING_BLOCKS: u64 = 15;
 
 pub fn sync_headers(
     p2p: Mgr,
@@ -71,29 +74,50 @@ pub fn sync_headers(
     }
 }
 
-fn prepare_send(
-    p2p: Mgr,
-    hash: u64,
-    mut _node_info: &NodeInfo,
-    best_num: u64, /*mode:Mode*/
-) -> bool
-{
-    // TODO mode match
-    let start = if best_num > 3 { best_num - 3 } else { 1 };
-    let size = NORMAL_REQUEST_SIZE;
+fn prepare_send(p2p: Mgr, node_hash: u64, node_info: &NodeInfo, local_best_numbder: u64) -> bool {
+    let node_best_number = node_info.best_block_number;
+    let from: u64;
+    let mut size: u32 = NORMAL_REQUEST_SIZE;
 
-    send(p2p.clone(), hash, start, size)
+    match node_info.mode {
+        Mode::THUNDER => {
+            // TODO: add repeat threshold
+            from = if local_best_numbder > FAR_OVERLAPPING_BLOCKS {
+                local_best_numbder - FAR_OVERLAPPING_BLOCKS
+            } else {
+                1
+            };
+            size = LARGE_REQUEST_SIZE;
+        }
+        Mode::NORMAL => {
+            if node_best_number >= local_best_numbder + BACKWARD_SYNC_STEP {
+                from = if local_best_numbder > FAR_OVERLAPPING_BLOCKS {
+                    local_best_numbder - FAR_OVERLAPPING_BLOCKS
+                } else {
+                    1
+                };
+            } else {
+                from = if local_best_numbder > CLOSE_OVERLAPPING_BLOCKS {
+                    local_best_numbder - CLOSE_OVERLAPPING_BLOCKS
+                } else {
+                    1
+                };
+            }
+        }
+    }
+
+    send(p2p.clone(), node_hash, from, size)
 }
 
-fn send(p2p: Mgr, hash: u64, start: u64, size: u32) -> bool {
-    debug!(target:"sync","headers.rs/send: start {}, size: {}, node hash: {}", start, size, hash);
+fn send(p2p: Mgr, hash: u64, from: u64, size: u32) -> bool {
+    debug!(target:"sync","headers.rs/send: from {}, size: {}, node hash: {}", from, size, hash);
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
     cb.head.ctrl = MODULE::SYNC.value();
     cb.head.action = ACTION::HEADERSREQ.value();
 
     let mut from_buf = [0u8; 8];
-    BigEndian::write_u64(&mut from_buf, start);
+    BigEndian::write_u64(&mut from_buf, from);
     cb.body.put_slice(&from_buf);
 
     let mut size_buf = [0u8; 4];

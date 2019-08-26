@@ -97,6 +97,7 @@ pub fn receive_res(
     node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
     hash: u64,
     cb_in: ChannelBuffer,
+    network_best_block_number: Arc<RwLock<u64>>,
 )
 {
     trace!(target: "sync", "status/receive_res");
@@ -111,6 +112,13 @@ pub fn receive_res(
     let td = U256::from(total_difficulty);
     let bh = H256::from(best_hash);
 
+    // Update network best block
+    let mut network_best_number = network_best_block_number.write();
+    if best_block_num > *network_best_number {
+        *network_best_number = best_block_num;
+    }
+
+    // Update node info
     // TODO: improve this
     let mut node_info_write = node_info.write();
     if !node_info_write.contains_key(&hash) {

@@ -19,12 +19,16 @@
  *
  ******************************************************************************/
 use std::sync::Arc;
+use std::collections::HashMap;
+
+use parking_lot::RwLock;
 
 use client::{BlockId, BlockChainClient};
 use client::BlockStatus;
 use header::Seal;
-// use views::BlockView;
+use views::BlockView;
 use sync::storage::SyncStorage;
+use sync::node_info::{NodeInfo, Mode};
 
 // pub fn import_staged_blocks(hash: &H256) {
 //    let mut blocks_to_import = Vec::new();
@@ -63,7 +67,12 @@ use sync::storage::SyncStorage;
 //    }
 // }
 
-pub fn import_blocks(client: Arc<BlockChainClient>, storage: Arc<SyncStorage>) {
+pub fn import_blocks(
+    client: Arc<BlockChainClient>,
+    storage: Arc<SyncStorage>,
+    nodes_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
+)
+{
     // Get downloaded blocks
     let mut downloaded_blocks = Vec::new();
     let mut blocks_wrappers = storage.downloaded_blocks().lock();
@@ -93,6 +102,7 @@ pub fn import_blocks(client: Arc<BlockChainClient>, storage: Arc<SyncStorage>) {
         }
 
         // Import blocks
+        let mut last_imported_number: u64 = 0;
         for block in blocks_to_import {
             // TODO: need p2p to provide log infomation
             // let block_view = BlockView::new(&block);
@@ -107,10 +117,30 @@ pub fn import_blocks(client: Arc<BlockChainClient>, storage: Arc<SyncStorage>) {
             // };
             // debug!(target: "sync", "hash: {}, number: {}, parent: {}, node id: {}, mode: {}, synced_block_number: {}", hash, number, parent, node.get_node_id(), node.mode, node.synced_block_num);
 
+            let block_view = BlockView::new(&block);
+            last_imported_number = block_view.header_view().number();
+
             let _result = client.import_block(block.to_vec());
             // TODO:
             // Parse result with different sync modes.
             // Add repeat threshold mechanism to remove peer
+        }
+
+        let node_hash = blocks_wrapper.node_hash;
+        if let Some(node_info) = nodes_info.read().get(&node_hash) {
+            let mut info = node_info.write();
+            let node_best_number = info.best_block_number;
+            if last_imported_number + 32 >= node_best_number {
+                if info.mode != Mode::NORMAL {
+                    debug!(target:"sync", "switch to NORMAL mode: last imported {}, node best: {}, node hash: {}", &last_imported_number, &node_best_number, &node_hash);
+                    info.mode = Mode::NORMAL;
+                }
+            } else {
+                if info.mode != Mode::THUNDER {
+                    debug!(target:"sync", "switch to THUNDER mode: last imported {}, node best: {}, node hash: {}", &last_imported_number, &node_best_number, &node_hash);
+                    info.mode = Mode::THUNDER;
+                }
+            }
         }
 
         // TODO: maybe we should consider reset the header request cooldown here

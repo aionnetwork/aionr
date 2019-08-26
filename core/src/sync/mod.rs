@@ -100,7 +100,7 @@ pub struct Sync {
     _network_best_td: Arc<RwLock<U256>>,
 
     /// network best block number
-    _network_best_block_number: Arc<RwLock<u64>>,
+    network_best_block_number: Arc<RwLock<u64>>,
 
     /// cache tx hash which has been stored and broadcasted
     _cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
@@ -138,10 +138,10 @@ impl Sync {
             shutdown_hook: Arc::new(RwLock::new(None)),
             storage: Arc::new(SyncStorage::new()),
             node_info: Arc::new(RwLock::new(HashMap::new())),
+            network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
             _local_best_td: Arc::new(RwLock::new(local_best_td)),
             _local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
             _network_best_td: Arc::new(RwLock::new(local_best_td)),
-            _network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
             _cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
             _cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
         }
@@ -273,10 +273,15 @@ impl Sync {
         let executor_import = executor.clone();
         let client_import = self.client.clone();
         let storage_import = self.storage.clone();
+        let node_info_import = self.node_info.clone();
         executor_import.spawn(
             Interval::new(Instant::now(), Duration::from_millis(INTERVAL_BODIES))
                 .for_each(move |_| {
-                    import::import_blocks(client_import.clone(), storage_import.clone());
+                    import::import_blocks(
+                        client_import.clone(),
+                        storage_import.clone(),
+                        node_info_import.clone(),
+                    );
                     Ok(())
                 })
                 .map_err(|err| error!(target: "sync", "executor import: {:?}", err)),
@@ -515,7 +520,15 @@ impl Callable for Sync {
                 let chain_info = &self.client.chain_info();
                 status::receive_req(p2p, chain_info, hash)
             }
-            ACTION::STATUSRES => status::receive_res(p2p, self.node_info.clone(), hash, cb),
+            ACTION::STATUSRES => {
+                status::receive_res(
+                    p2p,
+                    self.node_info.clone(),
+                    hash,
+                    cb,
+                    self.network_best_block_number.clone(),
+                )
+            }
             ACTION::HEADERSREQ => {
                 let client = self.client.clone();
                 headers::receive_req(p2p, hash, client, cb)
