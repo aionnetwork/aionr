@@ -445,22 +445,17 @@ impl Mgr {
 
         // clear
         drop(server);
-        info!(target: "p2p" , "server dropped!");
         drop(executor_timeout);
-        info!(target: "p2p" , "executor_timeout dropped!");
         drop(executor_active_nodes);
-        info!(target: "p2p" , "executor_active_nodes dropped!");
         drop(executor_outbound);
-        info!(target: "p2p" , "executor_outbound dropped!");
         drop(executor);
-        info!(target:"p2p", "executors dropped!");
         rt.block_on(rx.map_err(|_| ())).unwrap();
         rt.shutdown_now().wait().unwrap();
-        info!(target: "p2p" , "p2p shutdown!");
     }
 
     /// shutdown routine
     pub fn shutdown(&self) {
+        info!(target: "p2p" , "p2p shutdown start");
         if let Ok(mut lock) = self.shutdown_hook.write() {
             if lock.is_some() {
                 let tx = lock.take().unwrap();
@@ -486,6 +481,7 @@ impl Mgr {
             }
             lock.clear();
         }
+        info!(target: "p2p" , "p2p shutdown finished");
     }
 
     /// rechieve a random node with td >= target_td
