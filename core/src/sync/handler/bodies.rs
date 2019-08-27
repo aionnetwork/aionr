@@ -181,8 +181,7 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
             if !downloaded_block_hashes.contains_key(&hash) {
                 blocks.push(block);
                 downloaded_block_hashes.insert(hash, 0);
-            } else {
-                trace!(target: "sync", "downloaded_block_hashes: {}.", hash);
+                trace!(target: "sync", "downloaded block hash: {}.", hash);
             }
         }
     } else {

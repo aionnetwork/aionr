@@ -76,33 +76,36 @@ pub fn sync_headers(
 
 fn prepare_send(p2p: Mgr, node_hash: u64, node_info: &NodeInfo, local_best_numbder: u64) -> bool {
     let node_best_number = node_info.best_block_number;
-    let from: u64;
+    let branch_sync_base = node_info.branch_sync_base;
+    let mut from = 1u64;
     let mut size: u32 = NORMAL_REQUEST_SIZE;
 
     match node_info.mode {
-        Mode::THUNDER => {
+        Mode::Thunder => {
             // TODO: add repeat threshold
-            from = if local_best_numbder > FAR_OVERLAPPING_BLOCKS {
-                local_best_numbder - FAR_OVERLAPPING_BLOCKS
-            } else {
-                1
-            };
+            if local_best_numbder > FAR_OVERLAPPING_BLOCKS {
+                from = local_best_numbder - FAR_OVERLAPPING_BLOCKS;
+            }
             size = LARGE_REQUEST_SIZE;
         }
-        Mode::NORMAL => {
+        Mode::Normal => {
             if node_best_number >= local_best_numbder + BACKWARD_SYNC_STEP {
-                from = if local_best_numbder > FAR_OVERLAPPING_BLOCKS {
-                    local_best_numbder - FAR_OVERLAPPING_BLOCKS
-                } else {
-                    1
-                };
+                if local_best_numbder > FAR_OVERLAPPING_BLOCKS {
+                    from = local_best_numbder - FAR_OVERLAPPING_BLOCKS;
+                }
             } else {
-                from = if local_best_numbder > CLOSE_OVERLAPPING_BLOCKS {
-                    local_best_numbder - CLOSE_OVERLAPPING_BLOCKS
-                } else {
-                    1
-                };
+                if local_best_numbder > CLOSE_OVERLAPPING_BLOCKS {
+                    from = local_best_numbder - CLOSE_OVERLAPPING_BLOCKS;
+                }
             }
+        }
+        Mode::Backward => {
+            if branch_sync_base > BACKWARD_SYNC_STEP {
+                from = branch_sync_base - BACKWARD_SYNC_STEP;
+            }
+        }
+        Mode::Forward => {
+            from = branch_sync_base + 1;
         }
     }
 

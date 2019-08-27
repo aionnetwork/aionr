@@ -208,7 +208,7 @@ impl Sync {
                                           revision,
                                           connection,
                                           seed,
-                                          info.mode.to_str()
+                                          info.mode
                                     );
                                 }
                             }

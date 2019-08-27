@@ -57,7 +57,7 @@ pub fn send(p2p: Mgr, hash: u64) {
 }
 
 pub fn receive_req(p2p: Mgr, chain_info: &BlockChainInfo, hash: u64) {
-    debug!(target: "sync", "status/receive_req");
+    trace!(target: "sync", "status/receive_req");
 
     let mut cb = ChannelBuffer::new();
 
