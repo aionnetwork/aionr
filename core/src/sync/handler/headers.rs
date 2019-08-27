@@ -21,8 +21,11 @@
 
 use std::mem;
 use std::time::{SystemTime, Duration};
-use std::sync::{Arc, RwLock, Mutex};
+use std::sync::Arc;
 use std::collections::{HashMap, VecDeque};
+
+use parking_lot::{Mutex, RwLock};
+
 use engine::unity_engine::UnityEngine;
 use header::Header;
 use acore_bytes::to_hex;
@@ -34,53 +37,87 @@ use rlp::{RlpStream, UntrustedRlp};
 use p2p::{ChannelBuffer, Mgr, Node};
 use sync::route::{VERSION, MODULE, ACTION};
 use sync::wrappers::{HeadersWrapper};
-use sync::node_info::NodeInfo;
+use sync::node_info::{NodeInfo, Mode};
 use sync::storage::SyncStorage;
 use rand::{thread_rng, Rng};
 
-pub const NORMAL_REQUEST_SIZE: u32 = 24;
-const LARGE_REQUEST_SIZE: u32 = 48;
+const NORMAL_REQUEST_SIZE: u32 = 24;
+const LARGE_REQUEST_SIZE: u32 = 40;
 const REQUEST_COOLDOWN: u64 = 5000;
+const BACKWARD_SYNC_STEP: u64 = NORMAL_REQUEST_SIZE as u64 * 6 - 1;
+const FAR_OVERLAPPING_BLOCKS: u64 = 3;
+const CLOSE_OVERLAPPING_BLOCKS: u64 = 15;
 
 pub fn sync_headers(
     p2p: Mgr,
-    nodes_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
+    nodes_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
     local_total_diff: &U256,
     local_best_block_number: u64,
 )
 {
     let active_nodes = p2p.get_active_nodes();
+    // Filter nodes. Only sync from nodes with higher total difficulty and with a cooldown restriction.
     let candidates: Vec<Node> =
         filter_nodes_to_sync_headers(active_nodes, nodes_info.clone(), local_total_diff);
+    // Pick a random node among all candidates
     if let Some(candidate) = pick_random_node(&candidates) {
         let candidate_hash = candidate.get_hash();
-        if prepare_send(p2p, candidate_hash, local_best_block_number) {
-            if let Ok(mut node_info_write) = nodes_info.write() {
-                if let Some(node_info_mut) = node_info_write.get_mut(&candidate_hash) {
-                    node_info_mut.last_headers_request_time = SystemTime::now();
-                }
+        let nodes_info_read = nodes_info.read();
+        if let Some(node_info_lock) = nodes_info_read.get(&candidate_hash) {
+            let mut node_info = node_info_lock.write();
+            // Send header request
+            if prepare_send(p2p, candidate_hash, &node_info, local_best_block_number) {
+                // Update cooldown time after request succesfully sent
+                node_info.last_headers_request_time = SystemTime::now();
             }
         }
     }
 }
 
-fn prepare_send(p2p: Mgr, hash: u64, best_num: u64 /*mode:Mode*/) -> bool {
-    // TODO mode match
-    let start = if best_num > 3 { best_num - 3 } else { 1 };
-    let size = NORMAL_REQUEST_SIZE;
+fn prepare_send(p2p: Mgr, node_hash: u64, node_info: &NodeInfo, local_best_numbder: u64) -> bool {
+    let node_best_number = node_info.best_block_number;
+    let from: u64;
+    let mut size: u32 = NORMAL_REQUEST_SIZE;
 
-    send(p2p.clone(), hash, start, size)
+    match node_info.mode {
+        Mode::THUNDER => {
+            // TODO: add repeat threshold
+            from = if local_best_numbder > FAR_OVERLAPPING_BLOCKS {
+                local_best_numbder - FAR_OVERLAPPING_BLOCKS
+            } else {
+                1
+            };
+            size = LARGE_REQUEST_SIZE;
+        }
+        Mode::NORMAL => {
+            if node_best_number >= local_best_numbder + BACKWARD_SYNC_STEP {
+                from = if local_best_numbder > FAR_OVERLAPPING_BLOCKS {
+                    local_best_numbder - FAR_OVERLAPPING_BLOCKS
+                } else {
+                    1
+                };
+            } else {
+                from = if local_best_numbder > CLOSE_OVERLAPPING_BLOCKS {
+                    local_best_numbder - CLOSE_OVERLAPPING_BLOCKS
+                } else {
+                    1
+                };
+            }
+        }
+    }
+
+    send(p2p.clone(), node_hash, from, size)
 }
 
-fn send(p2p: Mgr, hash: u64, start: u64, size: u32) -> bool {
-    debug!(target:"sync","headers.rs/send: start {}, size: {}, node hash: {}", start, size, hash);
+fn send(p2p: Mgr, hash: u64, from: u64, size: u32) -> bool {
+    debug!(target:"sync","headers.rs/send: from {}, size: {}, node hash: {}", from, size, hash);
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
     cb.head.ctrl = MODULE::SYNC.value();
     cb.head.action = ACTION::HEADERSREQ.value();
 
     let mut from_buf = [0u8; 8];
-    BigEndian::write_u64(&mut from_buf, start);
+    BigEndian::write_u64(&mut from_buf, from);
     cb.body.put_slice(&from_buf);
 
     let mut size_buf = [0u8; 4];
@@ -245,11 +282,8 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
         header_wrapper.headers = headers;
         header_wrapper.timestamp = SystemTime::now();
         p2p.update_node(&hash);
-        if let Ok(mut downloaded_headers) = downloaded_headers.lock() {
-            downloaded_headers.push_back(header_wrapper);
-        } else {
-            println!("!!!!!!!!!!!!!")
-        }
+        let mut downloaded_headers = downloaded_headers.lock();
+        downloaded_headers.push_back(header_wrapper);
     } else {
         debug!(target: "sync", "Came too late............");
     }
@@ -258,28 +292,27 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
 /// Filter candidates to sync from based on total difficulty and syncing cool down
 fn filter_nodes_to_sync_headers(
     nodes: Vec<Node>,
-    nodes_info: Arc<RwLock<HashMap<u64, NodeInfo>>>,
+    nodes_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
     local_total_diff: &U256,
 ) -> Vec<Node>
 {
     let time_now = SystemTime::now();
-    match nodes_info.read() {
-        Ok(nodes_info_read) => {
-            nodes
-                .into_iter()
-                .filter(|node| {
-                    let node_hash = node.get_hash();
-                    nodes_info_read.get(&node_hash).map_or(false, |node_info| {
-                        &node_info.total_difficulty > local_total_diff
-                            && node_info.last_headers_request_time
-                                + Duration::from_millis(REQUEST_COOLDOWN)
-                                <= time_now
-                    })
+    let nodes_info_read = nodes_info.read();
+    nodes
+        .into_iter()
+        .filter(|node| {
+            let node_hash = node.get_hash();
+            nodes_info_read
+                .get(&node_hash)
+                .map_or(false, |node_info_lock| {
+                    let node_info = node_info_lock.read();
+                    &node_info.total_difficulty > local_total_diff
+                        && node_info.last_headers_request_time
+                            + Duration::from_millis(REQUEST_COOLDOWN)
+                            <= time_now
                 })
-                .collect()
-        }
-        Err(_) => Vec::new(),
-    }
+        })
+        .collect()
 }
 
 /// Pick a random node

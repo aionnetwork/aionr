@@ -27,7 +27,7 @@ pub enum Mode {
     //    BACKWARD,
     //    FORWARD,
     //    LIGHTNING,
-    //    THUNDER,
+    THUNDER,
 }
 
 impl Mode {
@@ -37,7 +37,7 @@ impl Mode {
             //            Mode::BACKWARD => "BACKWARD",
             //            Mode::FORWARD => "FORWARD",
             //            Mode::LIGHTNING => "LIGHTNING",
-            //            Mode::THUNDER => "THUNDER",
+            Mode::THUNDER => "THUNDER",
         }
     }
 }

@@ -19,9 +19,9 @@
  *
  ******************************************************************************/
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::SystemTime;
-use std::collections::VecDeque;
+
 use block::Block;
 use client::{BlockId, BlockChainClient};
 use aion_types::H256;
@@ -39,14 +39,13 @@ use header::Header;
 const HASH_LEN: usize = 32;
 
 pub fn sync_bodies(p2p: Mgr, storage: Arc<SyncStorage>) {
-    let downloaded_headers: &Mutex<VecDeque<HeadersWrapper>> = storage.downloaded_headers();
     // Get all downloaded headers
     let mut headers_wrappers: Vec<HeadersWrapper> = Vec::new();
-    if let Ok(mut downloaded_headers) = downloaded_headers.lock() {
-        while let Some(headers_wrapper) = downloaded_headers.pop_front() {
-            headers_wrappers.push(headers_wrapper);
-        }
+    let mut downloaded_headers = storage.downloaded_headers().lock();
+    while let Some(headers_wrapper) = downloaded_headers.pop_front() {
+        headers_wrappers.push(headers_wrapper);
     }
+    drop(downloaded_headers);
 
     // For each batch of downloaded headers, try to get bodies from the corresponding node
     for headers_wrapper in headers_wrappers {
@@ -64,19 +63,16 @@ pub fn sync_bodies(p2p: Mgr, storage: Arc<SyncStorage>) {
             continue;
         }
 
-        if let Ok(mut headers_with_bodies_requested) =
-            storage.headers_with_bodies_requested().lock()
-        {
-            let node_hash = headers_wrapper.node_hash;
-            if !headers_with_bodies_requested.contains_key(&node_hash) {
-                send(p2p.clone(), node_hash.clone(), hashes);
+        let node_hash = headers_wrapper.node_hash;
+        let mut headers_with_bodies_requested = storage.headers_with_bodies_requested().lock();
+        if !headers_with_bodies_requested.contains_key(&node_hash) {
+            send(p2p.clone(), node_hash.clone(), hashes);
 
-                let mut headers_wrapper_record = headers_wrapper.clone();
-                headers_wrapper_record.timestamp = SystemTime::now();
-                headers_wrapper_record.headers.clear();
-                headers_wrapper_record.headers.extend(headers_requested);
-                headers_with_bodies_requested.insert(node_hash, headers_wrapper_record);
-            }
+            let mut headers_wrapper_record = headers_wrapper.clone();
+            headers_wrapper_record.timestamp = SystemTime::now();
+            headers_wrapper_record.headers.clear();
+            headers_wrapper_record.headers.extend(headers_requested);
+            headers_with_bodies_requested.insert(node_hash, headers_wrapper_record);
         }
     }
 }
@@ -180,14 +176,13 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
                 header: headers[i].clone(),
                 transactions: bodies[i].clone(),
             };
-            if let Ok(mut downloaded_block_hashes) = storage.downloaded_blocks_hashes().lock() {
-                let hash = block.header.hash();
-                if !downloaded_block_hashes.contains_key(&hash) {
-                    blocks.push(block);
-                    downloaded_block_hashes.insert(hash, 0);
-                } else {
-                    trace!(target: "sync", "downloaded_block_hashes: {}.", hash);
-                }
+            let hash = block.header.hash();
+            let mut downloaded_block_hashes = storage.downloaded_blocks_hashes().lock();
+            if !downloaded_block_hashes.contains_key(&hash) {
+                blocks.push(block);
+                downloaded_block_hashes.insert(hash, 0);
+            } else {
+                trace!(target: "sync", "downloaded_block_hashes: {}.", hash);
             }
         }
     } else {

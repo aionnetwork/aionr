@@ -19,9 +19,9 @@
  *
  ******************************************************************************/
 use std::collections::{VecDeque, HashMap};
-use std::sync::Mutex;
 
 use lru_cache::LruCache;
+use parking_lot::Mutex;
 
 use aion_types::H256;
 use sync::wrappers::{HeadersWrapper, BlocksWrapper};
@@ -66,11 +66,8 @@ impl SyncStorage {
     pub fn downloaded_blocks(&self) -> &Mutex<VecDeque<BlocksWrapper>> { &self.downloaded_blocks }
 
     pub fn insert_downloaded_blocks(&self, blocks_wrapper: BlocksWrapper) {
-        if let Ok(mut downloaded_blocks) = self.downloaded_blocks.lock() {
-            downloaded_blocks.push_back(blocks_wrapper);
-        } else {
-            warn!(target: "sync", "downloaded_blocks lock failed");
-        }
+        let mut downloaded_blocks = self.downloaded_blocks.lock();
+        downloaded_blocks.push_back(blocks_wrapper);
     }
 
     pub fn downloaded_blocks_hashes(&self) -> &Mutex<LruCache<H256, u8>> {
@@ -78,33 +75,22 @@ impl SyncStorage {
     }
 
     pub fn is_block_hash_downloaded(&self, hash: &H256) -> bool {
-        if let Ok(mut downloaded_blocks_hashes) = self.downloaded_blocks_hashes.lock() {
-            downloaded_blocks_hashes.contains_key(hash)
-        } else {
-            warn!(target: "sync", "downloaded_blocks_hashes lock failed");
-            false
-        }
+        let mut downloaded_blocks_hashes = self.downloaded_blocks_hashes.lock();
+        downloaded_blocks_hashes.contains_key(hash)
     }
 
     pub fn insert_imported_block_hashes(&self, hashes: Vec<H256>) {
-        if let Ok(mut imported_blocks_hashes) = self.imported_blocks_hashes.lock() {
-            for hash in hashes {
-                if !imported_blocks_hashes.contains_key(&hash) {
-                    imported_blocks_hashes.insert(hash, 0);
-                }
+        let mut imported_blocks_hashes = self.imported_blocks_hashes.lock();
+        for hash in hashes {
+            if !imported_blocks_hashes.contains_key(&hash) {
+                imported_blocks_hashes.insert(hash, 0);
             }
-        } else {
-            warn!(target: "sync", "imported_blocks_hashes lock failed");
         }
     }
 
     pub fn is_block_hash_imported(&self, hash: &H256) -> bool {
-        if let Ok(mut imported_blocks_hashes) = self.imported_blocks_hashes.lock() {
-            imported_blocks_hashes.contains_key(hash)
-        } else {
-            warn!(target: "sync", "imported_blocks_hashes lock failed");
-            false
-        }
+        let mut imported_blocks_hashes = self.imported_blocks_hashes.lock();
+        imported_blocks_hashes.contains_key(hash)
     }
 
     pub fn headers_with_bodies_requested(&self) -> &Mutex<HashMap<u64, HeadersWrapper>> {
@@ -116,11 +102,7 @@ impl SyncStorage {
         node_hash: &u64,
     ) -> Option<HeadersWrapper>
     {
-        if let Ok(mut headers_with_bodies_requested) = self.headers_with_bodies_requested.lock() {
-            headers_with_bodies_requested.remove(node_hash)
-        } else {
-            warn!(target: "sync", "headers_with_bodies_requested mutex lock failed");
-            None
-        }
+        let mut headers_with_bodies_requested = self.headers_with_bodies_requested.lock();
+        headers_with_bodies_requested.remove(node_hash)
     }
 }
