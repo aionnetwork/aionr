@@ -290,14 +290,13 @@ impl Sync {
         }
 
         // clear
+        runtime.block_on(rx.map_err(|_| ())).unwrap();
+        runtime.shutdown_now().wait().unwrap();
         drop(executor_statics);
         drop(executor_status);
         drop(executor_header);
         drop(executor_body);
         drop(executor);
-
-        runtime.block_on(rx.map_err(|_| ())).unwrap();
-        runtime.shutdown_now().wait().unwrap();
     }
 
     pub fn shutdown(&self) {

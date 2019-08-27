@@ -24,7 +24,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
-use acore::client::{Client, DatabaseCompactionProfile, VMType /*, ChainNotify*/
+use acore::client::{Client, DatabaseCompactionProfile, VMType , ChainNotify
 };
 use acore::miner::external::ExternalMiner;
 use acore::miner::{Miner, MinerOptions, MinerService};
@@ -209,10 +209,13 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     );
 
     let sync = Arc::new(Sync::new(cmd.net_conf.clone(), client.clone()));
-    let sync_notify = sync.clone();
-    sync.run(sync.clone());
-    client.add_notify(sync_notify);
+    let sync_notify = sync.clone() as Arc<ChainNotify>;
+    let sync_run = sync.clone();
+    service.add_notify(sync_notify);
 
+    thread::spawn(move || {
+        sync_run.run(sync_run.clone());
+    });
     // start rpc server
     let runtime_rpc = tokio::runtime::Builder::new()
         .name_prefix("rpc-")
