@@ -539,12 +539,14 @@ impl Callable for Sync {
                 status::receive_req(p2p, chain_info, hash)
             }
             ACTION::STATUSRES => {
+                let genesis_hash = self.client.chain_info().genesis_hash;
                 status::receive_res(
                     p2p,
                     self.node_info.clone(),
                     hash,
                     cb,
                     self.network_best_block_number.clone(),
+                    genesis_hash,
                 )
             }
             ACTION::HEADERSREQ => {
