@@ -23,8 +23,8 @@ use std::collections::HashMap;
 
 use parking_lot::RwLock;
 
-use client::{BlockId, BlockChainClient};
-use client::BlockStatus;
+use client::{BlockId, BlockChainClient, BlockStatus, BlockImportError};
+use types::error::{BlockError, ImportError};
 use header::Seal;
 use views::BlockView;
 use sync::storage::SyncStorage;
@@ -102,7 +102,9 @@ pub fn import_blocks(
         }
 
         // Import blocks
-        let mut last_imported_number: u64 = 0;
+        let mut first_imported_number = 0u64;
+        let mut last_imported_number = 0u64;
+        let mut backward_number = 0u64;
         for block in blocks_to_import {
             // TODO: need p2p to provide log infomation
             // let block_view = BlockView::new(&block);
@@ -118,27 +120,67 @@ pub fn import_blocks(
             // debug!(target: "sync", "hash: {}, number: {}, parent: {}, node id: {}, mode: {}, synced_block_number: {}", hash, number, parent, node.get_node_id(), node.mode, node.synced_block_num);
 
             let block_view = BlockView::new(&block);
-            last_imported_number = block_view.header_view().number();
+            let block_number = block_view.header_view().number();
 
-            let _result = client.import_block(block.to_vec());
-            // TODO:
-            // Parse result with different sync modes.
-            // Add repeat threshold mechanism to remove peer
+            // Import block and check results
+            let result = client.import_block(block.to_vec());
+            match result {
+                Ok(_)
+                | Err(BlockImportError::Import(ImportError::AlreadyInChain))
+                | Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
+                    if first_imported_number == 0u64 {
+                        first_imported_number = block_number;
+                    }
+                    last_imported_number = block_number;
+                }
+                Err(BlockImportError::Block(BlockError::UnknownParent(_))) => {
+                    backward_number = block_number;
+                    break;
+                }
+                Err(_e) => {
+                    // TODO add repeat threshold
+                    break;
+                }
+            }
         }
 
+        // update mode
         let node_hash = blocks_wrapper.node_hash;
         if let Some(node_info) = nodes_info.read().get(&node_hash) {
             let mut info = node_info.write();
             let node_best_number = info.best_block_number;
-            if last_imported_number + 32 >= node_best_number {
-                if info.mode != Mode::NORMAL {
-                    debug!(target:"sync", "switch to NORMAL mode: last imported {}, node best: {}, node hash: {}", &last_imported_number, &node_best_number, &node_hash);
-                    info.mode = Mode::NORMAL;
+            let local_best_block = client.chain_info().best_block_number;
+
+            // Sync backward
+            if backward_number != 0u64 {
+                info.switch_mode(Mode::Backward, &local_best_block, &node_hash);
+                info.branch_sync_base = backward_number;
+                continue;
+            }
+
+            // Do nothing if no block is imported
+            if first_imported_number == 0u64 || last_imported_number == 0u64 {
+                continue;
+            }
+
+            match info.mode {
+                // Fork point found, switch to forward mode
+                Mode::Backward => {
+                    info!(target: "sync", "Node: {}, found the fork point #{}", &node_hash, first_imported_number);
+                    info.switch_mode(Mode::Forward, &local_best_block, &node_hash);
+                    info.branch_sync_base = last_imported_number;
                 }
-            } else {
-                if info.mode != Mode::THUNDER {
-                    debug!(target:"sync", "switch to THUNDER mode: last imported {}, node best: {}, node hash: {}", &last_imported_number, &node_best_number, &node_hash);
-                    info.mode = Mode::THUNDER;
+                // Continue forward
+                Mode::Forward => {
+                    info.branch_sync_base = last_imported_number;
+                }
+                // Switch among NORMAL, THUNDER and LIGHTNING
+                Mode::Normal | Mode::Thunder => {
+                    if last_imported_number + 32 >= node_best_number {
+                        info.switch_mode(Mode::Normal, &local_best_block, &node_hash);
+                    } else {
+                        info.switch_mode(Mode::Thunder, &local_best_block, &node_hash);
+                    }
                 }
             }
         }

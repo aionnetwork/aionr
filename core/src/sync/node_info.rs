@@ -19,25 +19,27 @@
  *
  ******************************************************************************/
 use std::time::{SystemTime, UNIX_EPOCH};
+use std::fmt::{Display, Formatter, Error as FmtError};
+
 use aion_types::{H256, U256};
 
 #[derive(Clone, PartialEq)]
 pub enum Mode {
-    NORMAL,
-    //    BACKWARD,
-    //    FORWARD,
-    //    LIGHTNING,
-    THUNDER,
+    Normal,
+    Backward,
+    Forward,
+    // Lightning,
+    Thunder,
 }
 
-impl Mode {
-    pub fn to_str(&self) -> &str {
+impl Display for Mode {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), FmtError> {
         match *self {
-            Mode::NORMAL => "NORMAL",
-            //            Mode::BACKWARD => "BACKWARD",
-            //            Mode::FORWARD => "FORWARD",
-            //            Mode::LIGHTNING => "LIGHTNING",
-            Mode::THUNDER => "THUNDER",
+            Mode::Normal => write!(f, "NORMAL"),
+            Mode::Backward => write!(f, "BACKWARD"),
+            Mode::Forward => write!(f, "FORWARD"),
+            // Mode::Lightning => write!(f, "LIGHTNING"),
+            Mode::Thunder => write!(f, "THUNDER"),
         }
     }
 }
@@ -46,14 +48,16 @@ impl Mode {
 pub struct NodeInfo {
     /// node total difficulty
     pub total_difficulty: U256,
-    /// node best block number
+    /// best block number
     pub best_block_number: u64,
-    /// node best block hash
+    /// best block hash
     pub best_block_hash: H256,
     /// last headers request time
     pub last_headers_request_time: SystemTime,
-    ///node mode
+    /// syncing mode
     pub mode: Mode,
+    /// base number for backward and forward syncing
+    pub branch_sync_base: u64,
 }
 
 impl NodeInfo {
@@ -63,7 +67,15 @@ impl NodeInfo {
             best_block_number: 0u64,
             best_block_hash: H256::default(),
             last_headers_request_time: UNIX_EPOCH,
-            mode: Mode::NORMAL,
+            mode: Mode::Normal,
+            branch_sync_base: 0u64,
+        }
+    }
+
+    pub fn switch_mode(&mut self, mode: Mode, local_best: &u64, node_hash: &u64) {
+        if self.mode != mode {
+            debug!(target:"sync", "Node {}: switch to {} mode. local_best: {}, node best: {}", node_hash, &mode, local_best, &self.best_block_number);
+            self.mode = mode;
         }
     }
 }

@@ -34,7 +34,7 @@ use itertools::Itertools;
 // use std::time::SystemTime;
 use std::collections::{HashMap};
 use std::thread;
-use client::{BlockId, BlockChainClient, BlockStatus, ChainNotify};
+use client::{BlockId, BlockChainClient, ChainNotify};
 // use transaction::UnverifiedTransaction;
 use aion_types::{H256,U256};
 use futures::Future;
@@ -208,7 +208,7 @@ impl Sync {
                                           revision,
                                           connection,
                                           seed,
-                                          info.mode.to_str()
+                                          info.mode
                                     );
                                 }
                             }
@@ -419,24 +419,28 @@ impl ChainNotify for Sync {
         // TODO: to think whether we still need to do the following or not.
         if !imported.is_empty() {
             let client = self.client.clone();
-            let chain_info = client.chain_info();
-            let min_imported_block_number = chain_info.best_block_number + 1;
-            let mut max_imported_block_number = 0;
+            // let chain_info = client.chain_info();
+            // let min_imported_block_number = chain_info.best_block_number + 1;
+            // let mut max_imported_block_number = 0;
             for hash in imported {
                 let block_id = BlockId::Hash(hash);
-                if client.block_status(block_id) == BlockStatus::InChain {
-                    if let Some(block_number) = client.block_number(block_id) {
-                        if max_imported_block_number < block_number {
-                            max_imported_block_number = block_number;
-                        }
-                    }
+                if let Some(block_number) = client.block_number(block_id) {
+                    info!(target: "sync", "New block #{}, hash: {}.", block_number, hash);
                 }
+
+                // if client.block_status(block_id) == BlockStatus::InChain {
+                //     if let Some(block_number) = client.block_number(block_id) {
+                //         if max_imported_block_number < block_number {
+                //             max_imported_block_number = block_number;
+                //         }
+                //     }
+                // }
             }
 
             // The imported blocks are not new or not yet in chain. Do not notify in this case.
-            if max_imported_block_number < min_imported_block_number {
-                return;
-            }
+            // if max_imported_block_number < min_imported_block_number {
+            //     return;
+            // }
 
             // TODO: to understand why we need to do this
             // let synced_block_number = chain_info.best_block_number;
@@ -453,21 +457,21 @@ impl ChainNotify for Sync {
             //     }
             // }
 
-            for block_number in min_imported_block_number..max_imported_block_number + 1 {
-                let block_id = BlockId::Number(block_number);
-                if let Some(blk) = client.block(block_id) {
-                    let block_hash = blk.hash();
-                    info!(target: "sync",
-                            "New block #{} {}, with {} txs added in chain.",
-                            block_number, block_hash, blk.transactions_count());
-                    // import::import_staged_blocks(&block_hash);
-                    // if let Some(time) = SyncStorage::get_requested_time(&block_hash) {
-                    //     info!(target: "sync",
-                    //         "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
-                    //         block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
-                    // }
-                }
-            }
+            // for block_number in min_imported_block_number..max_imported_block_number + 1 {
+            //     let block_id = BlockId::Number(block_number);
+            //     if let Some(blk) = client.block(block_id) {
+            //         let block_hash = blk.hash();
+            //         info!(target: "sync",
+            //                 "New block #{} {}, with {} txs added in chain.",
+            //                 block_number, block_hash, blk.transactions_count());
+            //         // import::import_staged_blocks(&block_hash);
+            //         // if let Some(time) = SyncStorage::get_requested_time(&block_hash) {
+            //         //     info!(target: "sync",
+            //         //         "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
+            //         //         block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
+            //         // }
+            //     }
+            // }
         }
 
         if !sealed.is_empty() {
