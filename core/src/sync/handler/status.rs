@@ -111,6 +111,7 @@ pub fn receive_res(
     let (_genesis_hash, _) = req_body_rest.split_at(HASH_LENGTH);
     let td = U256::from(total_difficulty);
     let bh = H256::from(best_hash);
+    // TODO: remove node if genesis is wrong
 
     // Update network best block
     let mut network_best_number = network_best_block_number.write();

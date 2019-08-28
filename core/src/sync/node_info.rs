@@ -54,6 +54,8 @@ pub struct NodeInfo {
     pub best_block_hash: H256,
     /// last headers request time
     pub last_headers_request_time: SystemTime,
+    /// last tx broadcast time
+    pub last_broadcast_timestamp: SystemTime,
     /// syncing mode
     pub mode: Mode,
     /// base number for backward and forward syncing
@@ -67,6 +69,7 @@ impl NodeInfo {
             best_block_number: 0u64,
             best_block_hash: H256::default(),
             last_headers_request_time: UNIX_EPOCH,
+            last_broadcast_timestamp: UNIX_EPOCH,
             mode: Mode::Normal,
             branch_sync_base: 0u64,
         }
