@@ -162,6 +162,7 @@ pub fn new_http<D: rpc_apis::Dependencies>(
     executor: TaskExecutor,
 ) -> Result<Option<HttpServer>, String>
 {
+    println!("AAA");
     if !conf.enabled {
         return Ok(None);
     }
@@ -184,6 +185,10 @@ pub fn new_http<D: rpc_apis::Dependencies>(
         conf.server_threads,
         executor,
     );
+
+    if start_result.is_ok() {
+        println!("BBB");
+    }
 
     match start_result {
         Ok(server) => Ok(Some(server)),

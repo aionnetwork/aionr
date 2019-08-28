@@ -60,7 +60,7 @@ use sync::handler::bodies;
 use sync::handler::headers;
 // use sync::handler::broadcast;
 use sync::handler::import;
-use sync::node_info::NodeInfo;
+use sync::node_info::{NodeInfo, Mode};
 use sync::storage::SyncStorage;
 
 const _HEADERS_CAPACITY: u64 = 256;
@@ -407,7 +407,7 @@ impl ChainNotify for Sync {
         imported: Vec<H256>,
         _invalid: Vec<H256>,
         _enacted: Vec<H256>,
-        _retracted: Vec<H256>,
+        retracted: Vec<H256>,
         sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
         _duration: u64,
@@ -473,6 +473,17 @@ impl ChainNotify for Sync {
             //         // }
             //     }
             // }
+        }
+
+        // If retracted is not empty, it means a chain reorg occurred.
+        // Reset mode of all connecting nodes to NORMAL.
+        // TODO: need more thoughts if this is good idea
+        if !retracted.is_empty() {
+            debug!(target: "sync", "Chain reorg. Reset the syncing mode of all connecting nodes to NORMAL.");
+            for (_, node_info_lock) in &*self.node_info.read() {
+                let mut node_info = node_info_lock.write();
+                node_info.mode = Mode::Normal;
+            }
         }
 
         if !sealed.is_empty() {

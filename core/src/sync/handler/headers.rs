@@ -93,10 +93,15 @@ fn prepare_send(p2p: Mgr, node_hash: u64, node_info: &NodeInfo, local_best_numbd
                 if local_best_numbder > FAR_OVERLAPPING_BLOCKS {
                     from = local_best_numbder - FAR_OVERLAPPING_BLOCKS;
                 }
-            } else {
+            } else if node_best_number >= local_best_numbder - BACKWARD_SYNC_STEP {
                 if local_best_numbder > CLOSE_OVERLAPPING_BLOCKS {
                     from = local_best_numbder - CLOSE_OVERLAPPING_BLOCKS;
                 }
+            } else {
+                // Do not sync from a node with higher td but far too lower block number.
+                // That node's td is probably corrupted.
+                // TODO: should remove peer or not?
+                return false;
             }
         }
         Mode::Backward => {

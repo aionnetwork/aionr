@@ -223,6 +223,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     let deps_for_rpc_apis = Arc::new(rpc_apis::FullDependencies {
         client: client.clone(),
+        sync: sync.clone(),
         account_store,
         miner: miner.clone(),
         external_miner: external_miner.clone(),

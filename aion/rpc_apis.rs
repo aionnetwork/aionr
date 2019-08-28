@@ -28,7 +28,7 @@ use acore::account_provider::AccountProvider;
 use acore::client::Client;
 use acore::miner::external::ExternalMiner;
 use acore::miner::Miner;
-// use acore::sync::SyncProvider;
+use acore::sync::SyncProvider;
 use aion_rpc::dispatch::{DynamicGasPrice, FullDispatcher};
 use aion_rpc::informant::{ActivityNotifier, ClientNotifier};
 use aion_rpc::Metadata;
@@ -152,8 +152,7 @@ pub trait Dependencies {
 /// RPC dependencies for a full node.
 pub struct FullDependencies {
     pub client: Arc<Client>,
-    // chris
-    // pub sync: Arc<SyncProvider>,
+    pub sync: Arc<SyncProvider>,
     pub account_store: Option<Arc<AccountProvider>>,
     pub miner: Arc<Miner>,
     pub external_miner: Arc<ExternalMiner>,
@@ -166,28 +165,28 @@ impl FullDependencies {
         &self,
         handler: &mut MetaIoHandler<Metadata, S>,
         apis: &HashSet<Api>,
-        _for_generic_pubsub: bool,
+        for_generic_pubsub: bool,
     ) where
         S: core::Middleware<Metadata>,
     {
         use aion_rpc::dispatch;
         use aion_rpc::impls::*;
         use aion_rpc::traits::*;
-        // macro_rules! add_signing_methods {
-        //     ($namespace:ident, $handler:expr, $deps:expr, $nonces:expr) => {{
-        //         let deps = &$deps;
-        //         let dispatcher = FullDispatcher::new(
-        //             deps.client.clone(),
-        //             deps.miner.clone(),
-        //             $nonces,
-        //             deps.dynamic_gas_price.clone(),
-        //         );
-        //         $handler.extend_with($namespace::to_delegate(SigningClient::new(
-        //             &deps.account_store,
-        //             dispatcher,
-        //         )))
-        //     }};
-        // }
+        macro_rules! add_signing_methods {
+            ($namespace:ident, $handler:expr, $deps:expr, $nonces:expr) => {{
+                let deps = &$deps;
+                let dispatcher = FullDispatcher::new(
+                    deps.client.clone(),
+                    deps.miner.clone(),
+                    $nonces,
+                    deps.dynamic_gas_price.clone(),
+                );
+                $handler.extend_with($namespace::to_delegate(SigningClient::new(
+                    &deps.account_store,
+                    dispatcher,
+                )))
+            }};
+        }
 
         let nonces = Arc::new(Mutex::new(dispatch::Reservations::new(
             self.executor.clone(),
@@ -203,37 +202,36 @@ impl FullDependencies {
                 Api::Web3 => {
                     handler.extend_with(Web3Client::new().to_delegate());
                 }
-                // chris
                 Api::Net => {
-                    //handler.extend_with(NetClient::new(&self.sync).to_delegate());
+                    handler.extend_with(NetClient::new(&self.sync).to_delegate());
                 }
                 Api::Eth => {
-                    // let client = EthClient::new(
-                    //     &self.client,
-                    //     &self.sync,
-                    //     &self.account_store,
-                    //     &self.miner,
-                    //     &self.external_miner,
-                    //     self.dynamic_gas_price.clone(),
-                    // );
-                    // handler.extend_with(client.to_delegate());
+                    let client = EthClient::new(
+                        &self.client,
+                        &self.sync,
+                        &self.account_store,
+                        &self.miner,
+                        &self.external_miner,
+                        self.dynamic_gas_price.clone(),
+                    );
+                    handler.extend_with(client.to_delegate());
 
-                    // if !for_generic_pubsub {
-                    //     let filter_client =
-                    //         EthFilterClient::new(self.client.clone(), self.miner.clone());
-                    //     handler.extend_with(filter_client.to_delegate());
+                    if !for_generic_pubsub {
+                        let filter_client =
+                            EthFilterClient::new(self.client.clone(), self.miner.clone());
+                        handler.extend_with(filter_client.to_delegate());
 
-                    //     add_signing_methods!(EthSigning, handler, self, nonces.clone());
-                    // }
+                        add_signing_methods!(EthSigning, handler, self, nonces.clone());
+                    }
                 }
                 Api::Stratum => {
-                    // let client = StratumClient::new(
-                    //     &self.client,
-                    //     &self.sync,
-                    //     &self.miner,
-                    //     &self.account_store,
-                    // );
-                    // handler.extend_with(client.to_delegate());
+                    let client = StratumClient::new(
+                        &self.client,
+                        &self.sync,
+                        &self.miner,
+                        &self.account_store,
+                    );
+                    handler.extend_with(client.to_delegate());
                 }
                 Api::Personal => {
                     handler.extend_with(
