@@ -94,10 +94,10 @@ const TEMP_MAX: usize = 64;
 
 #[derive(Clone)]
 pub struct Mgr {
-    /// threading
-    //runtime: Arc<Runtime>,
-    //runtime: Runtime,
+    /// shutdown hook
     shutdown_hook: Arc<RwLock<Option<Sender<()>>>>,
+    /// callback
+    callback: Option<Arc<Callable>>,
     /// config
     config: Arc<Config>,
     /// temp queue storing seeds and active nodes queried from other nodes
@@ -135,6 +135,7 @@ impl Mgr {
 
         Mgr {
             shutdown_hook: Arc::new(RwLock::new(None)),
+            callback: None,
             config,
             temp: Arc::new(Mutex::new(temp_queue)),
             nodes: Arc::new(RwLock::new(HashMap::new())),
@@ -187,6 +188,9 @@ impl Mgr {
                 if !flag {
                     if let Some(node) = lock.remove(&hash) {
                         trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
+                        if let Some(ref callback) = self.callback {
+                            callback.disconnect(hash);
+                        }
                     }
                 }
                 flag
@@ -211,12 +215,11 @@ impl Mgr {
             .unwrap()
             .clone();
 
-        let callback_in = callback.clone();
-        let callback_out = callback.clone();
+        let callback_timeout = callback.clone();
+        self.callback = Some(callback);
 
         // interval timeout
         let executor_timeout = executor.clone();
-        let callback_timeout = callback.clone();
         let p2p_timeout = self.clone();
         executor_timeout.spawn(
             Interval::new(
@@ -262,7 +265,6 @@ impl Mgr {
             ).for_each(move|_|{
 
                 let p2p_outbound_0 = p2p_outbound.clone();
-                let callback_out = callback_out.clone();
 
                 // exist lock immediately after poping temp node
                 let mut temp_node_opt: Option<TempNode> = None;
@@ -343,7 +345,7 @@ impl Mgr {
                                 // binding io futures
                                 let (sink, stream) = split_frame(ts);
                                 let read = stream.for_each(move |cb| {
-                                    p2p_outbound_2.handle(hash.clone(),cb,callback_out.clone());
+                                    p2p_outbound_2.handle(hash.clone(),cb);
                                     Ok(())
                                 }).map_err(move|err|{error!(target: "p2p", "read: {:?}", err)});
 
@@ -390,7 +392,6 @@ impl Mgr {
             .for_each(move |ts: TcpStream| {
                 // counters
                 let p2p_inbound_1 = p2p_inbound.clone();
-                let callback_in = callback_in.clone();
 
                 // TODO: black list check
                 if p2p_inbound.get_active_nodes_len() >= p2p_inbound.config.max_peers {
@@ -424,7 +425,7 @@ impl Mgr {
                 // binding io futures
                 let (sink, stream) = split_frame(ts);
                 let read = stream.for_each(move |cb| {
-                    p2p_inbound_1.handle(hash.clone(),cb,callback_in.clone());
+                    p2p_inbound_1.handle(hash.clone(),cb);
                     Ok(())
                 });
                 executor_inbound_0.spawn(read.then(|_| { Ok(()) }));
@@ -445,13 +446,13 @@ impl Mgr {
         }
 
         // clear
+        rt.block_on(rx.map_err(|_| ())).unwrap();
+        rt.shutdown_now().wait().unwrap();
         drop(server);
         drop(executor_timeout);
         drop(executor_active_nodes);
         drop(executor_outbound);
         drop(executor);
-        rt.block_on(rx.map_err(|_| ())).unwrap();
-        rt.shutdown_now().wait().unwrap();
     }
 
     /// shutdown routine
@@ -601,7 +602,7 @@ impl Mgr {
 
     /// messages with module code other than p2p module
     /// should flow into external handlers
-    fn handle(&self, hash: u64, cb: ChannelBuffer, callable: Arc<Callable>) {
+    fn handle(&self, hash: u64, cb: ChannelBuffer /*, callable: Arc<Callable>*/) {
         let p2p = self.clone();
         debug!(target: "p2p", "handle: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
         // verify if flag token has been set
@@ -629,7 +630,11 @@ impl Mgr {
                                 _ => error!(target: "p2p", "invalid action {}", cb.head.action),
                             };
                         }
-                        MODULE::EXTERNAL => callable.handle(hash, cb),
+                        MODULE::EXTERNAL => {
+                            if let Some(callback) = p2p.callback {
+                                callback.handle(hash, cb)
+                            }
+                        }
                     }
                 }
                 //VERSION::V1 => handshake::send(p2p, hash),
