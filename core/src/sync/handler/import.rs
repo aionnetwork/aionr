@@ -105,7 +105,8 @@ pub fn import_blocks(
         let mut first_imported_number = 0u64;
         let mut last_imported_number = 0u64;
         let mut backward_number = 0u64;
-        for block in blocks_to_import {
+
+        for block in &blocks_to_import {
             // TODO: need p2p to provide log infomation
             // let block_view = BlockView::new(&block);
             // let (hash, number, parent, difficulty) = {
@@ -143,6 +144,20 @@ pub fn import_blocks(
                 }
             }
         }
+
+        // Remove hashes that are not imported due to no parent
+        let mut downloaded_hashes_to_remove = Vec::new();
+        if backward_number != 0 {
+            for block in blocks_to_import {
+                let block_view = BlockView::new(&block);
+                let block_number = block_view.header_view().number();
+                let block_hash = block_view.header_view().hash();
+                if block_number >= backward_number {
+                    downloaded_hashes_to_remove.push(block_hash);
+                }
+            }
+        }
+        storage.remove_downloaded_blocks_hashes(&downloaded_hashes_to_remove);
 
         // update mode
         let node_hash = blocks_wrapper.node_hash;
@@ -184,7 +199,6 @@ pub fn import_blocks(
                 }
             }
         }
-
         // TODO: maybe we should consider reset the header request cooldown here
     }
 }

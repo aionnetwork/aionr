@@ -74,7 +74,7 @@ pub fn sync_headers(
     }
 }
 
-fn prepare_send(p2p: Mgr, node_hash: u64, node_info: &NodeInfo, local_best_numbder: u64) -> bool {
+fn prepare_send(p2p: Mgr, node_hash: u64, node_info: &NodeInfo, local_best_number: u64) -> bool {
     let node_best_number = node_info.best_block_number;
     let branch_sync_base = node_info.branch_sync_base;
     let mut from = 1u64;
@@ -83,19 +83,21 @@ fn prepare_send(p2p: Mgr, node_hash: u64, node_info: &NodeInfo, local_best_numbd
     match node_info.mode {
         Mode::Thunder => {
             // TODO: add repeat threshold
-            if local_best_numbder > FAR_OVERLAPPING_BLOCKS {
-                from = local_best_numbder - FAR_OVERLAPPING_BLOCKS;
+            if local_best_number > FAR_OVERLAPPING_BLOCKS {
+                from = local_best_number - FAR_OVERLAPPING_BLOCKS;
             }
             size = LARGE_REQUEST_SIZE;
         }
         Mode::Normal => {
-            if node_best_number >= local_best_numbder + BACKWARD_SYNC_STEP {
-                if local_best_numbder > FAR_OVERLAPPING_BLOCKS {
-                    from = local_best_numbder - FAR_OVERLAPPING_BLOCKS;
+            if node_best_number >= local_best_number + BACKWARD_SYNC_STEP {
+                if local_best_number > FAR_OVERLAPPING_BLOCKS {
+                    from = local_best_number - FAR_OVERLAPPING_BLOCKS;
                 }
-            } else if node_best_number >= local_best_numbder - BACKWARD_SYNC_STEP {
-                if local_best_numbder > CLOSE_OVERLAPPING_BLOCKS {
-                    from = local_best_numbder - CLOSE_OVERLAPPING_BLOCKS;
+            } else if local_best_number <= BACKWARD_SYNC_STEP
+                || node_best_number >= local_best_number - BACKWARD_SYNC_STEP
+            {
+                if local_best_number > CLOSE_OVERLAPPING_BLOCKS {
+                    from = local_best_number - CLOSE_OVERLAPPING_BLOCKS;
                 }
             } else {
                 // Do not sync from a node with higher td but far too lower block number.

@@ -425,12 +425,11 @@ impl ChainNotify for Sync {
             // let chain_info = client.chain_info();
             // let min_imported_block_number = chain_info.best_block_number + 1;
             // let mut max_imported_block_number = 0;
-            for hash in imported {
-                let block_id = BlockId::Hash(hash);
+            for hash in &imported {
+                let block_id = BlockId::Hash(*hash);
                 if let Some(block_number) = client.block_number(block_id) {
                     info!(target: "sync", "New block #{}, hash: {}.", block_number, hash);
                 }
-
                 // if client.block_status(block_id) == BlockStatus::InChain {
                 //     if let Some(block_number) = client.block_number(block_id) {
                 //         if max_imported_block_number < block_number {

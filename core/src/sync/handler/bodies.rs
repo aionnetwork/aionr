@@ -177,10 +177,10 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
                 transactions: bodies[i].clone(),
             };
             let hash = block.header.hash();
-            let mut downloaded_block_hashes = storage.downloaded_blocks_hashes().lock();
-            if !downloaded_block_hashes.contains_key(&hash) {
+            let mut downloaded_blocks_hashes = storage.downloaded_blocks_hashes().lock();
+            if !downloaded_blocks_hashes.contains_key(&hash) {
                 blocks.push(block);
-                downloaded_block_hashes.insert(hash, 0);
+                downloaded_blocks_hashes.insert(hash, 0);
                 trace!(target: "sync", "downloaded block hash: {}.", hash);
             }
         }

@@ -79,6 +79,13 @@ impl SyncStorage {
         downloaded_blocks_hashes.contains_key(hash)
     }
 
+    pub fn remove_downloaded_blocks_hashes(&self, hashes: &Vec<H256>) {
+        let mut downloaded_blocks_hashes = self.downloaded_blocks_hashes.lock();
+        for hash in hashes {
+            downloaded_blocks_hashes.remove(hash);
+        }
+    }
+
     pub fn insert_imported_block_hashes(&self, hashes: Vec<H256>) {
         let mut imported_blocks_hashes = self.imported_blocks_hashes.lock();
         for hash in hashes {
