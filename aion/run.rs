@@ -213,9 +213,14 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     let sync_run = sync.clone();
     service.add_notify(sync_notify);
 
-    thread::spawn(move || {
-        sync_run.run(sync_run.clone());
-    });
+    let runtime_sync = tokio::runtime::Builder::new()
+        .name_prefix("p2p-loop #")
+        .build()
+        .expect("p2p runtime loop init failed");
+    let executor_p2p = runtime_sync.executor();
+
+    sync_run.run(sync_run.clone(), executor_p2p.clone());
+
     // start rpc server
     let runtime_rpc = tokio::runtime::Builder::new()
         .name_prefix("rpc-")
@@ -297,8 +302,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .name_prefix("seal-block-loop #")
         .build()
         .expect("internal staker runtime loop init failed");
-    let executor_staker = runtime_staker.executor();
-    let close_staker = run_staker(executor_staker.clone(), client.clone());
+    let executor_internal_staker = runtime_staker.executor();
+    let close_staker = run_staker(executor_internal_staker.clone(), client.clone());
 
     // start PoS invoker
     let pos_invoker = tokio::runtime::Builder::new()
@@ -306,8 +311,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .name_prefix("seal-block-loop #")
         .build()
         .expect("internal staker runtime loop init failed");
-    let executor_staker = pos_invoker.executor();
-    let close_pos_invoker = pos_sealing(executor_staker.clone(), client.clone());
+    let executor_external_staker = pos_invoker.executor();
+    let close_pos_invoker = pos_sealing(executor_external_staker.clone(), client.clone());
 
     // Create a weak reference to the client so that we can wait on shutdown until it is dropped
     let weak_client = Arc::downgrade(&client);
@@ -336,6 +341,10 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     sync.shutdown();
 
+    runtime_sync
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown p2p&sync runtime instance!");
     runtime_rpc
         .shutdown_now()
         .wait()

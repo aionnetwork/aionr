@@ -59,6 +59,7 @@ use std::time::SystemTime;
 use std::time::Instant;
 use std::net::Shutdown;
 use std::net::SocketAddr;
+use std::io::{Error as IOError, ErrorKind as IOErrorKind};
 use rand::random;
 use futures::prelude::*;
 use futures::sync::mpsc;
@@ -69,7 +70,7 @@ use futures::sync::oneshot::Sender;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
 use tokio::prelude::*;
-use tokio::runtime::Runtime;
+use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use tokio_codec::{Decoder,Framed};
 use codec::Codec;
@@ -95,7 +96,9 @@ const TEMP_MAX: usize = 64;
 #[derive(Clone)]
 pub struct Mgr {
     /// shutdown hook
-    shutdown_hook: Arc<RwLock<Option<Sender<()>>>>,
+    shutdown_hooks: Arc<Mutex<Vec<Sender<()>>>>,
+    /// TcpListener shutdown flag
+    tcp_shutdown_flag: Arc<Mutex<bool>>,
     /// callback
     callback: Option<Arc<Callable>>,
     /// config
@@ -134,7 +137,8 @@ impl Mgr {
         );
 
         Mgr {
-            shutdown_hook: Arc::new(RwLock::new(None)),
+            shutdown_hooks: Arc::new(Mutex::new(Vec::new())),
+            tcp_shutdown_flag: Arc::new(Mutex::new(false)),
             callback: None,
             config,
             temp: Arc::new(Mutex::new(temp_queue)),
@@ -203,10 +207,8 @@ impl Mgr {
     }
 
     /// run p2p instance
-    pub fn run(&mut self, callback: Arc<Callable>) {
+    pub fn run(&mut self, callback: Arc<Callable>, executor: TaskExecutor) {
         // init
-        let mut rt = Runtime::new().unwrap();
-        let executor = rt.executor();
         let binding: SocketAddr = self
             .config
             .get_id_and_binding()
@@ -219,14 +221,13 @@ impl Mgr {
         self.callback = Some(callback);
 
         // interval timeout
-        let executor_timeout = executor.clone();
         let p2p_timeout = self.clone();
-        executor_timeout.spawn(
+        let (tx, rx) = oneshot::channel::<()>();
+        executor.spawn(
             Interval::new(
                 Instant::now(),
                 Duration::from_secs(INTERVAL_TIMEOUT)
             ).for_each(move|_|{
-
                 let now = SystemTime::now();
                 let mut index: Vec<u64> = vec![];
                 if let Ok(mut write) = p2p_timeout.nodes.try_write(){
@@ -251,14 +252,21 @@ impl Mgr {
                     }
                 }
                 Ok(())
-            }).map_err(|err| error!(target: "p2p", "executor timeout: {:?}", err))
+            })
+            .map_err(|err| error!(target: "p2p", "executor timeout: {:?}", err))
+            .select(rx.map_err(|_| {}))
+            .map(|_| ())
+            .map_err(|_| ())
         );
+        if let Ok(mut shutdown_hooks) = self.shutdown_hooks.lock() {
+            shutdown_hooks.push(tx);
+        }
 
         // interval outbound
-        let executor_outbound = executor.clone();
-        let executor_outbound_0 = executor_outbound.clone();
+        let executor_outbound_0 = executor.clone();
         let p2p_outbound = self.clone();
-        executor_outbound.spawn(
+        let (tx, rx) = oneshot::channel::<()>();
+        executor.spawn(
             Interval::new(
                 Instant::now(),
                 Duration::from_secs(INTERVAL_OUTBOUND_CONNECT)
@@ -366,28 +374,41 @@ impl Mgr {
                     }
                 }
                 Ok(())
-            }).map_err(|err| error!(target: "p2p", "executor outbound: {:?}", err))
+            })
+            .map_err(|err| error!(target: "p2p", "executor outbound: {:?}", err))
+            .select(rx.map_err(|_| {}))
+            .map(|_| ())
+            .map_err(|_| ())
         );
+        if let Ok(mut shutdown_hooks) = self.shutdown_hooks.lock() {
+            shutdown_hooks.push(tx);
+        }
 
         // interval active nodes
-        let executor_active_nodes = executor.clone();
         let p2p_active_nodes = self.clone();
-        executor_active_nodes.spawn(
+        let (tx, rx) = oneshot::channel::<()>();
+        executor.spawn(
             Interval::new(Instant::now(), Duration::from_secs(INTERVAL_ACTIVE_NODES))
                 .for_each(move |_| {
                     let p2p_active_nodes_0 = p2p_active_nodes.clone();
                     active_nodes::send(p2p_active_nodes_0);
                     Ok(())
                 })
-                .map_err(|err| error!(target: "p2p", "executor active nodes: {:?}", err)),
+                .map_err(|err| error!(target: "p2p", "executor active nodes: {:?}", err))
+                .select(rx.map_err(|_| {}))
+                .map(|_| ())
+                .map_err(|_| ()),
         );
+        if let Ok(mut shutdown_hooks) = self.shutdown_hooks.lock() {
+            shutdown_hooks.push(tx);
+        }
 
         // interval inbound
         let executor_inbound_0 = executor.clone();
         let executor_inbound_1 = executor.clone();
         let p2p_inbound = self.clone();
         let listener = TcpListener::bind(&binding).expect("binding failed");
-        let server = listener
+        let _ = listener
             .incoming()
             .for_each(move |ts: TcpStream| {
                 // counters
@@ -403,11 +424,11 @@ impl Mgr {
                 config_stream(&ts);
 
                 // construct node instance and store it
-                let (tx, rx) = mpsc::channel(409600);
+                let (tx_channel, rx_channel) = mpsc::channel(409600);
                 let ts_0 = ts.try_clone().unwrap();
                 let node = Node::new_inbound(
                     ts_0,
-                    tx,
+                    tx_channel,
                     false
                 );
                 let hash = node.get_hash();
@@ -425,53 +446,54 @@ impl Mgr {
                 // binding io futures
                 let (sink, stream) = split_frame(ts);
                 let read = stream.for_each(move |cb| {
-                    p2p_inbound_1.handle(hash.clone(),cb);
+                    p2p_inbound_1.handle(hash.clone(), cb);
                     Ok(())
                 });
                 executor_inbound_0.spawn(read.then(|_| { Ok(()) }));
-                let write = sink.send_all(rx.map_err(|()| {
+                let write = sink.send_all(rx_channel.map_err(|()| {
                     io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")
                 }));
                 executor_inbound_1.spawn(write.then(|_| { Ok(()) }));
+
+                // Exit if the shutdown flag is set to true
+                if let Ok(tcp_shutdown_flag) = self.tcp_shutdown_flag.lock() {
+                    if *tcp_shutdown_flag {
+                        return Err(IOError::new(IOErrorKind::Other, "P2p TCP listener exist."));
+                    } else {
+                        return Ok(());
+                    }
+                }
                 Ok(())
-            }).map_err(|err| error!(target: "p2p", "executor server: {:?}", err));
-
-        // bind shutdown hook
-        let (tx, rx) = oneshot::channel::<()>();
-        {
-            match self.shutdown_hook.write() {
-                Ok(mut guard) => *guard = Some(tx),
-                Err(_error) => {}
-            }
-        }
-
-        // clear
-        rt.block_on(rx.map_err(|_| ())).unwrap();
-        rt.shutdown_now().wait().unwrap();
-        drop(server);
-        drop(executor_timeout);
-        drop(executor_active_nodes);
-        drop(executor_outbound);
-        drop(executor);
+            })
+            .map_err(|err| error!(target: "p2p", "executor server: {:?}", err));
     }
 
     /// shutdown routine
     pub fn shutdown(&self) {
         info!(target: "p2p" , "p2p shutdown start");
-        if let Ok(mut lock) = self.shutdown_hook.write() {
-            if lock.is_some() {
-                let tx = lock.take().unwrap();
-                match tx.send(()) {
-                    Ok(_) => {
-                        debug!(target: "p2p", "shutdown signal sent");
-                    }
-                    Err(err) => {
-                        error!(target: "p2p", "shutdown: {:?}", err);
+        // Shutdown runtime tasks
+        if let Ok(mut shutdown_hooks) = self.shutdown_hooks.lock() {
+            while !shutdown_hooks.is_empty() {
+                if let Some(shutdown_hook) = shutdown_hooks.pop() {
+                    match shutdown_hook.send(()) {
+                        Ok(_) => {
+                            debug!(target: "p2p", "shutdown signal sent");
+                        }
+                        Err(err) => {
+                            error!(target: "p2p", "shutdown: {:?}", err);
+                        }
                     }
                 }
             }
         }
 
+        // Shutdown the tcp listener
+        if let Ok(mut tcp_shutdown_flag) = self.tcp_shutdown_flag.lock() {
+            *tcp_shutdown_flag = true;
+            debug!(target: "p2p", "tcp listener shutdown flag set");
+        }
+
+        // Disconnect nodes
         if let Ok(mut lock) = self.nodes.write() {
             for (_hash, mut node) in lock.iter_mut() {
                 match node.ts.shutdown(Shutdown::Both) {

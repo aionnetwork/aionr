@@ -33,14 +33,13 @@ use std::time::Instant;
 use itertools::Itertools;
 // use std::time::SystemTime;
 use std::collections::{HashMap};
-use std::thread;
 use client::{BlockId, BlockChainClient, ChainNotify};
 // use transaction::UnverifiedTransaction;
 use aion_types::{H256,U256};
 use futures::Future;
 use futures::Stream;
 use lru_cache::LruCache;
-use tokio::runtime::Runtime;
+use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use futures::sync::oneshot;
 use futures::sync::oneshot::Sender;
@@ -80,7 +79,7 @@ pub struct Sync {
 
     client: Arc<BlockChainClient>,
 
-    shutdown_hook: Arc<RwLock<Option<Sender<()>>>>,
+    shutdown_hooks: Arc<Mutex<Vec<Sender<()>>>>,
 
     p2p: Mgr,
 
@@ -135,7 +134,7 @@ impl Sync {
             _config: config.clone(),
             client,
             p2p: Mgr::new(config, token_rules),
-            shutdown_hook: Arc::new(RwLock::new(None)),
+            shutdown_hooks: Arc::new(Mutex::new(Vec::new())),
             storage: Arc::new(SyncStorage::new()),
             node_info: Arc::new(RwLock::new(HashMap::new())),
             network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
@@ -147,24 +146,20 @@ impl Sync {
         }
     }
 
-    pub fn run(&self, sync: Arc<Sync>) {
-        // counters
-        let mut runtime = Runtime::new().expect("new sync runtime failed!");
-        let executor = runtime.executor();
-
-        // init p2p;
+    pub fn run(&self, sync: Arc<Sync>, executor: TaskExecutor) {
+        // init p2p
         let p2p = &self.p2p.clone();
         let mut p2p_0 = p2p.clone();
-        thread::spawn(move || {
-            p2p_0.run(sync.clone());
-        });
+        p2p_0.run(sync.clone(), executor.clone());
+
+        let mut shutdown_hooks = self.shutdown_hooks.lock();
 
         // interval statics
         let node_info = self.node_info.clone();
-        let executor_statics = executor.clone();
         let p2p_statics = p2p.clone();
         let client_statics = self.client.clone();
-        executor_statics.spawn(
+        let (tx, rx) = oneshot::channel::<()>();
+        executor.spawn(
             Interval::new(
                 Instant::now(),
                 Duration::from_secs(INTERVAL_STATISICS)
@@ -218,28 +213,37 @@ impl Sync {
                 }
 
                 Ok(())
-            }).map_err(|err| error!(target: "sync", "executor statics: {:?}", err))
+            })
+            .map_err(|err| error!(target: "sync", "executor statics: {:?}", err))
+            .select(rx.map_err(|_| {}))
+            .map(|_| ())
+            .map_err(|_| ())
         );
+        shutdown_hooks.push(tx);
 
         // status thread
         let p2p_status = p2p.clone();
-        let executor_status = executor.clone();
         let node_info_status = self.node_info.clone();
-        executor_status.spawn(
+        let (tx, rx) = oneshot::channel::<()>();
+        executor.spawn(
             Interval::new(Instant::now(), Duration::from_millis(INTERVAL_STATUS))
                 .for_each(move |_| {
                     status::send_random(p2p_status.clone(), node_info_status.clone());
                     Ok(())
                 })
-                .map_err(|err| error!(target: "p2p", "executor status: {:?}", err)),
+                .map_err(|err| error!(target: "sync", "executor status: {:?}", err))
+                .select(rx.map_err(|_| {}))
+                .map(|_| ())
+                .map_err(|_| ()),
         );
+        shutdown_hooks.push(tx);
 
         // sync headers thread
         let p2p_header = p2p.clone();
-        let executor_header = executor.clone();
         let node_info_header = self.node_info.clone();
         let client_header = self.client.clone();
-        executor_header.spawn(
+        let (tx, rx) = oneshot::channel::<()>();
+        executor.spawn(
             Interval::new(Instant::now(), Duration::from_millis(INTERVAL_HEADERS))
                 .for_each(move |_| {
                     let chain_info = client_header.chain_info();
@@ -253,28 +257,36 @@ impl Sync {
                     );
                     Ok(())
                 })
-                .map_err(|err| error!(target: "sync", "executor header: {:?}", err)),
+                .map_err(|err| error!(target: "sync", "executor header: {:?}", err))
+                .select(rx.map_err(|_| {}))
+                .map(|_| ())
+                .map_err(|_| ()),
         );
+        shutdown_hooks.push(tx);
 
         // sync bodies thread
         let p2p_body = p2p.clone();
-        let executor_body = executor.clone();
         let storage_body = self.storage.clone();
-        executor_body.spawn(
+        let (tx, rx) = oneshot::channel::<()>();
+        executor.spawn(
             Interval::new(Instant::now(), Duration::from_millis(INTERVAL_BODIES))
                 .for_each(move |_| {
                     bodies::sync_bodies(p2p_body.clone(), storage_body.clone());
                     Ok(())
                 })
-                .map_err(|err| error!(target: "sync", "executor body: {:?}", err)),
+                .map_err(|err| error!(target: "sync", "executor body: {:?}", err))
+                .select(rx.map_err(|_| {}))
+                .map(|_| ())
+                .map_err(|_| ()),
         );
+        shutdown_hooks.push(tx);
 
         // import thread
-        let executor_import = executor.clone();
         let client_import = self.client.clone();
         let storage_import = self.storage.clone();
         let node_info_import = self.node_info.clone();
-        executor_import.spawn(
+        let (tx, rx) = oneshot::channel::<()>();
+        executor.spawn(
             Interval::new(Instant::now(), Duration::from_millis(INTERVAL_BODIES))
                 .for_each(move |_| {
                     import::import_blocks(
@@ -284,38 +296,29 @@ impl Sync {
                     );
                     Ok(())
                 })
-                .map_err(|err| error!(target: "sync", "executor import: {:?}", err)),
+                .map_err(|err| error!(target: "sync", "executor import: {:?}", err))
+                .select(rx.map_err(|_| {}))
+                .map(|_| ())
+                .map_err(|_| ()),
         );
-
-        // bind shutdown hook
-        let (tx, rx) = oneshot::channel::<()>();
-        {
-            let mut guard = self.shutdown_hook.write();
-            *guard = Some(tx);
-        }
-
-        // clear
-        runtime.block_on(rx.map_err(|_| ())).unwrap();
-        runtime.shutdown_now().wait().unwrap();
-        drop(executor_statics);
-        drop(executor_status);
-        drop(executor_header);
-        drop(executor_body);
-        drop(executor);
+        shutdown_hooks.push(tx);
     }
 
     pub fn shutdown(&self) {
+        // Shutdown p2p
         &self.p2p.shutdown();
         info!(target:"sync", "sync shutdown start");
-        let mut lock = self.shutdown_hook.write();
-        if lock.is_some() {
-            let tx = lock.take().unwrap();
-            match tx.send(()) {
-                Ok(_) => {
-                    debug!(target: "sync", "shutdown signal sent");
-                }
-                Err(err) => {
-                    error!(target: "sync", "shutdown: {:?}", err);
+        // Shutdown runtime tasks
+        let mut shutdown_hooks = self.shutdown_hooks.lock();
+        while !shutdown_hooks.is_empty() {
+            if let Some(shutdown_hook) = shutdown_hooks.pop() {
+                match shutdown_hook.send(()) {
+                    Ok(_) => {
+                        debug!(target: "sync", "shutdown signal sent");
+                    }
+                    Err(err) => {
+                        error!(target: "sync", "shutdown: {:?}", err);
+                    }
                 }
             }
         }
