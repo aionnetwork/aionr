@@ -59,7 +59,6 @@ use std::time::SystemTime;
 use std::time::Instant;
 use std::net::Shutdown;
 use std::net::SocketAddr;
-use std::io::{Error as IOError, ErrorKind as IOErrorKind};
 use rand::random;
 use futures::prelude::*;
 use futures::sync::mpsc;
@@ -97,8 +96,6 @@ const TEMP_MAX: usize = 64;
 pub struct Mgr {
     /// shutdown hook
     shutdown_hooks: Arc<Mutex<Vec<Sender<()>>>>,
-    /// TcpListener shutdown flag
-    tcp_shutdown_flag: Arc<Mutex<bool>>,
     /// callback
     callback: Option<Arc<Callable>>,
     /// config
@@ -138,7 +135,6 @@ impl Mgr {
 
         Mgr {
             shutdown_hooks: Arc::new(Mutex::new(Vec::new())),
-            tcp_shutdown_flag: Arc::new(Mutex::new(false)),
             callback: None,
             config,
             temp: Arc::new(Mutex::new(temp_queue)),
@@ -271,7 +267,6 @@ impl Mgr {
                 Instant::now(),
                 Duration::from_secs(INTERVAL_OUTBOUND_CONNECT)
             ).for_each(move|_|{
-
                 let p2p_outbound_0 = p2p_outbound.clone();
 
                 // exist lock immediately after poping temp node
@@ -407,8 +402,9 @@ impl Mgr {
         let executor_inbound_0 = executor.clone();
         let executor_inbound_1 = executor.clone();
         let p2p_inbound = self.clone();
+        let (tx, rx) = oneshot::channel::<()>();
         let listener = TcpListener::bind(&binding).expect("binding failed");
-        let _ = listener
+        let tcp_executor = listener
             .incoming()
             .for_each(move |ts: TcpStream| {
                 // counters
@@ -455,17 +451,16 @@ impl Mgr {
                 }));
                 executor_inbound_1.spawn(write.then(|_| { Ok(()) }));
 
-                // Exit if the shutdown flag is set to true
-                if let Ok(tcp_shutdown_flag) = self.tcp_shutdown_flag.lock() {
-                    if *tcp_shutdown_flag {
-                        return Err(IOError::new(IOErrorKind::Other, "P2p TCP listener exist."));
-                    } else {
-                        return Ok(());
-                    }
-                }
                 Ok(())
             })
-            .map_err(|err| error!(target: "p2p", "executor server: {:?}", err));
+            .map_err(|err| error!(target: "p2p", "executor server: {:?}", err))
+            .select(rx.map_err(|_| {}))
+            .map(|_| ())
+            .map_err(|_| ());
+        executor.spawn(tcp_executor);
+        if let Ok(mut shutdown_hooks) = self.shutdown_hooks.lock() {
+            shutdown_hooks.push(tx);
+        }
     }
 
     /// shutdown routine
@@ -485,12 +480,6 @@ impl Mgr {
                     }
                 }
             }
-        }
-
-        // Shutdown the tcp listener
-        if let Ok(mut tcp_shutdown_flag) = self.tcp_shutdown_flag.lock() {
-            *tcp_shutdown_flag = true;
-            debug!(target: "p2p", "tcp listener shutdown flag set");
         }
 
         // Disconnect nodes
@@ -556,7 +545,7 @@ impl Mgr {
     pub fn get_statics_info(&self) -> (usize, HashMap<u64, (String, String, String, &str)>) {
         let mut len = 0;
         let mut statics_info = HashMap::new();
-        if let Ok(read) = self.nodes.try_read() {
+        if let Ok(read) = self.nodes.read() {
             len = read.len();
             for node in read.values() {
                 if node.state == STATE::ACTIVE {
