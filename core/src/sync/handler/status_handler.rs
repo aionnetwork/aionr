@@ -132,13 +132,6 @@ impl StatusHandler {
             }
         }
 
-        if SyncStorage::get_network_best_block_number() <= SyncStorage::get_synced_block_number() {
-            node.last_request_timestamp = SystemTime::now();
-            P2pMgr::update_node(node.node_hash, node);
-        } else {
-            BlockHeadersHandler::get_headers_from_random_node();
-        }
-
         // if SyncStorage::get_network_best_block_number() <= SyncStorage::get_synced_block_number() {
         //     node.last_request_timestamp = SystemTime::now();
         //     P2pMgr::update_node(node.node_hash, node);
@@ -148,11 +141,11 @@ impl StatusHandler {
         // ------
         // FIX: syncing should be determined by difficuly but not block number
         // ------
-        // if node.target_total_difficulty <= node.current_total_difficulty {
-        //     node.last_request_timestamp = SystemTime::now();
-        //     P2pMgr::update_node(node.node_hash, node);
-        // } else {
-        //     BlockHeadersHandler::get_headers_from_node(node);
-        // }
+        if node.target_total_difficulty <= node.current_total_difficulty {
+            node.last_request_timestamp = SystemTime::now();
+            P2pMgr::update_node(node.node_hash, node);
+        } else {
+            BlockHeadersHandler::get_headers_from_node(node);
+        }
     }
 }

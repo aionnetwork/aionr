@@ -111,12 +111,11 @@ impl BlockHeadersHandler {
                     } else if node_num >= self_num - BACKWARD_SYNC_STEP {
                         from = self_num - 16;
                     } else {
-                        return;
                         // return;
                         // ------
                         // FIX: must consider a case when syncing backward (chain reorg) node_num < self_num - BACKWARD_SYNC_STEP
                         // ------
-                        // from = node_num;
+                        from = node_num;
                     }
                 }
                 Mode::BACKWARD => {

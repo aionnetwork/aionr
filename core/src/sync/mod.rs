@@ -194,34 +194,6 @@ impl SyncMgr {
                     info!(target: "sync", "{:-^127}","");
                 }
 
-                if block_number_now + 8 < SyncStorage::get_network_best_block_number()
-                    && block_number_now - block_number_last_time < 2
-                {
-                    SyncStorage::get_block_chain().clear_queue();
-                    SyncStorage::get_block_chain().clear_bad();
-                    SyncStorage::clear_downloaded_headers();
-                    SyncStorage::clear_downloaded_blocks();
-                    SyncStorage::clear_downloaded_block_hashes();
-                    SyncStorage::clear_requested_blocks();
-                    SyncStorage::clear_headers_with_bodies_requested();
-                    SyncStorage::set_synced_block_number(
-                        SyncStorage::get_chain_info().best_block_number,
-                    );
-                    let abnormal_mode_nodes_count =
-                        P2pMgr::get_nodes_count_with_mode(Mode::BACKWARD)
-                            + P2pMgr::get_nodes_count_with_mode(Mode::FORWARD);
-                    if abnormal_mode_nodes_count > (active_nodes_count / 5)
-                        || active_nodes_count == 0
-                    {
-                        info!(target: "sync", "Abnormal status, reseting network...");
-                        P2pMgr::reset();
-
-                        SyncStorage::clear_imported_block_hashes();
-                        SyncStorage::clear_staged_blocks();
-                        SyncStorage::set_max_staged_block_number(0);
-                    }
-                }
-
                 // if block_number_now + 8 < SyncStorage::get_network_best_block_number()
                 //     && block_number_now - block_number_last_time < 2
                 // {

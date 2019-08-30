@@ -115,18 +115,19 @@ impl ImportHandler {
                                         max_block_number,
                                     );
                                     SyncStorage::set_synced_block_number(max_block_number);
-                                } else {
-                                    // } else {
-                                    // ------
-                                    // FIX:
-                                    //   synced_block_number is set when new block imported successfully
-                                    //   synced_block_number_last_time is set to the local best block
-                                    //   when doing a deep chain reorg, steps will be:
-                                    //     1. BACKWARD syncing till the fork point
-                                    //     2. FORWARD syncing to the highest (total difficulty) block
-                                    //   During step 2, if it can't be done within one syncing batch, synced_block_number will not be equal to synced_block_number_last_time. In this case, we can't switch to NORMAL because the FORWARD syncing is not finished yet.
-                                    // ------
-                                    // } else if SyncStorage::get_synced_block_number() >= SyncStorage::get_network_best_block_number() {
+                                // } else {
+                                // ------
+                                // FIX:
+                                //   synced_block_number is set when new block imported successfully
+                                //   synced_block_number_last_time is set to the local best block
+                                //   when doing a deep chain reorg, steps will be:
+                                //     1. BACKWARD syncing till the fork point
+                                //     2. FORWARD syncing to the highest (total difficulty) block
+                                //   During step 2, if it can't be done within one syncing batch, synced_block_number will not be equal to synced_block_number_last_time. In this case, we can't switch to NORMAL because the FORWARD syncing is not finished yet.
+                                // ------
+                                } else if SyncStorage::get_synced_block_number()
+                                    >= SyncStorage::get_network_best_block_number()
+                                {
                                     info!(target: "sync", "Node: {}, the best block #{} found, switched from FORWARD mode to NORMAL mode", node.get_node_id(), max_block_number);
                                     node.mode = Mode::NORMAL;
                                 }
@@ -258,17 +259,15 @@ impl ImportHandler {
                                         // break;
                                     }
                                     Mode::FORWARD => {
-                                        info!(target: "sync", "Node: {}, found the best block #{} with status {:?}, switched to NORMAL mode", node.get_node_id(), number, status);
-                                        node.mode = Mode::NORMAL;
                                         // info!(target: "sync", "Node: {}, found the best block #{} with status {:?}, switched to NORMAL mode", node.get_node_id(), number, status);
                                         // node.mode = Mode::NORMAL;
                                         // ------
                                         // FIX: Same as above FIX
                                         // ------
-                                        // if number >= SyncStorage::get_network_best_block_number() {
-                                        //   info!(target: "sync", "Node: {}, found the best block #{} with status {:?}, switched to NORMAL mode", node.get_node_id(), number, status);
-                                        //   node.mode = Mode::NORMAL;
-                                        // }
+                                        if number >= SyncStorage::get_network_best_block_number() {
+                                            info!(target: "sync", "Node: {}, found the best block #{} with status {:?}, switched to NORMAL mode", node.get_node_id(), number, status);
+                                            node.mode = Mode::NORMAL;
+                                        }
                                         P2pMgr::update_node_with_mode(node.node_hash, &node);
                                         // break;
                                     }
