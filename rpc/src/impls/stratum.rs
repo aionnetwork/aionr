@@ -372,15 +372,15 @@ where
     }
 
     /// PoS submit seed
-    fn pos_submit_seed(&self, seed: H512, staker: H256) -> Result<H256> {
+    /// seed: signed seed by staker
+    /// psk: public key of staker
+    fn pos_submit_seed(&self, seed: H512, psk: H256) -> Result<H256> {
         // block template is generated each 20 secs
         // try to get block hash
 
-        debug!(target: "miner", "submit seed: {:?} - {:?}", seed, staker);
+        debug!(target: "miner", "submit seed: {:?} - {:?}", seed, psk);
 
-        let template = self
-            .miner
-            .get_pos_template(&*self.client, seed.into(), staker);
+        let template = self.miner.get_pos_template(&*self.client, seed.into(), psk);
 
         if template.is_some() {
             return Ok(template.unwrap().into());

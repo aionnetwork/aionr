@@ -286,7 +286,8 @@ impl Miner {
             Some(b) => {
                 if b.header().timestamp() <= timestamp_now {
                     let seal = b.header().seal();
-                    let stake = client.get_stake(b.header().author());
+                    let stake = client
+                        .get_stake(&b.header().get_pk_of_pos().unwrap_or(H256::default()), None);
                     if let Ok(sealed) = b.clone().lock().try_seal_pos(
                         &*self.engine,
                         seal.to_owned(),
@@ -342,10 +343,10 @@ impl Miner {
             .expect("Internal staker is null. Should have checked before.");
         let sk: [u8; 64] = staker.secret().0;
         let pk: [u8; 32] = staker.public().0;
-        let address: Address = staker.address();
+        // let address: Address = staker.address();
 
         // 1. Get the stake. Stop proceeding if stake is 0.
-        let stake: u64 = match client.get_stake(&address) {
+        let stake: u64 = match client.get_stake(&pk.into(), None) {
             Some(stake) if stake > 0 => stake,
             _ => return Ok(()),
         };
@@ -1400,6 +1401,11 @@ impl MinerService for Miner {
         *best_pos = None;
     }
 
+    /// Generate PoS block template
+    ///
+    /// client: client which is able to interact with staking contract
+    /// seed: new seed committed by signer
+    /// pk: public key of signer
     fn get_pos_template(
         &self,
         client: &MiningBlockChainClient,
@@ -1407,8 +1413,9 @@ impl MinerService for Miner {
         pk: H256,
     ) -> Option<H256>
     {
-        let address = public_to_address_ed25519(&pk);
-        let stake = client.get_stake(&address).unwrap_or(0);
+        //WARN: if coinbase is not found, send reward to black hole: full zero address
+        let coinbase = client.get_coinbase(&pk);
+        let stake = client.get_stake(&pk, coinbase).unwrap_or(0);
         if stake == 0 {
             return None;
         }
@@ -1457,7 +1464,7 @@ impl MinerService for Miner {
             client,
             &Some(SealType::PoS),
             Some(new_timestamp),
-            Some(address),
+            Some(coinbase.unwrap_or(H256::default())),
             Some(&seed),
         );
 
@@ -1484,10 +1491,10 @@ impl MinerService for Miner {
         block: ClosedBlock,
     ) -> Result<(), Error>
     {
-        let address = public_to_address_ed25519(&seal[2][..].into());
+        // let address = public_to_address_ed25519(&seal[2][..].into());
         let best_block_header = client.best_block_header_with_seal_type(&SealType::PoS);
 
-        let stake = client.get_stake(&address);
+        let stake = client.get_stake(&seal[2][..].into(), None);
 
         debug!(target: "miner", "start sealing");
 

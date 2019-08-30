@@ -38,6 +38,7 @@ use miner::MinerService;
 use tempdir::TempDir;
 use helpers::*;
 use header::SealType;
+use aion_types::H256;
 
 #[test]
 fn imports_from_empty() {
@@ -90,7 +91,7 @@ fn client_check_vote() {
     )
     .unwrap();
 
-    assert!(client.get_stake(&Address::default()).is_none());
+    assert!(client.get_stake(&H256::default(), None).is_none());
 }
 
 #[test]
