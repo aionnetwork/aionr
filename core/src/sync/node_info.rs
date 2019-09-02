@@ -28,7 +28,7 @@ pub enum Mode {
     Normal,
     Backward,
     Forward,
-    // Lightning,
+    Lightning,
     Thunder,
 }
 
@@ -38,7 +38,7 @@ impl Display for Mode {
             Mode::Normal => write!(f, "NORMAL"),
             Mode::Backward => write!(f, "BACKWARD"),
             Mode::Forward => write!(f, "FORWARD"),
-            // Mode::Lightning => write!(f, "LIGHTNING"),
+            Mode::Lightning => write!(f, "LIGHTNING"),
             Mode::Thunder => write!(f, "THUNDER"),
         }
     }
@@ -56,8 +56,8 @@ pub struct NodeInfo {
     pub last_headers_request_time: SystemTime,
     /// syncing mode
     pub mode: Mode,
-    /// base number for backward and forward syncing
-    pub branch_sync_base: u64,
+    /// base number for backward, forward and lightning syncing
+    pub sync_base_number: u64,
 }
 
 impl NodeInfo {
@@ -68,7 +68,7 @@ impl NodeInfo {
             best_block_hash: H256::default(),
             last_headers_request_time: UNIX_EPOCH,
             mode: Mode::Normal,
-            branch_sync_base: 0u64,
+            sync_base_number: 0u64,
         }
     }
 

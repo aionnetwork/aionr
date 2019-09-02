@@ -42,11 +42,12 @@ use sync::storage::SyncStorage;
 use rand::{thread_rng, Rng};
 
 const NORMAL_REQUEST_SIZE: u32 = 24;
-const LARGE_REQUEST_SIZE: u32 = 40;
+const LARGE_REQUEST_SIZE: u32 = 44;
 const REQUEST_COOLDOWN: u64 = 5000;
 const BACKWARD_SYNC_STEP: u64 = NORMAL_REQUEST_SIZE as u64 * 6 - 1;
 const FAR_OVERLAPPING_BLOCKS: u64 = 3;
 const CLOSE_OVERLAPPING_BLOCKS: u64 = 15;
+const JUMP_SIZE: u64 = 200;
 
 pub fn sync_headers(
     p2p: Mgr,
@@ -76,18 +77,11 @@ pub fn sync_headers(
 
 fn prepare_send(p2p: Mgr, node_hash: u64, node_info: &NodeInfo, local_best_number: u64) -> bool {
     let node_best_number = node_info.best_block_number;
-    let branch_sync_base = node_info.branch_sync_base;
+    let sync_base_number = node_info.sync_base_number;
     let mut from = 1u64;
     let mut size: u32 = NORMAL_REQUEST_SIZE;
 
     match node_info.mode {
-        Mode::Thunder => {
-            // TODO: add repeat threshold
-            if local_best_number > FAR_OVERLAPPING_BLOCKS {
-                from = local_best_number - FAR_OVERLAPPING_BLOCKS;
-            }
-            size = LARGE_REQUEST_SIZE;
-        }
         Mode::Normal => {
             if node_best_number >= local_best_number + BACKWARD_SYNC_STEP {
                 if local_best_number > FAR_OVERLAPPING_BLOCKS {
@@ -106,13 +100,28 @@ fn prepare_send(p2p: Mgr, node_hash: u64, node_info: &NodeInfo, local_best_numbe
                 return false;
             }
         }
+        Mode::Thunder => {
+            // TODO: add repeat threshold
+            if local_best_number > FAR_OVERLAPPING_BLOCKS {
+                from = local_best_number - FAR_OVERLAPPING_BLOCKS;
+            }
+            size = LARGE_REQUEST_SIZE;
+        }
+        Mode::Lightning => {
+            if local_best_number + LARGE_REQUEST_SIZE as u64 * 3 > sync_base_number {
+                from = sync_base_number + JUMP_SIZE
+            } else {
+                from = sync_base_number;
+            }
+            size = LARGE_REQUEST_SIZE;
+        }
         Mode::Backward => {
-            if branch_sync_base > BACKWARD_SYNC_STEP {
-                from = branch_sync_base - BACKWARD_SYNC_STEP;
+            if sync_base_number > BACKWARD_SYNC_STEP {
+                from = sync_base_number - BACKWARD_SYNC_STEP;
             }
         }
         Mode::Forward => {
-            from = branch_sync_base + 1;
+            from = sync_base_number;
         }
     }
 

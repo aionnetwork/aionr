@@ -503,7 +503,7 @@ impl Mgr {
     /// get copy of active nodes as vec
     pub fn get_active_nodes(&self) -> Vec<Node> {
         let mut active_nodes: Vec<Node> = Vec::new();
-        if let Ok(read) = &self.nodes.try_read() {
+        if let Ok(read) = &self.nodes.read() {
             for node in read.values() {
                 if node.state == STATE::ACTIVE {
                     active_nodes.push(node.clone())

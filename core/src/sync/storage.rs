@@ -46,6 +46,9 @@ pub struct SyncStorage {
 
     /// Bodies request record
     headers_with_bodies_requested: Mutex<HashMap<u64, HeadersWrapper>>,
+
+    /// Staged blocks to be imported later
+    staged_blocks: Mutex<LruCache<H256, Vec<Vec<u8>>>>,
 }
 
 impl SyncStorage {
@@ -53,9 +56,10 @@ impl SyncStorage {
         SyncStorage {
             downloaded_headers: Mutex::new(VecDeque::new()),
             downloaded_blocks: Mutex::new(VecDeque::new()),
-            downloaded_blocks_hashes: Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHES * 2)),
+            downloaded_blocks_hashes: Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHES * 40)),
             imported_blocks_hashes: Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHES)),
             headers_with_bodies_requested: Mutex::new(HashMap::new()),
+            staged_blocks: Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHES)),
         }
     }
 
@@ -111,5 +115,36 @@ impl SyncStorage {
     {
         let mut headers_with_bodies_requested = self.headers_with_bodies_requested.lock();
         headers_with_bodies_requested.remove(node_hash)
+    }
+
+    pub fn staged_blocks(&self) -> &Mutex<LruCache<H256, Vec<Vec<u8>>>> { &self.staged_blocks }
+
+    // pub fn insert_staged_blocks(&self, parent_hash: H256, blocks: Vec<Vec<u8>>) {
+    //     let mut staged_blocks = self.staged_blocks.lock();
+    //     if !staged_blocks.contains_key(&parent_hash) {
+    //         staged_blocks.insert(parent_hash, blocks);
+    //     }
+    // }
+
+    // pub fn is_blocks_batch_staged(&self, parent_hash: &H256) -> bool {
+    //     let mut staged_blocks = self.staged_blocks.lock();
+    //     staged_blocks.contains_key(parent_hash)
+    // }
+
+    // pub fn is_staged_blocks_full(&self) -> bool {
+    //     let staged_blocks = self.staged_blocks.lock();
+    //     staged_blocks.len() >= staged_blocks.capacity()
+    // }
+
+    pub fn stage_blocks(&self, parent_hash: H256, blocks: Vec<Vec<u8>>) -> bool {
+        let mut staged_blocks = self.staged_blocks.lock();
+        if staged_blocks.len() < staged_blocks.capacity()
+            && !staged_blocks.contains_key(&parent_hash)
+        {
+            staged_blocks.insert(parent_hash, blocks);
+            true
+        } else {
+            false
+        }
     }
 }

@@ -29,43 +29,40 @@ use header::Seal;
 use views::BlockView;
 use sync::storage::SyncStorage;
 use sync::node_info::{NodeInfo, Mode};
+use aion_types::H256;
 
-// pub fn import_staged_blocks(hash: &H256) {
-//    let mut blocks_to_import = Vec::new();
-//    if let Ok(mut staged_blocks) = SyncStorage::get_staged_blocks().lock() {
-//        if staged_blocks.contains_key(&hash) {
-//            if let Some(blocks_staged) = staged_blocks.remove(hash) {
-//                blocks_to_import.extend(blocks_staged);
-//            }
-//        }
-//    }
-//
-//    if blocks_to_import.len() > 0 {
-//        let client = SyncStorage::get_block_chain();
-//        let mut enable_import = true;
-//        for block in blocks_to_import.iter() {
-//            let block_view = BlockView::new(block);
-//            let header_view = block_view.header_view();
-//            let number = header_view.number();
-//            let hash = header_view.hash();
-//
-//            if enable_import {
-//                SyncStorage::insert_requested_time(hash);
-//                match client.import_block(block.clone()) {
-//                    Ok(_)
-//                    | Err(BlockImportError::Import(ImportError::AlreadyInChain))
-//                    | Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
-//                        trace!(target: "sync", "Staged block #{} imported...", number);
-//                    }
-//                    Err(e) => {
-//                        enable_import = false;
-//                        warn!(target: "sync", "Failed to import staged block #{}, due to {:?}", number, e);
-//                    }
-//                }
-//            }
-//        }
-//    }
-// }
+pub fn import_staged_blocks(hash: &H256, client: Arc<BlockChainClient>, storage: Arc<SyncStorage>) {
+    let mut blocks_to_import = Vec::new();
+    let mut staged_blocks = storage.staged_blocks().lock();
+    if staged_blocks.contains_key(&hash) {
+        if let Some(blocks_staged) = staged_blocks.remove(hash) {
+            blocks_to_import.extend(blocks_staged);
+        }
+    }
+    drop(staged_blocks);
+
+    if blocks_to_import.len() <= 0 {
+        return;
+    }
+
+    info!(target: "sync", "Importing {} staged blocks...", blocks_to_import.len());
+
+    for block in &blocks_to_import {
+        let block_number = BlockView::new(block).header_view().number();
+
+        match client.import_block(block.clone()) {
+            Ok(_)
+            | Err(BlockImportError::Import(ImportError::AlreadyInChain))
+            | Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
+                trace!(target: "sync", "Staged block #{} imported...", block_number);
+            }
+            Err(e) => {
+                warn!(target: "sync", "Failed to import staged block #{}, due to {:?}", block_number, e);
+                break;
+            }
+        }
+    }
+}
 
 pub fn import_blocks(
     client: Arc<BlockChainClient>,
@@ -97,14 +94,17 @@ pub fn import_blocks(
             }
         }
 
+        let mut empty_batch = false;
+        // Mark if no block to import
         if blocks_to_import.is_empty() {
-            continue;
+            empty_batch = true;
         }
 
         // Import blocks
         let mut first_imported_number = 0u64;
         let mut last_imported_number = 0u64;
-        let mut backward_number = 0u64;
+        let mut unknown_number = 0u64;
+        let mut unknown_parent_hash = H256::new();
 
         for block in &blocks_to_import {
             // TODO: need p2p to provide log infomation
@@ -135,7 +135,11 @@ pub fn import_blocks(
                     last_imported_number = block_number;
                 }
                 Err(BlockImportError::Block(BlockError::UnknownParent(_))) => {
-                    backward_number = block_number;
+                    if first_imported_number != 0u64 {
+                        error!(target: "sync", "Can't import inconsistent blocks");
+                    }
+                    unknown_number = block_number;
+                    unknown_parent_hash = block_view.header_view().parent_hash();
                     break;
                 }
                 Err(_e) => {
@@ -145,31 +149,63 @@ pub fn import_blocks(
             }
         }
 
-        // Remove hashes that are not imported due to no parent
-        let mut downloaded_hashes_to_remove = Vec::new();
-        if backward_number != 0 {
-            for block in blocks_to_import {
-                let block_view = BlockView::new(&block);
-                let block_number = block_view.header_view().number();
-                let block_hash = block_view.header_view().hash();
-                if block_number >= backward_number {
-                    downloaded_hashes_to_remove.push(block_hash);
-                }
-            }
-        }
-        storage.remove_downloaded_blocks_hashes(&downloaded_hashes_to_remove);
-
         // update mode
         let node_hash = blocks_wrapper.node_hash;
-        if let Some(node_info) = nodes_info.read().get(&node_hash) {
+        let nodes_info = nodes_info.read();
+        // Get network syncing modes (other than the current node)
+        let normal_nodes = count_nodes_with_mode(&nodes_info, &node_hash, &Mode::Normal);
+        let thunder_nodes = count_nodes_with_mode(&nodes_info, &node_hash, &Mode::Thunder);
+        let lightning_nodes = count_nodes_with_mode(&nodes_info, &node_hash, &Mode::Lightning);
+        if let Some(node_info) = nodes_info.get(&node_hash) {
+            // Get the write lock here. The operations should be kept atomic
             let mut info = node_info.write();
             let node_best_number = info.best_block_number;
             let local_best_block = client.chain_info().best_block_number;
 
-            // Sync backward
-            if backward_number != 0u64 {
-                info.switch_mode(Mode::Backward, &local_best_block, &node_hash);
-                info.branch_sync_base = backward_number;
+            // When get empty batch in backward or forward mode, switch to normal.
+            if empty_batch {
+                if info.mode == Mode::Backward || info.mode == Mode::Forward {
+                    info.switch_mode(Mode::Normal, &local_best_block, &node_hash);
+                }
+                continue;
+            }
+
+            // Handle unknown-parent blocks, based on syncing mode.
+            // We need to stage them in Lightning mode, or
+            // in other cases, discard them and switch to backward mode
+            if unknown_number != 0u64 {
+                let unknown_blocks = blocks_to_import.clone();
+                let mut unknown_blocks_hashes = Vec::new();
+                for block in &unknown_blocks {
+                    unknown_blocks_hashes.push(BlockView::new(&block).header_view().hash());
+                }
+                // In lightning mode, unknown parent blocks are far-away blocks that need to be staged and imported later
+                if info.mode == Mode::Lightning {
+                    // Try to stage blocks if not staged yet
+                    if storage.stage_blocks(unknown_parent_hash, unknown_blocks) {
+                        info!(target: "sync", "Node: {}, {} blocks staged for future import.", &node_hash, blocks_to_import.len());
+                        // Get last block number
+                        let last_block = blocks_to_import.last().expect(
+                            "checked collection is not empty. Should be able to get the last",
+                        );
+                        let next_block_number =
+                            BlockView::new(&last_block).header_view().number() + 1;
+                        // Set next step
+                        info.sync_base_number = next_block_number;
+                    }
+                    // If we cannot stage these blocks (staged blocks cache full), we need to remove downloaded records
+                    // and try to download them again later (in the next iteration).
+                    else {
+                        storage.remove_downloaded_blocks_hashes(&unknown_blocks_hashes);
+                    }
+                }
+                // In other modes, unknown parent blocks are fork blocks, and we need to sync backward
+                else {
+                    info.switch_mode(Mode::Backward, &local_best_block, &node_hash);
+                    info.sync_base_number = unknown_number;
+                    // Remove hashes that are not imported due to unknown parent in case of backward syncing.
+                    storage.remove_downloaded_blocks_hashes(&unknown_blocks_hashes);
+                }
                 continue;
             }
 
@@ -183,22 +219,52 @@ pub fn import_blocks(
                 Mode::Backward => {
                     info!(target: "sync", "Node: {}, found the fork point #{}", &node_hash, first_imported_number);
                     info.switch_mode(Mode::Forward, &local_best_block, &node_hash);
-                    info.branch_sync_base = last_imported_number;
                 }
                 // Continue forward
-                Mode::Forward => {
-                    info.branch_sync_base = last_imported_number;
-                }
+                Mode::Forward => {}
                 // Switch among NORMAL, THUNDER and LIGHTNING
-                Mode::Normal | Mode::Thunder => {
-                    if last_imported_number + 32 >= node_best_number {
-                        info.switch_mode(Mode::Normal, &local_best_block, &node_hash);
-                    } else {
-                        info.switch_mode(Mode::Thunder, &local_best_block, &node_hash);
+                Mode::Normal | Mode::Thunder | Mode::Lightning => {
+                    let mut mode = Mode::Normal;
+                    // Must have at least 1 normal node
+                    // If the target height is very close, sync in normal mode
+                    if last_imported_number + 32 < node_best_number && normal_nodes > 0 {
+                        // If the target height is far away and there are already enough normal and thunder nodes, jump to lightning
+                        if last_imported_number + 500 < node_best_number
+                            && thunder_nodes >= 1
+                            && lightning_nodes < (normal_nodes + thunder_nodes) / 2
+                        {
+                            mode = Mode::Lightning;
+                        } else {
+                            mode = Mode::Thunder;
+                        }
                     }
+                    info.switch_mode(mode, &local_best_block, &node_hash);
                 }
             }
+            // Set sync base number here for forward and lightning mode
+            info.sync_base_number = last_imported_number + 1;
         }
+        drop(nodes_info);
         // TODO: maybe we should consider reset the header request cooldown here
     }
+}
+
+fn count_nodes_with_mode(
+    nodes_info: &HashMap<u64, RwLock<NodeInfo>>,
+    node_hash: &u64,
+    mode: &Mode,
+) -> u32
+{
+    nodes_info.iter().fold(0u32, |sum, node_info_lock| {
+        // Skip the current node
+        if node_info_lock.0 == node_hash {
+            return sum;
+        }
+        let node_info = node_info_lock.1.read();
+        if &node_info.mode == mode {
+            sum + 1u32
+        } else {
+            sum
+        }
+    })
 }

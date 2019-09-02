@@ -101,7 +101,6 @@ pub fn receive_res(
 )
 {
     trace!(target: "sync", "status/receive_res");
-    trace!(target: "sync", "cb_body_len{}",cb_in.head.len);
     let (mut best_block_num, req_body_rest) = cb_in.body.split_at(mem::size_of::<u64>());
     let best_block_num = best_block_num.read_u64::<BigEndian>().unwrap_or(0);
     let (mut total_difficulty_len, req_body_rest) = req_body_rest.split_at(mem::size_of::<u8>());

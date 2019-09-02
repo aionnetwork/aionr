@@ -183,7 +183,6 @@ impl Sync {
                         }
                         drop(nodes);
 
-
                         for (hash, info) in nodes_info.iter()
                             .sorted_by(|a, b|
                                 if a.1.total_difficulty != b.1.total_difficulty {
@@ -211,7 +210,6 @@ impl Sync {
 
                     info!(target: "sync", "{:-^127}", "");
                 }
-
                 Ok(())
             })
             .map_err(|err| error!(target: "sync", "executor statics: {:?}", err))
@@ -421,15 +419,16 @@ impl ChainNotify for Sync {
 
         // TODO: to think whether we still need to do the following or not.
         if !imported.is_empty() {
-            let client = self.client.clone();
             // let chain_info = client.chain_info();
             // let min_imported_block_number = chain_info.best_block_number + 1;
             // let mut max_imported_block_number = 0;
             for hash in &imported {
+                let client = self.client.clone();
                 let block_id = BlockId::Hash(*hash);
                 if let Some(block_number) = client.block_number(block_id) {
                     info!(target: "sync", "New block #{}, hash: {}.", block_number, hash);
                 }
+                import::import_staged_blocks(hash, client, self.storage.clone());
                 // if client.block_status(block_id) == BlockStatus::InChain {
                 //     if let Some(block_number) = client.block_number(block_id) {
                 //         if max_imported_block_number < block_number {
