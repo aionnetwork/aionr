@@ -62,6 +62,7 @@ use rcrypto::ed25519;
 use key::{Ed25519KeyPair, public_to_address_ed25519};
 use num_bigint::BigUint;
 use blake2b::blake2b;
+use fixed_point::{FixedPoint,LogApproximator};
 
 struct Seed([u8; 64]);
 
@@ -389,17 +390,23 @@ impl Miner {
         let new_seed = ed25519::signature(&seed, &sk);
         let hash_of_seed = blake2b(&new_seed[..]);
         let a = BigUint::parse_bytes(
-            b"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            b"10000000000000000000000000000000000000000000000000000000000000000",
             16,
         )
         .unwrap();
-        let b = BigUint::from_bytes_be(&hash_of_seed[..]);
-        let u = ln(&a).unwrap() - ln(&b).unwrap();
-        let delta = (difficulty.as_u64() as f64) * u / (stake as f64);
+        //        let b = BigUint::from_bytes_be(&hash_of_seed[..]);
+        //        let u = ln(&a).unwrap() - ln(&b).unwrap();
+        //        let delta = (difficulty.as_u64() as f64) * u / (stake as f64);
 
-        trace!(target: "staker", "Staking...difficulty: {}, u: {}, stake: {}, delta: {}",
-               difficulty.as_u64(), u, stake, delta);
-        let new_timestamp = timestamp + max(1u64, delta as u64);
+        let u = FixedPoint::ln(a)
+            .subtruct(FixedPoint::ln(hash_of_seed.into()))
+            .expect("H256 should smaller than 2^256");
+        let delta = u.multiply_uint(difficulty.into()).divide_uint(stake.into());
+        let delta_uint: u64 = max(1u64, delta.into());
+
+        trace!(target: "staker", "Staking...difficulty: {}, u: {:?}, stake: {}, delta: {}",
+               difficulty.as_u64(), u.to_big_decimal(), stake, delta_uint);
+        let new_timestamp = timestamp + delta_uint;
 
         // 6. Determine if we can produce a new PoS block or not
         if timestamp_now >= new_timestamp {
@@ -1441,17 +1448,23 @@ impl MinerService for Miner {
 
         let hash_of_seed = blake2b(&seed[..]);
         let a = BigUint::parse_bytes(
-            b"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            b"10000000000000000000000000000000000000000000000000000000000000000",
             16,
         )
         .unwrap();
-        let b = BigUint::from_bytes_be(&hash_of_seed[..]);
-        let u = ln(&a).unwrap() - ln(&b).unwrap();
-        let delta = (difficulty.as_u64() as f64) * u / (stake as f64);
+        //        let b = BigUint::from_bytes_be(&hash_of_seed[..]);
+        //        let u = ln(&a).unwrap() - ln(&b).unwrap();
+        //        let delta = (difficulty.as_u64() as f64) * u / (stake as f64);
 
-        trace!(target: "staker", "Staking...difficulty: {}, u: {}, stake: {}, delta: {}",
-               difficulty.as_u64(), u, stake, delta);
-        let new_timestamp = timestamp + max(1u64, delta as u64);
+        let u = FixedPoint::ln(a)
+            .subtruct(FixedPoint::ln(hash_of_seed.into()))
+            .expect("H256 should smaller than 2^256");
+        let delta = u.multiply_uint(difficulty.into()).divide_uint(stake.into());
+        let delta_uint: u64 = max(1u64, delta.into());
+
+        trace!(target: "staker", "Staking...difficulty: {}, u: {:?}, stake: {}, delta: {}",
+               difficulty.as_u64(), u.to_big_decimal(), stake, delta_uint);
+        let new_timestamp = timestamp + delta_uint;
 
         let (raw_block, _): (ClosedBlock, Option<H256>) = self.prepare_block(
             client,
@@ -1652,20 +1665,20 @@ fn parse_staker(key: String) -> Result<Ed25519KeyPair, String> {
 }
 
 // TODO-Unity: To do this better
-fn ln(x: &BigUint) -> Result<f64, String> {
-    let x: Vec<u8> = x.to_bytes_le();
-
-    const BYTES: usize = 12;
-    let start = if x.len() < BYTES { 0 } else { x.len() - BYTES };
-
-    let mut n: f64 = 0.0;
-    for i in start..x.len() {
-        n = n / 256f64 + (x[i] as f64);
-    }
-    let ln_256: f64 = (256f64).ln();
-
-    Ok(n.ln() + ln_256 * ((x.len() - 1) as f64))
-}
+//fn ln(x: &BigUint) -> Result<f64, String> {
+//    let x: Vec<u8> = x.to_bytes_le();
+//
+//    const BYTES: usize = 12;
+//    let start = if x.len() < BYTES { 0 } else { x.len() - BYTES };
+//
+//    let mut n: f64 = 0.0;
+//    for i in start..x.len() {
+//        n = n / 256f64 + (x[i] as f64);
+//    }
+//    let ln_256: f64 = (256f64).ln();
+//
+//    Ok(n.ln() + ln_256 * ((x.len() - 1) as f64))
+//}
 
 #[cfg(test)]
 mod tests {

@@ -25,13 +25,18 @@ extern crate num_traits;
 #[macro_use]
 extern crate lazy_static;
 
+#[cfg(test)]
+extern crate rand;
+
 mod log_approximator;
 
 use std::fmt;
 
 use num_bigint::{BigUint,ToBigInt};
 use bigdecimal::BigDecimal;
-use num_traits::{Zero,One,Num};
+use num_traits::{Zero,One,ToPrimitive};
+
+pub use log_approximator::LogApproximator;
 
 //pub use
 
@@ -62,14 +67,22 @@ impl FixedPoint {
     pub fn one() -> FixedPoint { FixedPoint(BigUint::one() << PRECISION) }
 
     pub fn parse_from_big_decimal(num: BigDecimal) -> Result<FixedPoint, FixedPointError> {
+        let (n, ex) = num.as_bigint_and_exponent();
+        println!("{},{}", n, ex);
         let temp = (num * FixedPoint::one().0.to_bigint().unwrap())
             .to_bigint()
             .unwrap();
-        if temp > Zero::zero() {
+        if temp >= Zero::zero() {
             Ok(FixedPoint(temp.to_biguint().unwrap()))
         } else {
             Err(FixedPointError::Negative)
         }
+    }
+
+    // TODO: better
+    pub fn to_big_decimal(&self) -> BigDecimal {
+        BigDecimal::from(self.0.to_bigint().unwrap())
+            / BigDecimal::from(FixedPoint::one().0.to_bigint().unwrap())
     }
 
     pub fn add(&self, addend: FixedPoint) -> FixedPoint {
@@ -99,25 +112,26 @@ impl FixedPoint {
         FixedPoint(&self.0 >> shift)
     }
 }
-//impl Zero for FixedPoint{
-//    fn zero()-> FixedPoint {
-//        FixedPoint(BigUint::zero())
-//    }
-//}
-//
-//impl One for FixedPoint{
-//    fn one()-> FixedPoint {
-//        FixedPoint(MAX_PRECISION)
-//    }
-//}
 
 impl From<BigUint> for FixedPoint {
     fn from(value: BigUint) -> FixedPoint { FixedPoint(value) }
 }
 
+impl From<FixedPoint> for u64 {
+    fn from(value: FixedPoint) -> u64 {
+        let temp = value.0 >> PRECISION;
+        match temp.to_u64() {
+            Some(v) => v,
+            // TODO: if None ?
+            None => u64::max_value(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
+    use num_traits::Num;
 
     #[test]
     fn test_add() {

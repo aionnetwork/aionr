@@ -56,12 +56,13 @@ const HARD_CODE_LNS: [&str; 31] = [
     "0.00000000186264514750",
     "0.00000000093132257418",
 ];
+
 lazy_static! {
     static ref LN_TABLE: Vec<FixedPoint> = {
         let mut ln_table = Vec::new();
         for s in HARD_CODE_LNS.iter() {
             ln_table.push(
-                FixedPoint::parse_from_big_decimal(BigDecimal::from_str_radix(s, 10).unwrap())
+                FixedPoint::parse_from_big_decimal(BigDecimal::from_str_radix(*s, 10).unwrap())
                     .unwrap(),
             );
         }
@@ -73,51 +74,136 @@ lazy_static! {
     .unwrap();
 }
 
-//pub fn init_log_approximator(){
-//    for s in HARD_CODE_LNS.iter(){
-//        LN_TABLE.push(FixedPoint::parse_from_big_decimal(BigDecimal::from_str_radix(s, 10).unwrap()).unwrap());
-//    }
-//    LN2 = FixedPoint::parse_from_big_decimal(BigDecimal::from_str_radix("0.693147180559945309", 10).unwrap()).unwrap();
-//}
+pub trait LogApproximator {
+    fn ln(input: BigUint) -> FixedPoint;
+    fn ln2() -> FixedPoint { LN2.clone() }
+}
 
-pub fn log(input: BigUint) -> FixedPoint {
-    // put input in the range [0.1, 1)
-    let bit_len = input.bits();
+impl LogApproximator for FixedPoint {
+    fn ln(input: BigUint) -> FixedPoint {
+        // put input in the range [0.1, 1)
+        let bit_len = input.bits();
 
-    let mut y = (*LN2).multiply_uint(bit_len.into());
+        let mut y = (*LN2).multiply_uint(bit_len.into());
 
-    let mut x = FixedPoint(if super::PRECISION >= bit_len {
-        input << super::PRECISION - bit_len
-    } else {
-        input >> bit_len - super::PRECISION
-    });
+        let mut x = FixedPoint(if super::PRECISION >= bit_len {
+            input << super::PRECISION - bit_len
+        } else {
+            input >> bit_len - super::PRECISION
+        });
 
-    // We maintain, as an invariant, that y = log(input) - log(x)
+        // We maintain, as an invariant, that y = log(input) - log(x)
 
-    // Multiply x by factors in the sequence 3/2, 5/4, 9/8...
+        // Multiply x by factors in the sequence 3/2, 5/4, 9/8...
 
-    let mut left_shift = 1usize;
+        let mut left_shift = 1usize;
 
-    while left_shift < (*LN_TABLE).len() && x < FixedPoint::one() {
-        let x_prime = x.add(x.divide_by_power_of_two(left_shift));
+        while left_shift < (*LN_TABLE).len() && x < FixedPoint::one() {
+            let x_prime = x.add(x.divide_by_power_of_two(left_shift));
 
-        // if xPrime is less than or equal to one, this is the best factor we can multiplyInteger by
-        if x_prime <= FixedPoint::one() {
-            x = x_prime;
-            y = y
-                .subtruct((*LN_TABLE)[left_shift].clone())
-                .expect("FixedPoint sub ln failed");
+            // if xPrime is less than or equal to one, this is the best factor we can multiplyInteger by
+            if x_prime <= FixedPoint::one() {
+                x = x_prime;
+                y = y
+                    .subtruct((*LN_TABLE)[left_shift].clone())
+                    .expect("FixedPoint sub ln failed");
+            }
+            // otherwise, try the next factor (eg. 1.01 was too big, so try 1.001)
+            else {
+                left_shift += 1;
+            }
         }
-        // otherwise, try the next factor (eg. 1.01 was too big, so try 1.001)
-        else {
-            left_shift += 1;
+
+        y = y
+            .add(x)
+            .subtruct(FixedPoint::one())
+            .expect("FixedPoint sub one failed");
+
+        y
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use num_traits::{ToPrimitive};
+    use rand::{thread_rng, Rng};
+    use std::cmp::Ordering;
+
+    fn assert_ln(test_num: u64) -> bool {
+        let a = FixedPoint::ln(test_num.into()).0;
+        let a_len = a.bits();
+        let shift = a_len - 53;
+        let a = a >> shift;
+        let fix = a.to_u64().unwrap();
+        // u64 53 bits
+        let f64 = (test_num as f64).ln().to_bits() % (1u64 << 52) + (1u64 << 52);
+
+        match fix.cmp(&f64) {
+            Ordering::Greater => fix - f64 == 1,
+            Ordering::Less => f64 - fix == 1,
+            Ordering::Equal => true,
         }
     }
 
-    y = y
-        .add(x)
-        .subtruct(FixedPoint::one())
-        .expect("FixedPoint sub one failed");
+    #[test]
+    fn test_ln_1234567() {
+        assert!(assert_ln(1234567u64));
+    }
 
-    y
+    #[test]
+    fn test_ln_tables() {
+        let lns = vec![
+            "0".to_string(),
+            "478688709125778178049".to_string(),
+            "263441406898681741314".to_string(),
+            "139053664958586388484".to_string(),
+            "71572920525644939266".to_string(),
+            "36328762377545711618".to_string(),
+            "18304112710400286721".to_string(),
+            "9187529797136163839".to_string(),
+            "4602702206915280897".to_string(),
+            "2303594137142748674".to_string(),
+            "1152358920889075706".to_string(),
+            "576320060611281987".to_string(),
+            "288195197505197603".to_string(),
+            "144106392698596015".to_string(),
+            "72055395104146779".to_string(),
+            "36028247274334636".to_string(),
+            "18014261071926600".to_string(),
+            "9007164895177383".to_string(),
+            "4503591037457749".to_string(),
+            "2251797666204331".to_string(),
+            "1125899369972055".to_string(),
+            "562949819203622".to_string(),
+            "281474943156232".to_string(),
+            "140737479966715".to_string(),
+            "70368742080507".to_string(),
+            "35184371564548".to_string(),
+            "17592185913349".to_string(),
+            "8796092989442".to_string(),
+            "4398046502908".to_string(),
+            "2199023253508".to_string(),
+            "1099511627261".to_string(),
+        ];
+
+        let ln_table: Vec<String> = LN_TABLE.iter().map(|i| format!("{}", i.0)).collect();
+        assert_eq!(lns, ln_table);
+    }
+
+    #[test]
+    fn test_random_ln() {
+        let mut rng = thread_rng();
+        for _ in 0..200000 {
+            loop {
+                let v: u64 = rng.gen();
+                if v != 0 {
+                    FixedPoint::ln(v.into());
+                    //                    assert!(assert_ln(v));
+                    break;
+                }
+            }
+        }
+    }
+
 }

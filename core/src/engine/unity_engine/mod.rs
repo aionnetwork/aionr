@@ -39,6 +39,8 @@ use std::cmp;
 use std::sync::Mutex;
 use types::BlockNumber;
 use equihash::EquihashValidator;
+use fixed_point::{LogApproximator,FixedPoint};
+
 use self::dependent_header_validators::{
     DependentHeaderValidator,
     NumberValidator,
@@ -212,21 +214,22 @@ impl DifficultyCalc {
 
         // TODO-Unity: To refine floating calculation
         let alpha = 1f64 / (self.difficulty_bound_divisor_unity as f64);
-        let lambda = 1f64 / (2f64 * self.block_time_unity as f64);
-        let diff = match (delta_time as f64) - (-0.5f64.ln() / lambda) {
-            res if res > 0f64 => {
+        //        let lambda = 1f64 / (2f64 * self.block_time_unity as f64);
+        //        let diff = match (delta_time as f64) - (-0.5f64.ln() / lambda) {
+        let diff = match delta_time > FixedPoint::ln2().multiply_uint((2 * self.block_time_unity).into()).into() {
+            true => {
                 cmp::min(
                     parent_difficulty.as_u64() - 1,
                     (parent_difficulty.as_u64() as f64 / (1f64 + alpha)) as u64,
                 )
             }
-            res if res < 0f64 => {
+            false => {
                 cmp::max(
                     parent_difficulty.as_u64() + 1,
                     (parent_difficulty.as_u64() as f64 * (1f64 + alpha)) as u64,
                 )
             }
-            _ => parent_difficulty.as_u64(),
+//            _ => parent_difficulty.as_u64(),
         };
 
         cmp::max(self.minimum_difficulty, U256::from(diff))

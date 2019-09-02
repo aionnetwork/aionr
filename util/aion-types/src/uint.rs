@@ -26,6 +26,8 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer};
 #[cfg(feature = "serialize")]
 use ethereum_types_serialize;
 
+use num_bigint::BigUint;
+
 construct_uint!(U64, 1);
 construct_uint!(U128, 2);
 construct_uint!(U256, 4);
@@ -382,3 +384,10 @@ impl_serde!(U64, 1);
 impl_serde!(U128, 2);
 impl_serde!(U256, 4);
 impl_serde!(U512, 8);
+
+impl From<U256> for BigUint {
+    fn from(value: U256) -> BigUint {
+        let arr: [u8; 32] = value.into();
+        BigUint::from_bytes_be(&arr)
+    }
+}

@@ -29,6 +29,7 @@ use rcrypto::ed25519::verify;
 use aion_types::{H256, Address};
 use blake2b::blake2b;
 use num_bigint::BigUint;
+use fixed_point::{FixedPoint,LogApproximator};
 
 pub struct PoSValidator;
 impl PoSValidator {
@@ -92,19 +93,20 @@ impl PoSValidator {
         }
 
         // Verify timestamp
-        let difficulty = header.difficulty();
+        let difficulty = header.difficulty().clone();
         let timestamp = header.timestamp();
         let parent_timestamp = seal_parent_header.map_or(0, |h| h.timestamp());
         let hash_of_seed = blake2b(&seed[..]);
         let a = BigUint::parse_bytes(
-            b"ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+            b"10000000000000000000000000000000000000000000000000000000000000000",
             16,
         )
         .unwrap();
-        let b = BigUint::from_bytes_be(&hash_of_seed[..]);
-        let u = ln(&a).unwrap() - ln(&b).unwrap();
-        let delta = (difficulty.as_u64() as f64) * u / (stake as f64);
-        let delta_uint: u64 = max(1u64, delta as u64);
+        let u = FixedPoint::ln(a)
+            .subtruct(FixedPoint::ln(hash_of_seed.into()))
+            .expect("H256 should smaller than 2^256");
+        let delta = u.multiply_uint(difficulty.into()).divide_uint(stake.into());
+        let delta_uint: u64 = max(1u64, delta.into());
         if timestamp - parent_timestamp < delta_uint {
             Err(BlockError::InvalidPoSTimestamp(timestamp, parent_timestamp, delta_uint).into())
         } else {
@@ -113,21 +115,21 @@ impl PoSValidator {
     }
 }
 
-// TODO-Unity: to do this better
-fn ln(x: &BigUint) -> Result<f64, String> {
-    let x: Vec<u8> = x.to_bytes_le();
-
-    const BYTES: usize = 12;
-    let start = if x.len() < BYTES { 0 } else { x.len() - BYTES };
-
-    let mut n: f64 = 0.0;
-    for i in start..x.len() {
-        n = n / 256f64 + (x[i] as f64);
-    }
-    let ln_256: f64 = (256f64).ln();
-
-    Ok(n.ln() + ln_256 * ((x.len() - 1) as f64))
-}
+//// TODO-Unity: to do this better
+//fn ln(x: &BigUint) -> Result<f64, String> {
+//    let x: Vec<u8> = x.to_bytes_le();
+//
+//    const BYTES: usize = 12;
+//    let start = if x.len() < BYTES { 0 } else { x.len() - BYTES };
+//
+//    let mut n: f64 = 0.0;
+//    for i in start..x.len() {
+//        n = n / 256f64 + (x[i] as f64);
+//    }
+//    let ln_256: f64 = (256f64).ln();
+//
+//    Ok(n.ln() + ln_256 * ((x.len() - 1) as f64))
+//}
 
 #[cfg(test)]
 mod tests {
