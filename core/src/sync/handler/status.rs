@@ -31,7 +31,7 @@ use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use sync::node_info::NodeInfo;
 use sync::route::{VERSION,MODULE,ACTION};
-use p2p::{ChannelBuffer,  Mgr};
+use p2p::{ChannelBuffer, Mgr};
 
 const HASH_LENGTH: usize = 32;
 
@@ -98,6 +98,7 @@ pub fn receive_res(
     hash: u64,
     cb_in: ChannelBuffer,
     network_best_block_number: Arc<RwLock<u64>>,
+    local_genesis_hash: H256,
 )
 {
     trace!(target: "sync", "status/receive_res");
@@ -107,30 +108,35 @@ pub fn receive_res(
     let total_difficulty_len = total_difficulty_len.read_u8().unwrap_or(0) as usize;
     let (total_difficulty, req_body_rest) = req_body_rest.split_at(total_difficulty_len);
     let (best_hash, req_body_rest) = req_body_rest.split_at(HASH_LENGTH);
-    let (_genesis_hash, _) = req_body_rest.split_at(HASH_LENGTH);
+    let (genesis_hash, _) = req_body_rest.split_at(HASH_LENGTH);
     let td = U256::from(total_difficulty);
     let bh = H256::from(best_hash);
+    let genesis_hash = H256::from(genesis_hash);
+    if genesis_hash == local_genesis_hash {
+        // Update network best block
+        let mut network_best_number = network_best_block_number.write();
+        if best_block_num > *network_best_number {
+            *network_best_number = best_block_num;
+        }
 
-    // Update network best block
-    let mut network_best_number = network_best_block_number.write();
-    if best_block_num > *network_best_number {
-        *network_best_number = best_block_num;
+        // Update node info
+        // TODO: improve this
+        let mut node_info_write = node_info.write();
+        if !node_info_write.contains_key(&hash) {
+            trace!(target: "sync", "new node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, bh, td);
+        }
+        let info_lock = node_info_write
+            .entry(hash)
+            .or_insert(RwLock::new(NodeInfo::new()));
+        let mut info = info_lock.write();
+        info.best_block_hash = bh;
+        info.best_block_number = best_block_num;
+        info.total_difficulty = td;
+        drop(info);
+
+        p2p.update_node(&hash);
+    } else {
+        error!(target: "sync", "Bad status res from node:{} invalid genesis, local genesis: {}, node genesis: {}",hash, local_genesis_hash, genesis_hash);
+        // TODO: move node to black list
     }
-
-    // Update node info
-    // TODO: improve this
-    let mut node_info_write = node_info.write();
-    if !node_info_write.contains_key(&hash) {
-        trace!(target: "sync", "new node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, bh, td);
-    }
-    let info_lock = node_info_write
-        .entry(hash)
-        .or_insert(RwLock::new(NodeInfo::new()));
-    let mut info = info_lock.write();
-    info.best_block_hash = bh;
-    info.best_block_number = best_block_num;
-    info.total_difficulty = td;
-    drop(info);
-
-    p2p.update_node(&hash);
 }

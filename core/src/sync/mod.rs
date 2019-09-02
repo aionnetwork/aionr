@@ -57,7 +57,7 @@ use sync::route::ACTION;
 use sync::handler::status;
 use sync::handler::bodies;
 use sync::handler::headers;
-// use sync::handler::broadcast;
+use sync::handler::broadcast;
 use sync::handler::import;
 use sync::node_info::{NodeInfo, Mode};
 use sync::storage::SyncStorage;
@@ -66,7 +66,7 @@ const _HEADERS_CAPACITY: u64 = 256;
 const _STATUS_REQ_INTERVAL: u64 = 2;
 const _BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
 const _BLOCKS_IMPORT_INTERVAL: u64 = 50;
-const _BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
+const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const INTERVAL_STATUS: u64 = 5000;
 const INTERVAL_HEADERS: u64 = 100;
 const INTERVAL_BODIES: u64 = 100;
@@ -202,7 +202,7 @@ impl Sync {
                                           revision,
                                           connection,
                                           seed,
-                                          info.mode
+                                          format!("{}", info.mode)
                                     );
                                 }
                             }
@@ -298,6 +298,27 @@ impl Sync {
                 .select(rx.map_err(|_| {}))
                 .map(|_| ())
                 .map_err(|_| ()),
+        );
+        shutdown_hooks.push(tx);
+
+        let executor_broadcast = executor.clone();
+        let p2p_broadcast = p2p.clone();
+        let storage_broadcast = self.storage.clone();
+        let (tx, rx) = oneshot::channel::<()>();
+        executor_broadcast.spawn(
+            Interval::new(
+                Instant::now(),
+                Duration::from_millis(BROADCAST_TRANSACTIONS_INTERVAL),
+            )
+            .for_each(move |_| {
+                broadcast::broad_new_transactions(p2p_broadcast.clone(), storage_broadcast.clone());
+
+                Ok(())
+            })
+            .map_err(|e| error!("interval errored; err={:?}", e))
+            .select(rx.map_err(|_| {}))
+            .map(|_| ())
+            .map_err(|_| ()),
         );
         shutdown_hooks.push(tx);
     }
@@ -489,8 +510,7 @@ impl ChainNotify for Sync {
         if !sealed.is_empty() {
             debug!(target: "sync", "Propagating blocks...");
             self.storage.insert_imported_block_hashes(sealed.clone());
-            // TODO: enable broadcast after implemention done
-            // broadcast::propagate_blocks(sealed.index(0), SyncStorage::get_block_chain());
+            broadcast::propagate_new_blocks(self.p2p.clone(), &sealed[0], self.client.clone());
         }
     }
 
@@ -536,12 +556,14 @@ impl Callable for Sync {
                 status::receive_req(p2p, chain_info, hash)
             }
             ACTION::STATUSRES => {
+                let genesis_hash = self.client.chain_info().genesis_hash;
                 status::receive_res(
                     p2p,
                     self.node_info.clone(),
                     hash,
                     cb,
                     self.network_best_block_number.clone(),
+                    genesis_hash,
                 )
             }
             ACTION::HEADERSREQ => {
@@ -554,8 +576,29 @@ impl Callable for Sync {
                 bodies::receive_req(p2p, hash, client, cb)
             }
             ACTION::BODIESRES => bodies::receive_res(p2p, hash, cb, self.storage.clone()),
-            ACTION::BROADCASTTX => (),
-            ACTION::BROADCASTBLOCK => (),
+            ACTION::BROADCASTTX => {
+                let client = self.client.clone();
+                broadcast::handle_broadcast_tx(
+                    p2p,
+                    hash,
+                    cb,
+                    client,
+                    self.node_info.clone(),
+                    self.storage.clone(),
+                    self.network_best_block_number.clone(),
+                )
+            }
+            ACTION::BROADCASTBLOCK => {
+                let client = self.client.clone();
+                broadcast::handle_broadcast_block(
+                    p2p,
+                    hash,
+                    cb,
+                    client,
+                    self.storage.clone(),
+                    self.network_best_block_number.clone(),
+                )
+            }
             // TODO: kill the node
             ACTION::UNKNOWN => (),
         };

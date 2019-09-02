@@ -28,8 +28,8 @@ use sync::wrappers::{HeadersWrapper, BlocksWrapper};
 
 // const MAX_DOWNLOADED_HEADERS_COUNT: usize = 4096;
 const MAX_CACHED_BLOCK_HASHES: usize = 32;
-// const MAX_CACHED_TRANSACTION_HASHES: usize = 20480;
-// const MAX_RECEIVED_TRANSACTIONS_COUNT: usize = 20480;
+const MAX_CACHED_TRANSACTION_HASHES: usize = 20480;
+const MAX_RECEIVED_TRANSACTIONS_COUNT: usize = 20480;
 
 pub struct SyncStorage {
     /// Downloaded headers wrappers
@@ -49,6 +49,12 @@ pub struct SyncStorage {
 
     /// Staged blocks to be imported later
     staged_blocks: Mutex<LruCache<H256, Vec<Vec<u8>>>>,
+
+    /// sent tx hashes
+    sent_transaction_hashes: Mutex<LruCache<H256, u8>>,
+
+    /// Received txs
+    received_transactions: Mutex<VecDeque<Vec<u8>>>,
 }
 
 impl SyncStorage {
@@ -60,6 +66,8 @@ impl SyncStorage {
             imported_blocks_hashes: Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHES)),
             headers_with_bodies_requested: Mutex::new(HashMap::new()),
             staged_blocks: Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHES)),
+            sent_transaction_hashes: Mutex::new(LruCache::new(MAX_CACHED_TRANSACTION_HASHES)),
+            received_transactions: Mutex::new(VecDeque::new()),
         }
     }
 
@@ -81,6 +89,9 @@ impl SyncStorage {
     pub fn is_block_hash_downloaded(&self, hash: &H256) -> bool {
         let mut downloaded_blocks_hashes = self.downloaded_blocks_hashes.lock();
         downloaded_blocks_hashes.contains_key(hash)
+    }
+    pub fn get_imported_block_hashes(&self) -> &Mutex<LruCache<H256, u8>> {
+        &self.imported_blocks_hashes
     }
 
     pub fn remove_downloaded_blocks_hashes(&self, hashes: &Vec<H256>) {
@@ -145,6 +156,26 @@ impl SyncStorage {
             true
         } else {
             false
+        }
+    }
+
+    pub fn get_sent_transaction_hashes(&self) -> &Mutex<LruCache<H256, u8>> {
+        &self.sent_transaction_hashes
+    }
+
+    pub fn get_received_transactions(&self) -> &Mutex<VecDeque<Vec<u8>>> {
+        &self.received_transactions
+    }
+
+    //    pub fn get_received_transactions_count(&self) -> usize {
+    //        let received_transactions = self.received_transactions.lock();
+    //        return received_transactions.len();
+    //    }
+
+    pub fn insert_received_transaction(&self, transaction: Vec<u8>) {
+        let mut received_transactions = self.received_transactions.lock();
+        if received_transactions.len() <= MAX_RECEIVED_TRANSACTIONS_COUNT {
+            received_transactions.push_back(transaction);
         }
     }
 }
