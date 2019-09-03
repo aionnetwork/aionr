@@ -70,7 +70,7 @@ const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const INTERVAL_STATUS: u64 = 5000;
 const INTERVAL_HEADERS: u64 = 100;
 const INTERVAL_BODIES: u64 = 100;
-const INTERVAL_STATISICS: u64 = 5;
+const INTERVAL_STATISICS: u64 = 10;
 const MAX_TX_CACHE: usize = 20480;
 const MAX_BLOCK_CACHE: usize = 32;
 
@@ -443,11 +443,12 @@ impl ChainNotify for Sync {
             // let chain_info = client.chain_info();
             // let min_imported_block_number = chain_info.best_block_number + 1;
             // let mut max_imported_block_number = 0;
+            // info!(target: "sync", "{} new blocks saved.", imported.len());
             for hash in &imported {
                 let client = self.client.clone();
                 let block_id = BlockId::Hash(*hash);
                 if let Some(block_number) = client.block_number(block_id) {
-                    info!(target: "sync", "New block #{}, hash: {}.", block_number, hash);
+                    trace!(target: "sync", "New block #{}, hash: {}.", block_number, hash);
                 }
                 import::import_staged_blocks(hash, client, self.storage.clone());
                 // if client.block_status(block_id) == BlockStatus::InChain {
@@ -605,6 +606,7 @@ impl Callable for Sync {
     }
 
     fn disconnect(&self, hash: u64) {
+        info!(target: "sync", "stop syncing from disconnected node: {}", &hash);
         let mut node_info = self.node_info.write();
         node_info.remove(&hash);
         drop(node_info);
@@ -613,7 +615,6 @@ impl Callable for Sync {
         headers.remove(&hash);
         drop(headers);
 
-        // TODO-SYNC: remove downloaded headers with given node hash
         let mut headers = self.storage.downloaded_headers().lock();
         headers.retain(|x| x.node_hash != hash);
     }

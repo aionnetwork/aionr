@@ -194,8 +194,9 @@ pub fn import_blocks(
                         info.sync_base_number = next_block_number;
                     }
                     // If we cannot stage these blocks (staged blocks cache full), we need to remove downloaded records
-                    // and try to download them again later (in the next iteration).
+                    // and try to download them again later.
                     else {
+                        info.switch_mode(Mode::Thunder, &local_best_block, &node_hash);
                         storage.remove_downloaded_blocks_hashes(&unknown_blocks_hashes);
                     }
                 }
@@ -243,6 +244,8 @@ pub fn import_blocks(
             }
             // Set sync base number here for forward and lightning mode
             info.sync_base_number = last_imported_number + 1;
+            info!(target: "sync", "Node: {}, {} blocks imported", &node_hash, last_imported_number - first_imported_number + 1);
+            info!(target: "sync", "Node: {}, NORMAL: {}, THUNDER: {}, LIGHTNING: {}", &node_hash, normal_nodes, thunder_nodes, lightning_nodes);
         }
         drop(nodes_info);
         // TODO: maybe we should consider reset the header request cooldown here

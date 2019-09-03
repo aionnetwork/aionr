@@ -171,6 +171,7 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
     // match bodies with headers
     let mut blocks = Vec::new();
     if headers.len() == bodies.len() {
+        info!(target: "sync", "downloading {} blocks from node {}.", bodies.len(), &node_hash);
         for i in 0..headers.len() {
             let block = Block {
                 header: headers[i].clone(),
