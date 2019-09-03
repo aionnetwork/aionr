@@ -86,7 +86,7 @@ pub use node::Node;
 pub use config::Config;
 pub use callable::Callable;
 
-const INTERVAL_OUTBOUND_CONNECT: u64 = 10;
+const INTERVAL_OUTBOUND_CONNECT: u64 = 1;
 const INTERVAL_TIMEOUT: u64 = 5;
 const INTERVAL_ACTIVE_NODES: u64 = 3;
 const TIMEOUT_MAX: u64 = 30;
@@ -364,7 +364,7 @@ impl Mgr {
                                     Ok(())
                                 }));
 
-                            }).map_err(move|err|{error!(target: "p2p", "connect node: {:?}", err)})
+                            }).map_err(move|err|{debug!(target: "p2p", "connect node: {:?}", err)})
                         }));
                     }
                 }

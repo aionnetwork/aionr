@@ -304,7 +304,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
         let mut downloaded_headers = downloaded_headers.lock();
         downloaded_headers.push_back(header_wrapper);
     } else {
-        debug!(target: "sync", "Came too late............");
+        trace!(target: "sync", "Came too late............");
     }
 }
 

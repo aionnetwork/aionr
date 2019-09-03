@@ -87,6 +87,7 @@ pub fn receive_req(p2p: Mgr, hash: u64) {
     } else {
         res_body.push(0 as u8);
     }
+
     cb_out.body.put_slice(res_body.as_slice());
     cb_out.head.len = cb_out.body.len() as u32;
     p2p.send(hash, cb_out);
@@ -95,22 +96,26 @@ pub fn receive_req(p2p: Mgr, hash: u64) {
 pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     debug!(target: "p2p", "active_nodes/receive_res");
 
-    let (node_count, rest) = cb_in.body.split_at(1);
-    let mut temp_list = Vec::new();
-    if node_count[0] > 0 {
+    let (node_count, mut rest) = cb_in.body.split_at(1);
+
+    let nodes_count: u32 = node_count[0] as u32;
+
+    if nodes_count > 0 {
+        let mut temp_list = Vec::new();
         let (local_ip, _) = p2p.config.get_ip_and_port();
 
         // TODO: update node status with healthy active nodes msg
         // TODO: max active nodes filter
-        for _i in 0..node_count[0] as u32 {
-            let (id, rest) = rest.split_at(NODE_ID_LENGTH);
-            let (ip, rest) = rest.split_at(IP_LENGTH);
+        for _i in 0..nodes_count {
+            let (id, rest1) = rest.split_at(NODE_ID_LENGTH);
+            let (ip, rest1) = rest1.split_at(IP_LENGTH);
 
             if local_ip.as_bytes() == ip {
                 continue;
             }
 
-            let (mut port, _) = rest.split_at(mem::size_of::<u32>());
+            let (mut port, rest1) = rest1.split_at(mem::size_of::<u32>());
+            rest = rest1;
 
             let mut temp = TempNode::default();
             temp.addr.ip.copy_from_slice(ip);
