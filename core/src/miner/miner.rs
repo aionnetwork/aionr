@@ -398,8 +398,8 @@ impl Miner {
         //        let u = ln(&a).unwrap() - ln(&b).unwrap();
         //        let delta = (difficulty.as_u64() as f64) * u / (stake as f64);
 
-        let u = FixedPoint::ln(a)
-            .subtruct(FixedPoint::ln(hash_of_seed.into()))
+        let u = FixedPoint::ln(&a)
+            .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
             .expect("H256 should smaller than 2^256");
         let delta = u.multiply_uint(difficulty.into()).divide_uint(stake.into());
         let delta_uint: u64 = max(1u64, delta.into());
@@ -1456,8 +1456,8 @@ impl MinerService for Miner {
         //        let u = ln(&a).unwrap() - ln(&b).unwrap();
         //        let delta = (difficulty.as_u64() as f64) * u / (stake as f64);
 
-        let u = FixedPoint::ln(a)
-            .subtruct(FixedPoint::ln(hash_of_seed.into()))
+        let u = FixedPoint::ln(&a)
+            .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
             .expect("H256 should smaller than 2^256");
         let delta = u.multiply_uint(difficulty.into()).divide_uint(stake.into());
         let delta_uint: u64 = max(1u64, delta.into());

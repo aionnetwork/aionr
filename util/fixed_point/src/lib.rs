@@ -43,6 +43,10 @@ pub use log_approximator::LogApproximator;
 const PRECISION: usize = 70;
 //const MAX_PRECISION : BigUint = BigUint::one().shl(PRECISION);
 
+lazy_static! {
+    static ref MAX_PRECISION: FixedPoint = FixedPoint(BigUint::one() << PRECISION);
+}
+
 #[derive(Debug)]
 pub enum FixedPointError {
     Negative,
@@ -64,12 +68,10 @@ impl FixedPoint {
 
     pub fn zero() -> FixedPoint { FixedPoint(BigUint::zero()) }
 
-    pub fn one() -> FixedPoint { FixedPoint(BigUint::one() << PRECISION) }
+    //    pub fn one() -> FixedPoint { (*MAX_PRECISION).clone() }
 
-    pub fn parse_from_big_decimal(num: BigDecimal) -> Result<FixedPoint, FixedPointError> {
-        let (n, ex) = num.as_bigint_and_exponent();
-        println!("{},{}", n, ex);
-        let temp = (num * FixedPoint::one().0.to_bigint().unwrap())
+    pub fn parse_from_big_decimal(num: &BigDecimal) -> Result<FixedPoint, FixedPointError> {
+        let temp = (num * MAX_PRECISION.0.to_bigint().unwrap())
             .to_bigint()
             .unwrap();
         if temp >= Zero::zero() {
@@ -82,19 +84,19 @@ impl FixedPoint {
     // TODO: better
     pub fn to_big_decimal(&self) -> BigDecimal {
         BigDecimal::from(self.0.to_bigint().unwrap())
-            / BigDecimal::from(FixedPoint::one().0.to_bigint().unwrap())
+            / BigDecimal::from(MAX_PRECISION.0.to_bigint().unwrap())
     }
 
-    pub fn add(&self, addend: FixedPoint) -> FixedPoint {
-        let res = &self.0 + addend.0;
+    pub fn add(&self, addend: &FixedPoint) -> FixedPoint {
+        let res = &self.0 + &addend.0;
         FixedPoint(res)
     }
 
-    pub fn subtruct(&self, subtructend: FixedPoint) -> Result<FixedPoint, FixedPointError> {
+    pub fn subtruct(&self, subtructend: &FixedPoint) -> Result<FixedPoint, FixedPointError> {
         if self.0 < subtructend.0 {
             Err(FixedPointError::Negative)
         } else {
-            Ok(FixedPoint(&self.0 - subtructend.0))
+            Ok(FixedPoint(&self.0 - &subtructend.0))
         }
     }
 
@@ -108,8 +110,8 @@ impl FixedPoint {
 
     pub fn divide_uint(&self, divisor: BigUint) -> FixedPoint { FixedPoint(&self.0 / divisor) }
 
-    pub fn divide_by_power_of_two(&self, shift: usize) -> FixedPoint {
-        FixedPoint(&self.0 >> shift)
+    pub fn divide_by_power_of_two(&self, shift: &usize) -> FixedPoint {
+        FixedPoint(&self.0 >> *shift)
     }
 }
 
@@ -137,13 +139,13 @@ mod test {
     fn test_add() {
         let fixed33 = FixedPoint(BigUint::from(33u64));
         let fixed47 = FixedPoint(BigUint::from(47u64));
-        assert_eq!(fixed33.add(fixed47), FixedPoint(BigUint::from(80u64)));
+        assert_eq!(fixed33.add(&fixed47), FixedPoint(BigUint::from(80u64)));
     }
 
     #[test]
     fn test_parse_from_big_decimal() {
         let n1 = BigDecimal::from_str_radix("0.40546510810816438486", 10).unwrap();
-        let fixed_n1 = FixedPoint::parse_from_big_decimal(n1).unwrap();
+        let fixed_n1 = FixedPoint::parse_from_big_decimal(&n1).unwrap();
 
         assert_eq!(
             fixed_n1,
@@ -151,7 +153,7 @@ mod test {
         );
 
         let n2 = BigDecimal::from_str_radix("-0.40546510810816438486", 10).unwrap();
-        let fixed_n2 = FixedPoint::parse_from_big_decimal(n2);
+        let fixed_n2 = FixedPoint::parse_from_big_decimal(&n2);
 
         assert!(fixed_n2.is_err());
     }
@@ -162,10 +164,10 @@ mod test {
         let fixed60 = FixedPoint(BigUint::from(60u64));
         let fixed40 = FixedPoint(BigUint::from(40u64));
         assert_eq!(
-            fixed50.subtruct(fixed40).unwrap(),
+            fixed50.subtruct(&fixed40).unwrap(),
             FixedPoint(BigUint::from(10u64))
         );
-        assert!(fixed50.subtruct(fixed60).is_err());
+        assert!(fixed50.subtruct(&fixed60).is_err());
     }
 
     #[test]
@@ -190,7 +192,7 @@ mod test {
     fn test_divide_by_power_of_two() {
         let fixed50 = FixedPoint(BigUint::from(50u64));
         assert_eq!(
-            fixed50.divide_by_power_of_two(4),
+            fixed50.divide_by_power_of_two(&4),
             FixedPoint(BigUint::from(3u64))
         )
     }

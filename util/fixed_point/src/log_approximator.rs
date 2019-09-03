@@ -18,7 +18,7 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use super::FixedPoint;
+use super::{FixedPoint,MAX_PRECISION};
 use num_bigint::BigUint;
 use bigdecimal::BigDecimal;
 use num_traits::Num;
@@ -62,25 +62,25 @@ lazy_static! {
         let mut ln_table = Vec::new();
         for s in HARD_CODE_LNS.iter() {
             ln_table.push(
-                FixedPoint::parse_from_big_decimal(BigDecimal::from_str_radix(*s, 10).unwrap())
+                FixedPoint::parse_from_big_decimal(&BigDecimal::from_str_radix(*s, 10).unwrap())
                     .unwrap(),
             );
         }
         ln_table
     };
     static ref LN2: FixedPoint = FixedPoint::parse_from_big_decimal(
-        BigDecimal::from_str_radix("0.693147180559945309", 10).unwrap()
+        &BigDecimal::from_str_radix("0.693147180559945309", 10).unwrap()
     )
     .unwrap();
 }
 
 pub trait LogApproximator {
-    fn ln(input: BigUint) -> FixedPoint;
+    fn ln(input: &BigUint) -> FixedPoint;
     fn ln2() -> FixedPoint { LN2.clone() }
 }
 
 impl LogApproximator for FixedPoint {
-    fn ln(input: BigUint) -> FixedPoint {
+    fn ln(input: &BigUint) -> FixedPoint {
         // put input in the range [0.1, 1)
         let bit_len = input.bits();
 
@@ -96,27 +96,33 @@ impl LogApproximator for FixedPoint {
 
         // Multiply x by factors in the sequence 3/2, 5/4, 9/8...
 
-        let mut left_shift = 1usize;
+        assert!(x <= *MAX_PRECISION);
 
-        while left_shift < (*LN_TABLE).len() && x < FixedPoint::one() {
-            let x_prime = x.add(x.divide_by_power_of_two(left_shift));
+        if x == *MAX_PRECISION {
+            return y;
+        }
+
+        for left_shift in 1..LN_TABLE.len() {
+            let x_prime = x.add(&x.divide_by_power_of_two(&left_shift));
 
             // if xPrime is less than or equal to one, this is the best factor we can multiplyInteger by
-            if x_prime <= FixedPoint::one() {
+            if x_prime < *MAX_PRECISION {
                 x = x_prime;
                 y = y
-                    .subtruct((*LN_TABLE)[left_shift].clone())
+                    .subtruct(&(*LN_TABLE)[left_shift])
                     .expect("FixedPoint sub ln failed");
+            } else if x_prime == *MAX_PRECISION {
+                y = y
+                    .subtruct(&(*LN_TABLE)[left_shift])
+                    .expect("FixedPoint sub ln failed");
+                return y;
             }
             // otherwise, try the next factor (eg. 1.01 was too big, so try 1.001)
-            else {
-                left_shift += 1;
-            }
         }
 
         y = y
-            .add(x)
-            .subtruct(FixedPoint::one())
+            .add(&x)
+            .subtruct(&*MAX_PRECISION)
             .expect("FixedPoint sub one failed");
 
         y
@@ -131,7 +137,7 @@ mod test {
     use std::cmp::Ordering;
 
     fn assert_ln(test_num: u64) -> bool {
-        let a = FixedPoint::ln(test_num.into()).0;
+        let a = FixedPoint::ln(&test_num.into()).0;
         let a_len = a.bits();
         let shift = a_len - 53;
         let a = a >> shift;
@@ -193,17 +199,69 @@ mod test {
 
     #[test]
     fn test_random_ln() {
+        use std::time::Instant;
         let mut rng = thread_rng();
+
+        let t = Instant::now();
         for _ in 0..200000 {
             loop {
                 let v: u64 = rng.gen();
                 if v != 0 {
-                    FixedPoint::ln(v.into());
-                    //                    assert!(assert_ln(v));
+                    //                    FixedPoint::ln(&v.into());
+                    assert!(assert_ln(v));
                     break;
                 }
             }
         }
+        println!("use:{:?}", t.elapsed());
+    }
+
+    #[test]
+    fn test_collisions() {
+        use std::collections::HashSet;
+        let mut lns = HashSet::new();
+        let base = BigUint::parse_bytes(
+            b"1111111111111111111111111111111111111111111111111111111111111111111111",
+            16,
+        )
+        .unwrap();
+        lns.insert(FixedPoint::ln(&base).0);
+        for i in 1u64..(1 << 20) {
+            let ln = FixedPoint::ln(&(base.clone() - i));
+            if !lns.contains(&ln.0) {
+                println!("{} is the same ln result as 2^256", i - 1);
+                break;
+            }
+        }
+    }
+
+    #[test]
+    fn test_biguint() {
+        let a = BigUint::parse_bytes(
+            b"11111111111111111111111111111111111111111111111111111111111111111111111",
+            2,
+        )
+        .unwrap();
+        let o = BigUint::parse_bytes(
+            b"10000000000000000000000000000000000000000000000000000000000000000000000",
+            2,
+        )
+        .unwrap();
+        let b = BigUint::parse_bytes(
+            b"11111111111111111111111111111111111111111111111111111111111111111111110",
+            2,
+        )
+        .unwrap();
+        let c = BigUint::parse_bytes(
+            b"11111111111111111111111111111100000000000000000000000000000000000000000",
+            2,
+        )
+        .unwrap();
+        let d = BigUint::parse_bytes(b"1000000000000000000000000000001", 16).unwrap();
+        println!("{:b}", FixedPoint::ln(&a).0);
+        println!("{:b}", FixedPoint::ln(&b).0);
+        println!("{:b}", FixedPoint::ln(&c).0);
+        //        println!
     }
 
 }
