@@ -53,7 +53,7 @@ pub fn send(p2p: Mgr, hash: u64) {
     cb.head.ctrl = MODULE::SYNC.value();
     cb.head.action = ACTION::STATUSREQ.value();
     cb.head.len = 0;
-    let mut _p2p_0 = p2p.send(hash, cb);
+    p2p.send(hash, cb);
 }
 
 pub fn receive_req(p2p: Mgr, chain_info: &BlockChainInfo, hash: u64) {

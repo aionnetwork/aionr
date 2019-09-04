@@ -146,11 +146,15 @@ impl Sync {
         }
     }
 
-    pub fn run(&self, sync: Arc<Sync>, executor: TaskExecutor) {
+    pub fn register_callback(&self, callback: Arc<Callable>) {
+        self.p2p.register_callback(callback);
+    }
+
+    pub fn run(&self, executor: TaskExecutor) {
         // init p2p
         let p2p = &self.p2p.clone();
         let mut p2p_0 = p2p.clone();
-        p2p_0.run(sync.clone(), executor.clone());
+        p2p_0.run(executor.clone());
 
         let mut shutdown_hooks = self.shutdown_hooks.lock();
 
@@ -610,12 +614,16 @@ impl Callable for Sync {
         let mut node_info = self.node_info.write();
         node_info.remove(&hash);
         drop(node_info);
+        trace!(target: "sync", "finish dropping node_info");
 
         let mut headers = self.storage.headers_with_bodies_requested().lock();
         headers.remove(&hash);
         drop(headers);
+        trace!(target: "sync", "finish dropping headers_with_bodies_requested");
 
         let mut headers = self.storage.downloaded_headers().lock();
         headers.retain(|x| x.node_hash != hash);
+
+        trace!(target: "sync", "finish cleaning disconnected node: {}", &hash);
     }
 }

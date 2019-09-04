@@ -245,7 +245,7 @@ pub fn import_blocks(
             // Set sync base number here for forward and lightning mode
             info.sync_base_number = last_imported_number + 1;
             info!(target: "sync", "Node: {}, {} blocks imported", &node_hash, last_imported_number - first_imported_number + 1);
-            info!(target: "sync", "Node: {}, NORMAL: {}, THUNDER: {}, LIGHTNING: {}", &node_hash, normal_nodes, thunder_nodes, lightning_nodes);
+            debug!(target: "sync", "Node: {}, NORMAL: {}, THUNDER: {}, LIGHTNING: {}", &node_hash, normal_nodes, thunder_nodes, lightning_nodes);
         }
         drop(nodes_info);
         // TODO: maybe we should consider reset the header request cooldown here

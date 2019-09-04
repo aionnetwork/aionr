@@ -63,13 +63,18 @@ pub fn sync_headers(
     // Pick a random node among all candidates
     if let Some(candidate) = pick_random_node(&candidates) {
         let candidate_hash = candidate.get_hash();
+        let mut node_info = NodeInfo::new();
         let nodes_info_read = nodes_info.read();
         if let Some(node_info_lock) = nodes_info_read.get(&candidate_hash) {
-            let mut node_info = node_info_lock.write();
-            // Send header request
-            if prepare_send(p2p, candidate_hash, &node_info, local_best_block_number) {
-                // Update cooldown time after request succesfully sent
-                node_info.last_headers_request_time = SystemTime::now();
+            node_info = node_info_lock.read().clone();
+        }
+        drop(nodes_info_read);
+        // Send header request
+        if prepare_send(p2p, candidate_hash, &node_info, local_best_block_number) {
+            // Update cooldown time after request succesfully sent
+            let nodes_info_read = nodes_info.read();
+            if let Some(node_info_lock) = nodes_info_read.get(&candidate_hash) {
+                node_info_lock.write().last_headers_request_time = SystemTime::now();
             }
         }
     }
@@ -304,7 +309,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
         let mut downloaded_headers = downloaded_headers.lock();
         downloaded_headers.push_back(header_wrapper);
     } else {
-        debug!(target: "sync", "Came too late............");
+        trace!(target: "sync", "Came too late............");
     }
 }
 

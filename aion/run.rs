@@ -209,6 +209,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     );
 
     let sync = Arc::new(Sync::new(cmd.net_conf.clone(), client.clone()));
+    sync.register_callback(sync.clone());
     let sync_notify = sync.clone() as Arc<ChainNotify>;
     let sync_run = sync.clone();
     service.add_notify(sync_notify);
@@ -219,7 +220,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .expect("p2p runtime loop init failed");
     let executor_p2p = runtime_sync.executor();
 
-    sync_run.run(sync_run.clone(), executor_p2p.clone());
+    sync_run.run(executor_p2p.clone());
 
     // start rpc server
     let runtime_rpc = tokio::runtime::Builder::new()
