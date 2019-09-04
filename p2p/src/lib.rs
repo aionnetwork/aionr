@@ -30,6 +30,7 @@ extern crate bincode;
 extern crate rand;
 extern crate tokio;
 extern crate tokio_codec;
+extern crate tokio_reactor;
 extern crate acore_bytes;
 extern crate aion_types;
 extern crate uuid;
@@ -57,6 +58,7 @@ use std::sync::RwLock;
 use std::time::Duration;
 use std::time::SystemTime;
 use std::time::Instant;
+use std::net::TcpStream as StdTcpStream;
 use std::net::Shutdown;
 use std::net::SocketAddr;
 use rand::random;
@@ -71,6 +73,7 @@ use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
+use tokio_reactor::Handle;
 use tokio_codec::{Decoder,Framed};
 use codec::Codec;
 use route::VERSION;
@@ -110,7 +113,7 @@ pub struct Mgr {
 
 impl Mgr {
     /// constructor
-    pub fn new(config: Arc<Config>, tokens_pairs: Vec<[u32; 2]>) -> Mgr {
+    pub fn new(config: Config, tokens_pairs: Vec<[u32; 2]>) -> Mgr {
         // load seeds
         let mut temp_queue = VecDeque::<TempNode>::with_capacity(TEMP_MAX);
         for boot_node_str in config.boot_nodes.clone() {
@@ -136,7 +139,7 @@ impl Mgr {
         Mgr {
             shutdown_hooks: Arc::new(Mutex::new(Vec::new())),
             callback: None,
-            config,
+            config: Arc::new(config),
             temp: Arc::new(Mutex::new(temp_queue)),
             nodes: Arc::new(RwLock::new(HashMap::new())),
             tokens_rule: Arc::new(tokens_rule),
@@ -262,6 +265,7 @@ impl Mgr {
         let executor_outbound_0 = executor.clone();
         let p2p_outbound = self.clone();
         let (tx, rx) = oneshot::channel::<()>();
+        // let tokens_rule_1 = self.tokens_rule.clone();
         executor.spawn(
             Interval::new(
                 Instant::now(),
@@ -312,12 +316,16 @@ impl Mgr {
                     let executor_outbound_1 = executor_outbound_0.clone();
                     let executor_outbound_2 = executor_outbound_0.clone();
                     let executor_outbound_3 = executor_outbound_0.clone();
+                    // let tokens_rule_2 = tokens_rule_1.clone();
 
                     if let Ok(addr) = temp_node.addr.to_string().parse() {
                         debug!(target: "p2p", "connecting to: {}", &addr);
-                        executor_outbound_0.spawn(lazy(move||{
-                            TcpStream::connect(&addr)
-                            .map(move |ts: TcpStream| {
+
+                        match StdTcpStream::connect_timeout(&addr, Duration::from_millis(200)) {
+                            Ok(stdts)=>{
+
+                                let ts = TcpStream::from_std(stdts, &Handle::default()).unwrap();
+
                                 debug!(target: "p2p", "connected to: {}", &temp_node.addr.to_string());
 
                                 let p2p_outbound_1 = p2p_outbound_0.clone();
@@ -328,13 +336,16 @@ impl Mgr {
 
                                 // construct node instance and store it
                                 let (tx, rx) = mpsc::channel(409600);
+                                let (tx_thread, rx_thread) = oneshot::channel::<()>();
                                 let ts_0 = ts.try_clone().unwrap();
                                 let node = Node::new_outbound(
                                     ts_0,
                                     tx,
                                     temp_node.id,
-                                    temp_node.if_seed
+                                    temp_node.if_seed,
+                                    tx_thread,
                                 );
+
                                 if let Ok(mut write) = p2p_outbound_0.nodes.try_write() {
                                     if !write.contains_key(&hash) {
                                         let id = node.get_id_string();
@@ -348,11 +359,19 @@ impl Mgr {
                                 // binding io futures
                                 let (sink, stream) = split_frame(ts);
                                 let read = stream.for_each(move |cb| {
-                                    p2p_outbound_2.handle(hash.clone(),cb);
+                                    // println!("AAA: {:?}", tokens_rule_2.len());
+                                    p2p_outbound_2.handle(hash.clone(), cb);
                                     Ok(())
-                                }).map_err(move|err|{error!(target: "p2p", "read: {:?}", err)});
+                                })
+                                .map_err(|err| error!(target: "p2p", "tcp outbound read: {:?}", err))
+                                .select(rx_thread.map_err(|_| {}))
+                                .map(|_| ())
+                                .map_err(|_| ());
 
-                                executor_outbound_1.spawn(read.then(|_|{ Ok(()) }));
+                                executor_outbound_1.spawn(read.then(|_|{
+                                    Ok(())
+                                }));
+
                                 let write = sink.send_all(
                                     rx.map_err(|()| io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")),
                                 );
@@ -363,9 +382,11 @@ impl Mgr {
                                     handshake::send(p2p_outbound_1, hash);
                                     Ok(())
                                 }));
+                            },
+                            Err(_err) => {
 
-                            }).map_err(move|err|{debug!(target: "p2p", "connect node: {:?}", err)})
-                        }));
+                            }
+                        }
                     }
                 }
                 Ok(())
@@ -421,11 +442,13 @@ impl Mgr {
 
                 // construct node instance and store it
                 let (tx_channel, rx_channel) = mpsc::channel(409600);
+                let (tx_thread, rx_thread) = oneshot::channel::<()>();
                 let ts_0 = ts.try_clone().unwrap();
                 let node = Node::new_inbound(
                     ts_0,
                     tx_channel,
-                    false
+                    false,
+                    tx_thread,
                 );
                 let hash = node.get_hash();
 
@@ -434,7 +457,7 @@ impl Mgr {
                     let binding: String = node.addr.to_string();
                     if !write.contains_key(&node.get_hash()){
                         if let None = write.insert(node.get_hash(), node) {
-                            debug!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
+                            info!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
                         }
                     }
                 }
@@ -444,7 +467,11 @@ impl Mgr {
                 let read = stream.for_each(move |cb| {
                     p2p_inbound_1.handle(hash.clone(), cb);
                     Ok(())
-                });
+                })
+                .map_err(|err| error!(target: "p2p", "tcp inbound read: {:?}", err))
+                .select(rx_thread.map_err(|_| {}))
+                .map(|_| ())
+                .map_err(|_| ());
                 executor_inbound_0.spawn(read.then(|_| { Ok(()) }));
                 let write = sink.send_all(rx_channel.map_err(|()| {
                     io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")
@@ -487,13 +514,23 @@ impl Mgr {
             for (_hash, mut node) in lock.iter_mut() {
                 match node.ts.shutdown(Shutdown::Both) {
                     Ok(_) => {
-                        trace!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
+                        debug!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
                     }
                     Err(_err) => {}
+                }
+
+                match node.shutdown_tcp_thread() {
+                    Ok(_) => {
+                        debug!(target: "p2p", "tcp connection thread shutdown signal sent");
+                    }
+                    Err(err) => {
+                        error!(target: "p2p", "shutdown: {:?}", err);
+                    }
                 }
             }
             lock.clear();
         }
+
         info!(target: "p2p" , "p2p shutdown finished");
     }
 

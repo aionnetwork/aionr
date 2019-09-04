@@ -75,8 +75,6 @@ const MAX_TX_CACHE: usize = 20480;
 const MAX_BLOCK_CACHE: usize = 32;
 
 pub struct Sync {
-    _config: Arc<Config>,
-
     client: Arc<BlockChainClient>,
 
     shutdown_hooks: Arc<Mutex<Vec<Sender<()>>>>,
@@ -112,7 +110,6 @@ impl Sync {
     pub fn new(config: Config, client: Arc<BlockChainClient>) -> Sync {
         let local_best_td: U256 = client.chain_info().total_difficulty;
         let local_best_block_number: u64 = client.chain_info().best_block_number;
-        let config = Arc::new(config);
 
         let mut token_rules: Vec<[u32; 2]> = vec![];
         let sync_rule_base =
@@ -131,7 +128,6 @@ impl Sync {
         ]);
 
         Sync {
-            _config: config.clone(),
             client,
             p2p: Mgr::new(config, token_rules),
             shutdown_hooks: Arc::new(Mutex::new(Vec::new())),

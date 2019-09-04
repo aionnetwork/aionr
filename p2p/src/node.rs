@@ -33,6 +33,8 @@ use aion_types::H256;
 use tokio::net::TcpStream;
 use super::msg::*;
 use super::state::STATE;
+use futures::sync::oneshot::Sender;
+use std::sync::Mutex;
 
 const EMPTY_ID: &str = "00000000-0000-0000-0000-000000000000";
 
@@ -69,6 +71,7 @@ pub struct Node {
     /// storage for msg out routes as flag tokens
     /// clear on incoming paired clear_token received
     pub tokens: HashSet<u32>,
+    pub tx_thread: Arc<Mutex<Vec<Sender<()>>>>,
 }
 
 impl Node {
@@ -78,8 +81,11 @@ impl Node {
         tx: mpsc::Sender<ChannelBuffer>,
         id: [u8; NODE_ID_LENGTH],
         if_seed: bool,
+        tx_thread: Sender<()>,
     ) -> Node
     {
+        let mut tx_thread_vec = Vec::new();
+        tx_thread_vec.push(tx_thread);
         Node {
             hash: 0,
             id,
@@ -97,11 +103,20 @@ impl Node {
             update: SystemTime::now(),
 
             tokens: HashSet::new(),
+            tx_thread: Arc::new(Mutex::new(tx_thread_vec)),
         }
     }
 
     // construct outbound node
-    pub fn new_inbound(ts: TcpStream, tx: mpsc::Sender<ChannelBuffer>, if_seed: bool) -> Node {
+    pub fn new_inbound(
+        ts: TcpStream,
+        tx: mpsc::Sender<ChannelBuffer>,
+        if_seed: bool,
+        tx_thread: Sender<()>,
+    ) -> Node
+    {
+        let mut tx_thread_vec = Vec::new();
+        tx_thread_vec.push(tx_thread);
         Node {
             hash: 0,
             id: [b'0'; NODE_ID_LENGTH],
@@ -119,6 +134,7 @@ impl Node {
             update: SystemTime::now(),
 
             tokens: HashSet::new(),
+            tx_thread: Arc::new(Mutex::new(tx_thread_vec)),
         }
     }
 
@@ -137,6 +153,20 @@ impl Node {
     }
 
     pub fn is_active(&self) -> bool { self.state == STATE::ACTIVE }
+
+    pub fn shutdown_tcp_thread(&self) -> Result<(), ()> {
+        if let Ok(mut tx_thread_vec) = self.tx_thread.lock() {
+            let mut result = Ok(());
+            while !tx_thread_vec.is_empty() {
+                if let Some(tx_thread) = tx_thread_vec.pop() {
+                    result = tx_thread.send(())
+                }
+            }
+            result
+        } else {
+            Ok(())
+        }
+    }
 }
 
 pub fn convert_ip_string(ip_str: String) -> [u8; 8] {
