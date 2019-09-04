@@ -21,7 +21,7 @@
 use std::collections::{VecDeque, HashMap};
 
 use lru_cache::LruCache;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 
 use aion_types::H256;
 use sync::wrappers::{HeadersWrapper, BlocksWrapper};
@@ -55,6 +55,9 @@ pub struct SyncStorage {
 
     /// Received txs
     received_transactions: Mutex<VecDeque<Vec<u8>>>,
+
+    // Lightning sync block height
+    lightning_base: RwLock<u64>,
 }
 
 impl SyncStorage {
@@ -68,6 +71,7 @@ impl SyncStorage {
             staged_blocks: Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHES)),
             sent_transaction_hashes: Mutex::new(LruCache::new(MAX_CACHED_TRANSACTION_HASHES)),
             received_transactions: Mutex::new(VecDeque::new()),
+            lightning_base: RwLock::new(0u64),
         }
     }
 
@@ -99,6 +103,14 @@ impl SyncStorage {
         for hash in hashes {
             downloaded_blocks_hashes.remove(hash);
         }
+    }
+
+    pub fn downloaded_blocks_hashes_statics(&self) -> (usize, usize) {
+        let downloaded_blocks_hashes = self.downloaded_blocks_hashes.lock();
+        (
+            downloaded_blocks_hashes.len(),
+            downloaded_blocks_hashes.capacity(),
+        )
     }
 
     pub fn insert_imported_block_hashes(&self, hashes: Vec<H256>) {
@@ -178,4 +190,8 @@ impl SyncStorage {
             received_transactions.push_back(transaction);
         }
     }
+
+    pub fn lightning_base(&self) -> u64 { self.lightning_base.read().clone() }
+
+    pub fn set_lightning_base(&self, base: u64) { *self.lightning_base.write() = base; }
 }

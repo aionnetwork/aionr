@@ -54,6 +54,7 @@ pub fn sync_headers(
     nodes_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
     local_total_diff: &U256,
     local_best_block_number: u64,
+    storage: Arc<SyncStorage>,
 )
 {
     let active_nodes = p2p.get_active_nodes();
@@ -67,7 +68,13 @@ pub fn sync_headers(
         if let Some(node_info_lock) = nodes_info_read.get(&candidate_hash) {
             let mut node_info = node_info_lock.write();
             // Send header request
-            if prepare_send(p2p, candidate_hash, &node_info, local_best_block_number) {
+            if prepare_send(
+                p2p,
+                candidate_hash,
+                &node_info,
+                local_best_block_number,
+                storage,
+            ) {
                 // Update cooldown time after request succesfully sent
                 node_info.last_headers_request_time = SystemTime::now();
             }
@@ -75,7 +82,14 @@ pub fn sync_headers(
     }
 }
 
-fn prepare_send(p2p: Mgr, node_hash: u64, node_info: &NodeInfo, local_best_number: u64) -> bool {
+fn prepare_send(
+    p2p: Mgr,
+    node_hash: u64,
+    node_info: &NodeInfo,
+    local_best_number: u64,
+    storage: Arc<SyncStorage>,
+) -> bool
+{
     let node_best_number = node_info.best_block_number;
     let sync_base_number = node_info.sync_base_number;
     let mut from = 1u64;
@@ -108,10 +122,11 @@ fn prepare_send(p2p: Mgr, node_hash: u64, node_info: &NodeInfo, local_best_numbe
             size = LARGE_REQUEST_SIZE;
         }
         Mode::Lightning => {
-            if local_best_number + LARGE_REQUEST_SIZE as u64 * 3 > sync_base_number {
-                from = sync_base_number + JUMP_SIZE
+            let lightning_base = storage.lightning_base();
+            if local_best_number + LARGE_REQUEST_SIZE as u64 * 3 > lightning_base {
+                from = lightning_base + JUMP_SIZE
             } else {
-                from = sync_base_number;
+                from = lightning_base;
             }
             size = LARGE_REQUEST_SIZE;
         }

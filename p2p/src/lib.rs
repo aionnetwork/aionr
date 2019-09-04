@@ -323,65 +323,64 @@ impl Mgr {
 
                         match StdTcpStream::connect_timeout(&addr, Duration::from_millis(200)) {
                             Ok(stdts)=>{
+                                if let Ok(ts) = TcpStream::from_std(stdts, &Handle::default()) {
+                                    debug!(target: "p2p", "connected to: {}", &temp_node.addr.to_string());
 
-                                let ts = TcpStream::from_std(stdts, &Handle::default()).unwrap();
+                                    let p2p_outbound_1 = p2p_outbound_0.clone();
+                                    let p2p_outbound_2 = p2p_outbound_0.clone();
 
-                                debug!(target: "p2p", "connected to: {}", &temp_node.addr.to_string());
+                                    // config stream
+                                    config_stream(&ts);
 
-                                let p2p_outbound_1 = p2p_outbound_0.clone();
-                                let p2p_outbound_2 = p2p_outbound_0.clone();
+                                    // construct node instance and store it
+                                    let (tx, rx) = mpsc::channel(409600);
+                                    let (tx_thread, rx_thread) = oneshot::channel::<()>();
+                                    let ts_0 = ts.try_clone().unwrap();
+                                    let node = Node::new_outbound(
+                                        ts_0,
+                                        tx,
+                                        temp_node.id,
+                                        temp_node.if_seed,
+                                        tx_thread,
+                                    );
 
-                                // config stream
-                                config_stream(&ts);
-
-                                // construct node instance and store it
-                                let (tx, rx) = mpsc::channel(409600);
-                                let (tx_thread, rx_thread) = oneshot::channel::<()>();
-                                let ts_0 = ts.try_clone().unwrap();
-                                let node = Node::new_outbound(
-                                    ts_0,
-                                    tx,
-                                    temp_node.id,
-                                    temp_node.if_seed,
-                                    tx_thread,
-                                );
-
-                                if let Ok(mut write) = p2p_outbound_0.nodes.try_write() {
-                                    if !write.contains_key(&hash) {
-                                        let id = node.get_id_string();
-                                        let ip = node.addr.get_ip();
-                                        if let None = write.insert(hash.clone(), node) {
-                                            debug!(target: "p2p", "outbound node added: {} {} {}", hash, id, ip);
+                                    if let Ok(mut write) = p2p_outbound_0.nodes.try_write() {
+                                        if !write.contains_key(&hash) {
+                                            let id = node.get_id_string();
+                                            let ip = node.addr.get_ip();
+                                            if let None = write.insert(hash.clone(), node) {
+                                                debug!(target: "p2p", "outbound node added: {} {} {}", hash, id, ip);
+                                            }
                                         }
                                     }
+
+                                    // binding io futures
+                                    let (sink, stream) = split_frame(ts);
+                                    let read = stream.for_each(move |cb| {
+                                        // println!("AAA: {:?}", tokens_rule_2.len());
+                                        p2p_outbound_2.handle(hash.clone(), cb);
+                                        Ok(())
+                                    })
+                                    .map_err(|err| error!(target: "p2p", "tcp outbound read: {:?}", err))
+                                    .select(rx_thread.map_err(|_| {}))
+                                    .map(|_| ())
+                                    .map_err(|_| ());
+
+                                    executor_outbound_1.spawn(read.then(|_|{
+                                        Ok(())
+                                    }));
+
+                                    let write = sink.send_all(
+                                        rx.map_err(|()| io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")),
+                                    );
+                                    executor_outbound_2.spawn(write.then(|_| { Ok(()) }));
+
+                                    // send handshake request
+                                    executor_outbound_3.spawn(lazy(move||{
+                                        handshake::send(p2p_outbound_1, hash);
+                                        Ok(())
+                                    }));
                                 }
-
-                                // binding io futures
-                                let (sink, stream) = split_frame(ts);
-                                let read = stream.for_each(move |cb| {
-                                    // println!("AAA: {:?}", tokens_rule_2.len());
-                                    p2p_outbound_2.handle(hash.clone(), cb);
-                                    Ok(())
-                                })
-                                .map_err(|err| error!(target: "p2p", "tcp outbound read: {:?}", err))
-                                .select(rx_thread.map_err(|_| {}))
-                                .map(|_| ())
-                                .map_err(|_| ());
-
-                                executor_outbound_1.spawn(read.then(|_|{
-                                    Ok(())
-                                }));
-
-                                let write = sink.send_all(
-                                    rx.map_err(|()| io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")),
-                                );
-                                executor_outbound_2.spawn(write.then(|_| { Ok(()) }));
-
-                                // send handshake request
-                                executor_outbound_3.spawn(lazy(move||{
-                                    handshake::send(p2p_outbound_1, hash);
-                                    Ok(())
-                                }));
                             },
                             Err(_err) => {
 

@@ -191,7 +191,7 @@ pub fn import_blocks(
                         let next_block_number =
                             BlockView::new(&last_block).header_view().number() + 1;
                         // Set next step
-                        info.sync_base_number = next_block_number;
+                        storage.set_lightning_base(next_block_number);
                     }
                     // If we cannot stage these blocks (staged blocks cache full), we need to remove downloaded records
                     // and try to download them again later.
@@ -220,9 +220,12 @@ pub fn import_blocks(
                 Mode::Backward => {
                     info!(target: "sync", "Node: {}, found the fork point #{}", &node_hash, first_imported_number);
                     info.switch_mode(Mode::Forward, &local_best_block, &node_hash);
+                    info.sync_base_number = last_imported_number + 1;
                 }
                 // Continue forward
-                Mode::Forward => {}
+                Mode::Forward => {
+                    info.sync_base_number = last_imported_number + 1;
+                }
                 // Switch among NORMAL, THUNDER and LIGHTNING
                 Mode::Normal | Mode::Thunder | Mode::Lightning => {
                     let mut mode = Mode::Normal;
@@ -234,6 +237,7 @@ pub fn import_blocks(
                             && thunder_nodes >= 1
                             && lightning_nodes < (normal_nodes + thunder_nodes) / 2
                         {
+                            storage.set_lightning_base(last_imported_number + 1);
                             mode = Mode::Lightning;
                         } else {
                             mode = Mode::Thunder;
@@ -242,8 +246,6 @@ pub fn import_blocks(
                     info.switch_mode(mode, &local_best_block, &node_hash);
                 }
             }
-            // Set sync base number here for forward and lightning mode
-            info.sync_base_number = last_imported_number + 1;
             info!(target: "sync", "Node: {}, {} blocks imported", &node_hash, last_imported_number - first_imported_number + 1);
             debug!(target: "sync", "Node: {}, NORMAL: {}, THUNDER: {}, LIGHTNING: {}", &node_hash, normal_nodes, thunder_nodes, lightning_nodes);
         }

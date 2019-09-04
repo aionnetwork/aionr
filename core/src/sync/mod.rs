@@ -65,11 +65,11 @@ use sync::storage::SyncStorage;
 const _HEADERS_CAPACITY: u64 = 256;
 const _STATUS_REQ_INTERVAL: u64 = 2;
 const _BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
-const _BLOCKS_IMPORT_INTERVAL: u64 = 50;
 const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
 const INTERVAL_STATUS: u64 = 5000;
 const INTERVAL_HEADERS: u64 = 100;
 const INTERVAL_BODIES: u64 = 100;
+const INTERVAL_IMPORT: u64 = 50;
 const INTERVAL_STATISICS: u64 = 10;
 const MAX_TX_CACHE: usize = 20480;
 const MAX_BLOCK_CACHE: usize = 32;
@@ -154,6 +154,7 @@ impl Sync {
         let node_info = self.node_info.clone();
         let p2p_statics = p2p.clone();
         let client_statics = self.client.clone();
+        let storage_statics = self.storage.clone();
         let (tx, rx) = oneshot::channel::<()>();
         executor.spawn(
             Interval::new(
@@ -165,7 +166,8 @@ impl Sync {
                     let local_best_number = client_statics.chain_info().best_block_number;
                     let active_len = active_nodes.len();
                     info!(target: "sync", "total/active {}/{}  ,local_best_num {}", total_len, active_len, local_best_number);
-
+                    let (downloaded_blocks_size, downloaded_blocks_capacity) = storage_statics.downloaded_blocks_hashes_statics();
+                    info!(target: "sync", "downloaded cache size/capacity {}/{}", downloaded_blocks_size, downloaded_blocks_capacity);
                     info!(target: "sync", "{:-^127}", "");
                     info!(target: "sync", "                              td         bn          bh                    addr                 rev      conn  seed       mode");
                     info!(target: "sync", "{:-^127}", "");
@@ -236,6 +238,7 @@ impl Sync {
         let p2p_header = p2p.clone();
         let node_info_header = self.node_info.clone();
         let client_header = self.client.clone();
+        let storage_header = self.storage.clone();
         let (tx, rx) = oneshot::channel::<()>();
         executor.spawn(
             Interval::new(Instant::now(), Duration::from_millis(INTERVAL_HEADERS))
@@ -248,6 +251,7 @@ impl Sync {
                         node_info_header.clone(),
                         &local_total_diff,
                         local_best_block_number,
+                        storage_header.clone(),
                     );
                     Ok(())
                 })
@@ -281,7 +285,7 @@ impl Sync {
         let node_info_import = self.node_info.clone();
         let (tx, rx) = oneshot::channel::<()>();
         executor.spawn(
-            Interval::new(Instant::now(), Duration::from_millis(INTERVAL_BODIES))
+            Interval::new(Instant::now(), Duration::from_millis(INTERVAL_IMPORT))
                 .for_each(move |_| {
                     import::import_blocks(
                         client_import.clone(),
