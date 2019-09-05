@@ -1063,10 +1063,10 @@ impl Client {
         Transaction::new(
             0.into(),
             1.into(),
-            100_000.into(),
+            1000_0000.into(),
             call_type,
             0.into(),
-            // signature of getVote(Address)
+            // signature of getEffectiveStake(Address, Address)
             call_data,
             DEFAULT_TRANSACTION_TYPE,
         )
@@ -1126,20 +1126,17 @@ impl BlockChainClient for Client {
         );
         call_data.append(&mut AbiToken::ADDRESS(signing_address.to_owned().into()).encode());
         let tx = self.build_fake_transaction(call_data, Action::Call(self.config.stake_contract));
-        match self.call(&tx, Default::default(), BlockId::Latest) {
-            Ok(executed) => {
+
+        self.call(&tx, Default::default(), BlockId::Latest)
+            .ok()
+            .map(|executed| {
                 let mut decoder = AVMDecoder::new(executed.output);
-                // assume staking contract returns a long value
-                match decoder.decode_one_address() {
-                    Ok(v) => {
-                        debug!(target: "miner", "coinbase: {:?}", v);
-                        Some(v.into())
-                    }
-                    _ => None,
-                }
-            }
-            _ => None,
-        }
+                decoder
+                    .decode_one_address()
+                    .ok()
+                    .unwrap_or([0u8; 32])
+                    .into()
+            })
     }
 
     // get the staker's vote
@@ -1157,20 +1154,12 @@ impl BlockChainClient for Client {
         call_data.append(&mut AbiToken::ADDRESS(coinbase.to_owned().into()).encode());
         let tx = self.build_fake_transaction(call_data, Action::Call(self.config.stake_contract));
 
-        match self.call(&tx, Default::default(), BlockId::Latest) {
-            Ok(executed) => {
+        self.call(&tx, Default::default(), BlockId::Latest)
+            .ok()
+            .map(|executed| {
                 let mut decoder = AVMDecoder::new(executed.output);
-                // assume staking contract returns a long value
-                match decoder.decode_ulong() {
-                    Ok(v) => {
-                        debug!(target: "miner", "stake of {:?} = {:?}", signing_address, v);
-                        Some(v)
-                    }
-                    _ => None,
-                }
-            }
-            _ => None,
-        }
+                decoder.decode_ulong().ok().unwrap_or(0u64)
+            })
     }
 
     fn estimate_gas(&self, t: &SignedTransaction, block: BlockId) -> Result<U256, CallError> {
