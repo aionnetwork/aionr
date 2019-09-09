@@ -50,8 +50,8 @@ pub struct SyncStorage {
     /// Staged blocks to be imported later
     staged_blocks: Mutex<LruCache<H256, Vec<Vec<u8>>>>,
 
-    /// sent tx hashes
-    sent_transaction_hashes: Mutex<LruCache<H256, u8>>,
+    /// Recorded tx hashes
+    recorded_transaction_hashes: Mutex<LruCache<H256, u8>>,
 
     /// Received txs
     received_transactions: Mutex<VecDeque<Vec<u8>>>,
@@ -69,7 +69,7 @@ impl SyncStorage {
             imported_blocks_hashes: Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHES)),
             headers_with_bodies_requested: Mutex::new(HashMap::new()),
             staged_blocks: Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHES)),
-            sent_transaction_hashes: Mutex::new(LruCache::new(MAX_CACHED_TRANSACTION_HASHES)),
+            recorded_transaction_hashes: Mutex::new(LruCache::new(MAX_CACHED_TRANSACTION_HASHES)),
             received_transactions: Mutex::new(VecDeque::new()),
             lightning_base: RwLock::new(0u64),
         }
@@ -94,9 +94,6 @@ impl SyncStorage {
         let mut downloaded_blocks_hashes = self.downloaded_blocks_hashes.lock();
         downloaded_blocks_hashes.contains_key(hash)
     }
-    pub fn get_imported_block_hashes(&self) -> &Mutex<LruCache<H256, u8>> {
-        &self.imported_blocks_hashes
-    }
 
     pub fn remove_downloaded_blocks_hashes(&self, hashes: &Vec<H256>) {
         let mut downloaded_blocks_hashes = self.downloaded_blocks_hashes.lock();
@@ -113,7 +110,11 @@ impl SyncStorage {
         )
     }
 
-    pub fn insert_imported_block_hashes(&self, hashes: Vec<H256>) {
+    pub fn imported_blocks_hashes(&self) -> &Mutex<LruCache<H256, u8>> {
+        &self.imported_blocks_hashes
+    }
+
+    pub fn insert_imported_blocks_hashes(&self, hashes: Vec<H256>) {
         let mut imported_blocks_hashes = self.imported_blocks_hashes.lock();
         for hash in hashes {
             if !imported_blocks_hashes.contains_key(&hash) {
@@ -142,23 +143,6 @@ impl SyncStorage {
 
     pub fn staged_blocks(&self) -> &Mutex<LruCache<H256, Vec<Vec<u8>>>> { &self.staged_blocks }
 
-    // pub fn insert_staged_blocks(&self, parent_hash: H256, blocks: Vec<Vec<u8>>) {
-    //     let mut staged_blocks = self.staged_blocks.lock();
-    //     if !staged_blocks.contains_key(&parent_hash) {
-    //         staged_blocks.insert(parent_hash, blocks);
-    //     }
-    // }
-
-    // pub fn is_blocks_batch_staged(&self, parent_hash: &H256) -> bool {
-    //     let mut staged_blocks = self.staged_blocks.lock();
-    //     staged_blocks.contains_key(parent_hash)
-    // }
-
-    // pub fn is_staged_blocks_full(&self) -> bool {
-    //     let staged_blocks = self.staged_blocks.lock();
-    //     staged_blocks.len() >= staged_blocks.capacity()
-    // }
-
     pub fn stage_blocks(&self, parent_hash: H256, blocks: Vec<Vec<u8>>) -> bool {
         let mut staged_blocks = self.staged_blocks.lock();
         if staged_blocks.len() < staged_blocks.capacity()
@@ -176,18 +160,11 @@ impl SyncStorage {
         (staged_blocks.len(), staged_blocks.capacity())
     }
 
-    pub fn get_sent_transaction_hashes(&self) -> &Mutex<LruCache<H256, u8>> {
-        &self.sent_transaction_hashes
+    pub fn recorded_transaction_hashes(&self) -> &Mutex<LruCache<H256, u8>> {
+        &self.recorded_transaction_hashes
     }
 
-    pub fn get_received_transactions(&self) -> &Mutex<VecDeque<Vec<u8>>> {
-        &self.received_transactions
-    }
-
-    //    pub fn get_received_transactions_count(&self) -> usize {
-    //        let received_transactions = self.received_transactions.lock();
-    //        return received_transactions.len();
-    //    }
+    pub fn received_transactions(&self) -> &Mutex<VecDeque<Vec<u8>>> { &self.received_transactions }
 
     pub fn insert_received_transaction(&self, transaction: Vec<u8>) {
         let mut received_transactions = self.received_transactions.lock();

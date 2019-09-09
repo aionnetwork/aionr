@@ -31,7 +31,6 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 use itertools::Itertools;
-// use std::time::SystemTime;
 use std::collections::{HashMap};
 use client::{BlockId, BlockChainClient, ChainNotify};
 use transaction::UnverifiedTransaction;
@@ -44,8 +43,6 @@ use tokio::timer::Interval;
 use futures::sync::oneshot;
 use futures::sync::oneshot::Sender;
 use parking_lot::{Mutex, RwLock};
-// use bytes::BufMut;
-//use byteorder::{BigEndian,ByteOrder};
 
 use p2p::ChannelBuffer;
 use p2p::Config;
@@ -62,10 +59,7 @@ use sync::handler::import;
 use sync::node_info::{NodeInfo, Mode};
 use sync::storage::SyncStorage;
 
-const _HEADERS_CAPACITY: u64 = 256;
-const _STATUS_REQ_INTERVAL: u64 = 2;
-const _BLOCKS_BODIES_REQ_INTERVAL: u64 = 50;
-const BROADCAST_TRANSACTIONS_INTERVAL: u64 = 50;
+const INTERVAL_TRANSACTIONS_BROADCAST: u64 = 50;
 const INTERVAL_STATUS: u64 = 5000;
 const INTERVAL_HEADERS: u64 = 100;
 const INTERVAL_BODIES: u64 = 100;
@@ -75,10 +69,13 @@ const MAX_TX_CACHE: usize = 20480;
 const MAX_BLOCK_CACHE: usize = 32;
 
 pub struct Sync {
+    /// Blockchain kernel interface
     client: Arc<BlockChainClient>,
 
+    /// Oneshots to shutdown threads
     shutdown_hooks: Arc<Mutex<Vec<Sender<()>>>>,
 
+    /// P2p manager
     p2p: Mgr,
 
     /// Sync local storage cache
@@ -316,7 +313,7 @@ impl Sync {
         executor_broadcast.spawn(
             Interval::new(
                 Instant::now(),
-                Duration::from_millis(BROADCAST_TRANSACTIONS_INTERVAL),
+                Duration::from_millis(INTERVAL_TRANSACTIONS_BROADCAST),
             )
             .for_each(move |_| {
                 broadcast::broad_new_transactions(p2p_broadcast.clone(), storage_broadcast.clone());
@@ -443,16 +440,7 @@ impl ChainNotify for Sync {
         _duration: u64,
     )
     {
-        // if get_all_nodes_count() == 0 {
-        //     return;
-        // }
-
-        // TODO: to think whether we still need to do the following or not.
         if !imported.is_empty() {
-            // let chain_info = client.chain_info();
-            // let min_imported_block_number = chain_info.best_block_number + 1;
-            // let mut max_imported_block_number = 0;
-            // info!(target: "sync", "{} new blocks saved.", imported.len());
             for hash in &imported {
                 let client = self.client.clone();
                 let block_id = BlockId::Hash(*hash);
@@ -460,55 +448,12 @@ impl ChainNotify for Sync {
                     debug!(target: "sync", "New block #{}, hash: {}.", block_number, hash);
                 }
                 import::import_staged_blocks(hash, client, self.storage.clone());
-                // if client.block_status(block_id) == BlockStatus::InChain {
-                //     if let Some(block_number) = client.block_number(block_id) {
-                //         if max_imported_block_number < block_number {
-                //             max_imported_block_number = block_number;
-                //         }
-                //     }
-                // }
             }
-
-            // The imported blocks are not new or not yet in chain. Do not notify in this case.
-            // if max_imported_block_number < min_imported_block_number {
-            //     return;
-            // }
-
-            // TODO: to understand why we need to do this
-            // let synced_block_number = chain_info.best_block_number;
-            // if max_imported_block_number <= synced_block_number {
-            //     let mut hashes = Vec::new();
-            //     for block_number in max_imported_block_number..synced_block_number + 1 {
-            //         let block_id = BlockId::Number(block_number);
-            //         if let Some(block_hash) = client.block_hash(block_id) {
-            //             hashes.push(block_hash);
-            //         }
-            //     }
-            //     if hashes.len() > 0 {
-            //         SyncStorage::remove_imported_block_hashes(hashes);
-            //     }
-            // }
-
-            // for block_number in min_imported_block_number..max_imported_block_number + 1 {
-            //     let block_id = BlockId::Number(block_number);
-            //     if let Some(blk) = client.block(block_id) {
-            //         let block_hash = blk.hash();
-            //         info!(target: "sync",
-            //                 "New block #{} {}, with {} txs added in chain.",
-            //                 block_number, block_hash, blk.transactions_count());
-            //         // import::import_staged_blocks(&block_hash);
-            //         // if let Some(time) = SyncStorage::get_requested_time(&block_hash) {
-            //         //     info!(target: "sync",
-            //         //         "New block #{} {}, with {} txs added in chain, time elapsed: {:?}.",
-            //         //         block_number, block_hash, blk.transactions_count(), SystemTime::now().duration_since(time).expect("importing duration"));
-            //         // }
-            //     }
-            // }
         }
 
         // If retracted is not empty, it means a chain reorg occurred.
         // Reset mode of all connecting nodes to NORMAL.
-        // TODO: need more thoughts if this is good idea
+        // TODO: need more thoughts whether this is a good idea
         if !retracted.is_empty() {
             info!(target: "sync", "Chain reorg. Reset the syncing mode of all connecting nodes to NORMAL.");
             for (_, node_info_lock) in &*self.node_info.read() {
@@ -517,9 +462,10 @@ impl ChainNotify for Sync {
             }
         }
 
+        // For locally sealed blocks, record them and broadcast them
         if !sealed.is_empty() {
             trace!(target: "sync", "Propagating blocks...");
-            self.storage.insert_imported_block_hashes(sealed.clone());
+            self.storage.insert_imported_blocks_hashes(sealed.clone());
             broadcast::propagate_new_blocks(self.p2p.clone(), &sealed[0], self.client.clone());
         }
     }
@@ -541,11 +487,11 @@ impl ChainNotify for Sync {
             if let Ok(tx) = UntrustedRlp::new(&transaction_rlp).as_val() {
                 let transaction: UnverifiedTransaction = tx;
                 let hash = transaction.hash();
-                let sent_transaction_hashes_mutex = self.storage.get_sent_transaction_hashes();
-                let mut sent_transaction_hashes = sent_transaction_hashes_mutex.lock();
+                let recorded_transaction_hashes_mutex = self.storage.recorded_transaction_hashes();
+                let mut recorded_transaction_hashes = recorded_transaction_hashes_mutex.lock();
 
-                if !sent_transaction_hashes.contains_key(hash) {
-                    sent_transaction_hashes.insert(hash.clone(), 0);
+                if !recorded_transaction_hashes.contains_key(hash) {
+                    recorded_transaction_hashes.insert(hash.clone(), 0);
                     self.storage.insert_received_transaction(transaction_rlp);
                 }
             }

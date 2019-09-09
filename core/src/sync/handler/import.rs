@@ -94,9 +94,6 @@ pub fn import_blocks(
             if status == BlockStatus::Unknown {
                 blocks_to_import.push(block.rlp_bytes(Seal::With));
             } else if status == BlockStatus::Bad {
-                // TODO: need p2p to provide log infomation
-                // warn!(target: "sync", "Bad block {}, {:?}, got from node: {}@{}, mode: {}", block.header.number(), block.header.hash(), node.get_node_id(), node.get_ip_addr(), node.mode);
-                // Stop this batch when got bad block
                 break;
             }
         }
@@ -114,19 +111,6 @@ pub fn import_blocks(
         let mut unknown_parent_hash = H256::new();
 
         for block in &blocks_to_import {
-            // TODO: need p2p to provide log infomation
-            // let block_view = BlockView::new(&block);
-            // let (hash, number, parent, difficulty) = {
-            //     let header_view = block_view.header_view();
-            //     (
-            //         header_view.hash(),
-            //         header_view.number(),
-            //         header_view.parent_hash(),
-            //         header_view.difficulty(),
-            //     )
-            // };
-            // debug!(target: "sync", "hash: {}, number: {}, parent: {}, node id: {}, mode: {}, synced_block_number: {}", hash, number, parent, node.get_node_id(), node.mode, node.synced_block_num);
-
             let block_view = BlockView::new(&block);
             let block_number = block_view.header_view().number();
 
@@ -156,7 +140,7 @@ pub fn import_blocks(
             }
         }
 
-        // update mode
+        // Update mode
         let node_hash = blocks_wrapper.node_hash;
         let nodes_info = nodes_info.read();
         // Get network syncing modes (other than the current node)

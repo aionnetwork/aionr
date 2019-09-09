@@ -170,47 +170,6 @@ fn send(p2p: Mgr, hash: u64, from: u64, size: u32) -> bool {
     p2p.send(hash, cb)
 }
 
-// pub fn send(
-//     p2p: Arc<Mgr>,
-//     start: u64,
-//     chain_info: &BlockChainInfo,
-//     ws: Arc<RwLock<HashMap<u64, HeadersWrapper>>>,
-// )
-// {
-//     let working_nodes = get_working_nodes(ws);
-
-//     if let Some(node) = p2p.get_random_active_node(&working_nodes) {
-
-//         if node.total_difficulty > chain_info.total_difficulty
-//             && node.block_num - REQUEST_SIZE as u64 >= chain_info.best_block_number
-//         {
-//             let start = if start > 3 {
-//                 start - 3
-//             } else if chain_info.best_block_number > 3 {
-//                 chain_info.best_block_number - 3
-//             } else {
-//                 1
-//             };
-//             debug!(target:"sync","send header req start: {} , size: {} , node_hash: {}", start, REQUEST_SIZE,node.hash);
-//             let mut cb = ChannelBuffer::new();
-//             cb.head.ver = VERSION::V0.value();
-//             cb.head.ctrl = MODULE::SYNC.value();
-//             cb.head.action = ACTION::HEADERSREQ.value();
-
-//             let mut from_buf = [0u8; 8];
-//             BigEndian::write_u64(&mut from_buf, start);
-//             cb.body.put_slice(&from_buf);
-
-//             let mut size_buf = [0u8; 4];
-//             BigEndian::write_u32(&mut size_buf, REQUEST_SIZE);
-//             cb.body.put_slice(&size_buf);
-
-//             cb.head.len = cb.body.len() as u32;
-//             p2p.send(p2p.clone(), node.hash, cb);
-//         }
-//     }
-// }
-
 pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
     trace!(target: "sync", "headers/receive_req");
 
@@ -288,17 +247,6 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
                         break;
                     } else {
                         let block_hash = header.hash();
-
-                        // let number = header.number();
-
-                        // Skip staged block header
-                        // if node.mode == Mode::THUNDER {
-                        //     if SyncStorage::is_staged_block_hash(hash) {
-                        //         debug!(target: "sync", "Skip staged block header #{}: {:?}", number, hash);
-                        //         // hw.headers.push(header.clone());
-                        //         break;
-                        //     }
-                        // }
 
                         // ignore the block if its body is already downloaded or imported
                         if !storage.is_block_hash_downloaded(&block_hash)

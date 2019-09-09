@@ -43,22 +43,24 @@ use sync::storage::SyncStorage;
 const MAX_NEW_BLOCK_AGE: u64 = 20;
 // const MAX_RE_BROADCAST: usize = 10;
 
+/// Broadcast new transactions
 pub fn broad_new_transactions(p2p: Mgr, storage: Arc<SyncStorage>) {
-    // broadcast new transactions
+    // Get transactions waiting in the queue
     let mut transactions = Vec::new();
     let mut size = 0;
-    let mut received_transactions = storage.get_received_transactions().lock();
+    let mut received_transactions = storage.received_transactions().lock();
     while let Some(transaction) = received_transactions.pop_front() {
         transactions.extend_from_slice(&transaction);
         size += 1;
     }
 
+    // End of no transaction to broadcast
     if size < 1 {
         return;
     }
 
+    // Broadcast to active nodes
     let active_nodes = p2p.get_active_nodes();
-
     if active_nodes.len() > 0 {
         let mut req = ChannelBuffer::new();
         req.head.ver = VERSION::V0.value();
@@ -76,6 +78,7 @@ pub fn broad_new_transactions(p2p: Mgr, storage: Arc<SyncStorage>) {
             p2p.send(node.get_hash(), req.clone());
             trace!(target: "sync", "Sync broadcast new transactions sent...");
             node_count += 1;
+            // TODO: To reconsider why only broadcast to 10 nodes at maximum
             if node_count > 10 {
                 break;
             } else {
@@ -86,10 +89,9 @@ pub fn broad_new_transactions(p2p: Mgr, storage: Arc<SyncStorage>) {
     }
 }
 
+/// Broadcast new blocks
 pub fn propagate_new_blocks(p2p: Mgr, block_hash: &H256, client: Arc<BlockChainClient>) {
-    // broadcast new blocks
     let active_nodes = p2p.get_active_nodes();
-
     if active_nodes.len() > 0 {
         let mut req = ChannelBuffer::new();
         req.head.ver = VERSION::V0.value();
@@ -109,6 +111,7 @@ pub fn propagate_new_blocks(p2p: Mgr, block_hash: &H256, client: Arc<BlockChainC
     }
 }
 
+/// Handle block received from broadcast
 pub fn handle_broadcast_block(
     p2p: Mgr,
     node_hash: u64,
@@ -133,58 +136,56 @@ pub fn handle_broadcast_block(
     if let Ok(header_rlp) = block_rlp.at(0) {
         if let Ok(h) = header_rlp.as_val() {
             let header: Header = h;
-            let last_imported_number = best_block_number;
             let hash = header.hash();
 
-            if last_imported_number > header.number()
-                && last_imported_number - header.number() > MAX_NEW_BLOCK_AGE
+            // Only accept side chain blocks within MAX_NEW_BLOCK_AGE
+            if best_block_number > header.number()
+                && best_block_number - header.number() > MAX_NEW_BLOCK_AGE
             {
                 trace!(target: "sync", "Ignored ancient new block {:?}", header.hash());
                 return;
             }
 
             let parent_hash = header.parent_hash();
-            match client.block_header(BlockId::Hash(*parent_hash)) {
-                Some(_) => {
-                    {
-                        let mut imported_block_hashes = storage.get_imported_block_hashes().lock();
-                        if !imported_block_hashes.contains_key(&hash) {
-                            let result = client.import_block(block_rlp.as_raw().to_vec());
+            // Proceed only when the parent block is in chain
+            if client.block_header(BlockId::Hash(*parent_hash)).is_some() {
+                let mut imported_blocks_hashes = storage.imported_blocks_hashes().lock();
+                if !imported_blocks_hashes.contains_key(&hash) {
+                    let result = client.import_block(block_rlp.as_raw().to_vec());
 
-                            match result {
-                                Ok(_) => {
-                                    trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
-                                    imported_block_hashes.insert(hash, 0);
-                                    let active_nodes = p2p.get_active_nodes();
-                                    for n in active_nodes.iter() {
-                                        // broadcast new block
-                                        trace!(target: "sync", "Sync broadcast new block sent...");
-                                        p2p.send(n.get_hash(), req.clone());
-                                    }
-                                }
-                                Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
-                                    trace!(target: "sync", "New block already in chain {:?}", hash);
-                                }
-                                Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
-                                    trace!(target: "sync", "New block already queued {:?}", hash);
-                                }
-                                Err(BlockImportError::Block(BlockError::UnknownParent(p))) => {
-                                    info!(target: "sync", "New block with unknown parent ({:?}) {:?}", p, hash);
-                                }
-                                Err(e) => {
-                                    error!(target: "sync", "Bad new block {:?} : {:?}", hash, e);
-                                }
-                            };
+                    match result {
+                        Ok(_) => {
+                            trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
+                            imported_blocks_hashes.insert(hash, 0);
+                            let active_nodes = p2p.get_active_nodes();
+                            for n in active_nodes.iter() {
+                                // Re-broadcast this block
+                                trace!(target: "sync", "Sync broadcast new block sent...");
+                                p2p.send(n.get_hash(), req.clone());
+                            }
                         }
-                    }
+                        Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
+                            trace!(target: "sync", "New block already in chain {:?}", hash);
+                        }
+                        Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
+                            trace!(target: "sync", "New block already queued {:?}", hash);
+                        }
+                        Err(BlockImportError::Block(BlockError::UnknownParent(p))) => {
+                            info!(target: "sync", "New block with unknown parent ({:?}) {:?}", p, hash);
+                        }
+                        Err(e) => {
+                            error!(target: "sync", "Bad new block {:?} : {:?}", hash, e);
+                        }
+                    };
                 }
-                None => {}
-            };
+            }
+
             p2p.update_node(&node_hash);
         }
     }
 }
 
+/// Handle transaction received from broadcast
 pub fn handle_broadcast_tx(
     p2p: Mgr,
     node_hash: u64,
@@ -225,22 +226,22 @@ pub fn handle_broadcast_tx(
 
     let transactions_rlp = UntrustedRlp::new(req.body.as_slice());
     let mut transactions = Vec::new();
-    let mut transaction_hashes = storage.get_sent_transaction_hashes().lock();
+    let mut recorded_transaction_hashes = storage.recorded_transaction_hashes().lock();
     for transaction_rlp in transactions_rlp.iter() {
         if !transaction_rlp.is_empty() {
             if let Ok(t) = transaction_rlp.as_val() {
                 let tx: UnverifiedTransaction = t;
                 let hash = tx.hash().clone();
 
-                if !transaction_hashes.contains_key(&hash) {
+                if !recorded_transaction_hashes.contains_key(&hash) {
                     transactions.push(tx);
-                    transaction_hashes.insert(hash, 0);
+                    recorded_transaction_hashes.insert(hash, 0);
                     storage.insert_received_transaction(transaction_rlp.as_raw().to_vec());
                 }
             }
         }
     }
-    drop(transaction_hashes);
+    drop(recorded_transaction_hashes);
 
     if transactions.len() > 0 {
         client.import_queued_transactions(transactions);
