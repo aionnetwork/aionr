@@ -152,6 +152,12 @@ impl Mgr {
         }
     }
 
+    pub fn clear_callback(&self) {
+        if let Ok(mut lock) = self.callback.write() {
+            *lock = None;
+        }
+    }
+
     /// verify inbound msg route through token collection
     /// token_pair: [u32, u32]
     /// token_pair[0]: flag_token, set on indivisual node tokens collection when sending msg

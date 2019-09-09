@@ -333,6 +333,7 @@ impl Sync {
 
     pub fn shutdown(&self) {
         // Shutdown p2p
+        &self.p2p.clear_callback();
         &self.p2p.shutdown();
         info!(target:"sync", "sync shutdown start");
         // Shutdown runtime tasks
