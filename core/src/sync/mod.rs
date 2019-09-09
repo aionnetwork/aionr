@@ -34,7 +34,7 @@ use itertools::Itertools;
 // use std::time::SystemTime;
 use std::collections::{HashMap};
 use client::{BlockId, BlockChainClient, ChainNotify};
-// use transaction::UnverifiedTransaction;
+use transaction::UnverifiedTransaction;
 use aion_types::{H256,U256};
 use futures::Future;
 use futures::Stream;
@@ -533,23 +533,22 @@ impl ChainNotify for Sync {
 
     fn broadcast(&self, _message: Vec<u8>) {}
 
-    fn transactions_received(&self, _transactions: &[Vec<u8>]) {
-        // if transactions.len() == 1 {
-        //     let transaction_rlp = transactions[0].clone();
-        //     if let Ok(tx) = UntrustedRlp::new(&transaction_rlp).as_val() {
-        //         let transaction: UnverifiedTransaction = tx;
-        //         let hash = transaction.hash();
-        //         let sent_transaction_hashes_mutex = SyncStorage::get_sent_transaction_hashes();
-        //         let mut lock = sent_transaction_hashes_mutex.lock();
+    fn transactions_received(&self, transactions: &[Vec<u8>]) {
+        use rlp::UntrustedRlp;
+        if transactions.len() == 1 {
+            let transaction_rlp = transactions[0].clone();
+            if let Ok(tx) = UntrustedRlp::new(&transaction_rlp).as_val() {
+                let transaction: UnverifiedTransaction = tx;
+                let hash = transaction.hash();
+                let sent_transaction_hashes_mutex = self.storage.get_sent_transaction_hashes();
+                let mut sent_transaction_hashes = sent_transaction_hashes_mutex.lock();
 
-        //         if let Ok(ref mut sent_transaction_hashes) = lock {
-        //             if !sent_transaction_hashes.contains_key(hash) {
-        //                 sent_transaction_hashes.insert(hash.clone(), 0);
-        //                 SyncStorage::insert_received_transaction(transaction_rlp);
-        //             }
-        //         }
-        //     }
-        // }
+                if !sent_transaction_hashes.contains_key(hash) {
+                    sent_transaction_hashes.insert(hash.clone(), 0);
+                    self.storage.insert_received_transaction(transaction_rlp);
+                }
+            }
+        }
     }
 }
 
