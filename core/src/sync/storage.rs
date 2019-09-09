@@ -171,6 +171,11 @@ impl SyncStorage {
         }
     }
 
+    pub fn staged_blocks_statics(&self) -> (usize, usize) {
+        let staged_blocks = self.staged_blocks.lock();
+        (staged_blocks.len(), staged_blocks.capacity())
+    }
+
     pub fn get_sent_transaction_hashes(&self) -> &Mutex<LruCache<H256, u8>> {
         &self.sent_transaction_hashes
     }
@@ -191,7 +196,7 @@ impl SyncStorage {
         }
     }
 
-    pub fn lightning_base(&self) -> u64 { self.lightning_base.read().clone() }
+    pub fn lightning_base(&self) -> u64 { *self.lightning_base.read() }
 
     pub fn set_lightning_base(&self, base: u64) { *self.lightning_base.write() = base; }
 }

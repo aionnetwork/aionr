@@ -53,10 +53,8 @@ pub fn sync_bodies(p2p: Mgr, storage: Arc<SyncStorage>) {
         let mut headers_requested: Vec<Header> = Vec::new(); // headers request record
         for header in &headers_wrapper.headers {
             let hash = header.hash();
-            if !storage.is_block_hash_downloaded(&hash) && !storage.is_block_hash_imported(&hash) {
-                hashes.put_slice(&hash);
-                headers_requested.push(header.clone());
-            }
+            hashes.put_slice(&hash);
+            headers_requested.push(header.clone());
         }
 
         if hashes.len() == 0 {
@@ -66,18 +64,21 @@ pub fn sync_bodies(p2p: Mgr, storage: Arc<SyncStorage>) {
         let node_hash = headers_wrapper.node_hash;
         let mut headers_with_bodies_requested = storage.headers_with_bodies_requested().lock();
         if !headers_with_bodies_requested.contains_key(&node_hash) {
-            send(p2p.clone(), node_hash.clone(), hashes);
-
-            let mut headers_wrapper_record = headers_wrapper.clone();
-            headers_wrapper_record.timestamp = SystemTime::now();
-            headers_wrapper_record.headers.clear();
-            headers_wrapper_record.headers.extend(headers_requested);
-            headers_with_bodies_requested.insert(node_hash, headers_wrapper_record);
+            drop(headers_with_bodies_requested);
+            if send(p2p.clone(), node_hash.clone(), hashes) {
+                let mut headers_wrapper_record = headers_wrapper.clone();
+                headers_wrapper_record.timestamp = SystemTime::now();
+                headers_wrapper_record.headers.clear();
+                headers_wrapper_record.headers.extend(headers_requested);
+                let mut headers_with_bodies_requested =
+                    storage.headers_with_bodies_requested().lock();
+                headers_with_bodies_requested.insert(node_hash, headers_wrapper_record);
+            }
         }
     }
 }
 
-pub fn send(p2p: Mgr, hash: u64, hashes: Vec<u8>) {
+pub fn send(p2p: Mgr, hash: u64, hashes: Vec<u8>) -> bool {
     trace!(target: "sync", "bodies/send req");
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
@@ -85,7 +86,7 @@ pub fn send(p2p: Mgr, hash: u64, hashes: Vec<u8>) {
     cb.head.action = ACTION::BODIESREQ.value();
     cb.body = hashes;
     cb.head.len = cb.body.len() as u32;
-    p2p.send(hash, cb);
+    p2p.send(hash, cb)
 }
 
 pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
@@ -171,18 +172,19 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
     // match bodies with headers
     let mut blocks = Vec::new();
     if headers.len() == bodies.len() {
-        debug!(target: "sync", "Node : {}, downloading {} blocks.",  &node_hash, bodies.len());
+        trace!(target: "sync", "Node : {}, downloading {} blocks.",  &node_hash, bodies.len());
+        // Get the lock before iteration to keep the operation atomic, so that the downloaded blocks in the batch will be consecutive
+        let mut downloaded_blocks_hashes = storage.downloaded_blocks_hashes().lock();
         for i in 0..headers.len() {
             let block = Block {
                 header: headers[i].clone(),
                 transactions: bodies[i].clone(),
             };
             let hash = block.header.hash();
-            let mut downloaded_blocks_hashes = storage.downloaded_blocks_hashes().lock();
             if !downloaded_blocks_hashes.contains_key(&hash) {
                 blocks.push(block);
                 downloaded_blocks_hashes.insert(hash, 0);
-                trace!(target: "sync", "downloaded block hash: {}.", hash);
+                debug!(target: "sync", "downloaded block hash: {}.", hash);
             }
         }
     } else {

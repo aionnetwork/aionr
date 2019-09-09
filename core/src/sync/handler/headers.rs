@@ -43,7 +43,8 @@ use rand::{thread_rng, Rng};
 
 const NORMAL_REQUEST_SIZE: u32 = 24;
 const LARGE_REQUEST_SIZE: u32 = 44;
-const REQUEST_COOLDOWN: u64 = 3000;
+const LIGHTNING_REQUEST_SIZE: u32 = 40;
+const REQUEST_COOLDOWN: u64 = 5000;
 const BACKWARD_SYNC_STEP: u64 = NORMAL_REQUEST_SIZE as u64 * 6 - 1;
 const FAR_OVERLAPPING_BLOCKS: u64 = 3;
 const CLOSE_OVERLAPPING_BLOCKS: u64 = 15;
@@ -64,19 +65,26 @@ pub fn sync_headers(
     // Pick a random node among all candidates
     if let Some(candidate) = pick_random_node(&candidates) {
         let candidate_hash = candidate.get_hash();
+        let mut node_info;
         let nodes_info_read = nodes_info.read();
         if let Some(node_info_lock) = nodes_info_read.get(&candidate_hash) {
-            let mut node_info = node_info_lock.write();
-            // Send header request
-            if prepare_send(
-                p2p,
-                candidate_hash,
-                &node_info,
-                local_best_block_number,
-                storage,
-            ) {
-                // Update cooldown time after request succesfully sent
-                node_info.last_headers_request_time = SystemTime::now();
+            node_info = node_info_lock.read().clone();
+        } else {
+            return;
+        }
+        drop(nodes_info_read);
+        // Send header request
+        if prepare_send(
+            p2p,
+            candidate_hash,
+            &node_info,
+            local_best_block_number,
+            storage,
+        ) {
+            // Update cooldown time after request succesfully sent
+            let nodes_info_read = nodes_info.read();
+            if let Some(node_info_lock) = nodes_info_read.get(&candidate_hash) {
+                node_info_lock.write().last_headers_request_time = SystemTime::now();
             }
         }
     }
@@ -123,12 +131,12 @@ fn prepare_send(
         }
         Mode::Lightning => {
             let lightning_base = storage.lightning_base();
-            if local_best_number + LARGE_REQUEST_SIZE as u64 * 3 > lightning_base {
-                from = lightning_base + JUMP_SIZE
+            if local_best_number + LARGE_REQUEST_SIZE as u64 * 5 > lightning_base {
+                from = local_best_number + JUMP_SIZE
             } else {
                 from = lightning_base;
             }
-            size = LARGE_REQUEST_SIZE;
+            size = LIGHTNING_REQUEST_SIZE;
         }
         Mode::Backward => {
             if sync_base_number > BACKWARD_SYNC_STEP {
@@ -144,7 +152,7 @@ fn prepare_send(
 }
 
 fn send(p2p: Mgr, hash: u64, from: u64, size: u32) -> bool {
-    debug!(target:"sync","headers.rs/send: from {}, size: {}, node hash: {}", from, size, hash);
+    debug!(target:"sync", "headers.rs/send: from {}, size: {}, node hash: {}", from, size, hash);
     let mut cb = ChannelBuffer::new();
     cb.head.ver = VERSION::V0.value();
     cb.head.ctrl = MODULE::SYNC.value();
@@ -264,7 +272,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
             let result = UnityEngine::validate_block_header(&header);
             match result {
                 Ok(()) => {
-                    // break if not consisting
+                    // break if not consecutive
                     if prev_header.number() != 0
                         && (header.number() != prev_header.number() + 1
                             || prev_header.hash() != *header.parent_hash())
@@ -297,6 +305,9 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
                             && !storage.is_block_hash_imported(&block_hash)
                         {
                             headers.push(header.clone());
+                        } else if !headers.is_empty() {
+                            // Keep blocks in a batch consecutive
+                            break;
                         }
                     }
                     prev_header = header;
@@ -312,6 +323,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
     }
 
     if !headers.is_empty() {
+        debug!(target: "sync", "Node: {}, saved headers from {} to {}", hash, headers.first().expect("headers empty checked").number(), headers.last().expect("headers empty checked").number());
         header_wrapper.node_hash = hash;
         header_wrapper.headers = headers;
         header_wrapper.timestamp = SystemTime::now();

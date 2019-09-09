@@ -94,7 +94,7 @@ pub struct Sync {
     _local_best_block_number: Arc<RwLock<u64>>,
 
     /// network best td
-    _network_best_td: Arc<RwLock<U256>>,
+    network_best_td: Arc<RwLock<U256>>,
 
     /// network best block number
     network_best_block_number: Arc<RwLock<u64>>,
@@ -133,20 +133,24 @@ impl Sync {
             shutdown_hooks: Arc::new(Mutex::new(Vec::new())),
             storage: Arc::new(SyncStorage::new()),
             node_info: Arc::new(RwLock::new(HashMap::new())),
+            network_best_td: Arc::new(RwLock::new(local_best_td)),
             network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
             _local_best_td: Arc::new(RwLock::new(local_best_td)),
             _local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
-            _network_best_td: Arc::new(RwLock::new(local_best_td)),
             _cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
             _cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
         }
     }
 
-    pub fn run(&self, sync: Arc<Sync>, executor: TaskExecutor) {
+    pub fn register_callback(&self, callback: Arc<Callable>) {
+        self.p2p.register_callback(callback);
+    }
+
+    pub fn run(&self, executor: TaskExecutor) {
         // init p2p
         let p2p = &self.p2p.clone();
         let mut p2p_0 = p2p.clone();
-        p2p_0.run(sync.clone(), executor.clone());
+        p2p_0.run(executor.clone());
 
         let mut shutdown_hooks = self.shutdown_hooks.lock();
 
@@ -164,10 +168,14 @@ impl Sync {
                 let (total_len, active_nodes) = p2p_statics.get_statics_info();
                 {
                     let local_best_number = client_statics.chain_info().best_block_number;
+                    let local_best_hash = client_statics.chain_info().best_block_hash;
                     let active_len = active_nodes.len();
-                    info!(target: "sync", "total/active {}/{}  ,local_best_num {}", total_len, active_len, local_best_number);
+                    info!(target: "sync", "total/active {}/{}, local_best_num {}, hash {}", total_len, active_len, local_best_number, local_best_hash);
                     let (downloaded_blocks_size, downloaded_blocks_capacity) = storage_statics.downloaded_blocks_hashes_statics();
-                    info!(target: "sync", "downloaded cache size/capacity {}/{}", downloaded_blocks_size, downloaded_blocks_capacity);
+                    let (staged_blocks_size, staged_blocks_capacity) = storage_statics.staged_blocks_statics();
+                    info!(target: "sync", "download record cache size/capacity {}/{}", downloaded_blocks_size, downloaded_blocks_capacity);
+                    info!(target: "sync", "staged cache size/capacity {}/{}", staged_blocks_size, staged_blocks_capacity);
+                    info!(target: "sync", "lightning syncing height: {}", storage_statics.lightning_base());
                     info!(target: "sync", "{:-^127}", "");
                     info!(target: "sync", "                              td         bn          bh                    addr                 rev      conn  seed       mode");
                     info!(target: "sync", "{:-^127}", "");
@@ -448,7 +456,7 @@ impl ChainNotify for Sync {
                 let client = self.client.clone();
                 let block_id = BlockId::Hash(*hash);
                 if let Some(block_number) = client.block_number(block_id) {
-                    trace!(target: "sync", "New block #{}, hash: {}.", block_number, hash);
+                    debug!(target: "sync", "New block #{}, hash: {}.", block_number, hash);
                 }
                 import::import_staged_blocks(hash, client, self.storage.clone());
                 // if client.block_status(block_id) == BlockStatus::InChain {
@@ -501,7 +509,7 @@ impl ChainNotify for Sync {
         // Reset mode of all connecting nodes to NORMAL.
         // TODO: need more thoughts if this is good idea
         if !retracted.is_empty() {
-            debug!(target: "sync", "Chain reorg. Reset the syncing mode of all connecting nodes to NORMAL.");
+            info!(target: "sync", "Chain reorg. Reset the syncing mode of all connecting nodes to NORMAL.");
             for (_, node_info_lock) in &*self.node_info.read() {
                 let mut node_info = node_info_lock.write();
                 node_info.mode = Mode::Normal;
@@ -509,7 +517,7 @@ impl ChainNotify for Sync {
         }
 
         if !sealed.is_empty() {
-            debug!(target: "sync", "Propagating blocks...");
+            trace!(target: "sync", "Propagating blocks...");
             self.storage.insert_imported_block_hashes(sealed.clone());
             broadcast::propagate_new_blocks(self.p2p.clone(), &sealed[0], self.client.clone());
         }
@@ -563,6 +571,7 @@ impl Callable for Sync {
                     self.node_info.clone(),
                     hash,
                     cb,
+                    self.network_best_td.clone(),
                     self.network_best_block_number.clone(),
                     genesis_hash,
                 )
@@ -610,12 +619,16 @@ impl Callable for Sync {
         let mut node_info = self.node_info.write();
         node_info.remove(&hash);
         drop(node_info);
+        trace!(target: "sync", "finish dropping node_info");
 
         let mut headers = self.storage.headers_with_bodies_requested().lock();
         headers.remove(&hash);
         drop(headers);
+        trace!(target: "sync", "finish dropping headers_with_bodies_requested");
 
         let mut headers = self.storage.downloaded_headers().lock();
         headers.retain(|x| x.node_hash != hash);
+
+        trace!(target: "sync", "finish cleaning disconnected node: {}", &hash);
     }
 }

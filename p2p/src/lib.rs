@@ -100,7 +100,7 @@ pub struct Mgr {
     /// shutdown hook
     shutdown_hooks: Arc<Mutex<Vec<Sender<()>>>>,
     /// callback
-    callback: Option<Arc<Callable>>,
+    callback: Arc<RwLock<Option<Arc<Callable>>>>,
     /// config
     config: Arc<Config>,
     /// temp queue storing seeds and active nodes queried from other nodes
@@ -138,11 +138,17 @@ impl Mgr {
 
         Mgr {
             shutdown_hooks: Arc::new(Mutex::new(Vec::new())),
-            callback: None,
+            callback: Arc::new(RwLock::new(None)),
             config: Arc::new(config),
             temp: Arc::new(Mutex::new(temp_queue)),
             nodes: Arc::new(RwLock::new(HashMap::new())),
             tokens_rule: Arc::new(tokens_rule),
+        }
+    }
+
+    pub fn register_callback(&self, callback: Arc<Callable>) {
+        if let Ok(mut lock) = self.callback.write() {
+            *lock = Some(callback);
         }
     }
 
@@ -169,7 +175,7 @@ impl Mgr {
         // TODO: need more thoughts on write or try_write
         match nodes.write() {
             Ok(mut lock) => {
-                let mut flag = true;
+                let mut send_success = true;
                 if let Some(mut node) = lock.get_mut(&hash) {
                     let mut tx = node.tx.clone();
                     let route = cb.head.get_route();
@@ -180,7 +186,7 @@ impl Mgr {
                             trace!(target: "p2p", "p2p/send: {}", node.addr.get_ip());
                         }
                         Err(err) => {
-                            flag = false;
+                            send_success = false;
                             error!(target: "p2p", "p2p/send: ip:{} err:{}", node.addr.get_ip(), err);
                         }
                     }
@@ -188,15 +194,17 @@ impl Mgr {
                     warn!(target:"p2p", "send: node not found hash {}", hash);
                     return false;
                 }
-                if !flag {
+                if !send_success {
                     if let Some(node) = lock.remove(&hash) {
                         trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
-                        if let Some(ref callback) = self.callback {
-                            callback.disconnect(hash);
+                        if let Ok(lock) = self.callback.read() {
+                            if let Some(ref callback) = *lock {
+                                callback.disconnect(hash);
+                            }
                         }
                     }
                 }
-                flag
+                send_success
             }
             Err(err) => {
                 warn!(target:"p2p", "send: nodes read {:?}", err);
@@ -206,7 +214,7 @@ impl Mgr {
     }
 
     /// run p2p instance
-    pub fn run(&mut self, callback: Arc<Callable>, executor: TaskExecutor) {
+    pub fn run(&mut self, executor: TaskExecutor) {
         // init
         let binding: SocketAddr = self
             .config
@@ -216,8 +224,8 @@ impl Mgr {
             .unwrap()
             .clone();
 
-        let callback_timeout = callback.clone();
-        self.callback = Some(callback);
+        let callback_timeout = self.callback.clone();
+        //        self.callback = Some(callback);
 
         // interval timeout
         let p2p_timeout = self.clone();
@@ -243,7 +251,11 @@ impl Mgr {
                                 node.tx.close().unwrap();
 
                                 // dispatch node remove event
-                                callback_timeout.disconnect(hash.clone());
+                                if let Ok(lock) = callback_timeout.read() {
+                                    if let Some(ref callback) = *lock {
+                                        callback.disconnect(hash.clone());
+                                    }
+                                }
                                 debug!(target: "p2p", "timeout hash/id/ip {}/{}/{}", &node.get_hash(), &node.get_id_string(), &node.addr.get_ip());
                             },
                             None => {}
@@ -678,8 +690,10 @@ impl Mgr {
                             };
                         }
                         MODULE::EXTERNAL => {
-                            if let Some(callback) = p2p.callback {
-                                callback.handle(hash, cb)
+                            if let Ok(lock) = p2p.callback.read() {
+                                if let Some(ref callback) = *lock {
+                                    callback.handle(hash, cb)
+                                }
                             }
                         }
                     }

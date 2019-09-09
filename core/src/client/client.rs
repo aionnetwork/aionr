@@ -1301,9 +1301,19 @@ impl BlockChainClient for Client {
         }
 
         let chain = self.chain.read();
+
         match Self::block_hash(&chain, &self.miner, id) {
-            Some(ref hash) if chain.is_known(hash) => BlockStatus::InChain,
-            Some(hash) => self.block_queue.status(&hash).into(),
+            Some(ref hash) => {
+                // Must first check verification queue, then check blockchain to avoid
+                // multi-thread bug.
+                // This is because when importing a verified block, it is firstly added
+                // into the blockchain then get removed from the verification queue.
+                let mut status: BlockStatus = self.block_queue.status(hash).into();
+                if chain.is_known(hash) {
+                    status = BlockStatus::InChain;
+                }
+                status
+            }
             None => BlockStatus::Unknown,
         }
     }

@@ -53,7 +53,7 @@ pub fn send(p2p: Mgr, hash: u64) {
     cb.head.ctrl = MODULE::SYNC.value();
     cb.head.action = ACTION::STATUSREQ.value();
     cb.head.len = 0;
-    let mut _p2p_0 = p2p.send(hash, cb);
+    p2p.send(hash, cb);
 }
 
 pub fn receive_req(p2p: Mgr, chain_info: &BlockChainInfo, hash: u64) {
@@ -97,6 +97,7 @@ pub fn receive_res(
     node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
     hash: u64,
     cb_in: ChannelBuffer,
+    network_best_td: Arc<RwLock<U256>>,
     network_best_block_number: Arc<RwLock<u64>>,
     local_genesis_hash: H256,
 )
@@ -109,29 +110,31 @@ pub fn receive_res(
     let (total_difficulty, req_body_rest) = req_body_rest.split_at(total_difficulty_len);
     let (best_hash, req_body_rest) = req_body_rest.split_at(HASH_LENGTH);
     let (genesis_hash, _) = req_body_rest.split_at(HASH_LENGTH);
-    let td = U256::from(total_difficulty);
-    let bh = H256::from(best_hash);
+    let total_difficulty = U256::from(total_difficulty);
+    let best_hash = H256::from(best_hash);
     let genesis_hash = H256::from(genesis_hash);
     if genesis_hash == local_genesis_hash {
         // Update network best block
-        let mut network_best_number = network_best_block_number.write();
-        if best_block_num > *network_best_number {
-            *network_best_number = best_block_num;
+        let mut network_best_td = network_best_td.write();
+        let mut network_best_block_number = network_best_block_number.write();
+        if total_difficulty > *network_best_td {
+            *network_best_td = total_difficulty;
+            *network_best_block_number = best_block_num;
         }
 
         // Update node info
         // TODO: improve this
         let mut node_info_write = node_info.write();
         if !node_info_write.contains_key(&hash) {
-            trace!(target: "sync", "new node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, bh, td);
+            trace!(target: "sync", "new node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, best_hash, total_difficulty);
         }
         let info_lock = node_info_write
             .entry(hash)
             .or_insert(RwLock::new(NodeInfo::new()));
         let mut info = info_lock.write();
-        info.best_block_hash = bh;
+        info.best_block_hash = best_hash;
         info.best_block_number = best_block_num;
-        info.total_difficulty = td;
+        info.total_difficulty = total_difficulty;
         drop(info);
 
         p2p.update_node(&hash);

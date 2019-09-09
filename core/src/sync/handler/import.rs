@@ -58,6 +58,13 @@ pub fn import_staged_blocks(hash: &H256, client: Arc<BlockChainClient>, storage:
             }
             Err(e) => {
                 warn!(target: "sync", "Failed to import staged block #{}, due to {:?}", block_number, e);
+                // Remove records so that they can be downloaded again.
+                storage.remove_downloaded_blocks_hashes(
+                    &blocks_to_import
+                        .iter()
+                        .map(|block| BlockView::new(block).header_view().hash())
+                        .collect(),
+                );
                 break;
             }
         }
@@ -191,7 +198,9 @@ pub fn import_blocks(
                         let next_block_number =
                             BlockView::new(&last_block).header_view().number() + 1;
                         // Set next step
-                        storage.set_lightning_base(next_block_number);
+                        if next_block_number > storage.lightning_base() {
+                            storage.set_lightning_base(next_block_number);
+                        }
                     }
                     // If we cannot stage these blocks (staged blocks cache full), we need to remove downloaded records
                     // and try to download them again later.
@@ -199,14 +208,16 @@ pub fn import_blocks(
                         info.switch_mode(Mode::Thunder, &local_best_block, &node_hash);
                         storage.remove_downloaded_blocks_hashes(&unknown_blocks_hashes);
                     }
-                }
-                // In other modes, unknown parent blocks are fork blocks, and we need to sync backward
-                else {
-                    info.switch_mode(Mode::Backward, &local_best_block, &node_hash);
-                    info.sync_base_number = unknown_number;
-                    // Remove hashes that are not imported due to unknown parent in case of backward syncing.
+                } else {
+                    // Remove hashes that are not imported due to unknown parent, so that they can be downloaded again.
                     storage.remove_downloaded_blocks_hashes(&unknown_blocks_hashes);
+                    // If known parent blocks are fork blocks, we need to sync backward
+                    if unknown_number <= local_best_block {
+                        info.switch_mode(Mode::Backward, &local_best_block, &node_hash);
+                        info.sync_base_number = unknown_number;
+                    }
                 }
+
                 continue;
             }
 
@@ -247,7 +258,7 @@ pub fn import_blocks(
                 }
             }
             info!(target: "sync", "Node: {}, {} blocks imported", &node_hash, last_imported_number - first_imported_number + 1);
-            debug!(target: "sync", "Node: {}, NORMAL: {}, THUNDER: {}, LIGHTNING: {}", &node_hash, normal_nodes, thunder_nodes, lightning_nodes);
+            trace!(target: "sync", "Node: {}, NORMAL: {}, THUNDER: {}, LIGHTNING: {}", &node_hash, normal_nodes, thunder_nodes, lightning_nodes);
         }
         drop(nodes_info);
         // TODO: maybe we should consider reset the header request cooldown here
