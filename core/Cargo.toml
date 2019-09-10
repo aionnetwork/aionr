@@ -62,6 +62,7 @@ macros = { path = "../util/macros" }
 futures = "0.1.6"
 tokio = "0.1.11"
 rand = "0.5.5"
+ctrlc = { git = "https://github.com/paritytech/rust-ctrlc.git" }
 
 [dev-dependencies]
 tempdir = "*"

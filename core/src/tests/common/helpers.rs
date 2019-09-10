@@ -504,6 +504,7 @@ pub fn get_good_dummy_block_hash(seal_type: Option<SealType>) -> (H256, Bytes) {
     block_header.set_parent_hash(test_spec.genesis_header().hash());
     block_header.set_state_root(test_spec.genesis_header().state_root().clone());
     block_header.set_seal_type(seal_type.unwrap_or_default());
+    // block_header.set_seal(vec![vec![0u8;64], vec![0u8;64], vec![0u8;32]]);
 
     (block_header.hash(), create_test_block(&block_header))
 }

@@ -90,6 +90,7 @@ extern crate tempdir;
 extern crate macros;
 extern crate p2p;
 extern crate rand;
+extern crate ctrlc;
 
 /// pub mod is used here to avoid name collision when used in other module
 pub mod account_provider;
