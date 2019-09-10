@@ -63,6 +63,7 @@ use key::{Ed25519KeyPair, public_to_address_ed25519};
 use num_bigint::BigUint;
 use blake2b::blake2b;
 use fixed_point::{FixedPoint,LogApproximator};
+use num::ToPrimitive;
 
 struct Seed([u8; 64]);
 
@@ -401,8 +402,9 @@ impl Miner {
         let u = FixedPoint::ln(&a)
             .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
             .expect("H256 should smaller than 2^256");
-        let delta = u.multiply_uint(difficulty.into()).divide_uint(stake.into());
-        let delta_uint: u64 = max(1u64, delta.into());
+        let delta: BigUint =
+            u.multiply_uint(difficulty.into()).to_big_uint() / BigUint::from(stake);
+        let delta_uint: u64 = max(1u64, delta.to_u64().unwrap_or(u64::max_value()));
 
         trace!(target: "staker", "Staking...difficulty: {}, u: {:?}, stake: {}, delta: {}",
                difficulty.as_u64(), u.to_big_decimal(), stake, delta_uint);
@@ -1459,8 +1461,9 @@ impl MinerService for Miner {
         let u = FixedPoint::ln(&a)
             .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
             .expect("H256 should smaller than 2^256");
-        let delta = u.multiply_uint(difficulty.into()).divide_uint(stake.into());
-        let delta_uint: u64 = max(1u64, delta.into());
+        let delta: BigUint =
+            u.multiply_uint(difficulty.into()).to_big_uint() / BigUint::from(stake);
+        let delta_uint: u64 = max(1u64, delta.to_u64().unwrap_or(u64::max_value()));
 
         trace!(target: "staker", "Staking...difficulty: {}, u: {:?}, stake: {}, delta: {}",
                difficulty.as_u64(), u.to_big_decimal(), stake, delta_uint);

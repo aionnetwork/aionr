@@ -29,6 +29,7 @@ use rcrypto::ed25519::verify;
 use aion_types::{H256, Address};
 use blake2b::blake2b;
 use num_bigint::BigUint;
+use num::ToPrimitive;
 use fixed_point::{FixedPoint,LogApproximator};
 
 pub struct PoSValidator;
@@ -105,8 +106,9 @@ impl PoSValidator {
         let u = FixedPoint::ln(&a)
             .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
             .expect("H256 should smaller than 2^256");
-        let delta = u.multiply_uint(difficulty.into()).divide_uint(stake.into());
-        let delta_uint: u64 = max(1u64, delta.into());
+        let delta: BigUint =
+            u.multiply_uint(difficulty.into()).to_big_uint() / BigUint::from(stake);
+        let delta_uint: u64 = max(1u64, delta.to_u64().unwrap_or(u64::max_value()));
         if timestamp - parent_timestamp < delta_uint {
             Err(BlockError::InvalidPoSTimestamp(timestamp, parent_timestamp, delta_uint).into())
         } else {

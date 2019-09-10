@@ -87,6 +87,8 @@ impl FixedPoint {
             / BigDecimal::from(MAX_PRECISION.0.to_bigint().unwrap())
     }
 
+    pub fn to_big_uint(self) -> BigUint { self.0 >> PRECISION }
+
     pub fn add(&self, addend: &FixedPoint) -> FixedPoint {
         let res = &self.0 + &addend.0;
         FixedPoint(res)
