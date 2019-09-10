@@ -48,6 +48,8 @@ use transaction::{
 use verification::PreverifiedBlock;
 use kvdb::KeyValueDB;
 
+use num_bigint::BigUint;
+
 /// A block, encoded as it is on the block chain.
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Block {
@@ -643,7 +645,7 @@ impl LockedBlock {
         engine: &Engine,
         seal: Vec<Bytes>,
         seal_parent: Option<&Header>,
-        stake: Option<u64>,
+        stake: Option<BigUint>,
     ) -> Result<SealedBlock, (Error, LockedBlock)>
     {
         let mut s = self;

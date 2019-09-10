@@ -2,6 +2,7 @@
 
 use std::mem;
 use std::fmt::{Display, Formatter, Error as FmtError};
+use num_bigint::BigUint;
 
 pub trait ToBytes {
     fn to_vm_bytes(&self) -> Vec<u8>;
@@ -85,12 +86,14 @@ pub enum AbiToken<'a> {
     STRING(String),
     // METHOD(String),
     ADDRESS([u8; 32]),
+    BIGINTEGER(&'a [u8]),
 }
 
 pub trait AVMEncoder {
     fn encode(&self) -> Vec<u8>;
 }
 
+/// Updates: add BigInterger in v1.0
 impl<'a> AVMEncoder for AbiToken<'a> {
     fn encode(&self) -> Vec<u8> {
         let mut res = Vec::new();
@@ -197,6 +200,11 @@ impl<'a> AVMEncoder for AbiToken<'a> {
                 res.push(0x22);
                 res.extend(addr.iter());
             }
+            AbiToken::BIGINTEGER(v) => {
+                res.push(0x23);
+                res.push(v.len() as u8);
+                res.append(&mut v.into());
+            }
         }
 
         res
@@ -252,6 +260,16 @@ impl AVMDecoder {
         Ok(ret)
     }
 
+    //TODO: decide corresbonding rust type for avm BigInteger
+    pub fn decode_one_bigint(&mut self) -> Result<BigUint, DecodeError> {
+        self.eat(1)?;
+        let length = self.bytes[self.offset] as usize;
+        self.require(length);
+        self.eat(1)?;
+
+        Ok(BigUint::from_bytes_be(&self.bytes[self.offset..]))
+    }
+
     pub fn decode_one_address(&mut self) -> Result<[u8; 32], DecodeError> {
         self.eat(1)?;
         self.require(32)?;
@@ -268,6 +286,34 @@ impl AVMDecoder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    extern crate num_bigint;
+
+    use self::num_bigint::BigUint;
+
+    // Test for abi v1.0 update
+    #[test]
+    fn encode_bigint() {
+        let data = AbiToken::BIGINTEGER(&[1, 2, 3, 4]);
+        assert_eq!(data.encode(), vec![0x23, 0x04, 1, 2, 3, 4]);
+        // parse from num_bigint::BigUint
+        let a = BigUint::parse_bytes(b"fffffffffffffffffffffffffffffffffffff", 16);
+        assert_eq!(
+            AbiToken::BIGINTEGER(a.unwrap().to_bytes_be().as_slice()).encode(),
+            vec![
+                35, 19, 15, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+                255, 255, 255, 255
+            ]
+        );
+    }
+
+    #[test]
+    fn decode_bigint() {
+        let mut decoder = AVMDecoder::new(vec![0x23, 0x01, 0xdf, 0x12]);
+        assert_eq!(
+            decoder.decode_one_bigint(),
+            Ok(BigUint::from_bytes_be(&[0xdfu8, 0x12]))
+        );
+    }
 
     #[test]
     fn encode() {

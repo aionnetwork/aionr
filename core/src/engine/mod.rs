@@ -37,6 +37,7 @@ use machine::EthereumMachine;
 
 use aion_machine::{Machine, LocalizedMachine as Localized};
 use unexpected::{Mismatch, OutOfBounds};
+use num_bigint::BigUint;
 
 /// Voting errors.
 #[derive(Debug)]
@@ -155,7 +156,7 @@ pub trait Engine: Sync + Send {
         &self,
         header: &<EthereumMachine as Machine>::Header,
         seal_pos: Option<&<EthereumMachine as Machine>::Header>,
-        stake: Option<u64>,
+        stake: Option<BigUint>,
     ) -> Result<(), <EthereumMachine as Machine>::Error>;
 
     /// Phase 1 quick block verification. Only does checks that are cheap. Returns either a null `Ok` or a general error detailing the problem with import.

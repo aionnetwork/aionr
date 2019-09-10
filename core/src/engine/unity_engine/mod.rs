@@ -53,6 +53,7 @@ use self::header_validators::{
 };
 use self::grand_parent_header_validators::{GrandParentHeaderValidator, DifficultyValidator};
 use self::pos_validator::PoSValidator;
+use num_bigint::BigUint;
 
 const ANNUAL_BLOCK_MOUNT: u64 = 3110400;
 const COMPOUND_YEAR_MAX: u64 = 128;
@@ -467,7 +468,7 @@ impl Engine for Arc<UnityEngine> {
         &self,
         header: &Header,
         seal_parent: Option<&Header>,
-        stake: Option<u64>,
+        stake: Option<BigUint>,
     ) -> Result<(), Error>
     {
         if self

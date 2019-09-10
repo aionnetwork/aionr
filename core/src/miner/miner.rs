@@ -60,6 +60,7 @@ use transaction::transaction_queue::{
 use using_queue::{GetAction, UsingQueue};
 use rcrypto::ed25519;
 use key::Ed25519KeyPair;
+use num::Zero;
 use num_bigint::BigUint;
 use blake2b::blake2b;
 
@@ -347,8 +348,8 @@ impl Miner {
 
         // 1. Get the stake. Stop proceeding if stake is 0.
         // internal staker's coinbase is himself
-        let stake: u64 = match client.get_stake(&pk.into(), None) {
-            Some(stake) if stake > 0 => stake,
+        let stake: BigUint = match client.get_stake(&pk.into(), None) {
+            Some(stake) if stake > BigUint::zero() => stake,
             _ => return Ok(()),
         };
 
@@ -431,7 +432,7 @@ impl Miner {
         sk: &[u8; 64],
         pk: &[u8; 32],
         seal_parent: Option<&Header>,
-        stake: u64,
+        stake: BigUint,
     ) -> Result<(), Error>
     {
         trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
@@ -1418,8 +1419,8 @@ impl MinerService for Miner {
     {
         //WARN: if coinbase is not found, send reward to black hole: full zero address
         let coinbase = client.get_coinbase(&pk);
-        let stake = client.get_stake(&pk, coinbase).unwrap_or(0);
-        if stake == 0 {
+        let stake = client.get_stake(&pk, coinbase).unwrap_or(BigUint::zero());
+        if stake.is_zero() {
             return None;
         }
 

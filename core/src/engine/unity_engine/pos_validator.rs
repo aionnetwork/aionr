@@ -26,6 +26,7 @@ use types::error::{BlockError, Error};
 use unexpected::Mismatch;
 use rcrypto::ed25519::verify;
 use blake2b::blake2b;
+use num::Zero;
 use num_bigint::BigUint;
 
 pub struct PoSValidator;
@@ -33,7 +34,7 @@ impl PoSValidator {
     pub fn validate(
         header: &Header,
         seal_parent_header: Option<&Header>,
-        stake: Option<u64>,
+        stake: Option<BigUint>,
     ) -> Result<(), Error>
     {
         // Return error if seal type is not PoS
@@ -43,8 +44,8 @@ impl PoSValidator {
         }
 
         // Return error if stake is none or 0
-        let stake: u64 = match stake {
-            Some(stake) if stake > 0 => stake,
+        let stake: BigUint = match stake {
+            Some(stake) if stake > BigUint::zero() => stake,
             _ => {
                 error!(target: "pos", "pos block producer's stake is null or 0");
                 return Err(BlockError::NullStake.into());

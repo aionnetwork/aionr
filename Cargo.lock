@@ -266,6 +266,9 @@ dependencies = [
 [[package]]
 name = "avm_abi"
 version = "0.1.0"
+dependencies = [
+ "num-bigint 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "backtrace"

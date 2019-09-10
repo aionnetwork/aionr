@@ -84,6 +84,8 @@ use avm_abi::{AbiToken, AVMEncoder, AVMDecoder};
 use key::public_to_address_ed25519;
 
 use ctrlc::CtrlC;
+use num::Zero;
+use num_bigint::{BigUint};
 
 // re-export
 #[cfg(test)]
@@ -1142,7 +1144,7 @@ impl BlockChainClient for Client {
     // get the staker's vote
     // sa: public key of signing account
     // ca: coinbase address, Some(v) for imported block validation, otherwise None
-    fn get_stake(&self, spk: &H256, ca: Option<Address>) -> Option<u64> {
+    fn get_stake(&self, spk: &H256, ca: Option<Address>) -> Option<BigUint> {
         let coinbase = ca.unwrap_or_else(|| self.get_coinbase(spk).unwrap_or(H256::default()));
 
         let signing_address = public_to_address_ed25519(spk);
@@ -1158,7 +1160,7 @@ impl BlockChainClient for Client {
             .ok()
             .map(|executed| {
                 let mut decoder = AVMDecoder::new(executed.output);
-                decoder.decode_ulong().ok().unwrap_or(0u64)
+                decoder.decode_one_bigint().unwrap_or(BigUint::zero())
             })
     }
 
