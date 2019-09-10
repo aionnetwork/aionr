@@ -27,14 +27,13 @@ use client::{BlockId, BlockChainClient};
 use aion_types::H256;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
-use p2p::ChannelBuffer;
-use p2p::Mgr;
-use sync::route::VERSION;
-use sync::route::MODULE;
-use sync::route::ACTION;
+use p2p::{ChannelBuffer, Mgr};
+use sync::action::Action;
 use sync::storage::SyncStorage;
 use sync::wrappers::{HeadersWrapper, BlocksWrapper};
 use header::Header;
+
+use super::{channel_buffer_template,channel_buffer_template_with_version};
 
 const HASH_LEN: usize = 32;
 
@@ -80,10 +79,7 @@ pub fn sync_bodies(p2p: Mgr, storage: Arc<SyncStorage>) {
 
 pub fn send(p2p: Mgr, hash: u64, hashes: Vec<u8>) -> bool {
     trace!(target: "sync", "bodies/send req");
-    let mut cb = ChannelBuffer::new();
-    cb.head.ver = VERSION::V0.value();
-    cb.head.ctrl = MODULE::SYNC.value();
-    cb.head.action = ACTION::BODIESREQ.value();
+    let mut cb = channel_buffer_template(Action::BODIESREQ.value());
     cb.body = hashes;
     cb.head.len = cb.body.len() as u32;
     p2p.send(hash, cb)
@@ -92,11 +88,7 @@ pub fn send(p2p: Mgr, hash: u64, hashes: Vec<u8>) -> bool {
 pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
     trace!(target: "sync", "bodies/receive_req");
 
-    let mut res = ChannelBuffer::new();
-
-    res.head.ver = VERSION::V0.value();
-    res.head.ctrl = MODULE::SYNC.value();
-    res.head.action = ACTION::BODIESRES.value();
+    let mut res = channel_buffer_template_with_version(cb_in.head.ver, Action::BODIESRES.value());
 
     let mut res_body = Vec::new();
     let hash_count = cb_in.body.len() / HASH_LEN;

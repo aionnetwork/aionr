@@ -31,11 +31,11 @@ use node::IP_LENGTH;
 use node::NODE_ID_LENGTH;
 use node::REVISION_PREFIX;
 use node::convert_ip_string;
-use route::VERSION;
-use route::MODULE;
-use route::ACTION;
+use route::Action;
 use state::STATE;
 use super::super::Mgr;
+
+use super::{channel_buffer_template,channel_buffer_template_with_version};
 
 //TODO: remove it
 const VERSION: &str = "02";
@@ -45,10 +45,7 @@ pub fn send(p2p: Mgr, hash: u64) {
     debug!(target: "p2p", "handshake/send");
 
     // header
-    let mut req = ChannelBuffer::new();
-    req.head.ver = VERSION::V0.value();
-    req.head.ctrl = MODULE::P2P.value();
-    req.head.action = ACTION::HANDSHAKEREQ.value();
+    let mut req = channel_buffer_template(Action::HANDSHAKEREQ.value());
 
     // write id
     let (id, _) = p2p.config.get_id_and_binding();
@@ -79,6 +76,7 @@ pub fn send(p2p: Mgr, hash: u64) {
     // get bodylen
     req.head.len = req.body.len() as u32;
 
+    println!("send HS");
     // send
     p2p.send(hash, req);
 }
@@ -120,11 +118,10 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
                 node.revision[0..revision_len].copy_from_slice(revision);
             }
 
-            let mut cb_out = ChannelBuffer::new();
+            let mut cb_out =
+                channel_buffer_template_with_version(cb_in.head.ver, Action::HANDSHAKERES.value());;
             let mut res_body = Vec::new();
-            cb_out.head.ver = VERSION::V0.value();
-            cb_out.head.ctrl = MODULE::P2P.value();
-            cb_out.head.action = ACTION::HANDSHAKERES.value();
+
             res_body.push(1 as u8);
             let mut revision = short_version();
             revision.insert_str(0, REVISION_PREFIX);

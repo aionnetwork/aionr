@@ -21,7 +21,7 @@
 
 extern crate p2p;
 
-use p2p::Mgr;
+//use p2p::Mgr;
 
 #[test]
 fn test_mainnet() {

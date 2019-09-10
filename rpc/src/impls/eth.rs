@@ -55,8 +55,8 @@ use helpers::accounts::unwrap_provider;
 use traits::Eth;
 use types::{
     Block, BlockTransactions, BlockNumber, Bytes, SyncStatus, Transaction, CallRequest, Index,
-Filter, Log, Receipt, Work, Contract, ContractInfo, Abi, AbiIO /*, SyncInfo, AcitvePeerInfo, PbSyncInfo,
-                                                               SimpleReceipt, SimpleReceiptLog,*/
+Filter, Log, Receipt, Work, Contract, ContractInfo, Abi, AbiIO , SyncInfo, /*AcitvePeerInfo, PbSyncInfo,
+                                                                           SimpleReceipt, SimpleReceiptLog,*/
 };
 
 // const EXTRA_INFO_PROOF: &'static str = "Object exists in in blockchain (fetched earlier), extra_info is always available if object exists; qed";
@@ -70,7 +70,7 @@ where
     EM: ExternalMinerService,
 {
     client: Arc<C>,
-    _sync: Arc<S>,
+    sync: Arc<S>,
     accounts: Option<Arc<AccountProvider>>,
     miner: Arc<M>,
     external_miner: Arc<EM>,
@@ -96,7 +96,7 @@ where
     {
         EthClient {
             client: client.clone(),
-            _sync: sync.clone(),
+            sync: sync.clone(),
             miner: miner.clone(),
             accounts: accounts.clone(),
             external_miner: em.clone(),
@@ -231,34 +231,30 @@ where
     EM: ExternalMinerService + 'static,
 {
     fn protocol_version(&self) -> Result<String> {
-        // TODO
-        // let version = self.sync.status().protocol_version.to_owned();
-        // Ok(format!("{}", version))
-        unimplemented!()
+        let version = self.sync.status().protocol_version.to_owned();
+        Ok(format!("{}", version))
     }
 
     fn syncing(&self) -> Result<SyncStatus> {
-        // TODO
-        // let status = self.sync.status();
-        // let client = &self.client;
+        let status = self.sync.status();
+        let client = &self.client;
 
-        // let chain_info = client.chain_info();
-        // let current_block = chain_info.best_block_number;
-        // let highest_block = status.highest_block_number.unwrap_or(0u64);
+        let chain_info = client.chain_info();
+        let current_block = chain_info.best_block_number;
+        let highest_block = status.highest_block_number.unwrap_or(0u64);
 
-        // // refer to java's impl: AionImpl.java isSyncComplete.
-        // if (current_block + 5) < highest_block {
-        //     let info = SyncInfo {
-        //         // to comply with java's impl, return hex string.
-        //         starting_block: format!("{:#x}", status.start_block_number),
-        //         current_block: format!("{:#x}", current_block),
-        //         highest_block: format!("{:#x}", highest_block),
-        //     };
-        //     Ok(SyncStatus::Info(info))
-        // } else {
-        //     Ok(SyncStatus::None)
-        // }
-        unimplemented!()
+        // refer to java's impl: AionImpl.java isSyncComplete.
+        if (current_block + 5) < highest_block {
+            let info = SyncInfo {
+                // to comply with java's impl, return hex string.
+                starting_block: format!("{:#x}", status.start_block_number),
+                current_block: format!("{:#x}", current_block),
+                highest_block: format!("{:#x}", highest_block),
+            };
+            Ok(SyncStatus::Info(info))
+        } else {
+            Ok(SyncStatus::None)
+        }
     }
 
     fn author(&self) -> Result<H256> { Ok(H256::from(self.miner.author())) }

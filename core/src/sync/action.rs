@@ -19,10 +19,10 @@
  *
  ******************************************************************************/
 
-use std::fmt;
+/// sync related messages routing info defined here
 
 #[derive(PartialEq)]
-pub enum SyncAction {
+pub enum Action {
     STATUSREQ = 0,
     STATUSRES = 1,
     HEADERSREQ = 2,
@@ -34,49 +34,32 @@ pub enum SyncAction {
     UNKNOWN = 0xFF,
 }
 
-impl SyncAction {
+impl Action {
     pub fn value(&self) -> u8 {
         match *self {
-            SyncAction::STATUSREQ => 0 as u8,
-            SyncAction::STATUSRES => 1 as u8,
-            SyncAction::HEADERSREQ => 2 as u8,
-            SyncAction::HEADERSRES => 3 as u8,
-            SyncAction::BODIESREQ => 4 as u8,
-            SyncAction::BODIESRES => 5 as u8,
-            SyncAction::BROADCASTTX => 6 as u8,
-            SyncAction::BROADCASTBLOCK => 7 as u8,
-            SyncAction::UNKNOWN => 0xFF as u8,
+            Action::STATUSREQ => 0 as u8,
+            Action::STATUSRES => 1 as u8,
+            Action::HEADERSREQ => 2 as u8,
+            Action::HEADERSRES => 3 as u8,
+            Action::BODIESREQ => 4 as u8,
+            Action::BODIESRES => 5 as u8,
+            Action::BROADCASTTX => 6 as u8,
+            Action::BROADCASTBLOCK => 7 as u8,
+            Action::UNKNOWN => 0xFF as u8,
         }
     }
 
-    pub fn from(value: u8) -> SyncAction {
+    pub fn from(value: u8) -> Action {
         match value {
-            0 => SyncAction::STATUSREQ,
-            1 => SyncAction::STATUSRES,
-            2 => SyncAction::HEADERSREQ,
-            3 => SyncAction::HEADERSRES,
-            4 => SyncAction::BODIESREQ,
-            5 => SyncAction::BODIESRES,
-            6 => SyncAction::BROADCASTTX,
-            7 => SyncAction::BROADCASTBLOCK,
-            _ => SyncAction::UNKNOWN,
+            0 => Action::STATUSREQ,
+            1 => Action::STATUSRES,
+            2 => Action::HEADERSREQ,
+            3 => Action::HEADERSRES,
+            4 => Action::BODIESREQ,
+            5 => Action::BODIESRES,
+            6 => Action::BROADCASTTX,
+            7 => Action::BROADCASTBLOCK,
+            _ => Action::UNKNOWN,
         }
-    }
-}
-
-impl fmt::Display for SyncAction {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        let printable = match *self {
-            SyncAction::STATUSREQ => "STATUSREQ",
-            SyncAction::STATUSRES => "STATUSRES",
-            SyncAction::HEADERSREQ => "HEADERSREQ",
-            SyncAction::HEADERSRES => "HEADERSRES",
-            SyncAction::BODIESREQ => "BODIESREQ",
-            SyncAction::BODIESRES => "BODIESRES",
-            SyncAction::BROADCASTTX => "BROADCASTTX",
-            SyncAction::BROADCASTBLOCK => "BROADCASTBLOCK",
-            SyncAction::UNKNOWN => "UNKNOWN",
-        };
-        write!(f, "{}", printable)
     }
 }

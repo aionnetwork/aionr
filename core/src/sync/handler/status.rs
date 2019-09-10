@@ -30,8 +30,10 @@ use types::blockchain::info::BlockChainInfo;
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use sync::node_info::NodeInfo;
-use sync::route::{VERSION,MODULE,ACTION};
+use sync::action::Action;
 use p2p::{ChannelBuffer, Mgr};
+
+use super::{channel_buffer_template_with_version,channel_buffer_template};
 
 const HASH_LENGTH: usize = 32;
 
@@ -48,22 +50,14 @@ pub fn send_random(p2p: Mgr, node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>
 }
 
 pub fn send(p2p: Mgr, hash: u64) {
-    let mut cb = ChannelBuffer::new();
-    cb.head.ver = VERSION::V0.value();
-    cb.head.ctrl = MODULE::SYNC.value();
-    cb.head.action = ACTION::STATUSREQ.value();
-    cb.head.len = 0;
+    let cb = channel_buffer_template(Action::STATUSREQ.value());
     p2p.send(hash, cb);
 }
 
-pub fn receive_req(p2p: Mgr, chain_info: &BlockChainInfo, hash: u64) {
+pub fn receive_req(p2p: Mgr, chain_info: &BlockChainInfo, hash: u64, version: u16) {
     trace!(target: "sync", "status/receive_req");
 
-    let mut cb = ChannelBuffer::new();
-
-    cb.head.ver = VERSION::V0.value();
-    cb.head.ctrl = MODULE::SYNC.value();
-    cb.head.action = ACTION::STATUSRES.value();
+    let mut cb = channel_buffer_template_with_version(version, Action::STATUSRES.value());
 
     let mut res_body = Vec::new();
 

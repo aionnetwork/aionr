@@ -20,10 +20,11 @@
  ******************************************************************************/
 
 mod handler;
-mod route;
+mod action;
 mod wrappers;
 mod node_info;
 mod storage;
+mod sync_provider;
 #[cfg(test)]
 mod test;
 
@@ -44,13 +45,8 @@ use futures::sync::oneshot;
 use futures::sync::oneshot::Sender;
 use parking_lot::{Mutex, RwLock};
 
-use p2p::ChannelBuffer;
-use p2p::Config;
-use p2p::Mgr;
-use p2p::Callable;
-use sync::route::VERSION;
-use sync::route::MODULE;
-use sync::route::ACTION;
+use p2p::{ ChannelBuffer, Config, Mgr, Callable, PROTOCAL_VERSION, Module};
+use sync::action::Action;
 use sync::handler::status;
 use sync::handler::bodies;
 use sync::handler::headers;
@@ -58,6 +54,9 @@ use sync::handler::broadcast;
 use sync::handler::import;
 use sync::node_info::{NodeInfo, Mode};
 use sync::storage::SyncStorage;
+use sync::sync_provider::SyncStatus;
+
+pub use sync::sync_provider::SyncProvider;
 
 const INTERVAL_TRANSACTIONS_BROADCAST: u64 = 50;
 const INTERVAL_STATUS: u64 = 5000;
@@ -110,18 +109,18 @@ impl Sync {
 
         let mut token_rules: Vec<[u32; 2]> = vec![];
         let sync_rule_base =
-            ((VERSION::V0.value() as u32) << 16) + ((MODULE::SYNC.value() as u32) << 8);
+            ((PROTOCAL_VERSION as u32) << 16) + ((Module::SYNC.value() as u32) << 8);
         token_rules.push([
-            sync_rule_base + ACTION::STATUSREQ.value() as u32,
-            sync_rule_base + ACTION::STATUSRES.value() as u32,
+            sync_rule_base + Action::STATUSREQ.value() as u32,
+            sync_rule_base + Action::STATUSRES.value() as u32,
         ]);
         token_rules.push([
-            sync_rule_base + ACTION::HEADERSREQ.value() as u32,
-            sync_rule_base + ACTION::HEADERSRES.value() as u32,
+            sync_rule_base + Action::HEADERSREQ.value() as u32,
+            sync_rule_base + Action::HEADERSRES.value() as u32,
         ]);
         token_rules.push([
-            sync_rule_base + ACTION::BODIESREQ.value() as u32,
-            sync_rule_base + ACTION::BODIESRES.value() as u32,
+            sync_rule_base + Action::BODIESREQ.value() as u32,
+            sync_rule_base + Action::BODIESRES.value() as u32,
         ]);
 
         Sync {
@@ -351,80 +350,18 @@ impl Sync {
     }
 }
 
-pub trait SyncProvider: Send + ::std::marker::Sync {
-    // /// Get sync status
-    // fn status(&self) -> SyncStatus;
-
-    // /// Get peers information
-    // fn peers(&self) -> Vec<PeerInfo>;
-
-    /// Get the enode if available.
-    fn enode(&self) -> Option<String>;
-
-    // /// Returns propagation count for pending transactions.
-    // fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats>;
-
-    // /// Get active nodes
-    // fn active(&self) -> Vec<ActivePeerInfo>;
-}
-
 impl SyncProvider for Sync {
-    // /// Get sync status
-    // fn status(&self) -> SyncStatus {
-    //     // TODO:  only set start_block_number/highest_block_number.
-    //     SyncStatus {
-    //         state: SyncState::Idle,
-    //         protocol_version: 0,
-    //         network_id: 256,
-    //         start_block_number: self.client.chain_info().best_block_number,
-    //         last_imported_block_number: None,
-    //         highest_block_number: match self.network_best_block_number.read() {
-    //             Ok(number) => Some(*number),
-    //             Err(_) => None,
-    //         },
-    //         blocks_received: 0,
-    //         blocks_total: 0,
-    //         //num_peers: { get_nodes_count(ALIVE.value()) },
-    //         num_peers: 0,
-    //         num_active_peers: 0,
-    //     }
-    // }
-
-    // /// Get sync peers
-    // fn peers(&self) -> Vec<PeerInfo> {
-    // let mut peer_info_list = Vec::new();
-    // let peer_nodes = get_all_nodes();
-    // for peer in peer_nodes.iter() {
-    //     let peer_info = PeerInfo {
-    //         id: Some(peer.get_node_id()),
-    //     };
-    //     peer_info_list.push(peer_info);
-    // }
-    // peer_info_list
-    //     Vec::new()
-    // }
-
-    fn enode(&self) -> Option<String> {
-        // Some(get_local_node().get_node_id())
-        None
+    /// Get sync status
+    fn status(&self) -> SyncStatus {
+        // TODO:  only set start_block_number/highest_block_number.
+        SyncStatus {
+            protocol_version: PROTOCAL_VERSION as u8,
+            network_id: self.p2p.get_net_id(),
+            start_block_number: self.client.chain_info().best_block_number,
+            highest_block_number: Some(*self.network_best_block_number.read()),
+            num_peers: self.p2p.get_active_nodes_len() as usize,
+        }
     }
-
-    // fn transactions_stats(&self) -> BTreeMap<H256, TransactionStats> { BTreeMap::new() }
-
-    // fn active(&self) -> Vec<ActivePeerInfo> {
-    // let nodes = &self.p2p.get_active_nodes();
-    // nodes
-    //     .into_iter()
-    //     .map(|node| {
-    //         ActivePeerInfo {
-    //             highest_block_number: node.block_num,
-    //             id: node.id.to_hex(),
-    //             ip: node.addr.ip.to_hex(),
-    //         }
-    //     })
-    //     .collect()
-    //     vec![]
-    // }
 }
 
 impl ChainNotify for Sync {
@@ -502,15 +439,15 @@ impl ChainNotify for Sync {
 impl Callable for Sync {
     fn handle(&self, hash: u64, cb: ChannelBuffer) {
         let p2p = self.p2p.clone();
-        match ACTION::from(cb.head.action) {
-            ACTION::STATUSREQ => {
+        match Action::from(cb.head.action) {
+            Action::STATUSREQ => {
                 if cb.head.len != 0 {
                     // TODO: kill the node
                 }
                 let chain_info = &self.client.chain_info();
-                status::receive_req(p2p, chain_info, hash)
+                status::receive_req(p2p, chain_info, hash, cb.head.ver)
             }
-            ACTION::STATUSRES => {
+            Action::STATUSRES => {
                 let genesis_hash = self.client.chain_info().genesis_hash;
                 status::receive_res(
                     p2p,
@@ -522,17 +459,17 @@ impl Callable for Sync {
                     genesis_hash,
                 )
             }
-            ACTION::HEADERSREQ => {
+            Action::HEADERSREQ => {
                 let client = self.client.clone();
                 headers::receive_req(p2p, hash, client, cb)
             }
-            ACTION::HEADERSRES => headers::receive_res(p2p, hash, cb, self.storage.clone()),
-            ACTION::BODIESREQ => {
+            Action::HEADERSRES => headers::receive_res(p2p, hash, cb, self.storage.clone()),
+            Action::BODIESREQ => {
                 let client = self.client.clone();
                 bodies::receive_req(p2p, hash, client, cb)
             }
-            ACTION::BODIESRES => bodies::receive_res(p2p, hash, cb, self.storage.clone()),
-            ACTION::BROADCASTTX => {
+            Action::BODIESRES => bodies::receive_res(p2p, hash, cb, self.storage.clone()),
+            Action::BROADCASTTX => {
                 let client = self.client.clone();
                 broadcast::handle_broadcast_tx(
                     p2p,
@@ -544,7 +481,7 @@ impl Callable for Sync {
                     self.network_best_block_number.clone(),
                 )
             }
-            ACTION::BROADCASTBLOCK => {
+            Action::BROADCASTBLOCK => {
                 let client = self.client.clone();
                 broadcast::handle_broadcast_block(
                     p2p,
@@ -556,7 +493,7 @@ impl Callable for Sync {
                 )
             }
             // TODO: kill the node
-            ACTION::UNKNOWN => (),
+            Action::UNKNOWN => (),
         };
     }
 

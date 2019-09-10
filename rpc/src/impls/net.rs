@@ -28,7 +28,7 @@ use traits::Net;
 
 /// Net rpc implementation.
 pub struct NetClient<S: ?Sized> {
-    _sync: Arc<S>,
+    sync: Arc<S>,
 }
 
 impl<S: ?Sized> NetClient<S>
@@ -37,7 +37,7 @@ where S: SyncProvider
     /// Creates new NetClient.
     pub fn new(sync: &Arc<S>) -> Self {
         NetClient {
-            _sync: sync.clone(),
+            sync: sync.clone(),
         }
     }
 }
@@ -46,16 +46,10 @@ impl<S: ?Sized> Net for NetClient<S>
 where S: SyncProvider + 'static
 {
     fn version(&self) -> Result<String> {
-        // TODO
-        // Ok(format!("{}", self.sync.status().network_id).to_owned())
-        unimplemented!()
+        Ok(format!("{}", self.sync.status().network_id).to_owned())
     }
 
-    fn peer_count(&self) -> Result<u64> {
-        // TODO
-        // Ok(self.sync.status().num_peers as u64)
-        unimplemented!()
-    }
+    fn peer_count(&self) -> Result<u64> { Ok(self.sync.status().num_peers as u64) }
 
     fn is_listening(&self) -> Result<bool> {
         // right now (11 march 2016), we are always listening for incoming connections

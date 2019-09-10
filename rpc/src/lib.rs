@@ -64,10 +64,6 @@ extern crate serde_derive;
 #[macro_use]
 extern crate pretty_assertions;
 
-#[cfg(test)]
-#[macro_use]
-extern crate macros;
-
 mod helpers;
 
 pub mod types;

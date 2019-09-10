@@ -20,10 +20,8 @@
  *
  ******************************************************************************/
 use super::*;
-use std::{thread, time};
-use tokio::runtime::Runtime;
 
-pub fn get_network_config() -> Config {
+pub fn _get_network_config() -> Config {
     let mut net_config = Config::new();
     net_config.boot_nodes.push(String::from(
         "p2p://c33d1066-8c7e-496c-9c4e-c89318280274@13.92.155.115:30303",

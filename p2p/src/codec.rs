@@ -27,7 +27,7 @@ use bincode::config;
 use bytes::BytesMut;
 use node::HEADER_LENGTH;
 use msg::ChannelBuffer;
-use route::VERSION;
+use route::Version;
 
 pub struct Codec;
 
@@ -62,7 +62,7 @@ impl Decoder for Codec {
                 let (head_raw, _) = src.split_at(HEADER_LENGTH);
                 if let Ok(head) = decoder.deserialize(head_raw) {
                     decoded.head = head;
-                    if decoded.head.ver > VERSION::V2.value() || decoded.head.ctrl > 1
+                    if decoded.head.ver > Version::V2.value() || decoded.head.ctrl > 1
                     //TODO: FIX IT
                     {
                         invalid = true;

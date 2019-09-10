@@ -33,12 +33,12 @@ use transaction::UnverifiedTransaction;
 use aion_types::H256;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
-use p2p::ChannelBuffer;
-// use p2p::Node;
-use p2p::Mgr;
-use sync::route::{VERSION, MODULE, ACTION};
+use p2p::{ChannelBuffer,Mgr};
+use sync::action::Action;
 use sync::node_info::NodeInfo;
 use sync::storage::SyncStorage;
+
+use super::channel_buffer_template;
 
 const MAX_NEW_BLOCK_AGE: u64 = 20;
 // const MAX_RE_BROADCAST: usize = 10;
@@ -62,10 +62,7 @@ pub fn broad_new_transactions(p2p: Mgr, storage: Arc<SyncStorage>) {
     // Broadcast to active nodes
     let active_nodes = p2p.get_active_nodes();
     if active_nodes.len() > 0 {
-        let mut req = ChannelBuffer::new();
-        req.head.ver = VERSION::V0.value();
-        req.head.ctrl = MODULE::SYNC.value();
-        req.head.action = ACTION::BROADCASTTX.value();
+        let mut req = channel_buffer_template(Action::BROADCASTTX.value());
 
         let mut txs_rlp = RlpStream::new_list(size);
         txs_rlp.append_raw(transactions.as_slice(), size);
@@ -93,10 +90,7 @@ pub fn broad_new_transactions(p2p: Mgr, storage: Arc<SyncStorage>) {
 pub fn propagate_new_blocks(p2p: Mgr, block_hash: &H256, client: Arc<BlockChainClient>) {
     let active_nodes = p2p.get_active_nodes();
     if active_nodes.len() > 0 {
-        let mut req = ChannelBuffer::new();
-        req.head.ver = VERSION::V0.value();
-        req.head.ctrl = MODULE::SYNC.value();
-        req.head.action = ACTION::BROADCASTBLOCK.value();
+        let mut req = channel_buffer_template(Action::BROADCASTBLOCK.value());
 
         if let Some(block_rlp) = client.block(BlockId::Hash(block_hash.clone())) {
             req.body.put_slice(&block_rlp.into_inner());

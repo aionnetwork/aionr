@@ -59,7 +59,7 @@ where
     M: MinerService,
 {
     client: Arc<C>,
-    _sync: Arc<S>,
+    sync: Arc<S>,
     miner: Arc<M>,
     account_provider: Option<Arc<AccountProvider>>,
     recent_block_hash: Mutex<LinkedList<H256>>,
@@ -82,7 +82,7 @@ where
     {
         StratumClient {
             client: client.clone(),
-            _sync: sync.clone(),
+            sync: sync.clone(),
             miner: miner.clone(),
             account_provider: account_provider.clone(),
             recent_block_hash: Mutex::new(LinkedList::new()),
@@ -212,12 +212,11 @@ where
 
     /// Get information
     fn get_info(&self) -> Result<Info> {
+        // TODO
         Ok(Info {
             balance: 0,
             blocks: 0,
-            // TODO
-            // connections: self.sync.status().num_peers as u64,
-            connections: 0u64,
+            connections: self.sync.status().num_peers as u64,
             proxy: String::default(),
             generate: true,
             genproclimit: 100,

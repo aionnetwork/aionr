@@ -35,11 +35,13 @@ use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use p2p::{ChannelBuffer, Mgr, Node};
-use sync::route::{VERSION, MODULE, ACTION};
+use sync::action::Action;
 use sync::wrappers::{HeadersWrapper};
 use sync::node_info::{NodeInfo, Mode};
 use sync::storage::SyncStorage;
 use rand::{thread_rng, Rng};
+
+use super::{channel_buffer_template,channel_buffer_template_with_version};
 
 const NORMAL_REQUEST_SIZE: u32 = 24;
 const LARGE_REQUEST_SIZE: u32 = 44;
@@ -153,10 +155,7 @@ fn prepare_send(
 
 fn send(p2p: Mgr, hash: u64, from: u64, size: u32) -> bool {
     debug!(target:"sync", "headers.rs/send: from {}, size: {}, node hash: {}", from, size, hash);
-    let mut cb = ChannelBuffer::new();
-    cb.head.ver = VERSION::V0.value();
-    cb.head.ctrl = MODULE::SYNC.value();
-    cb.head.action = ACTION::HEADERSREQ.value();
+    let mut cb = channel_buffer_template(Action::HEADERSREQ.value());
 
     let mut from_buf = [0u8; 8];
     BigEndian::write_u64(&mut from_buf, from);
@@ -173,11 +172,7 @@ fn send(p2p: Mgr, hash: u64, from: u64, size: u32) -> bool {
 pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
     trace!(target: "sync", "headers/receive_req");
 
-    let mut res = ChannelBuffer::new();
-
-    res.head.ver = VERSION::V0.value();
-    res.head.ctrl = MODULE::SYNC.value();
-    res.head.action = ACTION::HEADERSRES.value();
+    let mut res = channel_buffer_template_with_version(cb_in.head.ver, Action::HEADERSRES.value());
 
     let mut res_body = Vec::new();
 

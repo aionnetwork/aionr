@@ -30,10 +30,9 @@ use node::NODE_ID_LENGTH;
 use node::IP_LENGTH;
 use node::Node;
 use node::TempNode;
-use route::VERSION;
-use route::MODULE;
-use route::ACTION;
+use route::Action;
 use super::super::Mgr;
+use super::{channel_buffer_template,channel_buffer_template_with_version};
 
 pub fn send(p2p: Mgr) {
     let active: Vec<Node> = p2p.get_active_nodes();
@@ -44,24 +43,15 @@ pub fn send(p2p: Mgr) {
         debug!(target: "p2p", "active_nodes/send:  hash {}", &hash);
         p2p.send(
             hash,
-            ChannelBuffer::new1(
-                VERSION::V0.value(),
-                MODULE::P2P.value(),
-                ACTION::ACTIVENODESREQ.value(),
-                0,
-            ),
+            channel_buffer_template(Action::ACTIVENODESREQ.value()),
         );
     }
 }
 
-pub fn receive_req(p2p: Mgr, hash: u64) {
+pub fn receive_req(p2p: Mgr, hash: u64, version: u16) {
     debug!(target: "p2p", "active_nodes/receive_req");
 
-    let mut cb_out = ChannelBuffer::new();
-    cb_out.head.ver = VERSION::V0.value();
-    cb_out.head.ctrl = MODULE::P2P.value();
-    cb_out.head.action = ACTION::ACTIVENODESRES.value();
-
+    let mut cb_out = channel_buffer_template_with_version(version, Action::ACTIVENODESRES.value());
     let active_nodes = p2p.get_active_nodes();
     let mut res_body = Vec::new();
 

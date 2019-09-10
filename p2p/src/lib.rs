@@ -76,9 +76,8 @@ use tokio::timer::Interval;
 use tokio_reactor::Handle;
 use tokio_codec::{Decoder,Framed};
 use codec::Codec;
-use route::VERSION;
-use route::MODULE;
-use route::ACTION;
+use route::Version;
+use route::Action;
 use state::STATE;
 use handler::handshake;
 use handler::active_nodes;
@@ -94,6 +93,9 @@ const INTERVAL_TIMEOUT: u64 = 5;
 const INTERVAL_ACTIVE_NODES: u64 = 3;
 const TIMEOUT_MAX: u64 = 30;
 const TEMP_MAX: usize = 64;
+
+pub const PROTOCAL_VERSION: u16 = Version::V0 as u16;
+pub use route::Module;
 
 #[derive(Clone)]
 pub struct Mgr {
@@ -129,11 +131,11 @@ impl Mgr {
         }
 
         let p2p_rule_base =
-            ((VERSION::V0.value() as u32) << 16) + ((MODULE::P2P.value() as u32) << 8);
+            ((Version::V0.value() as u32) << 16) + ((Module::P2P.value() as u32) << 8);
 
         tokens_rule.insert(
-            p2p_rule_base + ACTION::ACTIVENODESRES.value() as u32,
-            p2p_rule_base + ACTION::ACTIVENODESREQ.value() as u32,
+            p2p_rule_base + Action::ACTIVENODESRES.value() as u32,
+            p2p_rule_base + Action::ACTIVENODESREQ.value() as u32,
         );
 
         Mgr {
@@ -551,6 +553,8 @@ impl Mgr {
         info!(target: "p2p" , "p2p shutdown finished");
     }
 
+    pub fn get_net_id(&self) -> u32 { self.config.net_id }
+
     /// rechieve a random node with td >= target_td
     pub fn get_node_by_td(&self, _target_td: u64) -> u64 { 120 }
 
@@ -667,7 +671,7 @@ impl Mgr {
 
     /// messages with module code other than p2p module
     /// should flow into external handlers
-    fn handle(&self, hash: u64, cb: ChannelBuffer /*, callable: Arc<Callable>*/) {
+    fn handle(&self, hash: u64, cb: ChannelBuffer) {
         let p2p = self.clone();
         debug!(target: "p2p", "handle: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
         // verify if flag token has been set
@@ -682,30 +686,33 @@ impl Mgr {
         }
 
         if pass {
-            match VERSION::from(cb.head.ver) {
-                VERSION::V0 => {
-                    match MODULE::from(cb.head.ctrl) {
-                        MODULE::P2P => {
-                            match ACTION::from(cb.head.action) {
-                                ACTION::HANDSHAKEREQ => handshake::receive_req(p2p, hash, cb),
-                                ACTION::HANDSHAKERES => handshake::receive_res(p2p, hash, cb),
-                                ACTION::ACTIVENODESREQ => active_nodes::receive_req(p2p, hash),
-                                ACTION::ACTIVENODESRES => active_nodes::receive_res(p2p, hash, cb),
-                                ACTION::DISCONNECT => {}
+            match Version::from(cb.head.ver) {
+                Version::V0 => {
+                    match Module::from(cb.head.ctrl) {
+                        Module::P2P => {
+                            match Action::from(cb.head.action) {
+                                Action::HANDSHAKEREQ => handshake::receive_req(p2p, hash, cb),
+                                Action::HANDSHAKERES => handshake::receive_res(p2p, hash, cb),
+                                Action::ACTIVENODESREQ => {
+                                    active_nodes::receive_req(p2p, hash, cb.head.ver)
+                                }
+                                Action::ACTIVENODESRES => active_nodes::receive_res(p2p, hash, cb),
+                                Action::DISCONNECT => {}
                                 _ => error!(target: "p2p", "invalid action {}", cb.head.action),
                             };
                         }
-                        MODULE::EXTERNAL => {
+                        Module::SYNC => {
                             if let Ok(lock) = p2p.callback.read() {
                                 if let Some(ref callback) = *lock {
                                     callback.handle(hash, cb)
                                 }
                             }
                         }
+                        Module::UNKNOWN => error!(target: "p2p", "invalid ctrl {}", cb.head.ctrl),
                     }
                 }
-                //VERSION::V1 => handshake::send(p2p, hash),
-                _ => error!(target: "p2p", "invalid version code"),
+                //Version::V1 => handshake::send(p2p, hash),
+                _ => error!(target: "p2p", "invalid version {}", cb.head.ver),
             };
         } else {
             warn!(target: "p2p", "handle: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
@@ -736,14 +743,19 @@ fn split_frame(
 #[cfg(test)]
 mod tests {
 
-    use std::sync::Arc;
     use std::net::SocketAddr;
     use futures::Future;
     use tokio::net::TcpStream;
-    use futures::sync::mpsc;
+    use futures::sync::{mpsc,oneshot};
     use Mgr;
     use node::Node;
     use config::Config;
+    use super::PROTOCAL_VERSION;
+
+    #[test]
+    fn test_version() {
+        assert_eq!(PROTOCAL_VERSION, 0u16);
+    }
 
     #[test]
     pub fn test_tokens() {
@@ -754,9 +766,10 @@ mod tests {
             let flat_token_0: u32 = (0 << 16) + (0 << 8) + 0;
             let clear_token_0: u32 = (0 << 16) + (0 << 8) + 1;
             tokens_rules.push([flat_token_0, clear_token_0]);
-            let p2p = Mgr::new(Arc::new(Config::new()), tokens_rules);
+            let p2p = Mgr::new(Config::new(), tokens_rules);
 
             let (tx, _rx) = mpsc::channel(409600);
+            let (tx_thread, _rx_thread) = oneshot::channel::<()>();
             let mut node = Node::new_outbound(
                 ts,
                 tx,
@@ -766,6 +779,7 @@ mod tests {
                     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
                 ],
                 false,
+                tx_thread,
             );
             node.tokens.insert(flat_token_0);
 
