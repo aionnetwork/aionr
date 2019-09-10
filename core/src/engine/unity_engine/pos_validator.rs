@@ -24,10 +24,9 @@ use std::cmp::max;
 use header::{Header, SealType};
 use types::error::{BlockError, Error};
 use unexpected::Mismatch;
-use key::public_to_address_ed25519;
 use rcrypto::ed25519::verify;
-use aion_types::{H256, Address};
 use blake2b::blake2b;
+use num::Zero;
 use num_bigint::BigUint;
 use num::ToPrimitive;
 use fixed_point::{FixedPoint,LogApproximator};
@@ -37,7 +36,7 @@ impl PoSValidator {
     pub fn validate(
         header: &Header,
         seal_parent_header: Option<&Header>,
-        stake: Option<u64>,
+        stake: Option<BigUint>,
     ) -> Result<(), Error>
     {
         // Return error if seal type is not PoS
@@ -47,8 +46,8 @@ impl PoSValidator {
         }
 
         // Return error if stake is none or 0
-        let stake: u64 = match stake {
-            Some(stake) if stake > 0 => stake,
+        let stake: BigUint = match stake {
+            Some(stake) if stake > BigUint::zero() => stake,
             _ => {
                 error!(target: "pos", "pos block producer's stake is null or 0");
                 return Err(BlockError::NullStake.into());
@@ -88,10 +87,11 @@ impl PoSValidator {
         }
 
         // Verify the signer of the seed and the signature are the same as the block producer
-        let signer: Address = public_to_address_ed25519(&H256::from(pk.as_slice()));
-        if &signer != header.author() {
-            return Err(BlockError::InvalidPoSAuthor.into());
-        }
+        // Signer and coinbase can be different
+        // let signer: Address = public_to_address_ed25519(&H256::from(pk.as_slice()));
+        // if &signer != header.author() {
+        //     return Err(BlockError::InvalidPoSAuthor.into());
+        // }
 
         // Verify timestamp
         let difficulty = header.difficulty().clone();

@@ -17,6 +17,7 @@ dependencies = [
  "bytes 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
  "crossbeam 0.3.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "crypto 0.1.0",
+ "ctrlc 1.1.1 (git+https://github.com/paritytech/rust-ctrlc.git)",
  "db 0.0.1",
  "equihash 0.1.0",
  "ethbloom 0.5.1",
@@ -267,6 +268,9 @@ dependencies = [
 [[package]]
 name = "avm_abi"
 version = "0.1.0"
+dependencies = [
+ "num-bigint 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "backtrace"

@@ -59,7 +59,8 @@ use transaction::transaction_queue::{
 };
 use using_queue::{GetAction, UsingQueue};
 use rcrypto::ed25519;
-use key::{Ed25519KeyPair, public_to_address_ed25519};
+use key::Ed25519KeyPair;
+use num::Zero;
 use num_bigint::BigUint;
 use blake2b::blake2b;
 use fixed_point::{FixedPoint,LogApproximator};
@@ -288,7 +289,8 @@ impl Miner {
             Some(b) => {
                 if b.header().timestamp() <= timestamp_now {
                     let seal = b.header().seal();
-                    let stake = client.get_stake(b.header().author());
+                    let stake = client
+                        .get_stake(&b.header().get_pk_of_pos().unwrap_or(H256::default()), None);
                     if let Ok(sealed) = b.clone().lock().try_seal_pos(
                         &*self.engine,
                         seal.to_owned(),
@@ -344,11 +346,12 @@ impl Miner {
             .expect("Internal staker is null. Should have checked before.");
         let sk: [u8; 64] = staker.secret().0;
         let pk: [u8; 32] = staker.public().0;
-        let address: Address = staker.address();
+        // let address: Address = staker.address();
 
         // 1. Get the stake. Stop proceeding if stake is 0.
-        let stake: u64 = match client.get_stake(&address) {
-            Some(stake) if stake > 0 => stake,
+        // internal staker's coinbase is himself
+        let stake: BigUint = match client.get_stake(&pk.into(), None) {
+            Some(stake) if stake > BigUint::zero() => stake,
             _ => return Ok(()),
         };
 
@@ -373,7 +376,7 @@ impl Miner {
                     client.seal_parent_header(&header.parent_hash(), &header.seal_type()),
                 )
             }
-            None => (timestamp_now - 1u64, vec![0u8; 64], None), // TODO-Unity: To handle the first PoS block better
+            None => (0u64, vec![0u8; 64], None), // TODO-Unity: To handle the first PoS block better
         };
 
         // 4. Calculate difficulty
@@ -411,6 +414,7 @@ impl Miner {
         let new_timestamp = timestamp + delta_uint;
 
         // 6. Determine if we can produce a new PoS block or not
+        debug!(target: "staker", "time now: {}, expected: {}", timestamp_now, new_timestamp);
         if timestamp_now >= new_timestamp {
             self.prepare_block_pos(
                 client,
@@ -428,6 +432,7 @@ impl Miner {
 
     // TOREMOVE-Unity: Unity MS1 use only
     /// Generate PoS block
+    /// sk/pk is public/private key of signer
     pub fn prepare_block_pos(
         &self,
         client: &MiningBlockChainClient,
@@ -436,18 +441,18 @@ impl Miner {
         sk: &[u8; 64],
         pk: &[u8; 32],
         seal_parent: Option<&Header>,
-        stake: u64,
+        stake: BigUint,
     ) -> Result<(), Error>
     {
         trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
 
-        let staker = public_to_address_ed25519(&pk.clone().into());
+        let coinbase = client.get_coinbase(&pk.clone().into());
         // 1. Create a block with transactions
         let (raw_block, _): (ClosedBlock, Option<H256>) = self.prepare_block(
             client,
             &Some(SealType::PoS),
             Some(timestamp),
-            Some(staker),
+            coinbase,
             Some(&seed),
         );
 
@@ -590,7 +595,7 @@ impl Miner {
         client: &MiningBlockChainClient,
         seal_type: &Option<SealType>,
         timestamp: Option<u64>,
-        staker: Option<Address>,
+        author: Option<Address>,
         seed: Option<&[u8; 64]>,
     ) -> (ClosedBlock, Option<H256>)
     {
@@ -629,7 +634,7 @@ impl Miner {
                         }
                         None => {
                             client.prepare_open_block(
-                                staker.unwrap_or(Address::default()),
+                                author.unwrap_or(Address::default()),
                                 (self.gas_floor_target(), self.gas_ceil_target()),
                                 self.extra_data(),
                                 seal_type.to_owned(),
@@ -1409,6 +1414,11 @@ impl MinerService for Miner {
         *best_pos = None;
     }
 
+    /// Generate PoS block template
+    ///
+    /// client: client which is able to interact with staking contract
+    /// seed: new seed committed by signer
+    /// pk: public key of signer
     fn get_pos_template(
         &self,
         client: &MiningBlockChainClient,
@@ -1416,9 +1426,10 @@ impl MinerService for Miner {
         pk: H256,
     ) -> Option<H256>
     {
-        let address = public_to_address_ed25519(&pk);
-        let stake = client.get_stake(&address).unwrap_or(0);
-        if stake == 0 {
+        //WARN: if coinbase is not found, send reward to black hole: full zero address
+        let coinbase = client.get_coinbase(&pk);
+        let stake = client.get_stake(&pk, coinbase).unwrap_or(BigUint::zero());
+        if stake.is_zero() {
             return None;
         }
 
@@ -1473,7 +1484,7 @@ impl MinerService for Miner {
             client,
             &Some(SealType::PoS),
             Some(new_timestamp),
-            Some(address),
+            Some(coinbase.unwrap_or(H256::default())),
             Some(&seed),
         );
 
@@ -1500,10 +1511,9 @@ impl MinerService for Miner {
         block: ClosedBlock,
     ) -> Result<(), Error>
     {
-        let address = public_to_address_ed25519(&seal[2][..].into());
         let best_block_header = client.best_block_header_with_seal_type(&SealType::PoS);
 
-        let stake = client.get_stake(&address);
+        let stake = client.get_stake(&seal[2][..].into(), None);
 
         debug!(target: "miner", "start sealing");
 

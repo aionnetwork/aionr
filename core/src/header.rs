@@ -274,6 +274,20 @@ impl Header {
     /// Get the seal field of the header.
     pub fn seal(&self) -> &[Bytes] { &self.seal }
 
+    /// Get the public key of seal in PoS header
+    pub fn get_pk_of_pos(&self) -> Option<H256> {
+        if self
+            .seal_type()
+            .to_owned()
+            .map_or(true, |t| t == SealType::PoW)
+            || self.seal.len() != 3
+        {
+            return None;
+        }
+
+        Some(self.seal[2].as_slice().into())
+    }
+
     /// Get the cumulative transaction fee
     pub fn transaction_fee(&self) -> &U256 { &self.transaction_fee }
 

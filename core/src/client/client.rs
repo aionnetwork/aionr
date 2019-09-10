@@ -55,7 +55,7 @@ use header::{BlockNumber, Header, Seal, SealType};
 use io::*;
 use log_entry::LocalizedLogEntry;
 use miner::{Miner, MinerService};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::{Mutex, RwLock, Condvar};
 use receipt::{LocalizedReceipt, Receipt};
 use rlp::*;
 use service::ClientIoMessage;
@@ -81,6 +81,11 @@ use verification::{
 };
 use views::BlockView;
 use avm_abi::{AbiToken, AVMEncoder, AVMDecoder};
+use key::public_to_address_ed25519;
+
+use ctrlc::CtrlC;
+use num::Zero;
+use num_bigint::{BigUint};
 
 // re-export
 #[cfg(test)]
@@ -90,6 +95,10 @@ pub use types::blockchain::info::BlockChainInfo;
 pub use verification::queue::QueueInfo as BlockQueueInfo;
 
 const MIN_HISTORY_SIZE: u64 = 8;
+
+lazy_static! {
+    static ref DB_CAN_STOP: AtomicBool = AtomicBool::new(false);
+}
 
 /// Report on the status of a client.
 #[derive(Default, Clone, Debug, Eq, PartialEq)]
@@ -385,7 +394,10 @@ impl Client {
             let verify_pos_result = engine.verify_seal_pos(
                 header,
                 seal_parent.clone().map(|header| header.decode()).as_ref(),
-                self.get_stake(header.author()),
+                self.get_stake(
+                    &header.get_pk_of_pos().unwrap_or(H256::default()),
+                    Some(header.author().to_owned()),
+                ),
             );
             if let Err(e) = verify_pos_result {
                 warn!(target: "client", "Stage 4 block verification failed for #{} ({})\nError: {}", header.number(), header.hash(), e);
@@ -909,12 +921,31 @@ impl Client {
         }
     }
 
+    fn wait_for_db_completion() {
+        let exit = Arc::new((Mutex::new(false), Condvar::new()));
+
+        let e = exit.clone();
+        CtrlC::set_handler(move || {
+            DB_CAN_STOP.store(true, AtomicOrdering::SeqCst);
+            e.1.notify_all();
+        });
+
+        // Wait for signal
+        let mut l = exit.0.lock();
+        let _ = exit.1.wait(&mut l);
+    }
+
     /// revert database to blocknumber, only used in revert db
-    pub fn revert_block(&self, to: BlockNumber) -> Result<(), String> {
+    pub fn revert_block(&self, to: BlockNumber) -> Result<BlockNumber, String> {
         let state_db = self.state_db.read().boxed_clone();
         if !self.config.pruning.is_stable() {
             warn!(target:"revert","your pruning strategy is unstable! revert db may cause db crash");
         }
+
+        ::std::thread::spawn(move || {
+            Self::wait_for_db_completion();
+        });
+
         match state_db.journal_db().earliest_era() {
             Some(earliest_era) if to < earliest_era => {
                 return Err(format!(
@@ -938,18 +969,9 @@ impl Client {
             ));
         }
 
-        let target_block_header = self
-            .block(BlockId::Number(to))
-            .expect("can not found block , db may crashed")
-            .header()
-            .decode();
         let mut batch = DBTransaction::with_capacity(10000);
-        let mut target_block_details = self
-            .chain
-            .read()
-            .block_details(&target_block_header.hash())
-            .expect("can not found block , db may crashed");
-        target_block_details.children.clear();
+
+        let mut stop_blk = to;
 
         for blk in (to + 1..=latest).rev() {
             // delete col_headers && col_boides
@@ -991,9 +1013,27 @@ impl Client {
                     .map_err(|e| format!("db revert failed for: {:?}", e))?;
                 batch.ops.clear();
             }
+            if DB_CAN_STOP.load(AtomicOrdering::SeqCst) {
+                stop_blk = blk - 1;
+                println!("stopped block = {}", stop_blk);
+                break;
+            }
         }
 
-        let new_block = to;
+        let target_block_header = self
+            .block(BlockId::Number(stop_blk))
+            .expect("can not found block , db may crashed")
+            .header()
+            .decode();
+
+        let mut target_block_details = self
+            .chain
+            .read()
+            .block_details(&target_block_header.hash())
+            .expect("can not found block , db may crashed");
+        target_block_details.children.clear();
+
+        let new_block = stop_blk;
         let new_best_hash = self
             .block_hash(BlockId::Number(new_block))
             .expect("can not found block , db may crashed");
@@ -1016,7 +1056,23 @@ impl Client {
             .write(batch)
             .map_err(|e| format!("db revert failed for: {:?}", e))?;
 
-        Ok(())
+        // DB_FINAL_STOP.store(true, AtomicOrdering::SeqCst);
+
+        Ok(new_block)
+    }
+
+    fn build_fake_transaction(&self, call_data: Vec<u8>, call_type: Action) -> SignedTransaction {
+        Transaction::new(
+            0.into(),
+            1.into(),
+            1000_0000.into(),
+            call_type,
+            0.into(),
+            // signature of getEffectiveStake(Address, Address)
+            call_data,
+            DEFAULT_TRANSACTION_TYPE,
+        )
+        .fake_sign(Address::default())
     }
 }
 
@@ -1063,53 +1119,49 @@ impl BlockChainClient for Client {
         Ok(results)
     }
 
-    // get the staker's vote
-    // a: staker address
-    fn get_stake(&self, a: &Address) -> Option<u64> {
-        let machine = self.engine.machine();
-        let mut env_info = match self
-            // get the latest block
-            .env_info(BlockId::Latest)
-        {
-            Some(info) => info,
-            None => return None,
-        };
-
-        env_info.gas_limit = U256::max_value();
-        let mut state = match self.state_at(BlockId::Latest) {
-            Some(s) => s,
-            None => return None,
-        };
-        // construct fake transaction
+    /// Get coinbase according to signing account's public key
+    fn get_coinbase(&self, spk: &H256) -> Option<Address> {
+        let signing_address = public_to_address_ed25519(&spk);
         let mut call_data = Vec::new();
-        call_data.append(&mut AbiToken::STRING(String::from("getVote")).encode());
-        call_data.append(&mut AbiToken::ADDRESS(a.to_owned().into()).encode());
-        let tx = Transaction::new(
-            0.into(),
-            1.into(),
-            100_000.into(),
-            Action::Call(self.config.stake_contract),
-            0.into(),
-            // signature of getVote(Address)
-            call_data,
-            DEFAULT_TRANSACTION_TYPE,
-        )
-        .fake_sign(Address::default());
+        call_data.append(
+            &mut AbiToken::STRING(String::from("getCoinbaseAddressForSigningAddress")).encode(),
+        );
+        call_data.append(&mut AbiToken::ADDRESS(signing_address.to_owned().into()).encode());
+        let tx = self.build_fake_transaction(call_data, Action::Call(self.config.stake_contract));
 
-        match Self::do_virtual_call(machine, &env_info, &mut state, &tx, Default::default()) {
-            Ok(executed) => {
+        self.call(&tx, Default::default(), BlockId::Latest)
+            .ok()
+            .map(|executed| {
                 let mut decoder = AVMDecoder::new(executed.output);
-                // assume staking contract returns a long value
-                match decoder.decode_ulong() {
-                    Ok(v) => {
-                        debug!(target: "miner", "stake of {:?} = {:?}", a, v);
-                        Some(v)
-                    }
-                    _ => None,
-                }
-            }
-            _ => None,
-        }
+                decoder
+                    .decode_one_address()
+                    .ok()
+                    .unwrap_or([0u8; 32])
+                    .into()
+            })
+    }
+
+    // get the staker's vote
+    // sa: public key of signing account
+    // ca: coinbase address, Some(v) for imported block validation, otherwise None
+    fn get_stake(&self, spk: &H256, ca: Option<Address>) -> Option<BigUint> {
+        let coinbase = ca.unwrap_or_else(|| self.get_coinbase(spk).unwrap_or(H256::default()));
+
+        let signing_address = public_to_address_ed25519(spk);
+
+        // try to get effective stake
+        let mut call_data = Vec::new();
+        call_data.append(&mut AbiToken::STRING(String::from("getEffectiveStake")).encode());
+        call_data.append(&mut AbiToken::ADDRESS(signing_address.to_owned().into()).encode());
+        call_data.append(&mut AbiToken::ADDRESS(coinbase.to_owned().into()).encode());
+        let tx = self.build_fake_transaction(call_data, Action::Call(self.config.stake_contract));
+
+        self.call(&tx, Default::default(), BlockId::Latest)
+            .ok()
+            .map(|executed| {
+                let mut decoder = AVMDecoder::new(executed.output);
+                decoder.decode_one_bigint().unwrap_or(BigUint::zero())
+            })
     }
 
     fn estimate_gas(&self, t: &SignedTransaction, block: BlockId) -> Result<U256, CallError> {
