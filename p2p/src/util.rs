@@ -19,15 +19,12 @@
  *
  ******************************************************************************/
 
-pub mod active_nodes;
-pub mod handshake;
+use std::hash::Hash;
+use std::hash::Hasher;
+use std::collections::hash_map::DefaultHasher;
 
-use super::{ChannelBuffer,PROTOCAL_VERSION,Module};
-
-fn channel_buffer_template(action: u8) -> ChannelBuffer {
-    ChannelBuffer::new1(PROTOCAL_VERSION, Module::P2P.value(), action, 0u32)
-}
-
-fn channel_buffer_template_with_version(version: u16, action: u8) -> ChannelBuffer {
-    ChannelBuffer::new1(version, Module::P2P.value(), action, 0u32)
+pub fn calculate_hash<T: Hash>(t: T) -> u64 {
+    let mut s = DefaultHasher::new();
+    t.hash(&mut s);
+    s.finish()
 }

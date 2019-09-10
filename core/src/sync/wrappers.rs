@@ -1,5 +1,4 @@
 /*******************************************************************************
- * Copyright (c) 2015-2018 Parity Technologies (UK) Ltd.
  * Copyright (c) 2018-2019 Aion foundation.
  *
  *     This file is part of the aion network project.
@@ -20,28 +19,40 @@
  *
  ******************************************************************************/
 
-use aion_types::{H256, U256, Address};
+use std::time::SystemTime;
+use header::Header;
+use block::Block;
 
-use types::{Transaction, Block, AcitvePeerInfo, PbSyncInfo, Receipt, Bytes, SimpleReceipt};
+#[derive(Clone, PartialEq)]
+pub struct HeadersWrapper {
+    pub node_hash: u64,
+    pub timestamp: SystemTime,
+    pub headers: Vec<Header>,
+}
 
-pub trait Pb: Sync + Send {
-    fn balance(&self, address: Address) -> U256;
+impl HeadersWrapper {
+    pub fn new() -> Self {
+        HeadersWrapper {
+            node_hash: 0,
+            timestamp: SystemTime::now(),
+            headers: Vec::new(),
+        }
+    }
+}
 
-    fn transaction_by_hash(&self, txhash: H256) -> Option<Transaction>;
+#[derive(Clone, PartialEq)]
+pub struct BlocksWrapper {
+    pub node_hash: u64,
+    pub timestamp: SystemTime,
+    pub blocks: Vec<Block>,
+}
 
-    fn nonce(&self, address: Address) -> U256;
-
-    fn blocknumber(&self) -> U256;
-
-    fn block_by_number(&self, number: i64, include_txs: bool) -> Option<Block>;
-
-    fn block_receipt(&self, number: i64) -> Vec<SimpleReceipt>;
-
-    fn get_active_nodes(&self) -> Vec<AcitvePeerInfo>;
-
-    fn get_sync(&self) -> PbSyncInfo;
-
-    fn transaction_receipt(&self, txhash: H256) -> Option<Receipt>;
-
-    fn pb_send_transaction(&self, raw: Bytes) -> Option<H256>;
+impl BlocksWrapper {
+    pub fn new() -> Self {
+        BlocksWrapper {
+            node_hash: 0,
+            timestamp: SystemTime::now(),
+            blocks: Vec::new(),
+        }
+    }
 }

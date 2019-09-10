@@ -19,8 +19,18 @@
  *
  ******************************************************************************/
 
-pub mod status_handler;
-pub mod blocks_headers_handler;
-pub mod blocks_bodies_handler;
-pub mod broadcast_handler;
-pub mod import_handler;
+pub mod status;
+pub mod headers;
+pub mod bodies;
+pub mod broadcast;
+pub mod import;
+
+use p2p::{Module, PROTOCAL_VERSION, ChannelBuffer};
+
+fn channel_buffer_template(action: u8) -> ChannelBuffer {
+    ChannelBuffer::new1(PROTOCAL_VERSION, Module::SYNC.value(), action, 0u32)
+}
+
+fn channel_buffer_template_with_version(version: u16, action: u8) -> ChannelBuffer {
+    ChannelBuffer::new1(version, Module::SYNC.value(), action, 0u32)
+}

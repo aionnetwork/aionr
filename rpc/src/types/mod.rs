@@ -66,8 +66,8 @@ pub use self::receipt::{Receipt, SimpleReceipt, SimpleReceiptLog};
 pub use self::rpc_settings::RpcSettings;
 pub use self::secretstore::EncryptedDocumentKey;
 pub use self::sync::{
-    SyncStatus, SyncInfo, Peers, PeerInfo, PeerNetworkInfo, TransactionStats, ChainStatus,
-    AcitvePeerInfo, PbSyncInfo,
+SyncStatus, SyncInfo, /* Peers, PeerInfo, PeerNetworkInfo, TransactionStats, ChainStatus,
+                      AcitvePeerInfo, PbSyncInfo,*/
 };
 pub use self::transaction::{Transaction, RichRawTransaction};
 pub use self::transaction_request::TransactionRequest;

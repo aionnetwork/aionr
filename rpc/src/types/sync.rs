@@ -20,9 +20,9 @@
  *
  ******************************************************************************/
 
-use std::collections::BTreeMap;
+//use std::collections::BTreeMap;
 use serde::{Serialize, Serializer};
-use aion_types::{U256, H512};
+//use aion_types::{U256, H512};
 
 /// Sync info
 #[derive(Default, Debug, Serialize, PartialEq)]
@@ -37,43 +37,43 @@ pub struct SyncInfo {
     #[serde(rename = "highestBlock")]
     pub highest_block: String,
 }
-
-/// Peers info
-#[derive(Default, Debug, Serialize)]
-pub struct Peers {
-    /// Number of active peers
-    pub active: usize,
-    /// Number of connected peers
-    pub connected: usize,
-    /// Max number of peers
-    pub max: u32,
-    /// Detailed information on peers
-    pub peers: Vec<PeerInfo>,
-}
-
-/// Peer connection information
-#[derive(Default, Debug, Serialize)]
-pub struct PeerInfo {
-    /// Public node id
-    pub id: Option<String>,
-    /// Node client ID
-    pub name: String,
-    /// Capabilities
-    pub caps: Vec<String>,
-    /// Network information
-    pub network: PeerNetworkInfo,
-}
-
-/// Peer network information
-#[derive(Default, Debug, Serialize)]
-pub struct PeerNetworkInfo {
-    /// Remote endpoint address
-    #[serde(rename = "remoteAddress")]
-    pub remote_address: String,
-    /// Local endpoint address
-    #[serde(rename = "localAddress")]
-    pub local_address: String,
-}
+//
+///// Peers info
+//#[derive(Default, Debug, Serialize)]
+//pub struct Peers {
+//    /// Number of active peers
+//    pub active: usize,
+//    /// Number of connected peers
+//    pub connected: usize,
+//    /// Max number of peers
+//    pub max: u32,
+//    /// Detailed information on peers
+//    pub peers: Vec<PeerInfo>,
+//}
+//
+///// Peer connection information
+//#[derive(Default, Debug, Serialize)]
+//pub struct PeerInfo {
+//    /// Public node id
+//    pub id: Option<String>,
+//    /// Node client ID
+//    pub name: String,
+//    /// Capabilities
+//    pub caps: Vec<String>,
+//    /// Network information
+//    pub network: PeerNetworkInfo,
+//}
+//
+///// Peer network information
+//#[derive(Default, Debug, Serialize)]
+//pub struct PeerNetworkInfo {
+//    /// Remote endpoint address
+//    #[serde(rename = "remoteAddress")]
+//    pub remote_address: String,
+//    /// Local endpoint address
+//    #[serde(rename = "localAddress")]
+//    pub local_address: String,
+//}
 
 /// Sync status
 #[derive(Debug, PartialEq)]
@@ -84,30 +84,30 @@ pub enum SyncStatus {
     None,
 }
 
-/// Active peer infomation
-#[derive(Default, Debug, Serialize)]
-pub struct AcitvePeerInfo {
-    /// Best block number
-    pub highest_block_number: u64,
-    /// node id
-    pub id: String,
-    /// remote ip
-    pub ip: String,
-}
-
-///sync info use by pb
-pub struct PbSyncInfo {
-    /// is syncing
-    pub syncing: bool,
-    /// chain best block number
-    pub chain_best_number: u64,
-    /// network best block number
-    pub network_best_number: u64,
-    /// starting block
-    pub starting_block: u64,
-    /// max import block
-    pub max_import_block: u32,
-}
+///// Active peer infomation
+//#[derive(Default, Debug, Serialize)]
+//pub struct AcitvePeerInfo {
+//    /// Best block number
+//    pub highest_block_number: u64,
+//    /// node id
+//    pub id: String,
+//    /// remote ip
+//    pub ip: String,
+//}
+//
+/////sync info use by pb
+//pub struct PbSyncInfo {
+//    /// is syncing
+//    pub syncing: bool,
+//    /// chain best block number
+//    pub chain_best_number: u64,
+//    /// network best block number
+//    pub network_best_number: u64,
+//    /// starting block
+//    pub starting_block: u64,
+//    /// max import block
+//    pub max_import_block: u32,
+//}
 
 impl Serialize for SyncStatus {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -119,30 +119,31 @@ impl Serialize for SyncStatus {
     }
 }
 
-/// Propagation statistics for pending transaction.
-#[derive(Default, Debug, Serialize)]
-pub struct TransactionStats {
-    /// Block no this transaction was first seen.
-    #[serde(rename = "firstSeen")]
-    pub first_seen: u64,
-    /// Peers this transaction was propagated to with count.
-    #[serde(rename = "propagatedTo")]
-    pub propagated_to: BTreeMap<H512, usize>,
-}
-
-/// Chain status.
-#[derive(Default, Debug, Serialize)]
-pub struct ChainStatus {
-    /// Describes the gap in the blockchain, if there is one: (first, last)
-    #[serde(rename = "blockGap")]
-    pub block_gap: Option<(U256, U256)>,
-}
+///// Propagation statistics for pending transaction.
+//#[derive(Default, Debug, Serialize)]
+//pub struct TransactionStats {
+//    /// Block no this transaction was first seen.
+//    #[serde(rename = "firstSeen")]
+//    pub first_seen: u64,
+//    /// Peers this transaction was propagated to with count.
+//    #[serde(rename = "propagatedTo")]
+//    pub propagated_to: BTreeMap<H512, usize>,
+//}
+//
+///// Chain status.
+//#[derive(Default, Debug, Serialize)]
+//pub struct ChainStatus {
+//    /// Describes the gap in the blockchain, if there is one: (first, last)
+//    #[serde(rename = "blockGap")]
+//    pub block_gap: Option<(U256, U256)>,
+//}
 
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use std::collections::BTreeMap;
-    use super::{SyncInfo, SyncStatus, Peers, TransactionStats, ChainStatus};
+    //    use std::collections::BTreeMap;
+    use super::{SyncInfo, SyncStatus, /*Peers, TransactionStats, ChainStatus*/
+};
 
     #[test]
     fn test_serialize_sync_info() {
@@ -154,15 +155,15 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_serialize_peers() {
-        let t = Peers::default();
-        let serialized = serde_json::to_string(&t).unwrap();
-        assert_eq!(
-            serialized,
-            r#"{"active":0,"connected":0,"max":0,"peers":[]}"#
-        );
-    }
+    //    #[test]
+    //    fn test_serialize_peers() {
+    //        let t = Peers::default();
+    //        let serialized = serde_json::to_string(&t).unwrap();
+    //        assert_eq!(
+    //            serialized,
+    //            r#"{"active":0,"connected":0,"max":0,"peers":[]}"#
+    //        );
+    //    }
 
     #[test]
     fn test_serialize_sync_status() {
@@ -177,29 +178,29 @@ mod tests {
             r#"{"startingBlock":"","currentBlock":"","highestBlock":""}"#
         );
     }
-
-    #[test]
-    fn test_serialize_block_gap() {
-        let mut t = ChainStatus::default();
-        let serialized = serde_json::to_string(&t).unwrap();
-        assert_eq!(serialized, r#"{"blockGap":null}"#);
-
-        t.block_gap = Some((1.into(), 5.into()));
-
-        let serialized = serde_json::to_string(&t).unwrap();
-        assert_eq!(serialized, r#"{"blockGap":["0x1","0x5"]}"#);
-    }
-
-    #[test]
-    fn test_serialize_transaction_stats() {
-        let stats = TransactionStats {
-            first_seen: 100,
-            propagated_to: map![
-                10.into() => 50
-            ],
-        };
-
-        let serialized = serde_json::to_string(&stats).unwrap();
-        assert_eq!(serialized, r#"{"firstSeen":100,"propagatedTo":{"0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a":50}}"#)
-    }
+    //
+    //    #[test]
+    //    fn test_serialize_block_gap() {
+    //        let mut t = ChainStatus::default();
+    //        let serialized = serde_json::to_string(&t).unwrap();
+    //        assert_eq!(serialized, r#"{"blockGap":null}"#);
+    //
+    //        t.block_gap = Some((1.into(), 5.into()));
+    //
+    //        let serialized = serde_json::to_string(&t).unwrap();
+    //        assert_eq!(serialized, r#"{"blockGap":["0x1","0x5"]}"#);
+    //    }
+    //
+    //    #[test]
+    //    fn test_serialize_transaction_stats() {
+    //        let stats = TransactionStats {
+    //            first_seen: 100,
+    //            propagated_to: map![
+    //                10.into() => 50
+    //            ],
+    //        };
+    //
+    //        let serialized = serde_json::to_string(&stats).unwrap();
+    //        assert_eq!(serialized, r#"{"firstSeen":100,"propagatedTo":{"0x0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000a":50}}"#)
+    //    }
 }

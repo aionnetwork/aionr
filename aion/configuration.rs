@@ -23,7 +23,7 @@ use std::time::Duration;
 use cli::{Args, ArgsError};
 use aion_types::{U256, Address};
 use bytes::Bytes;
-use p2p::NetworkConfig;
+use p2p::Config;
 use acore::client::{VMType};
 use acore::miner::{MinerOptions, Banning};
 use acore::verification::queue::VerifierSettings;
@@ -403,8 +403,8 @@ impl Configuration {
         }
     }
 
-    fn net_config(&self) -> Result<NetworkConfig, String> {
-        let mut ret = NetworkConfig::new();
+    fn net_config(&self) -> Result<Config, String> {
+        let mut ret = Config::new();
         ret.max_peers = self.max_peers();
         ret.local_node = self.args.arg_local_node.clone();
         ret.boot_nodes = self.args.arg_boot_nodes.clone();
@@ -629,7 +629,7 @@ mod tests {
     use cli::Args;
     use dir::Directories;
     use run::RunCmd;
-    use p2p::NetworkConfig;
+    use p2p::Config;
     use super::*;
 
     #[derive(Debug, PartialEq)]
@@ -641,8 +641,8 @@ mod tests {
         }
     }
 
-    pub fn default_network_config() -> NetworkConfig {
-        NetworkConfig {
+    pub fn default_network_config() -> Config {
+        Config {
             boot_nodes: vec![
                 "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:30303".into(),
                 "p2p://c33d302f-216b-47d4-ac44-5d8181b56e7e@52.231.187.227:30303".into(),

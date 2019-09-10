@@ -19,15 +19,11 @@
  *
  ******************************************************************************/
 
-pub mod active_nodes;
-pub mod handshake;
+extern crate p2p;
 
-use super::{ChannelBuffer,PROTOCAL_VERSION,Module};
+//use p2p::Mgr;
 
-fn channel_buffer_template(action: u8) -> ChannelBuffer {
-    ChannelBuffer::new1(PROTOCAL_VERSION, Module::P2P.value(), action, 0u32)
-}
-
-fn channel_buffer_template_with_version(version: u16, action: u8) -> ChannelBuffer {
-    ChannelBuffer::new1(version, Module::P2P.value(), action, 0u32)
+#[test]
+fn test_mainnet() {
+    println!("test p2p");
 }

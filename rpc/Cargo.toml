@@ -41,4 +41,4 @@ solidity = { path = "../vms/solidity" }
 
 [dev-dependencies]
 pretty_assertions = "0.1"
-macros = { path = "../util/macros" }
+#macros = { path = "../util/macros" }

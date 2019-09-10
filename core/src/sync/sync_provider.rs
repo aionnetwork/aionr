@@ -19,18 +19,21 @@
  *
  ******************************************************************************/
 
-/// call back registered for upper layer modules which use p2p module
-use ChannelBuffer;
-use Node;
-
-pub type Callback = fn(node: &mut Node, cb: ChannelBuffer);
-
-#[derive(Clone, Copy)]
-pub struct DefaultHandler {
-    pub callback: Callback,
+pub trait SyncProvider: Send + Sync {
+    /// Get sync status
+    fn status(&self) -> SyncStatus;
 }
 
-impl DefaultHandler {
-    pub fn set_callback(&mut self, c: Callback) { self.callback = c; }
-    pub fn handle(&self, node: &mut Node, cb: ChannelBuffer) { (self.callback)(node, cb); }
+#[derive(Clone, Copy)]
+pub struct SyncStatus {
+    /// Syncing protocol version. That's the maximum protocol version we connect to.
+    pub protocol_version: u8,
+    /// The underlying p2p network version.
+    pub network_id: u32,
+    /// `BlockChain` height for the moment the sync started.
+    pub start_block_number: u64,
+    /// Highest block number in the download queue (if any).
+    pub highest_block_number: Option<u64>,
+    /// Total number of connected peers
+    pub num_peers: usize,
 }

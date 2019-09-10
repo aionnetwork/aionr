@@ -24,7 +24,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
-use acore::client::{Client, DatabaseCompactionProfile, VMType, ChainNotify};
+use acore::client::{Client, DatabaseCompactionProfile, VMType , ChainNotify
+};
 use acore::miner::external::ExternalMiner;
 use acore::miner::{Miner, MinerOptions, MinerService};
 use acore::service::{ClientService, run_miner, run_staker, pos_sealing, run_transaction_pool};
@@ -41,14 +42,15 @@ use helpers::{passwords_from_files, to_client_config};
 use dir::helpers::absolute;
 use io::IoChannel;
 use logger::LogConfig;
+use tokio;
+use tokio::prelude::*;
 use num_cpus;
 use params::{fatdb_switch_to_bool, AccountsConfig, StakeConfig, MinerExtras, Pruning, SpecType, Switch};
 use parking_lot::{Condvar, Mutex};
 use rpc;
 use rpc_apis;
-use p2p::{NetworkConfig, P2pMgr};
-use tokio;
-use tokio::prelude::*;
+use p2p::Config;
+
 use user_defaults::UserDefaults;
 
 // Pops along with error messages when a password is missing or invalid.
@@ -71,7 +73,7 @@ pub struct RunCmd {
     pub ws_conf: rpc::WsConfiguration,
     pub http_conf: rpc::HttpConfiguration,
     pub ipc_conf: rpc::IpcConfiguration,
-    pub net_conf: NetworkConfig,
+    pub net_conf: Config,
     pub acc_conf: AccountsConfig,
     pub stake_conf: StakeConfig,
     pub miner_extras: MinerExtras,
@@ -158,8 +160,10 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     client_config.queue.verifier_settings = cmd.verifier_settings;
     client_config.stake_contract = cmd.stake_conf.contract;
 
-    // set up bootnodes
-    let net_conf = cmd.net_conf;
+    let (id, binding) = &cmd.net_conf.get_id_and_binding();
+
+    info!(target: "run","          id: {}", &id);
+    info!(target: "run","     binding: {}", &binding);
 
     // create client service.
     let service = ClientService::start(
@@ -172,8 +176,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     .map_err(|e| format!("Client service error: {:?}", e))?;
 
     info!(target: "run","     genesis: {:?}",genesis_hash);
-
-    // display info about used pruning algorithm
     info!(
         target: "run",
         "    state db: {}{}",
@@ -183,8 +185,6 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
             false => "".to_owned(),
         }
     );
-
-    // display warning about using experimental journaldb algorithm
     if !algorithm.is_stable() {
         warn!(
             target: "run",
@@ -203,16 +203,24 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
 
     // log apis
     info!(target: "run", "        apis: rpc-http({}) rpc-ws({}) rpc-ipc({})",
-          if cmd.http_conf.enabled { "enable" } else { "disable" },
-          if cmd.ws_conf.enabled { "enable" } else { "disable" },
-          if cmd.ipc_conf.enabled { "enable" } else { "disable" },
+          if cmd.http_conf.enabled { "y" } else { "n" },
+          if cmd.ws_conf.enabled { "y" } else { "n" },
+          if cmd.ipc_conf.enabled { "y" } else { "n" },
     );
 
-    // start sync
-    let sync = Sync::new(client.clone(), net_conf);
-    let chain_notify = sync.clone() as Arc<ChainNotify>;
-    service.add_notify(chain_notify.clone());
-    sync.start_network();
+    let sync = Arc::new(Sync::new(cmd.net_conf.clone(), client.clone()));
+    sync.register_callback(sync.clone());
+    let sync_notify = sync.clone() as Arc<ChainNotify>;
+    let sync_run = sync.clone();
+    service.add_notify(sync_notify);
+
+    let runtime_sync = tokio::runtime::Builder::new()
+        .name_prefix("p2p-loop #")
+        .build()
+        .expect("p2p runtime loop init failed");
+    let executor_p2p = runtime_sync.executor();
+
+    sync_run.run(executor_p2p.clone());
 
     // start rpc server
     let runtime_rpc = tokio::runtime::Builder::new()
@@ -295,8 +303,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .name_prefix("seal-block-loop #")
         .build()
         .expect("internal staker runtime loop init failed");
-    let executor_staker = runtime_staker.executor();
-    let close_staker = run_staker(executor_staker.clone(), client.clone());
+    let executor_internal_staker = runtime_staker.executor();
+    let close_staker = run_staker(executor_internal_staker.clone(), client.clone());
 
     // start PoS invoker
     let pos_invoker = tokio::runtime::Builder::new()
@@ -304,20 +312,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .name_prefix("seal-block-loop #")
         .build()
         .expect("internal staker runtime loop init failed");
-    let executor_staker = pos_invoker.executor();
-    let close_pos_invoker = pos_sealing(executor_staker.clone(), client.clone());
-
-    if let Some(config_path) = cmd.dirs.config {
-        let local_node = P2pMgr::get_local_node();
-        fill_back_local_node(
-            config_path,
-            format!(
-                "p2p://{}@{}",
-                local_node.get_node_id(),
-                local_node.get_ip_addr()
-            ),
-        );
-    }
+    let executor_external_staker = pos_invoker.executor();
+    let close_pos_invoker = pos_sealing(executor_external_staker.clone(), client.clone());
 
     // Create a weak reference to the client so that we can wait on shutdown until it is dropped
     let weak_client = Arc::downgrade(&client);
@@ -325,7 +321,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // Handle exit
     wait_for_exit();
 
-    info!(target: "run","Finishing work, please wait...");
+    info!(target: "run","shutdowning ...");
 
     // close pool
     let _ = close_transaction_pool.send(());
@@ -344,14 +340,12 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         ipc_server.unwrap().close();
     }
 
-    // close p2p
-    sync.stop_network();
+    sync.shutdown();
 
-    // close/drop this stuff as soon as exit detected.
-    drop((sync, chain_notify));
-
-    thread::sleep(Duration::from_secs(5));
-
+    runtime_sync
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown p2p&sync runtime instance!");
     runtime_rpc
         .shutdown_now()
         .wait()
@@ -377,8 +371,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .wait()
         .expect("Failed to shutdown pos invoker!");
 
-    info!(target: "run","Shutdown.");
-
+    info!(target: "run","shutdown completed");
     Ok(weak_client)
 }
 
@@ -539,46 +532,6 @@ fn build_create_account_hint(spec: &SpecType, keys: &str) -> String {
         "You can create an account via RPC, UI or `aion account new --chain {} --keys-path {}`.",
         spec, keys
     )
-}
-
-fn fill_back_local_node(path: String, local_node_info: String) {
-    use std::fs;
-    use std::io::BufRead;
-    use std::io::BufReader;
-    let file = fs::File::open(&path).expect("Cannot open config file");
-    let reader = BufReader::new(file);
-    let mut no_change = true;
-    let mut ret: String = reader
-        .lines()
-        .filter_map(|l| l.ok())
-        .map(|config| {
-            let config_ = config.clone().to_owned();
-            let option: Vec<&str> = config_.split("=").collect();
-            if option[0].trim() == "local_node" && option[1]
-                .find("00000000-0000-0000-0000-000000000000")
-                .is_some()
-            {
-                no_change = false;
-                format!("local_node = {:?}", local_node_info)
-            } else {
-                config.trim().into()
-            }
-        })
-        .collect::<Vec<String>>()
-        .join("\n");
-    if ret.find("\nlocal_node").is_none() {
-        if let Some(index) = ret.find("[network]\n") {
-            ret.insert_str(index + 10, &format!("local_node = {:?}\n", local_node_info));
-        } else {
-            ret.insert_str(
-                0,
-                &format!("[network]\nlocal_node = {:?}\n\n", local_node_info),
-            );
-        }
-    } else if no_change {
-        return;
-    }
-    let _ = fs::write(&path, ret).expect("Rewrite failed");
 }
 
 fn wait_for_exit() {
