@@ -145,6 +145,8 @@ pub trait MinerService: Send + Sync {
         &self,
         hash: &H256,
         b: ClosedBlock,
+        seed: [u8; 64],
+        timestamp: u64,
         client: &MiningBlockChainClient,
     ) -> Result<(), Error>;
 
