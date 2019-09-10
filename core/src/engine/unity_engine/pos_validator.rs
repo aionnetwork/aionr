@@ -46,13 +46,11 @@ impl PoSValidator {
         }
 
         // Return error if stake is none or 0
-        let stake: BigUint = match stake {
-            Some(stake) if stake > BigUint::zero() => stake,
-            _ => {
-                error!(target: "pos", "pos block producer's stake is null or 0");
-                return Err(BlockError::NullStake.into());
-            }
-        };
+        let stake: BigUint = stake.unwrap_or(BigUint::from(0u32));
+        if stake.is_zero() {
+            error!(target: "pos", "pos block producer's stake is null or 0");
+            return Err(BlockError::NullStake.into());
+        }
 
         // Get seal, check seal length
         let seal = header.seal();
@@ -135,7 +133,7 @@ impl PoSValidator {
 
 #[cfg(test)]
 mod tests {
-    use super::PoSValidator;
+    use super::*;
     use header::{Header, SealType};
     use types::error::{Error, BlockError};
     use unexpected::Mismatch;
@@ -172,7 +170,7 @@ mod tests {
         let mut header = Header::default();
         header.set_seal_type(SealType::PoS);
         let parent_header = Header::default();
-        let stake = Some(0u64);
+        let stake = Some(BigUint::from(0u64));
         let result = PoSValidator::validate(&header, Some(&parent_header), stake);
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::NullStake),
@@ -189,7 +187,7 @@ mod tests {
         seal.push(vec![0u8; 64]);
         header.set_seal(seal);
         let parent_header = Header::default();
-        let stake = Some(1u64);
+        let stake = Some(BigUint::from(1u64));
         let result = PoSValidator::validate(&header, Some(&parent_header), stake);
         match result.err().unwrap() {
             Error::Block(error) => {
@@ -217,7 +215,7 @@ mod tests {
             59, 0, 255, 32, 176, 234, 66, 215, 193, 33, 250, 159,
         ]);
         header.set_seal(seal);
-        let stake = Some(1u64);
+        let stake = Some(BigUint::from(1u64));
         let result = PoSValidator::validate(&header, None, stake);
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSSeed),
@@ -264,7 +262,7 @@ mod tests {
         parent_seal.push(vec![0u8; 32]);
         parent_header.set_seal(parent_seal);
 
-        let stake = Some(1u64);
+        let stake = Some(BigUint::from(1u64));
         let result = PoSValidator::validate(&header, Some(&parent_header), stake);
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSAuthor),
@@ -314,7 +312,7 @@ mod tests {
         parent_header.set_seal(parent_seal);
         parent_header.set_timestamp(1u64);
 
-        let stake = Some(10_000u64);
+        let stake = Some(BigUint::from(10_000u64));
         let result = PoSValidator::validate(&header, Some(&parent_header), stake);
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSTimestamp(15, 1, 15)),
@@ -349,7 +347,7 @@ mod tests {
         ));
         header.set_difficulty(U256::from(1_000_000u64));
         header.set_timestamp(25u64);
-        let stake = Some(10_000u64);
+        let stake = Some(BigUint::from(10_000u64));
         let result = PoSValidator::validate(&header, None, stake);
         assert!(result.is_ok());
     }
@@ -395,7 +393,7 @@ mod tests {
         parent_seal.push(vec![0u8; 32]);
         parent_header.set_seal(parent_seal);
 
-        let stake = Some(10_000u64);
+        let stake = Some(BigUint::from(10_000u64));
         let result = PoSValidator::validate(&header, Some(&parent_header), stake);
         assert!(result.is_ok());
     }

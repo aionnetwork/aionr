@@ -350,10 +350,13 @@ impl Miner {
 
         // 1. Get the stake. Stop proceeding if stake is 0.
         // internal staker's coinbase is himself
-        let stake: BigUint = match client.get_stake(&pk.into(), None) {
-            Some(stake) if stake > BigUint::zero() => stake,
-            _ => return Ok(()),
-        };
+        let stake: BigUint = client
+            .get_stake(&pk.into(), None)
+            .unwrap_or(BigUint::from(0u32));
+
+        if stake == BigUint::from(0u32) {
+            return Ok(());
+        }
 
         // 2. Get the current best PoS block
         let best_block_header = client.best_block_header_with_seal_type(&SealType::PoS);
@@ -406,7 +409,7 @@ impl Miner {
             .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
             .expect("H256 should smaller than 2^256");
         let delta: BigUint =
-            u.multiply_uint(difficulty.into()).to_big_uint() / BigUint::from(stake);
+            u.multiply_uint(difficulty.into()).to_big_uint() / BigUint::from(stake.clone());
         let delta_uint: u64 = max(1u64, delta.to_u64().unwrap_or(u64::max_value()));
 
         trace!(target: "staker", "Staking...difficulty: {}, u: {:?}, stake: {}, delta: {}",
@@ -1472,8 +1475,7 @@ impl MinerService for Miner {
         let u = FixedPoint::ln(&a)
             .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
             .expect("H256 should smaller than 2^256");
-        let delta: BigUint =
-            u.multiply_uint(difficulty.into()).to_big_uint() / BigUint::from(stake);
+        let delta: BigUint = u.multiply_uint(difficulty.into()).to_big_uint() / stake.clone();
         let delta_uint: u64 = max(1u64, delta.to_u64().unwrap_or(u64::max_value()));
 
         trace!(target: "staker", "Staking...difficulty: {}, u: {:?}, stake: {}, delta: {}",

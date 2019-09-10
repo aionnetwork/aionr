@@ -65,6 +65,7 @@ use transaction::UnverifiedTransaction;
 use types::error::{CallError, ImportResult};
 use types::pruning_info::PruningInfo;
 use verification::queue::QueueInfo;
+use num_bigint::BigUint;
 
 /// Test client.
 pub struct TestBlockChainClient {
@@ -451,7 +452,9 @@ impl BlockChainClient for TestBlockChainClient {
         Ok(res)
     }
 
-    fn get_stake(&self, _pk: &H256, _a: Option<Address>) -> Option<u64> { Some(10000) }
+    fn get_stake(&self, _pk: &H256, _a: Option<Address>) -> Option<BigUint> {
+        Some(BigUint::from(10000u32))
+    }
 
     fn get_coinbase(&self, _pk: &H256) -> Option<Address> { None }
 
