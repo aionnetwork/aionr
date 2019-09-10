@@ -76,7 +76,6 @@ pub fn send(p2p: Mgr, hash: u64) {
     // get bodylen
     req.head.len = req.body.len() as u32;
 
-    println!("send HS");
     // send
     p2p.send(hash, req);
 }

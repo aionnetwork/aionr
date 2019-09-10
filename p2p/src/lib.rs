@@ -285,7 +285,6 @@ impl Mgr {
         let executor_outbound_0 = executor.clone();
         let p2p_outbound = self.clone();
         let (tx, rx) = oneshot::channel::<()>();
-        // let tokens_rule_1 = self.tokens_rule.clone();
         executor.spawn(
             Interval::new(
                 Instant::now(),
@@ -336,7 +335,6 @@ impl Mgr {
                     let executor_outbound_1 = executor_outbound_0.clone();
                     let executor_outbound_2 = executor_outbound_0.clone();
                     let executor_outbound_3 = executor_outbound_0.clone();
-                    // let tokens_rule_2 = tokens_rule_1.clone();
 
                     if let Ok(addr) = temp_node.addr.to_string().parse() {
                         debug!(target: "p2p", "connecting to: {}", &addr);
@@ -377,7 +375,6 @@ impl Mgr {
                                     // binding io futures
                                     let (sink, stream) = split_frame(ts);
                                     let read = stream.for_each(move |cb| {
-                                        // println!("AAA: {:?}", tokens_rule_2.len());
                                         p2p_outbound_2.handle(hash.clone(), cb);
                                         Ok(())
                                     })
