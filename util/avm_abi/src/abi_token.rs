@@ -251,6 +251,18 @@ impl AVMDecoder {
 
         Ok(ret)
     }
+
+    pub fn decode_one_address(&mut self) -> Result<[u8; 32], DecodeError> {
+        self.eat(1)?;
+        self.require(32)?;
+        let mut ret = [0u8; 32];
+        for i in self.offset..self.offset + 32 {
+            ret[i - self.offset] = self.bytes[i];
+        }
+
+        // deep copy
+        Ok(ret)
+    }
 }
 
 #[cfg(test)]

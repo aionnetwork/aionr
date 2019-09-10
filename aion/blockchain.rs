@@ -508,9 +508,9 @@ fn execute_revert(cmd: RevertBlockchain) -> Result<(), String> {
         ));
     }
     match client.revert_block(to) {
-        Ok(()) => {
+        Ok(blk) => {
             let ms = timer.elapsed().as_milliseconds();
-            info!(target: "revert", "Revert BlockChain to #{} completed in {} ms", to, ms);
+            info!(target: "revert", "Revert BlockChain to #{} completed in {} ms", blk, ms);
         }
         Err(e) => {
             println!("{}", e);

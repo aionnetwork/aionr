@@ -24,9 +24,7 @@ use std::cmp::max;
 use header::{Header, SealType};
 use types::error::{BlockError, Error};
 use unexpected::Mismatch;
-use key::public_to_address_ed25519;
 use rcrypto::ed25519::verify;
-use aion_types::{H256, Address};
 use blake2b::blake2b;
 use num_bigint::BigUint;
 use num::ToPrimitive;
@@ -88,10 +86,11 @@ impl PoSValidator {
         }
 
         // Verify the signer of the seed and the signature are the same as the block producer
-        let signer: Address = public_to_address_ed25519(&H256::from(pk.as_slice()));
-        if &signer != header.author() {
-            return Err(BlockError::InvalidPoSAuthor.into());
-        }
+        // Signer and coinbase can be different
+        // let signer: Address = public_to_address_ed25519(&H256::from(pk.as_slice()));
+        // if &signer != header.author() {
+        //     return Err(BlockError::InvalidPoSAuthor.into());
+        // }
 
         // Verify timestamp
         let difficulty = header.difficulty().clone();
