@@ -391,3 +391,26 @@ impl From<U256> for BigUint {
         BigUint::from_bytes_be(&arr)
     }
 }
+
+impl From<BigUint> for U256 {
+    fn from(value: BigUint) -> U256 {
+        let mut le = value.to_bytes_le();
+        // TODO: consider when bytes in BigUint is larger than 32
+        // it is enough for our calculation
+        le.resize(32, 0);
+        U256::from_little_endian(&le)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_from_to() {
+        let a = U256::from(258u64);
+        let b: BigUint = a.into();
+        assert_eq!(b, BigUint::from(258u64));
+        let c: U256 = b.into();
+        assert_eq!(c, U256::from(258u64));
+    }
+}

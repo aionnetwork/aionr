@@ -34,7 +34,7 @@ use std::fmt;
 
 use num_bigint::{BigUint,ToBigInt};
 use bigdecimal::BigDecimal;
-use num_traits::{Zero,One,ToPrimitive};
+use num_traits::{Zero,One,ToPrimitive,Num};
 
 pub use log_approximator::LogApproximator;
 
@@ -79,6 +79,11 @@ impl FixedPoint {
         } else {
             Err(FixedPointError::Negative)
         }
+    }
+
+    pub fn from_str_radix(s: &str, radix: u32) -> Result<FixedPoint, FixedPointError> {
+        let num = BigDecimal::from_str_radix(s, radix).unwrap();
+        Self::parse_from_big_decimal(&num)
     }
 
     // TODO: better
@@ -198,4 +203,5 @@ mod test {
             FixedPoint(BigUint::from(3u64))
         )
     }
+
 }
