@@ -44,8 +44,8 @@ cp resources/custom.json $CUSTJ
 echo -e '#!/usr/bin/env sh\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=custom/custom.toml $*'>package/$1/custom.sh
 chmod +x package/$1/custom.sh
 
-cp resources/config_mastery_unity.toml $MASTT2
-cp resources/mastery_unity.json $MASTJ2
+cp resources/config_mastery2.toml $MASTT2
+cp resources/mastery2.json $MASTJ2
 echo -e '#!/usr/bin/env sh\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mastery/mastery_unity.toml $*'>package/$1/mastery2
 chmod +x package/$1/mastery2
 
