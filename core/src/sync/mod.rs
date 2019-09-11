@@ -165,13 +165,14 @@ impl Sync {
                 {
                     let local_best_number = client_statics.chain_info().best_block_number;
                     let local_best_hash = client_statics.chain_info().best_block_hash;
+                    let local_total_difficulty = client_statics.chain_info().total_difficulty;
                     let active_len = active_nodes.len();
-                    info!(target: "sync", "total/active {}/{}, local_best_num {}, hash {}", total_len, active_len, local_best_number, local_best_hash);
+                    info!(target: "sync", "total/active {}/{}, local_best_num {}, hash {}, diff {}", total_len, active_len, local_best_number, local_best_hash, local_total_difficulty);
                     let (downloaded_blocks_size, downloaded_blocks_capacity) = storage_statics.downloaded_blocks_hashes_statics();
                     let (staged_blocks_size, staged_blocks_capacity) = storage_statics.staged_blocks_statics();
-                    info!(target: "sync", "download record cache size/capacity {}/{}", downloaded_blocks_size, downloaded_blocks_capacity);
-                    info!(target: "sync", "staged cache size/capacity {}/{}", staged_blocks_size, staged_blocks_capacity);
-                    info!(target: "sync", "lightning syncing height: {}", storage_statics.lightning_base());
+                    debug!(target: "sync", "download record cache size/capacity {}/{}", downloaded_blocks_size, downloaded_blocks_capacity);
+                    debug!(target: "sync", "staged cache size/capacity {}/{}", staged_blocks_size, staged_blocks_capacity);
+                    debug!(target: "sync", "lightning syncing height: {}", storage_statics.lightning_base());
                     info!(target: "sync", "{:-^127}", "");
                     info!(target: "sync", "                              td         bn          bh                    addr                 rev      conn  seed       mode");
                     info!(target: "sync", "{:-^127}", "");
@@ -331,7 +332,7 @@ impl Sync {
         // Shutdown p2p
         &self.p2p.clear_callback();
         &self.p2p.shutdown();
-        info!(target:"sync", "sync shutdown start");
+        debug!(target:"sync", "sync shutdown start");
         // Shutdown runtime tasks
         let mut shutdown_hooks = self.shutdown_hooks.lock();
         while !shutdown_hooks.is_empty() {
@@ -341,7 +342,7 @@ impl Sync {
                         debug!(target: "sync", "shutdown signal sent");
                     }
                     Err(err) => {
-                        error!(target: "sync", "shutdown: {:?}", err);
+                        warn!(target: "sync", "shutdown: {:?}", err);
                     }
                 }
             }

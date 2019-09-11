@@ -321,7 +321,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // Handle exit
     wait_for_exit();
 
-    info!(target: "run","shutdowning ...");
+    info!(target: "run","AION is shutting down. Please wait for remaining tasks to finish.");
 
     // close pool
     let _ = close_transaction_pool.send(());

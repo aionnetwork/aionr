@@ -468,21 +468,8 @@ impl Miner {
                 Err(Error::PosInvalid)
             })?;
 
-        // Log
-        let n = sealed_block.header().number();
-        let d = sealed_block.header().difficulty().clone();
-        let h = sealed_block.header().hash();
-        let t = sealed_block.header().timestamp();
-
         // 4. Import block
         client.import_sealed_block(sealed_block)?;
-
-        // Log
-        info!(target: "miner", "PoS block imported OK. #{}: diff: {}, hash: {}, timestamp: {}",
-            Colour::White.bold().paint(format!("{}", n)),
-            Colour::White.bold().paint(format!("{}", d)),
-            Colour::White.bold().paint(format!("{:x}", h)),
-            Colour::White.bold().paint(format!("{:x}", t)));
         Ok(())
     }
 
@@ -1509,20 +1496,7 @@ impl MinerService for Miner {
             stake,
         ) {
             Ok(s) => {
-                let n = s.header().number();
-                let d = s.header().difficulty().clone();
-                let h = s.header().hash();
-                let t = s.header().timestamp();
-
                 client.import_sealed_block(s)?;
-
-                // Log
-                info!(target: "miner", "PoS block imported OK. #{}: diff: {}, hash: {}, timestamp: {}",
-                Colour::White.bold().paint(format!("{}", n)),
-                Colour::White.bold().paint(format!("{}", d)),
-                Colour::White.bold().paint(format!("{:x}", h)),
-                Colour::White.bold().paint(format!("{:x}", t)));
-
                 return Ok(());
             }
             Err((e, _)) => {
@@ -1587,11 +1561,7 @@ impl MinerService for Miner {
             Err(Error::PowHashInvalid)
         };
         result.and_then(|sealed| {
-            let n = sealed.header().number();
-            let h = sealed.header().hash();
-            let d = sealed.header().difficulty().clone();
             client.import_sealed_block(sealed)?;
-            info!(target: "miner", "Submitted block imported OK. #{}: {}: {}", Colour::White.bold().paint(format!("{}", n)), Colour::White.bold().paint(format!("{:x}", h)), Colour::White.bold().paint(format!("{:x}", d)));
             Ok(())
         })
     }

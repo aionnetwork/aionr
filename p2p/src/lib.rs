@@ -508,7 +508,7 @@ impl Mgr {
 
     /// shutdown routine
     pub fn shutdown(&self) {
-        info!(target: "p2p" , "p2p shutdown start");
+        debug!(target: "p2p" , "p2p shutdown start");
         // Shutdown runtime tasks
         if let Ok(mut shutdown_hooks) = self.shutdown_hooks.lock() {
             while !shutdown_hooks.is_empty() {
@@ -518,7 +518,7 @@ impl Mgr {
                             debug!(target: "p2p", "shutdown signal sent");
                         }
                         Err(err) => {
-                            error!(target: "p2p", "shutdown: {:?}", err);
+                            warn!(target: "p2p", "shutdown: {:?}", err);
                         }
                     }
                 }
@@ -540,7 +540,7 @@ impl Mgr {
                         debug!(target: "p2p", "tcp connection thread shutdown signal sent");
                     }
                     Err(err) => {
-                        error!(target: "p2p", "shutdown: {:?}", err);
+                        warn!(target: "p2p", "shutdown: {:?}", err);
                     }
                 }
             }
