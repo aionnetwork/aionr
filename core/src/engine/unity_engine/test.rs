@@ -200,7 +200,7 @@ fn test_calculate_difficulty3() {
     let calculator = DifficultyCalc::new(&params, Some(0u64), Some(U256::from(2000000000u64)));
     let difficulty =
         calculator.calculate_difficulty(Some(&parent_header), Some(&grand_parent_header));
-    assert_eq!(difficulty, U256::from(3150));
+    assert_eq!(difficulty, U256::from(3149));
 }
 
 #[test]

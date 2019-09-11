@@ -234,34 +234,4 @@ mod test {
             }
         }
     }
-
-    #[test]
-    fn test_biguint() {
-        let a = BigUint::parse_bytes(
-            b"11111111111111111111111111111111111111111111111111111111111111111111111",
-            2,
-        )
-        .unwrap();
-        let o = BigUint::parse_bytes(
-            b"10000000000000000000000000000000000000000000000000000000000000000000000",
-            2,
-        )
-        .unwrap();
-        let b = BigUint::parse_bytes(
-            b"11111111111111111111111111111111111111111111111111111111111111111111110",
-            2,
-        )
-        .unwrap();
-        let c = BigUint::parse_bytes(
-            b"11111111111111111111111111111100000000000000000000000000000000000000000",
-            2,
-        )
-        .unwrap();
-        let d = BigUint::parse_bytes(b"1000000000000000000000000000001", 16).unwrap();
-        println!("{:b}", FixedPoint::ln(&a).0);
-        println!("{:b}", FixedPoint::ln(&b).0);
-        println!("{:b}", FixedPoint::ln(&c).0);
-        //        println!
-    }
-
 }

@@ -24,6 +24,7 @@ use aion_types::U256;
 use aion_machine::{LiveBlock, WithBalances, Machine};
 use engine::Engine;
 use machine::{EthereumMachine};
+use num_bigint::BigUint;
 
 /// Params for a null engine.
 #[derive(Clone, Default)]
@@ -99,7 +100,7 @@ impl Engine for NullEngine {
         &self,
         _header: &<EthereumMachine as Machine>::Header,
         _seal_type: Option<&<EthereumMachine as Machine>::Header>,
-        _stake: Option<u64>,
+        _stake: Option<BigUint>,
     ) -> Result<(), <EthereumMachine as Machine>::Error>
     {
         Ok(())

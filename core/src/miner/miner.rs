@@ -60,6 +60,7 @@ use transaction::transaction_queue::{
 use using_queue::{GetAction, UsingQueue};
 use rcrypto::ed25519;
 use key::Ed25519KeyPair;
+use num::Zero;
 use num_bigint::BigUint;
 use blake2b::blake2b;
 use fixed_point::{FixedPoint,LogApproximator};
@@ -349,10 +350,13 @@ impl Miner {
 
         // 1. Get the stake. Stop proceeding if stake is 0.
         // internal staker's coinbase is himself
-        let stake: u64 = match client.get_stake(&pk.into(), None) {
-            Some(stake) if stake > 0 => stake,
-            _ => return Ok(()),
-        };
+        let stake: BigUint = client
+            .get_stake(&pk.into(), None)
+            .unwrap_or(BigUint::from(0u32));
+
+        if stake == BigUint::from(0u32) {
+            return Ok(());
+        }
 
         // 2. Get the current best PoS block
         let best_block_header = client.best_block_header_with_seal_type(&SealType::PoS);
@@ -405,7 +409,7 @@ impl Miner {
             .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
             .expect("H256 should smaller than 2^256");
         let delta: BigUint =
-            u.multiply_uint(difficulty.into()).to_big_uint() / BigUint::from(stake);
+            u.multiply_uint(difficulty.into()).to_big_uint() / BigUint::from(stake.clone());
         let delta_uint: u64 = max(1u64, delta.to_u64().unwrap_or(u64::max_value()));
 
         trace!(target: "staker", "Staking...difficulty: {}, u: {:?}, stake: {}, delta: {}",
@@ -440,7 +444,7 @@ impl Miner {
         sk: &[u8; 64],
         pk: &[u8; 32],
         seal_parent: Option<&Header>,
-        stake: u64,
+        stake: BigUint,
     ) -> Result<(), Error>
     {
         trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
@@ -1427,8 +1431,8 @@ impl MinerService for Miner {
     {
         //WARN: if coinbase is not found, send reward to black hole: full zero address
         let coinbase = client.get_coinbase(&pk);
-        let stake = client.get_stake(&pk, coinbase).unwrap_or(0);
-        if stake == 0 {
+        let stake = client.get_stake(&pk, coinbase).unwrap_or(BigUint::zero());
+        if stake.is_zero() {
             return None;
         }
 
@@ -1471,8 +1475,7 @@ impl MinerService for Miner {
         let u = FixedPoint::ln(&a)
             .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
             .expect("H256 should smaller than 2^256");
-        let delta: BigUint =
-            u.multiply_uint(difficulty.into()).to_big_uint() / BigUint::from(stake);
+        let delta: BigUint = u.multiply_uint(difficulty.into()).to_big_uint() / stake.clone();
         let delta_uint: u64 = max(1u64, delta.to_u64().unwrap_or(u64::max_value()));
 
         trace!(target: "staker", "Staking...difficulty: {}, u: {:?}, stake: {}, delta: {}",
