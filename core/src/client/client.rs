@@ -33,6 +33,7 @@ use acore_bytes::Bytes;
 use journaldb;
 use kvdb::{DBTransaction, KeyValueDB};
 use trie::{Trie, TrieFactory, TrieSpec};
+use ansi_term::Colour;
 
 // other
 use aion_types::{Address, H128, H256, H264, U256};
@@ -532,12 +533,23 @@ impl Client {
             return 0;
         }
 
-        let max_blocks_to_import = 4;
-        let (imported_blocks, import_results, invalid_blocks, imported, proposed_blocks, duration) = {
+        let max_blocks_to_import = 10;
+        let (
+            imported_blocks,
+            import_results,
+            invalid_blocks,
+            imported,
+            proposed_blocks,
+            duration,
+            first_header,
+            last_header,
+        ) = {
             let mut imported_blocks = Vec::with_capacity(max_blocks_to_import);
             let mut invalid_blocks = HashSet::new();
             let mut proposed_blocks = Vec::with_capacity(max_blocks_to_import);
             let mut import_results = Vec::with_capacity(max_blocks_to_import);
+            let mut first_header: Option<Header> = None;
+            let mut last_header: Option<Header> = None;
 
             let _import_lock = self.import_lock.lock();
             let blocks = self.block_queue.drain(max_blocks_to_import);
@@ -555,11 +567,15 @@ impl Client {
                     continue;
                 }
                 if let Ok(closed_block) = self.check_and_close_block(&block) {
-                    imported_blocks.push(header.hash());
                     trace!(target: "block", "commit_block() number: {:?}", header.number());
                     trace!(target: "block", "commit_block() header: {:?}", header.hash());
                     let route = self.commit_block(closed_block, &header, &block.bytes);
+                    imported_blocks.push(header.hash());
                     import_results.push(route);
+                    if first_header.is_none() {
+                        first_header = Some(header.clone());
+                    }
+                    last_header = Some(header.clone());
                     self.report.write().accrue_block(&block);
                 } else {
                     invalid_blocks.insert(header.hash());
@@ -581,32 +597,50 @@ impl Client {
                 imported,
                 proposed_blocks,
                 duration_ns,
+                first_header,
+                last_header,
             )
         };
 
-        {
-            if !imported_blocks.is_empty() {
-                let (enacted, retracted) = self.calculate_enacted_retracted(&import_results);
-                self.miner.chain_new_blocks(
-                    self,
-                    &imported_blocks,
-                    &invalid_blocks,
-                    &enacted,
-                    &retracted,
-                );
-
-                self.notify(|notify| {
-                    notify.new_blocks(
-                        imported_blocks.clone(),
-                        invalid_blocks.clone(),
-                        enacted.clone(),
-                        retracted.clone(),
-                        Vec::new(),
-                        proposed_blocks.clone(),
-                        duration,
-                    );
-                });
+        // Print log
+        match (first_header, last_header) {
+            (Some(ref first), Some(ref last)) if first == last => {
+                info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}", 
+                    first.seal_type().clone().unwrap_or_default(),
+                    Colour::White.bold().paint(format!("{}", first.number())), 
+                    Colour::White.bold().paint(format!("{:x}", first.hash())), 
+                    Colour::White.bold().paint(format!("{:x}", first.difficulty())),
+                    Colour::White.bold().paint(format!("{:x}", first.timestamp())));
             }
+            (Some(first), Some(last)) => {
+                info!(target: "miner", "External blocks added from #{} to #{}", 
+                    Colour::White.bold().paint(format!("{}", first.number())), 
+                    Colour::White.bold().paint(format!("{}", last.number())));
+            }
+            (_, _) => {}
+        }
+
+        // Notify internal block producer and sync module
+        if !imported_blocks.is_empty() {
+            let (enacted, retracted) = self.calculate_enacted_retracted(&import_results);
+            self.miner.chain_new_blocks(
+                self,
+                &imported_blocks,
+                &invalid_blocks,
+                &enacted,
+                &retracted,
+            );
+            self.notify(|notify| {
+                notify.new_blocks(
+                    imported_blocks.clone(),
+                    invalid_blocks.clone(),
+                    enacted.clone(),
+                    retracted.clone(),
+                    Vec::new(),
+                    proposed_blocks.clone(),
+                    duration,
+                );
+            });
         }
 
         self.db.read().flush().expect("DB flush failed.");
@@ -1775,19 +1809,22 @@ impl MiningBlockChainClient for Client {
     }
 
     fn import_sealed_block(&self, block: SealedBlock) -> ImportResult {
-        let h = block.header().hash();
+        let hash = block.header().hash();
+        let number = block.header().number();
+        let timestamp = block.header().timestamp();
+        let difficulty = block.header().difficulty().clone();
+        let seal_type = block.header().seal_type().clone();
         let start = precise_time_ns();
         let route = {
             // scope for self.import_lock
             let _import_lock = self.import_lock.lock();
             trace_time!("import_sealed_block");
 
-            let number = block.header().number();
             let block_data = block.rlp_bytes();
             let header = block.header().clone();
 
             let route = self.commit_block(block, &header, &block_data);
-            trace!(target: "client", "Imported sealed block #{} ({})", number, h);
+            trace!(target: "client", "Imported sealed block #{} ({})", number, hash);
             self.state_db
                 .write()
                 .sync_cache(&route.enacted, &route.retracted, false);
@@ -1795,14 +1832,14 @@ impl MiningBlockChainClient for Client {
         };
         let (enacted, retracted) = self.calculate_enacted_retracted(&[route]);
         self.miner
-            .chain_new_blocks(self, &[h.clone()], &[], &enacted, &retracted);
+            .chain_new_blocks(self, &[hash.clone()], &[], &enacted, &retracted);
         self.notify(|notify| {
             notify.new_blocks(
-                vec![h.clone()],
+                vec![hash.clone()],
                 vec![],
                 enacted.clone(),
                 retracted.clone(),
-                vec![h.clone()],
+                vec![hash.clone()],
                 vec![],
                 precise_time_ns() - start,
             );
@@ -1810,7 +1847,14 @@ impl MiningBlockChainClient for Client {
         self.db.read().flush().expect("DB flush failed.");
         // clear pending PoS blocks
         self.miner.clear_pos_pending();
-        Ok(h)
+        // Print log
+        info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}", 
+            seal_type.unwrap_or_default(),
+            Colour::White.bold().paint(format!("{}", number)), 
+            Colour::White.bold().paint(format!("{:x}", hash)), 
+            Colour::White.bold().paint(format!("{:x}", difficulty)),
+            Colour::White.bold().paint(format!("{:x}", timestamp)));
+        Ok(hash)
     }
 
     fn prepare_block_interval(&self) -> Duration { self.miner.prepare_block_interval() }
