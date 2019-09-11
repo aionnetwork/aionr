@@ -238,7 +238,6 @@ impl BridgeController {
         // an event indicating the transactionHash that the bundle was
         // previously successfully broadcast in.
         if self.bundle_processed(ext, hash) {
-            print!("4");
             // ATB 6-1, fixed bug: emit stored transactionHash instead of input transaction Hash
             let bundle = self.connector.get_bundle(ext, hash);
             self.emit_successful_transaction_hash(ext, bundle);

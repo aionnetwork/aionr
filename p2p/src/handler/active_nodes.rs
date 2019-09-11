@@ -25,64 +25,50 @@ use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use rand::random;
 use byteorder::ReadBytesExt;
-use P2pMgr;
 use ChannelBuffer;
-use Node;
-use Event;
-use IP_LENGTH;
-use NODE_ID_LENGTH;
-use route::VERSION;
-use route::MODULE;
-use route::ACTION;
-use states::HANDSHAKE_DONE;
-use states::DISCONNECTED;
+use node::NODE_ID_LENGTH;
+use node::IP_LENGTH;
+use node::Node;
+use node::TempNode;
+use route::Action;
+use super::super::Mgr;
+use super::{channel_buffer_template,channel_buffer_template_with_version};
 
-pub fn send() {
-    let mut req = ChannelBuffer::new();
-    req.head.ver = VERSION::V0.value();
-    req.head.ctrl = MODULE::P2P.value();
-    req.head.action = ACTION::ACTIVENODESREQ.value();
-    req.head.len = 0;
-    let handshaked_nodes = P2pMgr::get_nodes(HANDSHAKE_DONE);
-    let handshaked_nodes_count = handshaked_nodes.len();
-    if handshaked_nodes_count > 0 {
-        let random_index = random::<usize>() % handshaked_nodes_count;
-        let node = &handshaked_nodes[random_index];
-        P2pMgr::send(node.node_hash, req.clone());
-        trace!(target: "net", "send active nodes req");
-    } else {
-        trace!(target: "net", "Net no active node...");
+pub fn send(p2p: Mgr) {
+    let active: Vec<Node> = p2p.get_active_nodes();
+    let len: usize = active.len();
+    if len > 0 {
+        let random = random::<usize>() % len;
+        let hash = active[random].get_hash();
+        debug!(target: "p2p", "active_nodes/send:  hash {}", &hash);
+        p2p.send(
+            hash,
+            channel_buffer_template(Action::ACTIVENODESREQ.value()),
+        );
     }
 }
 
-pub fn receive_req(peer_node: &mut Node) {
-    trace!(target: "net", "ACTIVENODESREQ received.");
+pub fn receive_req(p2p: Mgr, hash: u64, version: u16) {
+    debug!(target: "p2p", "active_nodes/receive_req");
 
-    let mut res = ChannelBuffer::new();
-    let peer_node_hash = peer_node.node_hash;
-
-    res.head.ver = VERSION::V0.value();
-    res.head.ctrl = MODULE::P2P.value();
-    res.head.action = ACTION::ACTIVENODESRES.value();
-
-    let active_nodes = P2pMgr::get_nodes(HANDSHAKE_DONE);
+    let mut cb_out = channel_buffer_template_with_version(version, Action::ACTIVENODESRES.value());
+    let active_nodes = p2p.get_active_nodes();
     let mut res_body = Vec::new();
-    let active_nodes_count = active_nodes.len();
 
-    if active_nodes_count > 1 {
+    if active_nodes.len() > 0 {
         let mut active_nodes_to_send = Vec::new();
-        for node in active_nodes.iter() {
-            if node.node_hash != peer_node.node_hash && peer_node.ip_addr.ip != node.ip_addr.ip {
-                active_nodes_to_send.push(node);
+        for active_node in active_nodes.iter() {
+            if active_node.hash != hash {
+                active_nodes_to_send.push(active_node);
             }
         }
         if active_nodes_to_send.len() > 0 {
             res_body.push(active_nodes_to_send.len() as u8);
             for n in active_nodes_to_send.iter() {
-                res_body.put_slice(&n.node_id);
-                res_body.put_slice(&n.ip_addr.ip);
+                res_body.put_slice(&n.id);
+                res_body.put_slice(&n.addr.ip);
                 let mut port = [0; 4];
-                BigEndian::write_u32(&mut port, n.ip_addr.port);
+                BigEndian::write_u32(&mut port, n.addr.port);
                 res_body.put_slice(&port);
             }
         } else {
@@ -91,56 +77,54 @@ pub fn receive_req(peer_node: &mut Node) {
     } else {
         res_body.push(0 as u8);
     }
-    res.body.put_slice(res_body.as_slice());
-    res.head.len = res.body.len() as u32;
 
-    Event::update_node_state(peer_node, Event::OnActiveNodesReq);
-    P2pMgr::update_node(peer_node_hash, peer_node);
-    P2pMgr::send(peer_node_hash, res);
+    cb_out.body.put_slice(res_body.as_slice());
+    cb_out.head.len = cb_out.body.len() as u32;
+    p2p.send(hash, cb_out);
 }
 
-pub fn receive_res(peer_node: &mut Node, req: ChannelBuffer) {
-    trace!(target: "net", "ACTIVENODESRES received.");
+pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
+    debug!(target: "p2p", "active_nodes/receive_res");
 
-    let peer_node_hash = peer_node.node_hash;
-    let (node_count, rest) = req.body.split_at(1);
-    let mut node_list = Vec::new();
-    let mut rest = rest;
-    if node_count[0] > 0 {
-        for _i in 0..node_count[0] as u32 {
-            let mut node = Node::new();
+    let (node_count, mut rest) = cb_in.body.split_at(1);
 
-            let (node_id, rest_body) = rest.split_at(NODE_ID_LENGTH);
-            let (ip, rest_body) = rest_body.split_at(IP_LENGTH);
-            let (mut port, next) = rest_body.split_at(mem::size_of::<u32>());
+    let nodes_count: u32 = node_count[0] as u32;
 
-            node.ip_addr.ip.copy_from_slice(ip);
-            node.ip_addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
-            node.node_id.copy_from_slice(node_id);
-            node.state_code = DISCONNECTED as u32;
-            node.node_hash = P2pMgr::calculate_hash(&node.get_node_id());
+    if nodes_count > 0 {
+        let mut temp_list = Vec::new();
+        let (local_ip, _) = p2p.config.get_ip_and_port();
 
-            let local_node_ip = P2pMgr::get_local_node().ip_addr.ip;
-            let local_node_ip_hash = P2pMgr::calculate_hash(&local_node_ip);
-            let peer_node_ip_hash = P2pMgr::calculate_hash(&peer_node.ip_addr.ip);
-            let node_ip_hash = P2pMgr::calculate_hash(&node.ip_addr.ip);
+        // TODO: update node status with healthy active nodes msg
+        // TODO: max active nodes filter
+        for _i in 0..nodes_count {
+            let (id, rest1) = rest.split_at(NODE_ID_LENGTH);
+            let (ip, rest1) = rest1.split_at(IP_LENGTH);
 
-            if local_node_ip_hash != node_ip_hash && peer_node_ip_hash != node_ip_hash {
-                node_list.push(node);
+            if local_ip.as_bytes() == ip {
+                continue;
             }
 
-            rest = next;
-        }
-    }
+            let (mut port, rest1) = rest1.split_at(mem::size_of::<u32>());
+            rest = rest1;
 
-    for n in node_list.iter() {
-        match P2pMgr::get_node(n.node_hash) {
-            Some(_) => {}
-            None => {
-                P2pMgr::add_node(n.clone());
+            let mut temp = TempNode::default();
+            temp.addr.ip.copy_from_slice(ip);
+            temp.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
+            temp.id.copy_from_slice(id);
+
+            // TODO: complete if should add
+            temp_list.push(temp);
+        }
+        if let Ok(mut lock) = p2p.temp.try_lock() {
+            for t in temp_list.iter() {
+                lock.push_back(t.to_owned());
             }
         }
     }
-    Event::update_node_state(peer_node, Event::OnActiveNodesRes);
-    P2pMgr::update_node(peer_node_hash, peer_node);
+
+    if let Ok(mut lock) = p2p.nodes.try_write() {
+        if let Some(node) = lock.get_mut(&hash) {
+            node.update();
+        }
+    }
 }

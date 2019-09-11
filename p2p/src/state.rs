@@ -19,15 +19,49 @@
  *
  ******************************************************************************/
 
-pub mod active_nodes;
-pub mod handshake;
-
-use super::{ChannelBuffer,PROTOCAL_VERSION,Module};
-
-fn channel_buffer_template(action: u8) -> ChannelBuffer {
-    ChannelBuffer::new1(PROTOCAL_VERSION, Module::P2P.value(), action, 0u32)
+/// simple p2p node state
+/// states defined here only for p2p layer
+#[derive(Debug, PartialEq, Clone)]
+pub enum STATE {
+    CONNECTED,
+    ACTIVE,
 }
 
-fn channel_buffer_template_with_version(version: u16, action: u8) -> ChannelBuffer {
-    ChannelBuffer::new1(version, Module::P2P.value(), action, 0u32)
+impl STATE {
+    pub fn value(&self) -> usize {
+        match self {
+            STATE::CONNECTED => 0,
+            STATE::ACTIVE => 1,
+        }
+    }
+    pub fn from(value: usize) -> STATE {
+        match value {
+            1 => STATE::ACTIVE,
+            _ => STATE::CONNECTED,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+
+    use state::STATE;
+
+    #[test]
+    fn equal() {
+        assert_eq!(STATE::CONNECTED, STATE::CONNECTED);
+        assert_eq!(STATE::ACTIVE, STATE::ACTIVE);
+    }
+
+    #[test]
+    fn value() {
+        assert_eq!(STATE::CONNECTED.value(), 0);
+        assert_eq!(STATE::ACTIVE.value(), 1);
+    }
+
+    #[test]
+    fn from() {
+        assert_eq!(STATE::CONNECTED, STATE::from(0));
+        assert_eq!(STATE::ACTIVE, STATE::from(1));
+    }
 }

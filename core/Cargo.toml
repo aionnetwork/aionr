@@ -12,7 +12,6 @@ bloomchain = { path = "../util/bloomchain" }
 byteorder = "1.0"
 bytes = "0.4"
 state = "0.4.1"
-p2p = { path = "../p2p" }
 crossbeam = "0.3"
 acore-bloom-journal = { path = "../util/bloom" }
 acore-bytes = { path = "../util/bytes" }
@@ -55,6 +54,7 @@ db = { path = "../db/core" }
 equihash = { path = "../util/equihash" }
 blake2b = { path = "../util/blake2b" }
 avm_abi =   { path = "../util/avm_abi" }
+p2p = { path = "../p2p" }
 tiny-keccak = "1.4.2"
 num-bigint = "0.2"
 bytebuffer = "0.2.1"
@@ -62,7 +62,8 @@ transient-hashmap = "0.4"
 macros = { path = "../util/macros" }
 futures = "0.1.6"
 tokio = "0.1.11"
-ctrlc =             { git = "https://github.com/paritytech/rust-ctrlc.git" }
+rand = "0.5.5"
+ctrlc = { git = "https://github.com/paritytech/rust-ctrlc.git" }
 
 [dev-dependencies]
 tempdir = "*"

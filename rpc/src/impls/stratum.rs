@@ -212,6 +212,7 @@ where
 
     /// Get information
     fn get_info(&self) -> Result<Info> {
+        // TODO
         Ok(Info {
             balance: 0,
             blocks: 0,

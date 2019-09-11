@@ -19,8 +19,8 @@
  *
  ******************************************************************************/
 
-use route::VERSION;
-use route::MODULE;
+use route::Version;
+use route::Module;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Head {
@@ -33,11 +33,26 @@ pub struct Head {
 impl Head {
     pub fn new() -> Head {
         Head {
-            ver: VERSION::V2.value(),
-            ctrl: MODULE::P2P.value(),
+            ver: Version::V2.value(),
+            ctrl: Module::P2P.value(),
             action: 0xFF,
             len: 0,
         }
+    }
+
+    /// temporiy name it for it now
+    pub fn new1(ver: u16, ctrl: u8, action: u8, len: u32) -> Head {
+        Head {
+            ver,
+            ctrl,
+            action,
+            len,
+        }
+    }
+
+    /// get route
+    pub fn get_route(&self) -> u32 {
+        return ((self.ver as u32) << 16) + ((self.ctrl as u32) << 8) + (self.action as u32);
     }
 }
 
@@ -54,4 +69,53 @@ impl ChannelBuffer {
             body: Vec::new(),
         }
     }
+    // temporiy name it for it now
+    pub fn new1(ver: u16, ctrl: u8, action: u8, len: u32) -> ChannelBuffer {
+        ChannelBuffer {
+            head: Head::new1(ver, ctrl, action, len),
+            body: Vec::new(),
+        }
+    }
+
+    pub fn to_route(ver: u16, ctrl: u8, action: u8) -> u32 {
+        ((ver as u32) << 16) + ((ctrl as u32) << 8) + (action as u32)
+    }
+}
+
+// TODO
+#[cfg(test)]
+mod tests {
+
+    use msg::Head;
+    use route::Version;
+    use route::Module;
+    use route::Action;
+
+    #[test]
+    pub fn test_head() {
+        let mut head = Head::new();
+
+        head.ver = Version::V0.value();
+        head.ctrl = Module::P2P.value();
+
+        head.action = Action::HANDSHAKEREQ.value();
+        assert_eq!(head.get_route(), 1);
+        head.action = Action::HANDSHAKERES.value();
+        assert_eq!(head.get_route(), 2);
+        head.action = Action::ACTIVENODESREQ.value();
+        assert_eq!(head.get_route(), 5);
+        head.action = Action::ACTIVENODESRES.value();
+        assert_eq!(head.get_route(), 6);
+
+        head.ver = Version::V1.value();
+        head.action = Action::HANDSHAKEREQ.value();
+        assert_eq!(head.get_route(), 65537);
+        head.action = Action::HANDSHAKERES.value();
+        assert_eq!(head.get_route(), 65538);
+        head.action = Action::ACTIVENODESREQ.value();
+        assert_eq!(head.get_route(), 65541);
+        head.action = Action::ACTIVENODESRES.value();
+        assert_eq!(head.get_route(), 65542);
+    }
+
 }

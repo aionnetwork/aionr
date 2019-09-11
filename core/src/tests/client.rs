@@ -91,7 +91,7 @@ fn client_check_vote() {
     )
     .unwrap();
 
-    assert!(client.get_stake(&H256::default(), None).is_none());
+    assert_eq!(client.get_stake(&H256::default(), None).unwrap(), 0);
 }
 
 #[test]

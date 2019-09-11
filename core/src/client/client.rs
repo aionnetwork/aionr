@@ -531,15 +531,7 @@ impl Client {
         }
 
         let max_blocks_to_import = 4;
-        let (
-            imported_blocks,
-            import_results,
-            invalid_blocks,
-            imported,
-            proposed_blocks,
-            duration,
-            is_empty,
-        ) = {
+        let (imported_blocks, import_results, invalid_blocks, imported, proposed_blocks, duration) = {
             let mut imported_blocks = Vec::with_capacity(max_blocks_to_import);
             let mut invalid_blocks = HashSet::new();
             let mut proposed_blocks = Vec::with_capacity(max_blocks_to_import);
@@ -578,7 +570,7 @@ impl Client {
             if !invalid_blocks.is_empty() {
                 self.block_queue.mark_as_bad(&invalid_blocks);
             }
-            let is_empty = self.block_queue.mark_as_good(&imported_blocks);
+            let _is_empty = self.block_queue.mark_as_good(&imported_blocks);
             let duration_ns = precise_time_ns() - start;
             (
                 imported_blocks,
@@ -587,22 +579,20 @@ impl Client {
                 imported,
                 proposed_blocks,
                 duration_ns,
-                is_empty,
             )
         };
 
         {
-            if !imported_blocks.is_empty() && is_empty {
+            if !imported_blocks.is_empty() {
                 let (enacted, retracted) = self.calculate_enacted_retracted(&import_results);
-                if is_empty {
-                    self.miner.chain_new_blocks(
-                        self,
-                        &imported_blocks,
-                        &invalid_blocks,
-                        &enacted,
-                        &retracted,
-                    );
-                }
+                self.miner.chain_new_blocks(
+                    self,
+                    &imported_blocks,
+                    &invalid_blocks,
+                    &enacted,
+                    &retracted,
+                );
+
                 self.notify(|notify| {
                     notify.new_blocks(
                         imported_blocks.clone(),
@@ -1361,9 +1351,19 @@ impl BlockChainClient for Client {
         }
 
         let chain = self.chain.read();
+
         match Self::block_hash(&chain, &self.miner, id) {
-            Some(ref hash) if chain.is_known(hash) => BlockStatus::InChain,
-            Some(hash) => self.block_queue.status(&hash).into(),
+            Some(ref hash) => {
+                // Must first check verification queue, then check blockchain to avoid
+                // multi-thread bug.
+                // This is because when importing a verified block, it is firstly added
+                // into the blockchain then get removed from the verification queue.
+                let mut status: BlockStatus = self.block_queue.status(hash).into();
+                if chain.is_known(hash) {
+                    status = BlockStatus::InChain;
+                }
+                status
+            }
             None => BlockStatus::Unknown,
         }
     }

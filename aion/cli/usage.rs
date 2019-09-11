@@ -331,6 +331,7 @@ macro_rules! usage {
 
                 // print default config
                 if raw_args.flag_default_config {
+                    fs::create_dir_all(&::dir::default_data_path()).expect("Fail to create dir at: {}.");
                     let default_config_path = format!("{}/default_config.toml",&::dir::default_data_path());
                     let path = Path::new(&default_config_path);
                     Args::print_default_config(path);
@@ -339,20 +340,8 @@ macro_rules! usage {
                 }
 
                 // Skip loading config file if no_config flag is specified
-                if raw_args.flag_no_config {
+                if raw_args.flag_no_config || raw_args.arg_config.is_none() {
                     return Ok(raw_args.into_args(Config::default()));
-                }
-
-                if raw_args.arg_config.is_none(){
-                    fs::create_dir_all(&::dir::default_data_path()).expect("Fail to create dir at: {}.");
-                    let default_config_path = raw_args.clone().into_args(Config::default()).arg_config;
-                    let default_config_path = replace_home(&::dir::default_data_path(), &default_config_path);
-                    let path= Path::new(&default_config_path);
-                    if !path.exists() {
-                        Args::print_default_config(path);
-                        println_stderr!("Create config file {}, you can modify it if needed",&default_config_path);
-                    }
-                    // TODO:config file validator
                 }
 
                 let config_file = raw_args.arg_config.clone().unwrap_or(raw_args.clone().into_args(Config::default()).arg_config);

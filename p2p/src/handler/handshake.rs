@@ -25,70 +25,78 @@ use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use byteorder::ReadBytesExt;
 use version::short_version;
-use P2pMgr;
 use ChannelBuffer;
-use Node;
-use Event;
-use MAX_REVISION_LENGTH;
-use IP_LENGTH;
-use NODE_ID_LENGTH;
-use REVISION_PREFIX;
-use route::VERSION;
-use route::MODULE;
-use route::ACTION;
+use node::MAX_REVISION_LENGTH;
+use node::IP_LENGTH;
+use node::NODE_ID_LENGTH;
+use node::REVISION_PREFIX;
+use node::convert_ip_string;
+use route::Action;
+use state::STATE;
+use super::super::Mgr;
+
+use super::{channel_buffer_template,channel_buffer_template_with_version};
 
 //TODO: remove it
 const VERSION: &str = "02";
 
-pub fn send(node: &mut Node) {
-    let local_node = P2pMgr::get_local_node();
-    let mut req = ChannelBuffer::new();
-    req.head.ver = VERSION::V0.value();
-    req.head.ctrl = MODULE::P2P.value();
-    req.head.action = ACTION::HANDSHAKEREQ.value();
+// TODO: validate len
+pub fn send(p2p: Mgr, hash: u64) {
+    debug!(target: "p2p", "handshake/send");
 
-    req.body.clear();
-    req.body.put_slice(&local_node.node_id);
+    // header
+    let mut req = channel_buffer_template(Action::HANDSHAKEREQ.value());
 
-    let mut net_id = [0; 4];
-    BigEndian::write_u32(&mut net_id, local_node.net_id);
+    // write id
+    let (id, _) = p2p.config.get_id_and_binding();
+    req.body.put_slice(id.as_bytes());
 
-    req.body.put_slice(&net_id);
-    req.body.put_slice(&local_node.ip_addr.ip);
-    let mut port = [0; 4];
-    BigEndian::write_u32(&mut port, local_node.ip_addr.port);
-    req.body.put_slice(&port);
+    // write net_id
+    let mut net_id_bytes = [0; 4];
+    BigEndian::write_u32(&mut net_id_bytes, p2p.config.net_id);
+    req.body.put_slice(&net_id_bytes);
+
+    // write ip & port
+    let (ip, port) = p2p.config.get_ip_and_port();
+    req.body.put_slice(&convert_ip_string(ip));
+    let mut port_bytes = [0; 4];
+    BigEndian::write_u32(&mut port_bytes, port);
+    req.body.put_slice(&port_bytes);
+
+    // write revision
     let mut revision = short_version();
     revision.insert_str(0, REVISION_PREFIX);
     req.body.push(revision.len() as u8);
     req.body.put_slice(revision.as_bytes());
+
+    // write version
     req.body.push((VERSION.len() / 2) as u8);
     req.body.put_slice(VERSION.as_bytes());
 
+    // get bodylen
     req.head.len = req.body.len() as u32;
 
-    // handshake req
-    trace!(target: "net", "Net handshake req sent...");
-    P2pMgr::send(node.node_hash, req.clone());
-    node.inc_repeated();
-
-    P2pMgr::update_node(node.node_hash, node);
+    // send
+    p2p.send(hash, req);
 }
 
-pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
-    trace!(target: "net", "HANDSHAKEREQ received.");
+/// 1. decode handshake msg
+/// 2. validate and prove incoming connection to active
+/// 3. acknowledge sender if it is proved
+pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
+    debug!(target: "p2p", "handshake/receive_req");
 
-    let (node_id, req_body_rest) = req.body.split_at(NODE_ID_LENGTH);
+    let (node_id, req_body_rest) = cb_in.body.split_at(NODE_ID_LENGTH);
     let (mut net_id, req_body_rest) = req_body_rest.split_at(mem::size_of::<i32>());
     let peer_net_id = net_id.read_u32::<BigEndian>().unwrap_or(0);
-    let local_net_id = P2pMgr::get_network_config().net_id;
+    let local_net_id = p2p.config.net_id;
     if peer_net_id != local_net_id {
-        warn!(target: "net", "Invalid net id {}, should be {}.", peer_net_id, local_net_id);
+        warn!(target: "p2p", "invalid net id {}, should be {}.", peer_net_id, local_net_id);
         return;
     }
 
     let (_ip, req_body_rest) = req_body_rest.split_at(IP_LENGTH);
-    let (mut port, revision_version) = req_body_rest.split_at(mem::size_of::<i32>());
+    let (_port, revision_version) = req_body_rest.split_at(mem::size_of::<i32>());
     let (revision_len, rest) = revision_version.split_at(1);
     let revision_len = revision_len[0] as usize;
     let (revision, rest) = rest.split_at(revision_len);
@@ -96,57 +104,62 @@ pub fn receive_req(node: &mut Node, req: ChannelBuffer) {
     let version_len = version_len[0] as usize;
     let (_version, _rest) = rest.split_at(version_len);
 
-    node.node_id.copy_from_slice(node_id);
-    node.ip_addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
-    if revision_len > MAX_REVISION_LENGTH {
-        node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
-    } else {
-        node.revision[0..revision_len].copy_from_slice(revision);
-    }
+    if let Ok(mut write) = p2p.nodes.try_write() {
+        if let Some(mut node) = write.get_mut(&hash) {
+            debug!(target: "p2p", "inbound node state: connected -> active");
+            node.id.copy_from_slice(node_id);
+            // node.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
+            node.state = STATE::ACTIVE;
+            if revision_len > MAX_REVISION_LENGTH {
+                node.revision[0..MAX_REVISION_LENGTH]
+                    .copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
+            } else {
+                node.revision[0..revision_len].copy_from_slice(revision);
+            }
 
-    let mut res = ChannelBuffer::new();
-    let mut res_body = Vec::new();
+            let mut cb_out =
+                channel_buffer_template_with_version(cb_in.head.ver, Action::HANDSHAKERES.value());;
+            let mut res_body = Vec::new();
 
-    res.head.ver = VERSION::V0.value();
-    res.head.ctrl = MODULE::P2P.value();
-    res.head.action = ACTION::HANDSHAKERES.value();
-    res_body.push(1 as u8);
-    let mut revision = short_version();
-    revision.insert_str(0, REVISION_PREFIX);
-    res_body.push(revision.len() as u8);
-    res_body.put_slice(revision.as_bytes());
-    res.body.put_slice(res_body.as_slice());
-    res.head.len = res.body.len() as u32;
+            res_body.push(1 as u8);
+            let mut revision = short_version();
+            revision.insert_str(0, REVISION_PREFIX);
+            res_body.push(revision.len() as u8);
+            res_body.put_slice(revision.as_bytes());
+            cb_out.body.put_slice(res_body.as_slice());
+            cb_out.head.len = cb_out.body.len() as u32;
 
-    let old_node_hash = node.node_hash;
-    let node_id_hash = P2pMgr::calculate_hash(&node.get_node_id());
-    node.node_hash = node_id_hash;
-    if P2pMgr::is_connected(node_id_hash) {
-        trace!(target: "net", "known node {}@{} ...", node.get_node_id(), node.get_ip_addr());
-    } else {
-        Event::update_node_state(node, Event::OnHandshakeReq);
-        if let Some(socket) = P2pMgr::get_peer(old_node_hash) {
-            P2pMgr::add_peer(node.clone(), &socket);
+            let mut tx = node.tx.clone();
+            match tx.try_send(cb_out) {
+                Ok(_) => trace!(target: "p2p", "succeed sending handshake res"),
+                Err(err) => {
+                    error!(target: "p2p", "failed sending handshake res: {:?}", err);
+                }
+            }
         }
     }
-
-    P2pMgr::send(node.node_hash, res);
-    P2pMgr::remove_peer(old_node_hash);
 }
 
-pub fn receive_res(node: &mut Node, req: ChannelBuffer) {
-    trace!(target: "net", "HANDSHAKERES received.");
+/// 1. decode handshake res msg
+/// 2. update outbound node to active
+pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
+    debug!(target: "p2p", "handshake/receive_res");
 
-    let (_, revision) = req.body.split_at(1);
+    let (_, revision) = cb_in.body.split_at(1);
     let (revision_len, rest) = revision.split_at(1);
     let revision_len = revision_len[0] as usize;
-    let (revision, _rest) = rest.split_at(revision_len);
-    if revision_len > MAX_REVISION_LENGTH {
-        node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
-    } else {
-        node.revision[0..revision_len].copy_from_slice(revision);
-    }
+    let (revision_bytes, _rest) = rest.split_at(revision_len);
 
-    Event::update_node_state(node, Event::OnHandshakeRes);
-    P2pMgr::update_node(node.node_hash, node);
+    if let Ok(mut write) = p2p.nodes.try_write() {
+        if let Some(mut node) = write.get_mut(&hash) {
+            // TODO: math::low
+            if revision_len > MAX_REVISION_LENGTH {
+                node.revision[0..MAX_REVISION_LENGTH]
+                    .copy_from_slice(&revision_bytes[..MAX_REVISION_LENGTH]);
+            } else {
+                node.revision[0..revision_len].copy_from_slice(revision_bytes);
+            }
+            node.state = STATE::ACTIVE;
+        }
+    }
 }

@@ -19,15 +19,10 @@
  *
  ******************************************************************************/
 
-pub mod active_nodes;
-pub mod handshake;
+use msg::ChannelBuffer;
 
-use super::{ChannelBuffer,PROTOCAL_VERSION,Module};
-
-fn channel_buffer_template(action: u8) -> ChannelBuffer {
-    ChannelBuffer::new1(PROTOCAL_VERSION, Module::P2P.value(), action, 0u32)
-}
-
-fn channel_buffer_template_with_version(version: u16, action: u8) -> ChannelBuffer {
-    ChannelBuffer::new1(version, Module::P2P.value(), action, 0u32)
+pub trait Callable: Sync + Send {
+    fn handle(&self, hash: u64, cb: ChannelBuffer);
+    // signal to external (sync) for disconnect event
+    fn disconnect(&self, hash: u64);
 }
