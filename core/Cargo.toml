@@ -40,6 +40,7 @@ rlp_compress = { path = "../util/rlp_compress" }
 rlp_derive = { path = "../util/rlp_derive" }
 util-error = { path = "../util/error" }
 stop-guard = { path = "../util/stop-guard" }
+fixed-point = { path = "../util/fixed_point" }
 rustc-hex = "1.0"
 stats = { path = "../util/stats" }
 time = "0.1"
@@ -63,6 +64,7 @@ futures = "0.1.6"
 tokio = "0.1.11"
 rand = "0.5.5"
 ctrlc = { git = "https://github.com/paritytech/rust-ctrlc.git" }
+delta-calc = { path = "../util/delta-calc" }
 
 [dev-dependencies]
 tempdir = "*"

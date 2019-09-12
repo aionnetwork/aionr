@@ -4,3 +4,4 @@ version = "0.1.0"
 authors = ["Camus Qiu <camus@aion.network>"]
 
 [dependencies]
+num-bigint = "0.2"

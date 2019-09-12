@@ -39,6 +39,8 @@ use std::cmp;
 use std::sync::Mutex;
 use types::BlockNumber;
 use equihash::EquihashValidator;
+use fixed_point::{FixedPoint};
+
 use self::dependent_header_validators::{
     DependentHeaderValidator,
     NumberValidator,
@@ -53,9 +55,19 @@ use self::header_validators::{
 };
 use self::grand_parent_header_validators::{GrandParentHeaderValidator, DifficultyValidator};
 use self::pos_validator::PoSValidator;
+use num_bigint::BigUint;
 
 const ANNUAL_BLOCK_MOUNT: u64 = 3110400;
 const COMPOUND_YEAR_MAX: u64 = 128;
+
+// Our barrier should be log2*20 = 13.862943611,
+// but we only compare it against integer values, so we use 14
+const BARRIER: u64 = 14;
+
+lazy_static! {
+    static ref DIFF_INC_RATE: FixedPoint = FixedPoint::from_str_radix("1.05", 10).unwrap();
+    static ref DIFF_DEC_RATE: FixedPoint = FixedPoint::from_str_radix("0.952381", 10).unwrap();
+}
 
 #[derive(Debug, PartialEq)]
 pub struct UnityEngineParams {
@@ -107,10 +119,10 @@ impl From<ajson::spec::UnityEngineParams> for UnityEngineParams {
 /// Difficulty calculator. TODO: impl mfc trait.
 pub struct DifficultyCalc {
     difficulty_bound_divisor: U256,
-    difficulty_bound_divisor_unity: u64,
+    //    difficulty_bound_divisor_unity: u64,
     block_time_lower_bound: u64,
     block_time_upper_bound: u64,
-    block_time_unity: u64,
+    //    block_time_unity: u64,
     minimum_difficulty: U256,
     unity_update: Option<BlockNumber>,
     unity_initial_pos_difficulty: Option<U256>,
@@ -125,11 +137,11 @@ impl DifficultyCalc {
     {
         DifficultyCalc {
             difficulty_bound_divisor: params.difficulty_bound_divisor,
-            difficulty_bound_divisor_unity: params.difficulty_bound_divisor_unity,
+            //            difficulty_bound_divisor_unity: params.difficulty_bound_divisor_unity,
             block_time_lower_bound: params.block_time_lower_bound,
             block_time_upper_bound: params.block_time_upper_bound,
             minimum_difficulty: params.minimum_difficulty,
-            block_time_unity: params.block_time_unity,
+            //            block_time_unity: params.block_time_unity,
             unity_update: unity_update,
             unity_initial_pos_difficulty: unity_initial_pos_difficulty,
         }
@@ -204,32 +216,42 @@ impl DifficultyCalc {
 
     // Aion 2.0 (Unity) difficulty adjusmtnet algorithm (PoS and PoW hybrid)
     fn calculate_difficulty_v2(&self, parent: &Header, grand_parent: &Header) -> U256 {
-        let parent_difficulty = parent.difficulty();
+        let parent_difficulty = parent.difficulty().clone();
         let parent_timestamp = parent.timestamp();
         let grand_parent_timestamp = grand_parent.timestamp();
         let delta_time = parent_timestamp - grand_parent_timestamp;
         assert!(delta_time > 0);
 
         // TODO-Unity: To refine floating calculation
-        let alpha = 1f64 / (self.difficulty_bound_divisor_unity as f64);
-        let lambda = 1f64 / (2f64 * self.block_time_unity as f64);
-        let diff = match (delta_time as f64) - (-0.5f64.ln() / lambda) {
-            res if res > 0f64 => {
-                cmp::min(
-                    parent_difficulty.as_u64() - 1,
-                    (parent_difficulty.as_u64() as f64 / (1f64 + alpha)) as u64,
-                )
+        //        let lambda = 1f64 / (2f64 * self.block_time_unity as f64);
+        //        let diff = match (delta_time as f64) - (-0.5f64.ln() / lambda) {
+
+        let diff: U256 = match delta_time >= BARRIER{
+            true => {
+                DIFF_DEC_RATE.multiply_uint(parent_difficulty.into()).to_big_uint().into()
             }
-            res if res < 0f64 => {
-                cmp::max(
-                    parent_difficulty.as_u64() + 1,
-                    (parent_difficulty.as_u64() as f64 * (1f64 + alpha)) as u64,
-                )
+            false => {
+                let temp :U256 = DIFF_INC_RATE.multiply_uint(parent_difficulty.into()).to_big_uint().into();
+                if temp == parent_difficulty {
+                    temp + 1u64.into()
+                } else {
+                    temp
+                }
             }
-            _ => parent_difficulty.as_u64(),
+//            _ => parent_difficulty.as_u64(),
         };
 
-        cmp::max(self.minimum_difficulty, U256::from(diff))
+        match parent.seal_type() {
+            None | Some(SealType::PoW) => cmp::max(self.minimum_difficulty, diff),
+            // TODO：
+            Some(SealType::PoS) => {
+                cmp::max(
+                    self.unity_initial_pos_difficulty
+                        .unwrap_or(2_000_000_000u64.into()),
+                    diff,
+                )
+            }
+        }
     }
 }
 
@@ -467,7 +489,7 @@ impl Engine for Arc<UnityEngine> {
         &self,
         header: &Header,
         seal_parent: Option<&Header>,
-        stake: Option<u64>,
+        stake: Option<BigUint>,
     ) -> Result<(), Error>
     {
         if self

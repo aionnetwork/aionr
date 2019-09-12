@@ -32,6 +32,7 @@ extern crate crunchy;
 extern crate uint as uint_crate;
 #[macro_use]
 extern crate fixed_hash;
+extern crate num_bigint;
 
 #[cfg(feature = "serialize")]
 extern crate ethereum_types_serialize;

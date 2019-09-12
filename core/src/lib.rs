@@ -78,6 +78,8 @@ extern crate tiny_keccak;
 extern crate num_bigint;
 extern crate bytebuffer;
 extern crate avm_abi;
+extern crate fixed_point;
+extern crate delta_calc;
 
 #[cfg(test)]
 extern crate fastvm;

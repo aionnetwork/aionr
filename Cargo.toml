@@ -87,6 +87,7 @@ members = [
 "util/unexpected",
 "util/using_queue",
 "util/version",
+"util/fixed_point",
 "vms"
 ]
 

@@ -38,6 +38,7 @@ use verification::queue::QueueInfo as BlockQueueInfo;
 use aion_types::{H256, H128, U256, Address};
 use vms::LastHashes;
 use acore_bytes::Bytes;
+use num_bigint::BigUint;
 
 use types::ids::*;
 use types::call_analytics::CallAnalytics;
@@ -225,7 +226,7 @@ pub trait BlockChainClient: Sync + Send {
         block: BlockId,
     ) -> Result<Vec<Executed>, CallError>;
 
-    fn get_stake(&self, a: &H256, ca: Option<Address>) -> Option<u64>;
+    fn get_stake(&self, a: &H256, ca: Option<Address>) -> Option<BigUint>;
 
     /// Estimates how much gas will be necessary for a call.
     fn estimate_gas(&self, t: &SignedTransaction, block: BlockId) -> Result<U256, CallError>;
