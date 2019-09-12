@@ -19,17 +19,13 @@
  *
  ******************************************************************************/
 
-use std::cmp::max;
-
 use header::{Header, SealType};
 use types::error::{BlockError, Error};
 use unexpected::Mismatch;
 use rcrypto::ed25519::verify;
-use blake2b::blake2b;
 use num::Zero;
 use num_bigint::BigUint;
-use num::ToPrimitive;
-use fixed_point::{FixedPoint,LogApproximator};
+use delta_calc::calculate_delta;
 
 pub struct PoSValidator;
 impl PoSValidator {
@@ -95,18 +91,9 @@ impl PoSValidator {
         let difficulty = header.difficulty().clone();
         let timestamp = header.timestamp();
         let parent_timestamp = seal_parent_header.map_or(0, |h| h.timestamp());
-        let hash_of_seed = blake2b(&seed[..]);
-        let a = BigUint::parse_bytes(
-            b"10000000000000000000000000000000000000000000000000000000000000000",
-            16,
-        )
-        .unwrap();
-        let u = FixedPoint::ln(&a)
-            .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
-            .expect("H256 should smaller than 2^256");
-        let delta: BigUint =
-            u.multiply_uint(difficulty.into()).to_big_uint() / BigUint::from(stake);
-        let delta_uint: u64 = max(1u64, delta.to_u64().unwrap_or(u64::max_value()));
+
+        let delta_uint = calculate_delta(difficulty, &seed, stake.clone());
+
         if timestamp - parent_timestamp < delta_uint {
             Err(BlockError::InvalidPoSTimestamp(timestamp, parent_timestamp, delta_uint).into())
         } else {

@@ -24,7 +24,6 @@ use std::collections::{BTreeMap, HashSet, HashMap};
 use std::sync::Arc;
 use std::time::{self, Duration, Instant, SystemTime, UNIX_EPOCH};
 use std::thread;
-use std::cmp::max;
 use std::ops::Deref;
 use std::hash::{Hash, Hasher};
 
@@ -62,9 +61,7 @@ use rcrypto::ed25519;
 use key::Ed25519KeyPair;
 use num::Zero;
 use num_bigint::BigUint;
-use blake2b::blake2b;
-use fixed_point::{FixedPoint,LogApproximator};
-use num::ToPrimitive;
+use delta_calc::calculate_delta;
 
 struct Seed([u8; 64]);
 
@@ -395,25 +392,9 @@ impl Miner {
         // TODO-Unity: don't use floating number to calculate this
         // \Delta = \frac{d_s \cdot ln({2^{256}}/{hash(seed)})}{V}.
         let new_seed = ed25519::signature(&seed, &sk);
-        let hash_of_seed = blake2b(&new_seed[..]);
-        let a = BigUint::parse_bytes(
-            b"10000000000000000000000000000000000000000000000000000000000000000",
-            16,
-        )
-        .unwrap();
-        //        let b = BigUint::from_bytes_be(&hash_of_seed[..]);
-        //        let u = ln(&a).unwrap() - ln(&b).unwrap();
-        //        let delta = (difficulty.as_u64() as f64) * u / (stake as f64);
 
-        let u = FixedPoint::ln(&a)
-            .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
-            .expect("H256 should smaller than 2^256");
-        let delta: BigUint =
-            u.multiply_uint(difficulty.into()).to_big_uint() / BigUint::from(stake.clone());
-        let delta_uint: u64 = max(1u64, delta.to_u64().unwrap_or(u64::max_value()));
+        let delta_uint = calculate_delta(difficulty, &new_seed, stake.clone());
 
-        trace!(target: "staker", "Staking...difficulty: {}, u: {:?}, stake: {}, delta: {}",
-               difficulty.as_u64(), u.to_big_decimal(), stake, delta_uint);
         let new_timestamp = timestamp + delta_uint;
 
         // 6. Determine if we can produce a new PoS block or not
@@ -1449,24 +1430,8 @@ impl MinerService for Miner {
 
         debug!(target: "miner", "new block difficulty = {:?}", difficulty);
 
-        let hash_of_seed = blake2b(&seed[..]);
-        let a = BigUint::parse_bytes(
-            b"10000000000000000000000000000000000000000000000000000000000000000",
-            16,
-        )
-        .unwrap();
-        //        let b = BigUint::from_bytes_be(&hash_of_seed[..]);
-        //        let u = ln(&a).unwrap() - ln(&b).unwrap();
-        //        let delta = (difficulty.as_u64() as f64) * u / (stake as f64);
+        let delta_uint = calculate_delta(difficulty, &seed, stake.clone());
 
-        let u = FixedPoint::ln(&a)
-            .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
-            .expect("H256 should smaller than 2^256");
-        let delta: BigUint = u.multiply_uint(difficulty.into()).to_big_uint() / stake.clone();
-        let delta_uint: u64 = max(1u64, delta.to_u64().unwrap_or(u64::max_value()));
-
-        trace!(target: "staker", "Staking...difficulty: {}, u: {:?}, stake: {}, delta: {}",
-               difficulty.as_u64(), u.to_big_decimal(), stake, delta_uint);
         let new_timestamp = timestamp + delta_uint;
 
         let (raw_block, _): (ClosedBlock, Option<H256>) = self.prepare_block(
