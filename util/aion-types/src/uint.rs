@@ -178,6 +178,26 @@ impl U256 {
     #[inline(always)]
     #[cfg(not(all(asm_available, target_arch = "x86_64")))]
     pub fn full_mul(self, other: U256) -> U512 { U512(uint_full_mul_reg!(U256, 4, self, other)) }
+
+    pub fn as_f64(self) -> f64 {
+        if self == U256::zero() {
+            return 0f64;
+        }
+        let bits = self.bits();
+        let exp = (bits as u64 - 2 + 0x3ff) << 52;
+        let t1;
+        if bits == 53 {
+            t1 = self;
+        } else if bits > 53 {
+            t1 = self >> (bits - 53);
+        } else {
+            t1 = self << (53 - bits);
+        }
+
+        let t2 = t1.as_u64() + exp;
+
+        f64::from_bits(t2)
+    }
 }
 
 impl From<U256> for U512 {
@@ -412,5 +432,14 @@ mod test {
         assert_eq!(b, BigUint::from(258u64));
         let c: U256 = b.into();
         assert_eq!(c, U256::from(258u64));
+    }
+
+    #[test]
+    fn test_as_f64() {
+        let a = U256::from("123456789abcdef01234567");
+        let a_s = format!("{}", a);
+        let f = a.as_f64();
+        let f_s = format!("{}", f);
+        assert_eq!(a_s[..15], f_s[..15]);
     }
 }

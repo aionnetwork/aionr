@@ -339,7 +339,7 @@ where
         let mut miner_hashrate = 0_f64;
 
         if block_time > 0 {
-            network_hashrate = latest_difficulty.as_u64() as f64 / block_time as f64;
+            network_hashrate = latest_difficulty.as_f64() / block_time as f64;
         }
 
         // hashrate shared by miner: mined blocks / total blocks

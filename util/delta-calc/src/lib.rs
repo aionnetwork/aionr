@@ -48,7 +48,7 @@ lazy_static! {
 pub fn calculate_delta(difficulty: U256, seed: &[u8], stake: BigUint) -> u64 {
     let hash_of_seed = blake2b(&seed[..]);
     trace!(target: "delta_calc", "difficulty: {:?}, hash: {}, stake: {}",
-           difficulty.as_u64(), hash_of_seed, stake);
+           difficulty, hash_of_seed, stake);
 
     let u = LN_BOUNDARY
         .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
@@ -58,4 +58,14 @@ pub fn calculate_delta(difficulty: U256, seed: &[u8], stake: BigUint) -> u64 {
     // use 1000000000 when delta overflow in to_u64()
     // there must be a new block generated during this 1000000000 seconds
     ::std::cmp::max(1u64, delta.to_u64().unwrap_or(1000000000u64))
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_calculate_delta() {
+
+        //        assert_eq!(calculate_delta());
+    }
 }
