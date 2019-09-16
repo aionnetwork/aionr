@@ -332,7 +332,7 @@ impl Sync {
         // Shutdown p2p
         &self.p2p.clear_callback();
         &self.p2p.shutdown();
-        debug!(target:"sync", "sync shutdown start");
+        info!(target:"sync", "sync shutdown start");
         // Shutdown runtime tasks
         let mut shutdown_hooks = self.shutdown_hooks.lock();
         while !shutdown_hooks.is_empty() {
@@ -342,7 +342,7 @@ impl Sync {
                         debug!(target: "sync", "shutdown signal sent");
                     }
                     Err(err) => {
-                        warn!(target: "sync", "shutdown: {:?}", err);
+                        debug!(target: "sync", "shutdown err: {:?}", err);
                     }
                 }
             }
