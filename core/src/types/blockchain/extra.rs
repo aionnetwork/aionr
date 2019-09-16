@@ -27,6 +27,7 @@ use types::blooms::{GroupPosition, BloomGroup};
 use db::Key;
 use header::BlockNumber;
 use receipt::Receipt;
+use rlp::*;
 
 use heapsize::HeapSizeOf;
 use aion_types::{H256, H264, U256};
@@ -117,22 +118,50 @@ impl Key<BlockReceipts> for H256 {
 }
 
 /// Familial details concerning a block
-#[derive(Debug, Clone, RlpEncodable, RlpDecodable)]
+#[derive(Debug, Clone, RlpEncodable)]
 pub struct BlockDetails {
     /// Block number
     pub number: BlockNumber,
     /// Total difficulty of the block and all its parents
     pub total_difficulty: U256,
-    /// PoW total difficulty of all the PoW block till this block
-    pub pow_total_difficulty: U256,
-    /// PoS total difficulty of all the PoS block till this block
-    pub pos_total_difficulty: U256,
     /// Parent block hash
     pub parent: H256,
     /// List of children block hashes
     pub children: Vec<H256>,
+    /// PoW total difficulty of all the PoW block till this block
+    pub pow_total_difficulty: U256,
+    /// PoS total difficulty of all the PoS block till this block
+    pub pos_total_difficulty: U256,
     /// The anti seal parent hash
     pub anti_seal_parent: Option<H256>,
+}
+
+impl Decodable for BlockDetails {
+    fn decode(r: &UntrustedRlp) -> Result<Self, DecoderError> {
+        let mut block_details = BlockDetails {
+            number: r.val_at::<BlockNumber>(0)?,
+            total_difficulty: r.val_at::<U256>(1)?,
+            parent: r.val_at(2)?,
+            children: r.list_at(3)?,
+            pow_total_difficulty: r.val_at::<U256>(1)?,
+            pos_total_difficulty: U256::zero(),
+            anti_seal_parent: None,
+        };
+
+        // AION 2.0 Unity specific fields
+        let count = r.item_count()?;
+        if count >= 5 {
+            block_details.pow_total_difficulty = r.val_at::<U256>(4)?;
+        }
+        if count >= 6 {
+            block_details.pos_total_difficulty = r.val_at::<U256>(5)?;
+        }
+        if count >= 7 {
+            block_details.anti_seal_parent = r.val_at(6)?;
+        }
+
+        Ok(block_details)
+    }
 }
 
 impl HeapSizeOf for BlockDetails {

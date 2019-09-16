@@ -648,10 +648,10 @@ impl BlockChain {
                 let details = BlockDetails {
                     number: header.number(),
                     total_difficulty: header.difficulty(),
-                    pow_total_difficulty: header.difficulty(),
-                    pos_total_difficulty: Default::default(),
                     parent: header.parent_hash(),
                     children: vec![],
+                    pow_total_difficulty: header.difficulty(),
+                    pos_total_difficulty: Default::default(),
                     anti_seal_parent: None,
                 };
 
@@ -1002,10 +1002,10 @@ impl BlockChain {
             let block_details = BlockDetails {
                 number: header.number(),
                 total_difficulty: info.total_difficulty,
-                pow_total_difficulty: info.pow_total_difficulty,
-                pos_total_difficulty: info.pos_total_difficulty,
                 parent: header.parent_hash(),
                 children: Vec::new(),
+                pow_total_difficulty: info.pow_total_difficulty,
+                pos_total_difficulty: info.pos_total_difficulty,
                 // TODO-Unity: Need more thoughts whether anti_seal_parent works for unordered insert
                 anti_seal_parent: None,
             };
@@ -1383,10 +1383,10 @@ impl BlockChain {
         let details = BlockDetails {
             number: header.number(),
             total_difficulty: info.total_difficulty,
-            pow_total_difficulty: info.pow_total_difficulty,
-            pos_total_difficulty: info.pos_total_difficulty,
             parent: parent_hash,
             children: vec![],
+            pow_total_difficulty: info.pow_total_difficulty,
+            pos_total_difficulty: info.pos_total_difficulty,
             anti_seal_parent: anti_seal_parent,
         };
 

@@ -446,10 +446,10 @@ mod tests {
                 BlockDetails {
                     number: header.number(),
                     total_difficulty: header.difficulty().clone(),
-                    pow_total_difficulty: header.difficulty().clone(),
-                    pos_total_difficulty: header.difficulty().clone(),
                     parent: header.parent_hash().clone(),
                     children: Vec::new(),
+                    pow_total_difficulty: header.difficulty().clone(),
+                    pos_total_difficulty: header.difficulty().clone(),
                     anti_seal_parent: None,
                 }
             })
