@@ -360,8 +360,11 @@ impl BlockProvider for BlockChain {
                 Some(details) => details,
                 None => return None,
             };
-            let anti_seal_parent: H256 = parent_details.anti_seal_parent;
-            self.block_header_data(&anti_seal_parent)
+            if let Some(anti_seal_parent) = parent_details.anti_seal_parent {
+                self.block_header_data(&anti_seal_parent)
+            } else {
+                None
+            }
         }
     }
 
@@ -378,8 +381,11 @@ impl BlockProvider for BlockChain {
                 Some(details) => details,
                 None => return None,
             };
-            let anti_seal_parent: H256 = block_details.anti_seal_parent;
-            self.block_header_data(&anti_seal_parent)
+            if let Some(anti_seal_parent) = block_details.anti_seal_parent {
+                self.block_header_data(&anti_seal_parent)
+            } else {
+                None
+            }
         }
     }
 
@@ -646,7 +652,7 @@ impl BlockChain {
                     pos_total_difficulty: Default::default(),
                     parent: header.parent_hash(),
                     children: vec![],
-                    anti_seal_parent: H256::default(),
+                    anti_seal_parent: None,
                 };
 
                 let mut batch = DBTransaction::new();
@@ -1000,7 +1006,8 @@ impl BlockChain {
                 pos_total_difficulty: info.pos_total_difficulty,
                 parent: header.parent_hash(),
                 children: Vec::new(),
-                anti_seal_parent: H256::default(),
+                // TODO-Unity: Need more thoughts whether anti_seal_parent works for unordered insert
+                anti_seal_parent: None,
             };
 
             let mut update = HashMap::new();
@@ -1366,10 +1373,10 @@ impl BlockChain {
             .block_header_data(&parent_hash)
             .expect("block's should always have a parent.");
         let parent_seal_type: SealType = parent_header.seal_type().to_owned().unwrap_or_default();
-        let anti_seal_parent_hash: H256 = if seal_type == parent_seal_type {
+        let anti_seal_parent = if seal_type == parent_seal_type {
             parent_details.anti_seal_parent.to_owned()
         } else {
-            parent_hash
+            Some(parent_hash)
         };
 
         // create current block details.
@@ -1380,7 +1387,7 @@ impl BlockChain {
             pos_total_difficulty: info.pos_total_difficulty,
             parent: parent_hash,
             children: vec![],
-            anti_seal_parent: anti_seal_parent_hash,
+            anti_seal_parent: anti_seal_parent,
         };
 
         // write to batch
