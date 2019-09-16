@@ -27,3 +27,7 @@ disable = true
 disable = true
 port = 8008
 interface = "0.0.0.0"
+
+[mining]
+author = "0xa07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137"
+staker_private_key = "0xcc76648ce8798bc18130bc9d637995e5c42a922ebeab78795fac58081b9cf9d4"

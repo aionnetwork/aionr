@@ -413,8 +413,11 @@ mod tests {
                     Some(details) => details,
                     None => return None,
                 };
-                let anti_seal_parent: H256 = parent_details.anti_seal_parent;
-                self.block_header_data(&anti_seal_parent)
+                if let Some(anti_seal_parent) = parent_details.anti_seal_parent {
+                    self.block_header_data(&anti_seal_parent)
+                } else {
+                    None
+                }
             }
         }
 
@@ -447,7 +450,7 @@ mod tests {
                     pos_total_difficulty: header.difficulty().clone(),
                     parent: header.parent_hash().clone(),
                     children: Vec::new(),
-                    anti_seal_parent: H256::zero(),
+                    anti_seal_parent: None,
                 }
             })
         }
