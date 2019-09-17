@@ -226,6 +226,7 @@ impl From<ajson::transaction::Transaction> for UnverifiedTransaction {
             timestamp: t.timestamp.into(),
             sig: t.sig.into(),
             hash: 0.into(),
+            beacon: None,
         }
         .compute_hash()
     }
@@ -264,6 +265,7 @@ impl Transaction {
             timestamp,
             sig: sig.to_vec(),
             hash: 0.into(),
+            beacon: None,
         }
         .compute_hash()
     }
@@ -276,6 +278,7 @@ impl Transaction {
             timestamp: vec![0x00; 8],
             sig: vec![0u8; 96],
             hash: 0.into(),
+            beacon: None,
         }
         .compute_hash()
     }
@@ -288,6 +291,7 @@ impl Transaction {
                 timestamp: vec![0x00; 8],
                 sig: vec![1u8; 96],
                 hash: 0.into(),
+                beacon: None,
             }
             .compute_hash(),
             sender: from,
@@ -324,6 +328,8 @@ pub struct UnverifiedTransaction {
     /// Timestamp.
     /// It is a 8-bytes array shown the time of the transaction signed by the kernel, the unit is nanosecond.
     timestamp: Bytes,
+    /// Beacon
+    beacon: Option<H256>,
 }
 
 impl Deref for UnverifiedTransaction {
@@ -334,7 +340,8 @@ impl Deref for UnverifiedTransaction {
 
 impl rlp::Decodable for UnverifiedTransaction {
     fn decode(d: &UntrustedRlp) -> Result<Self, DecoderError> {
-        if d.item_count()? != 9 {
+        let count = d.item_count()?;
+        if count != 9 && count != 10 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
         let hash = blake2b(d.as_raw());
@@ -376,6 +383,14 @@ impl rlp::Decodable for UnverifiedTransaction {
             timestamp: d.val_at(4)?,
             sig: d.val_at(8)?,
             hash: hash,
+            beacon: match count {
+                9 => None,
+                10 => Some(d.val_at(9)?),
+                _ => {
+                    error!(target: "tx", "should not be reached!!");
+                    return Err(DecoderError::RlpIncorrectListLen);
+                }
+            },
         })
     }
 }
@@ -401,6 +416,9 @@ impl UnverifiedTransaction {
         }
         true
     }
+
+    /// Set beacon hash
+    fn _set_beacon(&mut self, hash: H256) { self.beacon = Some(hash) }
 
     /// Append object with a signature into RLP stream
     fn rlp_append_sealed_transaction(&self, s: &mut RlpStream) {
@@ -430,6 +448,9 @@ impl UnverifiedTransaction {
         }
         s.append(&self.transaction_type);
         s.append(&self.sig);
+        if let Some(ref hash) = &self.beacon {
+            s.append(hash);
+        }
     }
 
     ///    Reference to unsigned part of this transaction.
@@ -748,6 +769,7 @@ mod tests {
             sig: Vec::new(),
             hash: H256::zero(),
             timestamp: Vec::new(),
+            beacon: None,
         };
         let r = ut.verify_basic(Some(0));
         assert!(r.is_err());
@@ -780,6 +802,7 @@ mod tests {
             sig: Vec::new(),
             hash: H256::zero(),
             timestamp: Vec::new(),
+            beacon: None,
         };
         let r = ut.verify_basic(Some(0));
         assert!(r.is_err());
