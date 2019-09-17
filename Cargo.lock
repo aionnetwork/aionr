@@ -110,7 +110,7 @@ dependencies = [
  "acore 0.1.0",
  "acore-bytes 0.1.0",
  "aion-types 0.1.0",
- "aion-version 0.2.5",
+ "aion-version 0.2.6-1",
  "ansi_term 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "blake2b 0.1.0",
  "ethbloom 0.5.1",
@@ -154,7 +154,7 @@ dependencies = [
 
 [[package]]
 name = "aion-version"
-version = "0.2.5"
+version = "0.2.6-1"
 dependencies = [
  "rustc_version 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
  "target_info 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -164,14 +164,14 @@ dependencies = [
 
 [[package]]
 name = "aionr"
-version = "0.2.5"
+version = "0.2.6-1"
 dependencies = [
  "acore 0.1.0",
  "acore-bytes 0.1.0",
  "acore-io 0.1.0",
  "aion-rpc 0.1.0",
  "aion-types 0.1.0",
- "aion-version 0.2.5",
+ "aion-version 0.2.6-1",
  "ansi_term 0.10.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "blake2b 0.1.0",
  "clap 2.32.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -1394,7 +1394,7 @@ version = "0.1.0"
 dependencies = [
  "acore-bytes 0.1.0",
  "aion-types 0.1.0",
- "aion-version 0.2.5",
+ "aion-version 0.2.6-1",
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
  "bytes 0.4.9 (registry+https://github.com/rust-lang/crates.io-index)",
