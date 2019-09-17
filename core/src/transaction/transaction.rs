@@ -832,6 +832,7 @@ mod tests {
         //                sig: Vec::new(),
         //                hash: H256::zero(),
         //                timestamp: Vec::new(),
+        //                beacon: None
         //        };
         //        println!("{}", rlp::encode(&ut).to_hex());
         let t: UnverifiedTransaction = rlp::decode(&::rustc_hex::FromHex::from_hex("f101a0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe808426121ff080825207820bb80180").unwrap());
@@ -870,6 +871,7 @@ mod tests {
         //                sig: Vec::new(),
         //                hash: H256::zero(),
         //                timestamp: Vec::new(),
+        //                beacon: None
         //        };
         let t: UnverifiedTransaction = rlp::decode(&::rustc_hex::FromHex::from_hex("f201a0fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffe808426121ff080831e8481820bb80180").unwrap());
         let r = t.verify_basic(Some(0));
@@ -907,6 +909,7 @@ mod tests {
         //                sig: Vec::new(),
         //                hash: H256::zero(),
         //                timestamp: Vec::new(),
+        //                beacon: None
         //        };
         let t: UnverifiedTransaction = rlp::decode(
             &::rustc_hex::FromHex::from_hex("d20180808426121ff08083030d3f820bb80180").unwrap(),
@@ -946,6 +949,7 @@ mod tests {
         //                sig: Vec::new(),
         //                hash: H256::zero(),
         //                timestamp: Vec::new(),
+        //                beacon: None
         //        };
         let t: UnverifiedTransaction = rlp::decode(
             &::rustc_hex::FromHex::from_hex("d20180808426121ff080834c4b41820bb80180").unwrap(),
@@ -995,6 +999,7 @@ mod tests {
         //                sig: Vec::new(),
         //                hash: H256::zero(),
         //                timestamp: Vec::new(),
+        //                beacon: None
         //        };
         let t: UnverifiedTransaction = rlp::decode(&::rustc_hex::FromHex::from_hex("f8519f01111111111111111111111111111111111111111111111111111111111111a00000000000000000000000000000000000000000000000000000000000000000808426121ff080830f4240820bb80180").unwrap());
         let r = t.verify_basic(None);
@@ -1025,6 +1030,7 @@ mod tests {
         //                sig: Vec::new(),
         //                hash: H256::zero(),
         //                timestamp: Vec::new(),
+        //                beacon: None
         //        };
         let t: UnverifiedTransaction = rlp::decode(&::rustc_hex::FromHex::from_hex("f84c01a000000000000000000000000000000000000000000000000000000000000000009a11111111111111111111111111111111111111111111111111118426121ff080830f4240820bb80180").unwrap());
         let r = t.verify_basic(None);
@@ -1064,6 +1070,36 @@ mod tests {
         //     t.gas_price,
         //     U256::from("00000000000000000000000000000000000000000000000000000088FFFFFFFF")
         // );
+    }
+
+    #[test]
+    fn beacon_rlp_test() {
+        use aion_types::H256;
+        let t = Transaction {
+            action: Action::Call(SYSTEM_ADDRESS),
+            nonce: U256::from(1),
+            nonce_bytes: Vec::new(),
+            gas_price: U256::from(3000),
+            gas_bytes: Vec::new(),
+            gas: U256::from(21000),
+            gas_price_bytes: Vec::new(),
+            value: U256::from(0),
+            value_bytes: Vec::new(),
+            data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
+            transaction_type: 1u64.into(),
+        };
+
+        let ut = UnverifiedTransaction {
+            unsigned: t,
+            sig: Vec::new(),
+            hash: H256::zero(),
+            timestamp: Vec::new(),
+            beacon: Some(H256::from(233)),
+        };
+        let rlp = rlp::encode(&ut);
+        println!("{}", rlp.to_hex());
+        let t: UnverifiedTransaction = rlp::decode(&rlp.into_vec());
+        assert_eq!(ut.beacon, t.beacon);
     }
 
     #[test]
