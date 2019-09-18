@@ -159,14 +159,8 @@ impl Transaction {
     }
 
     /// Append object with a without signature into RLP stream
-    pub fn rlp_append_unsigned_transaction(
-        &self,
-        s: &mut RlpStream,
-        chain_id: Option<u64>,
-        timestamp: &Bytes,
-    )
-    {
-        s.begin_list(if chain_id.is_none() { 8 } else { 11 });
+    pub fn rlp_append_unsigned_transaction(&self, s: &mut RlpStream, timestamp: &Bytes) {
+        s.begin_list(8);
         if self.nonce_bytes.is_empty() {
             s.append(&self.nonce);
         } else {
@@ -191,11 +185,6 @@ impl Transaction {
             s.append(&self.gas_price_bytes);
         }
         s.append(&self.transaction_type);
-        if let Some(n) = chain_id {
-            s.append(&n);
-            s.append(&0u8);
-            s.append(&0u8);
-        }
     }
 }
 
@@ -234,32 +223,26 @@ impl From<ajson::transaction::Transaction> for UnverifiedTransaction {
 
 impl Transaction {
     /// The message hash of the transaction.
-    pub fn hash(&self, chain_id: Option<u64>, timestamp: &Bytes) -> H256 {
+    pub fn hash(&self, timestamp: &Bytes) -> H256 {
         let mut stream = RlpStream::new();
-        self.rlp_append_unsigned_transaction(&mut stream, chain_id, timestamp);
+        self.rlp_append_unsigned_transaction(&mut stream, timestamp);
         blake2b(stream.as_raw())
     }
 
     #[cfg(test)]
-    pub fn sign(self, key: &[u8], chain_id: Option<u64>) -> SignedTransaction {
+    pub fn sign(self, key: &[u8]) -> SignedTransaction {
         let timestamp = i64_to_bytes(to_epoch_micro());
         //        let sig = sign_with_secret(secret_from_slice(key), &self.hash(chain_id, &timestamp))
         //            .expect("data is valid and context has signing capabilities; qed");
         let key = Ed25519Secret::from_slice(key)
             .expect("key is valid and context has signing capabilities; qed");
-        let sig = sign_ed25519(&key, &self.hash(chain_id, &timestamp))
+        let sig = sign_ed25519(&key, &self.hash(&timestamp))
             .expect("data is valid and context has signing capabilities; qed");
-        SignedTransaction::new(self.with_signature(sig, chain_id, timestamp.to_vec()))
+        SignedTransaction::new(self.with_signature(sig, timestamp.to_vec()))
             .expect("secret is valid so it's recoverable")
     }
 
-    pub fn with_signature(
-        self,
-        sig: Ed25519Signature,
-        _chain_id: Option<u64>,
-        timestamp: Bytes,
-    ) -> UnverifiedTransaction
-    {
+    pub fn with_signature(self, sig: Ed25519Signature, timestamp: Bytes) -> UnverifiedTransaction {
         UnverifiedTransaction {
             unsigned: self,
             timestamp,
@@ -328,7 +311,9 @@ pub struct UnverifiedTransaction {
     /// Timestamp.
     /// It is a 8-bytes array shown the time of the transaction signed by the kernel, the unit is nanosecond.
     timestamp: Bytes,
-    /// Beacon
+    /// Extension id
+    //    ext_id: u8,
+    /// Extension data
     beacon: Option<H256>,
 }
 
@@ -383,6 +368,7 @@ impl rlp::Decodable for UnverifiedTransaction {
             timestamp: d.val_at(4)?,
             sig: d.val_at(8)?,
             hash: hash,
+            //            ext_id: d.val_at(9)?,
             beacon: match count {
                 9 => None,
                 10 => Some(d.val_at(9)?),
@@ -472,10 +458,7 @@ impl UnverifiedTransaction {
 
     /// Recovers the public key of the sender.
     pub fn recover_public(&self) -> Result<Ed25519Public, key::Error> {
-        recover_ed25519(
-            &self.signature(),
-            &self.unsigned.hash(self.chain_id(), &self.timestamp),
-        )
+        recover_ed25519(&self.signature(), &self.unsigned.hash(&self.timestamp))
     }
 
     /// Do basic validation, checking for valid signature and minimum gas,
@@ -1140,7 +1123,7 @@ mod tests {
             data: b"Hello!".to_vec(),
             transaction_type: U256::from(1),
         }
-        .sign(&key.secret(), None);
+        .sign(&key.secret());
         let mut slice = blake2b(key.public());
         slice[0] = 0xA0;
         assert_eq!(Address::from(slice), *t.sender());

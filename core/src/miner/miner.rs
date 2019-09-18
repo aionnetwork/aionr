@@ -1723,7 +1723,7 @@ mod tests {
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
         }
-        .sign(keypair.secret(), None)
+        .sign(keypair.secret())
     }
 
     fn default_gas_price() -> U256 { 0u64.into() }

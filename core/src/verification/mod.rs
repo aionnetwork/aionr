@@ -573,7 +573,7 @@ mod tests {
             value_bytes: Vec::new(),
             transaction_type: U256::from(1),
         }
-        .sign(keypair.secret(), None);
+        .sign(keypair.secret());
 
         let tr2 = Transaction {
             action: Action::Create,
@@ -588,7 +588,7 @@ mod tests {
             value_bytes: Vec::new(),
             transaction_type: U256::from(1),
         }
-        .sign(keypair.secret(), None);
+        .sign(keypair.secret());
 
         let good_transactions = [tr1.clone(), tr2.clone()];
 

@@ -229,7 +229,7 @@ where
                     gas_bytes: Vec::new(),
                     value_bytes: Vec::new(),
                 }
-                .sign(kp.secret(), None),
+                .sign(kp.secret()),
                 None,
                 true,
             )

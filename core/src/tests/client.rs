@@ -367,7 +367,7 @@ fn does_not_propagate_delayed_transactions() {
             value_bytes: Vec::new(),
             transaction_type: 0x01.into(),
         }
-        .sign(&secret, None),
+        .sign(&secret),
         Some(Condition::Number(2)),
     );
     let tx1 = PendingTransaction::new(
@@ -384,7 +384,7 @@ fn does_not_propagate_delayed_transactions() {
             value_bytes: Vec::new(),
             transaction_type: 0x01.into(),
         }
-        .sign(&secret, None),
+        .sign(&secret),
         None,
     );
     let client = generate_dummy_client(1);

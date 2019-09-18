@@ -183,16 +183,14 @@ impl<C: MiningBlockChainClient, M: MinerService> Dispatcher for FullDispatcher<C
     {
         if let Some(nonce) = filled.nonce {
             return Box::new(future::done(sign_transaction(
-                &*accounts, filled, None, nonce, password,
+                &*accounts, filled, nonce, password,
             )));
         }
 
         let state_nonce = self.state_nonce(&filled.from);
         let reserved = self.nonces.lock().reserve(filled.from, state_nonce);
 
-        Box::new(ProspectiveSigner::new(
-            accounts, filled, None, reserved, password,
-        ))
+        Box::new(ProspectiveSigner::new(accounts, filled, reserved, password))
     }
 
     fn enrich(&self, signed_transaction: SignedTransaction) -> RpcRichRawTransaction {
@@ -216,7 +214,6 @@ pub fn eth_data_hash(mut data: Bytes) -> H256 {
 fn sign_transaction(
     accounts: &AccountProvider,
     filled: FilledTransactionRequest,
-    chain_id: Option<u64>,
     nonce: U256,
     password: SignWith,
 ) -> Result<SignResult>
@@ -232,12 +229,12 @@ fn sign_transaction(
     );
 
     let timestamp = i64_to_bytes(to_epoch_micro());
-    let hash = t.hash(chain_id, &timestamp);
+    let hash = t.hash(&timestamp);
     let signature = signature(accounts, filled.from, hash, password)?;
 
     Ok((
         signature.map(|sig| {
-            SignedTransaction::new(t.with_signature(sig, chain_id, timestamp.to_vec())).expect(
+            SignedTransaction::new(t.with_signature(sig, timestamp.to_vec())).expect(
                 "Transaction was signed by AccountsProvider; it never produces invalid \
                  signatures; qed",
             )
@@ -256,7 +253,6 @@ enum ProspectiveSignerState {
 struct ProspectiveSigner {
     accounts: Arc<AccountProvider>,
     filled: FilledTransactionRequest,
-    chain_id: Option<u64>,
     reserved: nonce::Reserved,
     password: SignWith,
     state: ProspectiveSignerState,
@@ -268,7 +264,6 @@ impl ProspectiveSigner {
     pub fn new(
         accounts: Arc<AccountProvider>,
         filled: FilledTransactionRequest,
-        chain_id: Option<u64>,
         reserved: nonce::Reserved,
         password: SignWith,
     ) -> Self
@@ -282,7 +277,6 @@ impl ProspectiveSigner {
         ProspectiveSigner {
             accounts,
             filled,
-            chain_id,
             reserved,
             password,
             state: if is_unlocked_permanently || has_password {
@@ -299,7 +293,6 @@ impl ProspectiveSigner {
         sign_transaction(
             &*self.accounts,
             self.filled.clone(),
-            self.chain_id,
             *nonce,
             self.password.clone(),
         )

@@ -1559,12 +1559,12 @@ pub mod test {
 
     fn new_signed_tx(nonce: U256, gas_price: U256) -> SignedTransaction {
         let keypair = generate_keypair();
-        new_unsigned_tx(nonce, default_gas_val(), gas_price).sign(keypair.secret(), None)
+        new_unsigned_tx(nonce, default_gas_val(), gas_price).sign(keypair.secret())
     }
 
     fn new_signed_tx_with_gas(gas: U256, gas_price: U256) -> SignedTransaction {
         let keypair = generate_keypair();
-        new_unsigned_tx(default_nonce(), gas, gas_price).sign(keypair.secret(), None)
+        new_unsigned_tx(default_nonce(), gas, gas_price).sign(keypair.secret())
     }
 
     fn new_tx(nonce: U256, gas_price: U256, origin: TransactionOrigin) -> VerifiedTransaction {
@@ -1625,8 +1625,8 @@ pub mod test {
         );
         let keypair = generate_keypair();
         let secret = &keypair.secret();
-        let signed_tx1: SignedTransaction = unsigned_tx1.sign(secret, None).into();
-        let signed_tx2: SignedTransaction = unsigned_tx2.sign(secret, None).into();
+        let signed_tx1: SignedTransaction = unsigned_tx1.sign(secret).into();
+        let signed_tx2: SignedTransaction = unsigned_tx2.sign(secret).into();
         let tx1: VerifiedTransaction = VerifiedTransaction::new(signed_tx1, origin, None, 0, 0);
         let tx2: VerifiedTransaction = VerifiedTransaction::new(signed_tx2, origin, None, 0, 0);
         (tx1, tx2)
@@ -1645,8 +1645,8 @@ pub mod test {
 
         let keypair = generate_keypair();
         let secret = &keypair.secret();
-        let signed_tx1: SignedTransaction = unsigned_tx1.sign(secret, None).into();
-        let signed_tx2: SignedTransaction = unsigned_tx2.sign(secret, None).into();
+        let signed_tx1: SignedTransaction = unsigned_tx1.sign(secret).into();
+        let signed_tx2: SignedTransaction = unsigned_tx2.sign(secret).into();
         let tx1: VerifiedTransaction = VerifiedTransaction::new(signed_tx1, origin, None, 0, 0);
         let tx2: VerifiedTransaction = VerifiedTransaction::new(signed_tx2, origin, None, 0, 0);
         (tx1, tx2)
@@ -2289,13 +2289,13 @@ pub mod test {
         let kp = generate_keypair();
         let secret = kp.secret();
         let tx = new_unsigned_tx(123.into(), default_gas_val(), 1.into())
-            .sign(secret, None)
+            .sign(secret)
             .into();
         let tx1 = new_unsigned_tx(124.into(), default_gas_val(), 1.into())
-            .sign(secret, None)
+            .sign(secret)
             .into();
         let tx2 = new_unsigned_tx(125.into(), default_gas_val(), 1.into())
-            .sign(secret, None)
+            .sign(secret)
             .into();
         let tx = VerifiedTransaction::new(tx, TransactionOrigin::External, None, 0, 0);
         let tx1 = VerifiedTransaction::new(tx1, TransactionOrigin::External, None, 0, 0);
@@ -2551,12 +2551,11 @@ pub mod test {
         // given
         let mut txq = TransactionQueue::default();
         let keypair = generate_keypair();
-        let tx =
-            new_unsigned_tx(123.into(), default_gas_val(), 20.into()).sign(keypair.secret(), None);
+        let tx = new_unsigned_tx(123.into(), default_gas_val(), 20.into()).sign(keypair.secret());
         let tx2 = {
             let mut tx2 = (**tx).clone();
             tx2.gas_price = U256::from(21);
-            tx2.sign(keypair.secret(), None)
+            tx2.sign(keypair.secret())
         };
         let tx = VerifiedTransaction::new(tx, TransactionOrigin::External, None, 0, 0);
         let tx2 = VerifiedTransaction::new(tx2, TransactionOrigin::External, None, 0, 0);
@@ -2579,12 +2578,11 @@ pub mod test {
         // given
         let mut txq = TransactionQueue::default();
         let keypair = generate_keypair();
-        let tx =
-            new_unsigned_tx(123.into(), default_gas_val(), 10.into()).sign(keypair.secret(), None);
+        let tx = new_unsigned_tx(123.into(), default_gas_val(), 10.into()).sign(keypair.secret());
         let tx2 = {
             let mut tx2 = (**tx).clone();
             tx2.gas_price = U256::from(20);
-            tx2.sign(keypair.secret(), None)
+            tx2.sign(keypair.secret())
         };
         let tx = VerifiedTransaction::new(tx, TransactionOrigin::External, None, 0, 0);
         let tx2 = VerifiedTransaction::new(tx2, TransactionOrigin::External, None, 0, 0);
@@ -2606,17 +2604,16 @@ pub mod test {
         // given
         let mut txq = TransactionQueue::default();
         let keypair = generate_keypair();
-        let tx0 =
-            new_unsigned_tx(123.into(), default_gas_val(), 1.into()).sign(keypair.secret(), None);
+        let tx0 = new_unsigned_tx(123.into(), default_gas_val(), 1.into()).sign(keypair.secret());
         let tx1 = {
             let mut tx1 = (**tx0).clone();
             tx1.nonce = U256::from(124);
-            tx1.sign(keypair.secret(), None)
+            tx1.sign(keypair.secret())
         };
         let tx2 = {
             let mut tx2 = (**tx1).clone();
             tx2.gas_price = U256::from(200);
-            tx2.sign(keypair.secret(), None)
+            tx2.sign(keypair.secret())
         };
         let tx0 = VerifiedTransaction::new(tx0, TransactionOrigin::External, None, 0, 0);
         let tx1 = VerifiedTransaction::new(tx1, TransactionOrigin::External, None, 0, 0);
@@ -2796,10 +2793,10 @@ pub mod test {
             let tx3 = new_unsigned_tx(nonce + 2.into(), gas, 1.into());
 
             (
-                tx.sign(secret, None),
-                tx2.sign(secret, None),
-                tx2_2.sign(secret, None),
-                tx3.sign(secret, None),
+                tx.sign(secret),
+                tx2.sign(secret),
+                tx2_2.sign(secret),
+                tx3.sign(secret),
             )
         };
         let tx1 = VerifiedTransaction::new(tx1, TransactionOrigin::Local, None, 0, 0);
@@ -2890,10 +2887,8 @@ pub mod test {
         // given
         let keypair1 = generate_keypair();
         let keypair2 = generate_keypair();
-        let tx1 =
-            new_unsigned_tx(123.into(), default_gas_val(), 0.into()).sign(keypair1.secret(), None);
-        let tx2 =
-            new_unsigned_tx(123.into(), default_gas_val(), 0.into()).sign(keypair2.secret(), None);
+        let tx1 = new_unsigned_tx(123.into(), default_gas_val(), 0.into()).sign(keypair1.secret());
+        let tx2 = new_unsigned_tx(123.into(), default_gas_val(), 0.into()).sign(keypair2.secret());
         let mut txq = TransactionQueue::default();
         let tx1 = VerifiedTransaction::new(tx1, TransactionOrigin::External, None, 0, 0);
         let tx2 = VerifiedTransaction::new(tx2, TransactionOrigin::External, None, 0, 1);
@@ -2916,7 +2911,7 @@ pub mod test {
         // when
         for nonce in 123..130 {
             let tx = new_unsigned_tx(nonce.into(), default_gas_val(), default_gas_price())
-                .sign(keypair.secret(), None);
+                .sign(keypair.secret());
             let tx = VerifiedTransaction::new(tx, TransactionOrigin::External, None, 0, 0);
             txq.add(tx, &fetch_account).unwrap();
         }

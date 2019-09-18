@@ -288,6 +288,6 @@ mod tests {
             Default::default(),
             DEFAULT_TRANSACTION_TYPE,
         )
-        .sign(keypair.secret(), None)
+        .sign(keypair.secret())
     }
 }

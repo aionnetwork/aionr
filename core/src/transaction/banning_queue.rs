@@ -248,7 +248,7 @@ mod tests {
             "3331600055".from_hex().unwrap(),
             DEFAULT_TRANSACTION_TYPE,
         )
-        .sign(keypair.secret(), None);
+        .sign(keypair.secret());
 
         VerifiedTransaction::new(signed_transaction, origin, None, 0, 0)
     }
