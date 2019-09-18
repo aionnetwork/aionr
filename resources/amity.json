@@ -1,6 +1,6 @@
 {
-	"name": "Mastery",
-	"dataDir": "mastery_unity",
+	"name": "Amity",
+	"dataDir": "amity",
 	"engine": {
 		"UnityEngine": {
 			"params": {
