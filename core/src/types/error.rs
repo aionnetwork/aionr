@@ -108,6 +108,8 @@ pub enum BlockError {
     InvalidPoSSignature,
     /// Invalid PoS block author
     InvalidPoSAuthor,
+    /// Invalid future time stamp
+    InvalidFutureTimestamp(OutOfBounds<u64>),
 }
 
 impl fmt::Display for BlockError {
@@ -161,6 +163,13 @@ impl fmt::Display for BlockError {
             InvalidPoSSignature => "PoS block's signature verification failed.".into(),
             InvalidPoSAuthor => {
                 "PoS block's author does not match the public key provided in the seal.".into()
+            }
+            InvalidFutureTimestamp(ref oob) => {
+                format!(
+                    "Block timestamp is greater than local system time plus tolerance threshold. \
+                     {}",
+                    oob
+                )
             }
         };
 

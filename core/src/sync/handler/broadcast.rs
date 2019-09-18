@@ -37,6 +37,8 @@ use p2p::{ChannelBuffer,Mgr};
 use sync::action::Action;
 use sync::node_info::NodeInfo;
 use sync::storage::SyncStorage;
+use engine::unity_engine::UnityEngine;
+use acore_bytes::to_hex;
 
 use super::channel_buffer_template;
 
@@ -145,32 +147,42 @@ pub fn handle_broadcast_block(
             if client.block_header(BlockId::Hash(*parent_hash)).is_some() {
                 let mut imported_blocks_hashes = storage.imported_blocks_hashes().lock();
                 if !imported_blocks_hashes.contains_key(&hash) {
-                    let result = client.import_block(block_rlp.as_raw().to_vec());
-
+                    // Do basic header validation before proceed
+                    let result = UnityEngine::validate_block_header(&header);
                     match result {
-                        Ok(_) => {
-                            trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
-                            imported_blocks_hashes.insert(hash, 0);
-                            let active_nodes = p2p.get_active_nodes();
-                            for n in active_nodes.iter() {
-                                // Re-broadcast this block
-                                trace!(target: "sync", "Sync broadcast new block sent...");
-                                p2p.send(n.get_hash(), req.clone());
-                            }
-                        }
-                        Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
-                            trace!(target: "sync", "New block already in chain {:?}", hash);
-                        }
-                        Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
-                            trace!(target: "sync", "New block already queued {:?}", hash);
-                        }
-                        Err(BlockImportError::Block(BlockError::UnknownParent(p))) => {
-                            info!(target: "sync", "New block with unknown parent ({:?}) {:?}", p, hash);
+                        Ok(()) => {
+                            let result = client.import_block(block_rlp.as_raw().to_vec());
+
+                            match result {
+                                Ok(_) => {
+                                    trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
+                                    imported_blocks_hashes.insert(hash, 0);
+                                    let active_nodes = p2p.get_active_nodes();
+                                    for n in active_nodes.iter() {
+                                        // Re-broadcast this block
+                                        trace!(target: "sync", "Sync broadcast new block sent...");
+                                        p2p.send(n.get_hash(), req.clone());
+                                    }
+                                }
+                                Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
+                                    trace!(target: "sync", "New block already in chain {:?}", hash);
+                                }
+                                Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
+                                    trace!(target: "sync", "New block already queued {:?}", hash);
+                                }
+                                Err(BlockImportError::Block(BlockError::UnknownParent(p))) => {
+                                    info!(target: "sync", "New block with unknown parent ({:?}) {:?}", p, hash);
+                                }
+                                Err(e) => {
+                                    error!(target: "sync", "Bad new block {:?} : {:?}", hash, e);
+                                }
+                            };
                         }
                         Err(e) => {
-                            error!(target: "sync", "Bad new block {:?} : {:?}", hash, e);
+                            // ignore this batch if any invalidated header
+                            error!(target: "sync", "Invalid header: {:?}, header: {}", e, to_hex(header_rlp.as_raw()));
                         }
-                    };
+                    }
                 }
             }
 

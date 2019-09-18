@@ -18,6 +18,7 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use header::Header;
 use equihash::EquihashValidator;
@@ -26,6 +27,9 @@ use aion_types::U256;
 use types::error::{BlockError, Error};
 use unexpected::{Mismatch, OutOfBounds};
 use acore_bytes::to_hex;
+
+/// Tolerance of future blocks with greater timestamp than local system time
+const FUTURE_TIME_TOLERANCE: u64 = 5;
 
 /// Header validator.
 pub trait HeaderValidator {
@@ -108,6 +112,7 @@ impl HeaderValidator for EquihashSolutionValidator {
         Ok(())
     }
 }
+
 pub struct POWValidator;
 impl HeaderValidator for POWValidator {
     fn validate(&self, header: &Header) -> Result<(), Error> {
@@ -142,6 +147,27 @@ impl HeaderValidator for POWValidator {
                 min: None,
                 max: Some(U256::from(boundary)),
                 found: hash,
+            })
+            .into());
+        }
+        Ok(())
+    }
+}
+
+pub struct FutureTimestampValidator;
+impl HeaderValidator for FutureTimestampValidator {
+    fn validate(&self, header: &Header) -> Result<(), Error> {
+        let timestamp = header.timestamp();
+        let timestamp_now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        if timestamp > timestamp_now + FUTURE_TIME_TOLERANCE {
+            error!(target: "validator", "block timestamp ({}) > local system time ({}) + {}", timestamp, timestamp_now, FUTURE_TIME_TOLERANCE);
+            return Err(BlockError::InvalidFutureTimestamp(OutOfBounds {
+                min: None,
+                max: Some(timestamp_now + FUTURE_TIME_TOLERANCE),
+                found: timestamp,
             })
             .into());
         }

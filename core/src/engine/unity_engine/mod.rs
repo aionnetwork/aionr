@@ -52,6 +52,7 @@ use self::header_validators::{
     POWValidator,
     EnergyConsumedValidator,
     EquihashSolutionValidator,
+    FutureTimestampValidator,
 };
 use self::grand_parent_header_validators::{GrandParentHeaderValidator, DifficultyValidator};
 use self::pos_validator::PoSValidator;
@@ -421,8 +422,9 @@ impl UnityEngine {
 
     // TODO-Unity: duplcation of verify_block_basic. Handle this better. Some functions in trait EthereumMachine do not need *self*.
     pub fn validate_block_header(header: &Header) -> Result<(), Error> {
-        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(2);
+        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(3);
         cheap_validators.push(Box::new(EnergyConsumedValidator {}));
+        cheap_validators.push(Box::new(FutureTimestampValidator {}));
         if header.seal_type() == &Some(SealType::PoW) {
             cheap_validators.push(Box::new(POWValidator {}));
         }
