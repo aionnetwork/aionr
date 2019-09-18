@@ -228,6 +228,7 @@ where
                     gas_price_bytes: Vec::new(),
                     gas_bytes: Vec::new(),
                     value_bytes: Vec::new(),
+                    beacon: None,
                 }
                 .sign(kp.secret()),
                 None,

@@ -57,10 +57,10 @@
 //!
 //! fn main() {
 //!        let key = Random.generate().unwrap();
-//!       let t1 = Transaction::new(U256::from(10), U256::one(), U256::from(100_000), Action::Create, U256::from(100), "3331600055".from_hex().unwrap());
+//!       let t1 = Transaction::new(U256::from(10), U256::one(), U256::from(100_000), Action::Create, U256::from(100), "3331600055".from_hex().unwrap(),None);
 //!        //let t1 = Transaction { action: Action::Create, value: U256::from(100), data: "3331600055".from_hex().unwrap(),
 //!        //    gas: U256::from(100_000), gas_price: U256::one(), nonce: U256::from(10) };
-//!        let t2 = Transaction::new(U256::from(11), U256::one(), U256::from(100_000), Action::Create, U256::from(100), "3331600055".from_hex().unwrap());
+//!        let t2 = Transaction::new(U256::from(11), U256::one(), U256::from(100_000), Action::Create, U256::from(100), "3331600055".from_hex().unwrap(),None);
 //!        //let t2 = Transaction { action: Action::Create, value: U256::from(100), data: "3331600055".from_hex().unwrap(),
 //!        //    gas: U256::from(100_000), gas_price: U256::one(), nonce: U256::from(11) };
 //!
@@ -1554,6 +1554,7 @@ pub mod test {
             U256::from(100),
             "3331600055".from_hex().unwrap(),
             DEFAULT_TRANSACTION_TYPE,
+            None,
         )
     }
 

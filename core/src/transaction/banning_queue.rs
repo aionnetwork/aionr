@@ -247,6 +247,7 @@ mod tests {
             U256::from(100),
             "3331600055".from_hex().unwrap(),
             DEFAULT_TRANSACTION_TYPE,
+            None,
         )
         .sign(keypair.secret());
 

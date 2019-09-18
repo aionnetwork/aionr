@@ -572,6 +572,7 @@ mod tests {
             gas_price_bytes: Vec::new(),
             value_bytes: Vec::new(),
             transaction_type: U256::from(1),
+            beacon: None,
         }
         .sign(keypair.secret());
 
@@ -587,6 +588,7 @@ mod tests {
             gas_price_bytes: Vec::new(),
             value_bytes: Vec::new(),
             transaction_type: U256::from(1),
+            beacon: None,
         }
         .sign(keypair.secret());
 

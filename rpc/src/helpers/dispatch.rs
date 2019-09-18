@@ -171,6 +171,7 @@ impl<C: MiningBlockChainClient, M: MinerService> Dispatcher for FullDispatcher<C
             data: request.data.unwrap_or_else(Vec::new),
             tx_type: request.tx_type.unwrap_or_else(|| 0x01.into()),
             condition: request.condition,
+            beacon: request.beacon,
         }))
     }
 
@@ -226,6 +227,7 @@ fn sign_transaction(
         filled.value,
         filled.data,
         filled.tx_type,
+        filled.beacon,
     );
 
     let timestamp = i64_to_bytes(to_epoch_micro());

@@ -605,16 +605,16 @@ impl Client {
         // Print log
         match (first_header, last_header) {
             (Some(ref first), Some(ref last)) if first == last => {
-                info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}", 
+                info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}",
                     first.seal_type().clone().unwrap_or_default(),
-                    Colour::White.bold().paint(format!("{}", first.number())), 
-                    Colour::White.bold().paint(format!("{:x}", first.hash())), 
+                    Colour::White.bold().paint(format!("{}", first.number())),
+                    Colour::White.bold().paint(format!("{:x}", first.hash())),
                     Colour::White.bold().paint(format!("{:x}", first.difficulty())),
                     Colour::White.bold().paint(format!("{:x}", first.timestamp())));
             }
             (Some(first), Some(last)) => {
-                info!(target: "miner", "External blocks added from #{} to #{}", 
-                    Colour::White.bold().paint(format!("{}", first.number())), 
+                info!(target: "miner", "External blocks added from #{} to #{}",
+                    Colour::White.bold().paint(format!("{}", first.number())),
                     Colour::White.bold().paint(format!("{}", last.number())));
             }
             (_, _) => {}
@@ -1095,6 +1095,7 @@ impl Client {
             // signature of getEffectiveStake(Address, Address)
             call_data,
             DEFAULT_TRANSACTION_TYPE,
+            None,
         )
         .fake_sign(Address::default())
     }
@@ -1848,10 +1849,10 @@ impl MiningBlockChainClient for Client {
         // clear pending PoS blocks
         self.miner.clear_pos_pending();
         // Print log
-        info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}", 
+        info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}",
             seal_type.unwrap_or_default(),
-            Colour::White.bold().paint(format!("{}", number)), 
-            Colour::White.bold().paint(format!("{:x}", hash)), 
+            Colour::White.bold().paint(format!("{}", number)),
+            Colour::White.bold().paint(format!("{:x}", hash)),
             Colour::White.bold().paint(format!("{:x}", difficulty)),
             Colour::White.bold().paint(format!("{:x}", timestamp)));
         Ok(hash)

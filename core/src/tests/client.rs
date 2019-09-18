@@ -366,6 +366,7 @@ fn does_not_propagate_delayed_transactions() {
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
             transaction_type: 0x01.into(),
+            beacon: None,
         }
         .sign(&secret),
         Some(Condition::Number(2)),
@@ -383,6 +384,7 @@ fn does_not_propagate_delayed_transactions() {
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
             transaction_type: 0x01.into(),
+            beacon: None,
         }
         .sign(&secret),
         None,

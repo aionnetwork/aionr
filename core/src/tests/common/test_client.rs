@@ -257,6 +257,7 @@ impl TestBlockChainClient {
                 //                        nonce: U256::zero(),
                 //                        nonce_bytes: Vec::new(),
                 //                        transaction_type: DEFAULT_TRANSACTION_TYPE,
+                //                        beacon: None,
                 //                    };
                 //                    let signed_tx = tx.sign(&keypair.secret().0, None);
                 //                    txs.append(&signed_tx);
@@ -332,6 +333,7 @@ impl TestBlockChainClient {
     //            nonce: U256::zero(),
     //            nonce_bytes: Vec::new(),
     //            transaction_type: DEFAULT_TRANSACTION_TYPE,
+    //            beacon: None,
     //        };
     //        let signed_tx = tx.sign(&keypair.secret().0, None);
     //        self.set_balance(

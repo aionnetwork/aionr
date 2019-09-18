@@ -49,6 +49,7 @@ fn should_apply_create_transaction() {
         transaction_type: 1.into(),
         data: FromHex::from_hex("601080600c6000396000f3006000355415600957005b60203560003555")
             .unwrap(),
+        beacon: None,
     }
     .sign(&secret());
 

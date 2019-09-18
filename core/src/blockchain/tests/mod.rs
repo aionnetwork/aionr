@@ -135,6 +135,7 @@ fn test_fork_transaction_addresses() {
         gas_bytes: Vec::new(),
         gas_price_bytes: Vec::new(),
         value_bytes: Vec::new(),
+        beacon: None,
     }
     .sign(keychain::ethkey::generate_keypair().secret());
 
@@ -195,6 +196,7 @@ fn test_overwriting_transaction_addresses() {
         gas_bytes: Vec::new(),
         value_bytes: Vec::new(),
         nonce_bytes: Vec::new(),
+        beacon: None,
     }
     .sign(&keypair.secret());
 
@@ -212,6 +214,7 @@ fn test_overwriting_transaction_addresses() {
         value_bytes: Vec::new(),
         nonce_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
+        beacon: None,
     }
     .sign(&keypair.secret());
     let t3 = Transaction {
@@ -228,6 +231,7 @@ fn test_overwriting_transaction_addresses() {
         value_bytes: Vec::new(),
         nonce_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
+        beacon: None,
     }
     .sign(&keypair.secret());
 
@@ -560,6 +564,7 @@ fn test_logs() {
         gas_bytes: Vec::new(),
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
+        beacon: None,
     }
     .sign(keypair.secret());
     let t2 = Transaction {
@@ -576,6 +581,7 @@ fn test_logs() {
         gas_bytes: Vec::new(),
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
+        beacon: None,
     }
     .sign(keypair.secret());
     let t3 = Transaction {
@@ -592,6 +598,7 @@ fn test_logs() {
         gas_bytes: Vec::new(),
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
+        beacon: None,
     }
     .sign(keypair.secret());
     let tx_hash1 = t1.hash().clone();

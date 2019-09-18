@@ -22,7 +22,7 @@
 
 use acore::contract_address;
 use acore::transaction::{LocalizedTransaction, Action, PendingTransaction, SignedTransaction};
-use aion_types::{U64, H256, U256};
+use aion_types::{H256, U256};
 use bytes::u64_to_bytes;
 use serde::ser::{Serialize, Serializer, SerializeStruct};
 
@@ -59,8 +59,6 @@ pub struct Transaction {
     pub raw: Bytes,
     /// Public key of the signer.
     pub public_key: Option<H256>,
-    /// The network id of the transaction, if any.
-    pub chain_id: Option<U64>,
     /// The standardised V field of the signature (0 or 1).
     pub standard_v: U256,
     /// Signature.
@@ -166,7 +164,6 @@ impl Transaction {
                 pk.copy_from_slice(&t.recover_public().unwrap().0);
                 Some(H256(pk))
             },
-            chain_id: t.chain_id().map(U64::from),
             standard_v: t.standard_v().into(),
             sig: Bytes::new(signature.to_vec()),
             condition: None,
@@ -199,7 +196,6 @@ impl Transaction {
             raw: ::rlp::encode(&t).into_vec().into(),
             public_key: t.public_key(),
 
-            chain_id: t.chain_id().map(U64::from),
             standard_v: t.standard_v().into(),
             sig: Bytes::new(signature.clone().to_vec()),
             condition: None,
