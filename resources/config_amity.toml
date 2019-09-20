@@ -1,6 +1,9 @@
 [aion]
 chain = "amity/amity.json"
 
+[account]
+stake_contract = "0xa056337bb14e818f3f53e13ab0d93b6539aa570cba91ce65c716058241989be9"
+
 [network]
 max_peers = 32
 net_id = 30
@@ -30,4 +33,4 @@ interface = "0.0.0.0"
 
 [mining]
 author = "0xa07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137"
-staker_private_key = "0xcc76648ce8798bc18130bc9d637995e5c42a922ebeab78795fac58081b9cf9d4"
+#staker_private_key = "0xcc76648ce8798bc18130bc9d637995e5c42a922ebeab78795fac58081b9cf9d4"
