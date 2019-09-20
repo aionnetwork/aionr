@@ -45,6 +45,8 @@ pub enum ExtrasIndex {
     BlocksBlooms = 3,
     /// Block receipts index
     BlockReceipts = 4,
+    /// Beacon List
+    BeaconList = 5,
 }
 
 fn with_index(hash: &H256, i: ExtrasIndex) -> H264 {
@@ -115,6 +117,12 @@ impl Key<BlockReceipts> for H256 {
     type Target = H264;
 
     fn key(&self) -> H264 { with_index(self, ExtrasIndex::BlockReceipts) }
+}
+
+impl Key<BlockNumber> for H256 {
+    type Target = H264;
+
+    fn key(&self) -> H264 { with_index(self, ExtrasIndex::BeaconList) }
 }
 
 /// Familial details concerning a block

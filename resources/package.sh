@@ -13,12 +13,13 @@ MASTT="package/$1/mastery/mastery.toml"
 MASTJ="package/$1/mastery/mastery.json"
 CUSTT="package/$1/custom/custom.toml"
 CUSTJ="package/$1/custom/custom.json"
-MASTT2="package/$1/mastery/mastery_unity.toml"
-MASTJ2="package/$1/mastery/mastery_unity.json"
+AMITYT="package/$1/amity/amity.toml"
+AMITYJ="package/$1/amity/amity.json"
 
 mkdir -p package/$1/mainnet
 mkdir  package/$1/mastery
 mkdir  package/$1/custom
+mkdir  package/$1/amity
 mkdir  package/$1/libs
 
 cargo build --release
@@ -44,10 +45,10 @@ cp resources/custom.json $CUSTJ
 echo -e '#!/usr/bin/env sh\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=custom/custom.toml $*'>package/$1/custom.sh
 chmod +x package/$1/custom.sh
 
-cp resources/config_mastery2.toml $MASTT2
-cp resources/mastery2.json $MASTJ2
-echo -e '#!/usr/bin/env sh\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mastery/mastery_unity.toml $*'>package/$1/mastery2
-chmod +x package/$1/mastery2
+cp resources/config_amity.toml $AMITYT
+cp resources/amity.json $AMITYJ
+echo -e '#!/usr/bin/env sh\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=amity/amity.toml $*'>package/$1/amity.sh
+chmod +x package/$1/amity.sh
 
 tar -C package -czf ${1}.tar.gz $1
 echo "Successfully packaged: $(pwd)/${1}.tar.gz !!!"

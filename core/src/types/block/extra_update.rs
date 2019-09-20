@@ -37,6 +37,8 @@ pub struct ExtrasUpdate<'a> {
     pub block: &'a [u8],
     /// Modified block hashes.
     pub block_hashes: HashMap<BlockNumber, H256>,
+    /// Modified beacon list.
+    pub beacon_list: HashMap<H256, BlockNumber>,
     /// Modified block details.
     pub block_details: HashMap<H256, BlockDetails>,
     /// Modified block receipts.
