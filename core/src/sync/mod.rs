@@ -339,10 +339,10 @@ impl Sync {
             if let Some(shutdown_hook) = shutdown_hooks.pop() {
                 match shutdown_hook.send(()) {
                     Ok(_) => {
-                        debug!(target: "sync", "shutdown signal sent");
+                        info!(target: "sync", "shutdown signal sent");
                     }
                     Err(err) => {
-                        debug!(target: "sync", "shutdown err: {:?}", err);
+                        info!(target: "sync", "shutdown err: {:?}", err);
                     }
                 }
             }
