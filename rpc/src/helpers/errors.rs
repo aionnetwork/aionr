@@ -397,6 +397,12 @@ pub fn transaction_message(error: TransactionError) -> String {
                 minimal, maximal, got
             )
         }
+        InvalidBeaconHash(ref hash) => {
+            format!(
+                "Invalid transaction beacon hash :{}, not in canon chain.",
+                hash
+            )
+        }
     }
 }
 

@@ -903,6 +903,14 @@ impl Miner {
         transaction: UnverifiedTransaction,
     ) -> Result<SignedTransaction, Error>
     {
+        // TODO: handle the new error
+        if let Some(ref hash) = transaction.beacon {
+            if client.is_beacon_hash(hash).is_none() {
+                return Err(Error::Transaction(TransactionError::InvalidBeaconHash(
+                    *hash,
+                )));
+            }
+        }
         let hash = transaction.hash().clone();
         let best_block_header = client.best_block_header().decode();
         if client

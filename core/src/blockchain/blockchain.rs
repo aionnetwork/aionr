@@ -105,6 +105,9 @@ pub trait BlockProvider {
     /// Get the hash of given block's number.
     fn block_hash(&self, index: BlockNumber) -> Option<H256>;
 
+    /// Get block number of block hash in beacon list
+    fn beacon_list(&self, hash: &H256) -> Option<BlockNumber>;
+
     /// Get the address of transaction with given hash.
     fn transaction_address(&self, hash: &H256) -> Option<TransactionAddress>;
 
@@ -206,6 +209,7 @@ enum CacheId {
     TransactionAddresses(H256),
     BlocksBlooms(GroupPosition),
     BlockReceipts(H256),
+    BeaconList(H256),
 }
 
 impl bc::group::BloomGroupDatabase for BlockChain {
@@ -244,6 +248,7 @@ pub struct BlockChain {
     // extra caches
     block_details: RwLock<HashMap<H256, BlockDetails>>,
     block_hashes: RwLock<HashMap<BlockNumber, H256>>,
+    beacon_list: RwLock<HashMap<H256, BlockNumber>>,
     transaction_addresses: RwLock<HashMap<H256, TransactionAddress>>,
     blocks_blooms: RwLock<HashMap<GroupPosition, BloomGroup>>,
     block_receipts: RwLock<HashMap<H256, BlockReceipts>>,
@@ -254,8 +259,11 @@ pub struct BlockChain {
 
     pending_best_block: RwLock<Option<BestBlock>>,
     pending_block_hashes: RwLock<HashMap<BlockNumber, H256>>,
+    pending_beacon_list: RwLock<HashMap<H256, BlockNumber>>,
     pending_block_details: RwLock<HashMap<H256, BlockDetails>>,
     pending_transaction_addresses: RwLock<HashMap<H256, Option<TransactionAddress>>>,
+
+    remove_beacon: RwLock<HashMap<H256, BlockNumber>>,
 
     // Unity hard fork parameters
     unity_update: Option<u64>,
@@ -448,6 +456,15 @@ impl BlockProvider for BlockChain {
         result
     }
 
+    /// Get the hash of given block's number.
+    fn beacon_list(&self, hash: &H256) -> Option<BlockNumber> {
+        let result = self
+            .db
+            .read_with_cache(db::COL_EXTRA, &self.beacon_list, hash);
+        self.cache_man.lock().note_used(CacheId::BeaconList(*hash));
+        result
+    }
+
     /// Get the address of transaction with given hash.
     fn transaction_address(&self, hash: &H256) -> Option<TransactionAddress> {
         let result = self
@@ -618,6 +635,7 @@ impl BlockChain {
             block_bodies: RwLock::new(HashMap::new()),
             block_details: RwLock::new(HashMap::new()),
             block_hashes: RwLock::new(HashMap::new()),
+            beacon_list: RwLock::new(HashMap::new()),
             transaction_addresses: RwLock::new(HashMap::new()),
             blocks_blooms: RwLock::new(HashMap::new()),
             block_receipts: RwLock::new(HashMap::new()),
@@ -627,6 +645,8 @@ impl BlockChain {
             pending_block_hashes: RwLock::new(HashMap::new()),
             pending_block_details: RwLock::new(HashMap::new()),
             pending_transaction_addresses: RwLock::new(HashMap::new()),
+            pending_beacon_list: RwLock::new(HashMap::new()),
+            remove_beacon: RwLock::new(HashMap::new()),
             unity_update: unity_update,
             unity_base_pos_total_difficulty: unity_base_pos_total_difficulty,
         };
@@ -1075,6 +1095,9 @@ impl BlockChain {
         }
 
         let (block_hashes, beacon_list) = self.prepare_block_hashes_update(bytes, &info);
+        use std::thread::sleep;
+        use std::time::Duration;
+        sleep(Duration::from_secs(1));
         self.prepare_update(
             batch,
             ExtrasUpdate {
@@ -1235,6 +1258,8 @@ impl BlockChain {
             }
 
             let mut write_hashes = self.pending_block_hashes.write();
+            let mut write_beacon = self.pending_beacon_list.write();
+            let mut write_remove = self.remove_beacon.write();
             let mut write_details = self.pending_block_details.write();
             let mut write_txs = self.pending_transaction_addresses.write();
 
@@ -1244,9 +1269,11 @@ impl BlockChain {
                 update.block_details,
                 CacheUpdatePolicy::Overwrite,
             );
-            batch.extend_with_cache(
+            batch.extend_with_cache_for_canon(
                 db::COL_EXTRA,
                 &mut *write_hashes,
+                &mut *write_beacon,
+                &mut *write_remove,
                 update.block_hashes,
                 CacheUpdatePolicy::Overwrite,
             );
@@ -1265,11 +1292,14 @@ impl BlockChain {
         let mut pending_write_hashes = self.pending_block_hashes.write();
         let mut pending_block_details = self.pending_block_details.write();
         let mut pending_write_txs = self.pending_transaction_addresses.write();
+        let mut pending_beacon = self.pending_beacon_list.write();
+        let mut remove_beacon = self.remove_beacon.write();
 
         let mut best_block = self.best_block.write();
         let mut write_block_details = self.block_details.write();
         let mut write_hashes = self.block_hashes.write();
         let mut write_txs = self.transaction_addresses.write();
+        let mut write_beacon = self.beacon_list.write();
         // update best block
         if let Some(block) = pending_best_block.take() {
             *best_block = block;
@@ -1283,6 +1313,12 @@ impl BlockChain {
         let pending_hashes_keys: Vec<_> = pending_write_hashes.keys().cloned().collect();
         let enacted_txs_keys: Vec<_> = enacted_txs.keys().cloned().collect();
         let pending_block_hashes: Vec<_> = pending_block_details.keys().cloned().collect();
+
+        for key in remove_beacon.keys() {
+            write_beacon.remove(key);
+        }
+        mem::replace(&mut *remove_beacon, HashMap::new());
+        write_beacon.extend(mem::replace(&mut *pending_beacon, HashMap::new()));
 
         write_hashes.extend(mem::replace(&mut *pending_write_hashes, HashMap::new()));
         write_txs.extend(
@@ -1613,6 +1649,7 @@ impl BlockChain {
         let mut transaction_addresses = self.transaction_addresses.write();
         let mut blocks_blooms = self.blocks_blooms.write();
         let mut block_receipts = self.block_receipts.write();
+        let mut beacon_list = self.beacon_list.write();
 
         let mut cache_man = self.cache_man.lock();
         cache_man.collect_garbage(current_size, |ids| {
@@ -1638,6 +1675,9 @@ impl BlockChain {
                     }
                     CacheId::BlockReceipts(ref h) => {
                         block_receipts.remove(h);
+                    }
+                    CacheId::BeaconList(ref h) => {
+                        beacon_list.remove(h);
                     }
                 }
             }

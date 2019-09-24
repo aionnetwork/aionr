@@ -1627,7 +1627,7 @@ impl BlockChainClient for Client {
         use verification::queue::kind::BlockLike;
 
         // create unverified block here so the `blake2b` calculation can be cached.
-        let unverified = Unverified::new(bytes);
+        let unverified = Unverified::new(bytes.clone());
 
         {
             if self.chain.read().is_known(&unverified.hash()) {
@@ -1644,6 +1644,91 @@ impl BlockChainClient for Client {
                 )));
             }
         }
+
+        // get block chain and validate beacon hash
+        // TODO: should not do validate here, do it better
+        if self
+            .block_number(BlockId::Latest)
+            .expect("should have best number")
+            >= self
+                .engine
+                .machine()
+                .params()
+                .unity_update
+                .unwrap_or(BlockNumber::max_value())
+        {
+            let block = BlockView::new(&bytes);
+            let parent_hash = unverified.parent_hash();
+
+            let parent_is_canon = self.is_beacon_hash(&parent_hash);
+
+            match parent_is_canon {
+                Some(_) => {
+                    for beacon in block.transactions().iter().map(|x| (x.beacon)) {
+                        if let Some(ref hash) = beacon {
+                            if self.is_beacon_hash(hash).is_none() {
+                                return Err(BlockImportError::Block(BlockError::InvalidBeaconHash(
+                                    *hash,
+                                )));
+                            }
+                        }
+                    }
+                }
+                None => {
+                    for beacon in block.transactions().iter().map(|x| (x.beacon)) {
+                        if let Some(ref hash) = beacon {
+                            match self.is_beacon_hash(&hash.clone()) {
+                                Some(ref num) => {
+                                    let mut parent_hash = parent_hash;
+                                    let mut block_num = block.header_view().number() - 1;
+                                    let chain = self.chain.read();
+                                    loop {
+                                        parent_hash = chain
+                                            .block_details(&parent_hash)
+                                            .expect(
+                                                "This branch is not completed cannot validate \
+                                                 beacon hash",
+                                            )
+                                            .parent;
+                                        block_num -= 1;
+                                        if self.is_beacon_hash(&parent_hash).is_some() {
+                                            break;
+                                        }
+                                        if &block_num == num {
+                                            return Err(BlockImportError::Block(
+                                                BlockError::InvalidBeaconHash(*hash),
+                                            ));
+                                        }
+                                    }
+                                }
+                                None => {
+                                    let mut parent_hash = parent_hash;
+                                    let chain = self.chain.read();
+                                    loop {
+                                        parent_hash = chain
+                                            .block_details(&parent_hash)
+                                            .expect(
+                                                "This branch is not completed cannot validate \
+                                                 beacon hash",
+                                            )
+                                            .parent;
+                                        if &parent_hash == hash {
+                                            break;
+                                        }
+                                        if self.is_beacon_hash(&parent_hash).is_some() {
+                                            return Err(BlockImportError::Block(
+                                                BlockError::InvalidBeaconHash(*hash),
+                                            ));
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
         Ok(self.block_queue.import(unverified)?)
     }
 
@@ -1859,6 +1944,11 @@ impl MiningBlockChainClient for Client {
     }
 
     fn prepare_block_interval(&self) -> Duration { self.miner.prepare_block_interval() }
+
+    fn is_beacon_hash(&self, hash: &H256) -> Option<BlockNumber> {
+        let chain = self.chain.read();
+        chain.beacon_list(hash)
+    }
 }
 
 impl ProvingBlockChainClient for Client {

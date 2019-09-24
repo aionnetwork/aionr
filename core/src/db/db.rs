@@ -161,6 +161,46 @@ pub trait Writable {
         }
     }
 
+    /// Writes the values into the database and updates the cache.
+    fn extend_with_cache_for_canon<K, T, R1, R2>(
+        &mut self,
+        db_name: &'static str,
+        cache1: &mut Cache<K, T>,
+        cache2: &mut Cache<T, K>,
+        cache3: &mut Cache<T, K>,
+        values: HashMap<K, T>,
+        policy: CacheUpdatePolicy,
+    ) where
+        K: Key<T, Target = R1> + Hash + Eq + rlp::Encodable + Clone,
+        T: rlp::Encodable + Key<K, Target = R2> + Hash + Eq + Clone,
+        R1: Deref<Target = [u8]>,
+        R2: Deref<Target = [u8]>,
+    {
+        match policy {
+            CacheUpdatePolicy::Overwrite => {
+                for (key, value) in values {
+                    self.write(db_name, &key, &value);
+                    self.write(db_name, &value, &key);
+                    cache3.remove(&value);
+                    if let Some(v) = cache1.insert(key.clone(), value.clone()) {
+                        cache2.remove(&v);
+                        cache3.insert(v, key.clone());
+                    }
+                    cache2.insert(value, key);
+                }
+            }
+            CacheUpdatePolicy::Remove => {
+                for (key, value) in &values {
+                    self.write(db_name, key, value);
+                    self.delete(db_name, value);
+                    cache1.remove(key);
+                    cache2.remove(value);
+                    cache3.insert(value.clone(), key.clone());
+                }
+            }
+        }
+    }
+
     /// Writes and removes the values into the database and updates the cache.
     fn extend_with_option_cache<K, T, R>(
         &mut self,

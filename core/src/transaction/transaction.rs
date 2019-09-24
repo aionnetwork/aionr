@@ -540,6 +540,8 @@ impl UnverifiedTransaction {
             )));
         }
 
+        // verify beacon hash
+
         // signature is verified in SignedTransaction.
 
         Ok(())

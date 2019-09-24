@@ -110,6 +110,8 @@ pub enum BlockError {
     InvalidPoSAuthor,
     /// Invalid future time stamp
     InvalidFutureTimestamp(OutOfBounds<u64>),
+    /// Invalid beacon hash
+    InvalidBeaconHash(H256),
 }
 
 impl fmt::Display for BlockError {
@@ -170,6 +172,9 @@ impl fmt::Display for BlockError {
                      {}",
                     oob
                 )
+            }
+            InvalidBeaconHash(ref hash) => {
+                format!("Block with invalid transaction beacon hash: {}", hash)
             }
         };
 
