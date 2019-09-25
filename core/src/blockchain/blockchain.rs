@@ -1095,9 +1095,6 @@ impl BlockChain {
         }
 
         let (block_hashes, beacon_list) = self.prepare_block_hashes_update(bytes, &info);
-        use std::thread::sleep;
-        use std::time::Duration;
-        sleep(Duration::from_secs(1));
         self.prepare_update(
             batch,
             ExtrasUpdate {

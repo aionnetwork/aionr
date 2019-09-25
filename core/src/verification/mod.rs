@@ -488,6 +488,8 @@ mod tests {
         {
             unimplemented!()
         }
+
+        fn beacon_list(&self, _hash: &H256) -> Option<BlockNumber> { unimplemented!() }
     }
 
     fn basic_test(bytes: &[u8], engine: &Engine) -> Result<(), Error> {

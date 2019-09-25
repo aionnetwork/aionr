@@ -428,6 +428,8 @@ impl MiningBlockChainClient for TestBlockChainClient {
     fn broadcast_proposal_block(&self, _block: SealedBlock) {}
 
     fn prepare_block_interval(&self) -> Duration { Duration::default() }
+
+    fn is_beacon_hash(&self, _hash: &H256) -> Option<BlockNumber> { unimplemented!() }
 }
 
 impl BlockChainClient for TestBlockChainClient {
