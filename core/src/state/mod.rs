@@ -566,7 +566,7 @@ impl<B: Backend> State<B> {
         debug!(target: "state", "add_balance({}, {}): {}", a, incr, self.balance(a)?);
         let is_value_transfer = !incr.is_zero();
         if is_value_transfer || (cleanup_mode == CleanupMode::ForceCreate && !self.exists(a)?) {
-            self.require(a, false)?.add_balance(incr);
+            self.require(a, true)?.add_balance(incr);
         //panic!("hi");
         } else if let CleanupMode::TrackTouched(set) = cleanup_mode {
             if self.exists(a)? {
@@ -587,7 +587,7 @@ impl<B: Backend> State<B> {
     {
         debug!(target: "state", "sub_balance({}, {}): {}", a, decr, self.balance(a)?);
         if !decr.is_zero() || !self.exists(a)? {
-            self.require(a, false)?.sub_balance(decr);
+            self.require(a, true)?.sub_balance(decr);
         }
         if let CleanupMode::TrackTouched(ref mut set) = *cleanup_mode {
             set.insert(*a);
@@ -611,18 +611,18 @@ impl<B: Backend> State<B> {
 
     /// Increment the nonce of account `a` by 1.
     pub fn inc_nonce(&mut self, a: &Address) -> trie::Result<()> {
-        self.require(a, false).map(|mut x| x.inc_nonce())
+        self.require(a, true).map(|mut x| x.inc_nonce())
     }
 
     /// Mutate storage of account `a` so that it is `value` for `key`.
     pub fn set_storage(&mut self, a: &Address, key: Bytes, value: Bytes) -> trie::Result<()> {
         trace!(target: "state", "set_storage({}:{:?} to {:?})", a, key, value);
-        self.require(a, false)?.set_storage(key, value);
+        self.require(a, true)?.set_storage(key, value);
         Ok(())
     }
 
     pub fn remove_storage(&mut self, a: &Address, key: Bytes) -> trie::Result<()> {
-        self.require(a, false)?.remove_storage(key);
+        self.require(a, true)?.remove_storage(key);
         Ok(())
     }
 
@@ -774,7 +774,7 @@ impl<B: Backend> State<B> {
     }
 
     fn touch(&mut self, a: &Address) -> trie::Result<()> {
-        self.require(a, false)?;
+        self.require(a, true)?;
         Ok(())
     }
 

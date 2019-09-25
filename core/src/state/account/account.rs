@@ -675,33 +675,35 @@ impl VMAccount for AionVMAccount {
         graph_db: Arc<KeyValueDB>,
     )
     {
-        if let Some(root) = graph_db
-            .get(::db::COL_AVM_GRAPH, &self.delta_root)
-            .unwrap_or(None)
-        {
-            debug!(target: "vm", "{:?}: update root from {:?} to {:?}", a, self.storage_root, root);
-            // try decode RLP to get the external storage root
-            let concatenated: Vec<H256> = ::rlp::decode_list(root[..].into());
-            assert!(concatenated.len() == 2, "unexpected value from graph db");
-            self.storage_root = concatenated.get(0).unwrap().clone();
-            // if storage_root has been stored, it should be avm created account
-            self.account_type = AccType::AVM;
-            // always cache object graph and key/value storage root
-            debug!(target: "vm", "try to get object graph from: {:?}", self.delta_root);
-            let graph_hash = concatenated.get(1).unwrap();
-            match graph_db.get(::db::COL_AVM_GRAPH, &graph_hash).unwrap() {
-                Some(data) => {
-                    self.object_graph_size = Some(data.len());
-                    self.object_graph_hash = concatenated.get(1).unwrap().clone(); //blake2b(&data);
-                    self.object_graph_cache = Arc::new(data[..].to_vec());
+        if self.object_graph_hash == BLAKE2B_EMPTY {
+            if let Some(root) = graph_db
+                .get(::db::COL_AVM_GRAPH, &self.delta_root)
+                .unwrap_or(None)
+            {
+                debug!(target: "vm", "{:?}: update root from {:?} to {:?}", a, self.storage_root, root);
+                // try decode RLP to get the external storage root
+                let concatenated: Vec<H256> = ::rlp::decode_list(root[..].into());
+                assert!(concatenated.len() == 2, "unexpected value from graph db");
+                self.storage_root = concatenated.get(0).unwrap().clone();
+                // if storage_root has been stored, it should be avm created account
+                self.account_type = AccType::AVM;
+                // always cache object graph and key/value storage root
+                debug!(target: "vm", "try to get object graph from: {:?}", self.delta_root);
+                let graph_hash = concatenated.get(1).unwrap();
+                match graph_db.get(::db::COL_AVM_GRAPH, &graph_hash).unwrap() {
+                    Some(data) => {
+                        self.object_graph_size = Some(data.len());
+                        self.object_graph_hash = concatenated.get(1).unwrap().clone(); //blake2b(&data);
+                        self.object_graph_cache = Arc::new(data[..].to_vec());
+                    }
+                    None => {
+                        self.object_graph_size = None;
+                        self.object_graph_hash = BLAKE2B_EMPTY;
+                    }
                 }
-                None => {
-                    self.object_graph_size = None;
-                    self.object_graph_hash = BLAKE2B_EMPTY;
-                }
-            }
 
-            debug!(target: "vm", "object graph hash = {:?}", self.object_graph_hash);
+                debug!(target: "vm", "object graph hash = {:?}", self.object_graph_hash);
+            }
         }
 
         if let RequireCache::None = require {
