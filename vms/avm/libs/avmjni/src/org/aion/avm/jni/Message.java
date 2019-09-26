@@ -1,13 +1,9 @@
 package org.aion.avm.jni;
 
-import org.aion.vm.api.interfaces.TransactionSideEffects;
-
-import org.aion.vm.api.interfaces.TransactionInterface;
 import org.aion.avm.core.BillingRules;
 
 import org.aion.types.AionAddress;
 import org.aion.types.Transaction;
-// import org.aion.kernel.Transaction;
 import org.aion.kernel.SideEffects;
 
 import java.math.BigInteger;

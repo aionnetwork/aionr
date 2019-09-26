@@ -17,19 +17,23 @@ AMITYT="package/$1/amity/amity.toml"
 AMITYJ="package/$1/amity/amity.json"
 
 mkdir -p package/$1/mainnet
-mkdir  package/$1/mastery
-mkdir  package/$1/custom
-mkdir  package/$1/amity
-mkdir  package/$1/libs
+mkdir -p package/$1/mastery
+mkdir -p package/$1/custom
+mkdir -p package/$1/amity
+mkdir -p package/$1/libs
 
 cargo build --release
 
+## Step 1: remove old packages
+rm -rf package/$1
+
+## Step 2: copy binary and libraries into target directory(package/$1)
 cp target/release/aion package/$1
-LIBAVMJNI=$(readlink -f target/release/build/avm*/out/libavmjni.so)
+LIBAVMJNI=$(readlink -f target/release/build/avm*/out/libavmjni.so | xargs ls -t | sed -n '1p')
 cp $LIBAVMJNI package/$1/libs/libavmjni.so
 cp -r vms/avm/libs/aion_vm package/$1/libs
 
-
+## Step 3: generate configuration files
 cp resources/config_mainnet.toml $MAINT
 cp resources/mainnet.json $MAINJ
 echo -e '#!/usr/bin/env sh\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mainnet/mainnet.toml $*'>package/$1/mainnet.sh
@@ -50,5 +54,6 @@ cp resources/amity.json $AMITYJ
 echo -e '#!/usr/bin/env sh\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=amity/amity.toml $*'>package/$1/amity.sh
 chmod +x package/$1/amity.sh
 
+## Step 4: compress
 tar -C package -czf ${1}.tar.gz $1
 echo "Successfully packaged: $(pwd)/${1}.tar.gz !!!"
