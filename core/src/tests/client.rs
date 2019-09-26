@@ -482,7 +482,7 @@ fn test_total_difficulty() {
     // td == 0x2000 , pow_td == 0x2000, pos_td == 0
     assert_eq!(
         client.block_total_difficulty(BlockId::Latest),
-        Some((0x2000.into(), 0x2000.into(), 0.into()))
+        Some(0x2000.into())
     );
 
     //import a pos block
@@ -495,17 +495,10 @@ fn test_total_difficulty() {
     // chain: td == 0x2000 , pow_td == 0x2000, pos_td == 0
     assert_eq!(
         client.block_total_difficulty(BlockId::Latest),
-        Some((0x2000.into(), 0x2000.into(), 0.into()))
+        Some(0x2000.into())
     );
     let info = client.chain_info();
-    assert_eq!(
-        (
-            info.total_difficulty,
-            info.pow_total_difficulty,
-            info.pos_total_difficulty
-        ),
-        (0x2000.into(), 0x2000.into(), 0.into())
-    );
+    assert_eq!(info.total_difficulty, 0x2000.into());
     // TODO: Commented out for wrong pending_total_difficulty calculation. Open and fix it after modification.
     //    // chain+queue : td == 0x2000 * 0x20000 = 0x40000000
     //    assert_eq!(info.pending_total_difficulty,0x40000000.into());
@@ -520,13 +513,10 @@ fn test_total_difficulty() {
     //    // chain: td == 0x2000 , pow_td == 0x2000, pos_td == 0
     //    assert_eq!(
     //        client.block_total_difficulty(BlockId::Latest),
-    //        Some((0x2000.into(),0x2000.into(),0.into()))
+    //        Some(0x2000.into())
     //    );
     //    let info = client.chain_info();
-    //    assert_eq!(
-    //        (info.total_difficulty, info.pow_total_difficulty, info.pos_total_difficulty),
-    //        (0x2000.into()        , 0x2000.into()            , 0.into()                 )
-    //    );
+    //    assert_eq!(info.total_difficulty, 0x2000.into());
     //    // chain+queue : td == (0x2000 + 0x20000) * 0x20000 = 0x440000000
     //    assert_eq!(info.pending_total_difficulty,0x80000000u64.into());
 
@@ -542,14 +532,7 @@ fn test_total_difficulty() {
     );
 
     let info = client.chain_info();
-    assert_eq!(
-        (
-            info.total_difficulty,
-            info.pow_total_difficulty,
-            info.pos_total_difficulty
-        ),
-        (0x40000000u64.into(), 0x2000.into(), 0x20000.into())
-    );
+    assert_eq!(info.total_difficulty, 0x40000000u64.into());
 
     //    // chain+queue : td == 0x2000 * 0x20000 = 0x40000000
     //    assert_eq!(info.pending_total_difficulty,0x40000000u64.into());

@@ -359,10 +359,18 @@ where
     fn pos_get_seed(&self) -> Result<H512> {
         // seal map:
         // 64 bytes signature + 64 bytes seed + 32 public key
-        match self.client.best_block_header_with_seal_type(&SealType::PoS) {
-            Some(h) => {
+        if !self
+            .miner
+            .new_block_allowed_with_seal_type(&*self.client, &SealType::PoS)
+        {
+            return Err(errors::no_work()); // TODO-Unity: refine error
+        }
+        let best_block = self.client.best_block_header();
+        let grand_parent = self.client.block_header_data(&best_block.parent_hash());
+        match grand_parent {
+            Some(ref header) if header.seal_type() == Some(SealType::PoS) => {
                 // seal length must be 3, since it is already validated
-                let seal = h.seal();
+                let seal = header.seal();
                 let mut s = [0u8; 64];
                 debug!(target: "miner", "seal = {:?}, len = {}", seal, seal.len());
                 s.copy_from_slice(seal[0].as_slice());
@@ -376,17 +384,13 @@ where
     /// seed: signed seed by staker
     /// psk: public key of staker
     fn pos_submit_seed(&self, seed: H512, psk: H256) -> Result<H256> {
-        // block template is generated each 20 secs
         // try to get block hash
-
         debug!(target: "miner", "submit seed: {:?} - {:?}", seed, psk);
-
         let template = self.miner.get_pos_template(&*self.client, seed.into(), psk);
-
         if template.is_some() {
             return Ok(template.unwrap().into());
         } else {
-            return Ok(H256::zero());
+            return Ok(H256::zero()); // TODO-Unity: return error
         }
     }
 

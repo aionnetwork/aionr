@@ -835,7 +835,7 @@ fn test_insert_unordered() {
     let b1 = genesis.add_block_with_bloom(bloom_b1);
     let b2 = b1.add_block_with_bloom(bloom_b2);
     let b3 = b2.add_block_with_bloom(bloom_b3);
-    let b1_pow_total_difficulty = genesis.last().difficulty() + b1.last().difficulty();
+    let b1_total_difficulty = genesis.last().difficulty() + b1.last().difficulty();
 
     let db = new_db();
     let bc = new_chain(&genesis.last().encoded(), db.clone());
@@ -844,8 +844,7 @@ fn test_insert_unordered() {
         &mut batch,
         &b2.last().encoded(),
         vec![],
-        Some(b1_pow_total_difficulty),
-        Some(U256::from(0)),
+        Some(b1_total_difficulty),
         false,
         false,
     );

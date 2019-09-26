@@ -45,6 +45,7 @@ use self::dependent_header_validators::{
     DependentHeaderValidator,
     NumberValidator,
     TimestampValidator,
+    SealTypeValidator,
 };
 use self::header_validators::{
 //    ExtraDataValidator,
@@ -61,9 +62,9 @@ use num_bigint::BigUint;
 const ANNUAL_BLOCK_MOUNT: u64 = 3110400;
 const COMPOUND_YEAR_MAX: u64 = 128;
 
-// Our barrier should be log2*20 = 13.862943611,
-// but we only compare it against integer values, so we use 14
-const BARRIER: u64 = 14;
+// Our barrier should be log2*10 = 6.9xxxx
+// but we only compare it against integer values, so we use 7
+const BARRIER: u64 = 7;
 
 lazy_static! {
     static ref DIFF_INC_RATE: FixedPoint = FixedPoint::from_str_radix("1.05", 10).unwrap();
@@ -150,21 +151,12 @@ impl DifficultyCalc {
 
     pub fn calculate_difficulty(
         &self,
-        parent: Option<&Header>,
+        parent: &Header,
         grand_parent: Option<&Header>,
+        great_grand_parent: Option<&Header>,
     ) -> U256
     {
-        let parent = match parent {
-            Some(header) => header,
-            // First PoS block does not have seal parent.
-            None => {
-                return self
-                    .unity_initial_pos_difficulty
-                    .unwrap_or(self.minimum_difficulty);
-            }
-        };
-
-        // If no seal grand parent, return the difficulty of the seal parent
+        // If no grand parent, return the difficulty of the parent
         let grand_parent = match grand_parent {
             Some(header) => header,
             None => {
@@ -174,7 +166,14 @@ impl DifficultyCalc {
 
         match self.unity_update {
             Some(fork_number) if parent.number() + 1 >= fork_number => {
-                self.calculate_difficulty_v2(parent, grand_parent)
+                // If no great grand parent, return the difficulty of the grand parent
+                let great_grand_parent = match great_grand_parent {
+                    Some(header) => header,
+                    None => {
+                        return grand_parent.difficulty().to_owned();
+                    }
+                };
+                self.calculate_difficulty_v2(grand_parent, great_grand_parent)
             }
             _ => self.calculate_difficulty_v1(parent, grand_parent),
         }
@@ -227,7 +226,7 @@ impl DifficultyCalc {
         //        let lambda = 1f64 / (2f64 * self.block_time_unity as f64);
         //        let diff = match (delta_time as f64) - (-0.5f64.ln() / lambda) {
 
-        let diff: U256 = match delta_time >= BARRIER{
+        let diff: U256 = match delta_time >= BARRIER {
             true => {
                 DIFF_DEC_RATE.multiply_uint(parent_difficulty.into()).to_big_uint().into()
             }
@@ -442,9 +441,15 @@ impl Engine for Arc<UnityEngine> {
 
     fn machine(&self) -> &EthereumMachine { &self.machine }
 
-    fn calculate_difficulty(&self, parent: Option<&Header>, grand_parent: Option<&Header>) -> U256 {
+    fn calculate_difficulty(
+        &self,
+        parent: &Header,
+        grand_parent: Option<&Header>,
+        great_grand_parent: Option<&Header>,
+    ) -> U256
+    {
         self.difficulty_calc
-            .calculate_difficulty(parent, grand_parent)
+            .calculate_difficulty(parent, grand_parent, great_grand_parent)
     }
 
     fn seal_fields(&self, header: &Header) -> usize {
@@ -490,7 +495,8 @@ impl Engine for Arc<UnityEngine> {
     fn verify_seal_pos(
         &self,
         header: &Header,
-        seal_parent: Option<&Header>,
+        parent: &Header,
+        grand_parent: Option<&Header>,
         stake: Option<BigUint>,
     ) -> Result<(), Error>
     {
@@ -502,7 +508,7 @@ impl Engine for Arc<UnityEngine> {
         {
             Err(BlockError::InvalidPoSBlockNumber.into())
         } else {
-            PoSValidator::validate(header, seal_parent, stake)?;
+            PoSValidator::validate(header, parent, grand_parent, stake)?;
             Ok(())
         }
     }
@@ -511,14 +517,24 @@ impl Engine for Arc<UnityEngine> {
         &self,
         header: &Header,
         parent: &Header,
-        seal_parent: Option<&Header>,
-        seal_grand_parent: Option<&Header>,
+        grand_parent: Option<&Header>,
+        great_grand_parent: Option<&Header>,
     ) -> Result<(), Error>
     {
         // Verifications related to direct parent
-        let mut parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(2);
+        let mut parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(3);
         parent_validators.push(Box::new(NumberValidator {}));
         parent_validators.push(Box::new(TimestampValidator {}));
+        // AION 2.0
+        // After Unity hard fork, verify if a block has different seal type with its parent
+        if self
+            .machine
+            .params()
+            .unity_update
+            .map_or(false, |fork_number| header.number() >= fork_number)
+        {
+            parent_validators.push(Box::new(SealTypeValidator {}));
+        }
         for v in parent_validators.iter() {
             v.validate(header, parent)?;
         }
@@ -529,7 +545,7 @@ impl Engine for Arc<UnityEngine> {
             difficulty_calc: &self.difficulty_calc,
         }));
         for v in grand_validators.iter() {
-            v.validate(header, seal_parent, seal_grand_parent)?;
+            v.validate(header, parent, grand_parent, great_grand_parent)?;
         }
 
         Ok(())
@@ -538,15 +554,16 @@ impl Engine for Arc<UnityEngine> {
     fn set_difficulty_from_parent(
         &self,
         header: &mut Header,
-        parent: Option<&Header>,
+        parent: &Header,
         grand_parent: Option<&Header>,
+        great_grand_parent: Option<&Header>,
     )
     {
         if header.number() == 0 {
             panic!("Can't calculate genesis block difficulty.");
         }
 
-        let difficulty = self.calculate_difficulty(parent, grand_parent);
+        let difficulty = self.calculate_difficulty(parent, grand_parent, great_grand_parent);
         header.set_difficulty(difficulty);
     }
 

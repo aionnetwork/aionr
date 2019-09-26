@@ -31,7 +31,8 @@ pub struct PoSValidator;
 impl PoSValidator {
     pub fn validate(
         header: &Header,
-        seal_parent_header: Option<&Header>,
+        parent_header: &Header,
+        grand_parent_header: Option<&Header>,
         stake: Option<BigUint>,
     ) -> Result<(), Error>
     {
@@ -63,11 +64,15 @@ impl PoSValidator {
         let seed = &seal[0];
         let signature = &seal[1];
         let pk = &seal[2];
-        let parent_seed = seal_parent_header.map_or(vec![0u8; 64], |h| {
-            h.seal()
-                .get(0)
-                .expect("parent pos block should have a seed")
-                .clone()
+        let parent_seed = grand_parent_header.map_or(vec![0u8; 64], |h| {
+            if h.seal_type() == &Some(SealType::PoS) {
+                h.seal()
+                    .get(0)
+                    .expect("parent pos block should have a seed")
+                    .clone()
+            } else {
+                vec![0u8; 64]
+            }
         });
 
         // Verify seed
@@ -90,11 +95,11 @@ impl PoSValidator {
         // Verify timestamp
         let difficulty = header.difficulty().clone();
         let timestamp = header.timestamp();
-        let parent_timestamp = seal_parent_header.map_or(0, |h| h.timestamp());
+        let parent_timestamp = parent_header.timestamp();
 
         let delta_uint = calculate_delta(difficulty, &seed, stake.clone());
 
-        if timestamp - parent_timestamp < delta_uint {
+        if timestamp - parent_timestamp != delta_uint {
             Err(BlockError::InvalidPoSTimestamp(timestamp, parent_timestamp, delta_uint).into())
         } else {
             Ok(())
