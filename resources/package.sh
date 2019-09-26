@@ -16,16 +16,17 @@ CUSTJ="package/$1/custom/custom.json"
 AMITYT="package/$1/amity/amity.toml"
 AMITYJ="package/$1/amity/amity.json"
 
-mkdir -p package/$1/mainnet
-mkdir -p package/$1/mastery
-mkdir -p package/$1/custom
-mkdir -p package/$1/amity
-mkdir -p package/$1/libs
-
-cargo build --release
-
-## Step 1: remove old packages
+## Step 0: remove old packages, build template release
 rm -rf package/$1
+
+mkdir -p package/$1/mainnet
+mkdir package/$1/mastery
+mkdir package/$1/custom
+mkdir package/$1/amity
+mkdir package/$1/libs
+
+## Step 1: build release version
+cargo build --release
 
 ## Step 2: copy binary and libraries into target directory(package/$1)
 cp target/release/aion package/$1
