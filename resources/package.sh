@@ -37,24 +37,27 @@ cp -r vms/avm/libs/aion_vm package/$1/libs
 ## Step 3: generate configuration files
 cp resources/config_mainnet.toml $MAINT
 cp resources/mainnet.json $MAINJ
-echo -e '#!/usr/bin/env sh\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mainnet/mainnet.toml $*'>package/$1/mainnet.sh
+echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mainnet/mainnet.toml $*'>package/$1/mainnet.sh
 chmod +x package/$1/mainnet.sh
 
 cp resources/config_mastery.toml $MASTT
 cp resources/mastery.json $MASTJ
-echo -e '#!/usr/bin/env sh\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mastery/mastery.toml $*'>package/$1/mastery.sh
+echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mastery/mastery.toml $*'>package/$1/mastery.sh
 chmod +x package/$1/mastery.sh
 
 cp resources/config_custom.toml $CUSTT
 cp resources/custom.json $CUSTJ
-echo -e '#!/usr/bin/env sh\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=custom/custom.toml $*'>package/$1/custom.sh
+echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=custom/custom.toml $*'>package/$1/custom.sh
 chmod +x package/$1/custom.sh
 
 cp resources/config_amity.toml $AMITYT
 cp resources/amity.json $AMITYJ
-echo -e '#!/usr/bin/env sh\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=amity/amity.toml $*'>package/$1/amity.sh
+echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=amity/amity.toml $*'>package/$1/amity.sh
 chmod +x package/$1/amity.sh
 
-## Step 4: compress
+## Step 5: copy env script
+cp resources/env package/$1
+
+## Step 6: compress
 tar -C package -czf ${1}.tar.gz $1
 echo "Successfully packaged: $(pwd)/${1}.tar.gz !!!"
