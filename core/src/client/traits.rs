@@ -69,7 +69,6 @@ pub trait BlockChainClient: Sync + Send {
     /// Get block status by block header hash.
     fn block_status(&self, id: BlockId) -> BlockStatus;
 
-    // TODO-UNITY: change back after finishing sync rf
     /// Get block total difficulty.
     fn block_total_difficulty(&self, id: BlockId) -> Option<U256>;
 

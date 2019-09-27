@@ -232,10 +232,6 @@ impl DifficultyCalc {
         let delta_time = parent_timestamp - grand_parent_timestamp;
         assert!(delta_time > 0);
 
-        // TODO-Unity: To refine floating calculation
-        //        let lambda = 1f64 / (2f64 * self.block_time_unity as f64);
-        //        let diff = match (delta_time as f64) - (-0.5f64.ln() / lambda) {
-
         let diff: U256 = if delta_time >= BARRIER {
             DIFF_DEC_RATE
                 .multiply_uint(parent_difficulty.into())
@@ -421,7 +417,6 @@ impl UnityEngine {
         self.rewards_calculator.calculate_reward(header)
     }
 
-    // TODO-Unity: duplcation of verify_block_basic. Handle this better. Some functions in trait EthereumMachine do not need *self*.
     pub fn validate_block_header(header: &Header) -> Result<(), Error> {
         let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(3);
         cheap_validators.push(Box::new(EnergyConsumedValidator {}));

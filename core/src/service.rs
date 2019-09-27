@@ -79,9 +79,7 @@ pub fn pos_sealing(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Send
     let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(1))
         .for_each(move |_| {
             let client: Arc<Client> = client.clone();
-            if client.miner().invoke_pos_interval(&*client).is_err() {
-                trace!("pos block generation failed");
-            }
+            client.miner().invoke_pos_interval(&*client);
             Ok(())
         })
         .map_err(|e| panic!("interval err: {:?}", e))
@@ -98,13 +96,7 @@ pub fn run_staker(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sende
     let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(1))
         .for_each(move |_| {
             let client: Arc<Client> = client.clone();
-            if client
-                .miner()
-                .try_produce_pos_block_internal(&*client)
-                .is_err()
-            {
-                trace!("pos block generation failed");
-            }
+            client.miner().try_produce_pos_block_internal(&*client);
             Ok(())
         })
         .map_err(|e| panic!("interval err: {:?}", e))

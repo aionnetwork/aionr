@@ -107,22 +107,6 @@ impl PoSValidator {
     }
 }
 
-//// TODO-Unity: to do this better
-//fn ln(x: &BigUint) -> Result<f64, String> {
-//    let x: Vec<u8> = x.to_bytes_le();
-//
-//    const BYTES: usize = 12;
-//    let start = if x.len() < BYTES { 0 } else { x.len() - BYTES };
-//
-//    let mut n: f64 = 0.0;
-//    for i in start..x.len() {
-//        n = n / 256f64 + (x[i] as f64);
-//    }
-//    let ln_256: f64 = (256f64).ln();
-//
-//    Ok(n.ln() + ln_256 * ((x.len() - 1) as f64))
-//}
-
 #[cfg(test)]
 mod tests {
     use super::*;

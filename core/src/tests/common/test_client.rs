@@ -477,7 +477,6 @@ impl BlockChainClient for TestBlockChainClient {
         ))
     }
 
-    // TODO-UNITY: change back after finishing sync rf
     fn block_total_difficulty(&self, _id: BlockId) -> Option<U256> {
         Some((U256::zero(), U256::zero(), U256::zero()))
     }

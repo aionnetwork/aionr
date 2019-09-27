@@ -63,6 +63,8 @@ use num::Zero;
 use num_bigint::BigUint;
 use delta_calc::calculate_delta;
 
+const POW_UPDATE_COOLDOWN: Duration = Duration::from_secs(1);
+
 struct Seed([u8; 64]);
 
 /// Different possible definitions for pending transaction set.
@@ -140,7 +142,7 @@ impl Default for MinerOptions {
             pending_set: PendingSet::AlwaysQueue,
             reseal_min_period: Duration::from_secs(4),
             prepare_block_interval: Duration::from_secs(4),
-            work_queue_size: 20,
+            work_queue_size: 100,
             enable_resubmission: true,
             tx_queue_banning: Banning::Disabled,
             infinite_pending_block: false,
@@ -278,7 +280,7 @@ impl Miner {
         }
     }
 
-    pub fn invoke_pos_interval(&self, client: &MiningBlockChainClient) -> Result<(), Error> {
+    pub fn invoke_pos_interval(&self, client: &MiningBlockChainClient) {
         // let chain_best_block = client
         //     .best_block_header()
         //     .map(|header| header.decode());
@@ -318,7 +320,9 @@ impl Miner {
                         let t = sealed.header().timestamp();
 
                         // 4. Import block
-                        client.import_sealed_block(sealed)?;
+                        if let Some(error) = client.import_sealed_block(sealed).err() {
+                            debug!(target: "miner", "PoS block imported error: {}", error);
+                        }
 
                         // Log
                         info!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
@@ -331,24 +335,18 @@ impl Miner {
             }
             None => {}
         }
-
-        Ok(())
     }
 
     /// Try to internally generate PoS block if minimum resealing duration is met
-    pub fn try_produce_pos_block_internal(
-        &self,
-        client: &MiningBlockChainClient,
-    ) -> Result<(), Error>
-    {
+    pub fn try_produce_pos_block_internal(&self, client: &MiningBlockChainClient) {
         // Not before the Unity fork point
         if !self.new_block_allowed_with_seal_type(client, &SealType::PoS) {
-            return Ok(()); // TODO-Unity: to handle result better
+            return;
         }
 
         // Return if no internal staker
         if self.staker.is_none() {
-            return Ok(()); // TODO-Unity: to handle result better
+            return;
         }
 
         // Staker
@@ -367,7 +365,7 @@ impl Miner {
             .unwrap_or(BigUint::from(0u32));
 
         if stake == BigUint::from(0u32) {
-            return Ok(());
+            return;
         }
 
         // 2. Get the current best block
@@ -400,8 +398,6 @@ impl Miner {
         );
 
         // 5. Calcualte timestamp for the new PoS block
-        // TODO-Unity: don't use floating number to calculate this
-        // \Delta = \frac{d_s \cdot ln({2^{256}}/{hash(seed)})}{V}.
         let new_seed = ed25519::signature(&seed, &sk);
 
         let delta_uint = calculate_delta(difficulty, &new_seed, stake.clone());
@@ -413,20 +409,23 @@ impl Miner {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        debug!(target: "staker", "time now: {}, expected: {}", timestamp_now, new_timestamp);
+        trace!(target: "staker", "time now: {}, expected: {}", timestamp_now, new_timestamp);
         if timestamp_now >= new_timestamp {
-            self.produce_pos_block_internal(
-                client,
-                new_timestamp,
-                new_seed,
-                &sk,
-                &pk,
-                &best_block_header.decode(),
-                grand_parant.map(|header| header.decode()).as_ref(),
-                stake,
-            )
-        } else {
-            Ok(())
+            if let Some(error) = self
+                .produce_pos_block_internal(
+                    client,
+                    new_timestamp,
+                    new_seed,
+                    &sk,
+                    &pk,
+                    &best_block_header.decode(),
+                    grand_parant.map(|header| header.decode()).as_ref(),
+                    stake,
+                )
+                .err()
+            {
+                debug!(target: "staker", "Internal PoS block creation failed: {}", error);
+            }
         }
     }
 
@@ -458,7 +457,7 @@ impl Miner {
                 Some(&seed),
             )
             .or_else(|()| {
-                debug!(target: "miner", "Current work's seal type equals to best block's seal type"); // TODO-Unity: to change err message
+                debug!(target: "miner", "Current work's seal type equals to best block's seal type");
                 Err(Error::PosInvalid) // TODO-Unity: to change err message
             })?;
 
@@ -623,6 +622,7 @@ impl Miner {
                             ) {
                                 return Ok((b.block.clone(), Some(*hash.unwrap())));
                             }
+                            // add transactions to old_block
                             client.reopen_block(b.block.clone())
                         }
                         None => {
@@ -637,16 +637,22 @@ impl Miner {
                     }
                 }
                 _ => {
-                    match sealing_work
-                        .queue
-                        .pop_if(|b| b.block().header().parent_hash() == &best_hash)
-                    {
-                        Some(old_block) => {
+                    match sealing_work.queue.use_last_ref() {
+                        Some(ref old_block)
+                            if old_block.block().header().parent_hash() == &best_hash =>
+                        {
                             trace!(target: "block", "prepare_block: Already have previous work; updating and returning");
-                            // add transactions to old_block
-                            client.reopen_block(old_block)
+                            // Clone old block and add transactions into it
+                            let mut reopened_block = client.reopen_block((*old_block).clone());
+                            // Update block timestamp for AION 2.0 unity protocol
+                            let timestamp_now = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs();
+                            reopened_block.set_timestamp(timestamp_now);
+                            reopened_block
                         }
-                        None => {
+                        _ => {
                             // block not found - create it.
                             trace!(target: "block", "prepare_block: No existing work - making new block");
                             let author: Address = self.author();
@@ -669,7 +675,6 @@ impl Miner {
             (transactions, open_block, last_work_hash)
         };
 
-        // TODO-Unity: add fork flag
         // AION 2.0
         // Only create new block on top of a block with opposite seal type
         if !self.new_block_allowed_with_seal_type(
@@ -870,7 +875,7 @@ impl Miner {
             {
                 self.prepare_work(block, original_work_hash);
             } else {
-                return false; //TODO-Unity: to do better
+                return false;
             }
         }
         let mut sealing_block_last_request = self.sealing_block_last_request.lock();
@@ -1013,7 +1018,7 @@ impl Miner {
 
     /// Update cooldown time for the next non-mandatory reseal
     fn update_reseal_cooldown(&self) {
-        *self.next_allowed_reseal.lock() = Instant::now() + self.options.reseal_min_period;
+        *self.next_allowed_reseal.lock() = Instant::now() + POW_UPDATE_COOLDOWN;
     }
 
     fn from_pending_block<H, F, G>(
@@ -1559,7 +1564,7 @@ impl MinerService for Miner {
         }
         // Get the latest PoW block
         trace!(target: "miner", "map_sealing_work: entering");
-        self.prepare_work_sealing(client, &None); // TODO-Unity-Rpc staking: handle PoW and PoS better
+        self.prepare_work_sealing(client, &None);
         trace!(target: "miner", "map_sealing_work: sealing prepared");
         let mut sealing_work = self.sealing_work.lock();
         let ret = sealing_work.queue.use_last_ref();
@@ -1597,6 +1602,8 @@ impl MinerService for Miner {
         };
         result.and_then(|sealed| {
             client.import_sealed_block(sealed)?;
+            // Clear the sealing_work queue after a PoW block is successfully imported
+            self.sealing_work.lock().queue.reset();
             Ok(())
         })
     }
@@ -1694,22 +1701,6 @@ fn parse_staker(key: String) -> Result<Ed25519KeyPair, String> {
     Ok(keypair.into())
 }
 
-// TODO-Unity: To do this better
-//fn ln(x: &BigUint) -> Result<f64, String> {
-//    let x: Vec<u8> = x.to_bytes_le();
-//
-//    const BYTES: usize = 12;
-//    let start = if x.len() < BYTES { 0 } else { x.len() - BYTES };
-//
-//    let mut n: f64 = 0.0;
-//    for i in start..x.len() {
-//        n = n / 256f64 + (x[i] as f64);
-//    }
-//    let ln_256: f64 = (256f64).ln();
-//
-//    Ok(n.ln() + ln_256 * ((x.len() - 1) as f64))
-//}
-
 #[cfg(test)]
 mod tests {
     use aion_types::U256;
@@ -1771,7 +1762,7 @@ mod tests {
                 tx_queue_memory_limit: None,
                 tx_queue_strategy: PrioritizationStrategy::GasFactorAndGasPrice,
                 pending_set: PendingSet::AlwaysSealing,
-                work_queue_size: 5,
+                work_queue_size: 50,
                 enable_resubmission: true,
                 tx_queue_banning: Banning::Disabled,
                 infinite_pending_block: false,

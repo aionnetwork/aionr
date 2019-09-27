@@ -1323,7 +1323,6 @@ impl BlockChainClient for Client {
         }
     }
 
-    // TODO-UNITY: change back after finishing sync rf
     fn block_total_difficulty(&self, id: BlockId) -> Option<U256> {
         let chain = self.chain.read();
         if let BlockId::Pending = id {
