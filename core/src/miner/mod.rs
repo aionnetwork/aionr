@@ -155,7 +155,8 @@ pub trait MinerService: Send + Sync {
         &self,
         client: &MiningBlockChainClient,
         seed: [u8; 64],
-        address: Address,
+        public_key: H256,
+        coinbase: H256,
     ) -> Option<H256>;
 
     fn try_seal_pos(

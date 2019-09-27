@@ -1421,15 +1421,12 @@ impl MinerService for Miner {
     }
 
     /// Generate PoS block template
-    ///
-    /// client: client which is able to interact with staking contract
-    /// seed: new seed committed by signer
-    /// pk: public key of signer
     fn get_pos_template(
         &self,
         client: &MiningBlockChainClient,
         seed: [u8; 64],
         pk: H256,
+        coinbase: H256,
     ) -> Option<H256>
     {
         // AION 2.0
@@ -1438,8 +1435,10 @@ impl MinerService for Miner {
         }
 
         //WARN: if coinbase is not found, send reward to black hole: full zero address
-        let coinbase = client.get_coinbase(&pk);
-        let stake = client.get_stake(&pk, coinbase).unwrap_or(BigUint::zero());
+        // let coinbase = client.get_coinbase(&pk);
+        let stake = client
+            .get_stake(&pk, Some(coinbase))
+            .unwrap_or(BigUint::zero());
         if stake.is_zero() {
             return None;
         }
@@ -1468,7 +1467,7 @@ impl MinerService for Miner {
             client,
             &Some(SealType::PoS),
             Some(new_timestamp),
-            Some(coinbase.unwrap_or(H256::default())),
+            Some(coinbase),
             Some(&seed),
         ) {
             let mut seal = Vec::with_capacity(3);

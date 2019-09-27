@@ -383,10 +383,13 @@ where
     /// PoS submit seed
     /// seed: signed seed by staker
     /// psk: public key of staker
-    fn pos_submit_seed(&self, seed: H512, psk: H256) -> Result<H256> {
+    /// coinbase: the account who receives block reward
+    fn pos_submit_seed(&self, seed: H512, psk: H256, coinbase: H256) -> Result<H256> {
         // try to get block hash
         debug!(target: "miner", "submit seed: {:?} - {:?}", seed, psk);
-        let template = self.miner.get_pos_template(&*self.client, seed.into(), psk);
+        let template = self
+            .miner
+            .get_pos_template(&*self.client, seed.into(), psk, coinbase);
         if template.is_some() {
             return Ok(template.unwrap().into());
         } else {
