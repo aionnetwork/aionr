@@ -220,6 +220,9 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         .expect("p2p runtime loop init failed");
     let executor_p2p = runtime_sync.executor();
 
+    if let Some(config_path) = cmd.dirs.config {
+        fill_back_local_node(config_path, sync_run.get_local_node_info());
+    }
     sync_run.run(executor_p2p.clone());
 
     // start rpc server
@@ -532,6 +535,47 @@ fn build_create_account_hint(spec: &SpecType, keys: &str) -> String {
         "You can create an account via RPC, UI or `aion account new --chain {} --keys-path {}`.",
         spec, keys
     )
+}
+
+fn fill_back_local_node(path: String, local_node_info: &String) {
+    use std::fs;
+    use std::io::BufRead;
+    use std::io::BufReader;
+    let file = fs::File::open(&path).expect("Cannot open config file");
+    let reader = BufReader::new(file);
+    let mut no_change = true;
+    let mut ret: String = reader
+        .lines()
+        .filter_map(|l| l.ok())
+        .map(|config| {
+            let config_ = config.clone().to_owned();
+            let option: Vec<&str> = config_.split("=").collect();
+            if option[0].trim() == "local_node" && option[1]
+                .find("00000000-0000-0000-0000-000000000000")
+                .is_some()
+            {
+                no_change = false;
+                format!("local_node = {:?}", local_node_info)
+            } else {
+                config.trim().into()
+            }
+        })
+        .collect::<Vec<String>>()
+        .join("\n");
+    if ret.find("\nlocal_node").is_none() {
+        if let Some(index) = ret.find("[network]\n") {
+            ret.insert_str(index + 10, &format!("local_node = {:?}\n", local_node_info));
+        } else {
+            ret.insert_str(
+                0,
+                &format!("[network]\nlocal_node = {:?}\n\n", local_node_info),
+            );
+        }
+    } else if no_change {
+        return;
+    }
+    let _ = fs::write(&path, ret).expect("Rewrite failed");
+    info!(target: "run","Local node fill back!");
 }
 
 fn wait_for_exit() {

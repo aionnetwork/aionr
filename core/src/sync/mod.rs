@@ -349,6 +349,8 @@ impl Sync {
         }
         info!(target:"sync", "sync shutdown finished");
     }
+
+    pub fn get_local_node_info(&self) -> &String { self.p2p.get_local_node_info() }
 }
 
 impl SyncProvider for Sync {

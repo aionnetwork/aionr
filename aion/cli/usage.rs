@@ -340,7 +340,7 @@ macro_rules! usage {
                 }
 
                 // Skip loading config file if no_config flag is specified
-                if raw_args.flag_no_config || raw_args.arg_config.is_none() {
+                if raw_args.flag_no_config /*|| raw_args.arg_config.is_none()*/ {
                     return Ok(raw_args.into_args(Config::default()));
                 }
 
@@ -353,7 +353,7 @@ macro_rules! usage {
                         file.read_to_string(&mut config).map_err(|e| ArgsError::Config(config_file, e))?;
                         Ok(raw_args.into_args(Self::parse_config(&config)?))
                     },
-                    Err(e) => Err(ArgsError::Config(config_file,e)),
+                    Err(_e) => Ok(raw_args.into_args(Config::default())),
                 }
             }
 
