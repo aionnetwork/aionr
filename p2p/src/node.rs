@@ -275,7 +275,7 @@ impl TempNode {
     //     calculate_hash(&text)
     // }
 
-    // pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
+    pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
 
     // construct node from seed config
     // constrait check

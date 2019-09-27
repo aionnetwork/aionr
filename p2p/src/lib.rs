@@ -115,7 +115,15 @@ pub struct Mgr {
 
 impl Mgr {
     /// constructor
-    pub fn new(config: Config, tokens_pairs: Vec<[u32; 2]>) -> Mgr {
+    pub fn new(mut config: Config, tokens_pairs: Vec<[u32; 2]>) -> Mgr {
+        // load local node
+        let temp_local = TempNode::new_from_str(config.local_node);
+        config.local_node = format!(
+            "p2p://{}@{}",
+            temp_local.get_id_string(),
+            temp_local.addr.to_string()
+        );
+
         // load seeds
         let mut temp_queue = VecDeque::<TempNode>::with_capacity(TEMP_MAX);
         for boot_node_str in config.boot_nodes.clone() {
@@ -667,6 +675,8 @@ impl Mgr {
             }
         }
     }
+
+    pub fn get_local_node_info(&self) -> &String { &self.config.local_node }
 
     /// messages with module code other than p2p module
     /// should flow into external handlers
