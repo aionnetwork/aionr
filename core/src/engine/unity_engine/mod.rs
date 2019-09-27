@@ -165,7 +165,16 @@ impl DifficultyCalc {
         };
 
         match self.unity_update {
-            Some(fork_number) if parent.number() + 1 >= fork_number => {
+            // AION 2.0
+            Some(fork_number) if parent.number() >= fork_number => {
+                // For the first PoS block
+                if parent.seal_type() == &Some(SealType::PoW)
+                    && grand_parent.seal_type() == &Some(SealType::PoW)
+                {
+                    return self
+                        .unity_initial_pos_difficulty
+                        .unwrap_or(self.minimum_difficulty);
+                }
                 // If no great grand parent, return the difficulty of the grand parent
                 let great_grand_parent = match great_grand_parent {
                     Some(header) => header,
@@ -175,6 +184,7 @@ impl DifficultyCalc {
                 };
                 self.calculate_difficulty_v2(grand_parent, great_grand_parent)
             }
+            // AION 1.x
             _ => self.calculate_difficulty_v1(parent, grand_parent),
         }
     }
@@ -215,10 +225,10 @@ impl DifficultyCalc {
     }
 
     // Aion 2.0 (Unity) difficulty adjusmtnet algorithm (PoS and PoW hybrid)
-    fn calculate_difficulty_v2(&self, parent: &Header, grand_parent: &Header) -> U256 {
-        let parent_difficulty = parent.difficulty().clone();
-        let parent_timestamp = parent.timestamp();
-        let grand_parent_timestamp = grand_parent.timestamp();
+    fn calculate_difficulty_v2(&self, grand_parent: &Header, great_grand_parent: &Header) -> U256 {
+        let parent_difficulty = grand_parent.difficulty().clone();
+        let parent_timestamp = grand_parent.timestamp();
+        let grand_parent_timestamp = great_grand_parent.timestamp();
         let delta_time = parent_timestamp - grand_parent_timestamp;
         assert!(delta_time > 0);
 
@@ -226,32 +236,24 @@ impl DifficultyCalc {
         //        let lambda = 1f64 / (2f64 * self.block_time_unity as f64);
         //        let diff = match (delta_time as f64) - (-0.5f64.ln() / lambda) {
 
-        let diff: U256 = match delta_time >= BARRIER {
-            true => {
-                DIFF_DEC_RATE.multiply_uint(parent_difficulty.into()).to_big_uint().into()
+        let diff: U256 = if delta_time >= BARRIER {
+            DIFF_DEC_RATE
+                .multiply_uint(parent_difficulty.into())
+                .to_big_uint()
+                .into()
+        } else {
+            let temp: U256 = DIFF_INC_RATE
+                .multiply_uint(parent_difficulty.into())
+                .to_big_uint()
+                .into();
+            if temp == parent_difficulty {
+                temp + 1u64.into()
+            } else {
+                temp
             }
-            false => {
-                let temp :U256 = DIFF_INC_RATE.multiply_uint(parent_difficulty.into()).to_big_uint().into();
-                if temp == parent_difficulty {
-                    temp + 1u64.into()
-                } else {
-                    temp
-                }
-            }
-//            _ => parent_difficulty.as_u64(),
         };
 
-        match parent.seal_type() {
-            None | Some(SealType::PoW) => cmp::max(self.minimum_difficulty, diff),
-            // TODO：
-            Some(SealType::PoS) => {
-                cmp::max(
-                    self.unity_initial_pos_difficulty
-                        .unwrap_or(2_000_000_000u64.into()),
-                    diff,
-                )
-            }
-        }
+        cmp::max(self.minimum_difficulty, diff)
     }
 }
 
@@ -504,7 +506,7 @@ impl Engine for Arc<UnityEngine> {
             .machine
             .params()
             .unity_update
-            .map_or(true, |fork_number| header.number() < fork_number)
+            .map_or(true, |fork_number| header.number() <= fork_number)
         {
             Err(BlockError::InvalidPoSBlockNumber.into())
         } else {
@@ -531,7 +533,7 @@ impl Engine for Arc<UnityEngine> {
             .machine
             .params()
             .unity_update
-            .map_or(false, |fork_number| header.number() >= fork_number)
+            .map_or(false, |fork_number| header.number() > fork_number)
         {
             parent_validators.push(Box::new(SealTypeValidator {}));
         }

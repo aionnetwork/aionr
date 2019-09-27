@@ -1650,7 +1650,7 @@ impl MinerService for Miner {
             .params()
             .unity_update
             .map_or(false, |fork_number| {
-                client.chain_info().best_block_number + 1 >= fork_number
+                client.chain_info().best_block_number >= fork_number
             })
     }
 
