@@ -535,12 +535,15 @@ impl Client {
         // Print log
         match (first_header, last_header) {
             (Some(ref first), Some(ref last)) if first == last => {
-                info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}", 
+                let (_, _, _, hour, minute, second) = utc_from_secs(first.timestamp() as i64);
+                info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}:{}:{}", 
                     first.seal_type().clone().unwrap_or_default(),
                     Colour::White.bold().paint(format!("{}", first.number())), 
                     Colour::White.bold().paint(format!("{:x}", first.hash())), 
                     Colour::White.bold().paint(format!("{:x}", first.difficulty())),
-                    Colour::White.bold().paint(format!("{:x}", first.timestamp())));
+                    Colour::White.bold().paint(format!("{}", hour)),
+                    Colour::White.bold().paint(format!("{}", minute)),
+                    Colour::White.bold().paint(format!("{}", second)));
             }
             (Some(first), Some(last)) => {
                 info!(target: "miner", "External blocks added from #{} to #{}", 
@@ -1777,17 +1780,34 @@ impl MiningBlockChainClient for Client {
         self.db.read().flush().expect("DB flush failed.");
         // clear pending PoS blocks
         self.miner.clear_pos_pending();
+
+        let (_, _, _, hour, minute, second) = utc_from_secs(timestamp as i64);
         // Print log
-        info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}", 
+        info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}:{}:{}", 
             seal_type.unwrap_or_default(),
             Colour::White.bold().paint(format!("{}", number)), 
             Colour::White.bold().paint(format!("{:x}", hash)), 
             Colour::White.bold().paint(format!("{:x}", difficulty)),
-            Colour::White.bold().paint(format!("{:x}", timestamp)));
+            Colour::White.bold().paint(format!("{}", hour)),
+            Colour::White.bold().paint(format!("{}", minute)),
+            Colour::White.bold().paint(format!("{}", second)));
         Ok(hash)
     }
 
     fn prepare_block_interval(&self) -> Duration { self.miner.prepare_block_interval() }
+}
+
+fn utc_from_secs(secs: i64) -> (u64, u64, u64, u64, u64, u64) {
+    let time_spec = ::time::Timespec::new(secs, 0);
+    let utc = ::time::at_utc(time_spec);
+    return (
+        1900 + utc.tm_year as u64,
+        utc.tm_mon as u64,
+        utc.tm_mday as u64,
+        utc.tm_hour as u64,
+        utc.tm_min as u64,
+        utc.tm_sec as u64,
+    );
 }
 
 impl ProvingBlockChainClient for Client {

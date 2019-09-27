@@ -1597,7 +1597,7 @@ impl MinerService for Miner {
                 Err(Error::PowInvalid)
             })
         } else {
-            warn!(target: "miner", "Submitted solution rejected: Block unknown or out of date.");
+            debug!(target: "miner", "Submitted solution rejected: Block unknown or out of date.");
             Err(Error::PowHashInvalid)
         };
         result.and_then(|sealed| {
