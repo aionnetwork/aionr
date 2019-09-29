@@ -376,7 +376,7 @@ mod tests {
         assert!(db.write(batch).is_ok());
 
         assert!(ClientService::test_correct_db(db.clone()).is_ok());
-        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone(), None, None);
+        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone());
 
         assert_eq!(bc.best_block_number(), 497);
 
@@ -387,7 +387,7 @@ mod tests {
         assert!(db.write(batch).is_ok());
 
         assert!(ClientService::test_correct_db(db.clone()).is_ok());
-        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone(), None, None);
+        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone());
 
         assert_eq!(bc.best_block_number(), 497);
 
@@ -399,7 +399,7 @@ mod tests {
         assert!(db.write(batch).is_ok());
 
         assert!(ClientService::test_correct_db(db.clone()).is_ok());
-        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone(), None, None);
+        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone());
 
         assert_eq!(bc.best_block_number(), 395);
     }

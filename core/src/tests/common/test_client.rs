@@ -477,9 +477,7 @@ impl BlockChainClient for TestBlockChainClient {
         ))
     }
 
-    fn block_total_difficulty(&self, _id: BlockId) -> Option<U256> {
-        Some((U256::zero(), U256::zero(), U256::zero()))
-    }
+    fn block_total_difficulty(&self, _id: BlockId) -> Option<U256> { Some(U256::zero()) }
 
     fn block_hash(&self, id: BlockId) -> Option<H256> { Self::block_hash(self, id) }
 
@@ -636,21 +634,6 @@ impl BlockChainClient for TestBlockChainClient {
             .get(&hash)
             .map(|r| Rlp::new(r).at(0).as_raw().to_vec())
             .map(encoded::Header::new)
-    }
-
-    fn seal_parent_header(
-        &self,
-        parent_hash: &H256,
-        seal_type: &Option<SealType>,
-    ) -> Option<::encoded::Header>
-    {
-        self.blocks
-            .read()
-            .get(&parent_hash)
-            .map(|r| Rlp::new(r).at(0).as_raw().to_vec())
-            .map(encoded::Header::new)
-            .filter(|h| h.seal_type() == *seal_type)
-        // TODO-UNITY-TEST: handle this better
     }
 
     fn block_number(&self, _id: BlockId) -> Option<BlockNumber> { unimplemented!() }

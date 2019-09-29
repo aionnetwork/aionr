@@ -1713,7 +1713,6 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use super::{Banning, MinerOptions, PendingSet, SealType};
-    use client::BlockChainClient;
     use tests::common::{EachBlockWith, TestBlockChainClient};
     use transaction::{PendingTransaction, SignedTransaction};
     use transaction::Action;
@@ -1890,9 +1889,6 @@ mod tests {
         let miner = miner();
         let client = TestBlockChainClient::default();
 
-        let header = client.best_block_header_with_seal_type(&SealType::PoS);
-        assert!(header.is_none());
-
         let seed = H512::zero();
         println!("seed = {:?}", seed);
 
@@ -1905,7 +1901,7 @@ mod tests {
         // 2. submit seed
         let seed: H512 = "d1c02f4679b4a022f2d843bd750c34c94cd08a2b6fc2def298653b81b88245a345d8d3e2d8bbce3fdb3ab2918459633f4496d5609ac13d9710ddcede8957cc0c".
             from_hex().unwrap().as_slice().into();
-        let template = miner.get_pos_template(&client, seed.into(), staker);
+        let template = miner.get_pos_template(&client, seed.into(), staker, staker);
 
         assert!(template.is_some());
         println!("new block = {:?}, staker = {:?}", template.unwrap(), staker);

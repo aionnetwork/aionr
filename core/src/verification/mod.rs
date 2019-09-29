@@ -307,7 +307,6 @@ mod tests {
     use transaction::{SignedTransaction, Transaction, UnverifiedTransaction, Action};
     use types::state::log_entry::{LogEntry, LocalizedLogEntry};
     use rlp;
-    use header::SealType;
     use keychain;
 
     fn check_ok(result: Result<(), Error>) {
