@@ -156,18 +156,19 @@ impl DifficultyCalc {
         great_grand_parent: Option<&Header>,
     ) -> U256
     {
-        // If no grand parent, return the difficulty of the parent
-        let grand_parent = match grand_parent {
-            Some(header) => header,
-            None => {
-                return parent.difficulty().to_owned();
-            }
-        };
-
         match self.unity_update {
             // AION 2.0
             Some(fork_number) if parent.number() >= fork_number => {
-                // For the first PoS block
+                // 1. First PoS block case 1: if no grand parent (block #1), return the initial PoS diff
+                let grand_parent = match grand_parent {
+                    Some(header) => header,
+                    None => {
+                        return self
+                            .unity_initial_pos_difficulty
+                            .unwrap_or(self.minimum_difficulty);
+                    }
+                };
+                // 2. First PoS block case 2: parent and grand parent are both PoW blocks
                 if parent.seal_type() == &Some(SealType::PoW)
                     && grand_parent.seal_type() == &Some(SealType::PoW)
                 {
@@ -175,7 +176,7 @@ impl DifficultyCalc {
                         .unity_initial_pos_difficulty
                         .unwrap_or(self.minimum_difficulty);
                 }
-                // If no great grand parent, return the difficulty of the grand parent
+                // If no great grand parent (block #2), return the difficulty of the grand parent
                 let great_grand_parent = match great_grand_parent {
                     Some(header) => header,
                     None => {
@@ -185,7 +186,16 @@ impl DifficultyCalc {
                 self.calculate_difficulty_v2(grand_parent, great_grand_parent)
             }
             // AION 1.x
-            _ => self.calculate_difficulty_v1(parent, grand_parent),
+            _ => {
+                // If no grand parent, return the difficulty of the parent
+                let grand_parent = match grand_parent {
+                    Some(header) => header,
+                    None => {
+                        return parent.difficulty().to_owned();
+                    }
+                };
+                self.calculate_difficulty_v1(parent, grand_parent)
+            }
         }
     }
 
