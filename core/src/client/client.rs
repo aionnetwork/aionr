@@ -536,11 +536,12 @@ impl Client {
         match (first_header, last_header) {
             (Some(ref first), Some(ref last)) if first == last => {
                 let (_, _, _, hour, minute, second) = utc_from_secs(first.timestamp() as i64);
-                info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}:{}:{}", 
+                info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}", 
                     first.seal_type().clone().unwrap_or_default(),
-                    Colour::White.bold().paint(format!("{}", first.number())), 
-                    Colour::White.bold().paint(format!("{:x}", first.hash())), 
+                    Colour::White.bold().paint(format!("{}", first.number())),
+                    Colour::White.bold().paint(format!("{:x}", first.hash())),
                     Colour::White.bold().paint(format!("{:x}", first.difficulty())),
+                    Colour::White.bold().paint(format!("{:x}", first.timestamp())),
                     Colour::White.bold().paint(format!("{}", hour)),
                     Colour::White.bold().paint(format!("{}", minute)),
                     Colour::White.bold().paint(format!("{}", second)));
@@ -1783,11 +1784,12 @@ impl MiningBlockChainClient for Client {
 
         let (_, _, _, hour, minute, second) = utc_from_secs(timestamp as i64);
         // Print log
-        info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}:{}:{}", 
+        info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}", 
             seal_type.unwrap_or_default(),
             Colour::White.bold().paint(format!("{}", number)), 
             Colour::White.bold().paint(format!("{:x}", hash)), 
             Colour::White.bold().paint(format!("{:x}", difficulty)),
+            Colour::White.bold().paint(format!("{:x}", timestamp)),
             Colour::White.bold().paint(format!("{}", hour)),
             Colour::White.bold().paint(format!("{}", minute)),
             Colour::White.bold().paint(format!("{}", second)));
