@@ -1570,6 +1570,23 @@ impl MinerService for Miner {
     {
         trace!(target: "block", "chain_new_blocks");
 
+        if retracted.is_empty() {
+            let _ = self
+                .pending_transactions()
+                .iter()
+                .chain(self.future_transactions().iter())
+                .map(|x| {
+                    if let Some(ref hash) = x.beacon {
+                        if client.is_beacon_hash(hash).is_none() {
+                            self.transaction_pool.remove_transaction(
+                                *x.hash(),
+                                RemovalReason::InvalidBeaconHash(*hash),
+                            )
+                        }
+                    }
+                });
+        }
+
         // Import all transactions in retracted routes...
         {
             for hash in retracted {

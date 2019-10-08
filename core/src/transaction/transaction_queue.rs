@@ -613,6 +613,8 @@ pub enum RemovalReason {
     Canceled,
     /// Transaction is not allowed,
     NotAllowed,
+    /// Transaction beacon hash invalid
+    InvalidBeaconHash(H256),
 }
 
 /// Point in time when transaction was inserted.
@@ -951,6 +953,11 @@ impl TransactionQueue {
                 RemovalReason::Canceled => {
                     self.local_transactions
                         .mark_canceled(transaction_hash.clone())
+                }
+                RemovalReason::InvalidBeaconHash(ref beacon_hash) => {
+                    debug!(target: "txqueue", "tx {} beacon hash {} invalid", transaction_hash, beacon_hash);
+                    self.local_transactions
+                        .mark_invalid(transaction_hash.clone())
                 }
             }
         }
