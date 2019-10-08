@@ -29,7 +29,7 @@ use unexpected::{Mismatch, OutOfBounds};
 use acore_bytes::to_hex;
 
 /// Tolerance of future blocks with greater timestamp than local system time
-const FUTURE_TIME_TOLERANCE: u64 = 5;
+const FUTURE_TIME_TOLERANCE: u64 = 1;
 
 /// Header validator.
 pub trait HeaderValidator {
