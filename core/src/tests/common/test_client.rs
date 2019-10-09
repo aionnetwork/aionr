@@ -41,7 +41,7 @@ use filter::Filter;
 use header::{BlockNumber, Header as BlockHeader, SealType};
 use itertools::Itertools;
 use journaldb;
-//use key::{generate_keypair, public_to_address_ed25519};
+use key::{generate_keypair, public_to_address_ed25519};
 use kvdb::{DatabaseConfig, DbRepository, RepositoryConfig};
 use kvdb::{KeyValueDB, MockDbRepository};
 use log_entry::LocalizedLogEntry;
@@ -49,7 +49,7 @@ use miner::{Miner, MinerService};
 use parking_lot::RwLock;
 use receipt::{LocalizedReceipt, Receipt};
 use rlp::*;
-//use rustc_hex::FromHex;
+use rustc_hex::FromHex;
 use spec::Spec;
 use state::BasicAccount;
 use std::collections::HashMap;
@@ -59,7 +59,7 @@ use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrder};
 use std::time::Duration;
 use tempdir::TempDir;
 use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction,
-/*Transaction, Action, DEFAULT_TRANSACTION_TYPE*/
+Transaction, Action, DEFAULT_TRANSACTION_TYPE
 };
 use transaction::UnverifiedTransaction;
 use types::error::{CallError, ImportResult};
@@ -124,8 +124,8 @@ pub struct TestBlockChainClient {
 pub enum EachBlockWith {
     /// Plain block.
     Nothing,
-    //    /// Block with a transaction.
-    //    Transaction,
+    /// Block with a transaction.
+    Transaction(Option<H256>),
 }
 
 impl Default for TestBlockChainClient {
@@ -141,11 +141,11 @@ impl TestBlockChainClient {
         let spec = Spec::new_test();
         TestBlockChainClient::new_with_spec_and_extra(spec, extra_data)
     }
-    //
-    //    /// Create test client with custom spec.
-    //    pub fn new_with_spec(spec: Spec) -> Self {
-    //        TestBlockChainClient::new_with_spec_and_extra(spec, Bytes::new())
-    //    }
+
+    /// Create test client with custom spec.
+    pub fn new_with_spec(spec: Spec) -> Self {
+        TestBlockChainClient::new_with_spec_and_extra(spec, Bytes::new())
+    }
 
     /// Create test client with custom spec and extra data.
     pub fn new_with_spec_and_extra(spec: Spec, extra_data: Bytes) -> Self {
@@ -238,31 +238,31 @@ impl TestBlockChainClient {
             header.set_extra_data(self.extra_data.clone());
             header.set_seal_type(seal_type.clone());
             let txs = match with {
-                //                EachBlockWith::Transaction => {
-                //                    let mut txs = RlpStream::new_list(1);
-                //                    let keypair = generate_keypair();
-                //                    // Update nonces value
-                //                    self.nonces
-                //                        .write()
-                //                        .insert(public_to_address_ed25519(&keypair.public()), U256::one());
-                //                    let tx = Transaction {
-                //                        action: Action::Create,
-                //                        value: U256::from(100),
-                //                        value_bytes: Vec::new(),
-                //                        data: "3331600055".from_hex().unwrap(),
-                //                        gas: U256::from(100_000),
-                //                        gas_bytes: Vec::new(),
-                //                        gas_price: U256::from(200_000_000_000u64),
-                //                        gas_price_bytes: Vec::new(),
-                //                        nonce: U256::zero(),
-                //                        nonce_bytes: Vec::new(),
-                //                        transaction_type: DEFAULT_TRANSACTION_TYPE,
-                //                        beacon: None,
-                //                    };
-                //                    let signed_tx = tx.sign(&keypair.secret().0, None);
-                //                    txs.append(&signed_tx);
-                //                    txs.out()
-                //                }
+                EachBlockWith::Transaction(beacon) => {
+                    let mut txs = RlpStream::new_list(1);
+                    let keypair = generate_keypair();
+                    // Update nonces value
+                    self.nonces
+                        .write()
+                        .insert(public_to_address_ed25519(&keypair.public()), U256::one());
+                    let tx = Transaction {
+                        action: Action::Create,
+                        value: U256::from(100),
+                        value_bytes: Vec::new(),
+                        data: "3331600055".from_hex().unwrap(),
+                        gas: U256::from(100_000),
+                        gas_bytes: Vec::new(),
+                        gas_price: U256::from(200_000_000_000u64),
+                        gas_price_bytes: Vec::new(),
+                        nonce: U256::zero(),
+                        nonce_bytes: Vec::new(),
+                        transaction_type: DEFAULT_TRANSACTION_TYPE,
+                        beacon,
+                    };
+                    let signed_tx = tx.sign(&keypair.secret().0);
+                    txs.append(&signed_tx);
+                    txs.out()
+                }
                 _ => ::rlp::EMPTY_LIST_RLP.to_vec(),
             };
 

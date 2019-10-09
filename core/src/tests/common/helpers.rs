@@ -142,8 +142,22 @@ where
         block_number,
         txs_per_block,
         tx_gas_prices,
+        None,
     )
 }
+/*
+
+pub fn generate_dummy_unity_client_with_beacon(block_number: u32) -> Arc<Client> {
+    generate_dummy_client_with_spec_accounts_and_data(
+        Spec::new_unity,
+        None,
+        block_number,
+        1,
+        &[0u64.into()],
+            Some(1235661u64.into())
+    )
+}
+*/
 
 pub fn generate_dummy_client_with_spec_accounts_and_data<F>(
     get_test_spec: F,
@@ -151,6 +165,7 @@ pub fn generate_dummy_client_with_spec_accounts_and_data<F>(
     block_number: u32,
     txs_per_block: usize,
     tx_gas_prices: &[U256],
+    beacon: Option<H256>,
 ) -> Arc<Client>
 where
     F: Fn() -> Spec,
@@ -228,7 +243,7 @@ where
                     gas_price_bytes: Vec::new(),
                     gas_bytes: Vec::new(),
                     value_bytes: Vec::new(),
-                    beacon: None,
+                    beacon,
                 }
                 .sign(kp.secret()),
                 None,

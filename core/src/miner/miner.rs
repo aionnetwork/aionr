@@ -903,16 +903,24 @@ impl Miner {
         transaction: UnverifiedTransaction,
     ) -> Result<SignedTransaction, Error>
     {
-        // TODO: handle the new error
-        if let Some(ref hash) = transaction.beacon {
-            if client.is_beacon_hash(hash).is_none() {
-                return Err(Error::Transaction(TransactionError::InvalidBeaconHash(
-                    *hash,
-                )));
+        let best_block_header = client.best_block_header().decode();
+        match self.engine.machine().params().unity_update {
+            Some(update_num) if best_block_header.number() + 1 >= update_num => {
+                if let Some(ref hash) = transaction.beacon {
+                    if client.is_beacon_hash(hash).is_none() {
+                        return Err(Error::Transaction(TransactionError::InvalidBeaconHash(
+                            *hash,
+                        )));
+                    }
+                }
+            }
+            _ => {
+                if transaction.beacon.is_some() {
+                    return Err(Error::Transaction(TransactionError::BeaconBanned));
+                }
             }
         }
         let hash = transaction.hash().clone();
-        let best_block_header = client.best_block_header().decode();
         if client
             .transaction_block(TransactionId::Hash(hash.clone()))
             .is_some()
@@ -1570,21 +1578,26 @@ impl MinerService for Miner {
     {
         trace!(target: "block", "chain_new_blocks");
 
-        if retracted.is_empty() {
-            let _ = self
-                .pending_transactions()
-                .iter()
-                .chain(self.future_transactions().iter())
-                .map(|x| {
-                    if let Some(ref hash) = x.beacon {
-                        if client.is_beacon_hash(hash).is_none() {
-                            self.transaction_pool.remove_transaction(
-                                *x.hash(),
-                                RemovalReason::InvalidBeaconHash(*hash),
-                            )
+        if let Some(update_num) = self.engine.machine().params().unity_update {
+            let best_num = client
+                .block_number(BlockId::Latest)
+                .expect("should not be none");
+            if best_num + 1 >= update_num && !retracted.is_empty() {
+                let _ = self
+                    .pending_transactions()
+                    .iter()
+                    .chain(self.future_transactions().iter())
+                    .map(|x| {
+                        if let Some(ref hash) = x.beacon {
+                            if client.is_beacon_hash(hash).is_none() {
+                                self.transaction_pool.remove_transaction(
+                                    *x.hash(),
+                                    RemovalReason::InvalidBeaconHash(*hash),
+                                )
+                            }
                         }
-                    }
-                });
+                    });
+            }
         }
 
         // Import all transactions in retracted routes...
@@ -1667,9 +1680,10 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use super::{Banning, MinerOptions, PendingSet, SealType};
+    use types::error::*;
     use client::BlockChainClient;
     use tests::common::{EachBlockWith, TestBlockChainClient};
-    use transaction::{PendingTransaction, SignedTransaction};
+    use transaction::{PendingTransaction, SignedTransaction, Error as TransactionError};
     use transaction::Action;
     use transaction::Transaction;
     use transaction::transaction_queue::PrioritizationStrategy;
@@ -1733,6 +1747,33 @@ mod tests {
         .expect("Miner was just created.")
     }
 
+    fn miner_with_spec(spec: &Spec) -> Miner {
+        Arc::try_unwrap(Miner::new(
+            MinerOptions {
+                force_sealing: false,
+                reseal_min_period: Duration::from_secs(5),
+                prepare_block_interval: Duration::from_secs(5),
+                tx_gas_limit: !U256::zero(),
+                tx_queue_memory_limit: None,
+                tx_queue_strategy: PrioritizationStrategy::GasFactorAndGasPrice,
+                pending_set: PendingSet::AlwaysSealing,
+                work_queue_size: 5,
+                enable_resubmission: true,
+                tx_queue_banning: Banning::Disabled,
+                infinite_pending_block: false,
+                minimal_gas_price: 0u64.into(),
+                maximal_gas_price: 9_000_000_000_000_000_000u64.into(),
+                local_max_gas_price: 100_000_000_000u64.into(),
+                staker_private_key: None,
+            },
+            spec,
+            None, // accounts provider
+            IoChannel::disconnected(),
+        ))
+        .ok()
+        .expect("Miner was just created.")
+    }
+
     fn transaction() -> SignedTransaction {
         let keypair = keychain::ethkey::generate_keypair();
         Transaction {
@@ -1748,6 +1789,25 @@ mod tests {
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
             beacon: None,
+        }
+        .sign(keypair.secret())
+    }
+
+    fn transaction_with_beacon(beacon: H256) -> SignedTransaction {
+        let keypair = keychain::ethkey::generate_keypair();
+        Transaction {
+            action: Action::Create,
+            value: U256::zero(),
+            data: "3331600055".from_hex().unwrap(),
+            gas: U256::from(300_000),
+            gas_price: default_gas_price(),
+            nonce: U256::zero(),
+            transaction_type: ::transaction::DEFAULT_TRANSACTION_TYPE,
+            nonce_bytes: Vec::new(),
+            gas_price_bytes: Vec::new(),
+            gas_bytes: Vec::new(),
+            value_bytes: Vec::new(),
+            beacon: Some(beacon),
         }
         .sign(keypair.secret())
     }
@@ -1810,12 +1870,44 @@ mod tests {
         // then
         assert!(res.is_ok());
         miner.update_transaction_pool(&client, true);
-        // miner.prepare_work_sealing(&client);
+        // miner.prepare_work_sealing(&client,&None);
         assert_eq!(miner.pending_transactions().len(), 1);
         assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
         assert_eq!(miner.pending_receipts(best_block).len(), 0);
         // This method will let us know if pending block was created (before calling that method)
+        assert!(miner.prepare_work_sealing(&client, &None));
+    }
+
+    #[test]
+    fn should_not_import_transaction_with_beacon_hash_before_fork_point() {
+        // given
+        let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
+        let miner = miner_with_spec(&Spec::new_unity());
+        let transaction = transaction_with_beacon(H256::from(37472u64));
+        let best_block = 0;
+        // external
+        let res = miner
+            .import_external_transactions(&client, vec![transaction.clone().into()])
+            .pop()
+            .unwrap();
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            format!("{}", Error::Transaction(TransactionError::BeaconBanned))
+        );
+        // internal
+        let res = miner.import_own_transaction(&client, PendingTransaction::new(transaction, None));
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            format!("{}", Error::Transaction(TransactionError::BeaconBanned))
+        );
+        // then
+        miner.update_transaction_pool(&client, true);
+        // miner.prepare_work_sealing(&client);
+        assert_eq!(miner.pending_transactions().len(), 0);
+        assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
+        assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
+        assert_eq!(miner.pending_receipts(best_block).len(), 0);
         assert!(miner.prepare_work_sealing(&client, &None));
     }
 
@@ -1858,8 +1950,8 @@ mod tests {
             .into();
 
         // 2. submit seed
-        let seed: H512 = "d1c02f4679b4a022f2d843bd750c34c94cd08a2b6fc2def298653b81b88245a345d8d3e2d8bbce3fdb3ab2918459633f4496d5609ac13d9710ddcede8957cc0c".
-            from_hex().unwrap().as_slice().into();
+        let seed: H512 = "d1c02f4679b4a022f2d843bd750c34c94cd08a2b6fc2def298653b81b88245a345d8d3e2d8bbce3fdb3ab2918459633f4496d5609ac13d9710ddcede8957cc0c"
+            .from_hex().unwrap().as_slice().into();
         let template = miner.get_pos_template(&client, seed.into(), staker);
 
         assert!(template.is_some());

@@ -110,6 +110,8 @@ pub enum Error {
     },
     /// Invalid beacon hash
     InvalidBeaconHash(H256),
+    /// beacon hash is banned
+    BeaconBanned,
 }
 
 impl From<key::Error> for Error {
@@ -195,6 +197,7 @@ impl fmt::Display for Error {
                     hash
                 )
             }
+            BeaconBanned => "Not yet forked, Beacon hash is banned.".into(),
         };
 
         f.write_fmt(format_args!("Transaction error ({})", msg))

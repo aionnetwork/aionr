@@ -403,6 +403,7 @@ pub fn transaction_message(error: TransactionError) -> String {
                 hash
             )
         }
+        BeaconBanned => "Not yet forked, Beacon hash is banned.".into(),
     }
 }
 

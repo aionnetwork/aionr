@@ -247,6 +247,13 @@ fn empty_gas_price_histogram() {
 
     assert!(client.gas_price_corpus(20, 64).histogram(5).is_none());
 }
+/*
+
+#[test]
+fn should_not_import_blocks_with_beacon_before_fork_point(){
+    generate_dummy_unity_client_with_beacon(3);
+}
+*/
 
 #[test]
 fn can_handle_long_fork() {

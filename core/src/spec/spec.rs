@@ -236,6 +236,10 @@ impl Spec {
     /// secret is blake2b('').
     pub fn new_null() -> Spec { load_bundled!("null") }
 
+    #[cfg(test)]
+    /// Create a new Spec which is a UnityEngine consensus
+    pub fn new_unity() -> Spec { load_bundled!("unity") }
+
     // create an instance of an Ethereum state machine, minus consensus logic.
     fn machine(
         params: CommonParams,

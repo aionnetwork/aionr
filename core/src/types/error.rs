@@ -112,6 +112,8 @@ pub enum BlockError {
     InvalidFutureTimestamp(OutOfBounds<u64>),
     /// Invalid beacon hash
     InvalidBeaconHash(H256),
+    /// Beacon hash is banned
+    BeaconHashBanned,
 }
 
 impl fmt::Display for BlockError {
@@ -176,6 +178,7 @@ impl fmt::Display for BlockError {
             InvalidBeaconHash(ref hash) => {
                 format!("Block with invalid transaction beacon hash: {}", hash)
             }
+            BeaconHashBanned => "Not yet forked, beacon hash is banned".into(),
         };
 
         f.write_fmt(format_args!("Block error ({})", msg))
