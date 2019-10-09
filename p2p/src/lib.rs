@@ -115,7 +115,15 @@ pub struct Mgr {
 
 impl Mgr {
     /// constructor
-    pub fn new(config: Config, tokens_pairs: Vec<[u32; 2]>) -> Mgr {
+    pub fn new(mut config: Config, tokens_pairs: Vec<[u32; 2]>) -> Mgr {
+        // load local node
+        let temp_local = TempNode::new_from_str(config.local_node);
+        config.local_node = format!(
+            "p2p://{}@{}",
+            temp_local.get_id_string(),
+            temp_local.addr.to_string()
+        );
+
         // load seeds
         let mut temp_queue = VecDeque::<TempNode>::with_capacity(TEMP_MAX);
         for boot_node_str in config.boot_nodes.clone() {
@@ -339,7 +347,7 @@ impl Mgr {
                     if let Ok(addr) = temp_node.addr.to_string().parse() {
                         debug!(target: "p2p", "connecting to: {}", &addr);
 
-                        match StdTcpStream::connect_timeout(&addr, Duration::from_millis(200)) {
+                        match StdTcpStream::connect_timeout(&addr, Duration::from_millis(1000)) {
                             Ok(stdts)=>{
                                 if let Ok(ts) = TcpStream::from_std(stdts, &Handle::default()) {
                                     debug!(target: "p2p", "connected to: {}", &temp_node.addr.to_string());
@@ -515,10 +523,10 @@ impl Mgr {
                 if let Some(shutdown_hook) = shutdown_hooks.pop() {
                     match shutdown_hook.send(()) {
                         Ok(_) => {
-                            debug!(target: "p2p", "shutdown signal sent");
+                            info!(target: "p2p", "shutdown signal sent");
                         }
                         Err(err) => {
-                            debug!(target: "p2p", "shutdown err: {:?}", err);
+                            info!(target: "p2p", "shutdown err: {:?}", err);
                         }
                     }
                 }
@@ -530,17 +538,19 @@ impl Mgr {
             for (_hash, mut node) in lock.iter_mut() {
                 match node.ts.shutdown(Shutdown::Both) {
                     Ok(_) => {
-                        debug!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
+                        info!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
                     }
-                    Err(_err) => {}
+                    Err(err) => {
+                        info!(target: "p2p", "shutdown err: {:?}", err);
+                    }
                 }
 
                 match node.shutdown_tcp_thread() {
                     Ok(_) => {
-                        debug!(target: "p2p", "tcp connection thread shutdown signal sent");
+                        info!(target: "p2p", "tcp connection thread shutdown signal sent");
                     }
                     Err(err) => {
-                        debug!(target: "p2p", "shutdown err: {:?}", err);
+                        info!(target: "p2p", "shutdown err: {:?}", err);
                     }
                 }
             }
@@ -665,6 +675,8 @@ impl Mgr {
             }
         }
     }
+
+    pub fn get_local_node_info(&self) -> &String { &self.config.local_node }
 
     /// messages with module code other than p2p module
     /// should flow into external handlers

@@ -12,7 +12,7 @@ stake_contract = "0xa056337bb14e818f3f53e13ab0d93b6539aa570cba91ce65c71605824198
 sync_from_boot_nodes_only = false
 max_peers = 128
 net_id = 256
-local_node = "p2p://7c637e7f-7146-42db-ab3b-c0f1ec08f92d@0.0.0.0:30303"
+local_node = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"
 boot_nodes = []
 ip_black_list = []
 

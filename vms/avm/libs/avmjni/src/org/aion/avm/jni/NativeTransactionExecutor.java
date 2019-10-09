@@ -2,12 +2,6 @@ package org.aion.avm.jni;
 
 import java.util.List;
 
-import org.aion.vm.api.interfaces.KernelInterface;
-import org.aion.vm.api.interfaces.SimpleFuture;
-import org.aion.vm.api.interfaces.TransactionInterface;
-// import org.aion.vm.api.interfaces.TransactionResult;
-import org.aion.vm.api.interfaces.IExecutionLog;
-import org.aion.vm.api.interfaces.TransactionSideEffects;
 import org.aion.avm.core.AvmImpl;
 import org.aion.avm.core.CommonAvmFactory;
 import org.aion.avm.core.IExternalCapabilities;
@@ -18,8 +12,6 @@ import org.aion.avm.core.FutureResult;
 import org.aion.types.Transaction;
 import org.aion.types.TransactionResult;
 import org.aion.types.Log;
-//import org.aion.kernel.AvmTransactionResult;
-// import org.aion.kernel.TransactionalKernel;
 
 import java.util.Set;
 

@@ -1,6 +1,5 @@
 package org.aion.avm.jni;
 
-import org.aion.vm.api.interfaces.KernelInterface;
 import org.aion.types.AionAddress;
 
 import org.aion.avm.core.IExternalState;

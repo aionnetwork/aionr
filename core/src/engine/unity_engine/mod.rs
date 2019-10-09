@@ -556,8 +556,8 @@ impl Engine for Arc<UnityEngine> {
         {
             let header = LiveBlock::header(&*block);
             result_block_reward = self.calculate_reward(&header);
-            debug!(target: "cons", "verify number: {}, reward: {} ", header.number(),  result_block_reward);
             author = *header.author();
+            debug!(target: "cons", "verify number: {}, coinbase: {}, reward: {} ", header.number(), &author, result_block_reward);
         }
         block.header_mut().set_reward(result_block_reward.clone());
         self.machine

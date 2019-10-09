@@ -339,16 +339,18 @@ impl Sync {
             if let Some(shutdown_hook) = shutdown_hooks.pop() {
                 match shutdown_hook.send(()) {
                     Ok(_) => {
-                        debug!(target: "sync", "shutdown signal sent");
+                        info!(target: "sync", "shutdown signal sent");
                     }
                     Err(err) => {
-                        debug!(target: "sync", "shutdown err: {:?}", err);
+                        info!(target: "sync", "shutdown err: {:?}", err);
                     }
                 }
             }
         }
         info!(target:"sync", "sync shutdown finished");
     }
+
+    pub fn get_local_node_info(&self) -> &String { self.p2p.get_local_node_info() }
 }
 
 impl SyncProvider for Sync {
