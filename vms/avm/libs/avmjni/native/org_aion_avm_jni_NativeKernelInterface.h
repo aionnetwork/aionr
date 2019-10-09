@@ -223,6 +223,14 @@ JNIEXPORT jboolean JNICALL Java_org_aion_avm_jni_NativeKernelInterface_edverify
 JNIEXPORT void JNICALL Java_org_aion_avm_jni_NativeKernelInterface_removeStorage
   (JNIEnv *, jclass, jlong, jbyteArray, jbyteArray);
 
+/*
+ * Class:     org_aion_avm_jni_NativeKernelInterface
+ * Method:    decode_meta_tx
+ * Signature: ([B[BJJ)[B
+ */
+JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_jni_NativeKernelInterface_decode_1meta_1tx
+  (JNIEnv *, jclass, jbyteArray, jbyteArray, jlong, jlong);
+
 #ifdef __cplusplus
 }
 #endif
