@@ -24,7 +24,6 @@
 
 use super::error;
 use aion_types::{to_u256, Address, Ed25519Public, H256, U256};
-use ajson;
 use blake2b::blake2b;
 use heapsize::HeapSizeOf;
 use key::{
@@ -204,36 +203,6 @@ impl Transaction {
 
 impl HeapSizeOf for Transaction {
     fn heap_size_of_children(&self) -> usize { self.data.heap_size_of_children() }
-}
-
-impl From<ajson::transaction::Transaction> for UnverifiedTransaction {
-    fn from(t: ajson::transaction::Transaction) -> Self {
-        let to: Option<ajson::hash::Address> = t.to.into();
-        UnverifiedTransaction {
-            unsigned: Transaction {
-                nonce: t.nonce.into(),
-                nonce_bytes: Vec::new(),
-                gas_price: t.gas_price.into(),
-                gas_price_bytes: Vec::new(),
-                gas: t.gas_limit.into(),
-                gas_bytes: Vec::new(),
-                action: match to {
-                    Some(to) => Action::Call(to.into()),
-                    None => Action::Create,
-                },
-                value: t.value.into(),
-                value_bytes: Vec::new(),
-                data: t.data.into(),
-                transaction_type: t.transaction_type.into(),
-                // TODO-ARK-58: need beacon hash in ajson::transaction::Transaction?
-                beacon: None,
-            },
-            timestamp: t.timestamp.into(),
-            sig: t.sig.into(),
-            hash: 0.into(),
-        }
-        .compute_hash()
-    }
 }
 
 impl Transaction {
