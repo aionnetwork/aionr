@@ -1099,94 +1099,6 @@ impl Client {
         )
         .fake_sign(Address::default())
     }
-
-    fn beacon_check(&self, block: &Bytes) -> Result<(), BlockImportError> {
-        let block = BlockView::new(block);
-        let header = block.header_view();
-        match self.engine.machine().params().unity_update {
-            Some(update_num) if header.number() >= update_num => {
-                let parent_hash = header.parent_hash();
-
-                let parent_is_canon = self.is_beacon_hash(&parent_hash);
-
-                match parent_is_canon {
-                    Some(_) => {
-                        for tx in block.transactions().iter().filter(|x| x.beacon.is_some()) {
-                            let hash = tx.beacon.unwrap();
-                            if self.is_beacon_hash(&hash).is_none() {
-                                debug!(target: "beacon", "Invalid block, tx:{}, beacon_hash:{}, beacon in branch, parent in canon",tx.hash(),hash);
-                                return Err(BlockImportError::Block(BlockError::InvalidBeaconHash(
-                                    hash,
-                                )));
-                            }
-                        }
-                    }
-                    None => {
-                        for tx in block.transactions().iter().filter(|x| x.beacon.is_some()) {
-                            let hash = tx.beacon.unwrap();
-                            match self.is_beacon_hash(&hash.clone()) {
-                                Some(ref num) => {
-                                    let mut parent_hash = parent_hash;
-                                    let mut block_num = header.number() - 1;
-                                    let chain = self.chain.read();
-                                    loop {
-                                        parent_hash = chain
-                                            .block_details(&parent_hash)
-                                            .expect(
-                                                "This branch is not completed cannot validate \
-                                                 beacon hash",
-                                            )
-                                            .parent;
-                                        block_num -= 1;
-                                        if self.is_beacon_hash(&parent_hash).is_some() {
-                                            break;
-                                        }
-                                        if &block_num == num {
-                                            debug!(target: "beacon", "Invalid block, tx:{}, beacon_hash:{}, beacon in canon, parent in branch",tx.hash(),hash);
-                                            return Err(BlockImportError::Block(
-                                                BlockError::InvalidBeaconHash(hash),
-                                            ));
-                                        }
-                                    }
-                                }
-                                None => {
-                                    let mut parent_hash = parent_hash;
-                                    let mut block_num = header.number() - 1;
-                                    let chain = self.chain.read();
-                                    loop {
-                                        let parent_details =
-                                            chain.block_details(&parent_hash).expect(
-                                                "This branch is not completed cannot validate \
-                                                 beacon hash",
-                                            );
-                                        parent_hash = parent_details.parent;
-                                        block_num -= 1;
-                                        if parent_hash == hash {
-                                            break;
-                                        }
-                                        if self.is_beacon_hash(&parent_hash).is_some()
-                                            || parent_details.number == block_num
-                                        {
-                                            debug!(target: "beacon", "Invalid block, tx:{}, beacon_hash:{}, beacon and parent in different branches",tx.hash(),hash);
-                                            return Err(BlockImportError::Block(
-                                                BlockError::InvalidBeaconHash(hash),
-                                            ));
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            _ => {
-                for _beacon in block.transactions().iter().filter_map(|x| x.beacon) {
-                    return Err(BlockImportError::Block(BlockError::BeaconHashBanned));
-                }
-            }
-        }
-        Ok(())
-    }
 }
 
 impl BlockChainClient for Client {
@@ -1732,10 +1644,6 @@ impl BlockChainClient for Client {
                 )));
             }
         }
-
-        // get block chain and validate beacon hash
-        // TODO: should not do validate here, do it better
-        self.beacon_check(&bytes)?;
 
         Ok(self.block_queue.import(unverified)?)
     }

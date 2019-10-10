@@ -114,6 +114,8 @@ pub enum BlockError {
     InvalidBeaconHash(H256),
     /// Beacon hash is banned
     BeaconHashBanned,
+    /// Branch is incomplete
+    IncompleteBranch,
 }
 
 impl fmt::Display for BlockError {
@@ -179,6 +181,7 @@ impl fmt::Display for BlockError {
                 format!("Block with invalid transaction beacon hash: {}", hash)
             }
             BeaconHashBanned => "Not yet forked, beacon hash is banned".into(),
+            IncompleteBranch => "Cannot trace back beacon hash on an incomplete branch".into(),
         };
 
         f.write_fmt(format_args!("Block error ({})", msg))

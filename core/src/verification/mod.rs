@@ -112,6 +112,140 @@ pub type FullFamilyParams<'a> = (
     &'a BlockChainClient,
 );
 
+/// check every txs' beacon hashes in block
+fn beacon_check(
+    engine: &Engine,
+    chain: &BlockProvider,
+    header: &Header,
+    parent: &Header,
+    txs: &[SignedTransaction],
+) -> Result<(), Error>
+{
+    match engine.machine().params().unity_update {
+        Some(update_num) if header.number() >= update_num => {
+            let parent_hash = header.parent_hash().clone();
+
+            let parent_is_canon = chain.beacon_list(&parent_hash);
+
+            match parent_is_canon {
+                Some(_) => {
+                    for tx in txs {
+                        if let Some(hash) = tx.beacon {
+                            if chain.beacon_list(&hash).is_none() {
+                                debug!(target: "beacon", "Invalid block, tx:{}, beacon_hash:{}, beacon in branch, parent in canon", tx.hash(), hash);
+                                return Err(Error::Block(BlockError::InvalidBeaconHash(hash)));
+                            }
+                        }
+                    }
+                }
+                None => {
+                    for tx in txs {
+                        if let Some(hash) = tx.beacon {
+                            match chain.beacon_list(&hash.clone()) {
+                                Some(beacon_num) => {
+                                    let mut parent_hash = parent_hash;
+                                    let mut block_num = parent.number();
+
+                                    if chain.beacon_list(&parent_hash).is_some() {
+                                        continue;
+                                    }
+                                    if block_num == beacon_num {
+                                        debug!(target: "beacon", "Invalid block, tx:{}, beacon_hash:{}, beacon in canon, parent in branch", tx.hash(), hash);
+                                        return Err(Error::Block(BlockError::InvalidBeaconHash(
+                                            hash,
+                                        )));
+                                    }
+                                    block_num -= 1;
+                                    parent_hash = parent.parent_hash().clone();
+
+                                    loop {
+                                        if chain.beacon_list(&parent_hash).is_some() {
+                                            break;
+                                        }
+                                        if block_num == beacon_num {
+                                            debug!(target: "beacon", "Invalid block, tx:{}, beacon_hash:{}, beacon in canon, parent in branch", tx.hash(), hash);
+                                            return Err(Error::Block(
+                                                BlockError::InvalidBeaconHash(hash),
+                                            ));
+                                        }
+                                        parent_hash = match chain.block_details(&parent_hash) {
+                                            Some(detail) => detail.parent,
+                                            None => {
+                                                return Err(Error::Block(
+                                                    BlockError::IncompleteBranch,
+                                                ))
+                                            }
+                                        };
+                                        block_num -= 1;
+                                    }
+                                }
+                                None => {
+                                    let mut parent_hash = parent_hash;
+                                    let mut block_num = parent.number();
+                                    let beacon_num = match chain.block_details(&hash) {
+                                        Some(detail) => detail.number,
+                                        None => {
+                                            debug!(target: "beacon", "Invalid block, tx:{}, beacon_hash:{}, cannot get beacon block detail", tx.hash(), hash);
+                                            return Err(Error::Block(
+                                                BlockError::InvalidBeaconHash(hash),
+                                            ));
+                                        }
+                                    };
+
+                                    if parent_hash == hash {
+                                        break;
+                                    }
+                                    if beacon_num == block_num
+                                        || chain.beacon_list(&parent_hash).is_some()
+                                    {
+                                        debug!(target: "beacon", "Invalid block, tx:{}, beacon_hash:{}, beacon and parent in different branches", tx.hash(), hash);
+                                        return Err(Error::Block(BlockError::InvalidBeaconHash(
+                                            hash,
+                                        )));
+                                    }
+                                    block_num -= 1;
+                                    parent_hash = parent.parent_hash().clone();
+
+                                    loop {
+                                        if parent_hash == hash {
+                                            break;
+                                        }
+                                        if beacon_num == block_num
+                                            || chain.beacon_list(&parent_hash).is_some()
+                                        {
+                                            debug!(target: "beacon", "Invalid block, tx:{}, beacon_hash:{}, beacon and parent in different branches", tx.hash(), hash);
+                                            return Err(Error::Block(
+                                                BlockError::InvalidBeaconHash(hash),
+                                            ));
+                                        }
+                                        parent_hash = match chain.block_details(&parent_hash) {
+                                            Some(detail) => detail.parent,
+                                            None => {
+                                                return Err(Error::Block(
+                                                    BlockError::IncompleteBranch,
+                                                ))
+                                            }
+                                        };
+                                        block_num -= 1;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        _ => {
+            for tx in txs {
+                if tx.beacon.is_some() {
+                    return Err(Error::Block(BlockError::BeaconHashBanned));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Phase 3 verification. Check block information against parent and uncles.
 pub fn verify_block_family(
     header: &Header,
@@ -129,10 +263,12 @@ pub fn verify_block_family(
     )?;
     engine.verify_block_family(&header, &parent, seal_parent, seal_grand_parent)?;
 
-    let (_bytes, _txs, _bc, _client) = match do_full {
+    let (_bytes, txs, bc, _client) = match do_full {
         Some(x) => x,
         None => return Ok(()),
     };
+
+    beacon_check(engine, bc, &header, &parent, txs)?;
 
     Ok(())
 }
