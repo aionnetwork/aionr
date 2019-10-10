@@ -29,7 +29,6 @@ use std::sync::{Condvar as SCondvar, Mutex as SMutex, Arc};
 use std::cmp;
 use std::collections::{VecDeque, HashSet, HashMap};
 use heapsize::HeapSizeOf;
-use header::SealType;
 use aion_types::{H256, U256};
 use parking_lot::{Condvar, Mutex, RwLock};
 use io::*;
@@ -151,15 +150,14 @@ pub struct VerificationQueue<K: Kind> {
     deleting: Arc<AtomicBool>,
     ready_signal: Arc<QueueSignal>,
     empty: Arc<SCondvar>,
-    processing: RwLock<HashMap<H256, (SealType, U256)>>, // hash to difficulty
+    processing: RwLock<HashMap<H256, U256>>, // hash to difficulty
     ticks_since_adjustment: AtomicUsize,
     max_queue_size: usize,
     max_mem_use: usize,
     scale_verifiers: bool,
     verifier_handles: Vec<JoinHandle<()>>,
     state: Arc<(Mutex<State>, Condvar)>,
-    pow_total_difficulty: RwLock<U256>,
-    pos_total_difficulty: RwLock<U256>,
+    total_difficulty: RwLock<U256>,
 }
 
 struct QueueSignal {
@@ -294,8 +292,7 @@ impl<K: Kind> VerificationQueue<K> {
             scale_verifiers,
             verifier_handles,
             state,
-            pow_total_difficulty: RwLock::new(0.into()),
-            pos_total_difficulty: RwLock::new(0.into()),
+            total_difficulty: RwLock::new(0.into()),
         }
     }
 
@@ -484,8 +481,7 @@ impl<K: Kind> VerificationQueue<K> {
         sizes.unverified.store(0, AtomicOrdering::Release);
         sizes.verifying.store(0, AtomicOrdering::Release);
         sizes.verified.store(0, AtomicOrdering::Release);
-        *self.pow_total_difficulty.write() = 0.into();
-        *self.pos_total_difficulty.write() = 0.into();
+        *self.total_difficulty.write() = 0.into();
 
         self.processing.write().clear();
     }
@@ -540,24 +536,10 @@ impl<K: Kind> VerificationQueue<K> {
                     .unverified
                     .fetch_add(item.heap_size_of_children(), AtomicOrdering::SeqCst);
 
-                self.processing.write().insert(
-                    h.clone(),
-                    (
-                        item.seal_type().clone().unwrap_or_default(),
-                        item.difficulty(),
-                    ),
-                );
+                self.processing.write().insert(h.clone(), item.difficulty());
                 {
-                    match item.seal_type().clone().unwrap_or_default() {
-                        SealType::PoW => {
-                            let mut td = self.pow_total_difficulty.write();
-                            *td = *td + item.difficulty();
-                        }
-                        SealType::PoS => {
-                            let mut td = self.pos_total_difficulty.write();
-                            *td = *td + item.difficulty();
-                        }
-                    }
+                    let mut td = self.total_difficulty.write();
+                    *td = *td + item.difficulty();
                 }
                 self.verification.unverified.lock().push_back(item);
                 self.more_to_verify.notify_all();
@@ -589,17 +571,9 @@ impl<K: Kind> VerificationQueue<K> {
         bad.reserve(hashes.len());
         for hash in hashes {
             bad.insert(hash.clone());
-            if let Some((seal_type, difficulty)) = processing.remove(hash) {
-                match seal_type {
-                    SealType::PoW => {
-                        let mut td = self.pow_total_difficulty.write();
-                        *td = *td - difficulty;
-                    }
-                    SealType::PoS => {
-                        let mut td = self.pos_total_difficulty.write();
-                        *td = *td - difficulty;
-                    }
-                }
+            if let Some(difficulty) = processing.remove(hash) {
+                let mut td = self.total_difficulty.write();
+                *td = *td - difficulty;
             }
         }
 
@@ -609,17 +583,9 @@ impl<K: Kind> VerificationQueue<K> {
             if bad.contains(&output.parent_hash()) {
                 removed_size += output.heap_size_of_children();
                 bad.insert(output.hash());
-                if let Some((seal_type, difficulty)) = processing.remove(&output.hash()) {
-                    match seal_type {
-                        SealType::PoW => {
-                            let mut td = self.pow_total_difficulty.write();
-                            *td = *td - difficulty;
-                        }
-                        SealType::PoS => {
-                            let mut td = self.pos_total_difficulty.write();
-                            *td = *td - difficulty;
-                        }
-                    }
+                if let Some(difficulty) = processing.remove(&output.hash()) {
+                    let mut td = self.total_difficulty.write();
+                    *td = *td - difficulty;
                 }
             } else {
                 new_verified.push_back(output);
@@ -641,17 +607,9 @@ impl<K: Kind> VerificationQueue<K> {
         }
         let mut processing = self.processing.write();
         for hash in hashes {
-            if let Some((seal_type, difficulty)) = processing.remove(hash) {
-                match seal_type {
-                    SealType::PoW => {
-                        let mut td = self.pow_total_difficulty.write();
-                        *td = *td - difficulty;
-                    }
-                    SealType::PoS => {
-                        let mut td = self.pos_total_difficulty.write();
-                        *td = *td - difficulty;
-                    }
-                }
+            if let Some(difficulty) = processing.remove(hash) {
+                let mut td = self.total_difficulty.write();
+                *td = *td - difficulty;
             }
         }
         processing.is_empty()
@@ -722,11 +680,8 @@ impl<K: Kind> VerificationQueue<K> {
         }
     }
 
-    /// Get the PoW total difficulty of all the blocks in the queue.
-    pub fn pow_total_difficulty(&self) -> U256 { self.pow_total_difficulty.read().clone() }
-
-    /// Get the PoS total difficulty of all the blocks in the queue.
-    pub fn pos_total_difficulty(&self) -> U256 { self.pos_total_difficulty.read().clone() }
+    /// Get the total difficulty of all the blocks in the queue.
+    pub fn total_difficulty(&self) -> U256 { self.total_difficulty.read().clone() }
 
     /// Get the current number of working verifiers.
     pub fn num_verifiers(&self) -> usize {
@@ -909,11 +864,11 @@ mod tests {
             panic!("error importing block that is valid by definition({:?})", e);
         }
         queue.flush();
-        assert_eq!(queue.pow_total_difficulty(), 131072.into());
+        assert_eq!(queue.total_difficulty(), 131072.into());
         queue.drain(10);
-        assert_eq!(queue.pow_total_difficulty(), 131072.into());
+        assert_eq!(queue.total_difficulty(), 131072.into());
         queue.mark_as_good(&[hash]);
-        assert_eq!(queue.pow_total_difficulty(), 0.into());
+        assert_eq!(queue.total_difficulty(), 0.into());
     }
 
     #[test]

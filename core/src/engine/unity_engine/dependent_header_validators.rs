@@ -62,3 +62,18 @@ impl DependentHeaderValidator for TimestampValidator {
         Ok(())
     }
 }
+
+// AION 2.0
+// Validate a block has different seal type with its parent
+pub struct SealTypeValidator;
+impl DependentHeaderValidator for SealTypeValidator {
+    fn validate(&self, header: &Header, dependent_header: &Header) -> Result<(), Error> {
+        let current_seal_type = header.seal_type();
+        let parent_seal_type = dependent_header.seal_type();
+        if current_seal_type == parent_seal_type {
+            error!(target: "unity", "current block's seal type ({:?}) is the same as its parent's seal type ({:?})", current_seal_type, parent_seal_type);
+            return Err(BlockError::InvalidSealType.into());
+        }
+        Ok(())
+    }
+}

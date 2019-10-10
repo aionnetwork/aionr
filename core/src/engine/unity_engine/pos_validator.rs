@@ -31,7 +31,8 @@ pub struct PoSValidator;
 impl PoSValidator {
     pub fn validate(
         header: &Header,
-        seal_parent_header: Option<&Header>,
+        parent_header: &Header,
+        grand_parent_header: Option<&Header>,
         stake: Option<BigUint>,
     ) -> Result<(), Error>
     {
@@ -63,11 +64,15 @@ impl PoSValidator {
         let seed = &seal[0];
         let signature = &seal[1];
         let pk = &seal[2];
-        let parent_seed = seal_parent_header.map_or(vec![0u8; 64], |h| {
-            h.seal()
-                .get(0)
-                .expect("parent pos block should have a seed")
-                .clone()
+        let parent_seed = grand_parent_header.map_or(vec![0u8; 64], |h| {
+            if h.seal_type() == &Some(SealType::PoS) {
+                h.seal()
+                    .get(0)
+                    .expect("parent pos block should have a seed")
+                    .clone()
+            } else {
+                vec![0u8; 64]
+            }
         });
 
         // Verify seed
@@ -90,33 +95,17 @@ impl PoSValidator {
         // Verify timestamp
         let difficulty = header.difficulty().clone();
         let timestamp = header.timestamp();
-        let parent_timestamp = seal_parent_header.map_or(0, |h| h.timestamp());
+        let parent_timestamp = parent_header.timestamp();
 
         let delta_uint = calculate_delta(difficulty, &seed, stake.clone());
 
-        if timestamp - parent_timestamp < delta_uint {
+        if timestamp - parent_timestamp != delta_uint {
             Err(BlockError::InvalidPoSTimestamp(timestamp, parent_timestamp, delta_uint).into())
         } else {
             Ok(())
         }
     }
 }
-
-//// TODO-Unity: to do this better
-//fn ln(x: &BigUint) -> Result<f64, String> {
-//    let x: Vec<u8> = x.to_bytes_le();
-//
-//    const BYTES: usize = 12;
-//    let start = if x.len() < BYTES { 0 } else { x.len() - BYTES };
-//
-//    let mut n: f64 = 0.0;
-//    for i in start..x.len() {
-//        n = n / 256f64 + (x[i] as f64);
-//    }
-//    let ln_256: f64 = (256f64).ln();
-//
-//    Ok(n.ln() + ln_256 * ((x.len() - 1) as f64))
-//}
 
 #[cfg(test)]
 mod tests {
@@ -131,8 +120,10 @@ mod tests {
         let mut header = Header::default();
         header.set_seal_type(SealType::PoW);
         let parent_header = Header::default();
+        let grand_parent_header = Header::default();
         let stake = None;
-        let result = PoSValidator::validate(&header, Some(&parent_header), stake);
+        let result =
+            PoSValidator::validate(&header, &parent_header, Some(&grand_parent_header), stake);
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSSealType),
             _ => panic!("Should return block error."),
@@ -144,8 +135,10 @@ mod tests {
         let mut header = Header::default();
         header.set_seal_type(SealType::PoS);
         let parent_header = Header::default();
+        let grand_parent_header = Header::default();
         let stake = None;
-        let result = PoSValidator::validate(&header, Some(&parent_header), stake);
+        let result =
+            PoSValidator::validate(&header, &parent_header, Some(&grand_parent_header), stake);
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::NullStake),
             _ => panic!("Should return block error."),
@@ -157,8 +150,10 @@ mod tests {
         let mut header = Header::default();
         header.set_seal_type(SealType::PoS);
         let parent_header = Header::default();
+        let grand_parent_header = Header::default();
         let stake = Some(BigUint::from(0u64));
-        let result = PoSValidator::validate(&header, Some(&parent_header), stake);
+        let result =
+            PoSValidator::validate(&header, &parent_header, Some(&grand_parent_header), stake);
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::NullStake),
             _ => panic!("Should return block error."),
@@ -174,8 +169,10 @@ mod tests {
         seal.push(vec![0u8; 64]);
         header.set_seal(seal);
         let parent_header = Header::default();
+        let grand_parent_header = Header::default();
         let stake = Some(BigUint::from(1u64));
-        let result = PoSValidator::validate(&header, Some(&parent_header), stake);
+        let result =
+            PoSValidator::validate(&header, &parent_header, Some(&grand_parent_header), stake);
         match result.err().unwrap() {
             Error::Block(error) => {
                 assert_eq!(
@@ -202,8 +199,11 @@ mod tests {
             59, 0, 255, 32, 176, 234, 66, 215, 193, 33, 250, 159,
         ]);
         header.set_seal(seal);
+        let parent_header = Header::default();
+        let grand_parent_header = Header::default();
         let stake = Some(BigUint::from(1u64));
-        let result = PoSValidator::validate(&header, None, stake);
+        let result =
+            PoSValidator::validate(&header, &parent_header, Some(&grand_parent_header), stake);
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSSeed),
             _ => panic!("Should return block error."),
@@ -286,21 +286,23 @@ mod tests {
         header.set_timestamp(15u64);
 
         let mut parent_header = Header::default();
-        parent_header.set_seal_type(SealType::PoS);
-        let mut parent_seal = Vec::with_capacity(3);
-        parent_seal.push(vec![
+        parent_header.set_timestamp(1u64);
+        let mut grand_parent_header = Header::default();
+        grand_parent_header.set_seal_type(SealType::PoS);
+        let mut grand_parent_seal = Vec::with_capacity(3);
+        grand_parent_seal.push(vec![
             97, 14, 49, 52, 139, 205, 231, 71, 40, 173, 229, 105, 74, 96, 74, 12, 232, 89, 79, 114,
             158, 9, 23, 133, 166, 22, 217, 233, 27, 73, 107, 207, 21, 245, 107, 127, 40, 197, 235,
             162, 78, 39, 142, 45, 242, 219, 146, 162, 194, 95, 250, 109, 207, 171, 133, 190, 243,
             119, 21, 14, 149, 29, 222, 3,
         ]);
-        parent_seal.push(vec![0u8; 64]);
-        parent_seal.push(vec![0u8; 32]);
-        parent_header.set_seal(parent_seal);
-        parent_header.set_timestamp(1u64);
+        grand_parent_seal.push(vec![0u8; 64]);
+        grand_parent_seal.push(vec![0u8; 32]);
+        grand_parent_header.set_seal(grand_parent_seal);
 
         let stake = Some(BigUint::from(10_000u64));
-        let result = PoSValidator::validate(&header, Some(&parent_header), stake);
+        let result =
+            PoSValidator::validate(&header, &parent_header, Some(&grand_parent_header), stake);
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSTimestamp(15, 1, 15)),
             _ => panic!("Should return block error."),
@@ -334,8 +336,11 @@ mod tests {
         ));
         header.set_difficulty(U256::from(1_000_000u64));
         header.set_timestamp(25u64);
+        let parent_header = Header::default();
+        let grand_parent_header = Header::default();
         let stake = Some(BigUint::from(10_000u64));
-        let result = PoSValidator::validate(&header, None, stake);
+        let result =
+            PoSValidator::validate(&header, &parent_header, Some(&grand_parent_header), stake);
         assert!(result.is_ok());
     }
 
@@ -367,21 +372,23 @@ mod tests {
         header.set_difficulty(U256::from(1_000_000u64));
         header.set_timestamp(15u64);
 
-        let mut parent_header = Header::default();
-        parent_header.set_seal_type(SealType::PoS);
-        let mut parent_seal = Vec::with_capacity(3);
-        parent_seal.push(vec![
+        let parent_header = Header::default();
+        let mut grand_parent_header = Header::default();
+        grand_parent_header.set_seal_type(SealType::PoS);
+        let mut grand_parent_seal = Vec::with_capacity(3);
+        grand_parent_seal.push(vec![
             97, 14, 49, 52, 139, 205, 231, 71, 40, 173, 229, 105, 74, 96, 74, 12, 232, 89, 79, 114,
             158, 9, 23, 133, 166, 22, 217, 233, 27, 73, 107, 207, 21, 245, 107, 127, 40, 197, 235,
             162, 78, 39, 142, 45, 242, 219, 146, 162, 194, 95, 250, 109, 207, 171, 133, 190, 243,
             119, 21, 14, 149, 29, 222, 3,
         ]);
-        parent_seal.push(vec![0u8; 64]);
-        parent_seal.push(vec![0u8; 32]);
-        parent_header.set_seal(parent_seal);
+        grand_parent_seal.push(vec![0u8; 64]);
+        grand_parent_seal.push(vec![0u8; 32]);
+        grand_parent_header.set_seal(grand_parent_seal);
 
         let stake = Some(BigUint::from(10_000u64));
-        let result = PoSValidator::validate(&header, Some(&parent_header), stake);
+        let result =
+            PoSValidator::validate(&header, &parent_header, Some(&grand_parent_header), stake);
         assert!(result.is_ok());
     }
 }

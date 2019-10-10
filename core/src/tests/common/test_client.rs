@@ -477,10 +477,7 @@ impl BlockChainClient for TestBlockChainClient {
         ))
     }
 
-    // TODO-UNITY: change back after finishing sync rf
-    fn block_total_difficulty(&self, _id: BlockId) -> Option<(U256, U256, U256)> {
-        Some((U256::zero(), U256::zero(), U256::zero()))
-    }
+    fn block_total_difficulty(&self, _id: BlockId) -> Option<U256> { Some(U256::zero()) }
 
     fn block_hash(&self, id: BlockId) -> Option<H256> { Self::block_hash(self, id) }
 
@@ -605,28 +602,19 @@ impl BlockChainClient for TestBlockChainClient {
             .expect("Best block always has header.")
     }
 
-    fn best_block_header_with_seal_type(&self, seal_type: &SealType) -> Option<encoded::Header> {
-        let mut result = None;
-        for (h, _) in self.blocks.read().clone().into_iter() {
-            let header = self
-                .block_header(BlockId::Hash(h))
-                .expect("Block always exists");
-            if header.seal_type() == Some(seal_type.clone()) {
-                result = Some(header);
-            }
-        }
-
-        result
-    }
-
     fn calculate_difficulty(
         &self,
-        parent_header: Option<&BlockHeader>,
+        parent_header: &BlockHeader,
         grand_parent_header: Option<&BlockHeader>,
+        great_grand_parent_header: Option<&BlockHeader>,
     ) -> U256
     {
         let engine = &*self.spec.engine;
-        engine.calculate_difficulty(parent_header, grand_parent_header)
+        engine.calculate_difficulty(
+            parent_header,
+            grand_parent_header,
+            great_grand_parent_header,
+        )
     }
 
     fn block_header(&self, id: BlockId) -> Option<encoded::Header> {
@@ -646,21 +634,6 @@ impl BlockChainClient for TestBlockChainClient {
             .get(&hash)
             .map(|r| Rlp::new(r).at(0).as_raw().to_vec())
             .map(encoded::Header::new)
-    }
-
-    fn seal_parent_header(
-        &self,
-        parent_hash: &H256,
-        seal_type: &Option<SealType>,
-    ) -> Option<::encoded::Header>
-    {
-        self.blocks
-            .read()
-            .get(&parent_hash)
-            .map(|r| Rlp::new(r).at(0).as_raw().to_vec())
-            .map(encoded::Header::new)
-            .filter(|h| h.seal_type() == *seal_type)
-        // TODO-UNITY-TEST: handle this better
     }
 
     fn block_number(&self, _id: BlockId) -> Option<BlockNumber> { unimplemented!() }
@@ -862,8 +835,6 @@ impl BlockChainClient for TestBlockChainClient {
         let number = self.blocks.read().len() as BlockNumber - 1;
         BlockChainInfo {
             total_difficulty: *self.difficulty.read(),
-            pow_total_difficulty: *self.pow_difficulty.read(),
-            pos_total_difficulty: *self.pos_difficulty.read(),
             pending_total_difficulty: *self.difficulty.read(),
             genesis_hash: self.genesis_hash.clone(),
             best_block_hash: self.last_hash.read().clone(),
@@ -931,8 +902,6 @@ impl ProvingBlockChainClient for TestBlockChainClient {
 }
 
 impl ::client::EngineClient for TestBlockChainClient {
-    fn update_sealing(&self) { self.miner.update_sealing(self) }
-
     fn submit_seal(&self, block_hash: H256, seal: Vec<Bytes>) {
         if self.miner.submit_seal(self, block_hash, seal).is_err() {
             warn!(target: "poa", "Wrong internal seal submission!")

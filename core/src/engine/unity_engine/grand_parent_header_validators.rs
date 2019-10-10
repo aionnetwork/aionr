@@ -28,8 +28,9 @@ pub trait GrandParentHeaderValidator {
     fn validate(
         &self,
         header: &Header,
-        parent_header: Option<&Header>,
+        parent_header: &Header,
         grand_parent_header: Option<&Header>,
+        great_grand_parent_header: Option<&Header>,
     ) -> Result<(), Error>;
 }
 
@@ -41,8 +42,9 @@ impl<'a> GrandParentHeaderValidator for DifficultyValidator<'a> {
     fn validate(
         &self,
         header: &Header,
-        parent_header: Option<&Header>,
+        parent_header: &Header,
         grand_parent_header: Option<&Header>,
+        great_grand_parent_header: Option<&Header>,
     ) -> Result<(), Error>
     {
         if header.number() == 0 {
@@ -50,9 +52,11 @@ impl<'a> GrandParentHeaderValidator for DifficultyValidator<'a> {
         }
 
         let difficulty = header.difficulty().to_owned();
-        let calc_difficulty = self
-            .difficulty_calc
-            .calculate_difficulty(parent_header, grand_parent_header);
+        let calc_difficulty = self.difficulty_calc.calculate_difficulty(
+            parent_header,
+            grand_parent_header,
+            great_grand_parent_header,
+        );
         if difficulty != calc_difficulty {
             Err(BlockError::InvalidDifficulty(Mismatch {
                 expected: calc_difficulty,

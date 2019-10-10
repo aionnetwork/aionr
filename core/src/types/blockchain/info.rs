@@ -33,10 +33,6 @@ use {types::BlockNumber};
 pub struct BlockChainInfo {
     /// Blockchain difficulty.
     pub total_difficulty: U256,
-    /// Blockchain PoW difficulty
-    pub pow_total_difficulty: U256,
-    /// Blockchain PoS difficulty
-    pub pos_total_difficulty: U256,
     /// Block queue difficulty.
     pub pending_total_difficulty: U256,
     /// Genesis block hash.

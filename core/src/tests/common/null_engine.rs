@@ -99,7 +99,8 @@ impl Engine for NullEngine {
     fn verify_seal_pos(
         &self,
         _header: &<EthereumMachine as Machine>::Header,
-        _seal_type: Option<&<EthereumMachine as Machine>::Header>,
+        _parent: &<EthereumMachine as Machine>::Header,
+        _grand_parent: Option<&<EthereumMachine as Machine>::Header>,
         _stake: Option<BigUint>,
     ) -> Result<(), <EthereumMachine as Machine>::Error>
     {

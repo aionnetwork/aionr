@@ -119,19 +119,6 @@ pub trait BlockProvider {
     /// Get the header RLP of a block.
     fn block_header_data(&self, hash: &H256) -> Option<encoded::Header>;
 
-    /// Get the header RLP of the seal parent of the given block.
-    /// Parameters:
-    ///   parent_hash: parent hash of the given block
-    ///   seal_type: seal type of the given block
-    fn seal_parent_header(
-        &self,
-        parent_hash: &H256,
-        seal_type: &Option<SealType>,
-    ) -> Option<::encoded::Header>;
-
-    /// Get the current best block with specified seal type
-    fn best_block_header_with_seal_type(&self, seal_type: &SealType) -> Option<encoded::Header>;
-
     /// Get the block body (uncles and transactions).
     fn block_body(&self, hash: &H256) -> Option<encoded::Body>;
 
@@ -256,10 +243,6 @@ pub struct BlockChain {
     pending_block_hashes: RwLock<HashMap<BlockNumber, H256>>,
     pending_block_details: RwLock<HashMap<H256, BlockDetails>>,
     pending_transaction_addresses: RwLock<HashMap<H256, Option<TransactionAddress>>>,
-
-    // Unity hard fork parameters
-    unity_update: Option<u64>,
-    unity_base_pos_total_difficulty: Option<U256>,
 }
 
 impl BlockProvider for BlockChain {
@@ -332,61 +315,6 @@ impl BlockProvider for BlockChain {
 
         self.cache_man.lock().note_used(CacheId::BlockHeader(*hash));
         result
-    }
-
-    /// Get the header RLP of the seal parent of the given block.
-    /// Parameters:
-    ///   parent_hash: parent hash of the given block
-    ///   seal_type: seal type of the given block
-    fn seal_parent_header(
-        &self,
-        parent_hash: &H256,
-        seal_type: &Option<SealType>,
-    ) -> Option<::encoded::Header>
-    {
-        // Get parent header
-        let parent_header: ::encoded::Header = match self.block_header_data(parent_hash) {
-            Some(header) => header,
-            None => return None,
-        };
-        let parent_seal_type: Option<SealType> = parent_header.seal_type();
-        // If parent's seal type is the same as the current, return parent
-        if seal_type.to_owned().unwrap_or_default() == parent_seal_type.unwrap_or_default() {
-            Some(parent_header)
-        }
-        // Else return the anti seal parent of the parent
-        else {
-            let parent_details: BlockDetails = match self.block_details(parent_hash) {
-                Some(details) => details,
-                None => return None,
-            };
-            if let Some(anti_seal_parent) = parent_details.anti_seal_parent {
-                self.block_header_data(&anti_seal_parent)
-            } else {
-                None
-            }
-        }
-    }
-
-    /// Get the current best block with specified seal type
-    fn best_block_header_with_seal_type(&self, seal_type: &SealType) -> Option<encoded::Header> {
-        let best_block_header = self.best_block_header();
-        // If the best block's seal type corresponds to the given seal type, return the current best block
-        if seal_type == &best_block_header.seal_type().unwrap_or_default() {
-            Some(best_block_header)
-        }
-        // Else, return the anti seal parent of the current best block
-        else {
-            let block_details: BlockDetails = match self.block_details(&best_block_header.hash()) {
-                Some(details) => details,
-                None => return None,
-            };
-            if let Some(anti_seal_parent) = block_details.anti_seal_parent {
-                self.block_header_data(&anti_seal_parent)
-            } else {
-                None
-            }
-        }
     }
 
     /// Get block body data
@@ -595,14 +523,7 @@ impl<'a> Iterator for AncestryIter<'a> {
 
 impl BlockChain {
     /// Create new instance of blockchain from given Genesis.
-    pub fn new(
-        config: Config,
-        genesis: &[u8],
-        db: Arc<KeyValueDB>,
-        unity_update: Option<u64>,
-        unity_base_pos_total_difficulty: Option<U256>,
-    ) -> BlockChain
-    {
+    pub fn new(config: Config, genesis: &[u8], db: Arc<KeyValueDB>) -> BlockChain {
         // 400 is the avarage size of the key
         let cache_man = CacheManager::new(config.pref_cache_size, config.max_cache_size, 400);
 
@@ -627,8 +548,6 @@ impl BlockChain {
             pending_block_hashes: RwLock::new(HashMap::new()),
             pending_block_details: RwLock::new(HashMap::new()),
             pending_transaction_addresses: RwLock::new(HashMap::new()),
-            unity_update: unity_update,
-            unity_base_pos_total_difficulty: unity_base_pos_total_difficulty,
         };
 
         // load best block
@@ -650,9 +569,6 @@ impl BlockChain {
                     total_difficulty: header.difficulty(),
                     parent: header.parent_hash(),
                     children: vec![],
-                    pow_total_difficulty: header.difficulty(),
-                    pos_total_difficulty: Default::default(),
-                    anti_seal_parent: None,
                 };
 
                 let mut batch = DBTransaction::new();
@@ -679,8 +595,6 @@ impl BlockChain {
                 .block_details(&best_block_hash)
                 .expect("best block not found, db may crashed");
             let best_block_total_difficulty = best_block_details.total_difficulty;
-            let best_block_pow_total_difficulty = best_block_details.pow_total_difficulty;
-            let best_block_pos_total_difficulty = best_block_details.pos_total_difficulty;
             let best_block_rlp = bc
                 .block(&best_block_hash)
                 .expect("best block not found, db may crashed")
@@ -746,8 +660,6 @@ impl BlockChain {
             *best_block = BestBlock {
                 number: best_block_number,
                 total_difficulty: best_block_total_difficulty,
-                pow_total_difficulty: best_block_pow_total_difficulty,
-                pos_total_difficulty: best_block_pos_total_difficulty,
                 hash: best_block_hash,
                 timestamp: best_block_timestamp,
                 block: best_block_rlp,
@@ -878,8 +790,7 @@ impl BlockChain {
         batch: &mut DBTransaction,
         bytes: &[u8],
         receipts: Vec<Receipt>,
-        parent_pow_td: Option<U256>,
-        parent_pos_td: Option<U256>,
+        parent_td: Option<U256>,
         is_best: bool,
         is_ancient: bool,
     ) -> bool
@@ -904,34 +815,10 @@ impl BlockChain {
         let maybe_parent = self.block_details(&header.parent_hash());
 
         if let Some(parent_details) = maybe_parent {
-            // parent known to be in chain.
-            let (pow_td, mut pos_td) = match header.seal_type().unwrap_or_default() {
-                SealType::PoW => {
-                    (
-                        parent_details.pow_total_difficulty + header.difficulty(),
-                        parent_details.pos_total_difficulty,
-                    )
-                }
-                SealType::PoS => {
-                    (
-                        parent_details.pow_total_difficulty,
-                        parent_details.pos_total_difficulty + header.difficulty(),
-                    )
-                }
-            };
-            pos_td = pos_td + match (self.unity_update, self.unity_base_pos_total_difficulty) {
-                (Some(fork_number), Some(td_pos_base)) if header.number() == fork_number => {
-                    td_pos_base
-                }
-                (_, _) => U256::from(0u64),
-            };
             let info = BlockInfo {
                 hash: hash,
                 number: header.number(),
-                // TODO-UNITY: add overflow check
-                total_difficulty: pow_td * ::std::cmp::max(pos_td, U256::from(1u64)),
-                pow_total_difficulty: pow_td,
-                pos_total_difficulty: pos_td,
+                total_difficulty: parent_details.total_difficulty + header.difficulty(),
                 location: BlockLocation::CanonChain,
             };
 
@@ -968,34 +855,15 @@ impl BlockChain {
             false
         } else {
             // parent not in the chain yet. we need the parent difficulty to proceed.
-            let pow_d = parent_pow_td.expect(
-                "parent PoW total difficulty always supplied for first block in chunk. only first \
+            let d = parent_td.expect(
+                "parent total difficulty always supplied for first block in chunk. only first \
                  block can have missing parent; qed",
             );
-            let pos_d = parent_pos_td.expect(
-                "parent PoS total difficulty always supplied for first block in chunk. only first \
-                 block can have missing parent; qed",
-            );
-
-            let (pow_td, mut pos_td) = match header.seal_type().unwrap_or_default() {
-                SealType::PoW => (pow_d + header.difficulty(), pos_d),
-                SealType::PoS => (pow_d, pos_d + header.difficulty()),
-            };
-
-            pos_td = pos_td + match (self.unity_update, self.unity_base_pos_total_difficulty) {
-                (Some(fork_number), Some(td_pos_base)) if header.number() == fork_number => {
-                    td_pos_base
-                }
-                (_, _) => U256::from(0u64),
-            };
 
             let info = BlockInfo {
                 hash: hash,
                 number: header.number(),
-                // TODO-UNITY: add overflow check
-                total_difficulty: pow_td * ::std::cmp::max(pos_td, U256::from(1u64)),
-                pow_total_difficulty: pow_td,
-                pos_total_difficulty: pos_td,
+                total_difficulty: d + header.difficulty(),
                 location: BlockLocation::CanonChain,
             };
 
@@ -1004,10 +872,6 @@ impl BlockChain {
                 total_difficulty: info.total_difficulty,
                 parent: header.parent_hash(),
                 children: Vec::new(),
-                pow_total_difficulty: info.pow_total_difficulty,
-                pos_total_difficulty: info.pos_total_difficulty,
-                // TODO-Unity: Need more thoughts whether anti_seal_parent works for unordered insert
-                anti_seal_parent: None,
             };
 
             let mut update = HashMap::new();
@@ -1096,38 +960,13 @@ impl BlockChain {
         let parent_details = self
             .block_details(&parent_hash)
             .unwrap_or_else(|| panic!("Invalid parent hash: {:?}", parent_hash));
-
-        let (pow_td, mut pos_td) = match header.seal_type().unwrap_or_default() {
-            SealType::PoW => {
-                (
-                    parent_details.pow_total_difficulty + header.difficulty(),
-                    parent_details.pos_total_difficulty,
-                )
-            }
-            SealType::PoS => {
-                (
-                    parent_details.pow_total_difficulty,
-                    parent_details.pos_total_difficulty + header.difficulty(),
-                )
-            }
-        };
-
-        pos_td = pos_td + match (self.unity_update, self.unity_base_pos_total_difficulty) {
-            (Some(fork_number), Some(td_pos_base)) if number == fork_number => td_pos_base,
-            (_, _) => U256::from(0u64),
-        };
-
-        // TODO-UNITY: add overflow check
-        let td = pow_td * ::std::cmp::max(pos_td, U256::from(1u64));
-
-        let is_new_best = td > self.best_block_total_difficulty();
+        let total_difficulty = parent_details.total_difficulty + header.difficulty();
+        let is_new_best = total_difficulty > self.best_block_total_difficulty();
 
         BlockInfo {
             hash: hash,
             number: number,
-            total_difficulty: td,
-            pow_total_difficulty: pow_td,
-            pos_total_difficulty: pos_td,
+            total_difficulty: total_difficulty,
             location: if is_new_best {
                 // on new best block we need to make sure that all ancestors
                 // are moved to "canon chain"
@@ -1221,8 +1060,6 @@ impl BlockChain {
                     hash: update.info.hash,
                     number: update.info.number,
                     total_difficulty: update.info.total_difficulty,
-                    pow_total_difficulty: update.info.pow_total_difficulty,
-                    pos_total_difficulty: update.info.pos_total_difficulty,
                     timestamp: update.timestamp,
                     block: update.block.to_vec(),
                 });
@@ -1367,27 +1204,12 @@ impl BlockChain {
             .unwrap_or_else(|| panic!("Invalid parent hash: {:?}", parent_hash));
         parent_details.children.push(info.hash);
 
-        // Set anti seal parent
-        let seal_type = header.seal_type().to_owned().unwrap_or_default();
-        let parent_header = self
-            .block_header_data(&parent_hash)
-            .expect("block's should always have a parent.");
-        let parent_seal_type: SealType = parent_header.seal_type().to_owned().unwrap_or_default();
-        let anti_seal_parent = if seal_type == parent_seal_type {
-            parent_details.anti_seal_parent.to_owned()
-        } else {
-            Some(parent_hash)
-        };
-
         // create current block details.
         let details = BlockDetails {
             number: header.number(),
             total_difficulty: info.total_difficulty,
             parent: parent_hash,
             children: vec![],
-            pow_total_difficulty: info.pow_total_difficulty,
-            pos_total_difficulty: info.pos_total_difficulty,
-            anti_seal_parent: anti_seal_parent,
         };
 
         // write to batch
@@ -1665,8 +1487,6 @@ impl BlockChain {
         let best_ancient_block = self.best_ancient_block.read();
         BlockChainInfo {
             total_difficulty: best_block.total_difficulty.clone(),
-            pow_total_difficulty: best_block.pow_total_difficulty.clone(),
-            pos_total_difficulty: best_block.pos_total_difficulty.clone(),
             pending_total_difficulty: best_block.total_difficulty.clone(),
             genesis_hash: self.genesis_hash(),
             best_block_hash: best_block.hash,

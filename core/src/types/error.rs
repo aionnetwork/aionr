@@ -110,6 +110,8 @@ pub enum BlockError {
     InvalidPoSAuthor,
     /// Invalid future time stamp
     InvalidFutureTimestamp(OutOfBounds<u64>),
+    /// Invalid seal type
+    InvalidSealType,
 }
 
 impl fmt::Display for BlockError {
@@ -170,6 +172,9 @@ impl fmt::Display for BlockError {
                      {}",
                     oob
                 )
+            }
+            InvalidSealType => {
+                "Block's seal type is the same as its parent after Unity fork.".into()
             }
         };
 
