@@ -1627,7 +1627,7 @@ impl BlockChainClient for Client {
         use verification::queue::kind::BlockLike;
 
         // create unverified block here so the `blake2b` calculation can be cached.
-        let unverified = Unverified::new(bytes.clone());
+        let unverified = Unverified::new(bytes);
 
         {
             if self.chain.read().is_known(&unverified.hash()) {

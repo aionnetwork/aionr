@@ -183,6 +183,7 @@ pub trait Writable {
                     self.write(db_name, &value, &key);
                     cache3.remove(&value);
                     if let Some(v) = cache1.insert(key.clone(), value.clone()) {
+                        self.delete(db_name, &v);
                         cache2.remove(&v);
                         cache3.insert(v, key.clone());
                     }

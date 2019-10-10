@@ -955,12 +955,10 @@ impl BlockChain {
                 location: BlockLocation::CanonChain,
             };
 
-            let (block_hashes, beacon_list) = self.prepare_block_hashes_update(bytes, &info);
             self.prepare_update(
                 batch,
                 ExtrasUpdate {
-                    block_hashes,
-                    beacon_list,
+                    block_hashes: self.prepare_block_hashes_update(bytes, &info),
                     block_details: self.prepare_block_details_update(bytes, &info),
                     block_receipts: self.prepare_block_receipts_update(receipts, &info),
                     blocks_blooms: self.prepare_block_blooms_update(bytes, &info),
@@ -1035,12 +1033,10 @@ impl BlockChain {
             let mut update = HashMap::new();
             update.insert(hash, block_details);
 
-            let (block_hashes, beacon_list) = self.prepare_block_hashes_update(bytes, &info);
             self.prepare_update(
                 batch,
                 ExtrasUpdate {
-                    block_hashes,
-                    beacon_list,
+                    block_hashes: self.prepare_block_hashes_update(bytes, &info),
                     block_details: update,
                     block_receipts: self.prepare_block_receipts_update(receipts, &info),
                     blocks_blooms: self.prepare_block_blooms_update(bytes, &info),
@@ -1094,12 +1090,10 @@ impl BlockChain {
             );
         }
 
-        let (block_hashes, beacon_list) = self.prepare_block_hashes_update(bytes, &info);
         self.prepare_update(
             batch,
             ExtrasUpdate {
-                block_hashes,
-                beacon_list,
+                block_hashes: self.prepare_block_hashes_update(bytes, &info),
                 block_details: self.prepare_block_details_update(bytes, &info),
                 block_receipts: self.prepare_block_receipts_update(receipts, &info),
                 blocks_blooms: self.prepare_block_blooms_update(bytes, &info),
@@ -1361,10 +1355,9 @@ impl BlockChain {
         &self,
         block_bytes: &[u8],
         info: &BlockInfo,
-    ) -> (HashMap<BlockNumber, H256>, HashMap<H256, BlockNumber>)
+    ) -> HashMap<BlockNumber, H256>
     {
         let mut block_hashes = HashMap::new();
-        let mut beacon_list = HashMap::new();
         let block = BlockView::new(block_bytes);
         let header = block.header_view();
         let number = header.number();
@@ -1373,7 +1366,6 @@ impl BlockChain {
             BlockLocation::Branch => (),
             BlockLocation::CanonChain => {
                 block_hashes.insert(number, info.hash);
-                beacon_list.insert(info.hash, number);
             }
             BlockLocation::BranchBecomingCanonChain(ref data) => {
                 let ancestor_number = self
@@ -1383,15 +1375,13 @@ impl BlockChain {
 
                 for (index, hash) in data.enacted.iter().cloned().enumerate() {
                     block_hashes.insert(start_number + index as BlockNumber, hash);
-                    beacon_list.insert(hash, start_number + index as BlockNumber);
                 }
 
                 block_hashes.insert(number, info.hash);
-                beacon_list.insert(info.hash, number);
             }
         }
 
-        (block_hashes, beacon_list)
+        block_hashes
     }
 
     /// This function returns modified block details.
