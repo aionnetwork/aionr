@@ -166,7 +166,11 @@ impl Transaction {
 
     /// Append object with a without signature into RLP stream
     pub fn rlp_append_unsigned_transaction(&self, s: &mut RlpStream, timestamp: &Bytes) {
-        s.begin_list(8);
+        if let Some(ref hash) = &self.beacon {
+            s.begin_list(10);
+        } else {
+            s.begin_list(8);
+        }
         if self.nonce_bytes.is_empty() {
             s.append(&self.nonce);
         } else {
@@ -221,6 +225,7 @@ impl From<ajson::transaction::Transaction> for UnverifiedTransaction {
                 value_bytes: Vec::new(),
                 data: t.data.into(),
                 transaction_type: t.transaction_type.into(),
+                // TODO-ARK-58: need beacon hash in ajson::transaction::Transaction?
                 beacon: None,
             },
             timestamp: t.timestamp.into(),
@@ -411,7 +416,11 @@ impl UnverifiedTransaction {
 
     /// Append object with a signature into RLP stream
     fn rlp_append_sealed_transaction(&self, s: &mut RlpStream) {
-        s.begin_list(9);
+        if let Some(ref hash) = &self.beacon {
+            s.begin_list(11);
+        } else {
+            s.begin_list(9);
+        }
         if self.nonce_bytes.is_empty() {
             s.append(&self.nonce);
         } else {
@@ -539,10 +548,6 @@ impl UnverifiedTransaction {
                 self.sig.len()
             )));
         }
-
-        // verify beacon hash
-
-        // signature is verified in SignedTransaction.
 
         Ok(())
     }

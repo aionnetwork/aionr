@@ -122,7 +122,7 @@ fn beacon_check(
 ) -> Result<(), Error>
 {
     match engine.machine().params().unity_update {
-        Some(update_num) if header.number() >= update_num => {
+        Some(update_num) if header.number() > update_num => {
             let parent_hash = header.parent_hash().clone();
 
             let parent_is_canon = chain.beacon_list(&parent_hash);

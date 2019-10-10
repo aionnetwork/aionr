@@ -905,7 +905,7 @@ impl Miner {
     {
         let best_block_header = client.best_block_header().decode();
         match self.engine.machine().params().unity_update {
-            Some(update_num) if best_block_header.number() + 1 >= update_num => {
+            Some(update_num) if best_block_header.number() >= update_num => {
                 if let Some(ref hash) = transaction.beacon {
                     if client.is_beacon_hash(hash).is_none() {
                         return Err(Error::Transaction(TransactionError::InvalidBeaconHash(
@@ -1582,7 +1582,7 @@ impl MinerService for Miner {
             let best_num = client
                 .block_number(BlockId::Latest)
                 .expect("should not be none");
-            if best_num + 1 >= update_num && !retracted.is_empty() {
+            if best_num >= update_num && !retracted.is_empty() {
                 let _ = self
                     .pending_transactions()
                     .iter()
@@ -1599,6 +1599,8 @@ impl MinerService for Miner {
                     });
             }
         }
+
+        // TODO-ARK-58: when chain reorg, check beacon hash of retracted transactions, discard invalid
 
         // Import all transactions in retracted routes...
         {
