@@ -135,8 +135,9 @@ fn test_fork_transaction_addresses() {
         gas_bytes: Vec::new(),
         gas_price_bytes: Vec::new(),
         value_bytes: Vec::new(),
+        beacon: None,
     }
-    .sign(keychain::ethkey::generate_keypair().secret(), None);
+    .sign(keychain::ethkey::generate_keypair().secret());
 
     let t1_hash = t1.hash().clone();
 
@@ -195,8 +196,9 @@ fn test_overwriting_transaction_addresses() {
         gas_bytes: Vec::new(),
         value_bytes: Vec::new(),
         nonce_bytes: Vec::new(),
+        beacon: None,
     }
-    .sign(&keypair.secret(), None);
+    .sign(&keypair.secret());
 
     let t2 = Transaction {
         nonce: 1.into(),
@@ -212,8 +214,9 @@ fn test_overwriting_transaction_addresses() {
         value_bytes: Vec::new(),
         nonce_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
+        beacon: None,
     }
-    .sign(&keypair.secret(), None);
+    .sign(&keypair.secret());
     let t3 = Transaction {
         nonce: 2.into(),
         gas_price: 0.into(),
@@ -228,8 +231,9 @@ fn test_overwriting_transaction_addresses() {
         value_bytes: Vec::new(),
         nonce_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
+        beacon: None,
     }
-    .sign(&keypair.secret(), None);
+    .sign(&keypair.secret());
 
     let genesis = BlockBuilder::genesis();
     let b1a = genesis.add_block_with_transactions(vec![t1.clone(), t2.clone()]);
@@ -560,8 +564,9 @@ fn test_logs() {
         gas_bytes: Vec::new(),
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
+        beacon: None,
     }
-    .sign(keypair.secret(), None);
+    .sign(keypair.secret());
     let t2 = Transaction {
         nonce: 0.into(),
         gas_price: 0.into(),
@@ -576,8 +581,9 @@ fn test_logs() {
         gas_bytes: Vec::new(),
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
+        beacon: None,
     }
-    .sign(keypair.secret(), None);
+    .sign(keypair.secret());
     let t3 = Transaction {
         nonce: 0.into(),
         gas_price: 0.into(),
@@ -592,8 +598,9 @@ fn test_logs() {
         gas_bytes: Vec::new(),
         value_bytes: Vec::new(),
         transaction_type: DEFAULT_TRANSACTION_TYPE,
+        beacon: None,
     }
-    .sign(keypair.secret(), None);
+    .sign(keypair.secret());
     let tx_hash1 = t1.hash().clone();
     let tx_hash2 = t2.hash().clone();
     let tx_hash3 = t3.hash().clone();
@@ -977,3 +984,82 @@ fn test_new_difficulty2() {
     bc.commit();
     assert_eq!(bc.best_block_total_difficulty(), U256::from(111));
 }
+// use to test import block error
+//#[test]
+//fn test_() {
+//    use std::thread::{spawn,sleep};
+//    use std::time::Duration;
+//    // genensis difficulty is 0
+//    let genesis = BlockBuilder::genesis();
+//
+//    let db = new_db();
+//    let bc = new_chain(&genesis.last().encoded(), db.clone());
+//    assert_eq!(bc.best_block_total_difficulty(), U256::zero());
+//
+//    // add 10 pow blocks with total pow difficulty 100 to simulate a blockchain
+//    // pow td > 0 when the first pos block come to chain.
+//    let a1 = genesis.add_blocks(10);
+//
+//    let generator1 = BlockGenerator::new(iter::once(a1.clone()));
+//    let mut batch = DBTransaction::new();
+//
+//    for block in generator1 {
+//        println!(0);
+//        bc.insert_block(&mut batch, &block.encoded(), vec![]);
+//        bc.commit();
+//    }
+//    db.write_buffered(batch.clone());
+//    assert_eq!(bc.best_block_total_difficulty(), U256::from(100));
+//
+//
+//    let mut batch = DBTransaction::new();
+//    let arc1 = Arc::new(bc);
+//    let arc2 = arc1.clone();
+//    let bc = arc1.clone();
+//    let arc_db1 = Arc::new(db);
+//    let arc_db2 = arc_db1.clone();
+//
+//    let a2 = a1.add_block();
+//    let a2e = a2.last().encoded();
+//    let handle1 = spawn(move || {
+//        sleep(Duration::from_millis(20));
+//        println!(1);
+//        // add a pos block and then td = 100 * 10 = 1000
+//        arc1.insert_block(&mut batch, &a2e, vec![]);
+//
+//        println!(1);
+//        sleep(Duration::from_secs(1));
+//        arc_db1.write_buffered(batch.clone());
+//        arc1.commit();
+//        assert_eq!(arc1.best_block_total_difficulty(), U256::from(110));
+//        println!(1);
+//    });
+//
+//    let mut batch = DBTransaction::new();
+//
+//    let b2 = a1.add_block_with_difficulty(9);
+//    let b2e = b2.last().encoded();
+//    let handle2 = spawn(move || {
+//        println!(2);
+//        // if a pow block come with the same block number as the pos block at moment,
+//        // b2 td = 100 + 10 = 110 < 1000, it will not be accepted
+//        arc2.insert_block(&mut batch, &b2e, vec![]);
+//        arc_db2.write_buffered(batch.clone());
+//        println!(2);
+//        arc_db2.write_buffered(batch.clone());
+//        arc2.commit();
+//        assert_eq!(arc2.best_block_total_difficulty(), U256::from(109));
+//        println!(2);
+//    });
+//    handle1.join().unwrap();
+//    handle2.join().unwrap();
+//
+//    assert_eq!(bc.best_block_total_difficulty(), U256::from(110));
+////
+////    // if a pow block come with the same block number as the pos block and 901 difficulty at moment,
+////    // b3 td = 100 + 901 = 1001 > 1000, it will be accepted
+////    let c2 = a1.add_block_with_difficulty(901);
+////    bc.insert_block(&mut batch, &c2.last().encoded(), vec![]);
+////    bc.commit();
+////    assert_eq!(bc.best_block_total_difficulty(), U256::from(1001));
+//}

@@ -287,7 +287,8 @@ mod tests {
             U256::from(100),
             Default::default(),
             DEFAULT_TRANSACTION_TYPE,
+            None,
         )
-        .sign(keypair.secret(), None)
+        .sign(keypair.secret())
     }
 }

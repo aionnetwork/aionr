@@ -186,9 +186,8 @@ impl<D: Dispatcher + 'static> Personal for PersonalClient<D> {
     fn send_transaction(&self, request: TransactionRequest, password: String) -> BoxFuture<H256> {
         Box::new(self.do_sign_transaction(request, password).and_then(
             |(pending_tx, dispatcher, nonce)| {
-                let chain_id = pending_tx.chain_id();
-                trace!(target: "miner", "send_transaction: dispatching tx: {} for chain ID {:?}",
-                    ::rlp::encode(&*pending_tx).into_vec().pretty(), chain_id);
+                trace!(target: "miner", "send_transaction: dispatching tx: {}",
+                    ::rlp::encode(&*pending_tx).into_vec().pretty());
 
                 dispatcher.dispatch_transaction(pending_tx).map(move |res| {
                     nonce.map(move |nonce| nonce.mark_used());

@@ -786,6 +786,7 @@ fn error_cases_rejected() {
         0.into(),
         Bytes::new(),
         DEFAULT_TRANSACTION_TYPE,
+        None,
     );
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
@@ -812,6 +813,7 @@ fn error_cases_rejected() {
         0.into(),
         Bytes::new(),
         DEFAULT_TRANSACTION_TYPE,
+        None,
     );
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
@@ -836,6 +838,7 @@ fn error_cases_rejected() {
         0.into(),
         Bytes::new(),
         DEFAULT_TRANSACTION_TYPE,
+        None,
     );
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
@@ -861,6 +864,7 @@ fn error_cases_rejected() {
         0.into(),
         data,
         DEFAULT_TRANSACTION_TYPE,
+        None,
     );
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let result = {
@@ -886,6 +890,7 @@ fn error_cases_rejected() {
         0.into(),
         data,
         DEFAULT_TRANSACTION_TYPE,
+        None,
     );
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let result = {
@@ -910,6 +915,7 @@ fn error_cases_rejected() {
         1000.into(),
         Bytes::new(),
         DEFAULT_TRANSACTION_TYPE,
+        None,
     );
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {
@@ -934,6 +940,7 @@ fn error_cases_rejected() {
         0.into(),
         Bytes::new(),
         DEFAULT_TRANSACTION_TYPE,
+        None,
     );
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
     let error = {

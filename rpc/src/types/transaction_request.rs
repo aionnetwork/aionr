@@ -25,7 +25,7 @@ use std::fmt;
 
 use ansi_term::Colour;
 use helpers;
-use aion_types::{U256, Address};
+use aion_types::{U256, Address, H256};
 
 use types::{Bytes, TransactionCondition};
 
@@ -62,6 +62,8 @@ pub struct TransactionRequest {
     pub tx_type: Option<U256>,
     /// Delay until this block condition.
     pub condition: Option<TransactionCondition>,
+    /// Beacon hash
+    pub beacon: Option<H256>,
 }
 
 pub fn format_ether(i: U256) -> String {
@@ -116,6 +118,7 @@ impl From<helpers::TransactionRequest> for TransactionRequest {
             nonce: r.nonce,
             tx_type: r.tx_type,
             condition: r.condition.map(Into::into),
+            beacon: r.beacon,
         }
     }
 }
@@ -132,6 +135,7 @@ impl From<helpers::FilledTransactionRequest> for TransactionRequest {
             nonce: r.nonce,
             tx_type: Some(r.tx_type),
             condition: r.condition.map(Into::into),
+            beacon: r.beacon,
         }
     }
 }
@@ -148,6 +152,7 @@ impl Into<helpers::TransactionRequest> for TransactionRequest {
             nonce: self.nonce,
             tx_type: self.tx_type,
             condition: self.condition.map(Into::into),
+            beacon: self.beacon,
         }
     }
 }
@@ -188,6 +193,7 @@ mod tests {
                 nonce: Some(U256::from(4)),
                 tx_type: Some(U256::from(0x01)),
                 condition: Some(TransactionCondition::Number(0x13)),
+                beacon: None
             }
         );
     }
@@ -214,6 +220,7 @@ mod tests {
             nonce: None,
             condition: None,
             tx_type: None,
+            beacon: None
         });
     }
 
@@ -234,6 +241,7 @@ mod tests {
                 nonce: None,
                 condition: None,
                 tx_type: None,
+                beacon: None
             }
         );
     }
@@ -272,6 +280,7 @@ mod tests {
                 nonce: None,
                 condition: None,
                 tx_type: None,
+                beacon: None
             }
         );
     }

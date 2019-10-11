@@ -37,7 +37,6 @@ pub mod trie;
 pub mod vm;
 pub mod maybe;
 pub mod state;
-pub mod transaction;
 pub mod misc;
 #[cfg(test)]
 mod tests;

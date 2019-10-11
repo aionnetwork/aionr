@@ -246,6 +246,13 @@ fn empty_gas_price_histogram() {
 
     assert!(client.gas_price_corpus(20, 64).histogram(5).is_none());
 }
+/*
+
+#[test]
+fn should_not_import_blocks_with_beacon_before_fork_point(){
+    generate_dummy_unity_client_with_beacon(3);
+}
+*/
 
 #[test]
 fn can_handle_long_fork() {
@@ -365,8 +372,9 @@ fn does_not_propagate_delayed_transactions() {
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
             transaction_type: 0x01.into(),
+            beacon: None,
         }
-        .sign(&secret, None),
+        .sign(&secret),
         Some(Condition::Number(2)),
     );
     let tx1 = PendingTransaction::new(
@@ -382,8 +390,9 @@ fn does_not_propagate_delayed_transactions() {
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
             transaction_type: 0x01.into(),
+            beacon: None,
         }
-        .sign(&secret, None),
+        .sign(&secret),
         None,
     );
     let client = generate_dummy_client(1);

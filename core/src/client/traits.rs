@@ -335,6 +335,9 @@ pub trait MiningBlockChainClient: BlockChainClient {
 
     /// get block preparation interval
     fn prepare_block_interval(&self) -> Duration;
+
+    /// get beacon hash number
+    fn is_beacon_hash(&self, hash: &H256) -> Option<BlockNumber>;
 }
 
 /// Client facilities used by internally sealing Engines.

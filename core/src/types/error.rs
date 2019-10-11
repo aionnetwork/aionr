@@ -110,6 +110,12 @@ pub enum BlockError {
     InvalidPoSAuthor,
     /// Invalid future time stamp
     InvalidFutureTimestamp(OutOfBounds<u64>),
+    /// Invalid beacon hash
+    InvalidBeaconHash(H256),
+    /// Beacon hash is banned
+    BeaconHashBanned,
+    /// Branch is incomplete
+    IncompleteBranch,
     /// Invalid seal type
     InvalidSealType,
 }
@@ -173,6 +179,11 @@ impl fmt::Display for BlockError {
                     oob
                 )
             }
+            InvalidBeaconHash(ref hash) => {
+                format!("Block with invalid transaction beacon hash: {}", hash)
+            }
+            BeaconHashBanned => "Not yet forked, beacon hash is banned".into(),
+            IncompleteBranch => "Cannot trace back beacon hash on an incomplete branch".into(),
             InvalidSealType => {
                 "Block's seal type is the same as its parent after Unity fork.".into()
             }
