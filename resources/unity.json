@@ -13,7 +13,6 @@
     "minGasLimit": "0x100590",
     "monetaryPolicyUpdate": "0",
     "unityUpdate": "10",
-    "unityPoSBaseTotalDifficulty": "2000000000",
     "unityPoSInitialDifficulty": "2000000000"
   },
   "genesis": {

@@ -118,8 +118,9 @@ pub trait Engine: Sync + Send {
     /// Calculate the difficulty of
     fn calculate_difficulty(
         &self,
-        _parent: Option<&Header>,
+        _parent: &Header,
         _grand_parent: Option<&Header>,
+        _great_grand_parent: Option<&Header>,
     ) -> U256
     {
         U256::from(0)
@@ -155,7 +156,8 @@ pub trait Engine: Sync + Send {
     fn verify_seal_pos(
         &self,
         header: &<EthereumMachine as Machine>::Header,
-        seal_pos: Option<&<EthereumMachine as Machine>::Header>,
+        parent: &<EthereumMachine as Machine>::Header,
+        grand_parent: Option<&<EthereumMachine as Machine>::Header>,
         stake: Option<BigUint>,
     ) -> Result<(), <EthereumMachine as Machine>::Error>;
 
@@ -182,8 +184,8 @@ pub trait Engine: Sync + Send {
         &self,
         _header: &<EthereumMachine as Machine>::Header,
         _parent: &<EthereumMachine as Machine>::Header,
-        _seal_parent: Option<&<EthereumMachine as Machine>::Header>,
-        _seal_grand_parent: Option<&<EthereumMachine as Machine>::Header>,
+        _grand_parent: Option<&<EthereumMachine as Machine>::Header>,
+        _great_grand_parent: Option<&<EthereumMachine as Machine>::Header>,
     ) -> Result<(), Error>
     {
         Ok(())
@@ -194,8 +196,9 @@ pub trait Engine: Sync + Send {
     fn set_difficulty_from_parent(
         &self,
         _header: &mut <EthereumMachine as Machine>::Header,
-        _parent: Option<&<EthereumMachine as Machine>::Header>,
+        _parent: &<EthereumMachine as Machine>::Header,
         _grand_parent: Option<&<EthereumMachine as Machine>::Header>,
+        _great_grand_parent: Option<&<EthereumMachine as Machine>::Header>,
     )
     {
     }

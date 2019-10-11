@@ -345,8 +345,6 @@ pub fn generate_dummy_blockchain(block_number: u32) -> BlockChain {
         BlockChainConfig::default(),
         &create_unverifiable_block(0, H256::zero()),
         db.clone(),
-        None,
-        None,
     );
 
     let mut batch = DBTransaction::new();
@@ -367,8 +365,6 @@ pub fn generate_dummy_blockchain_with_db(block_number: u32, db: Arc<KeyValueDB>)
         BlockChainConfig::default(),
         &create_unverifiable_block(0, H256::zero()),
         db.clone(),
-        None,
-        None,
     );
 
     let mut batch = DBTransaction::new();
@@ -393,8 +389,6 @@ pub fn generate_dummy_blockchain_with_extra(block_number: u32) -> BlockChain {
         BlockChainConfig::default(),
         &create_unverifiable_block(0, H256::zero()),
         db.clone(),
-        None,
-        None,
     );
 
     let mut batch = DBTransaction::new();
@@ -416,16 +410,14 @@ pub fn generate_dummy_blockchain_with_pos_block(block_number: u32) -> BlockChain
         BlockChainConfig::default(),
         &create_unverifiable_block(0, H256::zero()),
         db.clone(),
-        None,
-        None,
     );
 
     let mut batch = DBTransaction::new();
     for block_order in 1..block_number {
-        // which means pow and pos blocks alternately insert every two
-        // it will be like pow pow pos pos pow pow pos pos ...
+        // which means pow and pos blocks are inserted alternately
+        // it will be like pow pow pos pow pos pow pos pow ...
         //                 0   1   2   3   4   5   6   7
-        let next_block = match block_order / 2 % 2 == 0 {
+        let next_block = match block_order % 2 == 1 {
             true => create_unverifiable_block(block_order, bc.best_block_hash()),
             false => create_unverifiable_pos_block(block_order, bc.best_block_hash()),
         };
@@ -442,8 +434,6 @@ pub fn generate_dummy_empty_blockchain() -> BlockChain {
         BlockChainConfig::default(),
         &create_unverifiable_block(0, H256::zero()),
         db.clone(),
-        None,
-        None,
     );
     bc
 }

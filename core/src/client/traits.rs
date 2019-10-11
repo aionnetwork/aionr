@@ -56,16 +56,6 @@ pub trait BlockChainClient: Sync + Send {
     /// Get raw block header data by block hash.
     fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header>;
 
-    /// Get the header RLP of the seal parent of the given block.
-    /// Parameters:
-    ///   parent_hash: parent hash of the given block
-    ///   seal_type: seal type of the given block
-    fn seal_parent_header(
-        &self,
-        parent_hash: &H256,
-        seal_type: &Option<SealType>,
-    ) -> Option<::encoded::Header>;
-
     /// Look up the block number for the given block ID.
     fn block_number(&self, id: BlockId) -> Option<BlockNumber>;
 
@@ -79,9 +69,8 @@ pub trait BlockChainClient: Sync + Send {
     /// Get block status by block header hash.
     fn block_status(&self, id: BlockId) -> BlockStatus;
 
-    // TODO-UNITY: change back after finishing sync rf
     /// Get block total difficulty.
-    fn block_total_difficulty(&self, id: BlockId) -> Option<(U256, U256, U256)>;
+    fn block_total_difficulty(&self, id: BlockId) -> Option<U256>;
 
     /// Attempt to get address nonce at given block.
     /// May not fail on BlockId::Latest.
@@ -197,14 +186,12 @@ pub trait BlockChainClient: Sync + Send {
     /// Get the best block header.
     fn best_block_header(&self) -> encoded::Header;
 
-    /// Get the best block header with given seal type
-    fn best_block_header_with_seal_type(&self, seal_type: &SealType) -> Option<encoded::Header>;
-
     /// Calculate difficulty
     fn calculate_difficulty(
         &self,
-        parent_header: Option<&Header>,
+        parent_header: &Header,
         grand_parent_header: Option<&Header>,
+        great_grand_parent_header: Option<&Header>,
     ) -> U256;
 
     /// Returns logs matching given filter.
@@ -355,9 +342,6 @@ pub trait MiningBlockChainClient: BlockChainClient {
 
 /// Client facilities used by internally sealing Engines.
 pub trait EngineClient: Sync + Send {
-    /// Make a new block and seal it.
-    fn update_sealing(&self);
-
     /// Submit a seal for a block in the mining queue.
     fn submit_seal(&self, block_hash: H256, seal: Vec<Bytes>);
 

@@ -116,6 +116,8 @@ pub enum BlockError {
     BeaconHashBanned,
     /// Branch is incomplete
     IncompleteBranch,
+    /// Invalid seal type
+    InvalidSealType,
 }
 
 impl fmt::Display for BlockError {
@@ -182,6 +184,9 @@ impl fmt::Display for BlockError {
             }
             BeaconHashBanned => "Not yet forked, beacon hash is banned".into(),
             IncompleteBranch => "Cannot trace back beacon hash on an incomplete branch".into(),
+            InvalidSealType => {
+                "Block's seal type is the same as its parent after Unity fork.".into()
+            }
         };
 
         f.write_fmt(format_args!("Block error ({})", msg))

@@ -194,16 +194,7 @@ impl Client {
 
         let gb = spec.genesis_block();
         let engine = spec.engine.clone();
-        let unity_update = engine.machine().params().unity_update;
-        let unity_base_pos_total_difficulty =
-            engine.machine().params().unity_base_pos_total_difficulty;
-        let chain = Arc::new(BlockChain::new(
-            config.blockchain.clone(),
-            &gb,
-            db.clone(),
-            unity_update,
-            unity_base_pos_total_difficulty,
-        ));
+        let chain = Arc::new(BlockChain::new(config.blockchain.clone(), &gb, db.clone()));
 
         trace!(
             target: "client",
@@ -363,12 +354,10 @@ impl Client {
             }
         };
 
-        // Get seal parent and seal grand parent
-        let seal_type: Option<SealType> = header.seal_type().to_owned();
-        let seal_parent: Option<::encoded::Header> =
-            self.seal_parent_header(&parent_hash, &seal_type);
-        let seal_grand_parent: Option<::encoded::Header> = match &seal_parent {
-            Some(header) => self.seal_parent_header(&header.parent_hash(), &header.seal_type()),
+        // Get grand parent and great grand parent
+        let grand_parent = self.block_header_data(&parent.parent_hash());
+        let great_grand_parent = match &grand_parent {
+            Some(header) => self.block_header_data(&header.parent_hash()),
             None => None,
         };
 
@@ -376,8 +365,8 @@ impl Client {
         let verify_family_result = verify_block_family(
             header,
             &parent,
-            seal_parent.clone().map(|header| header.decode()).as_ref(),
-            seal_grand_parent
+            grand_parent.clone().map(|header| header.decode()).as_ref(),
+            great_grand_parent
                 .clone()
                 .map(|header| header.decode())
                 .as_ref(),
@@ -394,7 +383,8 @@ impl Client {
         if header.seal_type() == &Some(SealType::PoS) {
             let verify_pos_result = engine.verify_seal_pos(
                 header,
-                seal_parent.clone().map(|header| header.decode()).as_ref(),
+                &parent,
+                grand_parent.clone().map(|header| header.decode()).as_ref(),
                 self.get_stake(
                     &header.get_pk_of_pos().unwrap_or(H256::default()),
                     Some(header.author().to_owned()),
@@ -415,8 +405,8 @@ impl Client {
             engine,
             db,
             &parent,
-            seal_parent.map(|header| header.decode()).as_ref(),
-            seal_grand_parent.map(|header| header.decode()).as_ref(),
+            grand_parent.map(|header| header.decode()).as_ref(),
+            great_grand_parent.map(|header| header.decode()).as_ref(),
             last_hashes,
             self.factories.clone(),
             self.db.read().clone(),
@@ -432,66 +422,6 @@ impl Client {
         }
 
         Ok(locked_block)
-    }
-
-    fn block_difficulties(&self, id: BlockId) -> Option<(U256, U256, U256)> {
-        let chain = self.chain.read();
-        if let BlockId::Pending = id {
-            let (latest_difficulty, latest_pow_difficulty, latest_pos_difficulty) = self
-                .block_difficulties(BlockId::Latest)
-                .expect("blocks in chain have details; qed");
-            let pending = self
-                .miner
-                .pending_block_header(chain.best_block_number())
-                .map(|header| {
-                    (
-                        header.seal_type().clone().unwrap_or_default(),
-                        *header.difficulty(),
-                    )
-                });
-            if let Some((seal_type, difficulty)) = pending {
-                match seal_type {
-                    SealType::PoW => {
-                        let pow_difficulty = latest_pow_difficulty + difficulty;
-                        return Some((
-                            // TODO-UNITY: add overflow check
-                            // TODO-Unity: add unity base pos total difficulty check for pending block if necessary
-                            pow_difficulty
-                                * ::std::cmp::max(latest_pos_difficulty, U256::from(1u64)),
-                            pow_difficulty,
-                            latest_pos_difficulty,
-                        ));
-                    }
-                    SealType::PoS => {
-                        let pos_difficulty = latest_pos_difficulty + difficulty;
-                        return Some((
-                            // TODO-UNITY: add overflow check
-                            // TODO-Unity: add unity base pos total difficulty check for pending block if necessary
-                            latest_pow_difficulty
-                                * ::std::cmp::max(pos_difficulty, U256::from(1u64)),
-                            latest_pow_difficulty,
-                            pos_difficulty,
-                        ));
-                    }
-                }
-            }
-            // fall back to latest
-            return Some((
-                latest_difficulty,
-                latest_pow_difficulty,
-                latest_pos_difficulty,
-            ));
-        }
-
-        Self::block_hash(&chain, &self.miner, id)
-            .and_then(|hash| chain.block_details(&hash))
-            .map(|d| {
-                (
-                    d.total_difficulty,
-                    d.pow_total_difficulty,
-                    d.pos_total_difficulty,
-                )
-            })
     }
 
     fn calculate_enacted_retracted(
@@ -605,12 +535,16 @@ impl Client {
         // Print log
         match (first_header, last_header) {
             (Some(ref first), Some(ref last)) if first == last => {
-                info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}",
+                let (_, _, _, hour, minute, second) = utc_from_secs(first.timestamp() as i64);
+                info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}",
                     first.seal_type().clone().unwrap_or_default(),
                     Colour::White.bold().paint(format!("{}", first.number())),
                     Colour::White.bold().paint(format!("{:x}", first.hash())),
                     Colour::White.bold().paint(format!("{:x}", first.difficulty())),
-                    Colour::White.bold().paint(format!("{:x}", first.timestamp())));
+                    Colour::White.bold().paint(format!("{:x}", first.timestamp())),
+                    Colour::White.bold().paint(format!("{}", hour)),
+                    Colour::White.bold().paint(format!("{}", minute)),
+                    Colour::White.bold().paint(format!("{}", second)));
             }
             (Some(first), Some(last)) => {
                 info!(target: "miner", "External blocks added from #{} to #{}",
@@ -1309,20 +1243,19 @@ impl BlockChainClient for Client {
 
     fn best_block_header(&self) -> encoded::Header { self.chain.read().best_block_header() }
 
-    fn best_block_header_with_seal_type(&self, seal_type: &SealType) -> Option<encoded::Header> {
-        self.chain
-            .read()
-            .best_block_header_with_seal_type(seal_type)
-    }
-
     fn calculate_difficulty(
         &self,
-        parent_header: Option<&Header>,
+        parent_header: &Header,
         grand_parent_header: Option<&Header>,
+        great_grand_parent_header: Option<&Header>,
     ) -> U256
     {
         let engine = &*self.engine;
-        engine.calculate_difficulty(parent_header, grand_parent_header)
+        engine.calculate_difficulty(
+            parent_header,
+            grand_parent_header,
+            great_grand_parent_header,
+        )
     }
 
     fn block_header(&self, id: BlockId) -> Option<::encoded::Header> {
@@ -1342,16 +1275,6 @@ impl BlockChainClient for Client {
     fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header> {
         let chain = self.chain.read();
         chain.block_header_data(hash)
-    }
-
-    fn seal_parent_header(
-        &self,
-        parent_hash: &H256,
-        seal_type: &Option<SealType>,
-    ) -> Option<::encoded::Header>
-    {
-        let chain = self.chain.read();
-        chain.seal_parent_header(parent_hash, seal_type)
     }
 
     fn block_number(&self, id: BlockId) -> Option<BlockNumber> { self.block_number_ref(&id) }
@@ -1409,9 +1332,26 @@ impl BlockChainClient for Client {
         }
     }
 
-    // TODO-UNITY: change back after finishing sync rf
-    fn block_total_difficulty(&self, id: BlockId) -> Option<(U256, U256, U256)> {
-        self.block_difficulties(id)
+    fn block_total_difficulty(&self, id: BlockId) -> Option<U256> {
+        let chain = self.chain.read();
+        if let BlockId::Pending = id {
+            let latest_difficulty = self
+                .block_total_difficulty(BlockId::Latest)
+                .expect("blocks in chain have details; qed");
+            let pending_difficulty = self
+                .miner
+                .pending_block_header(chain.best_block_number())
+                .map(|header| *header.difficulty());
+            if let Some(difficulty) = pending_difficulty {
+                return Some(difficulty + latest_difficulty);
+            }
+            // fall back to latest
+            return Some(latest_difficulty);
+        }
+
+        Self::block_hash(&chain, &self.miner, id)
+            .and_then(|hash| chain.block_details(&hash))
+            .map(|d| d.total_difficulty)
     }
 
     fn nonce(&self, address: &Address, id: BlockId) -> Option<U256> {
@@ -1661,16 +1601,11 @@ impl BlockChainClient for Client {
     fn chain_info(&self) -> BlockChainInfo {
         let mut chain_info = self.chain.read().chain_info();
 
-        // TODO-UNITY: add overflow check
         // TODO-Unity: pending_total_difficulty is not used now. To add unity base pos total difficulty factor if necessary.
         // TODO: It will add up the difficulty of all the blocks in the queue, regardless of whether the block can be successfully verified.
         // TODO: Find a better way to fix it if we want to use pending_total_difficulty.
-        chain_info.pending_total_difficulty = (chain_info.pow_total_difficulty
-            + self.block_queue.pow_total_difficulty())
-            * ::std::cmp::max(
-                chain_info.pos_total_difficulty + self.block_queue.pos_total_difficulty(),
-                U256::from(1u64),
-            );
+        chain_info.pending_total_difficulty =
+            chain_info.total_difficulty + self.block_queue.total_difficulty();
         chain_info
     }
 
@@ -1756,10 +1691,9 @@ impl MiningBlockChainClient for Client {
             .block_header(&h)
             .expect("h is best block hash: so its header must exist: qed");
 
-        let seal_parent: Option<::encoded::Header> =
-            self.seal_parent_header(&best_header.hash(), &seal_type);
-        let seal_grand_parent: Option<::encoded::Header> = match &seal_parent {
-            Some(header) => self.seal_parent_header(&header.parent_hash(), &header.seal_type()),
+        let grand_parent = self.block_header_data(&best_header.parent_hash());
+        let great_grand_parent = match &grand_parent {
+            Some(header) => self.block_header_data(&header.parent_hash()),
             None => None,
         };
 
@@ -1769,8 +1703,8 @@ impl MiningBlockChainClient for Client {
             self.state_db.read().boxed_clone_canon(&h),
             best_header,
             seal_type.unwrap_or_default(),
-            seal_parent.map(|header| header.decode()).as_ref(),
-            seal_grand_parent.map(|header| header.decode()).as_ref(),
+            grand_parent.map(|header| header.decode()).as_ref(),
+            great_grand_parent.map(|header| header.decode()).as_ref(),
             self.build_last_hashes(h.clone()),
             author,
             gas_range_target,
@@ -1853,13 +1787,18 @@ impl MiningBlockChainClient for Client {
         self.db.read().flush().expect("DB flush failed.");
         // clear pending PoS blocks
         self.miner.clear_pos_pending();
+
+        let (_, _, _, hour, minute, second) = utc_from_secs(timestamp as i64);
         // Print log
-        info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}",
+        info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}",
             seal_type.unwrap_or_default(),
             Colour::White.bold().paint(format!("{}", number)),
             Colour::White.bold().paint(format!("{:x}", hash)),
             Colour::White.bold().paint(format!("{:x}", difficulty)),
-            Colour::White.bold().paint(format!("{:x}", timestamp)));
+            Colour::White.bold().paint(format!("{:x}", timestamp)),
+            Colour::White.bold().paint(format!("{}", hour)),
+            Colour::White.bold().paint(format!("{}", minute)),
+            Colour::White.bold().paint(format!("{}", second)));
         Ok(hash)
     }
 
@@ -1869,6 +1808,19 @@ impl MiningBlockChainClient for Client {
         let chain = self.chain.read();
         chain.beacon_list(hash)
     }
+}
+
+fn utc_from_secs(secs: i64) -> (u64, u64, u64, u64, u64, u64) {
+    let time_spec = ::time::Timespec::new(secs, 0);
+    let utc = ::time::at_utc(time_spec);
+    return (
+        1900 + utc.tm_year as u64,
+        utc.tm_mon as u64,
+        utc.tm_mday as u64,
+        utc.tm_hour as u64,
+        utc.tm_min as u64,
+        utc.tm_sec as u64,
+    );
 }
 
 impl ProvingBlockChainClient for Client {

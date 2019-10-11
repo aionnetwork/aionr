@@ -37,7 +37,7 @@ use acore::sync::SyncProvider;
 use acore::account_provider::AccountProvider;
 use acore::client::{MiningBlockChainClient, BlockId, TransactionId};
 use acore::filter::Filter as EthcoreFilter;
-use acore::header::{BlockNumber as EthBlockNumber};
+use acore::header::{BlockNumber as EthBlockNumber, SealType};
 use acore::log_entry::LogEntry;
 use acore::miner::MinerService;
 use acore::miner::external::ExternalMinerService;
@@ -111,34 +111,56 @@ where
     fn block(&self, id: BlockId, include_txs: bool) -> Result<Option<Block>> {
         let client = &self.client;
         match (client.block(id.clone()), client.block_total_difficulty(id)) {
-            // TODO-UNITY: change back after finishing sync rf
-            (Some(block), Some((total_difficulty, _, _))) => {
+            (Some(block), Some(total_difficulty)) => {
                 let view = block.header_view();
+                let seal_type: SealType = view.seal_type().unwrap_or_default();
                 let seal_fields: Vec<Bytes> = view.seal().into_iter().map(Into::into).collect();
-                // Pending block do not yet has nonce and solution. Return empty value in this case.
-                let (nonce, solution) = match seal_fields.len() {
-                    length if length >= 2 => {
-                        (Some(seal_fields[0].clone()), Some(seal_fields[1].clone()))
+                // Get seal by seal type.
+                // Pending block do not yet has seal. Return empty value in this case.
+                let (nonce, solution, seed, signature, public_key) = match seal_type {
+                    SealType::PoW => {
+                        let (nonce, solution) = if seal_fields.len() == 2 {
+                            (Some(seal_fields[0].clone()), Some(seal_fields[1].clone()))
+                        } else {
+                            (None, None)
+                        };
+                        (nonce, solution, None, None, None)
                     }
-                    _ => (None, None),
+                    SealType::PoS => {
+                        let (seed, signature, public_key) = if seal_fields.len() == 3 {
+                            (
+                                Some(seal_fields[0].clone()),
+                                Some(seal_fields[1].clone()),
+                                Some(seal_fields[2].clone()),
+                            )
+                        } else {
+                            (None, None, None)
+                        };
+                        (None, None, seed, signature, public_key)
+                    }
                 };
                 Ok(Some(Block {
+                    number: Some(view.number().into()),
+                    seal_type: seal_type,
                     hash: Some(view.hash().into()),
-                    size: Some(block.rlp().as_raw().len().into()),
                     parent_hash: view.parent_hash().into(),
                     miner: view.author().into(),
-                    state_root: view.state_root().into(),
-                    transactions_root: view.transactions_root().into(),
-                    receipts_root: view.receipts_root().into(),
-                    number: Some(view.number().into()),
-                    gas_used: view.gas_used().into(),
-                    gas_limit: view.gas_limit().into(),
-                    logs_bloom: view.log_bloom().into(),
                     timestamp: view.timestamp().into(),
                     difficulty: view.difficulty().into(),
                     total_difficulty: Some(total_difficulty.into()),
+                    size: Some(block.rlp().as_raw().len().into()),
+                    gas_limit: view.gas_limit().into(),
+                    gas_used: view.gas_used().into(),
+                    state_root: view.state_root().into(),
+                    transactions_root: view.transactions_root().into(),
+                    receipts_root: view.receipts_root().into(),
+                    logs_bloom: view.log_bloom().into(),
+                    extra_data: Bytes::new(view.extra_data()),
                     nonce: nonce,
                     solution: solution,
+                    seed: seed,
+                    signature: signature,
+                    public_key: public_key,
                     transactions: match include_txs {
                         true => {
                             BlockTransactions::Full(
@@ -162,7 +184,6 @@ where
                             )
                         }
                     },
-                    extra_data: Bytes::new(view.extra_data()),
                 }))
             }
             _ => Ok(None),

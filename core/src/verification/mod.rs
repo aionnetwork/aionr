@@ -250,18 +250,18 @@ fn beacon_check(
 pub fn verify_block_family(
     header: &Header,
     parent: &Header,
-    seal_parent: Option<&Header>,
-    seal_grand_parent: Option<&Header>,
+    grand_parent: Option<&Header>,
+    great_grand_parent: Option<&Header>,
     engine: &Engine,
     do_full: Option<FullFamilyParams>,
 ) -> Result<(), Error>
 {
     verify_parent(
-        &header,
-        &parent,
+        header,
+        parent,
         engine.machine().params().gas_limit_bound_divisor,
     )?;
-    engine.verify_block_family(&header, &parent, seal_parent, seal_grand_parent)?;
+    engine.verify_block_family(header, parent, grand_parent, great_grand_parent)?;
 
     let (_bytes, txs, bc, _client) = match do_full {
         Some(x) => x,
@@ -443,7 +443,6 @@ mod tests {
     use transaction::{SignedTransaction, Transaction, UnverifiedTransaction, Action};
     use types::state::log_entry::{LogEntry, LocalizedLogEntry};
     use rlp;
-    use header::SealType;
     use keychain;
 
     fn check_ok(result: Result<(), Error>) {
@@ -523,49 +522,6 @@ mod tests {
                 .map(encoded::Header::new)
         }
 
-        /// Get the header RLP of the seal parent of the given block.
-        /// Parameters:
-        ///   parent_hash: parent hash of the given block
-        ///   seal_type: seal type of the given block
-        fn seal_parent_header(
-            &self,
-            parent_hash: &H256,
-            seal_type: &Option<SealType>,
-        ) -> Option<::encoded::Header>
-        {
-            // Get parent header
-            let parent_header: ::encoded::Header = match self.block_header_data(parent_hash) {
-                Some(header) => header,
-                None => return None,
-            };
-            let parent_seal_type: Option<SealType> = parent_header.seal_type();
-            // If parent's seal type is the same as the current, return parent
-            if seal_type == &parent_seal_type {
-                Some(parent_header)
-            }
-            // Else return the anti seal parent of the parent
-            else {
-                let parent_details: BlockDetails = match self.block_details(parent_hash) {
-                    Some(details) => details,
-                    None => return None,
-                };
-                if let Some(anti_seal_parent) = parent_details.anti_seal_parent {
-                    self.block_header_data(&anti_seal_parent)
-                } else {
-                    None
-                }
-            }
-        }
-
-        /// Get the current best block with specified seal type
-        fn best_block_header_with_seal_type(
-            &self,
-            _seal_type: &SealType,
-        ) -> Option<encoded::Header>
-        {
-            unimplemented!()
-        }
-
         fn block_body(&self, hash: &H256) -> Option<encoded::Body> {
             self.block(hash)
                 .map(|b| BlockChain::block_to_body(&b.into_inner()))
@@ -584,9 +540,6 @@ mod tests {
                     total_difficulty: header.difficulty().clone(),
                     parent: header.parent_hash().clone(),
                     children: Vec::new(),
-                    pow_total_difficulty: header.difficulty().clone(),
-                    pos_total_difficulty: header.difficulty().clone(),
-                    anti_seal_parent: None,
                 }
             })
         }

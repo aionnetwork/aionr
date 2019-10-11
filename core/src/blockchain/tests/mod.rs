@@ -26,7 +26,7 @@ fn new_db() -> Arc<KeyValueDB> {
 }
 
 fn new_chain(genesis: &[u8], db: Arc<KeyValueDB>) -> BlockChain {
-    BlockChain::new(Default::default(), genesis, db, None, None)
+    BlockChain::new(Default::default(), genesis, db)
 }
 
 #[test]
@@ -842,7 +842,7 @@ fn test_insert_unordered() {
     let b1 = genesis.add_block_with_bloom(bloom_b1);
     let b2 = b1.add_block_with_bloom(bloom_b2);
     let b3 = b2.add_block_with_bloom(bloom_b3);
-    let b1_pow_total_difficulty = genesis.last().difficulty() + b1.last().difficulty();
+    let b1_total_difficulty = genesis.last().difficulty() + b1.last().difficulty();
 
     let db = new_db();
     let bc = new_chain(&genesis.last().encoded(), db.clone());
@@ -851,33 +851,16 @@ fn test_insert_unordered() {
         &mut batch,
         &b2.last().encoded(),
         vec![],
-        Some(b1_pow_total_difficulty),
-        Some(U256::from(0)),
+        Some(b1_total_difficulty),
         false,
         false,
     );
     db.write_buffered(batch.clone());
     bc.commit();
-    bc.insert_unordered_block(
-        &mut batch,
-        &b3.last().encoded(),
-        vec![],
-        None,
-        None,
-        true,
-        false,
-    );
+    bc.insert_unordered_block(&mut batch, &b3.last().encoded(), vec![], None, true, false);
     db.write_buffered(batch.clone());
     bc.commit();
-    bc.insert_unordered_block(
-        &mut batch,
-        &b1.last().encoded(),
-        vec![],
-        None,
-        None,
-        false,
-        false,
-    );
+    bc.insert_unordered_block(&mut batch, &b1.last().encoded(), vec![], None, false, false);
     bc.commit();
     db.write(batch).unwrap();
 
@@ -951,8 +934,8 @@ fn test_new_difficulty1() {
 
     let bc = generate_dummy_blockchain_with_pos_block(50);
     // td = pow_td * pos_td if there is pos block in chain
-    // td = pow_td(0+100+400+500+...+4800+4900) * pos_td(200+300+600+700+...+4600+4700) = 3745560000
-    assert_eq!(bc.best_block_total_difficulty(), U256::from(3745560000u64));
+    // td = pow_td(0+100+300+500+...+4700+4900) + pos_td(200+400+600+800+...+4600+4800) = 122500
+    assert_eq!(bc.best_block_total_difficulty(), U256::from(122500));
 }
 
 #[test]
@@ -980,26 +963,26 @@ fn test_new_difficulty2() {
 
     assert_eq!(bc.best_block_total_difficulty(), U256::from(100));
 
-    // add a pos block and then td = 100 * 10 = 1000
+    // add a pos block and then td = 100 + 10 = 110
     let a2 = a1.add_pos_block();
     bc.insert_block(&mut batch, &a2.last().encoded(), vec![]);
     db.write_buffered(batch.clone());
     bc.commit();
-    assert_eq!(bc.best_block_total_difficulty(), U256::from(1000));
+    assert_eq!(bc.best_block_total_difficulty(), U256::from(110));
 
-    // if a pow block come with the same block number as the pos block at moment,
-    // b2 td = 100 + 10 = 110 < 1000, it will not be accepted
-    let b2 = a1.add_block();
+    // if a pow block come with the same block number as the pos block and 9 difficulty at moment,
+    // b2 td = 100 + 9 = 109 < 110, it will not be accepted
+    let b2 = a1.add_block_with_difficulty(9);
     bc.insert_block(&mut batch, &b2.last().encoded(), vec![]);
     bc.commit();
-    assert_eq!(bc.best_block_total_difficulty(), U256::from(1000));
+    assert_eq!(bc.best_block_total_difficulty(), U256::from(110));
 
-    // if a pow block come with the same block number as the pos block and 901 difficulty at moment,
-    // b3 td = 100 + 901 = 1001 > 1000, it will be accepted
-    let c2 = a1.add_block_with_difficulty(901);
+    // if a pow block come with the same block number as the pos block and 11 difficulty at moment,
+    // b3 td = 100 + 11 = 111 > 110, it will be accepted
+    let c2 = a1.add_block_with_difficulty(11);
     bc.insert_block(&mut batch, &c2.last().encoded(), vec![]);
     bc.commit();
-    assert_eq!(bc.best_block_total_difficulty(), U256::from(1001));
+    assert_eq!(bc.best_block_total_difficulty(), U256::from(111));
 }
 // use to test import block error
 //#[test]

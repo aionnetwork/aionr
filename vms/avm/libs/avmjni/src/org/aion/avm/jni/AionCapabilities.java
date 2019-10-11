@@ -3,6 +3,8 @@ package org.aion.avm.jni;
 import org.aion.avm.core.IExternalCapabilities;
 import org.aion.types.AionAddress;
 import org.aion.types.Transaction;
+import org.aion.types.InternalTransaction;
+import org.aion.avm.utils.InvokableTxUtil;
 
 public class AionCapabilities implements IExternalCapabilities {
 
@@ -34,5 +36,10 @@ public class AionCapabilities implements IExternalCapabilities {
         if (Constants.DEBUG)
             System.out.println(new_contract);
         return new_contract;
+    }
+
+    @Override
+    public InternalTransaction decodeSerializedTransaction(byte[] innerTx, AionAddress executor, long energyPrice, long energyLimit) {
+            return InvokableTxUtil.decode(innerTx, executor, energyPrice, energyLimit);
     }
 }
