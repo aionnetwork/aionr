@@ -142,7 +142,7 @@ public class NativeTransactionExecutor {
      */
     public static byte[] execute(long handle, byte[] txs, boolean is_local) {
         if (Constants.DEBUG) {
-            System.out.println("JNI V2");
+            System.out.println("JNI V1");
         }
         
         long blockNumber = 0;

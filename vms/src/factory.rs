@@ -38,6 +38,7 @@ pub trait Factory {
         params: Vec<ActionParams>,
         ext: &mut Ext,
         is_local: bool,
+        unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>;
 }
 
@@ -62,6 +63,7 @@ impl Factory for FastVMFactory {
         params: Vec<ActionParams>,
         ext: &mut Ext,
         _is_local: bool,
+        _unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>
     {
         assert!(params.len() == 1);
@@ -191,8 +193,6 @@ impl Factory for FastVMFactory {
 const AVM_CREATE: i32 = 3;
 const AVM_CALL: i32 = 0;
 const AVM_BALANCE_TRANSFER: i32 = 4;
-const AVM_V2_FORK: u64 = 265;
-// const AVM_GARBAGE_COLLECTION: i32 = 5;
 
 #[derive(Clone)]
 pub struct AVMFactory {
@@ -213,6 +213,7 @@ impl Factory for AVMFactory {
         params: Vec<ActionParams>,
         ext: &mut Ext,
         is_local: bool,
+        unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>
     {
         let mut avm_tx_contexts = Vec::new();
@@ -272,14 +273,12 @@ impl Factory for AVMFactory {
             }
             let nonce = params.nonce;
 
-            // TODO: modify this block number in production
-            if block_number > AVM_V2_FORK {
-                version = 1;
+            match unity_update {
+                Some(ref n) if &block_number > n => {
+                    version = 1;
+                }
+                _ => {}
             }
-
-            // if block_number > 80 {
-            //     version = 0;
-            // }
 
             avm_tx_contexts.push(AVMTxContext::new(
                 tx_hash,
