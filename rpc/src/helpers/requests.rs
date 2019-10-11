@@ -20,7 +20,7 @@
  *
  ******************************************************************************/
 
-use aion_types::{Address, U256};
+use aion_types::{Address, U256, H256};
 use bytes::Bytes;
 
 use types::{Origin, TransactionCondition};
@@ -46,6 +46,8 @@ pub struct TransactionRequest {
     pub tx_type: Option<U256>,
     /// Delay until this condition is met.
     pub condition: Option<TransactionCondition>,
+    /// Beacon hash
+    pub beacon: Option<H256>,
 }
 
 /// Transaction request coming from RPC in decimal
@@ -90,6 +92,8 @@ pub struct FilledTransactionRequest {
     pub tx_type: U256,
     /// Delay until this condition is met.
     pub condition: Option<TransactionCondition>,
+    /// Beacon hash
+    pub beacon: Option<H256>,
 }
 
 impl From<FilledTransactionRequest> for TransactionRequest {
@@ -104,6 +108,7 @@ impl From<FilledTransactionRequest> for TransactionRequest {
             nonce: r.nonce,
             tx_type: Some(r.tx_type),
             condition: r.condition,
+            beacon: r.beacon,
         }
     }
 }

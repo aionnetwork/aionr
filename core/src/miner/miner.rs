@@ -692,13 +692,28 @@ impl Miner {
         let mut invalid_transactions = HashSet::new();
         let mut non_allowed_transactions = HashSet::new();
         let mut transactions_to_penalize = HashSet::new();
+        let mut transactions_with_invalid_beacon = HashMap::new();
         let block_number = open_block.block().header().number();
 
         trace!(target: "block", "prepare_block: block_number: {:?}, parent_block: {:?}", block_number, client.best_block_header().number());
 
         let mut tx_count: usize = 0;
+        let update_unity = self.engine.machine().params().unity_update;
         let tx_total = transactions.len();
         for tx in transactions {
+            if let Some(num) = update_unity {
+                if block_number <= num && tx.beacon.is_some() {
+                    invalid_transactions.insert(tx.hash().clone());
+                    continue;
+                } else if block_number > num {
+                    if let Some(hash) = tx.beacon {
+                        if client.is_beacon_hash(&hash).is_none() {
+                            transactions_with_invalid_beacon.insert(tx.hash().clone(), hash);
+                            continue;
+                        }
+                    }
+                }
+            }
             let hash = tx.hash().clone();
             let start = Instant::now();
             let result = open_block.push_transaction(tx, None, true);
@@ -788,6 +803,13 @@ impl Miner {
         transactions_to_penalize.iter().for_each(|hash| {
             self.transaction_pool.penalize(hash);
         });
+
+        transactions_with_invalid_beacon
+            .iter()
+            .for_each(|(hash, beacon)| {
+                self.transaction_pool
+                    .remove_transaction(*hash, RemovalReason::InvalidBeaconHash(*beacon));
+            });
 
         Ok((block, original_work_hash))
     }
@@ -949,8 +971,24 @@ impl Miner {
         transaction: UnverifiedTransaction,
     ) -> Result<SignedTransaction, Error>
     {
-        let hash = transaction.hash().clone();
         let best_block_header = client.best_block_header().decode();
+        match self.engine.machine().params().unity_update {
+            Some(update_num) if best_block_header.number() >= update_num => {
+                if let Some(ref hash) = transaction.beacon {
+                    if client.is_beacon_hash(hash).is_none() {
+                        return Err(Error::Transaction(TransactionError::InvalidBeaconHash(
+                            *hash,
+                        )));
+                    }
+                }
+            }
+            _ => {
+                if transaction.beacon.is_some() {
+                    return Err(Error::Transaction(TransactionError::BeaconBanned));
+                }
+            }
+        }
+        let hash = transaction.hash().clone();
         if client
             .transaction_block(TransactionId::Hash(hash.clone()))
             .is_some()
@@ -1620,6 +1658,28 @@ impl MinerService for Miner {
     {
         trace!(target: "block", "chain_new_blocks");
 
+        if let Some(update_num) = self.engine.machine().params().unity_update {
+            let best_num = client
+                .block_number(BlockId::Latest)
+                .expect("should not be none");
+            if best_num >= update_num && !retracted.is_empty() {
+                let _ = self
+                    .pending_transactions()
+                    .iter()
+                    .chain(self.future_transactions().iter())
+                    .map(|x| {
+                        if let Some(ref hash) = x.beacon {
+                            if client.is_beacon_hash(hash).is_none() {
+                                self.transaction_pool.remove_transaction(
+                                    *x.hash(),
+                                    RemovalReason::InvalidBeaconHash(*hash),
+                                )
+                            }
+                        }
+                    });
+            }
+        }
+
         // Import all transactions in retracted routes...
         {
             for hash in retracted {
@@ -1629,7 +1689,7 @@ impl MinerService for Miner {
                 );
                 let transactions = block.transactions();
                 transactions.into_iter().for_each(|unverified_transaction| {
-                    let _ = self
+                    let _r = self
                         .verify_transaction(client, unverified_transaction)
                         .and_then(|transaction| {
                             self.add_transaction_to_queue(
@@ -1713,8 +1773,10 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use super::{Banning, MinerOptions, PendingSet, SealType};
+    use types::error::*;
+    use client::{BlockChainClient, BlockId};
     use tests::common::{EachBlockWith, TestBlockChainClient};
-    use transaction::{PendingTransaction, SignedTransaction};
+    use transaction::{PendingTransaction, SignedTransaction, Error as TransactionError};
     use transaction::Action;
     use transaction::Transaction;
     use transaction::transaction_queue::PrioritizationStrategy;
@@ -1778,6 +1840,33 @@ mod tests {
         .expect("Miner was just created.")
     }
 
+    fn miner_with_spec(spec: &Spec) -> Miner {
+        Arc::try_unwrap(Miner::new(
+            MinerOptions {
+                force_sealing: false,
+                reseal_min_period: Duration::from_secs(5),
+                prepare_block_interval: Duration::from_secs(5),
+                tx_gas_limit: !U256::zero(),
+                tx_queue_memory_limit: None,
+                tx_queue_strategy: PrioritizationStrategy::GasFactorAndGasPrice,
+                pending_set: PendingSet::AlwaysSealing,
+                work_queue_size: 5,
+                enable_resubmission: true,
+                tx_queue_banning: Banning::Disabled,
+                infinite_pending_block: false,
+                minimal_gas_price: 0u64.into(),
+                maximal_gas_price: 9_000_000_000_000_000_000u64.into(),
+                local_max_gas_price: 100_000_000_000u64.into(),
+                staker_private_key: None,
+            },
+            spec,
+            None, // accounts provider
+            IoChannel::disconnected(),
+        ))
+        .ok()
+        .expect("Miner was just created.")
+    }
+
     fn transaction() -> SignedTransaction {
         let keypair = keychain::ethkey::generate_keypair();
         Transaction {
@@ -1792,8 +1881,28 @@ mod tests {
             gas_price_bytes: Vec::new(),
             gas_bytes: Vec::new(),
             value_bytes: Vec::new(),
+            beacon: None,
         }
-        .sign(keypair.secret(), None)
+        .sign(keypair.secret())
+    }
+
+    fn transaction_with_beacon(beacon: H256) -> SignedTransaction {
+        let keypair = keychain::ethkey::generate_keypair();
+        Transaction {
+            action: Action::Create,
+            value: U256::zero(),
+            data: "3331600055".from_hex().unwrap(),
+            gas: U256::from(300_000),
+            gas_price: default_gas_price(),
+            nonce: U256::zero(),
+            transaction_type: ::transaction::DEFAULT_TRANSACTION_TYPE,
+            nonce_bytes: Vec::new(),
+            gas_price_bytes: Vec::new(),
+            gas_bytes: Vec::new(),
+            value_bytes: Vec::new(),
+            beacon: Some(beacon),
+        }
+        .sign(keypair.secret())
     }
 
     fn default_gas_price() -> U256 { 0u64.into() }
@@ -1854,7 +1963,7 @@ mod tests {
         // then
         assert!(res.is_ok());
         miner.update_transaction_pool(&client, true);
-        // miner.prepare_work_sealing(&client);
+        // miner.prepare_work_sealing(&client,&None);
         assert_eq!(miner.pending_transactions().len(), 1);
         assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
@@ -1862,6 +1971,213 @@ mod tests {
         // This method will let us know if pending block was created (before calling that method)
         assert!(miner.prepare_work_sealing(&client, &None));
     }
+
+    #[test]
+    fn should_not_import_transaction_with_beacon_hash_before_unity_update() {
+        // given
+        let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
+        let miner = miner_with_spec(&Spec::new_unity());
+        let transaction = transaction_with_beacon(H256::from(37472u64));
+        let best_block = 0;
+        // external
+        let res = miner
+            .import_external_transactions(&client, vec![transaction.clone().into()])
+            .pop()
+            .unwrap();
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            format!("{}", Error::Transaction(TransactionError::BeaconBanned))
+        );
+        // internal
+        let res = miner
+            .import_own_transaction(&client, PendingTransaction::new(transaction.clone(), None));
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            format!("{}", Error::Transaction(TransactionError::BeaconBanned))
+        );
+        // then
+        miner.update_transaction_pool(&client, true);
+        // miner.prepare_work_sealing(&client);
+        assert_eq!(miner.pending_transactions().len(), 0);
+        assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
+        assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
+        assert_eq!(miner.pending_receipts(best_block).len(), 0);
+        assert!(miner.prepare_work_sealing(&client, &None));
+
+        client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
+
+        let res = miner
+            .import_external_transactions(&client, vec![transaction.clone().into()])
+            .pop()
+            .unwrap();
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            format!(
+                "{}",
+                Error::Transaction(TransactionError::InvalidBeaconHash(H256::from(37472u64)))
+            )
+        );
+        // internal
+        let res = miner
+            .import_own_transaction(&client, PendingTransaction::new(transaction.clone(), None));
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            format!(
+                "{}",
+                Error::Transaction(TransactionError::InvalidBeaconHash(H256::from(37472u64)))
+            )
+        );
+    }
+
+    #[test]
+    fn should_not_import_transaction_with_invalid_beacon_hash_after_unity_update() {
+        // given
+        let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
+        let miner = miner_with_spec(&Spec::new_unity());
+        let transaction = transaction_with_beacon(H256::from(37472u64));
+        client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
+        let best_block = 9;
+
+        let res = miner
+            .import_external_transactions(&client, vec![transaction.clone().into()])
+            .pop()
+            .unwrap();
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            format!(
+                "{}",
+                Error::Transaction(TransactionError::InvalidBeaconHash(H256::from(37472u64)))
+            )
+        );
+        // internal
+        let res = miner
+            .import_own_transaction(&client, PendingTransaction::new(transaction.clone(), None));
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            format!(
+                "{}",
+                Error::Transaction(TransactionError::InvalidBeaconHash(H256::from(37472u64)))
+            )
+        );
+
+        // then
+        miner.update_transaction_pool(&client, true);
+        // miner.prepare_work_sealing(&client);
+        assert_eq!(miner.pending_transactions().len(), 0);
+        assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
+        assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
+        assert_eq!(miner.pending_receipts(best_block).len(), 0);
+    }
+
+    #[test]
+    fn should_import_transaction_with_valid_beacon_hash_after_unity_update() {
+        // given
+        let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
+        let miner = miner_with_spec(&Spec::new_unity());
+        client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
+        let best_block = 9;
+        let beacon = client.block(BlockId::Number(8)).unwrap();
+
+        let transaction = transaction_with_beacon(beacon.hash());
+
+        let res = miner
+            .import_external_transactions(&client, vec![transaction.clone().into()])
+            .pop()
+            .unwrap();
+        assert!(res.is_ok());
+
+        // internal
+        let res = miner
+            .import_own_transaction(&client, PendingTransaction::new(transaction.clone(), None));
+        assert!(res.is_ok());
+
+        // then
+        miner.update_transaction_pool(&client, true);
+
+        let res = miner
+            .import_external_transactions(&client, vec![transaction.clone().into()])
+            .pop()
+            .unwrap();
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            format!("{}", Error::Transaction(TransactionError::AlreadyImported))
+        );
+
+        // internal
+        let res = miner
+            .import_own_transaction(&client, PendingTransaction::new(transaction.clone(), None));
+        assert_eq!(
+            format!("{}", res.err().unwrap()),
+            format!("{}", Error::Transaction(TransactionError::AlreadyImported))
+        );
+
+        //        miner.prepare_work_sealing(&client,&None);
+        assert_eq!(miner.pending_transactions().len(), 1);
+        assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
+        assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
+        assert_eq!(miner.pending_receipts(best_block).len(), 0);
+    }
+
+    /*
+    
+        #[test]
+        fn test_tx_pool_with_beacon_when_chain_reorg() {
+            // given
+            let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
+            let miner = miner_with_spec(&Spec::new_unity());
+            client.add_blocks(9,EachBlockWith::Nothing,SealType::PoW);
+            let best_block = 9;
+            let hash7 = client.block(BlockId::Number(7)).unwrap().hash();
+            let hash8 = client.block(BlockId::Number(8)).unwrap().hash();
+            client.add_blocks(1,EachBlockWith::Transaction(Some(hash8)),SealType::PoS);
+            let hash10 = client.chain_info().best_block_hash;
+            client.add_blocks(1, EachBlockWith::Transaction(Some(hash10)),SealType::PoW);
+            let hash11 = client.chain_info().best_block_hash;
+    
+            let best = client.best_block_header();
+            assert_eq!(best.number(),11);
+            assert_eq!(best.parent_hash(),hash10);
+    
+    
+    
+            miner.chain_new_blocks(&client,&[],&[],&[],&[hash10,hash11]);
+            assert_eq!(miner.pending_transactions().len(), 1);
+            assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
+            assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
+            assert_eq!(miner.pending_receipts(best_block).len(),0);
+            assert!(miner.prepare_work_sealing(&client, &None));
+    
+    
+    
+            let transaction_b7 = transaction_with_beacon(hash7);
+            let transaction_b11 = transaction_with_beacon(hash11);
+    
+            let res = miner
+                .import_external_transactions(&client, vec![transaction_b7.clone().into()])
+                .pop()
+                .unwrap();
+            assert!(res.is_ok());
+    
+            // internal
+            let res = miner.import_own_transaction(&client, PendingTransaction::new(transaction_b11.clone(), None));
+            assert!(res.is_ok());
+    
+            // then
+            miner.update_transaction_pool(&client, true);
+            assert_eq!(miner.pending_transactions().len(), 3);
+            assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
+            assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
+            assert_eq!(miner.pending_receipts(best_block).len(),0);
+            assert!(miner.prepare_work_sealing(&client, &None));
+    
+            miner.chain_new_blocks(&client,&[],&[],&[],&[hash10,hash11]);
+            assert_eq!(miner.pending_transactions().len(), 2);
+            assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
+            assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
+            assert_eq!(miner.pending_receipts(best_block).len(),0);
+            assert!(miner.prepare_work_sealing(&client, &None));
+        }
+    */
 
     #[test]
     fn should_not_seal_unless_enabled() {

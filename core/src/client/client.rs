@@ -536,7 +536,7 @@ impl Client {
         match (first_header, last_header) {
             (Some(ref first), Some(ref last)) if first == last => {
                 let (_, _, _, hour, minute, second) = utc_from_secs(first.timestamp() as i64);
-                info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}", 
+                info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}",
                     first.seal_type().clone().unwrap_or_default(),
                     Colour::White.bold().paint(format!("{}", first.number())),
                     Colour::White.bold().paint(format!("{:x}", first.hash())),
@@ -547,8 +547,8 @@ impl Client {
                     Colour::White.bold().paint(format!("{}", second)));
             }
             (Some(first), Some(last)) => {
-                info!(target: "miner", "External blocks added from #{} to #{}", 
-                    Colour::White.bold().paint(format!("{}", first.number())), 
+                info!(target: "miner", "External blocks added from #{} to #{}",
+                    Colour::White.bold().paint(format!("{}", first.number())),
                     Colour::White.bold().paint(format!("{}", last.number())));
             }
             (_, _) => {}
@@ -941,10 +941,13 @@ impl Client {
             // delete col_extra
             let mut key_blk_detail = H264::default();
             let mut key_blk_recipts = H264::default();
+            let mut key_beacon_list = H264::default();
             key_blk_detail[0] = 0u8;
             key_blk_recipts[0] = 4u8;
+            key_beacon_list[0] = 5u8;
             (*key_blk_detail)[1..].clone_from_slice(&hash);
             (*key_blk_recipts)[1..].clone_from_slice(&hash);
+            (*key_beacon_list)[1..].clone_from_slice(&hash);
             let mut blk_number = [0u8; 5];
             blk_number[0] = 1u8;
             blk_number[1] = (blk >> 24) as u8;
@@ -955,6 +958,7 @@ impl Client {
             batch.delete(::db::COL_EXTRA, &key_blk_detail);
             batch.delete(::db::COL_EXTRA, &key_blk_recipts);
             batch.delete(::db::COL_EXTRA, &blk_number);
+            batch.delete(::db::COL_EXTRA, &key_beacon_list);
             let header = self
                 .chain
                 .read()
@@ -1029,6 +1033,7 @@ impl Client {
             // signature of getEffectiveStake(Address, Address)
             call_data,
             DEFAULT_TRANSACTION_TYPE,
+            None,
         )
         .fake_sign(Address::default())
     }
@@ -1574,7 +1579,7 @@ impl BlockChainClient for Client {
             }
 
             let parent_hash = unverified.parent_hash();
-            debug!(target: "block","parent_hash: {}", parent_hash);
+            debug!(target: "block", "parent_hash: {}", parent_hash);
 
             let status = self.block_status(BlockId::Hash(parent_hash));
             if status == BlockStatus::Unknown || status == BlockStatus::Pending {
@@ -1583,6 +1588,7 @@ impl BlockChainClient for Client {
                 )));
             }
         }
+
         Ok(self.block_queue.import(unverified)?)
     }
 
@@ -1784,10 +1790,10 @@ impl MiningBlockChainClient for Client {
 
         let (_, _, _, hour, minute, second) = utc_from_secs(timestamp as i64);
         // Print log
-        info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}", 
+        info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}",
             seal_type.unwrap_or_default(),
-            Colour::White.bold().paint(format!("{}", number)), 
-            Colour::White.bold().paint(format!("{:x}", hash)), 
+            Colour::White.bold().paint(format!("{}", number)),
+            Colour::White.bold().paint(format!("{:x}", hash)),
             Colour::White.bold().paint(format!("{:x}", difficulty)),
             Colour::White.bold().paint(format!("{:x}", timestamp)),
             Colour::White.bold().paint(format!("{}", hour)),
@@ -1797,6 +1803,11 @@ impl MiningBlockChainClient for Client {
     }
 
     fn prepare_block_interval(&self) -> Duration { self.miner.prepare_block_interval() }
+
+    fn is_beacon_hash(&self, hash: &H256) -> Option<BlockNumber> {
+        let chain = self.chain.read();
+        chain.beacon_list(hash)
+    }
 }
 
 fn utc_from_secs(secs: i64) -> (u64, u64, u64, u64, u64, u64) {
