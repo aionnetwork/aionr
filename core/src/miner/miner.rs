@@ -1997,7 +1997,7 @@ mod tests {
         assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
         assert_eq!(miner.pending_receipts(best_block).len(), 0);
-        assert!(miner.prepare_work_sealing(&client, &None));
+        assert!(miner.prepare_work_sealing(&client));
 
         client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
 
@@ -2140,7 +2140,7 @@ mod tests {
             assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
             assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
             assert_eq!(miner.pending_receipts(best_block).len(),0);
-            assert!(miner.prepare_work_sealing(&client, &None));
+            assert!(miner.prepare_work_sealing(&client));
     
     
     
@@ -2163,14 +2163,14 @@ mod tests {
             assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
             assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
             assert_eq!(miner.pending_receipts(best_block).len(),0);
-            assert!(miner.prepare_work_sealing(&client, &None));
+            assert!(miner.prepare_work_sealing(&client));
     
             miner.chain_new_blocks(&client,&[],&[],&[],&[hash10,hash11]);
             assert_eq!(miner.pending_transactions().len(), 2);
             assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
             assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
             assert_eq!(miner.pending_receipts(best_block).len(),0);
-            assert!(miner.prepare_work_sealing(&client, &None));
+            assert!(miner.prepare_work_sealing(&client));
         }
     */
 
