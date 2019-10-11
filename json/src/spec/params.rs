@@ -50,9 +50,6 @@ pub struct Params {
     #[serde(rename = "unityUpdate")]
     pub unity_update: Option<Uint>,
     /// Unity update block number.
-    #[serde(rename = "unityPoSBaseTotalDifficulty")]
-    pub unity_base_pos_total_difficulty: Option<Uint>,
-    /// Unity update block number.
     #[serde(rename = "unityPoSInitialDifficulty")]
     pub unity_initial_pos_difficulty: Option<Uint>,
 }

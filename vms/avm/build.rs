@@ -28,7 +28,7 @@ fn main() {
     // build avm library
     let status = Command::new("make")
         .arg("-C")
-        .arg("libs/avmjni/native")
+        .arg("libs/avmjni_v1/native")
         .arg(format!("{}={}", "OUTDIR", outdir))
         .arg(profile.clone())
         .status()
@@ -43,7 +43,7 @@ fn main() {
     // NOTE: build jni jar package
     Command::new("ant")
         .arg("-f")
-        .arg("libs/avmjni/build.xml")
+        .arg("libs/avmjni_v1/build.xml")
         .status()
         .expect("failed to build jni jar");
     Command::new("ant")

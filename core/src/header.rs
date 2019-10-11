@@ -31,6 +31,7 @@ use rlp::*;
 use std::cell::RefCell;
 use std::cmp;
 use time::get_time;
+use serde::{Serialize, Serializer};
 
 pub use types::BlockNumber;
 
@@ -119,6 +120,17 @@ impl Encodable for SealType {
 impl Decodable for SealType {
     fn decode(rlp: &UntrustedRlp) -> ::std::result::Result<Self, DecoderError> {
         rlp.as_val().and_then(|v: u8| Ok(SealType::from(v)))
+    }
+}
+
+/// Implement Serialize for SealType
+impl Serialize for SealType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer {
+        match *self {
+            SealType::PoW => serializer.serialize_str("0x1"),
+            SealType::PoS => serializer.serialize_str("0x2"),
+        }
     }
 }
 

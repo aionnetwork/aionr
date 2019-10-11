@@ -33,7 +33,7 @@ use acore_bytes::Bytes;
 use block::ClosedBlock;
 use client::{MiningBlockChainClient};
 use types::error::{Error};
-use header::{BlockNumber};
+use header::{BlockNumber, SealType};
 use receipt::Receipt;
 use transaction::{UnverifiedTransaction, PendingTransaction};
 use key::Ed25519KeyPair;
@@ -129,9 +129,6 @@ pub trait MinerService: Send + Sync {
         retracted: &[H256],
     );
 
-    /// New chain head event. Restart mining operation.
-    fn update_sealing(&self, chain: &MiningBlockChainClient);
-
     /// Submit `seal` as a valid solution for the header of `pow_hash`.
     /// Will check the seal, but not actually insert the block into the chain.
     fn submit_seal(
@@ -158,7 +155,8 @@ pub trait MinerService: Send + Sync {
         &self,
         client: &MiningBlockChainClient,
         seed: [u8; 64],
-        address: Address,
+        public_key: H256,
+        coinbase: H256,
     ) -> Option<H256>;
 
     fn try_seal_pos(
@@ -167,6 +165,19 @@ pub trait MinerService: Send + Sync {
         seal: Vec<Bytes>,
         block: ClosedBlock,
     ) -> Result<(), Error>;
+
+    // AION 2.0
+    // Check if next block is on the unity hard fork
+    fn unity_update(&self, client: &MiningBlockChainClient) -> bool;
+
+    // AION 2.0
+    // Check if it's allowed to produce a new block with given seal type.
+    // A block's seal type must be different than its parent's seal type.
+    fn new_block_allowed_with_seal_type(
+        &self,
+        client: &MiningBlockChainClient,
+        seal_type: &SealType,
+    ) -> bool;
 
     /// Get the sealing work package and if `Some`, apply some transform.
     fn map_sealing_work<F, T>(&self, chain: &MiningBlockChainClient, f: F) -> Option<T>

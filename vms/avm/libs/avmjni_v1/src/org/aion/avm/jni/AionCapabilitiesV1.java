@@ -3,7 +3,6 @@ package org.aion.avm.jni;
 import org.aion.avm.core.IExternalCapabilities;
 import org.aion.types.AionAddress;
 import org.aion.types.Transaction;
-// import org.aion.avm.jni.NativeKernelInterface;
 
 public class AionCapabilitiesV1 implements IExternalCapabilities {
 

@@ -20,11 +20,12 @@
  *
  ******************************************************************************/
 
-use acore::encoded::Header as EthHeader;
+use acore::encoded::{Header as AionHeader};
+use acore::header::SealType;
 use aion_types::{H256, U256};
 use ethbloom::Bloom;
 
-use serde::{Serialize, Serializer};
+use serde::ser::{Serialize, Serializer, SerializeStruct};
 use types::{Bytes, Transaction};
 
 /// Block Transactions
@@ -47,54 +48,102 @@ impl Serialize for BlockTransactions {
 }
 
 /// Block representation
-#[derive(Debug, Serialize)]
+#[derive(Debug)]
 pub struct Block {
+    /// Block number
+    pub number: Option<u64>,
+    /// Seal type
+    pub seal_type: SealType,
     /// Hash of the block
     pub hash: Option<H256>,
     /// Hash of the parent
-    #[serde(rename = "parentHash")]
     pub parent_hash: H256,
-    // TODO: get rid of this one
-    /// ?
+    /// Miner of the block
     pub miner: H256,
-    /// State root hash
-    #[serde(rename = "stateRoot")]
-    pub state_root: H256,
-    /// Transactions root hash
-    #[serde(rename = "transactionsRoot")]
-    pub transactions_root: H256,
-    /// Transactions receipts root hash
-    #[serde(rename = "receiptsRoot")]
-    pub receipts_root: H256,
-    /// Block number
-    pub number: Option<u64>,
-    /// Gas Used
-    #[serde(rename = "gasUsed")]
-    pub gas_used: U256,
-    /// Gas Limit
-    #[serde(rename = "gasLimit")]
-    pub gas_limit: U256,
-    /// Extra data
-    #[serde(rename = "extraData")]
-    pub extra_data: Bytes,
-    /// Logs bloom
-    #[serde(rename = "logsBloom")]
-    pub logs_bloom: Bloom,
     /// Timestamp
     pub timestamp: U256,
     /// Difficulty
     pub difficulty: U256,
     /// Total difficulty
-    #[serde(rename = "totalDifficulty")]
     pub total_difficulty: Option<U256>,
+    /// Size in bytes
+    pub size: Option<U256>,
+    /// Gas Limit
+    pub gas_limit: U256,
+    /// Gas Used
+    pub gas_used: U256,
+    /// State root hash
+    pub state_root: H256,
+    /// Transactions root hash
+    pub transactions_root: H256,
+    /// Transactions receipts root hash
+    pub receipts_root: H256,
+    /// Logs bloom
+    pub logs_bloom: Bloom,
+    /// Extra data
+    pub extra_data: Bytes,
     /// nonce
     pub nonce: Option<Bytes>,
     /// solution
     pub solution: Option<Bytes>,
+    /// seed
+    pub seed: Option<Bytes>,
+    /// signature
+    pub signature: Option<Bytes>,
+    /// public_key
+    pub public_key: Option<Bytes>,
     /// Transactions
     pub transactions: BlockTransactions,
-    /// Size in bytes
-    pub size: Option<U256>,
+}
+
+impl Serialize for Block {
+    // Serialize block according on its seal type
+    fn serialize<S>(
+        &self,
+        serializer: S,
+    ) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
+    where
+        S: Serializer,
+    {
+        let mut field_number = 19;
+        if self.seal_type == SealType::PoW {
+            field_number = 21;
+        } else if self.seal_type == SealType::PoS {
+            field_number = 22;
+        }
+        let mut block = serializer.serialize_struct("Block", field_number)?;
+
+        block.serialize_field("number", &self.number)?;
+        block.serialize_field("sealType", &self.seal_type)?;
+        block.serialize_field("hash", &self.hash)?;
+        block.serialize_field("parentHash", &self.parent_hash)?;
+        block.serialize_field("miner", &self.miner)?;
+        block.serialize_field("timestamp", &self.timestamp)?;
+        block.serialize_field("difficulty", &self.difficulty)?;
+        block.serialize_field("totalDifficulty", &self.total_difficulty)?;
+        block.serialize_field("size", &self.size)?;
+        block.serialize_field("nrgLimit", &self.gas_limit)?;
+        block.serialize_field("nrgUsed", &self.gas_used)?;
+        block.serialize_field("gasLimit", &self.gas_limit)?;
+        block.serialize_field("gasUsed", &self.gas_used)?;
+        block.serialize_field("stateRoot", &self.state_root)?;
+        block.serialize_field("transactionsRoot", &self.transactions_root)?;
+        block.serialize_field("receiptsRoot", &self.receipts_root)?;
+        block.serialize_field("logsBloom", &self.logs_bloom)?;
+        block.serialize_field("extraData", &self.extra_data)?;
+
+        if self.seal_type == SealType::PoW {
+            block.serialize_field("nonce", &self.nonce)?;
+            block.serialize_field("solution", &self.solution)?;
+        } else if self.seal_type == SealType::PoS {
+            block.serialize_field("seed", &self.seed)?;
+            block.serialize_field("signature", &self.signature)?;
+            block.serialize_field("publicKey", &self.public_key)?;
+        }
+
+        block.serialize_field("transactions", &self.transactions)?;
+        block.end()
+    }
 }
 
 /// Block header representation.
@@ -143,12 +192,12 @@ pub struct Header {
     pub size: Option<U256>,
 }
 
-impl From<EthHeader> for Header {
-    fn from(h: EthHeader) -> Self { (&h).into() }
+impl From<AionHeader> for Header {
+    fn from(h: AionHeader) -> Self { (&h).into() }
 }
 
-impl<'a> From<&'a EthHeader> for Header {
-    fn from(h: &'a EthHeader) -> Self {
+impl<'a> From<&'a AionHeader> for Header {
+    fn from(h: &'a AionHeader) -> Self {
         let seal_fields: Vec<Bytes> = h.view().seal().into_iter().map(Into::into).collect();
         // Pending block do not yet has nonce and solution. Return empty value in this case.
         let (nonce, solution) = match seal_fields.len() {
@@ -182,7 +231,7 @@ mod tests {
     use ethbloom::Bloom;
     use aion_types::{H256, U256};
     use types::{Transaction, Bytes};
-    use super::{Block, BlockTransactions, Header};
+    use super::{Block, BlockTransactions, Header, SealType};
 
     #[test]
     fn test_serialize_block_transactions() {
@@ -219,10 +268,14 @@ mod tests {
             solution: Some(Bytes::default()),
             transactions: BlockTransactions::Hashes(vec![].into()),
             size: Some(69.into()),
+            seal_type: SealType::PoW,
+            seed: None,
+            signature: None,
+            public_key: None,
         };
         let serialized_block = serde_json::to_string(&block).unwrap();
 
-        assert_eq!(serialized_block, r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000000","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","miner":"0x0000000000000000000000000000000000000000000000000000000000000000","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","number":0,"gasUsed":"0x0","gasLimit":"0x0","extraData":"0x","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x0","difficulty":"0x0","totalDifficulty":"0x0","nonce":"0x","solution":"0x","transactions":[],"size":"0x45"}"#);
+        assert_eq!(serialized_block, r#"{"number":0,"sealType":"0x1","hash":"0x0000000000000000000000000000000000000000000000000000000000000000","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","miner":"0x0000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x0","difficulty":"0x0","totalDifficulty":"0x0","size":"0x45","nrgLimit":"0x0","nrgUsed":"0x0","gasLimit":"0x0","gasUsed":"0x0","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","extraData":"0x","nonce":"0x","solution":"0x","transactions":[]}"#);
     }
 
     #[test]
@@ -246,10 +299,14 @@ mod tests {
             solution: Some(Bytes::default()),
             transactions: BlockTransactions::Hashes(vec![].into()),
             size: None,
+            seal_type: SealType::PoW,
+            seed: None,
+            signature: None,
+            public_key: None,
         };
         let serialized_block = serde_json::to_string(&block).unwrap();
 
-        assert_eq!(serialized_block, r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000000","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","miner":"0x0000000000000000000000000000000000000000000000000000000000000000","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","number":0,"gasUsed":"0x0","gasLimit":"0x0","extraData":"0x","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x0","difficulty":"0x0","totalDifficulty":"0x0","nonce":"0x","solution":"0x","transactions":[],"size":null}"#);
+        assert_eq!(serialized_block, r#"{"number":0,"sealType":"0x1","hash":"0x0000000000000000000000000000000000000000000000000000000000000000","parentHash":"0x0000000000000000000000000000000000000000000000000000000000000000","miner":"0x0000000000000000000000000000000000000000000000000000000000000000","timestamp":"0x0","difficulty":"0x0","totalDifficulty":"0x0","size":null,"nrgLimit":"0x0","nrgUsed":"0x0","gasLimit":"0x0","gasUsed":"0x0","stateRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","transactionsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","receiptsRoot":"0x0000000000000000000000000000000000000000000000000000000000000000","logsBloom":"0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000","extraData":"0x","nonce":"0x","solution":"0x","transactions":[]}"#);
     }
 
     #[test]

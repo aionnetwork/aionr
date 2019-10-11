@@ -365,9 +365,9 @@ usage! {
             "--reseal-min-period=[MS]",
             "Specify the minimum time between reseals from incoming transactions. MS is time measured in milliseconds.",
 
-            ARG arg_work_queue_size: (usize) = 20usize, or |c: &Config| c.mining.as_ref()?.work_queue_size.clone(),
+            ARG arg_work_queue_size: (usize) = 100usize, or |c: &Config| c.mining.as_ref()?.work_queue_size.clone(),
             "--work-queue-size=[ITEMS]",
-            "Specify the number of historical work packages which are kept cached lest a solution is found for them later. High values take more memory but result in fewer unusable solutions.",
+            "Specify the number of pow work which are kept cached. The cache is clreared at every pow block height when a solution is found later. High values take more memory but result in fewer unusable solutions.",
 
             ARG arg_relay_set: (String) = "cheap", or |c: &Config| c.mining.as_ref()?.relay_set.clone(),
             "--relay-set=[SET]",
@@ -907,7 +907,7 @@ mod tests {
             arg_author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
             flag_force_sealing: true,
             arg_reseal_min_period: 4000u64,
-            arg_work_queue_size: 20usize,
+            arg_work_queue_size: 100usize,
             arg_tx_gas_limit: Some("6283184".into()),
             arg_tx_time_limit: Some(100u64),
             arg_relay_set: "cheap".into(),

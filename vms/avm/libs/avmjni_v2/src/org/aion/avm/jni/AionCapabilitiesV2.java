@@ -4,6 +4,7 @@ import org.aion.avm.core.IExternalCapabilities;
 import org.aion.types.AionAddress;
 import org.aion.types.Transaction;
 import org.aion.avm.jni.NativeKernelInterface;
+import org.aion.avm.utils.InvokableTxUtil;
 
 public class AionCapabilitiesV2 implements IExternalCapabilities {
 
@@ -32,8 +33,11 @@ public class AionCapabilitiesV2 implements IExternalCapabilities {
         byte[] sender = tx.senderAddress.toByteArray();
         byte[] nonce = tx.nonce.toByteArray();
         AionAddress new_contract = new AionAddress(NativeKernelInterface.contract_address(sender, nonce));
-        // if (Constants.DEBUG)
-        //     System.out.println(new_contract);
         return new_contract;
     }
+
+    // @Override
+    // public InternalTransaction decodeSerializedTransaction(byte[] innerTx, AionAddress executor, long energyPrice, long energyLimit) {
+    //         return InvokableTxUtil.decode(innerTx, executor, energyPrice, energyLimit);
+    // }
 }

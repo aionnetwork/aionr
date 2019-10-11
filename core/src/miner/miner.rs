@@ -63,6 +63,8 @@ use num::Zero;
 use num_bigint::BigUint;
 use delta_calc::calculate_delta;
 
+const POW_UPDATE_COOLDOWN: Duration = Duration::from_secs(1);
+
 struct Seed([u8; 64]);
 
 /// Different possible definitions for pending transaction set.
@@ -140,7 +142,7 @@ impl Default for MinerOptions {
             pending_set: PendingSet::AlwaysQueue,
             reseal_min_period: Duration::from_secs(4),
             prepare_block_interval: Duration::from_secs(4),
-            work_queue_size: 20,
+            work_queue_size: 100,
             enable_resubmission: true,
             tx_queue_banning: Banning::Disabled,
             infinite_pending_block: false,
@@ -256,20 +258,32 @@ impl Miner {
         self.map_pending_block(|b| b.header().clone(), latest_block_number)
     }
 
-    /// Try to prepare a work.
+    /// Try to prepare a PoW work.
     /// Create a new work if no work exists or update an existing work depending on the
     /// configurations and the current conditions.
-    pub fn try_prepare_block(&self, client: &MiningBlockChainClient, is_forced: bool) {
-        if is_forced || self.tx_reseal_allowed() {
-            *self.next_allowed_reseal.lock() = Instant::now() + self.options.reseal_min_period;
-            self.update_sealing(client);
+    pub fn try_prepare_block_pow(&self, client: &MiningBlockChainClient, is_forced: bool) {
+        // Create new PoW work only when the current best is PoS, and cooldown allows.
+        if (is_forced || self.reseal_cooldown_reached())
+            && self.new_block_allowed_with_seal_type(client, &SealType::PoW)
+        {
+            self.update_reseal_cooldown();
+            trace!(target: "miner", "update_sealing: best_block: {:?}", client.chain_info().best_block_number);
+            // TODO-Unity: consider remove or simplify this condition
+            if self.requires_reseal(client.chain_info().best_block_number) {
+                trace!(target: "miner", "update_sealing: preparing a block");
+                if let Ok((block, original_work_hash)) =
+                    self.prepare_block(client, &Some(SealType::PoW), None, None, None)
+                {
+                    self.prepare_work(block, original_work_hash)
+                }
+            }
         }
     }
 
-    pub fn invoke_pos_interval(&self, client: &MiningBlockChainClient) -> Result<(), Error> {
-        let chain_best_pos_block = client
-            .best_block_header_with_seal_type(&SealType::PoS)
-            .map(|header| header.decode());
+    pub fn invoke_pos_interval(&self, client: &MiningBlockChainClient) {
+        // let chain_best_block = client
+        //     .best_block_header()
+        //     .map(|header| header.decode());
 
         // compete with import_lock, if another is imported, block will be None, or else try importing pending_best
         let block = {
@@ -288,10 +302,16 @@ impl Miner {
                     let seal = b.header().seal();
                     let stake = client
                         .get_stake(&b.header().get_pk_of_pos().unwrap_or(H256::default()), None);
+                    let parent = client
+                        .block_header_data(b.header().parent_hash())
+                        .expect("New block must have parent."); //TODO-Unity: handle as result error
+                                                                // TODO-Unity: compare parent = best
+                    let grand_parent = client.block_header_data(&parent.parent_hash());
                     if let Ok(sealed) = b.clone().lock().try_seal_pos(
                         &*self.engine,
                         seal.to_owned(),
-                        chain_best_pos_block.as_ref(),
+                        &parent.decode(),
+                        grand_parent.map(|header| header.decode()).as_ref(),
                         stake,
                     ) {
                         let n = sealed.header().number();
@@ -300,7 +320,9 @@ impl Miner {
                         let t = sealed.header().timestamp();
 
                         // 4. Import block
-                        client.import_sealed_block(sealed)?;
+                        if let Some(error) = client.import_sealed_block(sealed).err() {
+                            debug!(target: "miner", "PoS block imported error: {}", error);
+                        }
 
                         // Log
                         info!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
@@ -313,27 +335,18 @@ impl Miner {
             }
             None => {}
         }
-
-        Ok(())
     }
 
-    /// Try to generate PoS block if minimum resealing duration is met
-    pub fn try_prepare_block_pos(&self, client: &MiningBlockChainClient) -> Result<(), Error> {
+    /// Try to internally generate PoS block if minimum resealing duration is met
+    pub fn try_produce_pos_block_internal(&self, client: &MiningBlockChainClient) {
         // Not before the Unity fork point
-        if self
-            .engine
-            .machine()
-            .params()
-            .unity_update
-            .map_or(true, |fork_number| {
-                client.chain_info().best_block_number + 1 < fork_number
-            }) {
-            return Ok(());
+        if !self.new_block_allowed_with_seal_type(client, &SealType::PoS) {
+            return;
         }
 
         // Return if no internal staker
         if self.staker.is_none() {
-            return Ok(());
+            return;
         }
 
         // Staker
@@ -352,45 +365,39 @@ impl Miner {
             .unwrap_or(BigUint::from(0u32));
 
         if stake == BigUint::from(0u32) {
-            return Ok(());
+            return;
         }
 
-        // 2. Get the current best PoS block
-        let best_block_header = client.best_block_header_with_seal_type(&SealType::PoS);
+        // 2. Get the current best block
+        let best_block_header = client.best_block_header();
 
-        // 3. Get the timestamp, the seed and the seal parent of the best PoS block
-        let timestamp_now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let (timestamp, seed, seal_parent) = match &best_block_header {
+        // 3. Get the previous seed; Get the timestamp, the grand / great grand parents of the best block
+        let timestamp = best_block_header.timestamp();
+        let grand_parant = client.block_header_data(&best_block_header.parent_hash());
+        let (great_grand_parent, seed) = match &grand_parant {
             Some(header) => {
-                let seed: Bytes = header
-                    .seal()
-                    .get(0)
-                    .expect("A pos block has to contain a seed")
-                    .to_owned();
-                (
-                    header.timestamp(),
-                    seed,
-                    client.seal_parent_header(&header.parent_hash(), &header.seal_type()),
-                )
+                let seed = if header.seal_type() == Some(SealType::PoS) {
+                    header
+                        .seal()
+                        .get(0)
+                        .expect("A pos block has to contain a seed")
+                        .to_owned()
+                } else {
+                    vec![0u8; 64]
+                };
+                (client.block_header_data(&header.parent_hash()), seed)
             }
-            None => (0u64, vec![0u8; 64], None), // TODO-Unity: To handle the first PoS block better
+            None => (None, vec![0u8; 64]),
         };
 
         // 4. Calculate difficulty
         let difficulty = client.calculate_difficulty(
-            best_block_header
-                .clone()
-                .map(|header| header.decode())
-                .as_ref(),
-            seal_parent.map(|header| header.decode()).as_ref(),
+            &best_block_header.decode(),
+            grand_parant.clone().map(|header| header.decode()).as_ref(),
+            great_grand_parent.map(|header| header.decode()).as_ref(),
         );
 
         // 5. Calcualte timestamp for the new PoS block
-        // TODO-Unity: don't use floating number to calculate this
-        // \Delta = \frac{d_s \cdot ln({2^{256}}/{hash(seed)})}{V}.
         let new_seed = ed25519::signature(&seed, &sk);
 
         let delta_uint = calculate_delta(difficulty, &new_seed, stake.clone());
@@ -398,33 +405,42 @@ impl Miner {
         let new_timestamp = timestamp + delta_uint;
 
         // 6. Determine if we can produce a new PoS block or not
-        debug!(target: "staker", "time now: {}, expected: {}", timestamp_now, new_timestamp);
+        let timestamp_now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_secs();
+        trace!(target: "staker", "time now: {}, expected: {}", timestamp_now, new_timestamp);
         if timestamp_now >= new_timestamp {
-            self.prepare_block_pos(
-                client,
-                timestamp_now, // TODO-Unity: Or use new_timestamp?
-                new_seed,
-                &sk,
-                &pk,
-                best_block_header.map(|header| header.decode()).as_ref(),
-                stake,
-            )
-        } else {
-            Ok(())
+            if let Some(error) = self
+                .produce_pos_block_internal(
+                    client,
+                    new_timestamp,
+                    new_seed,
+                    &sk,
+                    &pk,
+                    &best_block_header.decode(),
+                    grand_parant.map(|header| header.decode()).as_ref(),
+                    stake,
+                )
+                .err()
+            {
+                debug!(target: "staker", "Internal PoS block creation failed: {}", error);
+            }
         }
     }
 
     // TOREMOVE-Unity: Unity MS1 use only
     /// Generate PoS block
     /// sk/pk is public/private key of signer
-    pub fn prepare_block_pos(
+    pub fn produce_pos_block_internal(
         &self,
         client: &MiningBlockChainClient,
         timestamp: u64,
         seed: [u8; 64],
         sk: &[u8; 64],
         pk: &[u8; 32],
-        seal_parent: Option<&Header>,
+        parent: &Header,
+        grand_parant: Option<&Header>,
         stake: BigUint,
     ) -> Result<(), Error>
     {
@@ -432,13 +448,18 @@ impl Miner {
 
         let coinbase = client.get_coinbase(&pk.clone().into());
         // 1. Create a block with transactions
-        let (raw_block, _): (ClosedBlock, Option<H256>) = self.prepare_block(
-            client,
-            &Some(SealType::PoS),
-            Some(timestamp),
-            coinbase,
-            Some(&seed),
-        );
+        let (raw_block, _): (ClosedBlock, Option<H256>) = self
+            .prepare_block(
+                client,
+                &Some(SealType::PoS),
+                Some(timestamp),
+                coinbase,
+                Some(&seed),
+            )
+            .or_else(|()| {
+                debug!(target: "miner", "Current work's seal type equals to best block's seal type");
+                Err(Error::PosInvalid) // TODO-Unity: to change err message
+            })?;
 
         // 2. Generate signature
         let mut preseal = Vec::with_capacity(3);
@@ -456,9 +477,9 @@ impl Miner {
         seal.push(pk.to_vec());
         let sealed_block: SealedBlock = presealed_block
             .lock()
-            .try_seal_pos(&*self.engine, seal, seal_parent, Some(stake))
+            .try_seal_pos(&*self.engine, seal, parent, grand_parant, Some(stake))
             .or_else(|(e, _)| {
-                warn!(target: "miner", "Staking seal rejected: {}", e);
+                debug!(target: "miner", "Staking seal rejected: {}", e);
                 Err(Error::PosInvalid)
             })?;
 
@@ -568,7 +589,7 @@ impl Miner {
         timestamp: Option<u64>,
         author: Option<Address>,
         seed: Option<&[u8; 64]>,
-    ) -> (ClosedBlock, Option<H256>)
+    ) -> Result<(ClosedBlock, Option<H256>), ()>
     {
         trace_time!("prepare_block");
         let chain_info = client.chain_info();
@@ -599,8 +620,9 @@ impl Miner {
                             if !b.require_pos_reseal(
                                 timestamp.unwrap() - self.options.reseal_min_period.as_secs(),
                             ) {
-                                return (b.block.clone(), Some(*hash.unwrap()));
+                                return Ok((b.block.clone(), Some(*hash.unwrap())));
                             }
+                            // add transactions to old_block
                             client.reopen_block(b.block.clone())
                         }
                         None => {
@@ -615,16 +637,22 @@ impl Miner {
                     }
                 }
                 _ => {
-                    match sealing_work
-                        .queue
-                        .pop_if(|b| b.block().header().parent_hash() == &best_hash)
-                    {
-                        Some(old_block) => {
+                    match sealing_work.queue.use_last_ref() {
+                        Some(ref old_block)
+                            if old_block.block().header().parent_hash() == &best_hash =>
+                        {
                             trace!(target: "block", "prepare_block: Already have previous work; updating and returning");
-                            // add transactions to old_block
-                            client.reopen_block(old_block)
+                            // Clone old block and add transactions into it
+                            let mut reopened_block = client.reopen_block((*old_block).clone());
+                            // Update block timestamp for AION 2.0 unity protocol
+                            let timestamp_now = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs();
+                            reopened_block.set_timestamp(timestamp_now);
+                            reopened_block
                         }
-                        None => {
+                        _ => {
                             // block not found - create it.
                             trace!(target: "block", "prepare_block: No existing work - making new block");
                             let author: Address = self.author();
@@ -646,6 +674,20 @@ impl Miner {
 
             (transactions, open_block, last_work_hash)
         };
+
+        // AION 2.0
+        // Only create new block on top of a block with opposite seal type
+        if !self.new_block_allowed_with_seal_type(
+            client,
+            &open_block
+                .block()
+                .header()
+                .seal_type()
+                .clone()
+                .unwrap_or_default(),
+        ) {
+            return Err(());
+        }
 
         let mut invalid_transactions = HashSet::new();
         let mut non_allowed_transactions = HashSet::new();
@@ -747,7 +789,7 @@ impl Miner {
             self.transaction_pool.penalize(hash);
         });
 
-        (block, original_work_hash)
+        Ok((block, original_work_hash))
     }
 
     /// Check if reseal is allowed and necessary.
@@ -828,9 +870,13 @@ impl Miner {
             }
         };
         if prepare_new {
-            let (block, original_work_hash) =
-                self.prepare_block(client, seal_type, None, None, None);
-            self.prepare_work(block, original_work_hash);
+            if let Ok((block, original_work_hash)) =
+                self.prepare_block(client, seal_type, None, None, None)
+            {
+                self.prepare_work(block, original_work_hash);
+            } else {
+                return false;
+            }
         }
         let mut sealing_block_last_request = self.sealing_block_last_request.lock();
         let best_number = client.chain_info().best_block_number;
@@ -965,9 +1011,14 @@ impl Miner {
         Ok(result)
     }
 
-    /// Are we allowed to do a non-mandatory reseal?
-    fn tx_reseal_allowed(&self) -> bool {
+    /// Check if it's allowed to do a non-mandatory reseal
+    fn reseal_cooldown_reached(&self) -> bool {
         Instant::now() >= (*self.next_allowed_reseal.lock() - Duration::from_millis(100))
+    }
+
+    /// Update cooldown time for the next non-mandatory reseal
+    fn update_reseal_cooldown(&self) {
+        *self.next_allowed_reseal.lock() = Instant::now() + POW_UPDATE_COOLDOWN;
     }
 
     fn from_pending_block<H, F, G>(
@@ -1016,7 +1067,7 @@ const SEALING_TIMEOUT_IN_BLOCKS: u64 = 5;
 impl MinerService for Miner {
     fn clear_and_reset(&self, client: &MiningBlockChainClient) {
         self.transaction_pool.clear();
-        self.update_sealing(client);
+        self.try_prepare_block_pow(client, true);
     }
 
     /// MinerStatus     -   pending transaction number
@@ -1336,17 +1387,6 @@ impl MinerService for Miner {
         self.transaction_pool.last_nonce(address)
     }
 
-    /// Client: Prepare new best block or update existing best block if required.
-    fn update_sealing(&self, client: &MiningBlockChainClient) {
-        trace!(target: "block", "update_sealing: best_block: {:?}", client.chain_info().best_block_number);
-        if self.requires_reseal(client.chain_info().best_block_number) {
-            trace!(target: "block", "update_sealing: preparing a block");
-            let (block, original_work_hash) =
-                self.prepare_block(client, &Some(SealType::PoW), None, None, None);
-            self.prepare_work(block, original_work_hash)
-        }
-    }
-
     fn add_sealing_pos(
         &self,
         hash: &H256,
@@ -1386,46 +1426,40 @@ impl MinerService for Miner {
     }
 
     /// Generate PoS block template
-    ///
-    /// client: client which is able to interact with staking contract
-    /// seed: new seed committed by signer
-    /// pk: public key of signer
     fn get_pos_template(
         &self,
         client: &MiningBlockChainClient,
         seed: [u8; 64],
         pk: H256,
+        coinbase: H256,
     ) -> Option<H256>
     {
+        // AION 2.0
+        if !self.new_block_allowed_with_seal_type(client, &SealType::PoS) {
+            return None;
+        }
+
         //WARN: if coinbase is not found, send reward to black hole: full zero address
-        let coinbase = client.get_coinbase(&pk);
-        let stake = client.get_stake(&pk, coinbase).unwrap_or(BigUint::zero());
+        // let coinbase = client.get_coinbase(&pk);
+        let stake = client
+            .get_stake(&pk, Some(coinbase))
+            .unwrap_or(BigUint::zero());
         if stake.is_zero() {
             return None;
         }
 
-        let best_block_header = client.best_block_header_with_seal_type(&SealType::PoS);
+        let best_block_header = client.best_block_header();
 
-        let timestamp_now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-        let (timestamp, seal_parent) = match &best_block_header {
-            Some(header) => {
-                (
-                    header.timestamp(),
-                    client.seal_parent_header(&header.parent_hash(), &header.seal_type()),
-                )
-            }
-            None => (timestamp_now - 1u64, None), // TODO-Unity: To handle the first PoS block better
+        let timestamp = best_block_header.timestamp();
+        let grand_parent = client.block_header_data(&best_block_header.parent_hash());
+        let great_grand_parent = match &grand_parent {
+            Some(header) => client.block_header_data(&header.parent_hash()),
+            None => None,
         };
-
         let difficulty = client.calculate_difficulty(
-            best_block_header
-                .clone()
-                .map(|header| header.decode())
-                .as_ref(),
-            seal_parent.map(|header| header.decode()).as_ref(),
+            &best_block_header.decode(),
+            grand_parent.map(|header| header.decode()).as_ref(),
+            great_grand_parent.map(|header| header.decode()).as_ref(),
         );
 
         debug!(target: "miner", "new block difficulty = {:?}", difficulty);
@@ -1434,26 +1468,31 @@ impl MinerService for Miner {
 
         let new_timestamp = timestamp + delta_uint;
 
-        let (raw_block, _): (ClosedBlock, Option<H256>) = self.prepare_block(
+        if let Ok((raw_block, _)) = self.prepare_block(
             client,
             &Some(SealType::PoS),
             Some(new_timestamp),
-            Some(coinbase.unwrap_or(H256::default())),
+            Some(coinbase),
             Some(&seed),
-        );
+        ) {
+            let mut seal = Vec::with_capacity(3);
+            seal.push(seed.to_vec());
+            seal.push(vec![0u8; 64]);
+            seal.push(pk.to_vec());
 
-        let mut seal = Vec::with_capacity(3);
-        seal.push(seed.to_vec());
-        seal.push(vec![0u8; 64]);
-        seal.push(pk.to_vec());
+            let block = raw_block.pre_seal(seal);
 
-        let block = raw_block.pre_seal(seal);
-
-        let hash = block.header().mine_hash();
-
-        match self.add_sealing_pos(&hash, block, seed, timestamp_now, client) {
-            Ok(_) => Some(hash),
-            _ => None,
+            let hash = block.header().mine_hash();
+            let timestamp_now = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
+            match self.add_sealing_pos(&hash, block, seed, timestamp_now, client) {
+                Ok(_) => Some(hash),
+                _ => None,
+            }
+        } else {
+            None
         }
     }
 
@@ -1465,7 +1504,16 @@ impl MinerService for Miner {
         block: ClosedBlock,
     ) -> Result<(), Error>
     {
-        let best_block_header = client.best_block_header_with_seal_type(&SealType::PoS);
+        // TODO-Unity: check parent = best
+        // let best_block_header = client.best_block_header();
+
+        let parent = match client.block_header_data(block.block().header().parent_hash()) {
+            Some(header) => header,
+            None => {
+                return Ok(()); // TODO-Unity: to handle as error result
+            }
+        };
+        let grand_parent = client.block_header_data(&parent.parent_hash());
 
         let stake = client.get_stake(&seal[2][..].into(), None);
 
@@ -1476,7 +1524,8 @@ impl MinerService for Miner {
         match block.clone().lock().try_seal_pos(
             &*self.engine,
             seal,
-            best_block_header.map(|header| header.decode()).as_ref(),
+            &parent.decode(),
+            grand_parent.map(|header| header.decode()).as_ref(),
             stake,
         ) {
             Ok(s) => {
@@ -1507,8 +1556,15 @@ impl MinerService for Miner {
     // Stratum server receives a finished job, and updates sealing work
     fn map_sealing_work<F, T>(&self, client: &MiningBlockChainClient, f: F) -> Option<T>
     where F: FnOnce(&ClosedBlock) -> T {
+        // AION 2.0
+        // Return if PoW mining is not allowed
+        if !self.new_block_allowed_with_seal_type(client, &SealType::PoW) {
+            trace!(target: "miner", "PoW mining not allowed because the current best is a PoW");
+            return None;
+        }
+        // Get the latest PoW block
         trace!(target: "miner", "map_sealing_work: entering");
-        self.prepare_work_sealing(client, &None); // TODO-Unity-Rpc staking: handle PoW and PoS better
+        self.prepare_work_sealing(client, &None);
         trace!(target: "miner", "map_sealing_work: sealing prepared");
         let mut sealing_work = self.sealing_work.lock();
         let ret = sealing_work.queue.use_last_ref();
@@ -1541,11 +1597,13 @@ impl MinerService for Miner {
                 Err(Error::PowInvalid)
             })
         } else {
-            warn!(target: "miner", "Submitted solution rejected: Block unknown or out of date.");
+            debug!(target: "miner", "Submitted solution rejected: Block unknown or out of date.");
             Err(Error::PowHashInvalid)
         };
         result.and_then(|sealed| {
             client.import_sealed_block(sealed)?;
+            // Clear the sealing_work queue after a PoW block is successfully imported
+            self.sealing_work.lock().queue.reset();
             Ok(())
         })
     }
@@ -1589,6 +1647,35 @@ impl MinerService for Miner {
         self.clear_pos_pending();
         client.new_block_chained();
     }
+
+    // AION 2.0
+    // Check if next block is on the unity hard fork
+    fn unity_update(&self, client: &MiningBlockChainClient) -> bool {
+        self.engine
+            .machine()
+            .params()
+            .unity_update
+            .map_or(false, |fork_number| {
+                client.chain_info().best_block_number >= fork_number
+            })
+    }
+
+    // AION 2.0
+    // Check if it's allowed to produce a new block with given seal type.
+    // A block's seal type must be different than its parent's seal type.
+    fn new_block_allowed_with_seal_type(
+        &self,
+        client: &MiningBlockChainClient,
+        seal_type: &SealType,
+    ) -> bool
+    {
+        // This rule only applies after unity fork
+        if !self.unity_update(client) {
+            return true;
+        }
+
+        seal_type != &client.best_block_header().seal_type().unwrap_or_default()
+    }
 }
 
 // TOREMOVE-Unity: Unity MS1 use only
@@ -1614,22 +1701,6 @@ fn parse_staker(key: String) -> Result<Ed25519KeyPair, String> {
     Ok(keypair.into())
 }
 
-// TODO-Unity: To do this better
-//fn ln(x: &BigUint) -> Result<f64, String> {
-//    let x: Vec<u8> = x.to_bytes_le();
-//
-//    const BYTES: usize = 12;
-//    let start = if x.len() < BYTES { 0 } else { x.len() - BYTES };
-//
-//    let mut n: f64 = 0.0;
-//    for i in start..x.len() {
-//        n = n / 256f64 + (x[i] as f64);
-//    }
-//    let ln_256: f64 = (256f64).ln();
-//
-//    Ok(n.ln() + ln_256 * ((x.len() - 1) as f64))
-//}
-
 #[cfg(test)]
 mod tests {
     use aion_types::U256;
@@ -1642,7 +1713,6 @@ mod tests {
     use std::sync::Arc;
     use std::time::Duration;
     use super::{Banning, MinerOptions, PendingSet, SealType};
-    use client::BlockChainClient;
     use tests::common::{EachBlockWith, TestBlockChainClient};
     use transaction::{PendingTransaction, SignedTransaction};
     use transaction::Action;
@@ -1691,7 +1761,7 @@ mod tests {
                 tx_queue_memory_limit: None,
                 tx_queue_strategy: PrioritizationStrategy::GasFactorAndGasPrice,
                 pending_set: PendingSet::AlwaysSealing,
-                work_queue_size: 5,
+                work_queue_size: 50,
                 enable_resubmission: true,
                 tx_queue_banning: Banning::Disabled,
                 infinite_pending_block: false,
@@ -1819,9 +1889,6 @@ mod tests {
         let miner = miner();
         let client = TestBlockChainClient::default();
 
-        let header = client.best_block_header_with_seal_type(&SealType::PoS);
-        assert!(header.is_none());
-
         let seed = H512::zero();
         println!("seed = {:?}", seed);
 
@@ -1834,7 +1901,7 @@ mod tests {
         // 2. submit seed
         let seed: H512 = "d1c02f4679b4a022f2d843bd750c34c94cd08a2b6fc2def298653b81b88245a345d8d3e2d8bbce3fdb3ab2918459633f4496d5609ac13d9710ddcede8957cc0c".
             from_hex().unwrap().as_slice().into();
-        let template = miner.get_pos_template(&client, seed.into(), staker);
+        let template = miner.get_pos_template(&client, seed.into(), staker, staker);
 
         assert!(template.is_some());
         println!("new block = {:?}, staker = {:?}", template.unwrap(), staker);

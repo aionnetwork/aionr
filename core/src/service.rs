@@ -60,10 +60,10 @@ pub enum ClientIoMessage {
 /// Run the miner
 pub fn run_miner(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sender<()> {
     let (close, shutdown_signal) = oneshot::channel();
-    let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(1))
+    let seal_block_task = Interval::new(Instant::now(), Duration::from_millis(500))
         .for_each(move |_| {
             let client: Arc<Client> = client.clone();
-            client.miner().try_prepare_block(&*client, false);
+            client.miner().try_prepare_block_pow(&*client, false);
             Ok(())
         })
         .map_err(|e| panic!("interval err: {:?}", e))
@@ -79,10 +79,7 @@ pub fn pos_sealing(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Send
     let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(1))
         .for_each(move |_| {
             let client: Arc<Client> = client.clone();
-            client
-                .miner()
-                .invoke_pos_interval(&*client)
-                .map_err(|e| panic!("pos block generation err: {:?}", e))?;
+            client.miner().invoke_pos_interval(&*client);
             Ok(())
         })
         .map_err(|e| panic!("interval err: {:?}", e))
@@ -99,10 +96,7 @@ pub fn run_staker(executor: TaskExecutor, client: Arc<Client>) -> oneshot::Sende
     let seal_block_task = Interval::new(Instant::now(), Duration::from_secs(1))
         .for_each(move |_| {
             let client: Arc<Client> = client.clone();
-            client
-                .miner()
-                .try_prepare_block_pos(&*client)
-                .map_err(|e| panic!("pos block generation err: {:?}", e))?;
+            client.miner().try_produce_pos_block_internal(&*client);
             Ok(())
         })
         .map_err(|e| panic!("interval err: {:?}", e))
@@ -345,7 +339,7 @@ impl IoHandler<ClientIoMessage> for ClientIoHandler {
                 debug!(target: "block", "ClientIoMessage::NewChainHead");
                 let client: Arc<Client> = self.client.clone();
                 client.miner().update_transaction_pool(&*client, true);
-                client.miner().try_prepare_block(&*client, true); // TODO: handle PoW and PoS better
+                client.miner().try_prepare_block_pow(&*client, true); // TODO: handle PoW and PoS better
             }
             _ => {} // ignore other messages
         }
@@ -382,7 +376,7 @@ mod tests {
         assert!(db.write(batch).is_ok());
 
         assert!(ClientService::test_correct_db(db.clone()).is_ok());
-        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone(), None, None);
+        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone());
 
         assert_eq!(bc.best_block_number(), 497);
 
@@ -393,7 +387,7 @@ mod tests {
         assert!(db.write(batch).is_ok());
 
         assert!(ClientService::test_correct_db(db.clone()).is_ok());
-        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone(), None, None);
+        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone());
 
         assert_eq!(bc.best_block_number(), 497);
 
@@ -405,7 +399,7 @@ mod tests {
         assert!(db.write(batch).is_ok());
 
         assert!(ClientService::test_correct_db(db.clone()).is_ok());
-        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone(), None, None);
+        let bc = BlockChain::new(Default::default(), &Vec::new(), db.clone());
 
         assert_eq!(bc.best_block_number(), 395);
     }

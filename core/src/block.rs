@@ -224,8 +224,8 @@ impl<'x> OpenBlock<'x> {
         db: StateDB,
         parent: &Header,
         seal_type: SealType,
-        seal_parent: Option<&Header>,
-        seal_grand_parent: Option<&Header>,
+        grand_parent: Option<&Header>,
+        great_grand_parent: Option<&Header>,
         last_hashes: Arc<LastHashes>,
         author: Address,
         gas_range_target: (U256, U256),
@@ -280,7 +280,12 @@ impl<'x> OpenBlock<'x> {
             gas_ceil_target,
         );
         // Set difficulty
-        engine.set_difficulty_from_parent(&mut r.block.header, seal_parent, seal_grand_parent);
+        engine.set_difficulty_from_parent(
+            &mut r.block.header,
+            parent,
+            grand_parent,
+            great_grand_parent,
+        );
 
         engine.machine().on_new_block(&mut r.block)?;
 
@@ -644,14 +649,15 @@ impl LockedBlock {
         self,
         engine: &Engine,
         seal: Vec<Bytes>,
-        seal_parent: Option<&Header>,
+        parent: &Header,
+        grand_parent: Option<&Header>,
         stake: Option<BigUint>,
     ) -> Result<SealedBlock, (Error, LockedBlock)>
     {
         let mut s = self;
         s.block.header.set_seal(seal);
 
-        match engine.verify_seal_pos(&s.block.header, seal_parent, stake) {
+        match engine.verify_seal_pos(&s.block.header, parent, grand_parent, stake) {
             Err(e) => Err((e, s)),
             _ => {
                 Ok(SealedBlock {
@@ -693,8 +699,8 @@ fn enact(
     engine: &Engine,
     db: StateDB,
     parent: &Header,
-    seal_parent: Option<&Header>,
-    seal_grand_parent: Option<&Header>,
+    grand_parent: Option<&Header>,
+    great_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
     kvdb: Arc<KeyValueDB>,
@@ -720,8 +726,8 @@ fn enact(
         db,
         parent,
         header.seal_type().to_owned().unwrap_or_default(),
-        seal_parent,
-        seal_grand_parent,
+        grand_parent,
+        great_grand_parent,
         last_hashes,
         Address::new(),
         (3141562.into(), 31415620.into()),
@@ -852,8 +858,8 @@ pub fn enact_verified(
     engine: &Engine,
     db: StateDB,
     parent: &Header,
-    seal_parent: Option<&Header>,
-    seal_grand_parent: Option<&Header>,
+    grand_parent: Option<&Header>,
+    great_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
     kvdb: Arc<KeyValueDB>,
@@ -865,8 +871,8 @@ pub fn enact_verified(
         engine,
         db,
         parent,
-        seal_parent,
-        seal_grand_parent,
+        grand_parent,
+        great_grand_parent,
         last_hashes,
         factories,
         kvdb,

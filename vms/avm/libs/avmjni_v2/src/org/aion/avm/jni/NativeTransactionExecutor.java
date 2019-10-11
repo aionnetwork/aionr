@@ -16,8 +16,6 @@ import org.aion.types.TransactionResult;
 import org.aion.types.Log;
 import org.objectweb.asm.ClassVisitor;
 
-import jdk.vm.ci.meta.Constant;
-
 import java.util.Set;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -37,7 +35,7 @@ public class NativeTransactionExecutor {
         if (Constants.DEBUG)
             config.enableVerboseConcurrentExecutor = true;
         System.out.println(String.format("native exec: new AionCapabilities"));
-        AionCapabilitiesV1 cap = new AionCapabilitiesV1();
+        AionCapabilitiesV2 cap = new AionCapabilitiesV2();
         System.out.println(String.format("native exec: new AvmImpl"));
         try {
             Class<?> clazz = clsLoader.loadClass("org.aion.avm.core.CommonAvmFactory");
@@ -143,8 +141,8 @@ public class NativeTransactionExecutor {
      * @return serialized list of transaction result, using the Native Codec
      */
     public static byte[] execute(long handle, byte[] txs, boolean is_local) {
-        if (Constant.DEBUG) {
-            System.out.println("JNI V2");
+        if (Constants.DEBUG) {
+            System.out.println("JNI V1");
         }
         
         long blockNumber = 0;
@@ -169,7 +167,7 @@ public class NativeTransactionExecutor {
             AvmConfiguration config = new AvmConfiguration();
             if (Constants.DEBUG)
                 config.enableVerboseConcurrentExecutor = true;
-            AionCapabilitiesV1 cap = new AionCapabilitiesV1();
+            AionCapabilitiesV2 cap = new AionCapabilitiesV2();
             AvmImpl avm = CommonAvmFactory.buildAvmInstanceForConfiguration(cap, config);
             FutureResult[] futures = avm.run(substate, contexts, ExecutionType.ASSUME_MAINCHAIN, blockNumber-1);
 
