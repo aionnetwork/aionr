@@ -353,14 +353,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         // 2. Check gas limit
         // 2.1 Gas limit should not be less than the basic gas requirement
-        let mut base_gas_required: U256 = t.gas_required();
+        let base_gas_required: U256 = t.gas_required();
         if t.gas < base_gas_required {
-            // return Err(From::from(ExecutionError::NotEnoughBaseGas {
-            //     required: base_gas_required,
-            //     got: t.gas,
-            // }));
-            // WORKAROUND: let this tx get into vm with gas = 0, aionj specific
-            base_gas_required = t.gas;
+            return Err(From::from(ExecutionError::NotEnoughBaseGas {
+                required: base_gas_required,
+                got: t.gas,
+            }));
         }
         debug!(target: "vm", "base_gas_required = {}", base_gas_required);
 
