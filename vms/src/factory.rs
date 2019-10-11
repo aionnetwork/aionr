@@ -191,7 +191,7 @@ impl Factory for FastVMFactory {
 const AVM_CREATE: i32 = 3;
 const AVM_CALL: i32 = 0;
 const AVM_BALANCE_TRANSFER: i32 = 4;
-const AVM_V2_FORK: u64 = 100;
+const AVM_V2_FORK: u64 = 265;
 // const AVM_GARBAGE_COLLECTION: i32 = 5;
 
 #[derive(Clone)]

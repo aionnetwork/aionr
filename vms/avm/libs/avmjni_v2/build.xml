@@ -1,17 +1,17 @@
-<project name="org-aion-avm-jni" basedir="." default="build">
+<project name="org-aion-avm-jni-v2" basedir="." default="build">
 
     <property name="src.dir" value="src"/>
     <property name="test.dir" value="test"/>
     <property name="native.dir" value="native"/>
     <property name="build.dir" value="build"/>
-    <property name="package.dir" value="../aion_vm/v1"/>
+    <property name="package.dir" value="../aion_vm/v2"/>
     <property name="reports.dir" value="${build.dir}/reports"/>
     <property name="main.classes.dir" value="${build.dir}/classes/main"/>
     <property name="test.classes.dir" value="${build.dir}/classes/test"/>
 
     <path id="avm-classpath">
         <fileset dir="../aion_vm/">
-            <include name="v1/*.jar"/>
+            <include name="v2/*.jar"/>
             <include name="common/*.jar"/>
         </fileset>
     </path>

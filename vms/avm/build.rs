@@ -46,6 +46,11 @@ fn main() {
         .arg("libs/avmjni/build.xml")
         .status()
         .expect("failed to build jni jar");
+    Command::new("ant")
+        .arg("-f")
+        .arg("libs/avmjni_v2/build.xml")
+        .status()
+        .expect("failed to build jni jar");
 
     //println!("cargo:rustc-link-lib=avmjni");
 

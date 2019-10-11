@@ -3,9 +3,9 @@ package org.aion.avm.jni;
 import org.aion.avm.core.IExternalCapabilities;
 import org.aion.types.AionAddress;
 import org.aion.types.Transaction;
-// import org.aion.avm.jni.NativeKernelInterface;
+import org.aion.avm.jni.NativeKernelInterface;
 
-public class AionCapabilitiesV1 implements IExternalCapabilities {
+public class AionCapabilitiesV2 implements IExternalCapabilities {
 
     @Override
     public byte[] sha256(byte[] data) {
@@ -32,6 +32,8 @@ public class AionCapabilitiesV1 implements IExternalCapabilities {
         byte[] sender = tx.senderAddress.toByteArray();
         byte[] nonce = tx.nonce.toByteArray();
         AionAddress new_contract = new AionAddress(NativeKernelInterface.contract_address(sender, nonce));
+        // if (Constants.DEBUG)
+        //     System.out.println(new_contract);
         return new_contract;
     }
 }

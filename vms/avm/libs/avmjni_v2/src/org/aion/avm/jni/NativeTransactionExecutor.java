@@ -16,6 +16,8 @@ import org.aion.types.TransactionResult;
 import org.aion.types.Log;
 import org.objectweb.asm.ClassVisitor;
 
+import jdk.vm.ci.meta.Constant;
+
 import java.util.Set;
 import java.io.IOException;
 import java.io.ByteArrayInputStream;
@@ -141,8 +143,8 @@ public class NativeTransactionExecutor {
      * @return serialized list of transaction result, using the Native Codec
      */
     public static byte[] execute(long handle, byte[] txs, boolean is_local) {
-        if (Constants.DEBUG) {
-            System.out.println("JNI V1");
+        if (Constant.DEBUG) {
+            System.out.println("JNI V2");
         }
         
         long blockNumber = 0;
