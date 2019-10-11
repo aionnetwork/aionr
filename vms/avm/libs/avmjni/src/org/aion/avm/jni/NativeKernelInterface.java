@@ -153,22 +153,9 @@ public class NativeKernelInterface implements IExternalState {
     }
 
     @Override
-    public void payMiningFee(AionAddress address, BigInteger fee) {
-        // System.out.println("Native: avm trys to pay mining fee");
-        // This method may have special logic in the kernel. Here it is just adjustBalance.
-        adjustBalance(address, fee);
-    }
-
-    @Override
     public void refundAccount(AionAddress address, BigInteger amount) {
         // This method may have special logic in the kernel. Here it is just adjustBalance.
         adjustBalance(address, amount);
-    }
-
-    @Override
-    public void deductEnergyCost(AionAddress address, BigInteger cost) {
-        // This method may have special logic in the kernel. Here it is just adjustBalance.
-        adjustBalance(address, cost);
     }
 
     @Override
@@ -196,7 +183,7 @@ public class NativeKernelInterface implements IExternalState {
 
     // Camus: this should not be in kernel interface
     @Override
-    public long getBlockDifficulty() {
+    public BigInteger getBlockDifficulty() {
         throw new AssertionError("Did not expect this to be called.");
     }
 

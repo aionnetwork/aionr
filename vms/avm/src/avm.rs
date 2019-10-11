@@ -52,15 +52,21 @@ pub fn launch_jvm() {
                     libs = PathBuf::from(default_var.unwrap());
                 }
 
-                libs.push("libs/aion_vm");
+                libs.push("libs/aion_vm/AvmVersion.jar");
+                // libs.push("libs/aion_vm");
+                // TODO: use avm version to manage classpath
                 classpath = add_jars(
                     classpath,
                     libs.to_str().expect("The `libs` folder is not found"),
                 );
+                println!("classpath: {:?}", classpath);
+                // classpath = add_jars(classpath, "modAvmVersion1.jar");
+                // classpath = add_jars(classpath, "modAvmVersion2.jar");
 
                 // prepare options
                 let mut options = Options::new();
                 options = options.version(Version::V18);
+                // TODO: use avm version to load resources
                 options = options.classpath(classpath);
 
                 // launch jvm
@@ -128,10 +134,17 @@ fn find_files(path: &Path, extension: &str) -> Result<Vec<String>, Error> {
     return Ok(result);
 }
 
+#[derive(Clone, Default)]
+pub struct VmStatistics {
+    exec_count: i64,
+    total_exec_time: i64,
+}
+
 /// Aion virtual machine
 #[derive(Clone)]
 pub struct AVM {
     jvm: JavaVM,
+    state: VmStatistics,
 }
 
 impl Drop for AVM {
@@ -142,8 +155,6 @@ impl Drop for AVM {
         }
     }
 }
-
-// static mut ExecutorClass: AtomicPtr<Class> = AtomicPtr::new(ptr::null_mut());
 
 impl AVM {
     /// create a new AVM instance
@@ -161,6 +172,7 @@ impl AVM {
                     vm: ffi::from_raw(vm),
                     env: ffi::from_raw(env),
                 },
+                state: VmStatistics::default(),
             }
         }
     }
@@ -176,6 +188,7 @@ impl AVM {
                     vm: self.jvm.vm,
                     env: ffi::from_raw(env),
                 },
+                state: self.state.clone(),
             }
         }
     }
@@ -189,33 +202,48 @@ impl AVM {
 
     /// Executes a list of transactions
     pub fn execute(
-        &self,
+        &mut self,
         ext_hdl: i64,
+        version: i32,
         transactions: &Vec<TransactionContext>,
         is_local: bool,
     ) -> Result<Vec<TransactionResult>, &'static str>
     {
         trace!(target: "vm", "start rust jvm executor");
         let vm = self.attach();
-        // find the NativeTransactionExecutor class
+
         let class = vm
             .jvm
-            .class("org/aion/avm/jni/NativeTransactionExecutor")
+            .class("org/aion/avm/version/AvmVersion")
             .expect("NativeTransactionExecutor is missing in the classpath");
 
         trace!(target: "vm", "load native class");
-        // the method name
-        let name = "execute";
-
+        // method name: now defined in AvmVersion
+        // who is responsible to call correct version of avm
+        let method = "execute";
         // the method return type
         let return_type = Type::Object("[B");
 
+        let key = "AIONR_HOME";
+        let default_var = env::var(key);
+        let mut libs;
+        if default_var.is_err() {
+            libs = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        //warn!("AIONR_HOME is not set, use default path: {:?}", libs);
+        } else {
+            libs = PathBuf::from(default_var.unwrap());
+        }
+
+        libs.push("libs/aion_vm/");
+
         // the arguments
         let arguments = [
+            Value::Int(version),
+            Value::Str(libs.to_str().expect("Unknown root path").to_string()),
             Value::Long(ext_hdl), // handle
             Value::Object(
                 vm.jvm
-                    .new_byte_array_with_data(&Self::encode_transaction_contexts(&transactions))
+                    .new_byte_array_with_data(&Self::encode_transaction_contexts(transactions))
                     .expect("Failed to create new byte array in JVM"),
             ),
             Value::Boolean(is_local),
@@ -224,7 +252,7 @@ impl AVM {
         trace!(target: "vm", "rust jvm call_static");
         // invoke the method
         let ret = class
-            .call_static(name, &arguments, return_type)
+            .call_static(method, &arguments, return_type)
             .expect("Failed to call the execute() method");
 
         if let Value::Object(obj) = ret {
