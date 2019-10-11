@@ -165,7 +165,7 @@ impl Transaction {
 
     /// Append object with a without signature into RLP stream
     pub fn rlp_append_unsigned_transaction(&self, s: &mut RlpStream, timestamp: &Bytes) {
-        if let Some(ref hash) = &self.beacon {
+        if self.beacon.is_some() {
             s.begin_list(10);
         } else {
             s.begin_list(8);
@@ -385,7 +385,7 @@ impl UnverifiedTransaction {
 
     /// Append object with a signature into RLP stream
     fn rlp_append_sealed_transaction(&self, s: &mut RlpStream) {
-        if let Some(ref hash) = &self.beacon {
+        if self.beacon.is_some() {
             s.begin_list(11);
         } else {
             s.begin_list(9);

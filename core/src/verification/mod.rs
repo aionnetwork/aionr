@@ -625,7 +625,17 @@ mod tests {
             unimplemented!()
         }
 
-        fn beacon_list(&self, _hash: &H256) -> Option<BlockNumber> { unimplemented!() }
+        fn beacon_list(&self, hash: &H256) -> Option<BlockNumber> {
+            if let Some(b) = self.block(hash) {
+                let num = b.view().header_view().number();
+                if let Some(h) = self.block_hash(num) {
+                    if h == *hash {
+                        return Some(num);
+                    }
+                }
+            }
+            None
+        }
     }
 
     fn basic_test(bytes: &[u8], engine: &Engine) -> Result<(), Error> {
@@ -688,7 +698,7 @@ mod tests {
     fn test_verify_block() {
         // Test against morden
         let mut good = Header::new();
-        let spec = Spec::new_test();
+        let spec = Spec::new_unity();
         let engine = &*spec.engine;
 
         let min_gas_limit = engine.params().min_gas_limit;
@@ -714,24 +724,6 @@ mod tests {
         }
         .sign(keypair.secret());
 
-        let tr2 = Transaction {
-            action: Action::Create,
-            value: U256::from(0),
-            data: Bytes::new(),
-            gas: U256::from(300_000),
-            gas_price: U256::from(40_000),
-            nonce: U256::from(2),
-            nonce_bytes: Vec::new(),
-            gas_bytes: Vec::new(),
-            gas_price_bytes: Vec::new(),
-            value_bytes: Vec::new(),
-            transaction_type: U256::from(1),
-            beacon: None,
-        }
-        .sign(keypair.secret());
-
-        let good_transactions = [tr1.clone(), tr2.clone()];
-
         let diff_inc = U256::from(0x40);
 
         let mut parent6 = good.clone();
@@ -747,17 +739,35 @@ mod tests {
         parent8.set_difficulty(parent7.difficulty().clone() + diff_inc);
         parent8.set_timestamp(parent7.timestamp() + 10);
 
-        let good_transactions_root = ordered_trie_root(
-            good_transactions
-                .iter()
-                .map(|t| ::rlp::encode::<UnverifiedTransaction>(t)),
-        );
-
         let mut parent = good.clone();
         parent.set_number(9);
         parent.set_timestamp(parent8.timestamp() + 10);
         parent.set_parent_hash(parent8.hash());
         parent.set_difficulty(parent8.difficulty().clone() + diff_inc);
+
+        let tr2 = Transaction {
+            action: Action::Create,
+            value: U256::from(0),
+            data: Bytes::new(),
+            gas: U256::from(300_000),
+            gas_price: U256::from(40_000),
+            nonce: U256::from(2),
+            nonce_bytes: Vec::new(),
+            gas_bytes: Vec::new(),
+            gas_price_bytes: Vec::new(),
+            value_bytes: Vec::new(),
+            transaction_type: U256::from(1),
+            beacon: Some(parent.hash()),
+        }
+        .sign(keypair.secret());
+
+        let good_transactions = [tr1.clone(), tr2.clone()];
+
+        let good_transactions_root = ordered_trie_root(
+            good_transactions
+                .iter()
+                .map(|t| ::rlp::encode::<UnverifiedTransaction>(t)),
+        );
 
         good.set_parent_hash(parent.hash());
         good.set_difficulty(parent.difficulty().clone() + diff_inc);
@@ -941,5 +951,339 @@ mod tests {
                 panic!("Should be error, got Ok");
             }
         }
+    }
+
+    #[test]
+    fn test_block_beacon_check() {
+        let mut good = Header::new();
+
+        // unity_update is 9
+        let spec = Spec::new_unity();
+        let engine = &*spec.engine;
+
+        let min_gas_limit = engine.params().min_gas_limit;
+        good.set_gas_limit(min_gas_limit);
+        good.set_timestamp(40);
+        good.set_number(10);
+
+        let diff_inc = U256::from(0x40);
+
+        let mut parent6 = good.clone();
+        parent6.set_number(6);
+        let mut parent7 = good.clone();
+        parent7.set_number(7);
+        parent7.set_parent_hash(parent6.hash());
+        parent7.set_difficulty(parent6.difficulty().clone() + diff_inc);
+        parent7.set_timestamp(parent6.timestamp() + 10);
+        let mut parent8 = good.clone();
+        parent8.set_number(8);
+        parent8.set_parent_hash(parent7.hash());
+        parent8.set_difficulty(parent7.difficulty().clone() + diff_inc);
+        parent8.set_timestamp(parent7.timestamp() + 10);
+
+        let keypair = keychain::ethkey::generate_keypair();
+
+        let tr1 = Transaction {
+            action: Action::Create,
+            value: U256::from(0),
+            data: Bytes::new(),
+            gas: U256::from(300_000),
+            gas_price: U256::from(40_000),
+            nonce: U256::one(),
+            nonce_bytes: Vec::new(),
+            gas_bytes: Vec::new(),
+            gas_price_bytes: Vec::new(),
+            value_bytes: Vec::new(),
+            transaction_type: U256::from(1),
+            beacon: None,
+        }
+        .sign(keypair.secret());
+
+        // tr2 has a valid beacon
+        let tr2 = Transaction {
+            action: Action::Create,
+            value: U256::from(0),
+            data: Bytes::new(),
+            gas: U256::from(300_000),
+            gas_price: U256::from(40_000),
+            nonce: U256::from(2),
+            nonce_bytes: Vec::new(),
+            gas_bytes: Vec::new(),
+            gas_price_bytes: Vec::new(),
+            value_bytes: Vec::new(),
+            transaction_type: U256::from(1),
+            beacon: Some(parent7.hash()),
+        }
+        .sign(keypair.secret());
+
+        // tr3 has an unknown beacon
+        let tr3 = Transaction {
+            action: Action::Create,
+            value: U256::from(0),
+            data: Bytes::new(),
+            gas: U256::from(300_000),
+            gas_price: U256::from(40_000),
+            nonce: U256::from(2),
+            nonce_bytes: Vec::new(),
+            gas_bytes: Vec::new(),
+            gas_price_bytes: Vec::new(),
+            value_bytes: Vec::new(),
+            transaction_type: U256::from(1),
+            beacon: Some(2333u64.into()),
+        }
+        .sign(keypair.secret());
+
+        let canon1_transactions = [tr1.clone(), tr2.clone()];
+
+        let canon1_transactions_root = ordered_trie_root(
+            canon1_transactions
+                .iter()
+                .map(|t| ::rlp::encode::<UnverifiedTransaction>(t)),
+        );
+
+        let unknown_beacon_transactions = [tr1.clone(), tr3.clone()];
+
+        let unknown_beacon_transactions_root = ordered_trie_root(
+            unknown_beacon_transactions
+                .iter()
+                .map(|t| ::rlp::encode::<UnverifiedTransaction>(t)),
+        );
+
+        let mut parent = good.clone();
+        parent.set_number(9);
+        parent.set_timestamp(parent8.timestamp() + 10);
+        parent.set_parent_hash(parent8.hash());
+        parent.set_difficulty(parent8.difficulty().clone() + diff_inc);
+
+        good.set_parent_hash(parent.hash());
+        good.set_difficulty(parent.difficulty().clone() + diff_inc);
+        good.set_timestamp(parent.timestamp() + 10);
+
+        let mut bc = TestBlockChain::new();
+        bc.insert(create_test_block(&good));
+        bc.insert(create_test_block(&parent));
+        bc.insert(create_test_block(&parent6));
+        bc.insert(create_test_block(&parent7));
+        bc.insert(create_test_block(&parent8));
+
+        // verify canon block with canon beacon hash before unity update
+        let mut header = parent.clone();
+        header.set_transactions_root(canon1_transactions_root.clone());
+        check_ok(basic_test(
+            &create_test_block_with_data(&header, &canon1_transactions),
+            engine,
+        ));
+        check_fail(
+            family_test(
+                &create_test_block_with_data(&header, &canon1_transactions),
+                engine,
+                &bc,
+            ),
+            BeaconHashBanned,
+        );
+
+        // verify canon block with canon beacon hash after unity update
+        // beacon is canon, parent is canon
+        let mut header = good.clone();
+        header.set_transactions_root(canon1_transactions_root.clone());
+        check_ok(basic_test(
+            &create_test_block_with_data(&header, &canon1_transactions),
+            engine,
+        ));
+        check_ok(family_test(
+            &create_test_block_with_data(&header, &canon1_transactions),
+            engine,
+            &bc,
+        ));
+
+        // verify canon block with unknown beacon hash before unity update
+        let mut header = parent.clone();
+        header.set_transactions_root(unknown_beacon_transactions_root.clone());
+        check_ok(basic_test(
+            &create_test_block_with_data(&header, &unknown_beacon_transactions),
+            engine,
+        ));
+        check_fail(
+            family_test(
+                &create_test_block_with_data(&header, &unknown_beacon_transactions),
+                engine,
+                &bc,
+            ),
+            BeaconHashBanned,
+        );
+
+        // verify canon block with unknown beacon hash after unity update
+        let mut header = good.clone();
+        header.set_transactions_root(unknown_beacon_transactions_root.clone());
+        check_ok(basic_test(
+            &create_test_block_with_data(&header, &unknown_beacon_transactions),
+            engine,
+        ));
+        check_fail(
+            family_test(
+                &create_test_block_with_data(&header, &unknown_beacon_transactions),
+                engine,
+                &bc,
+            ),
+            InvalidBeaconHash(2333u64.into()),
+        );
+
+        // make branch1
+        let mut parent8b = parent8.clone();
+        parent8b.set_difficulty(parent8.difficulty().clone() + 1u64.into());
+        let mut parentb = parent.clone();
+        parentb.set_difficulty(parent.difficulty().clone() + 2u64.into());
+        parentb.set_parent_hash(parent8b.hash());
+        let mut goodb = good.clone();
+        goodb.set_difficulty(good.difficulty().clone() + 3u64.into());
+        goodb.set_parent_hash(parentb.hash());
+
+        bc.insert(create_test_block(&goodb));
+        bc.insert(create_test_block(&parentb));
+        bc.insert(create_test_block(&parent8b));
+
+        let tr4 = Transaction {
+            action: Action::Create,
+            value: U256::from(0),
+            data: Bytes::new(),
+            gas: U256::from(300_000),
+            gas_price: U256::from(40_000),
+            nonce: U256::from(2),
+            nonce_bytes: Vec::new(),
+            gas_bytes: Vec::new(),
+            gas_price_bytes: Vec::new(),
+            value_bytes: Vec::new(),
+            transaction_type: U256::from(1),
+            beacon: Some(parentb.hash()),
+        }
+        .sign(keypair.secret());
+
+        let tr5 = Transaction {
+            action: Action::Create,
+            value: U256::from(0),
+            data: Bytes::new(),
+            gas: U256::from(300_000),
+            gas_price: U256::from(40_000),
+            nonce: U256::from(2),
+            nonce_bytes: Vec::new(),
+            gas_bytes: Vec::new(),
+            gas_price_bytes: Vec::new(),
+            value_bytes: Vec::new(),
+            transaction_type: U256::from(1),
+            beacon: Some(parent.hash()),
+        }
+        .sign(keypair.secret());
+
+        let canon2_transactions = [tr4.clone(), tr1.clone()];
+
+        let canon2_transactions_root = ordered_trie_root(
+            canon2_transactions
+                .iter()
+                .map(|t| ::rlp::encode::<UnverifiedTransaction>(t)),
+        );
+
+        let branch_transactions = [tr5.clone(), tr1.clone()];
+        let branch_transactions_root = ordered_trie_root(
+            branch_transactions
+                .iter()
+                .map(|t| ::rlp::encode::<UnverifiedTransaction>(t)),
+        );
+
+        // verify branch block with canon beacon hash after unity update
+        // beacon is canon after fork point, parent is branch
+        let mut header = good.clone();
+        header.set_transactions_root(canon2_transactions_root.clone());
+        check_ok(basic_test(
+            &create_test_block_with_data(&header, &canon2_transactions),
+            engine,
+        ));
+        check_fail(
+            family_test(
+                &create_test_block_with_data(&header, &canon2_transactions),
+                engine,
+                &bc,
+            ),
+            InvalidBeaconHash(parentb.hash()),
+        );
+
+        // verify branch block with canon beacon hash after unity update
+        // beacon is canon before fork point , parent is branch
+        let mut header = good.clone();
+        header.set_transactions_root(canon1_transactions_root.clone());
+        check_ok(basic_test(
+            &create_test_block_with_data(&header, &canon1_transactions),
+            engine,
+        ));
+        check_ok(family_test(
+            &create_test_block_with_data(&header, &canon1_transactions),
+            engine,
+            &bc,
+        ));
+
+        // verify canon block with branch beacon hash after unity update
+        // beacon is branch, parent is canon
+        let mut header = goodb.clone();
+        header.set_transactions_root(branch_transactions_root.clone());
+        check_ok(basic_test(
+            &create_test_block_with_data(&header, &branch_transactions),
+            engine,
+        ));
+        check_fail(
+            family_test(
+                &create_test_block_with_data(&header, &branch_transactions),
+                engine,
+                &bc,
+            ),
+            InvalidBeaconHash(parent.hash()),
+        );
+
+        // verify branch block with canon beacon hash after unity update
+        // beacon and parent are the same branch
+        let mut header = good.clone();
+        header.set_transactions_root(branch_transactions_root.clone());
+        check_ok(basic_test(
+            &create_test_block_with_data(&header, &branch_transactions),
+            engine,
+        ));
+        check_ok(family_test(
+            &create_test_block_with_data(&header, &branch_transactions),
+            engine,
+            &bc,
+        ));
+
+        // make branch2
+        let mut parent7c = parent7.clone();
+        parent7c.set_difficulty(parent7.difficulty().clone() + 2u64.into());
+        let mut parent8c = parent8.clone();
+        parent8c.set_difficulty(parent8.difficulty().clone() + 4u64.into());
+        parent8c.set_parent_hash(parent7c.hash());
+        let mut parentc = parent.clone();
+        parentc.set_difficulty(parent.difficulty().clone() + 6u64.into());
+        parentc.set_parent_hash(parent8c.hash());
+        let mut goodc = good.clone();
+        goodc.set_difficulty(good.difficulty().clone() + 8u64.into());
+        goodc.set_parent_hash(parentc.hash());
+
+        bc.insert(create_test_block(&goodc));
+        bc.insert(create_test_block(&parentc));
+        bc.insert(create_test_block(&parent8c));
+        bc.insert(create_test_block(&parent7c));
+
+        // verify canon block with branch beacon hash after unity update
+        // beacon is branch, parent is another branch
+        let mut header = goodb.clone();
+        header.set_transactions_root(branch_transactions_root.clone());
+        check_ok(basic_test(
+            &create_test_block_with_data(&header, &branch_transactions),
+            engine,
+        ));
+        check_fail(
+            family_test(
+                &create_test_block_with_data(&header, &branch_transactions),
+                engine,
+                &bc,
+            ),
+            InvalidBeaconHash(parent.hash()),
+        );
     }
 }

@@ -41,7 +41,7 @@ use filter::Filter;
 use header::{BlockNumber, Header as BlockHeader, SealType};
 use itertools::Itertools;
 use journaldb;
-//use key::{generate_keypair, public_to_address_ed25519};
+use key::{generate_keypair, public_to_address_ed25519};
 use kvdb::{DatabaseConfig, DbRepository, RepositoryConfig};
 use kvdb::{KeyValueDB, MockDbRepository};
 use log_entry::LocalizedLogEntry;
@@ -49,7 +49,7 @@ use miner::{Miner, MinerService};
 use parking_lot::RwLock;
 use receipt::{LocalizedReceipt, Receipt};
 use rlp::*;
-//use rustc_hex::FromHex;
+use rustc_hex::FromHex;
 use spec::Spec;
 use state::BasicAccount;
 use std::collections::HashMap;
@@ -59,12 +59,13 @@ use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrder};
 use std::time::Duration;
 use tempdir::TempDir;
 use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction,
-/*Transaction, Action, DEFAULT_TRANSACTION_TYPE*/
+Transaction, Action, DEFAULT_TRANSACTION_TYPE
 };
 use transaction::UnverifiedTransaction;
 use types::error::{CallError, ImportResult};
 use types::pruning_info::PruningInfo;
 use verification::queue::QueueInfo;
+use views::BlockView;
 use num_bigint::BigUint;
 
 /// Test client.
@@ -124,8 +125,8 @@ pub struct TestBlockChainClient {
 pub enum EachBlockWith {
     /// Plain block.
     Nothing,
-    //    /// Block with a transaction.
-    //    Transaction(Option<H256>),
+    /// Block with a transaction.
+    Transaction(Option<H256>),
 }
 
 impl Default for TestBlockChainClient {
@@ -226,50 +227,85 @@ impl TestBlockChainClient {
     //    /// Set logs to return for each logs call.
     //    pub fn set_logs(&self, logs: Vec<LocalizedLogEntry>) { *self.logs.write() = logs; }
 
+    fn generate_header(
+        &self,
+        diff: U256,
+        parent_hash: H256,
+        number: BlockNumber,
+        seal_type: SealType,
+    ) -> BlockHeader
+    {
+        let mut header = BlockHeader::new();
+        header.set_difficulty(diff);
+        header.set_parent_hash(parent_hash);
+        header.set_number(number);
+        header.set_gas_limit(U256::from(1_000_000));
+        header.set_extra_data(self.extra_data.clone());
+        header.set_seal_type(seal_type);
+        header
+    }
+
+    fn generate_txs(&self, with: EachBlockWith) -> Vec<u8> {
+        match with {
+            EachBlockWith::Transaction(beacon) => {
+                let mut txs = RlpStream::new_list(1);
+                let keypair = generate_keypair();
+                // Update nonces value
+                self.nonces
+                    .write()
+                    .insert(public_to_address_ed25519(&keypair.public()), U256::one());
+                let tx = Transaction {
+                    action: Action::Create,
+                    value: U256::from(100),
+                    value_bytes: Vec::new(),
+                    data: "3331600055".from_hex().unwrap(),
+                    gas: U256::from(300_000),
+                    gas_bytes: Vec::new(),
+                    gas_price: U256::from(200_000_000_000u64),
+                    gas_price_bytes: Vec::new(),
+                    nonce: U256::zero(),
+                    nonce_bytes: Vec::new(),
+                    transaction_type: DEFAULT_TRANSACTION_TYPE,
+                    beacon,
+                };
+                let signed_tx = tx.sign(&keypair.secret().0);
+                txs.append(&signed_tx);
+                txs.out()
+            }
+            _ => ::rlp::EMPTY_LIST_RLP.to_vec(),
+        }
+    }
+
+    pub fn generate_block_rlp(
+        &self,
+        with: EachBlockWith,
+        diff: U256,
+        parent_hash: H256,
+        number: BlockNumber,
+        seal_type: SealType,
+    ) -> RlpStream
+    {
+        let header = self.generate_header(diff, parent_hash, number, seal_type);
+        let txs = self.generate_txs(with);
+
+        let mut rlp = RlpStream::new_list(2);
+        rlp.append(&header);
+        rlp.append_raw(&txs, 1);
+        rlp
+    }
+
     /// Add blocks to test client.
     pub fn add_blocks(&self, count: usize, with: EachBlockWith, seal_type: SealType) {
         let len = self.numbers.read().len();
         for n in len..(len + count) {
-            let mut header = BlockHeader::new();
-            header.set_difficulty(From::from(n));
-            header.set_parent_hash(self.last_hash.read().clone());
-            header.set_number(n as BlockNumber);
-            header.set_gas_limit(U256::from(1_000_000));
-            header.set_extra_data(self.extra_data.clone());
-            header.set_seal_type(seal_type.clone());
-            let txs = match with {
-                //                EachBlockWith::Transaction(beacon) => {
-                //                    let mut txs = RlpStream::new_list(1);
-                //                    let keypair = generate_keypair();
-                //                    // Update nonces value
-                //                    self.nonces
-                //                        .write()
-                //                        .insert(public_to_address_ed25519(&keypair.public()), U256::one());
-                //                    let tx = Transaction {
-                //                        action: Action::Create,
-                //                        value: U256::from(100),
-                //                        value_bytes: Vec::new(),
-                //                        data: "3331600055".from_hex().unwrap(),
-                //                        gas: U256::from(100_000),
-                //                        gas_bytes: Vec::new(),
-                //                        gas_price: U256::from(200_000_000_000u64),
-                //                        gas_price_bytes: Vec::new(),
-                //                        nonce: U256::zero(),
-                //                        nonce_bytes: Vec::new(),
-                //                        transaction_type: DEFAULT_TRANSACTION_TYPE,
-                //                        beacon,
-                //                    };
-                //                    let signed_tx = tx.sign(&keypair.secret().0);
-                //                    txs.append(&signed_tx);
-                //                    txs.out()
-                //                }
-                _ => ::rlp::EMPTY_LIST_RLP.to_vec(),
-            };
-
-            let mut rlp = RlpStream::new_list(2);
-            rlp.append(&header);
-            rlp.append_raw(&txs, 1);
-            self.import_block(rlp.as_raw().to_vec()).unwrap();
+            let block_rlp = self.generate_block_rlp(
+                with.clone(),
+                n.into(),
+                self.last_hash.read().clone(),
+                n as BlockNumber,
+                seal_type.clone(),
+            );
+            self.import_block(block_rlp.as_raw().to_vec()).unwrap();
         }
     }
     //
@@ -429,7 +465,17 @@ impl MiningBlockChainClient for TestBlockChainClient {
 
     fn prepare_block_interval(&self) -> Duration { Duration::default() }
 
-    fn is_beacon_hash(&self, _hash: &H256) -> Option<BlockNumber> { unimplemented!() }
+    fn is_beacon_hash(&self, hash: &H256) -> Option<BlockNumber> {
+        if let Some(b) = self.blocks.read().get(&hash) {
+            let num = BlockView::new(b).header_view().number();
+            if let Some(h) = self.block_hash(BlockId::Number(num)) {
+                if h == *hash {
+                    return Some(num);
+                }
+            }
+        }
+        None
+    }
 }
 
 impl BlockChainClient for TestBlockChainClient {
@@ -667,7 +713,14 @@ impl BlockChainClient for TestBlockChainClient {
         // TODO-UNITY-TEST: handle this better
     }
 
-    fn block_number(&self, _id: BlockId) -> Option<BlockNumber> { unimplemented!() }
+    fn block_number(&self, _id: BlockId) -> Option<BlockNumber> {
+        //        let hash = match  Self::block_hash(self, id){
+        //            Some(hash) => hash,
+        //            None => return None
+        //        };
+        //        Some(BlockView::new(&self.blocks.read().get(hash).unwrap()).header_view().number())
+        Some(9)
+    }
 
     fn block_body(&self, id: BlockId) -> Option<encoded::Body> {
         self.block_hash(id).and_then(|hash| {
