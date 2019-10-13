@@ -275,6 +275,7 @@ impl Factory for AVMFactory {
 
             match unity_update {
                 Some(ref n) if &block_number > n => {
+                    // println!("start avm v2");
                     version = 1;
                 }
                 _ => {}

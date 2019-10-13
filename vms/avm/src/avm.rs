@@ -52,13 +52,14 @@ pub fn launch_jvm() {
                     libs = PathBuf::from(default_var.unwrap());
                 }
 
-                libs.push("libs/aion_vm/common/avm-version-0.1.jar");
+                libs.push("libs/aion_vm/common/boot/");
                 // libs.push("libs/aion_vm");
                 // TODO: use avm version to manage classpath
                 classpath = add_jars(
                     classpath,
                     libs.to_str().expect("The `libs` folder is not found"),
                 );
+
                 println!("classpath: {:?}", classpath);
                 // classpath = add_jars(classpath, "modAvmVersion1.jar");
                 // classpath = add_jars(classpath, "modAvmVersion2.jar");
