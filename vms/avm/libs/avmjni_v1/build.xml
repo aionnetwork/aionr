@@ -1,4 +1,4 @@
-<project name="org-aion-avm-jni-v1" basedir="." default="build">
+<project name="org-aion-avm-jni" basedir="." default="build">
 
     <property name="src.dir" value="src"/>
     <property name="test.dir" value="test"/>

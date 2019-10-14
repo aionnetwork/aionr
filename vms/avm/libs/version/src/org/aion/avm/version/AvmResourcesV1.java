@@ -65,6 +65,7 @@ public final class AvmResourcesV1 implements Closeable {
         File avmUserlibJar = new File(projectRootPath + AvmDependencyInfo.userlibJarPathVersion1);
         File avmApiJar = new File(projectRootPath + AvmDependencyInfo.apiJarPathVersion1);
         File rustJniJar = new File(projectRootPath + AvmDependencyInfo.rustJniVersion1);
+        System.out.println("rust jni path: " + projectRootPath + AvmDependencyInfo.rustJniVersion1);
         File aionTypes = new File(projectRootPath + AvmDependencyInfo.aionTypes);
         File asm = new File(projectRootPath + AvmDependencyInfo.asm);
         File asm_analysis = new File(projectRootPath + AvmDependencyInfo.asm_analysis);

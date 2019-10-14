@@ -12,6 +12,7 @@ import org.aion.types.InternalTransaction;
 import org.aion.types.InternalTransaction.RejectedStatus;
 import org.aion.types.Transaction;
 import org.aion.avm.jni.NativeKernelInterface;;
+import org.aion.avm.loader.Loader;
 // import org.aion.util.types.AddressUtils;
 
 public class InvokableTxUtil {
@@ -185,7 +186,7 @@ public class InvokableTxUtil {
             byte[] rlpEncoding) {
 
         byte[] transactionHashWithoutSignature =
-        NativeKernelInterface.blake2b(
+        Loader.blake2b(
                 InvokableTxUtil.rlpEncodeWithoutSignature(
                     nonce,
                     destination,
@@ -194,14 +195,14 @@ public class InvokableTxUtil {
                     executor));
 
         // message, public_key, signature
-        if (!NativeKernelInterface.edverify(transactionHashWithoutSignature, 
+        if (!Loader.edverify(transactionHashWithoutSignature, 
             Arrays.copyOfRange(signature, 0, 32),
             Arrays.copyOfRange(signature, 32, 96)))
         {
             throw new IllegalStateException("Signature does not match Transaction Content");
         }
 
-        byte[] transactionHash = NativeKernelInterface.blake2b(rlpEncoding);
+        byte[] transactionHash = Loader.blake2b(rlpEncoding);
 
         if (destination == null) {
             return

@@ -1,4 +1,4 @@
-<project name="org-aion-avm-jni-v2" basedir="." default="build">
+<project name="org-aion-avm-jni" basedir="." default="build">
 
     <property name="src.dir" value="src"/>
     <property name="test.dir" value="test"/>
@@ -13,6 +13,7 @@
         <fileset dir="../aion_vm/">
             <include name="v2/*.jar"/>
             <include name="common/*.jar"/>
+            <include name="common/boot/*.jar"/>
         </fileset>
     </path>
 
