@@ -381,13 +381,6 @@ impl BlockProvider for BlockChain {
 
     /// Get the hash of given block's number.
     fn beacon_list(&self, hash: &H256) -> Option<BlockNumber> {
-        //        let result = self
-        //            .db
-        //            .read_with_cache(db::COL_EXTRA, &self.beacon_list, hash);
-        //        self.cache_man.lock().note_used(CacheId::BeaconList(*hash));
-        //        result
-
-        // check beacon without beacon list
         if let Some(details) = self
             .db
             .read_with_cache(db::COL_EXTRA, &self.block_details, hash)

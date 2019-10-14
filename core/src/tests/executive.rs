@@ -871,19 +871,19 @@ fn error_cases_rejected() {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.transact(&signed_transaction, true, false, true)
     };
-    // assert_eq!(
-    //     error,
-    //     ExecutionError::NotEnoughBaseGas {
-    //         required: U256::from(246_240),
-    //         got: U256::from(1_000),
-    //     }
-    // );
-    assert!(result.is_ok());
+    assert_eq!(
+        result.unwrap_err(),
+        ExecutionError::NotEnoughBaseGas {
+            required: U256::from(246_240),
+            got: U256::from(1_000),
+        }
+    );
+    //    assert!(result.is_ok());
 
     // 1.5 Transaction does not have enough base gas (call)
     let data = "2d7df21a".from_hex().unwrap();
     let transaction: Transaction = Transaction::new(
-        U256::one(),
+        U256::zero(),
         U256::zero(),
         U256::from(1_000),
         Action::Call(0.into()),
@@ -897,18 +897,18 @@ fn error_cases_rejected() {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.transact(&signed_transaction, true, false, true)
     };
-    // assert_eq!(
-    //     error,
-    //     ExecutionError::NotEnoughBaseGas {
-    //         required: U256::from(21_256),
-    //         got: U256::from(1_000),
-    //     }
-    // );
-    assert!(result.is_ok());
+    assert_eq!(
+        result.unwrap_err(),
+        ExecutionError::NotEnoughBaseGas {
+            required: U256::from(21_256),
+            got: U256::from(1_000),
+        }
+    );
+    //    assert!(result.is_ok());
 
     // 2. Insufficient balance
     let transaction: Transaction = Transaction::new(
-        U256::from(2),
+        U256::zero(),
         U256::from(1),
         U256::from(50_000),
         Action::Call(0.into()),
@@ -951,7 +951,7 @@ fn error_cases_rejected() {
     assert_eq!(
         error,
         ExecutionError::InvalidNonce {
-            expected: U256::from(2),
+            expected: U256::zero(),
             got: U256::from(4),
         }
     );

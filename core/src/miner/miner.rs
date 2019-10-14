@@ -2209,11 +2209,6 @@ mod tests {
         assert_eq!(client.chain_info().best_block_hash, hash11);
         assert!(r11c.is_ok());
 
-        println!(
-            "7:{},8:{},11a:{},11b:{},11c:{}",
-            hash7, hash8, hash11, hash11b, hash11c
-        );
-
         miner.chain_new_blocks(&client, &[], &[], &[hash11c], &[hash11b]);
         miner.update_transaction_pool(&client, true);
         assert_eq!(miner.pending_transactions().len(), 2);
@@ -2245,8 +2240,9 @@ mod tests {
     #[test]
     fn generate_pos_block() {
         // 1. get seed
-        let miner = miner();
-        let client = TestBlockChainClient::default();
+        let miner = miner_with_spec(&Spec::new_unity());
+        let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
+        client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
 
         let seed = H512::zero();
         println!("seed = {:?}", seed);

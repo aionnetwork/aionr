@@ -472,7 +472,6 @@ impl MiningBlockChainClient for TestBlockChainClient {
         if let Some(b) = self.blocks.read().get(&hash) {
             let num = BlockView::new(b).header_view().number();
             if let Some(h) = self.block_hash(BlockId::Number(num)) {
-                println!("canon:{}", h);
                 if h == *hash {
                     return Some(num);
                 }
