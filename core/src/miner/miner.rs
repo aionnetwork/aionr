@@ -873,12 +873,7 @@ impl Miner {
     }
 
     /// Returns true if we had to prepare new pending block.
-    fn prepare_work_sealing(
-        &self,
-        client: &MiningBlockChainClient,
-        seal_type: &Option<SealType>,
-    ) -> bool
-    {
+    fn prepare_work_sealing(&self, client: &MiningBlockChainClient) -> bool {
         trace!(target: "block", "prepare_work_sealing: entering");
         let prepare_new = {
             let mut sealing_work = self.sealing_work.lock();
@@ -893,7 +888,7 @@ impl Miner {
         };
         if prepare_new {
             if let Ok((block, original_work_hash)) =
-                self.prepare_block(client, seal_type, None, None, None)
+                self.prepare_block(client, &Some(SealType::PoW), None, None, None)
             {
                 self.prepare_work(block, original_work_hash);
             } else {
@@ -1602,7 +1597,7 @@ impl MinerService for Miner {
         }
         // Get the latest PoW block
         trace!(target: "miner", "map_sealing_work: entering");
-        self.prepare_work_sealing(client, &None);
+        self.prepare_work_sealing(client);
         trace!(target: "miner", "map_sealing_work: sealing prepared");
         let mut sealing_work = self.sealing_work.lock();
         let ret = sealing_work.queue.use_last_ref();
@@ -1919,13 +1914,13 @@ mod tests {
         // then
         assert!(res.is_ok());
         miner.update_transaction_pool(&client, true);
-        miner.prepare_work_sealing(&client, &None);
+        miner.prepare_work_sealing(&client);
         assert_eq!(miner.pending_transactions().len(), 1);
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 1);
         assert_eq!(miner.pending_transactions_hashes(best_block).len(), 1);
         assert_eq!(miner.pending_receipts(best_block).len(), 1);
         // This method will let us know if pending block was created (before calling that method)
-        assert!(!miner.prepare_work_sealing(&client, &None));
+        assert!(!miner.prepare_work_sealing(&client));
     }
 
     #[test]
@@ -1940,7 +1935,7 @@ mod tests {
         // then
         assert!(res.is_ok());
         miner.update_transaction_pool(&client, true);
-        miner.prepare_work_sealing(&client, &None);
+        miner.prepare_work_sealing(&client);
         assert_eq!(miner.pending_transactions().len(), 1);
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
         assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
@@ -1969,7 +1964,7 @@ mod tests {
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
         assert_eq!(miner.pending_receipts(best_block).len(), 0);
         // This method will let us know if pending block was created (before calling that method)
-        assert!(miner.prepare_work_sealing(&client, &None));
+        assert!(miner.prepare_work_sealing(&client));
     }
 
     #[test]
@@ -2002,7 +1997,7 @@ mod tests {
         assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
         assert_eq!(miner.pending_receipts(best_block).len(), 0);
-        assert!(miner.prepare_work_sealing(&client, &None));
+        assert!(miner.prepare_work_sealing(&client));
 
         client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
 
@@ -2234,7 +2229,7 @@ mod tests {
             .pop()
             .unwrap()
             .unwrap();
-        assert!(miner.prepare_work_sealing(&client, &None));
+        assert!(miner.prepare_work_sealing(&client));
         // Unless asked to prepare work.
         assert!(miner.requires_reseal(1u8.into()));
     }

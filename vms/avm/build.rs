@@ -28,47 +28,55 @@ fn main() {
     // build avm library
     let status = Command::new("make")
         .arg("-C")
-        .arg("libs/avmjni/native")
+        .arg("libs/native_loader/native")
         .arg(format!("{}={}", "OUTDIR", outdir))
         .arg(profile.clone())
         .status()
-        .expect("failed to build jni library");
+        .expect("failed to build native loader library");
 
     if !status.success() {
-        panic!("build native jni library failed");
+        panic!("build native library failed");
+    }
+
+    if !Command::new("ant")
+        .arg("-f")
+        .arg("libs/native_loader/build.xml")
+        .status()
+        .expect("failed to build native loader")
+        .success()
+    {
+        panic!("failed to build avm native loader");
+    }
+
+    if !Command::new("ant")
+        .arg("-f")
+        .arg("libs/version/build.xml")
+        .status()
+        .expect("failed to build avm version provider")
+        .success()
+    {
+        panic!("failed to build avm version provider");
     }
 
     println!("cargo:rustc-link-search=native={}", outdir);
 
     // NOTE: build jni jar package
-    Command::new("ant")
+    if !Command::new("ant")
         .arg("-f")
-        .arg("libs/avmjni/build.xml")
+        .arg("libs/avmjni_v1/build.xml")
         .status()
-        .expect("failed to build jni jar");
-
-    //println!("cargo:rustc-link-lib=avmjni");
-
-    // fetch jni jar
-    // let mut jni_jar_path = env!("CARGO_MANIFEST_DIR").to_string();
-    // jni_jar_path.extend("/libs/aion_vm/org-aion-avm-jni.jar".chars());
-    // println!("{:?}", jni_jar_path);
-    // Command::new("wget")
-    //         .arg("https://github.com/aion-camus/rust_avm/releases/download/v0.5.0/org-aion-avm-jni.jar")
-    //         .args(["-O", &jni_jar_path].iter())
-    //         .status()
-    //         .expect("fetch jni jar error");
-
-    // // fetch avm libs
-    // Command::new("wget")
-    //         .arg("https://github.com/aionnetwork/AVM/archive/1.0.tar.gz")
-    //         .args(["-O", "/tmp/avm.tar.gz"].iter())
-    //         .status()
-    //         .expect("fetch AVM error");
-
-    // // unpack avm package and put the jars in libs dir
-    // Command::new("tar")
-    // .arg("-xvf")
-    // .arg("/tmp/avm.tar.gz")
-    // .args(["-C", "/tmp/"].iter());
+        .expect("failed to build jni v1 jar")
+        .success()
+    {
+        panic!("build jni v1 failed");
+    }
+    if !Command::new("ant")
+        .arg("-f")
+        .arg("libs/avmjni_v2/build.xml")
+        .status()
+        .expect("failed to build jni v2 jar")
+        .success()
+    {
+        panic!("build jni v2 failed");
+    }
 }

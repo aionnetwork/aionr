@@ -38,6 +38,7 @@ pub trait Factory {
         params: Vec<ActionParams>,
         ext: &mut Ext,
         is_local: bool,
+        unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>;
 }
 
@@ -62,6 +63,7 @@ impl Factory for FastVMFactory {
         params: Vec<ActionParams>,
         ext: &mut Ext,
         _is_local: bool,
+        _unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>
     {
         assert!(params.len() == 1);
@@ -191,7 +193,6 @@ impl Factory for FastVMFactory {
 const AVM_CREATE: i32 = 3;
 const AVM_CALL: i32 = 0;
 const AVM_BALANCE_TRANSFER: i32 = 4;
-// const AVM_GARBAGE_COLLECTION: i32 = 5;
 
 #[derive(Clone)]
 pub struct AVMFactory {
@@ -212,9 +213,12 @@ impl Factory for AVMFactory {
         params: Vec<ActionParams>,
         ext: &mut Ext,
         is_local: bool,
+        unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>
     {
         let mut avm_tx_contexts = Vec::new();
+
+        let mut version = 0;
 
         for params in params {
             assert!(
@@ -269,6 +273,14 @@ impl Factory for AVMFactory {
             }
             let nonce = params.nonce;
 
+            match unity_update {
+                Some(ref n) if &block_number > n => {
+                    // println!("start avm v2");
+                    version = 1;
+                }
+                _ => {}
+            }
+
             avm_tx_contexts.push(AVMTxContext::new(
                 tx_hash,
                 address,
@@ -291,7 +303,8 @@ impl Factory for AVMFactory {
 
         let inst = &mut self.instance;
         let ext_ptr: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(ext)) };
-        let mut res = inst.execute(ext_ptr as i64, &avm_tx_contexts, is_local);
+
+        let mut res = inst.execute(ext_ptr as i64, version, &avm_tx_contexts, is_local);
 
         let mut exec_results = Vec::new();
 

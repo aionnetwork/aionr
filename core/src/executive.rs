@@ -265,7 +265,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         }
 
         let mut substates = vec![Substate::new(); vm_params.len()];
-        let results = self.exec_avm(vm_params, &mut substates.as_mut_slice(), is_local_call);
+        let results = self.exec_avm(
+            vm_params,
+            &mut substates.as_mut_slice(),
+            is_local_call,
+            self.machine.params().unity_update,
+        );
 
         self.avm_finalize(txs, substates.as_slice(), results)
     }
@@ -275,6 +280,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         params: Vec<ActionParams>,
         unconfirmed_substate: &mut [Substate],
         is_local_call: bool,
+        unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>
     {
         let local_stack_size = ::io::LOCAL_STACK_SIZE.with(|sz| sz.get());
@@ -305,7 +311,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let mut ext = self.as_avm_externalities(unconfirmed_substate, tx.clone());
             //TODO: make create/exec compatible with fastvm
             let vm = vm_factory.create(VMType::AVM);
-            return vm.exec(params, &mut ext, is_local_call);
+            return vm.exec(params, &mut ext, is_local_call, unity_update);
         }
 
         //Start in new thread with stack size needed up to max depth
@@ -323,7 +329,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 ))
                 .spawn(move || {
                     let vm = vm_factory.create(VMType::AVM);
-                    vm.exec(params, &mut ext, is_local_call)
+                    vm.exec(params, &mut ext, is_local_call, unity_update)
                 })
                 .expect("Sub-thread creation cannot fail; the host might run out of resources; qed")
         })
@@ -353,14 +359,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         // 2. Check gas limit
         // 2.1 Gas limit should not be less than the basic gas requirement
-        let mut base_gas_required: U256 = t.gas_required();
+        let base_gas_required: U256 = t.gas_required();
         if t.gas < base_gas_required {
-            // return Err(From::from(ExecutionError::NotEnoughBaseGas {
-            //     required: base_gas_required,
-            //     got: t.gas,
-            // }));
-            // WORKAROUND: let this tx get into vm with gas = 0, aionj specific
-            base_gas_required = t.gas;
+            return Err(From::from(ExecutionError::NotEnoughBaseGas {
+                required: base_gas_required,
+                got: t.gas,
+            }));
         }
         debug!(target: "vm", "base_gas_required = {}", base_gas_required);
 
@@ -492,7 +496,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             let vm = vm_factory.create(VMType::FastVM);
             // fastvm local call flag is unused
             return vm
-                .exec(vec![params], &mut ext, false)
+                .exec(vec![params], &mut ext, false, None)
                 .first()
                 .unwrap()
                 .clone();
@@ -516,7 +520,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 ))
                 .spawn(move || {
                     let vm = vm_factory.create(VMType::FastVM);
-                    vm.exec(vec![params], &mut ext, false)
+                    vm.exec(vec![params], &mut ext, false, None)
                         .first()
                         .unwrap()
                         .clone()
@@ -693,7 +697,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         let mut unconfirmed_substates = vec![Substate::new(); params.len()];
 
-        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice(), false);
+        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice(), false, None);
 
         res
     }
@@ -709,7 +713,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         let mut unconfirmed_substates = vec![Substate::new(); params.len()];
 
-        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice(), false);
+        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice(), false, None);
 
         println!("{:?}", unconfirmed_substates);
 
