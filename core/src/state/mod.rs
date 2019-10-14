@@ -502,7 +502,7 @@ impl<B: Backend> State<B> {
             a.as_ref().map_or(None, |a| a.objectgraph().clone())
         });
 
-        debug!(target: "vm", "get object graph of: {:?} = {:?}", a, ret);
+        debug!(target: "vm", "get object graph of: {:?}", a);
 
         return ret;
     }
@@ -534,7 +534,7 @@ impl<B: Backend> State<B> {
             a.as_ref().map_or(None, |a| a.transformed_code().clone())
         });
 
-        debug!(target: "vm", "get transformed code of: {:?} = {:?}", a, ret);
+        debug!(target: "vm", "get transformed code of: {:?}", a);
 
         return ret;
     }
