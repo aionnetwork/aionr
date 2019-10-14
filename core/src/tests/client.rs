@@ -91,7 +91,9 @@ fn client_check_vote() {
     .unwrap();
 
     assert_eq!(
-        client.get_stake(&H256::default(), None).unwrap(),
+        client
+            .get_stake(&H256::default(), Address::default())
+            .unwrap(),
         0u64.into()
     );
 }

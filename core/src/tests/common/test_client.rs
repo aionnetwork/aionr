@@ -502,11 +502,11 @@ impl BlockChainClient for TestBlockChainClient {
         Ok(res)
     }
 
-    fn get_stake(&self, _pk: &H256, _a: Option<Address>) -> Option<BigUint> {
+    fn get_stake(&self, _pk: &H256, _a: Address) -> Option<BigUint> {
         Some(BigUint::from(10000u32))
     }
 
-    fn get_coinbase(&self, _pk: &H256) -> Option<Address> { None }
+    fn get_coinbase(&self, _address: Address) -> Option<Address> { None }
 
     fn estimate_gas(&self, _t: &SignedTransaction, _block: BlockId) -> Result<U256, CallError> {
         Ok(21000.into())
