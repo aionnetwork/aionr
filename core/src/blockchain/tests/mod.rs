@@ -341,10 +341,20 @@ fn test_small_fork() {
     bc.commit();
     db.write(batch).unwrap();
     assert_eq!(bc.block_hash(3).unwrap(), b3b_hash);
+    assert_eq!(bc.beacon_list(&genesis_hash).unwrap(), 0);
+    assert_eq!(bc.beacon_list(&b1_hash).unwrap(), 1);
+    assert_eq!(bc.beacon_list(&b2_hash).unwrap(), 2);
+    assert_eq!(bc.beacon_list(&b3b_hash).unwrap(), 3);
+
     let mut batch = DBTransaction::new();
     let ir3a = bc.insert_block(&mut batch, &b3a.last().encoded(), vec![]);
     bc.commit();
     db.write(batch).unwrap();
+    assert_eq!(bc.beacon_list(&genesis_hash).unwrap(), 0);
+    assert_eq!(bc.beacon_list(&b1_hash).unwrap(), 1);
+    assert_eq!(bc.beacon_list(&b2_hash).unwrap(), 2);
+    assert!(bc.beacon_list(&b3b_hash).is_none());
+    assert_eq!(bc.beacon_list(&b3a_hash).unwrap(), 3);
 
     assert_eq!(
         ir1,

@@ -256,12 +256,12 @@ impl TestBlockChainClient {
                     .insert(public_to_address_ed25519(&keypair.public()), U256::one());
                 let tx = Transaction {
                     action: Action::Create,
-                    value: U256::from(100),
+                    value: U256::from(0),
                     value_bytes: Vec::new(),
                     data: "3331600055".from_hex().unwrap(),
                     gas: U256::from(300_000),
                     gas_bytes: Vec::new(),
-                    gas_price: U256::from(200_000_000_000u64),
+                    gas_price: U256::from(0),
                     gas_price_bytes: Vec::new(),
                     nonce: U256::zero(),
                     nonce_bytes: Vec::new(),
@@ -283,28 +283,31 @@ impl TestBlockChainClient {
         parent_hash: H256,
         number: BlockNumber,
         seal_type: SealType,
-    ) -> RlpStream
+    ) -> (H256, RlpStream)
     {
         let header = self.generate_header(diff, parent_hash, number, seal_type);
         let txs = self.generate_txs(with);
+        let hash = header.hash();
 
         let mut rlp = RlpStream::new_list(2);
         rlp.append(&header);
         rlp.append_raw(&txs, 1);
-        rlp
+        (hash, rlp)
     }
 
     /// Add blocks to test client.
     pub fn add_blocks(&self, count: usize, with: EachBlockWith, seal_type: SealType) {
         let len = self.numbers.read().len();
         for n in len..(len + count) {
-            let block_rlp = self.generate_block_rlp(
-                with.clone(),
-                n.into(),
-                self.last_hash.read().clone(),
-                n as BlockNumber,
-                seal_type.clone(),
-            );
+            let block_rlp = self
+                .generate_block_rlp(
+                    with.clone(),
+                    n.into(),
+                    self.last_hash.read().clone(),
+                    n as BlockNumber,
+                    seal_type.clone(),
+                )
+                .1;
             self.import_block(block_rlp.as_raw().to_vec()).unwrap();
         }
     }
@@ -469,6 +472,7 @@ impl MiningBlockChainClient for TestBlockChainClient {
         if let Some(b) = self.blocks.read().get(&hash) {
             let num = BlockView::new(b).header_view().number();
             if let Some(h) = self.block_hash(BlockId::Number(num)) {
+                println!("canon:{}", h);
                 if h == *hash {
                     return Some(num);
                 }
@@ -686,13 +690,17 @@ impl BlockChainClient for TestBlockChainClient {
             .map(encoded::Header::new)
     }
 
-    fn block_number(&self, _id: BlockId) -> Option<BlockNumber> {
-        //        let hash = match  Self::block_hash(self, id){
-        //            Some(hash) => hash,
-        //            None => return None
-        //        };
-        //        Some(BlockView::new(&self.blocks.read().get(hash).unwrap()).header_view().number())
-        Some(9)
+    fn block_number(&self, id: BlockId) -> Option<BlockNumber> {
+        let hash = match Self::block_hash(self, id) {
+            Some(hash) => hash,
+            None => return None,
+        };
+        Some(
+            BlockView::new(&self.blocks.read().get(&hash).unwrap())
+                .header_view()
+                .number(),
+        )
+        //        Some(11)
     }
 
     fn block_body(&self, id: BlockId) -> Option<encoded::Body> {

@@ -939,15 +939,13 @@ impl Client {
             batch.delete(::db::COL_HEADERS, &hash);
             batch.delete(::db::COL_BODIES, &hash);
             // delete col_extra
+            // TODO: delete block blooms ?
             let mut key_blk_detail = H264::default();
             let mut key_blk_recipts = H264::default();
-            let mut key_beacon_list = H264::default();
             key_blk_detail[0] = 0u8;
             key_blk_recipts[0] = 4u8;
-            key_beacon_list[0] = 5u8;
             (*key_blk_detail)[1..].clone_from_slice(&hash);
             (*key_blk_recipts)[1..].clone_from_slice(&hash);
-            (*key_beacon_list)[1..].clone_from_slice(&hash);
             let mut blk_number = [0u8; 5];
             blk_number[0] = 1u8;
             blk_number[1] = (blk >> 24) as u8;
@@ -958,7 +956,6 @@ impl Client {
             batch.delete(::db::COL_EXTRA, &key_blk_detail);
             batch.delete(::db::COL_EXTRA, &key_blk_recipts);
             batch.delete(::db::COL_EXTRA, &blk_number);
-            batch.delete(::db::COL_EXTRA, &key_beacon_list);
             let header = self
                 .chain
                 .read()
