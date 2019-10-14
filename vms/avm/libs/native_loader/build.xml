@@ -34,14 +34,14 @@
             </classpath>
         </javac>
 
-        <mkdir dir="${test.classes.dir}"/>
+        <!-- <mkdir dir="${test.classes.dir}"/>
         <javac includeantruntime="false" destdir="${test.classes.dir}">
             <src path="${test.dir}"/>
             <classpath>
                 <path refid="avm-classpath"/>
                 <pathelement location="${main.classes.dir}"/>
             </classpath>
-        </javac>
+        </javac> -->
 
         <!-- <exec executable="make">
           <arg line="-C native"></arg>
