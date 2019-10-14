@@ -300,8 +300,10 @@ impl Miner {
             Some(b) => {
                 if b.header().timestamp() <= timestamp_now {
                     let seal = b.header().seal();
-                    let stake = client
-                        .get_stake(&b.header().get_pk_of_pos().unwrap_or(H256::default()), None);
+                    let stake = client.get_stake(
+                        &b.header().get_pk_of_pos().unwrap_or(H256::default()),
+                        b.header().author().clone(),
+                    );
                     let parent = client
                         .block_header_data(b.header().parent_hash())
                         .expect("New block must have parent."); //TODO-Unity: handle as result error
@@ -356,12 +358,14 @@ impl Miner {
             .expect("Internal staker is null. Should have checked before.");
         let sk: [u8; 64] = staker.secret().0;
         let pk: [u8; 32] = staker.public().0;
-        // let address: Address = staker.address();
+        let coinbase: Address = client
+            .get_coinbase(staker.address())
+            .unwrap_or(Address::default());
 
         // 1. Get the stake. Stop proceeding if stake is 0.
         // internal staker's coinbase is himself
         let stake: BigUint = client
-            .get_stake(&pk.into(), None)
+            .get_stake(&pk.into(), coinbase)
             .unwrap_or(BigUint::from(0u32));
 
         if stake == BigUint::from(0u32) {
@@ -421,6 +425,7 @@ impl Miner {
                     &best_block_header.decode(),
                     grand_parant.map(|header| header.decode()).as_ref(),
                     stake,
+                    coinbase,
                 )
                 .err()
             {
@@ -442,18 +447,18 @@ impl Miner {
         parent: &Header,
         grand_parant: Option<&Header>,
         stake: BigUint,
+        coinbase: Address,
     ) -> Result<(), Error>
     {
         trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
 
-        let coinbase = client.get_coinbase(&pk.clone().into());
         // 1. Create a block with transactions
         let (raw_block, _): (ClosedBlock, Option<H256>) = self
             .prepare_block(
                 client,
                 &Some(SealType::PoS),
                 Some(timestamp),
-                coinbase,
+                Some(coinbase),
                 Some(&seed),
             )
             .or_else(|()| {
@@ -1472,11 +1477,7 @@ impl MinerService for Miner {
             return None;
         }
 
-        //WARN: if coinbase is not found, send reward to black hole: full zero address
-        // let coinbase = client.get_coinbase(&pk);
-        let stake = client
-            .get_stake(&pk, Some(coinbase))
-            .unwrap_or(BigUint::zero());
+        let stake = client.get_stake(&pk, coinbase).unwrap_or(BigUint::zero());
         if stake.is_zero() {
             return None;
         }
@@ -1548,7 +1549,7 @@ impl MinerService for Miner {
         };
         let grand_parent = client.block_header_data(&parent.parent_hash());
 
-        let stake = client.get_stake(&seal[2][..].into(), None);
+        let stake = client.get_stake(&seal[2][..].into(), block.header().author().clone());
 
         debug!(target: "miner", "start sealing");
 
@@ -1726,10 +1727,14 @@ impl MinerService for Miner {
     {
         // This rule only applies after unity fork
         if !self.unity_update(client) {
-            return true;
+            if seal_type == &SealType::PoS {
+                false
+            } else {
+                true
+            }
+        } else {
+            seal_type != &client.best_block_header().seal_type().unwrap_or_default()
         }
-
-        seal_type != &client.best_block_header().seal_type().unwrap_or_default()
     }
 }
 

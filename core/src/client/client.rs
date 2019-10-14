@@ -387,7 +387,7 @@ impl Client {
                 grand_parent.clone().map(|header| header.decode()).as_ref(),
                 self.get_stake(
                     &header.get_pk_of_pos().unwrap_or(H256::default()),
-                    Some(header.author().to_owned()),
+                    header.author().to_owned(),
                 ),
             );
             if let Err(e) = verify_pos_result {
@@ -1079,14 +1079,11 @@ impl BlockChainClient for Client {
         Ok(results)
     }
 
-    /// Get coinbase according to signing account's public key
-    fn get_coinbase(&self, spk: &H256) -> Option<Address> {
-        let signing_address = public_to_address_ed25519(&spk);
+    /// Get coinbase address according to staker's identity address
+    fn get_coinbase(&self, address: Address) -> Option<Address> {
         let mut call_data = Vec::new();
-        call_data.append(
-            &mut AbiToken::STRING(String::from("getCoinbaseAddressForSigningAddress")).encode(),
-        );
-        call_data.append(&mut AbiToken::ADDRESS(signing_address.to_owned().into()).encode());
+        call_data.append(&mut AbiToken::STRING(String::from("getCoinbaseAddress")).encode());
+        call_data.append(&mut AbiToken::ADDRESS(address.into()).encode());
         let tx = self.build_fake_transaction(call_data, Action::Call(self.config.stake_contract));
 
         self.call(&tx, Default::default(), BlockId::Latest)
@@ -1103,17 +1100,15 @@ impl BlockChainClient for Client {
 
     // get the staker's vote
     // sa: public key of signing account
-    // ca: coinbase address, Some(v) for imported block validation, otherwise None
-    fn get_stake(&self, spk: &H256, ca: Option<Address>) -> Option<BigUint> {
-        let coinbase = ca.unwrap_or_else(|| self.get_coinbase(spk).unwrap_or(H256::default()));
-
+    // coinbase: coinbase address
+    fn get_stake(&self, spk: &H256, coinbase: Address) -> Option<BigUint> {
         let signing_address = public_to_address_ed25519(spk);
 
         // try to get effective stake
         let mut call_data = Vec::new();
         call_data.append(&mut AbiToken::STRING(String::from("getEffectiveStake")).encode());
         call_data.append(&mut AbiToken::ADDRESS(signing_address.to_owned().into()).encode());
-        call_data.append(&mut AbiToken::ADDRESS(coinbase.to_owned().into()).encode());
+        call_data.append(&mut AbiToken::ADDRESS(coinbase.into()).encode());
         let tx = self.build_fake_transaction(call_data, Action::Call(self.config.stake_contract));
 
         self.call(&tx, Default::default(), BlockId::Latest)

@@ -213,7 +213,7 @@ pub trait BlockChainClient: Sync + Send {
         block: BlockId,
     ) -> Result<Vec<Executed>, CallError>;
 
-    fn get_stake(&self, a: &H256, ca: Option<Address>) -> Option<BigUint>;
+    fn get_stake(&self, a: &H256, ca: Address) -> Option<BigUint>;
 
     /// Estimates how much gas will be necessary for a call.
     fn estimate_gas(&self, t: &SignedTransaction, block: BlockId) -> Result<U256, CallError>;
@@ -299,8 +299,9 @@ pub trait BlockChainClient: Sync + Send {
 
     // Like `call`, but with various defaults. Designed to be used for calling contracts.
     //fn call_contract(&self, id: BlockId, address: Address, data: Bytes) -> Result<Bytes, String>;
-    /// Aion Unity helper function, get coinbase according to signing account
-    fn get_coinbase(&self, spk: &H256) -> Option<Address>;
+
+    /// Aion Unity helper function, get coinbase according to staker's identity address
+    fn get_coinbase(&self, address: Address) -> Option<Address>;
 }
 
 /// Extended client interface used for mining
