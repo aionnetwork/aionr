@@ -26,16 +26,16 @@ fn main() {
     let outdir: String = env::var("OUT_DIR").unwrap();
     let profile = env::var("PROFILE").unwrap();
     // build avm library
-    let status = Command::new("make")
+    if !Command::new("make")
         .arg("-C")
         .arg("libs/native_loader/native")
         .arg(format!("{}={}", "OUTDIR", outdir))
         .arg(profile.clone())
         .status()
-        .expect("failed to build native loader library");
-
-    if !status.success() {
-        panic!("build native library failed");
+        .expect("failed to build native loader library")
+        .success()
+    {
+        panic!("build native loader failed");
     }
 
     if !Command::new("ant")

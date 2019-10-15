@@ -462,7 +462,7 @@ pub extern fn avm_get_objectgraph(handle: *const c_void, address: *const avm_add
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
 
-    debug!(target: "vm", "avm_get_transformed_code: 0x{:?}", addr);
+    debug!(target: "vm", "avm_get_objectgraph: 0x{:?}", addr);
 
     match ext.get_objectgraph(addr) {
         None => unsafe { new_null_bytes() },

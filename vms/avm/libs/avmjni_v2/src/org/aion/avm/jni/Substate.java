@@ -22,8 +22,8 @@ public class Substate implements IExternalState {
     /// cached object graph
     private final HashMap<AionAddress, byte[]> objectGraphs;
     /// storage keys and values
-    private final HashMap<AionAddress, HashSet<byte[]>> keys;
-    private final HashMap<byte[], byte[]> values;
+    private final HashMap<AionAddress, HashMap<String, byte[]>> storage;
+    // private final HashMap<byte[], byte[]> values;
     
     /// block info (act as env info)
     private EnvInfo info;
@@ -54,14 +54,25 @@ public class Substate implements IExternalState {
         private long blockNumber;
     }
 
+    private static final char[] HEX_ARRAY = "0123456789ABCDEF".toCharArray();
+    public static String bytesToHex(byte[] bytes) {
+        char[] hexChars = new char[bytes.length * 2];
+        for (int j = 0; j < bytes.length; j++) {
+            int v = bytes[j] & 0xFF;
+            hexChars[j * 2] = HEX_ARRAY[v >>> 4];
+            hexChars[j * 2 + 1] = HEX_ARRAY[v & 0x0F];
+        }
+        return new String(hexChars);
+    }
+
     public Substate(IExternalState parent, boolean isLocal) {
         this.parent = parent;
         this.writeLog = new ArrayList<>();
         this.nonces = new HashMap<>();
         this.balances = new HashMap<>();
         this.objectGraphs = new HashMap<>();
-        this.keys = new HashMap<>();
-        this.values = new HashMap<>();
+        this.storage = new HashMap<>();
+        // this.values = new HashMap<>();
         this.info = new EnvInfo();
         this.isLocalCall = isLocal;
     }
@@ -135,51 +146,46 @@ public class Substate implements IExternalState {
     }
 
     @Override
-    public void putStorage(AionAddress address, byte[] key, byte[] value) {
-        if (Constants.DEBUG) {
-            System.out.printf("JNI: put storage");
-        }
+    public void putStorage(AionAddress address, byte[] _key, byte[] value) {
+        String key = bytesToHex(_key);
         Consumer<IExternalState> write = (kernel) -> {
-            kernel.putStorage(address, key, value);
+            kernel.putStorage(address, _key, value);
         };
         writeLog.add(write);
 
-        HashSet<byte[]> keySet = this.keys.get(address);
-        if (keySet == null) {
-            this.keys.put(address, new HashSet<>());
-            this.keys.get(address).add(key);
-            this.values.put(key, value);
+
+        HashMap<String, byte[]> account_storage = this.storage.get(address);
+        if (account_storage == null) {
+            this.storage.put(address, new HashMap<>());
+            this.storage.get(address).put(key, value);
         } else {
             // key set is not null but the key is not found
-            keySet.add(key);
-            this.values.put(key, value);
+            account_storage.put(key, value);
         }
-
-        
     }
 
     @Override
-    public byte[] getStorage(AionAddress address, byte[] key) {
-        if (Constants.DEBUG) {
-            System.out.printf("JNI: get storage");
-        }
-
+    public byte[] getStorage(AionAddress address, byte[] _key) {
+        String key = bytesToHex(_key);
         byte[] value;
-        HashSet<byte[]> localKeys = this.keys.get(address);
-        if (null == localKeys) {
-            value = this.parent.getStorage(address, key);
-            this.keys.put(address, new HashSet<>());
-            this.keys.get(address).add(key);
-            this.values.put(key, value);
+        HashMap<String, byte[]> account_storage = this.storage.get(address);
+        if (null == account_storage) {
+            value = this.parent.getStorage(address, _key);
+            // this.keys.put(address, new HashSet<>());
+            // this.keys.get(address).add(key);
+            // this.values.put(key, value);
+            this.storage.put(address, new HashMap<>());
+            this.storage.get(address).put(key, value);
         } else {
             // has local keys
-            if (localKeys.contains(key)) {
-                value = this.values.get(key);
+            if (account_storage.containsKey(key)) {
+                value = account_storage.get(key);
             } else {
-                value = this.parent.getStorage(address, key);
+                value = this.parent.getStorage(address, _key);
                 // key/value always update together
-                localKeys.add(key);
-                this.values.put(key, value);
+                // localKeys.add(key);
+                // this.values.put(key, value);
+                account_storage.put(key, value);
             }
         }
 

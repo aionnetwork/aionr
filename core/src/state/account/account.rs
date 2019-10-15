@@ -710,35 +710,37 @@ impl VMAccount for AionVMAccount {
             return;
         }
 
-        if self.is_cached() && self.is_transformed_cached() {
-            return;
-        }
+        // if self.is_cached() && self.is_transformed_cached() {
+        //     return;
+        // }
 
         // println!("Account: update code cache");
         // if there's already code in the global cache, always cache it localy
-        let hash = self.code_hash();
-        match state_db.get_cached_code(&hash) {
-            Some(code) => {
-                self.cache_given_code(code);
-            }
-            None => {
-                match require {
-                    RequireCache::None => {}
-                    RequireCache::Code => {
-                        if let Some(code) = self.cache_code(db) {
-                            // propagate code loaded from the database to
-                            // the global code cache.
-                            state_db.cache_code(hash, code)
+        if !self.is_cached() {
+            let hash = self.code_hash();
+            match state_db.get_cached_code(&hash) {
+                Some(code) => {
+                    self.cache_given_code(code);
+                }
+                None => {
+                    match require {
+                        RequireCache::None => {}
+                        RequireCache::Code => {
+                            if let Some(code) = self.cache_code(db) {
+                                // propagate code loaded from the database to
+                                // the global code cache.
+                                state_db.cache_code(hash, code)
+                            }
                         }
-                    }
-                    RequireCache::CodeSize => {
-                        self.cache_code_size(db);
+                        RequireCache::CodeSize => {
+                            self.cache_code_size(db);
+                        }
                     }
                 }
             }
         }
 
-        if self.account_type == AccType::AVM {
+        if self.account_type == AccType::AVM && !self.is_transformed_cached() {
             // update transformed code cache
             let hash = blake2b(self.address_hash.get().unwrap());
             match state_db.get_cached_code(&hash) {

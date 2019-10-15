@@ -165,8 +165,10 @@ public class NativeTransactionExecutor {
             }
 
             AvmConfiguration config = new AvmConfiguration();
-            if (Constants.DEBUG)
+            if (Constants.DEBUG) {
+                config.enableVerboseContractErrors = true;
                 config.enableVerboseConcurrentExecutor = true;
+            }
             AionCapabilitiesV2 cap = new AionCapabilitiesV2();
             AvmImpl avm = CommonAvmFactory.buildAvmInstanceForConfiguration(cap, config);
             FutureResult[] futures = avm.run(substate, contexts, ExecutionType.ASSUME_MAINCHAIN, blockNumber-1);
