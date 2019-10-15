@@ -14,7 +14,7 @@
 		"maximumExtraDataSize": "0x20",
 		"minGasLimit": "0x100590",
         "monetaryPolicyUpdate": "0",
-        "unityUpdate": "82200",
+        "unityUpdate": "210",
     	"unityPoSInitialDifficulty": "2000000000"
 	},
 	"genesis": {
@@ -28,7 +28,7 @@
 		"author": "0xa00e7d012e80e11c75968ffc7657c81a116029cf1d8925f7a6e52580e26d865f",
 		"timestamp": "1567110000",
 		"parentHash": "0x10e71bf64dcb8c60766ccb491ab6e3acec1ab07d0d5a088fcf533cbfbc801295",
-		"extraData": "0x000000000000000000000000000000000000000000000000000000000000001e",
+		"extraData": "0x000000000000000000000000000000000000000000000000000000000000001c",
 		"gasLimit": "0xE4E1C0"
 	},
 	"accounts": {
