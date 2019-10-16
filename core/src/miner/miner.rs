@@ -281,23 +281,27 @@ impl Miner {
     }
 
     pub fn invoke_pos_interval(&self, client: &MiningBlockChainClient) {
-        // let chain_best_block = client
-        //     .best_block_header()
-        //     .map(|header| header.decode());
-
         // compete with import_lock, if another is imported, block will be None, or else try importing pending_best
         let block = {
             let mut pending_best = self.best_pos.lock();
             pending_best.clone()
         };
 
-        let timestamp_now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
         match block {
             Some(sealed) => {
+                // Check if the block is still fresh
+                let best_hash = client.chain_info().best_block_hash;
+                let parent_hash = sealed.header().parent_hash().clone();
+                if best_hash != parent_hash {
+                    return;
+                }
+
+                // Check if it's time to import the block
+                let timestamp_now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+
                 if sealed.header().timestamp() <= timestamp_now {
                     let n = sealed.header().number();
                     let d = sealed.header().difficulty().clone();
