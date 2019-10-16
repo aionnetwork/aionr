@@ -388,6 +388,7 @@ impl Client {
                 self.get_stake(
                     &header.get_pk_of_pos().unwrap_or(H256::default()),
                     header.author().to_owned(),
+                    BlockId::Hash(header.parent_hash().clone()),
                 ),
             );
             if let Err(e) = verify_pos_result {
@@ -1101,7 +1102,7 @@ impl BlockChainClient for Client {
     // get the staker's vote
     // sa: public key of signing account
     // coinbase: coinbase address
-    fn get_stake(&self, spk: &H256, coinbase: Address) -> Option<BigUint> {
+    fn get_stake(&self, spk: &H256, coinbase: Address, id: BlockId) -> Option<BigUint> {
         let signing_address = public_to_address_ed25519(spk);
 
         // try to get effective stake
@@ -1111,12 +1112,10 @@ impl BlockChainClient for Client {
         call_data.append(&mut AbiToken::ADDRESS(coinbase.into()).encode());
         let tx = self.build_fake_transaction(call_data, Action::Call(self.config.stake_contract));
 
-        self.call(&tx, Default::default(), BlockId::Latest)
-            .ok()
-            .map(|executed| {
-                let mut decoder = AVMDecoder::new(executed.output);
-                decoder.decode_one_bigint().unwrap_or(BigUint::zero())
-            })
+        self.call(&tx, Default::default(), id).ok().map(|executed| {
+            let mut decoder = AVMDecoder::new(executed.output);
+            decoder.decode_one_bigint().unwrap_or(BigUint::zero())
+        })
     }
 
     fn estimate_gas(&self, t: &SignedTransaction, block: BlockId) -> Result<U256, CallError> {

@@ -303,6 +303,7 @@ impl Miner {
                     let stake = client.get_stake(
                         &b.header().get_pk_of_pos().unwrap_or(H256::default()),
                         b.header().author().clone(),
+                        BlockId::Latest,
                     );
                     let parent = client
                         .block_header_data(b.header().parent_hash())
@@ -365,7 +366,7 @@ impl Miner {
         // 1. Get the stake. Stop proceeding if stake is 0.
         // internal staker's coinbase is himself
         let stake: BigUint = client
-            .get_stake(&pk.into(), coinbase)
+            .get_stake(&pk.into(), coinbase, BlockId::Latest)
             .unwrap_or(BigUint::from(0u32));
 
         if stake == BigUint::from(0u32) {
@@ -1477,7 +1478,9 @@ impl MinerService for Miner {
             return None;
         }
 
-        let stake = client.get_stake(&pk, coinbase).unwrap_or(BigUint::zero());
+        let stake = client
+            .get_stake(&pk, coinbase, BlockId::Latest)
+            .unwrap_or(BigUint::zero());
         if stake.is_zero() {
             return None;
         }
@@ -1549,7 +1552,11 @@ impl MinerService for Miner {
         };
         let grand_parent = client.block_header_data(&parent.parent_hash());
 
-        let stake = client.get_stake(&seal[2][..].into(), block.header().author().clone());
+        let stake = client.get_stake(
+            &seal[2][..].into(),
+            block.header().author().clone(),
+            BlockId::Latest,
+        );
 
         debug!(target: "miner", "start sealing");
 

@@ -213,7 +213,7 @@ pub trait BlockChainClient: Sync + Send {
         block: BlockId,
     ) -> Result<Vec<Executed>, CallError>;
 
-    fn get_stake(&self, a: &H256, ca: Address) -> Option<BigUint>;
+    fn get_stake(&self, a: &H256, ca: Address, block_id: BlockId) -> Option<BigUint>;
 
     /// Estimates how much gas will be necessary for a call.
     fn estimate_gas(&self, t: &SignedTransaction, block: BlockId) -> Result<U256, CallError>;
