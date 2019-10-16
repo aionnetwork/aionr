@@ -1660,7 +1660,7 @@ impl MinerService for Miner {
         client: &MiningBlockChainClient,
         _imported: &[H256],
         _invalid: &[H256],
-        _enacted: &[H256],
+        enacted: &[H256],
         retracted: &[H256],
     )
     {
@@ -1711,9 +1711,12 @@ impl MinerService for Miner {
             }
         }
 
-        self.transaction_pool.record_transaction_sealed();
-        self.clear_pos_pending();
-        client.new_block_chained();
+        // Actions to do when new block imported in the main chain
+        if !enacted.is_empty() {
+            self.transaction_pool.record_transaction_sealed();
+            self.clear_pos_pending();
+            client.new_block_chained();
+        }
     }
 
     // AION 2.0
