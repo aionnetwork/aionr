@@ -339,7 +339,7 @@ impl rlp::Decodable for UnverifiedTransaction {
                 transaction_type: {
                     let transaction_type_vec = d.val_at::<Vec<u8>>(7)?;
                     if transaction_type_vec.len() == 0 {
-                        0u8.into()
+                        1u8.into()
                     } else {
                         transaction_type_vec[0].into()
                     }

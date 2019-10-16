@@ -505,7 +505,7 @@ impl BlockChainClient for TestBlockChainClient {
         Ok(res)
     }
 
-    fn get_stake(&self, _pk: &H256, _a: Address) -> Option<BigUint> {
+    fn get_stake(&self, _pk: &H256, _a: Address, _block_id: BlockId) -> Option<BigUint> {
         Some(BigUint::from(10000u32))
     }
 
