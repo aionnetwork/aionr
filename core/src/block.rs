@@ -212,6 +212,7 @@ pub struct LockedBlock {
 /// A block that has a valid seal.
 ///
 /// The block's header has valid seal arguments. The block cannot be reversed into a `ClosedBlock` or `OpenBlock`.
+#[derive(Clone)]
 pub struct SealedBlock {
     block: ExecutedBlock,
 }
