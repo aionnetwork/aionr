@@ -37,7 +37,6 @@ use futures::sync::oneshot::Sender;
 use std::sync::Mutex;
 
 const EMPTY_ID: &str = "00000000-0000-0000-0000-000000000000";
-const EMPTY_ID_0: &str = "000000000000000000000000000000000000";
 
 pub const HEADER_LENGTH: usize = 8;
 pub const NODE_ID_LENGTH: usize = 36;
@@ -142,14 +141,7 @@ impl Node {
     pub fn get_hash(&self) -> u64 {
         let mut ip: String = self.addr.get_ip();
         let id: String = self.get_id_string();
-        if id.ne(EMPTY_ID_0) {
-            ip.push_str(&id);
-        }
-        calculate_hash(&ip)
-    }
-
-    pub fn get_ip_hash(&self) -> u64 {
-        let ip: String = self.addr.get_ip();
+        ip.push_str(&id);
         calculate_hash(&ip)
     }
 
@@ -266,22 +258,11 @@ impl TempNode {
     }
 
     pub fn get_hash(&self) -> u64 {
-        let ip = self.addr.get_ip();
-        // let list = vec![String::from(from_utf8(&self.id).unwrap()), ip];
-        // let text = list.join("").to_string();
-        // calculate_hash(&text)
-        let hash: u64 = calculate_hash(&ip);
-        trace!(target: "p2p", "temp_node/get_hash: {}", &hash);
-        hash
+        let mut ip: String = self.addr.get_ip();
+        let id: String = self.get_id_string();
+        ip.push_str(&id);
+        calculate_hash(&ip)
     }
-
-    // filter out incoming connection
-    // pub fn get_blank_id_hash(&self) -> u64 {
-    //     let ip = self.addr.get_ip();
-    //     let list = vec![String::from(EMPTY_ID), ip];
-    //     let text = list.join("").to_string();
-    //     calculate_hash(&text)
-    // }
 
     pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
 
@@ -340,7 +321,7 @@ mod node_tests {
     use TempNode;
 
     #[test]
-    fn parse_seed_test() {
+    fn test_parse_seed() {
         let node_str = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303".to_string();
         let tn = TempNode::new_from_str(node_str);
         assert_eq!(tn.addr.to_string(), "0.0.0.0:30303".to_string());

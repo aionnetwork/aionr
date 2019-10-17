@@ -83,8 +83,7 @@ pub fn send(p2p: Mgr, hash: u64) {
 /// 1. decode handshake msg
 /// 2. validate and prove incoming connection to active
 /// 3. acknowledge sender if it is proved
-/// 4. param hash in this function is hash of ip, after handshake, 
-///    we need to update key as hash(ip + id)
+/// 4. update new hash
 pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     debug!(target: "p2p", "handshake/receive_req");
 
@@ -118,9 +117,9 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
             } else {
                 node.revision[0..revision_len].copy_from_slice(revision);
             }
-            let mut tx = node.tx.clone();
+            let mut tx = node.tx.clone(); 
             write.insert(node.get_hash(), node);
-
+            
             let mut cb_out =
                 channel_buffer_template_with_version(cb_in.head.ver, Action::HANDSHAKERES.value());;
             let mut res_body = Vec::new();
@@ -140,7 +139,7 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
                 }
             }
         }
-    }
+    } 
 }
 
 /// 1. decode handshake res msg
@@ -155,13 +154,13 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
 
     if let Ok(mut write) = p2p.nodes.try_write() {
         if let Some(mut node) = write.get_mut(&hash) {
-            // TODO: math::low
             if revision_len > MAX_REVISION_LENGTH {
                 node.revision[0..MAX_REVISION_LENGTH]
                     .copy_from_slice(&revision_bytes[..MAX_REVISION_LENGTH]);
             } else {
                 node.revision[0..revision_len].copy_from_slice(revision_bytes);
             }
+            
             node.state = STATE::ACTIVE;
         }
     }

@@ -50,7 +50,6 @@ pub fn send(p2p: Mgr) {
 
 pub fn receive_req(p2p: Mgr, hash: u64, version: u16) {
     debug!(target: "p2p", "active_nodes/receive_req");
-
     let mut cb_out = channel_buffer_template_with_version(version, Action::ACTIVENODESRES.value());
     let active_nodes = p2p.get_active_nodes();
     let mut res_body = Vec::new();
@@ -89,7 +88,6 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     let (node_count, mut rest) = cb_in.body.split_at(1);
 
     let nodes_count: u32 = node_count[0] as u32;
-
     if nodes_count > 0 {
         let mut temp_list = Vec::new();
         let (local_ip, _) = p2p.config.get_ip_and_port();

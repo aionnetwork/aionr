@@ -187,7 +187,14 @@ impl Mgr {
     /// send msg
     pub fn send(&self, hash: u64, cb: ChannelBuffer) -> bool {
         let nodes = &self.nodes;
-        trace!(target: "p2p", "send: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
+        trace!(target: "p2p", "send: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", 
+            &hash, 
+            cb.head.ver, 
+            cb.head.ctrl, 
+            cb.head.action, 
+            cb.head.get_route()
+        );
+
         // TODO: need more thoughts on write or try_write
         match nodes.write() {
             Ok(mut lock) => {
@@ -208,6 +215,7 @@ impl Mgr {
                     }
                 } else {
                     warn!(target:"p2p", "send: node not found hash {}", hash);
+                    println!("!!!! send: node not found hash {}\n", hash);
                     return false;
                 }
                 if !send_success {
@@ -330,7 +338,7 @@ impl Mgr {
                                 if let Some(node) = read.get(&hash) {
                                     debug!(target: "p2p", "exist hash/id/ip {}/{}/{}", &hash, node.get_id_string(), node.addr.to_string());
                                     return Ok(());
-                                }
+                                } 
                             },
                             Err(_err) => {
                                 // return if read lock is unable to be rechieved
@@ -383,7 +391,7 @@ impl Mgr {
                                     // binding io futures
                                     let (sink, stream) = split_frame(ts);
                                     let read = stream.for_each(move |cb| {
-                                        p2p_outbound_2.handle(hash.clone(), 0, cb);
+                                        p2p_outbound_2.handle(hash.clone(), cb);
                                         Ok(())
                                     })
                                     .map_err(|err| error!(target: "p2p", "tcp outbound read: {:?}", err))
@@ -475,7 +483,6 @@ impl Mgr {
                     tx_thread,
                 );
                 let hash = node.get_hash();
-                let ip_hash = node.get_ip_hash();
 
                 if let Ok(mut write) = p2p_inbound.nodes.try_write() {
                     let id: String = node.get_id_string();
@@ -490,7 +497,7 @@ impl Mgr {
                 // binding io futures
                 let (sink, stream) = split_frame(ts);
                 let read = stream.for_each(move |cb| {
-                    p2p_inbound_1.handle(hash.clone(), ip_hash, cb);
+                    p2p_inbound_1.handle(hash.clone(), cb);
                     Ok(())
                 })
                 .map_err(|err| error!(target: "p2p", "tcp inbound read: {:?}", err))
@@ -682,8 +689,7 @@ impl Mgr {
 
     /// messages with module code other than p2p module
     /// should flow into external handlers
-    fn handle(&self, hash: u64, ip_hash: u64, cb: ChannelBuffer) {
-        println!("hash {} ip_hash {}", hash, ip_hash);
+    fn handle(&self, hash: u64, cb: ChannelBuffer) {
         let p2p = self.clone();
         debug!(target: "p2p", "handle: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
         // verify if flag token has been set
@@ -703,13 +709,10 @@ impl Mgr {
                     match Module::from(cb.head.ctrl) {
                         Module::P2P => {
                             match Action::from(cb.head.action) {
-                                Action::HANDSHAKEREQ => handshake::receive_req(p2p, ip_hash, cb),
+                                Action::HANDSHAKEREQ => handshake::receive_req(p2p, hash, cb),
                                 Action::HANDSHAKERES => handshake::receive_res(p2p, hash, cb),
-                                Action::ACTIVENODESREQ => {
-                                    active_nodes::receive_req(p2p, hash, cb.head.ver)
-                                }
+                                Action::ACTIVENODESREQ => active_nodes::receive_req(p2p, hash, cb.head.ver),
                                 Action::ACTIVENODESRES => active_nodes::receive_res(p2p, hash, cb),
-                                Action::DISCONNECT => {}
                                 _ => error!(target: "p2p", "invalid action {}", cb.head.action),
                             };
                         }
