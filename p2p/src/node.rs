@@ -37,6 +37,7 @@ use futures::sync::oneshot::Sender;
 use std::sync::Mutex;
 
 const EMPTY_ID: &str = "00000000-0000-0000-0000-000000000000";
+const EMPTY_ID_0: &str = "000000000000000000000000000000000000";
 
 pub const HEADER_LENGTH: usize = 8;
 pub const NODE_ID_LENGTH: usize = 36;
@@ -139,10 +140,17 @@ impl Node {
     }
 
     pub fn get_hash(&self) -> u64 {
-        let ip = self.addr.get_ip();
-        let hash: u64 = calculate_hash(&ip);
-        //        trace!(target: "p2p", "node/get_hash: {}", &hash);
-        hash
+        let mut ip: String = self.addr.get_ip();
+        let id: String = self.get_id_string();
+        if id.ne(EMPTY_ID_0) {
+            ip.push_str(&id);
+        }
+        calculate_hash(&ip)
+    }
+
+    pub fn get_ip_hash(&self) -> u64 {
+        let ip: String = self.addr.get_ip();
+        calculate_hash(&ip)
     }
 
     pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }

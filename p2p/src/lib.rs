@@ -383,7 +383,7 @@ impl Mgr {
                                     // binding io futures
                                     let (sink, stream) = split_frame(ts);
                                     let read = stream.for_each(move |cb| {
-                                        p2p_outbound_2.handle(hash.clone(), cb);
+                                        p2p_outbound_2.handle(hash.clone(), 0, cb);
                                         Ok(())
                                     })
                                     .map_err(|err| error!(target: "p2p", "tcp outbound read: {:?}", err))
@@ -475,10 +475,12 @@ impl Mgr {
                     tx_thread,
                 );
                 let hash = node.get_hash();
+                let ip_hash = node.get_ip_hash();
 
                 if let Ok(mut write) = p2p_inbound.nodes.try_write() {
                     let id: String = node.get_id_string();
                     let binding: String = node.addr.to_string();
+                    println!("wocao {} ", &node.get_hash());
                     if !write.contains_key(&node.get_hash()){
                         if let None = write.insert(node.get_hash(), node) {
                             info!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
@@ -489,7 +491,7 @@ impl Mgr {
                 // binding io futures
                 let (sink, stream) = split_frame(ts);
                 let read = stream.for_each(move |cb| {
-                    p2p_inbound_1.handle(hash.clone(), cb);
+                    p2p_inbound_1.handle(hash.clone(), ip_hash, cb);
                     Ok(())
                 })
                 .map_err(|err| error!(target: "p2p", "tcp inbound read: {:?}", err))
@@ -606,6 +608,7 @@ impl Mgr {
             None
         }
     }
+    
     /// get total nodes count
     pub fn get_statics_info(&self) -> (usize, HashMap<u64, (String, String, String, &str)>) {
         let mut len = 0;
@@ -680,7 +683,8 @@ impl Mgr {
 
     /// messages with module code other than p2p module
     /// should flow into external handlers
-    fn handle(&self, hash: u64, cb: ChannelBuffer) {
+    fn handle(&self, hash: u64, ip_hash: u64, cb: ChannelBuffer) {
+        println!("hash {} ip_hash {}", hash, ip_hash);
         let p2p = self.clone();
         debug!(target: "p2p", "handle: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
         // verify if flag token has been set
@@ -700,7 +704,7 @@ impl Mgr {
                     match Module::from(cb.head.ctrl) {
                         Module::P2P => {
                             match Action::from(cb.head.action) {
-                                Action::HANDSHAKEREQ => handshake::receive_req(p2p, hash, cb),
+                                Action::HANDSHAKEREQ => handshake::receive_req(p2p, ip_hash, cb),
                                 Action::HANDSHAKERES => handshake::receive_res(p2p, hash, cb),
                                 Action::ACTIVENODESREQ => {
                                     active_nodes::receive_req(p2p, hash, cb.head.ver)
