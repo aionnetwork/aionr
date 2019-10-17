@@ -480,7 +480,6 @@ impl Mgr {
                 if let Ok(mut write) = p2p_inbound.nodes.try_write() {
                     let id: String = node.get_id_string();
                     let binding: String = node.addr.to_string();
-                    println!("wocao {} ", &node.get_hash());
                     if !write.contains_key(&node.get_hash()){
                         if let None = write.insert(node.get_hash(), node) {
                             info!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
