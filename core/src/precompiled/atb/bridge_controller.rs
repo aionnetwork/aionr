@@ -395,6 +395,7 @@ impl BridgeController {
             return_data: ReturnData::empty(),
             exception: String::default(),
             state_root: H256::default(),
+            invokable_hashes: Default::default(),
         })
     }
 }

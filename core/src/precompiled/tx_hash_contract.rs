@@ -54,6 +54,7 @@ impl BuiltinContract for TxHashContract {
             return_data: ReturnData::new(tx_hash.to_vec(), 0, tx_hash.len()),
             exception: String::default(),
             state_root: H256::default(),
+            invokable_hashes: Default::default(),
         }
     }
 }

@@ -1,4 +1,4 @@
-package org.aion.avm.utils;
+package org.aion.avm.rlp;
 
 import java.io.Serializable;
 

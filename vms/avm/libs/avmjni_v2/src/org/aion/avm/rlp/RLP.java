@@ -1,18 +1,15 @@
-package org.aion.avm.utils;
+package org.aion.avm.rlp;
 
 import static java.util.Arrays.copyOfRange;
-// import static org.aion.rlp.Utils.asUnsignedByteArray;
-// import static org.aion.rlp.Utils.concatenate;
-// import static org.aion.util.bytes.ByteUtil.byteArrayToInt;
-// import static org.aion.util.bytes.ByteUtil.intToBytesNoLeadZeroes;
-// import static org.aion.util.bytes.ByteUtil.isNullOrZeroArray;
-// import static org.aion.util.bytes.ByteUtil.isSingleZero;
+import org.aion.avm.utils.DecodeResult;
+import org.aion.avm.utils.ByteUtil;
+import org.aion.avm.utils.Hex;
+import org.aion.avm.utils.Value;
+import org.aion.avm.utils.Utils;
 
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.List;
-// import org.aion.util.bytes.ByteUtil;
-// import org.aion.util.conversions.Hex;
 
 /**
  * @author Roman Mandeleil 2014

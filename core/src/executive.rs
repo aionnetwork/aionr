@@ -562,6 +562,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         return_data: ReturnData::empty(),
                         exception: String::from("Error in balance transfer"),
                         state_root: H256::default(),
+                        invokable_hashes: Default::default(),
                     };
                 }
             }
@@ -631,6 +632,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     return_data: ReturnData::empty(),
                     exception: String::from("Not enough gas to execute precompiled contract."),
                     state_root: H256::default(),
+                    invokable_hashes: Default::default(),
                 };
             }
         } else {
@@ -656,6 +658,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     return_data: ReturnData::empty(),
                     exception: String::default(),
                     state_root: H256::default(),
+                    invokable_hashes: Default::default(),
                 };
             }
         }
@@ -678,6 +681,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         return_data: ReturnData::empty(),
                         exception: String::from("Error in balance transfer"),
                         state_root: H256::default(),
+                        invokable_hashes: Default::default(),
                     };
                 }
             }
@@ -753,6 +757,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                          failed.",
                     ),
                     state_root: H256::default(),
+                    invokable_hashes: Default::default(),
                 };
             }
         }
@@ -788,6 +793,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     return_data: ReturnData::empty(),
                     exception: String::from("Error in balance transfer"),
                     state_root: H256::default(),
+                    invokable_hashes: Default::default(),
                 };
             }
             self.state

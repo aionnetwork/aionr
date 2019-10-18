@@ -4,7 +4,7 @@ import java.math.BigInteger;
 import java.util.HashMap;
 import java.util.Map;
 
-class Utils {
+public class Utils {
 
     static final byte[] encodingTable = {
         (byte) '0',
@@ -48,14 +48,14 @@ class Utils {
 
     static final byte TERMINATOR = 16;
 
-    static byte[] concatenate(byte[] a, byte[] b) {
+    public static byte[] concatenate(byte[] a, byte[] b) {
         byte[] ret = new byte[a.length + b.length];
         System.arraycopy(a, 0, ret, 0, a.length);
         System.arraycopy(b, 0, ret, a.length, b.length);
         return ret;
     }
 
-    static byte[] asUnsignedByteArray(BigInteger bi) {
+    public static byte[] asUnsignedByteArray(BigInteger bi) {
         byte[] bytes = bi.toByteArray();
 
         if (bytes[0] == 0) {

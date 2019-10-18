@@ -93,27 +93,38 @@ impl TransactionContext {
 
         enc.to_bytes()
     }
+
+    pub fn tx_hash(&self) -> &Vec<u8> { return &self.transaction_hash; }
 }
 
 #[derive(Debug, Clone)]
 pub struct TransactionResult {
-    pub code: u32,
+    pub status: u32,
     pub return_data: Vec<u8>,
     pub energy_used: u64,
     pub state_root: H256,
+    pub invokable_hashes: Vec<H256>,
 }
 
 impl TransactionResult {
     pub fn new(bytes: Vec<u8>, state_root: Vec<u8>) -> Result<TransactionResult, &'static str> {
         let mut decoder = NativeDecoder::new(&bytes);
-        let code = decoder.decode_int()?;
+        let status = decoder.decode_int()?;
         let return_data = decoder.decode_bytes()?;
         let energy_used = decoder.decode_long()?;
+        let mut invokable_hashes = Vec::new();
+        loop {
+            match decoder.decode_bytes() {
+                Ok(hash) => invokable_hashes.push(hash[..].into()),
+                Err(_) => break,
+            }
+        }
         Ok(TransactionResult {
-            code,
+            status,
             return_data,
             energy_used,
             state_root: state_root.as_slice().into(),
+            invokable_hashes,
         })
     }
 }

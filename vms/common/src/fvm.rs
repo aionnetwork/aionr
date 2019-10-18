@@ -63,9 +63,10 @@ pub struct ExecutionResult {
     pub return_data: ReturnData,
     /// exception / error message (empty if success)
     pub exception: String,
-    // storage root : AVM
-    //pub storage_root: u32,
+    /// state root from avm
     pub state_root: H256,
+    /// invokable transaction hashes from avm
+    pub invokable_hashes: Vec<(H256, H256)>,
 }
 
 impl Default for ExecutionResult {
@@ -76,6 +77,7 @@ impl Default for ExecutionResult {
             return_data: ReturnData::empty(),
             exception: String::new(),
             state_root: H256::default(),
+            invokable_hashes: Vec::new(),
         }
     }
 }

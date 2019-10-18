@@ -91,6 +91,7 @@ impl Factory for FastVMFactory {
                 return_data: ReturnData::empty(),
                 exception: String::default(),
                 state_root: H256::default(),
+                invokable_hashes: Default::default(),
             }];
         }
 
@@ -186,6 +187,7 @@ impl Factory for FastVMFactory {
                 code => code.to_string(),
             },
             state_root: H256::default(),
+            invokable_hashes: Default::default(),
         }]
     }
 }
@@ -316,7 +318,7 @@ impl Factory for AVMFactory {
 
             for index in 0..tx_res.len() {
                 let result = tx_res[index].clone();
-                let mut status_code: AvmStatusCode = (result.code as i32).into();
+                let mut status_code: AvmStatusCode = (result.status as i32).into();
                 let mut gas_left =
                     U256::from(avm_tx_contexts[index].energy_limit - result.energy_used);
                 let return_data = result.return_data;
@@ -330,6 +332,14 @@ impl Factory for AVMFactory {
                         code => code.to_string(),
                     },
                     state_root: result.state_root.clone(),
+                    invokable_hashes: {
+                        let mut invokable_res = Vec::<(H256, H256)>::new();
+                        for hash in result.invokable_hashes {
+                            invokable_res
+                                .push((hash, avm_tx_contexts[index].tx_hash().as_slice().into()));
+                        }
+                        invokable_res
+                    },
                 });
             }
         } else {

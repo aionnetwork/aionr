@@ -71,6 +71,7 @@ fn bytearraymap_test() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -97,6 +98,7 @@ fn bytearraymap_test() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -151,6 +153,7 @@ fn test_create_contract() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params, &mut substate)
@@ -196,6 +199,7 @@ fn fibonacci() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         println!("call executor");
@@ -224,6 +228,7 @@ fn fibonacci() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -251,6 +256,7 @@ fn fibonacci() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -278,6 +284,7 @@ fn fibonacci() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -305,6 +312,7 @@ fn fibonacci() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -342,6 +350,7 @@ fn recursive() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params, &mut substate)
@@ -378,6 +387,7 @@ fn recursive() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -413,6 +423,7 @@ fn recursive() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -448,6 +459,7 @@ fn transfer() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params, &mut substate)
@@ -481,6 +493,7 @@ fn transfer() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -515,6 +528,7 @@ fn transfer() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -549,6 +563,7 @@ fn wallet() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params, &mut substate)
@@ -587,6 +602,7 @@ fn wallet() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -627,6 +643,7 @@ fn test_internal_transactions() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params, &mut substate)
@@ -660,6 +677,7 @@ fn test_internal_transactions() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -691,6 +709,7 @@ fn test_internal_transactions() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -720,6 +739,7 @@ fn test_internal_transactions() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -751,6 +771,7 @@ fn test_internal_transactions() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -985,6 +1006,7 @@ fn error_cases_revert() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params, &mut substate)
@@ -1004,6 +1026,7 @@ fn error_cases_revert() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params, &mut substate)
@@ -1040,6 +1063,7 @@ fn error_cases_revert() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -1074,6 +1098,7 @@ fn error_cases_revert() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -1107,6 +1132,7 @@ fn error_cases_failure() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params, &mut substate)
@@ -1145,6 +1171,7 @@ fn error_cases_out_of_gas() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params, &mut substate)
@@ -1168,6 +1195,7 @@ fn error_cases_out_of_gas() {
         return_data,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params, &mut substate)
@@ -1196,6 +1224,7 @@ fn error_cases_out_of_gas() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params, &mut substate)
@@ -1229,6 +1258,7 @@ fn create_empty_contract() {
         return_data,
         exception,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params, &mut substate)
@@ -1278,6 +1308,7 @@ fn static_call() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params.clone(), &mut substate)
@@ -1302,6 +1333,7 @@ fn static_call() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params.clone(), &mut substate)
@@ -1326,6 +1358,7 @@ fn static_call() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params.clone(), &mut substate)
@@ -1350,6 +1383,7 @@ fn static_call() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params.clone(), &mut substate)
@@ -1373,6 +1407,7 @@ fn static_call() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params.clone(), &mut substate)
@@ -1397,6 +1432,7 @@ fn static_call() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params.clone(), &mut substate)
@@ -1421,6 +1457,7 @@ fn static_call() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params.clone(), &mut substate)
@@ -1445,6 +1482,7 @@ fn static_call() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.call(params.clone(), &mut substate)
@@ -1493,6 +1531,7 @@ fn avm_recursive() {
             return_data,
             exception: _,
             state_root: _,
+            invokable_hashes: _,
         } = r;
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1532,6 +1571,7 @@ fn avm_recursive() {
             return_data: _,
             exception: _,
             state_root: _,
+            invokable_hashes: _,
         } = r;
 
         println!("gas left = {:?}", gas_left);
@@ -1581,6 +1621,7 @@ fn get_vote() {
             return_data,
             exception: _,
             state_root: _,
+            invokable_hashes: _,
         } = r;
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1613,6 +1654,7 @@ fn get_vote() {
             return_data,
             exception: _,
             state_root: _,
+            invokable_hashes: _,
         } = r;
 
         println!("gas left = {:?}, output = {:?}", gas_left, return_data);
@@ -1641,6 +1683,7 @@ fn get_vote() {
             return_data,
             exception: _,
             state_root: _,
+            invokable_hashes: _,
         } = r;
 
         println!("gas left = {:?}, output = {:?}", gas_left, return_data);
@@ -1668,6 +1711,7 @@ fn get_vote() {
             return_data,
             exception: _,
             state_root: _,
+            invokable_hashes: _,
         } = r;
 
         println!("gas left = {:?}, output = {:?}", gas_left, return_data);
@@ -1717,6 +1761,7 @@ fn hello_avm() {
             return_data,
             exception: _,
             state_root: _,
+            invokable_hashes: _,
         } = r;
 
         assert_eq!(status_code, ExecStatus::Success);
@@ -1748,6 +1793,7 @@ fn hello_avm() {
             return_data: _,
             exception: _,
             state_root: _,
+            invokable_hashes: _,
         } = r;
 
         println!("gas left = {:?}", gas_left);
@@ -1950,6 +1996,7 @@ fn contract_create2() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params.clone(), &mut substate)
@@ -1968,6 +2015,7 @@ fn contract_create2() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params.clone(), &mut substate)
@@ -1991,6 +2039,7 @@ fn contract_create2() {
         return_data: _,
         exception: _,
         state_root: _,
+        invokable_hashes: _,
     } = {
         let mut ex = Executive::new(&mut state, &info, &machine);
         ex.create(params.clone(), &mut substate)
