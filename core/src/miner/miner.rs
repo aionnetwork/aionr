@@ -314,7 +314,7 @@ impl Miner {
                     }
 
                     // Log
-                    info!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
+                    debug!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
                             Colour::White.bold().paint(format!("{}", n)),
                             Colour::White.bold().paint(format!("{}", d)),
                             Colour::White.bold().paint(format!("{:x}", h)),

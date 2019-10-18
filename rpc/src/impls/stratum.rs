@@ -241,28 +241,35 @@ where
 
     /// Get the highest known difficulty
     fn get_difficulty(&self) -> Result<U256> {
-        let best_block = self.client.block(BlockId::Latest).expect("db crashed");
-        Ok(best_block.difficulty())
+        let best_pow_block = self
+            .client
+            .best_pow_block()
+            .expect("must have a best pow block");
+        Ok(best_pow_block.difficulty())
     }
 
     /// Get mining information
     fn get_mining_info(&self) -> Result<MiningInfo> {
-        let best_block = self.client.block(BlockId::Latest).expect("db crashed");
+        let best_pow_block = self
+            .client
+            .best_pow_block()
+            .expect("must have a best pow block");
         Ok(MiningInfo {
-            blocks: best_block.number(),
-            currentblocksize: best_block.0.len(),
-            currentblocktx: best_block.transactions_count(),
-            difficulty: best_block.difficulty(),
+            blocks: best_pow_block.number(),
+            currentblocksize: best_pow_block.0.len(),
+            currentblocktx: best_pow_block.transactions_count(),
+            difficulty: best_pow_block.difficulty(),
             testnet: true,
         })
     }
 
     /// Get miner stats
     fn get_miner_stats(&self, address: H256) -> Result<MinerStats> {
-        let mut header = self
+        let best_pow_block = self
             .client
-            .block_header(BlockId::Latest)
-            .expect("db crashed");
+            .best_pow_block()
+            .expect("must have a best pow block");
+        let mut header = best_pow_block.header();
         let latest_difficulty = header.difficulty();
         let mut index = 0;
         let mut new_blk_headers = Vec::new();
