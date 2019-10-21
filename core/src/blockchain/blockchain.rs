@@ -416,8 +416,8 @@ impl BlockProvider for BlockChain {
                 let mut data = [0u8; 32];
                 data.copy_from_slice(&tx_data[5..37]);
                 data.into()
-            },
-            _ => hash.clone()
+            }
+            _ => hash.clone(),
         };
 
         let result = self

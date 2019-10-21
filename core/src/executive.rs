@@ -879,15 +879,20 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     set.clone()
                 } else {
                     let mut set = HashSet::new();
-                    match self.state.export_kvdb().get(::db::COL_EXTRA, &alias[..]).unwrap() {
+                    match self
+                        .state
+                        .export_kvdb()
+                        .get(::db::COL_EXTRA, &alias[..])
+                        .unwrap()
+                    {
                         Some(invoked_set) => {
                             Self::decode_alias_and_set(&invoked_set[..], &mut set);
-                        },
+                        }
                         None => {}
                     }
                     set
                 };
-                
+
                 set.insert(tx_hash);
                 multiple_sets.insert(alias, set);
             }
@@ -906,12 +911,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
             // Step 2: write into database
             let mut batch = DBTransaction::new();
-            batch.put(
-                ::db::COL_EXTRA,
-                &k,
-                alias_data.as_slice(),
-            );
-            self.state.export_kvdb().write(batch).expect("GRAPH DB write failed");
+            batch.put(::db::COL_EXTRA, &k, alias_data.as_slice());
+            self.state
+                .export_kvdb()
+                .write(batch)
+                .expect("GRAPH DB write failed");
         }
 
         return final_results;
@@ -920,8 +924,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     fn decode_alias_and_set(raw_set: &[u8], set: &mut HashSet<H256>) {
         assert!(raw_set.len() >= 5);
         let mut index = 5;
-        while index <= raw_set.len()-32 {
-            set.insert(raw_set[index..(index+32)].into());
+        while index <= raw_set.len() - 32 {
+            set.insert(raw_set[index..(index + 32)].into());
             index += 32;
         }
     }
