@@ -410,9 +410,19 @@ impl BlockProvider for BlockChain {
 
     /// Get the address of transaction with given hash.
     fn transaction_address(&self, hash: &H256) -> Option<TransactionAddress> {
+        // check whether this tx is meta transaction
+        let tx_hash = match self.db.get(::db::COL_EXTRA, &hash).unwrap() {
+            Some(ref tx_data) if tx_data[..].starts_with(b"alias") => {
+                let mut data = [0u8; 32];
+                data.copy_from_slice(&tx_data[5..37]);
+                data.into()
+            },
+            _ => hash.clone()
+        };
+
         let result = self
             .db
-            .read_with_cache(db::COL_EXTRA, &self.transaction_addresses, hash);
+            .read_with_cache(db::COL_EXTRA, &self.transaction_addresses, &tx_hash);
         self.cache_man
             .lock()
             .note_used(CacheId::TransactionAddresses(*hash));
