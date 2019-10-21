@@ -636,11 +636,8 @@ impl Miner {
                             // Clone old block and add transactions into it
                             let mut reopened_block = client.reopen_block((*old_block).clone());
                             // Update block timestamp for AION 2.0 unity protocol
-                            let timestamp_now = SystemTime::now()
-                                .duration_since(UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs();
-                            reopened_block.set_timestamp(timestamp_now);
+                            reopened_block
+                                .set_timestamp_now_later_than(chain_info.best_block_timestamp);
                             reopened_block
                         }
                         _ => {

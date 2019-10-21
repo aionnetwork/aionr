@@ -719,6 +719,18 @@ impl BlockChainClient for TestBlockChainClient {
             .map(encoded::Block::new)
     }
 
+    fn best_pow_block(&self) -> Option<encoded::Block> {
+        let best_block = self
+            .block(BlockId::Latest)
+            .expect("must have a latest block");
+        if best_block.seal_type().unwrap_or_default() == SealType::PoW {
+            Some(best_block)
+        } else {
+            let parent_hash = best_block.parent_hash();
+            self.block(BlockId::Hash(parent_hash))
+        }
+    }
+
     fn block_status(&self, id: BlockId) -> BlockStatus {
         match id {
             BlockId::Number(number) if (number as usize) < self.blocks.read().len() => {
