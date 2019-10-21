@@ -180,7 +180,7 @@ public class InvokableTxUtil {
                 energyLimit,
                 energyPrice,
                 sigs,
-                rlpEncoding);
+                rlpEncodingWithVersion);
         }
         catch (Exception e) {
             e.printStackTrace();
