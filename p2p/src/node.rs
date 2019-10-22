@@ -139,10 +139,8 @@ impl Node {
     }
 
     pub fn get_hash(&self) -> u64 {
-        let mut ip: String = self.addr.get_ip();
-        let id: String = self.get_id_string();
-        ip.push_str(&id);
-        calculate_hash(&ip)
+        let addr: String = self.addr.to_string();
+        calculate_hash(&addr)
     }
 
     pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
@@ -258,10 +256,8 @@ impl TempNode {
     }
 
     pub fn get_hash(&self) -> u64 {
-        let mut ip: String = self.addr.get_ip();
-        let id: String = self.get_id_string();
-        ip.push_str(&id);
-        calculate_hash(&ip)
+        let addr: String = self.addr.to_string();
+        calculate_hash(&addr)
     }
 
     pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
