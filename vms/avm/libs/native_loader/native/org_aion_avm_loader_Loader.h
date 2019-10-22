@@ -106,18 +106,18 @@ JNIEXPORT void JNICALL Java_org_aion_avm_loader_Loader_incrementNonce
 /*
  * Class:     org_aion_avm_loader_Loader
  * Method:    getTransformedCode
- * Signature: (J[B)[B
+ * Signature: (J[BB)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_loader_Loader_getTransformedCode
-  (JNIEnv *, jclass, jlong, jbyteArray);
+  (JNIEnv *, jclass, jlong, jbyteArray, jbyte);
 
 /*
  * Class:     org_aion_avm_loader_Loader
  * Method:    setTransformedCode
- * Signature: (J[B[B)V
+ * Signature: (J[B[BB)V
  */
 JNIEXPORT void JNICALL Java_org_aion_avm_loader_Loader_setTransformedCode
-  (JNIEnv *, jclass, jlong, jbyteArray, jbyteArray);
+  (JNIEnv *, jclass, jlong, jbyteArray, jbyteArray, jbyte);
 
 /*
  * Class:     org_aion_avm_loader_Loader

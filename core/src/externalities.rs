@@ -289,6 +289,7 @@ where B: StateBackend
                          may encountered.",
                     ),
                     state_root: H256::default(),
+                    invokable_hashes: Default::default(),
                 };
             }
         };
@@ -338,6 +339,7 @@ where B: StateBackend
                         "inc_nonce failed. Database corruption may encountered.",
                     ),
                     state_root: H256::default(),
+                    invokable_hashes: Default::default(),
                 };
             }
 
@@ -353,6 +355,7 @@ where B: StateBackend
                         "inc_nonce failed. Database corruption may encountered.",
                     ),
                     state_root: H256::default(),
+                    invokable_hashes: Default::default(),
                 };
             }
         }
@@ -389,6 +392,7 @@ where B: StateBackend
                     return_data: ReturnData::empty(),
                     exception: String::from("Code not founded."),
                     state_root: H256::default(),
+                    invokable_hashes: Default::default(),
                 }
             }
         };

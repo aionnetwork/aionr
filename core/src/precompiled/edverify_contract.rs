@@ -58,6 +58,7 @@ impl BuiltinContract for EDVerifyContract {
                 return_data: ReturnData::empty(),
                 exception: "Incorrect input length".into(),
                 state_root: H256::default(),
+                invokable_hashes: Default::default(),
             };
         }
 
@@ -72,6 +73,7 @@ impl BuiltinContract for EDVerifyContract {
                 return_data: ReturnData::new(pub_key.to_vec(), 0, pub_key.len()),
                 exception: String::default(),
                 state_root: H256::default(),
+                invokable_hashes: Default::default(),
             }
         } else {
             let return_data = Address::zero();
@@ -81,6 +83,7 @@ impl BuiltinContract for EDVerifyContract {
                 return_data: ReturnData::new(return_data.to_vec(), 0, return_data.len()),
                 exception: String::default(),
                 state_root: H256::default(),
+                invokable_hashes: Default::default(),
             }
         }
     }

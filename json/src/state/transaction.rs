@@ -69,7 +69,7 @@ mod tests {
             "to" : "0000000000000000000000000000000000000000000000000000000000000002",
             "value" : "0x00",
             "timestamp" : "0x56850c2c",
-            "transaction_type": 0
+            "transaction_type": 1
         }"#;
         let _deserialized: Transaction = serde_json::from_str(s).unwrap();
         // TODO: validate all fields

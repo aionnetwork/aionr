@@ -53,6 +53,7 @@ impl TotalCurrencyContract {
             return_data: ReturnData::empty(),
             exception: err_msg,
             state_root: H256::default(),
+            invokable_hashes: Default::default(),
         }
     }
 
@@ -65,6 +66,7 @@ impl TotalCurrencyContract {
             return_data: ReturnData::new(result, 0, length),
             exception: String::default(),
             state_root: H256::default(),
+            invokable_hashes: Default::default(),
         }
     }
 
@@ -129,6 +131,7 @@ impl TotalCurrencyContract {
             return_data: ReturnData::empty(),
             exception: String::default(),
             state_root: H256::default(),
+            invokable_hashes: Default::default(),
         }
     }
 }

@@ -42,6 +42,14 @@ public class AionCapabilitiesV2 implements IExternalCapabilities {
 
     @Override
     public InternalTransaction decodeSerializedTransaction(byte[] innerTx, AionAddress executor, long energyPrice, long energyLimit) {
-            return InvokableTxUtil.decode(innerTx, executor, energyPrice, energyLimit);
+        try {
+            InternalTransaction tx = InvokableTxUtil.decode(innerTx, executor, energyPrice, energyLimit);
+            if (Constants.DEBUG)
+                System.out.printf("avm2 cap: %s\n", tx);
+            return tx;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return null;
+        }
     }
 }

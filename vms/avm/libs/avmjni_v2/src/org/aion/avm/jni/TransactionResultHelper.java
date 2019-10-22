@@ -1,11 +1,8 @@
 package org.aion.avm.jni;
 
-// import org.aion.kernel.Log;
-// import org.aion.kernel.AvmTransactionResult;
-// import org.aion.vm.api.interfaces.TransactionResult;
-// import org.aion.vm.api.interfaces.ResultCode;
 import org.aion.types.TransactionResult;
 import org.aion.types.TransactionStatus;
+import org.aion.types.InternalTransaction;
 
 import java.util.List;
 import java.util.Optional;
@@ -35,7 +32,7 @@ public class TransactionResultHelper {
             return 0;
         } else {
             // it's a fatal error
-            return -1;
+            return 255;
         }
     }
 
@@ -49,6 +46,13 @@ public class TransactionResultHelper {
         // enc.encodeBytes(result.output == null ? new byte[0] : result.output);
         enc.encodeBytes(output.orElse(new byte[0]));
         enc.encodeLong(result.energyUsed);
+
+        // Encode invokable internal transactions
+        for (InternalTransaction tx: result.internalTransactions) {
+            if (tx.copyOfInvokableHash() != null) {
+                enc.encodeBytes(tx.copyOfInvokableHash());
+            }
+        }
 
         return enc.toByteArray();
     }

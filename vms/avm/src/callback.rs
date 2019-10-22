@@ -11,6 +11,10 @@ use hash::blake2b;
 use crypto::{sha2::Sha256, digest::Digest, ed25519};
 use tiny_keccak::keccak256;
 
+const AVM_VERSION_MAGIC: &[u8] = b"avm-version-";
+const AVM_V1: u8 = 1;
+const AVM_V2: u8 = 2;
+
 #[derive(Debug)]
 #[repr(C)]
 pub struct avm_address {
@@ -67,9 +71,13 @@ pub struct avm_callbacks {
         extern fn(sender: *const avm_address, nonce: *const avm_bytes) -> avm_bytes,
     pub add_log: extern fn(handle: *const c_void, logs: *const avm_bytes, idx: i32),
     pub get_transformed_code:
-        extern fn(handle: *const c_void, addr: *const avm_address) -> avm_bytes,
-    pub put_transformed_code:
-        extern fn(handle: *const c_void, addr: *const avm_address, code: *const avm_bytes),
+        extern fn(handle: *const c_void, addr: *const avm_address, version: u8) -> avm_bytes,
+    pub put_transformed_code: extern fn(
+        handle: *const c_void,
+        addr: *const avm_address,
+        code: *const avm_bytes,
+        version: u8,
+    ),
     pub get_objectgraph: extern fn(handle: *const c_void, addr: *const avm_address) -> avm_bytes,
     pub set_objectgraph:
         extern fn(handle: *const c_void, addr: *const avm_address, data: *const avm_bytes),
@@ -417,12 +425,13 @@ pub extern fn avm_add_log(handle: *const c_void, avm_log: *const avm_bytes, inde
 pub extern fn avm_get_transformed_code(
     handle: *const c_void,
     address: *const avm_address,
+    version: u8,
 ) -> avm_bytes
 {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
 
-    debug!(target: "vm", "avm_get_transformed_code: 0x{:?}", addr);
+    debug!(target: "vm", "avm_get_transformed_code: 0x{:?}, v{:?}", addr, version);
 
     match ext.get_transformed_code(addr) {
         None => unsafe { new_null_bytes() },
@@ -430,10 +439,48 @@ pub extern fn avm_get_transformed_code(
             if code.len() == 0 {
                 unsafe { new_null_bytes() }
             } else {
-                unsafe {
-                    let ret = new_fixed_bytes(code.len() as u32);
-                    ptr::copy(&code.as_slice()[0], ret.pointer, code.len());
-                    ret
+                match (version, code.as_slice().starts_with(AVM_VERSION_MAGIC)) {
+                    (AVM_V1, true) => {
+                        if code[AVM_VERSION_MAGIC.len()] != AVM_V1 {
+                            unsafe { new_null_bytes() }
+                        } else {
+                            unsafe {
+                                let ret = new_fixed_bytes(
+                                    (code.len() - AVM_VERSION_MAGIC.len() - 1) as u32,
+                                );
+                                ptr::copy(
+                                    &code.as_slice()[AVM_VERSION_MAGIC.len() + 1],
+                                    ret.pointer,
+                                    code.len(),
+                                );
+                                ret
+                            }
+                        }
+                    }
+                    (AVM_V1, false) => unsafe {
+                        let ret = new_fixed_bytes(code.len() as u32);
+                        ptr::copy(&code.as_slice()[0], ret.pointer, code.len());
+                        ret
+                    },
+                    (AVM_V2, true) => {
+                        if code[AVM_VERSION_MAGIC.len()] != AVM_V2 {
+                            unsafe { new_null_bytes() }
+                        } else {
+                            unsafe {
+                                let ret = new_fixed_bytes(
+                                    (code.len() - AVM_VERSION_MAGIC.len() - 1) as u32,
+                                );
+                                ptr::copy(
+                                    &code.as_slice()[AVM_VERSION_MAGIC.len() + 1],
+                                    ret.pointer,
+                                    code.len(),
+                                );
+                                ret
+                            }
+                        }
+                    }
+                    (AVM_V2, false) => unsafe { new_null_bytes() },
+                    (_, _) => unsafe { new_null_bytes() },
                 }
             }
         }
@@ -445,15 +492,19 @@ pub extern fn avm_put_transformed_code(
     handle: *const c_void,
     address: *const avm_address,
     code: *const avm_bytes,
+    version: u8,
 )
 {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
     let code: &avm_bytes = unsafe { mem::transmute(code) };
-    debug!(target: "vm", "avm_put_transformed_code at: {:?}", addr);
+    debug!(target: "vm", "avm_put_transformed_code at: {:?}, v{:?}", addr, version);
     let ext_code: &[u8] =
         unsafe { ::std::slice::from_raw_parts(code.pointer, code.length as usize) };
-    //debug!(target: "vm", "code = {:?}", ext_code);
+    let mut transformed_code = Vec::new();
+    transformed_code.extend_from_slice(AVM_VERSION_MAGIC);
+    transformed_code.push(version);
+    transformed_code.extend_from_slice(ext_code);
     ext.save_transformed_code(addr, ext_code.to_vec());
 }
 

@@ -4,6 +4,8 @@ import java.math.BigInteger;
 import java.util.Arrays;
 import java.util.List;
 
+import org.aion.avm.rlp.RLP;
+
 /**
  * Class to encapsulate an object and provide utilities for conversion
  *

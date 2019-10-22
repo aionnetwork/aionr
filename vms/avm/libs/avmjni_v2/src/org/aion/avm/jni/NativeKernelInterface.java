@@ -200,11 +200,6 @@ public class NativeKernelInterface implements IExternalState {
         throw new AssertionError("Did not expect this to be called.");
     }
 
-    // @Override
-    // public Set<byte[]> getTouchedAccounts() {
-    //     throw new AssertionError("This class does not implement this method.");
-    // }
-
     @Override
     public void commitTo(IExternalState target) { }
 
@@ -213,12 +208,12 @@ public class NativeKernelInterface implements IExternalState {
 
     @Override
     public void setTransformedCode(AionAddress address, byte[] code) {
-        Loader.setTransformedCode(handle, address.toByteArray(), code);
+        Loader.setTransformedCode(handle, address.toByteArray(), code, (byte)0x02);
 
     }
 
     @Override
     public byte[] getTransformedCode(AionAddress address) {
-        return Loader.getTransformedCode(handle, address.toByteArray());
+        return Loader.getTransformedCode(handle, address.toByteArray(), (byte)0x2);
     }
 }

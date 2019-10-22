@@ -204,7 +204,7 @@ pub struct Miner {
     // a seed/block_hash map for resealing
     sealing_work_pos: Mutex<HashMap<Seed, H256>>,
     // the current PoS block with minimum timestamp
-    best_pos: Mutex<Option<ClosedBlock>>,
+    best_pos: Mutex<Option<SealedBlock>>,
     next_allowed_reseal: Mutex<Instant>,
     sealing_block_last_request: Mutex<u64>,
     // for sealing...
@@ -281,59 +281,44 @@ impl Miner {
     }
 
     pub fn invoke_pos_interval(&self, client: &MiningBlockChainClient) {
-        // let chain_best_block = client
-        //     .best_block_header()
-        //     .map(|header| header.decode());
-
         // compete with import_lock, if another is imported, block will be None, or else try importing pending_best
         let block = {
             let mut pending_best = self.best_pos.lock();
             pending_best.clone()
         };
 
-        let timestamp_now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
         match block {
-            Some(b) => {
-                if b.header().timestamp() <= timestamp_now {
-                    let seal = b.header().seal();
-                    let stake = client.get_stake(
-                        &b.header().get_pk_of_pos().unwrap_or(H256::default()),
-                        b.header().author().clone(),
-                        BlockId::Latest,
-                    );
-                    let parent = client
-                        .block_header_data(b.header().parent_hash())
-                        .expect("New block must have parent."); //TODO-Unity: handle as result error
-                                                                // TODO-Unity: compare parent = best
-                    let grand_parent = client.block_header_data(&parent.parent_hash());
-                    if let Ok(sealed) = b.clone().lock().try_seal_pos(
-                        &*self.engine,
-                        seal.to_owned(),
-                        &parent.decode(),
-                        grand_parent.map(|header| header.decode()).as_ref(),
-                        stake,
-                    ) {
-                        let n = sealed.header().number();
-                        let d = sealed.header().difficulty().clone();
-                        let h = sealed.header().hash();
-                        let t = sealed.header().timestamp();
+            Some(sealed) => {
+                // Check if the block is still fresh
+                let best_hash = client.chain_info().best_block_hash;
+                let parent_hash = sealed.header().parent_hash().clone();
+                if best_hash != parent_hash {
+                    return;
+                }
 
-                        // 4. Import block
-                        if let Some(error) = client.import_sealed_block(sealed).err() {
-                            debug!(target: "miner", "PoS block imported error: {}", error);
-                        }
+                // Check if it's time to import the block
+                let timestamp_now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
 
-                        // Log
-                        info!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
-                                Colour::White.bold().paint(format!("{}", n)),
-                                Colour::White.bold().paint(format!("{}", d)),
-                                Colour::White.bold().paint(format!("{:x}", h)),
-                                Colour::White.bold().paint(format!("{:x}", t)));
+                if sealed.header().timestamp() <= timestamp_now {
+                    let n = sealed.header().number();
+                    let d = sealed.header().difficulty().clone();
+                    let h = sealed.header().hash();
+                    let t = sealed.header().timestamp();
+
+                    // 4. Import block
+                    if let Some(error) = client.import_sealed_block(sealed).err() {
+                        debug!(target: "miner", "PoS block imported error: {}", error);
                     }
+
+                    // Log
+                    debug!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
+                            Colour::White.bold().paint(format!("{}", n)),
+                            Colour::White.bold().paint(format!("{}", d)),
+                            Colour::White.bold().paint(format!("{:x}", h)),
+                            Colour::White.bold().paint(format!("{:x}", t)));
                 }
             }
             None => {}
@@ -651,11 +636,8 @@ impl Miner {
                             // Clone old block and add transactions into it
                             let mut reopened_block = client.reopen_block((*old_block).clone());
                             // Update block timestamp for AION 2.0 unity protocol
-                            let timestamp_now = SystemTime::now()
-                                .duration_since(UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs();
-                            reopened_block.set_timestamp(timestamp_now);
+                            reopened_block
+                                .set_timestamp_now_later_than(chain_info.best_block_timestamp);
                             reopened_block
                         }
                         _ => {
@@ -1541,17 +1523,21 @@ impl MinerService for Miner {
         block: ClosedBlock,
     ) -> Result<(), Error>
     {
-        // TODO-Unity: check parent = best
-        // let best_block_header = client.best_block_header();
+        // Check if the block is fresh (if the block's parent is the current best block)
+        let best_block_hash = client.chain_info().best_block_hash;
+        let parent_hash = block.header().parent_hash().clone();
+        if parent_hash != best_block_hash {
+            return Ok(()); // TODO-Unity: to handle as error result
+        }
 
-        let parent = match client.block_header_data(block.block().header().parent_hash()) {
+        // Get information for PoS block sealing
+        let parent = match client.block_header_data(&parent_hash) {
             Some(header) => header,
             None => {
                 return Ok(()); // TODO-Unity: to handle as error result
             }
         };
         let grand_parent = client.block_header_data(&parent.parent_hash());
-
         let stake = client.get_stake(
             &seal[2][..].into(),
             block.header().author().clone(),
@@ -1560,32 +1546,48 @@ impl MinerService for Miner {
 
         debug!(target: "miner", "start sealing");
 
-        // try seal block
-        // TODO: avoid clone
-        match block.clone().lock().try_seal_pos(
+        // Try to seal block (validate seal)
+        match block.lock().try_seal_pos(
             &*self.engine,
             seal,
             &parent.decode(),
             grand_parent.map(|header| header.decode()).as_ref(),
             stake,
         ) {
-            Ok(s) => {
-                client.import_sealed_block(s)?;
-                return Ok(());
-            }
-            Err((e, _)) => {
-                debug!(target: "miner", "{:?}", e);
-                match e {
-                    Error::Block(BlockError::InvalidPoSTimestamp(t1, _, _)) => {
-                        let mut best_pos = self.best_pos.lock();
-                        if best_pos.is_some()
-                            && best_pos.clone().unwrap().header().timestamp() >= t1
-                        {
-                            *best_pos = Some(block.clone());
+            // Sealing(validation) succeeded
+            Ok(sealed_block) => {
+                debug!(target: "miner", "sealing succeeded");
+                let timestamp_now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+                let timestamp_block = sealed_block.header().timestamp();
+                // Check if we can import the block now
+                if timestamp_now >= timestamp_block {
+                    client.import_sealed_block(sealed_block)?;
+                } else {
+                    // If it's not yet the time to import the block, compare it to the current best and save it if it's better
+                    let mut best_pos = self.best_pos.lock();
+                    let mut need_update = false;
+                    match *best_pos {
+                        Some(ref best_block) => {
+                            if best_block.header().timestamp() >= timestamp_block {
+                                need_update = true;
+                            }
+                        }
+                        None => {
+                            need_update = true;
                         }
                     }
-                    _ => {}
+                    if need_update {
+                        *best_pos = Some(sealed_block);
+                    }
                 }
+                return Ok(());
+            }
+            // Sealing(validation) failed
+            Err((e, _)) => {
+                debug!(target: "miner", "pos sealing validation error: {:?}", e);
                 return Err(Error::from(e));
             }
         }
@@ -1655,7 +1657,7 @@ impl MinerService for Miner {
         client: &MiningBlockChainClient,
         _imported: &[H256],
         _invalid: &[H256],
-        _enacted: &[H256],
+        enacted: &[H256],
         retracted: &[H256],
     )
     {
@@ -1706,9 +1708,12 @@ impl MinerService for Miner {
             }
         }
 
-        self.transaction_pool.record_transaction_sealed();
-        self.clear_pos_pending();
-        client.new_block_chained();
+        // Actions to do when new block imported in the main chain
+        if !enacted.is_empty() {
+            self.transaction_pool.record_transaction_sealed();
+            self.clear_pos_pending();
+            client.new_block_chained();
+        }
     }
 
     // AION 2.0

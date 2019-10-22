@@ -92,7 +92,7 @@ fn client_check_vote() {
 
     assert_eq!(
         client
-            .get_stake(&H256::default(), Address::default())
+            .get_stake(&H256::default(), Address::default(), BlockId::Latest)
             .unwrap(),
         0u64.into()
     );

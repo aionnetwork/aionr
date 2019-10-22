@@ -32,9 +32,9 @@ public class Loader {
 
     public static native void incrementNonce(long handle, byte[] address);
 
-    public static native byte[] getTransformedCode(long handle, byte[] address);
+    public static native byte[] getTransformedCode(long handle, byte[] address, byte version);
 
-    public static native void setTransformedCode(long handle, byte[] address, byte[] code);
+    public static native void setTransformedCode(long handle, byte[] address, byte[] code, byte version);
 
     public static native byte[] getObjectGraph(long handle, byte[] address);
 

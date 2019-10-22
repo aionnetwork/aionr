@@ -66,6 +66,9 @@ pub trait BlockChainClient: Sync + Send {
     /// Get raw block data by block header hash.
     fn block(&self, id: BlockId) -> Option<encoded::Block>;
 
+    /// Get best pow block
+    fn best_pow_block(&self) -> Option<encoded::Block>;
+
     /// Get block status by block header hash.
     fn block_status(&self, id: BlockId) -> BlockStatus;
 

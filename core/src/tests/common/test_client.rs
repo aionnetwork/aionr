@@ -505,7 +505,7 @@ impl BlockChainClient for TestBlockChainClient {
         Ok(res)
     }
 
-    fn get_stake(&self, _pk: &H256, _a: Address) -> Option<BigUint> {
+    fn get_stake(&self, _pk: &H256, _a: Address, _block_id: BlockId) -> Option<BigUint> {
         Some(BigUint::from(10000u32))
     }
 
@@ -717,6 +717,18 @@ impl BlockChainClient for TestBlockChainClient {
         self.block_hash(id)
             .and_then(|hash| self.blocks.read().get(&hash).cloned())
             .map(encoded::Block::new)
+    }
+
+    fn best_pow_block(&self) -> Option<encoded::Block> {
+        let best_block = self
+            .block(BlockId::Latest)
+            .expect("must have a latest block");
+        if best_block.seal_type().unwrap_or_default() == SealType::PoW {
+            Some(best_block)
+        } else {
+            let parent_hash = best_block.parent_hash();
+            self.block(BlockId::Hash(parent_hash))
+        }
     }
 
     fn block_status(&self, id: BlockId) -> BlockStatus {

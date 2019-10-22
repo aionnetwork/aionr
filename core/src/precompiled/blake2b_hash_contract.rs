@@ -73,6 +73,7 @@ impl BuiltinContract for Blake2bHashContract {
                 return_data: ReturnData::empty(),
                 exception: "incorrect size of the input data.".into(),
                 state_root: H256::default(),
+                invokable_hashes: Default::default(),
             };
         }
         let hash = &Blake2b::hash_256(input);
@@ -82,6 +83,7 @@ impl BuiltinContract for Blake2bHashContract {
             return_data: ReturnData::new(hash.to_vec(), 0, hash.len()),
             exception: String::default(),
             state_root: H256::default(),
+            invokable_hashes: Default::default(),
         }
     }
 }
