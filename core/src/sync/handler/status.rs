@@ -97,13 +97,27 @@ pub fn receive_res(
 )
 {
     trace!(target: "sync", "status/receive_res");
+
+    // check channelbuffer len
+    if cb_in.head.len as usize < mem::size_of::<u64>() + mem::size_of::<u8>() + 2 * HASH_LENGTH {
+        debug!(target: "sync", "status res channelbuffer length is too short" );
+        return;
+    }
+
     let (mut best_block_num, req_body_rest) = cb_in.body.split_at(mem::size_of::<u64>());
     let best_block_num = best_block_num.read_u64::<BigEndian>().unwrap_or(0);
     let (mut total_difficulty_len, req_body_rest) = req_body_rest.split_at(mem::size_of::<u8>());
     let total_difficulty_len = total_difficulty_len.read_u8().unwrap_or(0) as usize;
+
+    // check total_difficulty_len
+    if req_body_rest.len() != total_difficulty_len + 2 * HASH_LENGTH {
+        debug!(target: "sync", "status res with wrong total_difficulty length " );
+        return;
+    }
+
     let (total_difficulty, req_body_rest) = req_body_rest.split_at(total_difficulty_len);
-    let (best_hash, req_body_rest) = req_body_rest.split_at(HASH_LENGTH);
-    let (genesis_hash, _) = req_body_rest.split_at(HASH_LENGTH);
+    let (best_hash, genesis_hash) = req_body_rest.split_at(HASH_LENGTH);
+
     let total_difficulty = U256::from(total_difficulty);
     let best_hash = H256::from(best_hash);
     let genesis_hash = H256::from(genesis_hash);

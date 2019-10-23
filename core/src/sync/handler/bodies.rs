@@ -88,10 +88,20 @@ pub fn send(p2p: Mgr, hash: u64, hashes: Vec<u8>) -> bool {
 pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
     trace!(target: "sync", "bodies/receive_req");
 
+    // check channelbuffer len
+    if cb_in.head.len == 0 {
+        debug!(target: "sync", "bodies req channelbuffer is empty" );
+        return;
+    }
+    if cb_in.head.len as usize % HASH_LEN != 0 {
+        debug!(target: "sync", "bodies res channelbuffer is invalid" );
+        return;
+    }
+
     let mut res = channel_buffer_template_with_version(cb_in.head.ver, Action::BODIESRES.value());
 
     let mut res_body = Vec::new();
-    let hash_count = cb_in.body.len() / HASH_LEN;
+    let hash_count = cb_in.head.len / HASH_LEN;
     let mut rest = cb_in.body.as_slice();
     let mut data = Vec::new();
     let mut body_count = 0;

@@ -85,7 +85,19 @@ pub fn receive_req(p2p: Mgr, hash: u64, version: u16) {
 pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     debug!(target: "p2p", "active_nodes/receive_res");
 
+    // check channelbuffer len
+    if cb_in.head.len < 1 {
+        debug!(target: "p2p", "active_nodes res channelbuffer length is too short" );
+        return;
+    }
+
     let (node_count, mut rest) = cb_in.body.split_at(1);
+
+    // check nodes length
+    if nodes_count as usize * (NODE_ID_LENGTH + IP_LENGTH + mem::size_of::<u32>()) != rest.len() {
+        debug!(target: "p2p", "active_nodes res with wrong nodes length " );
+        return;
+    }
 
     let nodes_count: u32 = node_count[0] as u32;
     if nodes_count > 0 {
