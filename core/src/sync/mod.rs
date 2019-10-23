@@ -28,7 +28,7 @@ mod sync_provider;
 #[cfg(test)]
 mod test;
 
-use std::sync::Arc;
+use std::sync::{Arc,Weak};
 use std::time::Duration;
 use std::time::Instant;
 use itertools::Itertools;
@@ -138,7 +138,7 @@ impl Sync {
         }
     }
 
-    pub fn register_callback(&self, callback: Arc<Callable>) {
+    pub fn register_callback(&self, callback: Weak<Callable>) {
         self.p2p.register_callback(callback);
     }
 

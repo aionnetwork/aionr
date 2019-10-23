@@ -70,6 +70,7 @@ fn main() {
     {
         panic!("build jni v1 failed");
     }
+
     if !Command::new("ant")
         .arg("-f")
         .arg("libs/avmjni_v2/build.xml")

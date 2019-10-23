@@ -83,10 +83,16 @@ pub fn send(p2p: Mgr, hash: u64) {
 /// 1. decode handshake msg
 /// 2. validate and prove incoming connection to active
 /// 3. acknowledge sender if it is proved
+/// 4. update new hash
 pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     debug!(target: "p2p", "handshake/receive_req");
 
     let (node_id, req_body_rest) = cb_in.body.split_at(NODE_ID_LENGTH);
+    if let Ok(id_set) = p2p.nodes_id.lock() {
+        if id_set.contains(&String::from_utf8_lossy(&node_id).to_string()) {
+            return;
+        }
+    }
     let (mut net_id, req_body_rest) = req_body_rest.split_at(mem::size_of::<i32>());
     let peer_net_id = net_id.read_u32::<BigEndian>().unwrap_or(0);
     let local_net_id = p2p.config.net_id;
@@ -95,8 +101,8 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
         return;
     }
 
-    let (_ip, req_body_rest) = req_body_rest.split_at(IP_LENGTH);
-    let (_port, revision_version) = req_body_rest.split_at(mem::size_of::<i32>());
+    let (ip, req_body_rest) = req_body_rest.split_at(IP_LENGTH);
+    let (mut port, revision_version) = req_body_rest.split_at(mem::size_of::<i32>());
     let (revision_len, rest) = revision_version.split_at(1);
     let revision_len = revision_len[0] as usize;
     let (revision, rest) = rest.split_at(revision_len);
@@ -108,8 +114,15 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
         if let Some(mut node) = write.get_mut(&hash) {
             debug!(target: "p2p", "inbound node state: connected -> active");
             node.id.copy_from_slice(node_id);
-            // node.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
+            trace!(target: "p2p", "ip:{:?} - {:?}", node.addr.ip, ip);
+            let port = port.read_u32::<BigEndian>().unwrap_or(30303);
+            trace!(target: "p2p", "port:{} - {}", node.addr.port, port);
+            // use tcp random port now
+            // node.addr.port = port;
             node.state = STATE::ACTIVE;
+            if let Ok(mut id_set) = p2p.nodes_id.lock() {
+                id_set.insert(node.get_id_string());
+            }
             if revision_len > MAX_REVISION_LENGTH {
                 node.revision[0..MAX_REVISION_LENGTH]
                     .copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
@@ -152,14 +165,17 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
 
     if let Ok(mut write) = p2p.nodes.try_write() {
         if let Some(mut node) = write.get_mut(&hash) {
-            // TODO: math::low
             if revision_len > MAX_REVISION_LENGTH {
                 node.revision[0..MAX_REVISION_LENGTH]
                     .copy_from_slice(&revision_bytes[..MAX_REVISION_LENGTH]);
             } else {
                 node.revision[0..revision_len].copy_from_slice(revision_bytes);
             }
+
             node.state = STATE::ACTIVE;
+            if let Ok(mut id_set) = p2p.nodes_id.lock() {
+                id_set.insert(node.get_id_string());
+            }
         }
     }
 }

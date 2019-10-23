@@ -1321,6 +1321,18 @@ impl BlockChainClient for Client {
         Self::block_hash(&chain, &self.miner, id).and_then(|hash| chain.block(&hash))
     }
 
+    fn best_pow_block(&self) -> Option<encoded::Block> {
+        let best_block = self
+            .block(BlockId::Latest)
+            .expect("must have a latest block");
+        if best_block.seal_type().unwrap_or_default() == SealType::PoW {
+            Some(best_block)
+        } else {
+            let parent_hash = best_block.parent_hash();
+            self.block(BlockId::Hash(parent_hash))
+        }
+    }
+
     fn block_status(&self, id: BlockId) -> BlockStatus {
         if let BlockId::Pending = id {
             return BlockStatus::Pending;

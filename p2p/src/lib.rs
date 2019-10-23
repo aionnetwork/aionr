@@ -50,9 +50,8 @@ mod handler;
 mod callable;
 
 use std::io;
-use std::sync::Arc;
-use std::collections::VecDeque;
-use std::collections::HashMap;
+use std::sync::{Arc,Weak};
+use std::collections::{VecDeque,HashMap,HashSet};
 use std::sync::Mutex;
 use std::sync::RwLock;
 use std::time::Duration;
@@ -102,7 +101,7 @@ pub struct Mgr {
     /// shutdown hook
     shutdown_hooks: Arc<Mutex<Vec<Sender<()>>>>,
     /// callback
-    callback: Arc<RwLock<Option<Arc<Callable>>>>,
+    callback: Arc<RwLock<Option<Weak<Callable>>>>,
     /// config
     config: Arc<Config>,
     /// temp queue storing seeds and active nodes queried from other nodes
@@ -111,6 +110,8 @@ pub struct Mgr {
     nodes: Arc<RwLock<HashMap<u64, Node>>>,
     /// tokens rule
     tokens_rule: Arc<HashMap<u32, u32>>,
+    /// nodes ID
+    nodes_id: Arc<Mutex<HashSet<String>>>,
 }
 
 impl Mgr {
@@ -123,6 +124,8 @@ impl Mgr {
             temp_local.get_id_string(),
             temp_local.addr.to_string()
         );
+        let mut id_set = HashSet::new();
+        id_set.insert(temp_local.get_id_string());
 
         // load seeds
         let mut temp_queue = VecDeque::<TempNode>::with_capacity(TEMP_MAX);
@@ -153,10 +156,11 @@ impl Mgr {
             temp: Arc::new(Mutex::new(temp_queue)),
             nodes: Arc::new(RwLock::new(HashMap::new())),
             tokens_rule: Arc::new(tokens_rule),
+            nodes_id: Arc::new(Mutex::new(id_set)),
         }
     }
 
-    pub fn register_callback(&self, callback: Arc<Callable>) {
+    pub fn register_callback(&self, callback: Weak<Callable>) {
         if let Ok(mut lock) = self.callback.write() {
             *lock = Some(callback);
         }
@@ -187,7 +191,14 @@ impl Mgr {
     /// send msg
     pub fn send(&self, hash: u64, cb: ChannelBuffer) -> bool {
         let nodes = &self.nodes;
-        trace!(target: "p2p", "send: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
+        trace!(target: "p2p", "send: hash/ver/ctrl/action/route {}/{}/{}/{}/{}",
+            &hash,
+            cb.head.ver,
+            cb.head.ctrl,
+            cb.head.action,
+            cb.head.get_route()
+        );
+
         // TODO: need more thoughts on write or try_write
         match nodes.write() {
             Ok(mut lock) => {
@@ -213,11 +224,7 @@ impl Mgr {
                 if !send_success {
                     if let Some(node) = lock.remove(&hash) {
                         trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
-                        if let Ok(lock) = self.callback.read() {
-                            if let Some(ref callback) = *lock {
-                                callback.disconnect(hash);
-                            }
-                        }
+                        self.disconnect(hash, node.get_id_string());
                     }
                 }
                 send_success
@@ -239,9 +246,6 @@ impl Mgr {
             .parse::<SocketAddr>()
             .unwrap()
             .clone();
-
-        let callback_timeout = self.callback.clone();
-        //        self.callback = Some(callback);
 
         // interval timeout
         let p2p_timeout = self.clone();
@@ -267,12 +271,8 @@ impl Mgr {
                                 node.tx.close().unwrap();
 
                                 // dispatch node remove event
-                                if let Ok(lock) = callback_timeout.read() {
-                                    if let Some(ref callback) = *lock {
-                                        callback.disconnect(hash.clone());
-                                    }
-                                }
-                                debug!(target: "p2p", "timeout hash/id/ip {}/{}/{}", &node.get_hash(), &node.get_id_string(), &node.addr.get_ip());
+                                p2p_timeout.disconnect(hash, node.get_id_string());
+                                debug!(target: "p2p", "timeout hash/id/ip {}/{}/{}", &node.get_hash(), &node.get_id_string(), &node.addr.to_string());
                             },
                             None => {}
                         }
@@ -308,6 +308,11 @@ impl Mgr {
                         if let Some(temp_node) = lock.pop_front() {
                             temp_node_opt = Some(temp_node.clone());
 
+                            if let Ok(id_set) = p2p_outbound.nodes_id.lock(){
+                                if id_set.contains(&temp_node.get_id_string()){
+                                    temp_node_opt = None;
+                                }
+                            }
                             // store back if seed node immediately
                             if temp_node.if_seed {
                                 lock.push_back(temp_node);
@@ -514,6 +519,20 @@ impl Mgr {
         }
     }
 
+    fn disconnect(&self, hash: u64, id: String) {
+        if let Ok(mut id_set) = self.nodes_id.lock() {
+            id_set.remove(&id);
+        }
+        if let Ok(lock) = self.callback.read() {
+            if let Some(ref callback) = *lock {
+                match Weak::upgrade(callback) {
+                    Some(arc_callback) => arc_callback.disconnect(hash),
+                    None => warn!(target: "p2p", "sync has been shutdown?" ),
+                }
+            }
+        }
+    }
+
     /// shutdown routine
     pub fn shutdown(&self) {
         info!(target: "p2p" , "p2p shutdown start");
@@ -606,6 +625,7 @@ impl Mgr {
             None
         }
     }
+
     /// get total nodes count
     pub fn get_statics_info(&self) -> (usize, HashMap<u64, (String, String, String, &str)>) {
         let mut len = 0;
@@ -706,14 +726,16 @@ impl Mgr {
                                     active_nodes::receive_req(p2p, hash, cb.head.ver)
                                 }
                                 Action::ACTIVENODESRES => active_nodes::receive_res(p2p, hash, cb),
-                                Action::DISCONNECT => {}
                                 _ => error!(target: "p2p", "invalid action {}", cb.head.action),
                             };
                         }
                         Module::SYNC => {
                             if let Ok(lock) = p2p.callback.read() {
                                 if let Some(ref callback) = *lock {
-                                    callback.handle(hash, cb)
+                                    match Weak::upgrade(callback) {
+                                        Some(arc_callback) => arc_callback.handle(hash, cb),
+                                        None => warn!(target: "p2p", "sync has been shutdown?" ),
+                                    }
                                 }
                             }
                         }

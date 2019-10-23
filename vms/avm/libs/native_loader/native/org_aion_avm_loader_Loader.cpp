@@ -369,12 +369,12 @@ JNIEXPORT void JNICALL Java_org_aion_avm_loader_Loader_addLog
  * Signature: (J[B)[B
  */
 JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_loader_Loader_getTransformedCode
-  (JNIEnv *env, jclass clazz, jlong handle, jbyteArray address)
+  (JNIEnv *env, jclass clazz, jlong handle, jbyteArray address, jbyte version)
 {
     struct avm_address a = load_address(env, address);
 
     // ask the client for account code
-    struct avm_bytes c = callbacks.get_transformed_code((void *)handle, &a);
+    struct avm_bytes c = callbacks.get_transformed_code((void *)handle, &a, version);
 
     // convert into JVM byte array.
     jbyteArray ret = is_null(&c) ? NULL : to_jbyteArray(env, c.pointer, c.length);
@@ -391,12 +391,12 @@ JNIEXPORT jbyteArray JNICALL Java_org_aion_avm_loader_Loader_getTransformedCode
  * Signature: (J[B[B)V
  */
 JNIEXPORT void JNICALL Java_org_aion_avm_loader_Loader_setTransformedCode
-  (JNIEnv *env, jclass clazz, jlong handle, jbyteArray address, jbyteArray code)
+  (JNIEnv *env, jclass clazz, jlong handle, jbyteArray address, jbyteArray code, jbyte version)
 {
     struct avm_address a = load_address(env, address);
     struct avm_bytes c = load_bytes(env, code);
 
-    callbacks.put_transformed_code((void *)handle, &a, &c);
+    callbacks.put_transformed_code((void *)handle, &a, &c, version);
 
     // release the buffer
     release_bytes(&c);

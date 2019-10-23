@@ -213,13 +213,13 @@ public class NativeKernelInterface implements IExternalState {
 
     @Override
     public void setTransformedCode(AionAddress address, byte[] code) {
-        Loader.setTransformedCode(handle, address.toByteArray(), code);
+        Loader.setTransformedCode(handle, address.toByteArray(), code, (byte)0x01);
 
     }
 
     @Override
     public byte[] getTransformedCode(AionAddress address) {
-        return Loader.getTransformedCode(handle, address.toByteArray());
+        return Loader.getTransformedCode(handle, address.toByteArray(), (byte)0x01);
     }
 
     public static byte[] contract_address(byte[] sender, byte[] nonce) {

@@ -281,23 +281,27 @@ impl Miner {
     }
 
     pub fn invoke_pos_interval(&self, client: &MiningBlockChainClient) {
-        // let chain_best_block = client
-        //     .best_block_header()
-        //     .map(|header| header.decode());
-
         // compete with import_lock, if another is imported, block will be None, or else try importing pending_best
         let block = {
             let mut pending_best = self.best_pos.lock();
             pending_best.clone()
         };
 
-        let timestamp_now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
-
         match block {
             Some(sealed) => {
+                // Check if the block is still fresh
+                let best_hash = client.chain_info().best_block_hash;
+                let parent_hash = sealed.header().parent_hash().clone();
+                if best_hash != parent_hash {
+                    return;
+                }
+
+                // Check if it's time to import the block
+                let timestamp_now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs();
+
                 if sealed.header().timestamp() <= timestamp_now {
                     let n = sealed.header().number();
                     let d = sealed.header().difficulty().clone();
@@ -310,7 +314,7 @@ impl Miner {
                     }
 
                     // Log
-                    info!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
+                    debug!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
                             Colour::White.bold().paint(format!("{}", n)),
                             Colour::White.bold().paint(format!("{}", d)),
                             Colour::White.bold().paint(format!("{:x}", h)),
@@ -632,11 +636,8 @@ impl Miner {
                             // Clone old block and add transactions into it
                             let mut reopened_block = client.reopen_block((*old_block).clone());
                             // Update block timestamp for AION 2.0 unity protocol
-                            let timestamp_now = SystemTime::now()
-                                .duration_since(UNIX_EPOCH)
-                                .unwrap()
-                                .as_secs();
-                            reopened_block.set_timestamp(timestamp_now);
+                            reopened_block
+                                .set_timestamp_now_later_than(chain_info.best_block_timestamp);
                             reopened_block
                         }
                         _ => {
@@ -1656,7 +1657,7 @@ impl MinerService for Miner {
         client: &MiningBlockChainClient,
         _imported: &[H256],
         _invalid: &[H256],
-        _enacted: &[H256],
+        enacted: &[H256],
         retracted: &[H256],
     )
     {
@@ -1707,9 +1708,12 @@ impl MinerService for Miner {
             }
         }
 
-        self.transaction_pool.record_transaction_sealed();
-        self.clear_pos_pending();
-        client.new_block_chained();
+        // Actions to do when new block imported in the main chain
+        if !enacted.is_empty() {
+            self.transaction_pool.record_transaction_sealed();
+            self.clear_pos_pending();
+            client.new_block_chained();
+        }
     }
 
     // AION 2.0

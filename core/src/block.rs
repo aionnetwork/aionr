@@ -299,6 +299,11 @@ impl<'x> OpenBlock<'x> {
     /// Alter the timestamp of the block.
     pub fn set_timestamp(&mut self, timestamp: u64) { self.block.header.set_timestamp(timestamp); }
 
+    /// Set the timestamp of the block to the current local time, but later than the given time.
+    pub fn set_timestamp_now_later_than(&mut self, later_than: u64) {
+        self.block.header.set_timestamp_now_later_than(later_than);
+    }
+
     /// Alter the difficulty for the block.
     pub fn set_difficulty(&mut self, a: U256) { self.block.header.set_difficulty(a); }
 

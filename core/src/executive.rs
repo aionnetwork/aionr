@@ -25,7 +25,7 @@ use std::thread;
 use std::sync::mpsc::{channel, Sender};
 use std::clone::Clone;
 use std::sync::{Arc, Mutex};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use blake2b::{blake2b};
 use aion_types::{H256, U256, U512, Address};
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ExecutionResult, ExecStatus, ReturnData, ParamsType};
@@ -40,6 +40,8 @@ use transaction::{Action, SignedTransaction};
 use crossbeam;
 pub use types::executed::Executed;
 use precompiled::builtin::{BuiltinExtImpl, BuiltinContext};
+
+use kvdb::{DBTransaction};
 
 #[cfg(debug_assertions)]
 /// Roughly estimate what stack size each level of evm depth will use. (Debug build)
@@ -562,6 +564,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         return_data: ReturnData::empty(),
                         exception: String::from("Error in balance transfer"),
                         state_root: H256::default(),
+                        invokable_hashes: Default::default(),
                     };
                 }
             }
@@ -631,6 +634,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     return_data: ReturnData::empty(),
                     exception: String::from("Not enough gas to execute precompiled contract."),
                     state_root: H256::default(),
+                    invokable_hashes: Default::default(),
                 };
             }
         } else {
@@ -656,6 +660,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     return_data: ReturnData::empty(),
                     exception: String::default(),
                     state_root: H256::default(),
+                    invokable_hashes: Default::default(),
                 };
             }
         }
@@ -678,6 +683,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         return_data: ReturnData::empty(),
                         exception: String::from("Error in balance transfer"),
                         state_root: H256::default(),
+                        invokable_hashes: Default::default(),
                     };
                 }
             }
@@ -753,6 +759,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                          failed.",
                     ),
                     state_root: H256::default(),
+                    invokable_hashes: Default::default(),
                 };
             }
         }
@@ -788,6 +795,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     return_data: ReturnData::empty(),
                     exception: String::from("Error in balance transfer"),
                     state_root: H256::default(),
+                    invokable_hashes: Default::default(),
                 };
             }
             self.state
@@ -816,6 +824,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         let mut final_results = Vec::new();
 
         let mut total_gas_used: U256 = U256::from(0);
+        let mut multiple_sets: HashMap<H256, HashSet<H256>> = HashMap::new();
         for idx in 0..txs.len() {
             let result = results.get(idx).unwrap().clone();
             let t = txs[idx].clone();
@@ -862,9 +871,63 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     state_root: result.state_root,
                 }))
             }
+
+            // store Meta transaction hashes
+            // encode as: b"alias" + hash + hash + ...
+            for (alias, tx_hash) in result.invokable_hashes {
+                let mut set = if let Some(ref mut set) = multiple_sets.get_mut(&alias) {
+                    set.clone()
+                } else {
+                    let mut set = HashSet::new();
+                    match self
+                        .state
+                        .export_kvdb()
+                        .get(::db::COL_EXTRA, &alias[..])
+                        .unwrap()
+                    {
+                        Some(invoked_set) => {
+                            Self::decode_alias_and_set(&invoked_set[..], &mut set);
+                        }
+                        None => {}
+                    }
+                    set
+                };
+
+                set.insert(tx_hash);
+                multiple_sets.insert(alias, set);
+            }
+        }
+
+        debug!(target: "vm", "meta alias sets: {:?}", multiple_sets);
+
+        // store alias sets
+        for (k, set) in multiple_sets.drain() {
+            // Step 1: encode alias set
+            let mut alias_data = Vec::new();
+            alias_data.append(&mut b"alias".to_vec());
+            for mut hash in set {
+                alias_data.append(&mut hash[..].to_vec());
+            }
+
+            // Step 2: write into database
+            let mut batch = DBTransaction::new();
+            batch.put(::db::COL_EXTRA, &k, alias_data.as_slice());
+            self.state
+                .export_kvdb()
+                .write(batch)
+                .expect("GRAPH DB write failed");
         }
 
         return final_results;
+    }
+
+    fn decode_alias_and_set(raw_set: &[u8], set: &mut HashSet<H256>) {
+        assert!(raw_set.len() >= 5);
+        let mut index = 5;
+        while index <= raw_set.len() - 32 {
+            set.insert(raw_set[index..(index + 32)].into());
+            index += 32;
+        }
     }
 
     /// Finalizes the transaction (does refunds and suicides).

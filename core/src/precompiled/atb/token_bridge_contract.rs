@@ -77,6 +77,7 @@ impl TokenBridgeContract {
             return_data: ReturnData::empty(),
             exception: err_msg,
             state_root: H256::default(),
+            invokable_hashes: Default::default(),
         }
     }
 
@@ -88,6 +89,7 @@ impl TokenBridgeContract {
             return_data: ReturnData::new(return_data, 0, length),
             exception: String::default(),
             state_root: H256::default(),
+            invokable_hashes: Default::default(),
         }
     }
 }

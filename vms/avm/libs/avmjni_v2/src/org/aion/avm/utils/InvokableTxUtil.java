@@ -2,18 +2,16 @@ package org.aion.avm.utils;
 
 import java.math.BigInteger;
 import java.util.Arrays;
+import java.nio.ByteBuffer;
 
-// import org.aion.crypto.ECKey;
-// import org.aion.crypto.HashUtil;
-// import org.aion.crypto.ISignature;
-// import org.aion.crypto.SignatureFac;
 import org.aion.types.AionAddress;
 import org.aion.types.InternalTransaction;
 import org.aion.types.InternalTransaction.RejectedStatus;
 import org.aion.types.Transaction;
-import org.aion.avm.jni.NativeKernelInterface;;
+import org.aion.avm.jni.NativeKernelInterface;
 import org.aion.avm.loader.Loader;
-// import org.aion.util.types.AddressUtils;
+import org.aion.avm.rlp.RLPList;
+import org.aion.avm.rlp.RLP;
 
 public class InvokableTxUtil {
 
@@ -24,6 +22,29 @@ public class InvokableTxUtil {
         RLP_META_TX_DATA = 3,
         RLP_META_TX_EXECUTOR = 4,
         RLP_META_TX_SIG = 5;
+    
+    private static final byte VERSION = 0;
+
+    private static final byte A0_IDENTIFIER = ByteUtil.hexStringToBytes("0xA0")[0];
+
+    /**
+     * Returns an address of with identifier A0, given the public key of the account (this is
+     * currently our only account type)
+     */
+    private static byte[] computeA0Address(byte[] publicKey) {
+        ByteBuffer buf = ByteBuffer.allocate(32);
+        buf.put(A0_IDENTIFIER);
+        // [1:]
+        buf.put(Loader.blake2b(publicKey), 1, 31);
+        return buf.array();
+    }
+
+    private static byte[] prependVersion(byte[] encoding) {
+        byte[] ret = new byte[encoding.length + 1];
+        ret[0] = VERSION;
+        System.arraycopy(encoding, 0, ret, 1, encoding.length);
+        return ret;
+    }
 
     // public static byte[] encodeInvokableTransaction(
     //         ECKey key,
@@ -98,8 +119,11 @@ public class InvokableTxUtil {
     // }
 
 
-    public static InternalTransaction decode(byte[] rlpEncoding, AionAddress callingAddress, long energyPrice, long energyLimit) {
+    public static InternalTransaction decode(byte[] rlpEncodingWithVersion, AionAddress callingAddress, long energyPrice, long energyLimit) {
+        if (rlpEncodingWithVersion[0] != 0) { return null; }
 
+        byte[] rlpEncoding = Arrays.copyOfRange(rlpEncodingWithVersion, 1, rlpEncodingWithVersion.length);
+        
         RLPList decodedTxList;
         try {
             decodedTxList = RLP.decode2(rlpEncoding);
@@ -136,20 +160,10 @@ public class InvokableTxUtil {
         // ISignature signature;
         AionAddress sender;
         if (sigs != null) {
-            // Singature Factory will decode the signature based on the algo
-            // presetted in main() entry.
-            // ISignature is = SignatureFac.fromBytes(sigs);
-            // if (is != null) {
-            //     signature = is;
-            //     sender = new AionAddress(is.getAddress());
-            // } else {
-            //     return null;
-            // }
-            // TODO: use signature method in rust kernel
             if (sigs.length != 96) {
                 return null;
             } else {
-                sender = new AionAddress(Arrays.copyOfRange(sigs, 0, 32));
+                sender = new AionAddress(computeA0Address(Arrays.copyOfRange(sigs, 0, 32)));
             }
         } else {
             return null;
@@ -166,9 +180,10 @@ public class InvokableTxUtil {
                 energyLimit,
                 energyPrice,
                 sigs,
-                rlpEncoding);
+                rlpEncodingWithVersion);
         }
         catch (Exception e) {
+            e.printStackTrace();
             return null;
         }
     }
@@ -187,12 +202,13 @@ public class InvokableTxUtil {
 
         byte[] transactionHashWithoutSignature =
         Loader.blake2b(
+            prependVersion(
                 InvokableTxUtil.rlpEncodeWithoutSignature(
                     nonce,
                     destination,
                     value,
                     data,
-                    executor));
+                    executor)));
 
         // message, public_key, signature
         if (!Loader.edverify(transactionHashWithoutSignature, 
@@ -206,7 +222,7 @@ public class InvokableTxUtil {
 
         if (destination == null) {
             return
-                InternalTransaction.contractCreateMetaTransaction(
+                InternalTransaction.contractCreateInvokableTransaction(
                     RejectedStatus.NOT_REJECTED,
                     sender,
                     nonce,
@@ -217,7 +233,7 @@ public class InvokableTxUtil {
                     transactionHash);
         } else {
             return
-                InternalTransaction.contractCallMetaTransaction(
+                InternalTransaction.contractCallInvokableTransaction(
                     RejectedStatus.NOT_REJECTED,
                     sender,
                     destination,

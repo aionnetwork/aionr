@@ -145,7 +145,10 @@ typedef struct avm_bytes (*avm_contract_address_fn)(const struct avm_address *ad
 
 typedef void (*avm_add_log_fn)(const void *handle, const struct avm_bytes *log, const i32 idx);
 
-typedef struct avm_bytes (*avm_get_transformed_code_fn)(const void *handle, const struct avm_address *address);
+typedef struct avm_bytes (*avm_get_transformed_code_fn)(
+    const void *handle,
+    const struct avm_address *address,
+    const u8 version);
 
 typedef void (*avm_set_objectgraph_fn)(const void *handle, const struct avm_address *address, const struct avm_bytes *data);
 
@@ -154,7 +157,8 @@ typedef struct avm_bytes (*avm_get_objectgraph_fn)(const void *handle, const str
 typedef void (*avm_set_transformed_code_fn)(
     const void *handle,
     const struct avm_address *address,
-    const struct avm_bytes *data);
+    const struct avm_bytes *data,
+    const u8 version);
 
 typedef struct avm_bytes (*avm_get_blockhash_fn)(const void *handle, const i64 block_number);
 

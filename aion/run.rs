@@ -209,7 +209,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     );
 
     let sync = Arc::new(Sync::new(cmd.net_conf.clone(), client.clone()));
-    sync.register_callback(sync.clone());
+    let weak_sync = Arc::downgrade(&sync);
+    sync.register_callback(weak_sync);
     let sync_notify = sync.clone() as Arc<ChainNotify>;
     let sync_run = sync.clone();
     service.add_notify(sync_notify);
