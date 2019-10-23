@@ -370,7 +370,7 @@ where
             .miner
             .new_block_allowed_with_seal_type(&*self.client, &SealType::PoS)
         {
-            return Err(errors::no_work()); // TODO-Unity: refine error
+            return Err(errors::pos_not_allowed());
         }
         let best_block = self.client.best_block_header();
         let grand_parent = self.client.block_header_data(&best_block.parent_hash());
@@ -400,7 +400,7 @@ where
         if template.is_some() {
             return Ok(template.unwrap().into());
         } else {
-            return Ok(H256::zero()); // TODO-Unity: return error
+            return Err(errors::pos_not_allowed());
         }
     }
 

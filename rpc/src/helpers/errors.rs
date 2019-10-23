@@ -38,6 +38,8 @@ mod codes {
     pub const NO_AUTHOR: i64 = -32002;
     pub const NO_NEW_WORK: i64 = -32003;
     pub const NO_WORK_REQUIRED: i64 = -32004;
+    pub const POW_NOT_ALLOWED: i64 = -32005;
+    pub const POS_NOT_ALLOWED: i64 = -32006;
     pub const UNKNOWN_ERROR: i64 = -32009;
     pub const TRANSACTION_ERROR: i64 = -32010;
     pub const EXECUTION_ERROR: i64 = -32015;
@@ -174,6 +176,22 @@ pub fn no_work() -> Error {
     Error {
         code: ErrorCode::ServerError(codes::NO_WORK),
         message: "Still syncing.".into(),
+        data: None,
+    }
+}
+
+pub fn pow_not_allowed() -> Error {
+    Error {
+        code: ErrorCode::ServerError(codes::POW_NOT_ALLOWED),
+        message: "PoW mining not allowed.".into(),
+        data: None,
+    }
+}
+
+pub fn pos_not_allowed() -> Error {
+    Error {
+        code: ErrorCode::ServerError(codes::POS_NOT_ALLOWED),
+        message: "PoS mining not allowed.".into(),
         data: None,
     }
 }

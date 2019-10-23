@@ -31,7 +31,6 @@ use rustc_hex::FromHex;
 use account_provider::AccountProvider;
 use acore_bytes::Bytes;
 use aion_types::{Address, H256, U256};
-use ansi_term::Colour;
 use block::{Block, ClosedBlock, IsBlock, SealedBlock};
 use client::{BlockId, MiningBlockChainClient, TransactionId};
 use engine::Engine;
@@ -268,7 +267,7 @@ impl Miner {
         {
             self.update_reseal_cooldown();
             trace!(target: "miner", "update_sealing: best_block: {:?}", client.chain_info().best_block_number);
-            // TODO-Unity: consider remove or simplify this condition
+            // TODO: consider remove or simplify this condition
             if self.requires_reseal(client.chain_info().best_block_number) {
                 trace!(target: "miner", "update_sealing: preparing a block");
                 if let Ok((block, original_work_hash)) =
@@ -303,22 +302,10 @@ impl Miner {
                     .as_secs();
 
                 if sealed.header().timestamp() <= timestamp_now {
-                    let n = sealed.header().number();
-                    let d = sealed.header().difficulty().clone();
-                    let h = sealed.header().hash();
-                    let t = sealed.header().timestamp();
-
                     // 4. Import block
                     if let Some(error) = client.import_sealed_block(sealed).err() {
                         debug!(target: "miner", "PoS block imported error: {}", error);
                     }
-
-                    // Log
-                    debug!(target: "miner", "PoS block reimported OK. #{}: diff: {}, hash: {}, timestamp: {}",
-                            Colour::White.bold().paint(format!("{}", n)),
-                            Colour::White.bold().paint(format!("{}", d)),
-                            Colour::White.bold().paint(format!("{:x}", h)),
-                            Colour::White.bold().paint(format!("{:x}", t)));
                 }
             }
             None => {}
@@ -449,7 +436,7 @@ impl Miner {
             )
             .or_else(|()| {
                 debug!(target: "miner", "Current work's seal type equals to best block's seal type");
-                Err(Error::PosInvalid) // TODO-Unity: to change err message
+                Err(Error::Other("PoS mining is not allowed.".to_string()))
             })?;
 
         // 2. Generate signature
@@ -601,7 +588,6 @@ impl Miner {
 
             let mut open_block = match seal_type {
                 Some(SealType::PoS) => {
-                    // TODO UNITY: consider reseal
                     let mut maybe_work = self.maybe_work.lock();
                     let mut resealing_work = self.sealing_work_pos.lock();
                     assert!(seed.is_some());
@@ -1527,14 +1513,16 @@ impl MinerService for Miner {
         let best_block_hash = client.chain_info().best_block_hash;
         let parent_hash = block.header().parent_hash().clone();
         if parent_hash != best_block_hash {
-            return Ok(()); // TODO-Unity: to handle as error result
+            return Err(Error::Other(
+                "The submited PoS block is outdated.".to_string(),
+            ));
         }
 
         // Get information for PoS block sealing
         let parent = match client.block_header_data(&parent_hash) {
             Some(header) => header,
             None => {
-                return Ok(()); // TODO-Unity: to handle as error result
+                return Err(Error::from(BlockError::UnknownParent(parent_hash)));
             }
         };
         let grand_parent = client.block_header_data(&parent.parent_hash());

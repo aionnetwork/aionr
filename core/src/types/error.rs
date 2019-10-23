@@ -153,7 +153,6 @@ impl fmt::Display for BlockError {
             InvalidNumber(ref mis) => format!("Invalid number in header: {}", mis),
             RidiculousNumber(ref oob) => format!("Implausible block number. {}", oob),
             UnknownParent(ref hash) => format!("Unknown parent: {}", hash),
-            //            UnknownUncleParent(ref hash) => format!("Unknown uncle parent: {}", hash),
             UnknownEpochTransition(ref num) => {
                 format!("Unknown transition to epoch number: {}", num)
             }
@@ -293,6 +292,8 @@ pub enum Error {
     Ethkey(EthkeyError),
     /// Account Provider error.
     AccountProvider(AccountsError),
+    /// Other error.
+    Other(String),
 }
 
 impl fmt::Display for Error {
@@ -317,6 +318,7 @@ impl fmt::Display for Error {
             Error::Engine(ref err) => err.fmt(f),
             Error::Ethkey(ref err) => err.fmt(f),
             Error::AccountProvider(ref err) => err.fmt(f),
+            Error::Other(ref err) => f.write_str(err),
         }
     }
 }

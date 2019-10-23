@@ -25,8 +25,6 @@ mod wrappers;
 mod node_info;
 mod storage;
 mod sync_provider;
-#[cfg(test)]
-mod test;
 
 use std::sync::{Arc,Weak};
 use std::time::Duration;

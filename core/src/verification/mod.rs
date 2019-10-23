@@ -534,7 +534,6 @@ mod tests {
         fn block_details(&self, hash: &H256) -> Option<BlockDetails> {
             self.blocks.get(hash).map(|bytes| {
                 let header = BlockView::new(bytes).header();
-                // TODO-UNITY: to fix difficulties if needed
                 BlockDetails {
                     number: header.number(),
                     total_difficulty: header.difficulty().clone(),

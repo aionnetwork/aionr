@@ -1604,9 +1604,9 @@ impl BlockChainClient for Client {
     fn chain_info(&self) -> BlockChainInfo {
         let mut chain_info = self.chain.read().chain_info();
 
-        // TODO-Unity: pending_total_difficulty is not used now. To add unity base pos total difficulty factor if necessary.
         // TODO: It will add up the difficulty of all the blocks in the queue, regardless of whether the block can be successfully verified.
-        // TODO: Find a better way to fix it if we want to use pending_total_difficulty.
+        //       Find a better way to fix it if we want to use pending_total_difficulty.
+        // TODO: pending_total_difficulty is not used now. To add unity base pos total difficulty factor if necessary.
         chain_info.pending_total_difficulty =
             chain_info.total_difficulty + self.block_queue.total_difficulty();
         chain_info
