@@ -136,6 +136,13 @@ macro_rules! load_bundled {
         Spec::load(include_bytes!(concat!("../../../resources/", $e, ".json")) as &[u8])
             .expect(concat!("Chain spec ", $e, " is invalid."))
     };
+    ($e:expr,$u:expr) => {
+        Spec::load_with_unity_update(
+            include_bytes!(concat!("../../../resources/", $e, ".json")) as &[u8],
+            $u,
+        )
+        .expect(concat!("Chain spec ", $e, " is invalid."))
+    };
 }
 
 #[cfg(test)]
@@ -222,6 +229,55 @@ fn load_from(s: ajson::spec::Spec) -> Result<Spec, Error> {
     Ok(s)
 }
 
+#[cfg(test)]
+/// Load from JSON object.
+fn load_from_with_unity_update(s: ajson::spec::Spec, unity_update: u64) -> Result<Spec, Error> {
+    let builtins = s
+        .accounts
+        .builtins()
+        .into_iter()
+        .map(|p| (p.0.into(), builtin_contract(From::from(p.1))))
+        .collect();
+    let g = Genesis::from(s.genesis);
+    let GenericSeal(seal_rlp) = g.seal.into();
+    let mut params = CommonParams::from(s.params);
+    params.unity_update = Some(unity_update);
+
+    let mut s = Spec {
+        name: s.name.clone().into(),
+        engine: Spec::engine(s.engine, params, builtins, s.accounts.premine()),
+        data_dir: s.data_dir.unwrap_or(s.name).into(),
+        parent_hash: g.parent_hash,
+        transactions_root: g.transactions_root,
+        receipts_root: g.receipts_root,
+        author: g.author,
+        difficulty: g.difficulty,
+        gas_limit: g.gas_limit,
+        gas_used: g.gas_used,
+        timestamp: g.timestamp,
+        extra_data: g.extra_data,
+        seal_rlp,
+        constructors: s
+            .accounts
+            .constructors()
+            .into_iter()
+            .map(|(a, c)| (a.into(), c.into()))
+            .collect(),
+        state_root_memo: RwLock::new(Default::default()), // will be overwritten right after.
+        genesis_state: s.accounts.into(),
+    };
+
+    // use memoized state root if provided.
+    match g.state_root {
+        Some(root) => *s.state_root_memo.get_mut() = root,
+        None => {
+            let _ = s.run_constructors(&Default::default(), BasicBackend(MemoryDB::new()))?;
+        }
+    }
+
+    Ok(s)
+}
+
 impl Spec {
     #[cfg(test)]
     /// Create a new Spec which conforms to the Frontier-era Morden chain except that it's a
@@ -235,7 +291,13 @@ impl Spec {
 
     #[cfg(test)]
     /// Create a new Spec which is a UnityEngine consensus
-    pub fn new_unity() -> Spec { load_bundled!("null_unity") }
+    pub fn new_unity(unity_update: Option<u64>) -> Spec {
+        if let Some(u) = unity_update {
+            load_bundled!("null_unity", u)
+        } else {
+            load_bundled!("null_unity")
+        }
+    }
 
     // create an instance of an Ethereum state machine, minus consensus logic.
     fn machine(
@@ -438,6 +500,15 @@ impl Spec {
         ajson::spec::Spec::load(reader)
             .map_err(fmt_err)
             .and_then(|x| load_from(x).map_err(fmt_err))
+    }
+    #[cfg(test)]
+    /// Loads spec from json file. Provide factories for executing contracts and ensuring
+    /// storage goes to the right place.
+    pub fn load_with_unity_update<'a, R>(reader: R, update_unity: u64) -> Result<Self, String>
+    where R: Read {
+        ajson::spec::Spec::load(reader)
+            .map_err(fmt_err)
+            .and_then(|x| load_from_with_unity_update(x, update_unity).map_err(fmt_err))
     }
 }
 
