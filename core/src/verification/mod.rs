@@ -650,7 +650,7 @@ mod tests {
     fn test_verify_block() {
         // Test against morden
         let mut good = Header::new();
-        let spec = Spec::new_unity();
+        let spec = Spec::new_unity(None);
         let engine = &*spec.engine;
 
         let min_gas_limit = engine.params().min_gas_limit;
@@ -910,7 +910,7 @@ mod tests {
         let mut good = Header::new();
 
         // unity_update is 9
-        let spec = Spec::new_unity();
+        let spec = Spec::new_unity(None);
         let engine = &*spec.engine;
 
         let min_gas_limit = engine.params().min_gas_limit;

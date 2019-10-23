@@ -1980,8 +1980,8 @@ mod tests {
     #[test]
     fn should_not_import_transaction_with_beacon_hash_before_unity_update() {
         // given
-        let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
-        let miner = miner_with_spec(&Spec::new_unity());
+        let client = TestBlockChainClient::new_with_spec(Spec::new_unity(None));
+        let miner = miner_with_spec(&Spec::new_unity(None));
         let transaction = transaction_with_beacon(H256::from(37472u64));
         let best_block = 0;
         // external
@@ -2037,8 +2037,8 @@ mod tests {
     #[test]
     fn should_not_import_transaction_with_invalid_beacon_hash_after_unity_update() {
         // given
-        let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
-        let miner = miner_with_spec(&Spec::new_unity());
+        let client = TestBlockChainClient::new_with_spec(Spec::new_unity(None));
+        let miner = miner_with_spec(&Spec::new_unity(None));
         let transaction = transaction_with_beacon(H256::from(37472u64));
         client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
         let best_block = 9;
@@ -2077,8 +2077,8 @@ mod tests {
     #[test]
     fn should_import_transaction_with_valid_beacon_hash_after_unity_update() {
         // given
-        let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
-        let miner = miner_with_spec(&Spec::new_unity());
+        let client = TestBlockChainClient::new_with_spec(Spec::new_unity(None));
+        let miner = miner_with_spec(&Spec::new_unity(None));
         client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
         let best_block = 9;
         let beacon = client.block(BlockId::Number(8)).unwrap();
@@ -2126,8 +2126,8 @@ mod tests {
     #[test]
     fn test_tx_pool_with_beacon_when_chain_reorg() {
         // given
-        let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
-        let miner = miner_with_spec(&Spec::new_unity());
+        let client = TestBlockChainClient::new_with_spec(Spec::new_unity(None));
+        let miner = miner_with_spec(&Spec::new_unity(None));
         client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
         let best_block = 9;
         let hash7 = client.block(BlockId::Number(7)).unwrap().hash();
@@ -2243,8 +2243,8 @@ mod tests {
     #[test]
     fn generate_pos_block() {
         // 1. get seed
-        let miner = miner_with_spec(&Spec::new_unity());
-        let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
+        let miner = miner_with_spec(&Spec::new_unity(None));
+        let client = TestBlockChainClient::new_with_spec(Spec::new_unity(None));
         client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
 
         let seed = H512::zero();
@@ -2275,9 +2275,9 @@ mod tests {
 
     #[test]
     fn pos_reseal() {
-        let miner = miner_with_spec(&Spec::new_unity());
-        let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
-        client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
+        let spec = Spec::new_unity(Some(0));
+        let miner = miner_with_spec(&spec);
+        let client = TestBlockChainClient::new_with_spec(spec);
 
         let seed = H512::zero();
         println!("seed = {:?}", seed);
