@@ -16,13 +16,14 @@ if [ ! -f "custom.env" ];then
     ## Step 1: check java environment
     if [ -z "$JAVA_HOME" ];then
         echo -e "\033[33mWARN: JAVA_HOME not found, try to install jdk first \033[0m"
-        apt install -y openjdk-11-jdk
+        sudo apt install -y openjdk-11-jdk
         echo "export JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64" > ./custom.env
         echo -e "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$JAVA_HOME/lib/server" >> ./custom.env
     fi
 
+    touch ./custom.env
     ## Step 2: install dependencies
-    apt update;apt install -y libboost-filesystem1.65-dev libboost-program-options1.65-dev llvm-4.0-dev
+    sudo apt update;apt install -y libboost-filesystem1.65-dev libboost-program-options1.65-dev llvm-4.0-dev
 fi
 
 echo -e "\033[32mCongratulations! Aion Rust Kernel is ready to run\033[0m"
