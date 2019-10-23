@@ -219,7 +219,6 @@ impl Mgr {
                     }
                 } else {
                     warn!(target:"p2p", "send: node not found hash {}", hash);
-                    println!("!!!! send: node not found hash {}\n", hash);
                     return false;
                 }
                 if !send_success {
@@ -708,9 +707,7 @@ impl Mgr {
         let mut pass = false;
         {
             if let Ok(mut lock) = self.nodes.write() {
-                println!("get nodes");
                 if let Some(mut node) = lock.get_mut(&hash) {
-                    println!("get node {}", hash);
                     let clear_token = cb.head.get_route();
                     pass = self.token_check(clear_token, node);
                 }

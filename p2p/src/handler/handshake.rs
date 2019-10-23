@@ -111,16 +111,14 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     let (_version, _rest) = rest.split_at(version_len);
 
     if let Ok(mut write) = p2p.nodes.try_write() {
-        if let Some(mut node) = write.remove(&hash) {
+        if let Some(mut node) = write.get_mut(&hash) {
             debug!(target: "p2p", "inbound node state: connected -> active");
             node.id.copy_from_slice(node_id);
-            println!("{}", node.get_id_string());
-
-            println!("ip:{:?} - {:?}", node.addr.ip, ip);
-            //            node.addr.ip.copy_from_slice(ip);
+            trace!(target: "p2p", "ip:{:?} - {:?}", node.addr.ip, ip);
             let port = port.read_u32::<BigEndian>().unwrap_or(30303);
-            println!("port:{} - {}", node.addr.port, port);
-            //            node.addr.port = port;
+            trace!(target: "p2p", "port:{} - {}", node.addr.port, port);
+            // use tcp random port now
+            // node.addr.port = port;
             node.state = STATE::ACTIVE;
             if let Ok(mut id_set) = p2p.nodes_id.lock() {
                 id_set.insert(node.get_id_string());
@@ -131,8 +129,6 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
             } else {
                 node.revision[0..revision_len].copy_from_slice(revision);
             }
-            let mut tx = node.tx.clone();
-            write.insert(node.get_hash(), node);
 
             let mut cb_out =
                 channel_buffer_template_with_version(cb_in.head.ver, Action::HANDSHAKERES.value());;
@@ -146,6 +142,7 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
             cb_out.body.put_slice(res_body.as_slice());
             cb_out.head.len = cb_out.body.len() as u32;
 
+            let mut tx = node.tx.clone();
             match tx.try_send(cb_out) {
                 Ok(_) => trace!(target: "p2p", "succeed sending handshake res"),
                 Err(err) => {
