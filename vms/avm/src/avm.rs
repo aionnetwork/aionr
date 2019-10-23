@@ -60,15 +60,15 @@ pub fn launch_jvm() {
                     libs.to_str().expect("The `libs` folder is not found"),
                 );
 
-                println!("classpath: {:?}", classpath);
-                // classpath = add_jars(classpath, "modAvmVersion1.jar");
-                // classpath = add_jars(classpath, "modAvmVersion2.jar");
+                debug!(target: "vm", "classpath: {:?}", classpath);
 
                 // prepare options
                 let mut options = Options::new();
                 options = options.version(Version::V18);
                 // TODO: use avm version to load resources
                 options = options.classpath(classpath);
+                options = options.initial_heap_size(512 * 1024 * 1024);
+                options = options.max_heap_size(512 * 1024 * 1024);
 
                 // launch jvm
                 let jvm = JavaVM::new(options).expect("Failed to launch a JVM instance");
