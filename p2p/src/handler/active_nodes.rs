@@ -92,6 +92,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     }
 
     let (node_count, mut rest) = cb_in.body.split_at(1);
+    let nodes_count: u32 = node_count[0] as u32;
 
     // check nodes length
     if nodes_count as usize * (NODE_ID_LENGTH + IP_LENGTH + mem::size_of::<u32>()) != rest.len() {
@@ -99,7 +100,6 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
         return;
     }
 
-    let nodes_count: u32 = node_count[0] as u32;
     if nodes_count > 0 {
         let mut temp_list = Vec::new();
         let (local_ip, _) = p2p.config.get_ip_and_port();

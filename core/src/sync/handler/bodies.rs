@@ -101,7 +101,7 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
     let mut res = channel_buffer_template_with_version(cb_in.head.ver, Action::BODIESRES.value());
 
     let mut res_body = Vec::new();
-    let hash_count = cb_in.head.len / HASH_LEN;
+    let hash_count = cb_in.head.len / HASH_LEN as u32;
     let mut rest = cb_in.body.as_slice();
     let mut data = Vec::new();
     let mut body_count = 0;

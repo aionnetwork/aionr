@@ -99,7 +99,7 @@ pub fn receive_res(
     trace!(target: "sync", "status/receive_res");
 
     // check channelbuffer len
-    if cb_in.head.len as usize < mem::size_of::<u64>() + mem::size_of::<u8>() + 2 * HASH_LENGTH {
+    if (cb_in.head.len as usize) < mem::size_of::<u64>() + mem::size_of::<u8>() + 2 * HASH_LENGTH {
         debug!(target: "sync", "status res channelbuffer length is too short" );
         return;
     }
