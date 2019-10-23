@@ -969,8 +969,6 @@ impl Client {
                 batch.delete(::db::COL_EXTRA, &key_tx_addr);
             }
 
-            // TODO: delete block blooms ?
-
             // block receipts
             let mut key_blk_receipts = H264::default();
             key_blk_receipts[0] = 4u8;
@@ -996,7 +994,7 @@ impl Client {
             }
             if DB_CAN_STOP.load(AtomicOrdering::SeqCst) {
                 stop_blk = blk - 1;
-                println!("stopped block = {}", stop_blk);
+                info!(target: "revert","stopped block = {}", stop_blk);
                 break;
             }
         }
