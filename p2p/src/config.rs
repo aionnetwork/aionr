@@ -58,7 +58,10 @@ impl Config {
         let frags: Vec<&str> = binding.split(":").collect::<Vec<&str>>();
         (
             String::from(frags[0]),
-            String::from(frags[1]).parse::<u32>().unwrap(),
+            String::from(frags[1]).parse::<u32>().unwrap_or_else(|e| {
+                warn!(target: "p2p", "failed to parse local node port: {}", e );
+                30303
+            }),
         )
     }
 }
