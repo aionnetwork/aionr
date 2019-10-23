@@ -2243,9 +2243,9 @@ mod tests {
     #[test]
     fn generate_pos_block() {
         // 1. get seed
-        let miner = miner_with_spec(&Spec::new_unity(None));
-        let client = TestBlockChainClient::new_with_spec(Spec::new_unity(None));
-        client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
+        let spec = Spec::new_unity(Some(0));
+        let miner = miner_with_spec(&spec);
+        let client = TestBlockChainClient::new_with_spec(spec);
 
         let seed = H512::zero();
         println!("seed = {:?}", seed);
