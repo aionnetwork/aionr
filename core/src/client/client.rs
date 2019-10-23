@@ -939,24 +939,43 @@ impl Client {
                 .expect("can not found block , db may crashed");
             batch.delete(::db::COL_HEADERS, &hash);
             batch.delete(::db::COL_BODIES, &hash);
+
             // delete col_extra
-            // TODO: delete block blooms ?
+
+            // block details
             let mut key_blk_detail = H264::default();
-            let mut key_blk_recipts = H264::default();
             key_blk_detail[0] = 0u8;
-            key_blk_recipts[0] = 4u8;
-            (*key_blk_detail)[1..].clone_from_slice(&hash);
-            (*key_blk_recipts)[1..].clone_from_slice(&hash);
+            batch.delete(::db::COL_EXTRA, &key_blk_detail);
+
+            // block hashes
             let mut blk_number = [0u8; 5];
             blk_number[0] = 1u8;
             blk_number[1] = (blk >> 24) as u8;
             blk_number[2] = (blk >> 16) as u8;
             blk_number[3] = (blk >> 8) as u8;
             blk_number[4] = blk as u8;
-            batch.delete(::db::COL_EXTRA, &hash);
-            batch.delete(::db::COL_EXTRA, &key_blk_detail);
-            batch.delete(::db::COL_EXTRA, &key_blk_recipts);
             batch.delete(::db::COL_EXTRA, &blk_number);
+
+            // transaction address
+            let mut key_tx_addr = H264::default();
+            key_tx_addr[0] = 2u8;
+            let body = self
+                .chain
+                .read()
+                .block_body(&hash)
+                .expect("can not found body , db may crashed");
+            for tx in body.transactions() {
+                (*key_tx_addr)[1..].clone_from_slice(tx.hash());
+                batch.delete(::db::COL_EXTRA, &key_tx_addr);
+            }
+
+            // block receipts
+            let mut key_blk_receipts = H264::default();
+            key_blk_receipts[0] = 4u8;
+            (*key_blk_detail)[1..].clone_from_slice(&hash);
+            (*key_blk_receipts)[1..].clone_from_slice(&hash);
+            batch.delete(::db::COL_EXTRA, &key_blk_receipts);
+
             let header = self
                 .chain
                 .read()
@@ -966,7 +985,7 @@ impl Client {
             batch.delete(::db::COL_STATE, &state_root);
             // flush dbtransaction
             if blk % 1000 == 0 {
-                info!(target:"revert","#{}", blk);
+                info!(target: "revert", "#{}", blk);
                 self.db
                     .write()
                     .write(batch.clone())
@@ -975,7 +994,7 @@ impl Client {
             }
             if DB_CAN_STOP.load(AtomicOrdering::SeqCst) {
                 stop_blk = blk - 1;
-                println!("stopped block = {}", stop_blk);
+                info!(target: "revert","stopped block = {}", stop_blk);
                 break;
             }
         }
