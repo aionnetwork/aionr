@@ -594,11 +594,16 @@ impl Miner {
                     let hash = resealing_work.get(&Seed(*seed.unwrap()));
                     match maybe_work.get(hash.unwrap_or(&H256::default())) {
                         Some(b) => {
+                            let timestamp_now = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs();
                             if !b.require_pos_reseal(
-                                timestamp.unwrap() - self.options.reseal_min_period.as_secs(),
+                                timestamp_now - self.options.reseal_min_period.as_secs(),
                             ) {
                                 return Ok((b.block.clone(), Some(*hash.unwrap())));
                             }
+                            debug!(target: "miner", "reopen pos block");
                             // add transactions to old_block
                             client.reopen_block(b.block.clone())
                         }
@@ -1844,7 +1849,7 @@ mod tests {
         Arc::try_unwrap(Miner::new(
             MinerOptions {
                 force_sealing: false,
-                reseal_min_period: Duration::from_secs(5),
+                reseal_min_period: Duration::from_secs(1),
                 prepare_block_interval: Duration::from_secs(5),
                 tx_gas_limit: !U256::zero(),
                 tx_queue_memory_limit: None,
@@ -2234,8 +2239,6 @@ mod tests {
         assert!(miner.requires_reseal(1u8.into()));
     }
 
-    // use client::EngineClient;
-    // use super::BlockId;
     use aion_types::{H256, H512};
     #[test]
     fn generate_pos_block() {
@@ -2260,6 +2263,41 @@ mod tests {
 
         assert!(template.is_some());
         println!("new block = {:?}, staker = {:?}", template.unwrap(), staker);
+
+        // 3. submit signature
+        let signature: H512 = "8e6151cd613c07fae0aaf521461111c8281c0715dc6bdc5620682efd52540c4040d48dc067b88b1bc225294f4a7412c46f49bdcb9271b6b18022149663eb3108"
+            .from_hex().unwrap().as_slice().into();
+        let (block, mut seal) = miner.get_ready_pos(&template.unwrap()).unwrap();
+        seal[1] = signature[..].into();
+        let result = miner.try_seal_pos(&client, seal, block);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn pos_reseal() {
+        let miner = miner_with_spec(&Spec::new_unity());
+        let client = TestBlockChainClient::new_with_spec(Spec::new_unity());
+        client.add_blocks(9, EachBlockWith::Nothing, SealType::PoW);
+
+        let seed = H512::zero();
+        println!("seed = {:?}", seed);
+
+        let staker: H256 = "da13c5e00eefa13b58292b9083c04559b77c5859bc764b47e2aa5ecfe9ea3bab"
+            .from_hex()
+            .unwrap()
+            .as_slice()
+            .into();
+
+        // 2. submit seed
+        let seed: H512 = "d1c02f4679b4a022f2d843bd750c34c94cd08a2b6fc2def298653b81b88245a345d8d3e2d8bbce3fdb3ab2918459633f4496d5609ac13d9710ddcede8957cc0c".
+            from_hex().unwrap().as_slice().into();
+        let template = miner.get_pos_template(&client, seed.into(), staker, staker);
+
+        assert!(template.is_some());
+        println!("new block = {:?}, staker = {:?}", template.unwrap(), staker);
+        ::std::thread::sleep(Duration::from_secs(1));
+        let template_1 = miner.get_pos_template(&client, seed.into(), staker, staker);
+        assert_eq!(template, template_1);
 
         // 3. submit signature
         let signature: H512 = "8e6151cd613c07fae0aaf521461111c8281c0715dc6bdc5620682efd52540c4040d48dc067b88b1bc225294f4a7412c46f49bdcb9271b6b18022149663eb3108"

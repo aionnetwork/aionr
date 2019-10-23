@@ -55,7 +55,6 @@ use std::collections::{VecDeque,HashMap,HashSet};
 use std::sync::Mutex;
 use std::sync::RwLock;
 use std::time::Duration;
-use std::time::SystemTime;
 use std::time::Instant;
 use std::net::TcpStream as StdTcpStream;
 use std::net::Shutdown;
@@ -255,12 +254,13 @@ impl Mgr {
                 Instant::now(),
                 Duration::from_secs(INTERVAL_TIMEOUT)
             ).for_each(move|_|{
-                let now = SystemTime::now();
                 let mut index: Vec<u64> = vec![];
                 if let Ok(mut write) = p2p_timeout.nodes.try_write(){
                     for (hash, node) in write.iter_mut() {
-                        if now.duration_since(node.update).expect("SystemTime::duration_since failed").as_secs() >= TIMEOUT_MAX {
-                            index.push(*hash);
+                        if let Ok(interval) = node.update.elapsed() {
+                            if interval.as_secs() >= TIMEOUT_MAX {
+                                index.push( * hash);
+                            }
                         }
                     }
 
@@ -361,28 +361,38 @@ impl Mgr {
                                     let p2p_outbound_2 = p2p_outbound_0.clone();
 
                                     // config stream
-                                    config_stream(&ts);
+                                    match config_stream(&ts){
+                                        Err(e) => {
+                                            error!(target: "p2p", "fail to connect to {} : {}",&temp_node.addr.to_string(),e);
+                                            return Ok(())
+                                        }
+                                        _ => ()
+                                    }
 
                                     // construct node instance and store it
-                                    let (tx, rx) = mpsc::channel(409600);
-                                    let (tx_thread, rx_thread) = oneshot::channel::<()>();
-                                    let ts_0 = ts.try_clone().unwrap();
-                                    let node = Node::new_outbound(
-                                        ts_0,
-                                        tx,
-                                        temp_node.id,
-                                        temp_node.if_seed,
-                                        tx_thread,
-                                    );
+                                    let (mut tx, rx) = mpsc::channel(409600);
+                                    let (mut tx_thread, rx_thread) = oneshot::channel::<()>();
+                                    if let Ok(ts_0) = ts.try_clone() {
+                                        let node = Node::new_outbound(
+                                            ts_0,
+                                            tx,
+                                            temp_node.id,
+                                            temp_node.if_seed,
+                                            tx_thread,
+                                        );
 
-                                    if let Ok(mut write) = p2p_outbound_0.nodes.try_write() {
-                                        if !write.contains_key(&hash) {
-                                            let id = node.get_id_string();
-                                            let ip = node.addr.get_ip();
-                                            if let None = write.insert(hash.clone(), node) {
-                                                debug!(target: "p2p", "outbound node added: {} {} {}", hash, id, ip);
+                                        if let Ok(mut write) = p2p_outbound_0.nodes.try_write() {
+                                            if !write.contains_key(&hash) {
+                                                let id = node.get_id_string();
+                                                let ip = node.addr.get_ip();
+                                                if let None = write.insert(hash.clone(), node) {
+                                                    debug!(target: "p2p", "outbound node added: {} {} {}", hash, id, ip);
+                                                }
                                             }
                                         }
+                                    } else {
+                                        error!(target: "p2p", "failed to clone TcpStream, stop connecting to {}",&temp_node.addr.to_string());
+                                        return Ok(())
                                     }
 
                                     // binding io futures
@@ -467,46 +477,54 @@ impl Mgr {
                 }
 
                 // config stream
-                config_stream(&ts);
+                match config_stream(&ts){
+                    Err(e) => {
+                        error!(target: "p2p", "fail to connect to {} : {}",&ts.peer_addr().unwrap().to_string(),e);
+                        return Ok(())
+                    }
+                    _ => ()
+                }
 
                 // construct node instance and store it
                 let (tx_channel, rx_channel) = mpsc::channel(409600);
                 let (tx_thread, rx_thread) = oneshot::channel::<()>();
-                let ts_0 = ts.try_clone().unwrap();
-                let node = Node::new_inbound(
-                    ts_0,
-                    tx_channel,
-                    false,
-                    tx_thread,
-                );
-                let hash = node.get_hash();
+                if let Ok(ts_0) = ts.try_clone() {
+                    let node = Node::new_inbound(
+                        ts_0,
+                        tx_channel,
+                        false,
+                        tx_thread,
+                    );
+                    let hash = node.get_hash();
 
-                if let Ok(mut write) = p2p_inbound.nodes.try_write() {
-                    let id: String = node.get_id_string();
-                    let binding: String = node.addr.to_string();
-                    if !write.contains_key(&node.get_hash()){
-                        if let None = write.insert(node.get_hash(), node) {
-                            info!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
+                    if let Ok(mut write) = p2p_inbound.nodes.try_write() {
+                        let id: String = node.get_id_string();
+                        let binding: String = node.addr.to_string();
+                        if !write.contains_key(&node.get_hash()) {
+                            if let None = write.insert(node.get_hash(), node) {
+                                info!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
+                            }
                         }
                     }
+
+                    // binding io futures
+                    let (sink, stream) = split_frame(ts);
+                    let read = stream.for_each(move |cb| {
+                        p2p_inbound_1.handle(hash.clone(), cb);
+                        Ok(())
+                    })
+                        .map_err(|err| error!(target: "p2p", "tcp inbound read: {:?}", err))
+                        .select(rx_thread.map_err(|_| {}))
+                        .map(|_| ())
+                        .map_err(|_| ());
+                    executor_inbound_0.spawn(read.then(|_| { Ok(()) }));
+                    let write = sink.send_all(rx_channel.map_err(|()| {
+                        io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")
+                    }));
+                    executor_inbound_1.spawn(write.then(|_| { Ok(()) }));
+                } else {
+                    error!(target: "p2p", "failed to clone TcpStream, stop connecting to {}", &ts.peer_addr().unwrap().to_string());
                 }
-
-                // binding io futures
-                let (sink, stream) = split_frame(ts);
-                let read = stream.for_each(move |cb| {
-                    p2p_inbound_1.handle(hash.clone(), cb);
-                    Ok(())
-                })
-                .map_err(|err| error!(target: "p2p", "tcp inbound read: {:?}", err))
-                .select(rx_thread.map_err(|_| {}))
-                .map(|_| ())
-                .map_err(|_| ());
-                executor_inbound_0.spawn(read.then(|_| { Ok(()) }));
-                let write = sink.send_all(rx_channel.map_err(|()| {
-                    io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")
-                }));
-                executor_inbound_1.spawn(write.then(|_| { Ok(()) }));
-
                 Ok(())
             })
             .map_err(|err| error!(target: "p2p", "executor server: {:?}", err))
@@ -752,13 +770,11 @@ impl Mgr {
 }
 
 /// helper function for setting inbound & outbound stream
-fn config_stream(stream: &TcpStream) {
-    stream
-        .set_recv_buffer_size(1 << 24)
-        .expect("set_recv_buffer_size failed");
-    stream
-        .set_keepalive(Some(Duration::from_secs(TIMEOUT_MAX)))
-        .expect("set_keepalive failed");
+fn config_stream(stream: &TcpStream) -> Result<(), io::Error> {
+    stream.set_recv_buffer_size(1 << 24)?;
+    stream.set_keepalive(Some(Duration::from_secs(TIMEOUT_MAX)))?;
+
+    Ok(())
 }
 
 /// helper function for tokio io frame
