@@ -50,7 +50,7 @@ mod handler;
 mod callable;
 
 use std::io;
-use std::sync::Arc;
+use std::sync::{Arc,Weak};
 use std::collections::{VecDeque,HashMap,HashSet};
 use std::sync::Mutex;
 use std::sync::RwLock;
@@ -101,7 +101,7 @@ pub struct Mgr {
     /// shutdown hook
     shutdown_hooks: Arc<Mutex<Vec<Sender<()>>>>,
     /// callback
-    callback: Arc<RwLock<Option<Arc<Callable>>>>,
+    callback: Arc<RwLock<Option<Weak<Callable>>>>,
     /// config
     config: Arc<Config>,
     /// temp queue storing seeds and active nodes queried from other nodes
@@ -160,7 +160,7 @@ impl Mgr {
         }
     }
 
-    pub fn register_callback(&self, callback: Arc<Callable>) {
+    pub fn register_callback(&self, callback: Weak<Callable>) {
         if let Ok(mut lock) = self.callback.write() {
             *lock = Some(callback);
         }
@@ -526,7 +526,10 @@ impl Mgr {
         }
         if let Ok(lock) = self.callback.read() {
             if let Some(ref callback) = *lock {
-                callback.disconnect(hash.clone());
+                match Weak::upgrade(callback) {
+                    Some(arc_callback) => arc_callback.disconnect(hash),
+                    None => warn!(target: "p2p", "sync has been shutdown?" ),
+                }
             }
         }
     }
@@ -732,7 +735,10 @@ impl Mgr {
                         Module::SYNC => {
                             if let Ok(lock) = p2p.callback.read() {
                                 if let Some(ref callback) = *lock {
-                                    callback.handle(hash, cb)
+                                    match Weak::upgrade(callback) {
+                                        Some(arc_callback) => arc_callback.handle(hash, cb),
+                                        None => warn!(target: "p2p", "sync has been shutdown?" ),
+                                    }
                                 }
                             }
                         }
