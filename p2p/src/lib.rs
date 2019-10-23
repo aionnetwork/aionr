@@ -213,7 +213,7 @@ impl Mgr {
                         }
                         Err(err) => {
                             send_success = false;
-                            error!(target: "p2p", "p2p/send: ip:{} err:{}", node.addr.get_ip(), err);
+                            trace!(target: "p2p", "p2p/send: ip:{} err:{}", node.addr.get_ip(), err);
                         }
                     }
                 } else {
@@ -391,7 +391,7 @@ impl Mgr {
                                             }
                                         }
                                     } else {
-                                        error!(target: "p2p", "failed to clone TcpStream, stop connecting to {}",&temp_node.addr.to_string());
+                                        trace!(target: "p2p", "failed to clone TcpStream, stop connecting to {}",&temp_node.addr.to_string());
                                         return Ok(())
                                     }
 
@@ -401,7 +401,7 @@ impl Mgr {
                                         p2p_outbound_2.handle(hash.clone(), cb);
                                         Ok(())
                                     })
-                                    .map_err(|err| error!(target: "p2p", "tcp outbound read: {:?}", err))
+                                    .map_err(|err| trace!(target: "p2p", "tcp outbound read: {:?}", err))
                                     .select(rx_thread.map_err(|_| {}))
                                     .map(|_| ())
                                     .map_err(|_| ());
@@ -513,7 +513,7 @@ impl Mgr {
                         p2p_inbound_1.handle(hash.clone(), cb);
                         Ok(())
                     })
-                        .map_err(|err| error!(target: "p2p", "tcp inbound read: {:?}", err))
+                        .map_err(|err| trace!(target: "p2p", "tcp inbound read: {:?}", err))
                         .select(rx_thread.map_err(|_| {}))
                         .map(|_| ())
                         .map_err(|_| ());
@@ -523,7 +523,7 @@ impl Mgr {
                     }));
                     executor_inbound_1.spawn(write.then(|_| { Ok(()) }));
                 } else {
-                    error!(target: "p2p", "failed to clone TcpStream, stop connecting to {}", &ts.peer_addr().unwrap().to_string());
+                    trace!(target: "p2p", "failed to clone TcpStream, stop connecting to {}", &ts.peer_addr().unwrap().to_string());
                 }
                 Ok(())
             })
@@ -744,7 +744,7 @@ impl Mgr {
                                     active_nodes::receive_req(p2p, hash, cb.head.ver)
                                 }
                                 Action::ACTIVENODESRES => active_nodes::receive_res(p2p, hash, cb),
-                                _ => error!(target: "p2p", "invalid action {}", cb.head.action),
+                                _ => trace!(target: "p2p", "invalid action {}", cb.head.action),
                             };
                         }
                         Module::SYNC => {
@@ -757,11 +757,11 @@ impl Mgr {
                                 }
                             }
                         }
-                        Module::UNKNOWN => error!(target: "p2p", "invalid ctrl {}", cb.head.ctrl),
+                        Module::UNKNOWN => trace!(target: "p2p", "invalid ctrl {}", cb.head.ctrl),
                     }
                 }
                 //Version::V1 => handshake::send(p2p, hash),
-                _ => error!(target: "p2p", "invalid version {}", cb.head.ver),
+                _ => trace!(target: "p2p", "invalid version {}", cb.head.ver),
             };
         } else {
             warn!(target: "p2p", "handle: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
