@@ -178,9 +178,8 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
         return;
     }
 
-    let (mut from, req_body_rest) = cb_in.body.split_at(mem::size_of::<u64>());
+    let (mut from, mut size) = cb_in.body.split_at(mem::size_of::<u64>());
     let from = from.read_u64::<BigEndian>().unwrap_or(1);
-    let (mut size, _) = req_body_rest.split_at(mem::size_of::<u32>());
     let size = size.read_u32::<BigEndian>().unwrap_or(1);
     let mut data = Vec::new();
 
