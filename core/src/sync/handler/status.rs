@@ -110,13 +110,14 @@ pub fn receive_res(
     let total_difficulty_len = total_difficulty_len.read_u8().unwrap_or(0) as usize;
 
     // check total_difficulty_len
-    if req_body_rest.len() != total_difficulty_len + 2 * HASH_LENGTH {
+    if req_body_rest.len() < total_difficulty_len + 2 * HASH_LENGTH {
         debug!(target: "sync", "status res with wrong total_difficulty length " );
         return;
     }
 
     let (total_difficulty, req_body_rest) = req_body_rest.split_at(total_difficulty_len);
-    let (best_hash, genesis_hash) = req_body_rest.split_at(HASH_LENGTH);
+    let (best_hash, rest) = req_body_rest.split_at(HASH_LENGTH);
+    let (genesis_hash, _rest) = rest.split_at(HASH_LENGTH);
 
     let total_difficulty = U256::from(total_difficulty);
     let best_hash = H256::from(best_hash);
