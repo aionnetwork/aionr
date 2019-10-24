@@ -95,6 +95,8 @@ pub fn import_blocks(
                 blocks_to_import.push(block.rlp_bytes(Seal::With));
             } else if status == BlockStatus::Bad {
                 break;
+            } else {
+                trace!(target: "sync", "ignore block #{}({}): {:?} ,from node {} ", block.header.number(), block.header.hash() , status, blocks_wrapper.node_hash);
             }
         }
 
