@@ -27,6 +27,9 @@ mod pos_validator;
 mod test;
 
 use std::sync::Arc;
+use std::cmp;
+use std::sync::Mutex;
+
 use super::Engine;
 use ajson;
 use machine::EthereumMachine;
@@ -35,11 +38,10 @@ use aion_types::{U256, U512};
 use header::{Header, SealType};
 use block::ExecutedBlock;
 use types::error::{BlockError, Error};
-use std::cmp;
-use std::sync::Mutex;
 use types::BlockNumber;
 use equihash::EquihashValidator;
 use fixed_point::{FixedPoint};
+use client::{BlockChainClient, BlockId};
 
 use self::dependent_header_validators::{
     DependentHeaderValidator,
@@ -84,7 +86,8 @@ pub struct UnityEngineParams {
     pub block_time_lower_bound: u64,
     pub block_time_upper_bound: u64,
     pub block_time_unity: u64,
-    pub minimum_difficulty: U256,
+    pub minimum_pow_difficulty: U256,
+    pub minimum_pos_difficulty: U256,
 }
 
 impl From<ajson::spec::UnityEngineParams> for UnityEngineParams {
@@ -113,7 +116,13 @@ impl From<ajson::spec::UnityEngineParams> for UnityEngineParams {
             block_time_lower_bound: p.block_time_lower_bound.map_or(5u64, Into::into),
             block_time_upper_bound: p.block_time_upper_bound.map_or(15u64, Into::into),
             block_time_unity: p.block_time_unity.map_or(10u64, Into::into),
-            minimum_difficulty: p.minimum_difficulty.map_or(U256::from(16), Into::into),
+            minimum_pow_difficulty: p
+                .minimum_pow_difficulty
+                .map_or(U256::from(16u64), Into::into),
+            minimum_pos_difficulty: p.minimum_pos_difficulty.map_or(
+                U256::from(10_000_000_000_000u64) * U256::from(1_000_000_000u64),
+                Into::into,
+            ),
         }
     }
 }
@@ -121,31 +130,26 @@ impl From<ajson::spec::UnityEngineParams> for UnityEngineParams {
 /// Difficulty calculator. TODO: impl mfc trait.
 pub struct DifficultyCalc {
     difficulty_bound_divisor: U256,
-    //    difficulty_bound_divisor_unity: u64,
+    // difficulty_bound_divisor_unity: u64,
     block_time_lower_bound: u64,
     block_time_upper_bound: u64,
-    //    block_time_unity: u64,
-    minimum_difficulty: U256,
+    // block_time_unity: u64,
+    minimum_pow_difficulty: U256,
+    minimum_pos_difficulty: U256,
     unity_update: Option<BlockNumber>,
-    unity_initial_pos_difficulty: Option<U256>,
 }
 
 impl DifficultyCalc {
-    pub fn new(
-        params: &UnityEngineParams,
-        unity_update: Option<BlockNumber>,
-        unity_initial_pos_difficulty: Option<U256>,
-    ) -> DifficultyCalc
-    {
+    pub fn new(params: &UnityEngineParams, unity_update: Option<BlockNumber>) -> DifficultyCalc {
         DifficultyCalc {
             difficulty_bound_divisor: params.difficulty_bound_divisor,
-            //            difficulty_bound_divisor_unity: params.difficulty_bound_divisor_unity,
+            // difficulty_bound_divisor_unity: params.difficulty_bound_divisor_unity,
             block_time_lower_bound: params.block_time_lower_bound,
             block_time_upper_bound: params.block_time_upper_bound,
-            minimum_difficulty: params.minimum_difficulty,
-            //            block_time_unity: params.block_time_unity,
+            minimum_pow_difficulty: params.minimum_pow_difficulty,
+            minimum_pos_difficulty: params.minimum_pos_difficulty,
+            // block_time_unity: params.block_time_unity,
             unity_update: unity_update,
-            unity_initial_pos_difficulty: unity_initial_pos_difficulty,
         }
     }
 
@@ -154,35 +158,35 @@ impl DifficultyCalc {
         parent: &Header,
         grand_parent: Option<&Header>,
         great_grand_parent: Option<&Header>,
+        client: &BlockChainClient,
     ) -> U256
     {
         match self.unity_update {
             // AION 2.0
             Some(fork_number) if parent.number() >= fork_number => {
-                // 1. First PoS block case 1: if no grand parent (block #1), return the initial PoS diff
-                let grand_parent = match grand_parent {
-                    Some(header) => header,
-                    None => {
-                        return self
-                            .unity_initial_pos_difficulty
-                            .unwrap_or(self.minimum_difficulty);
-                    }
-                };
-                // 2. First PoS block case 2: parent and grand parent are both PoW blocks
-                if parent.seal_type() == &Some(SealType::PoW)
-                    && grand_parent.seal_type() == &Some(SealType::PoW)
-                {
-                    return self
-                        .unity_initial_pos_difficulty
-                        .unwrap_or(self.minimum_difficulty);
+                // 1. First PoS block
+                if parent.number() == fork_number {
+                    // Dynamic initial pos difficulty: ARK-71
+                    let initial_pos_difficulty = client
+                        .get_total_stake(BlockId::Hash(parent.hash()))
+                        .map(|total_stake| total_stake * U256::from(10u64))
+                        .unwrap_or(self.minimum_pos_difficulty);
+                    return cmp::max(self.minimum_pos_difficulty, initial_pos_difficulty);
                 }
-                // If no great grand parent (block #2), return the difficulty of the grand parent
+
+                let grand_parent = grand_parent.expect(
+                    "Must have grand parent because block number is greater than 1 from here",
+                );
+
+                // 2. If no great grand parent (block #2), return the difficulty of the grand parent
                 let great_grand_parent = match great_grand_parent {
                     Some(header) => header,
                     None => {
                         return grand_parent.difficulty().to_owned();
                     }
                 };
+
+                // 3. Normal case
                 self.calculate_difficulty_v2(grand_parent, great_grand_parent)
             }
             // AION 1.x
@@ -227,10 +231,10 @@ impl DifficultyCalc {
             if parent_difficulty > multiplier * diff_base {
                 output_difficulty = parent_difficulty - multiplier * diff_base;
             } else {
-                output_difficulty = self.minimum_difficulty;
+                output_difficulty = self.minimum_pow_difficulty;
             }
         }
-        output_difficulty = cmp::max(output_difficulty, self.minimum_difficulty);
+        output_difficulty = cmp::max(output_difficulty, self.minimum_pow_difficulty);
         output_difficulty
     }
 
@@ -258,8 +262,12 @@ impl DifficultyCalc {
                 temp
             }
         };
+        let minimum_difficulty = match grand_parent.seal_type() {
+            Some(SealType::PoS) => self.minimum_pos_difficulty,
+            _ => self.minimum_pow_difficulty,
+        };
 
-        cmp::max(self.minimum_difficulty, diff)
+        cmp::max(minimum_difficulty, diff)
     }
 }
 
@@ -411,11 +419,7 @@ impl UnityEngine {
             machine.params().monetary_policy_update,
             machine.premine(),
         );
-        let difficulty_calc = DifficultyCalc::new(
-            &params,
-            machine.params().unity_update,
-            machine.params().unity_initial_pos_difficulty,
-        );
+        let difficulty_calc = DifficultyCalc::new(&params, machine.params().unity_update);
         Arc::new(UnityEngine {
             machine,
             rewards_calculator,
@@ -453,10 +457,11 @@ impl Engine for Arc<UnityEngine> {
         parent: &Header,
         grand_parent: Option<&Header>,
         great_grand_parent: Option<&Header>,
+        client: &BlockChainClient,
     ) -> U256
     {
         self.difficulty_calc
-            .calculate_difficulty(parent, grand_parent, great_grand_parent)
+            .calculate_difficulty(parent, grand_parent, great_grand_parent, client)
     }
 
     fn seal_fields(&self, header: &Header) -> usize {
@@ -526,6 +531,7 @@ impl Engine for Arc<UnityEngine> {
         parent: &Header,
         grand_parent: Option<&Header>,
         great_grand_parent: Option<&Header>,
+        client: &BlockChainClient,
     ) -> Result<(), Error>
     {
         // Verifications related to direct parent
@@ -552,7 +558,7 @@ impl Engine for Arc<UnityEngine> {
             difficulty_calc: &self.difficulty_calc,
         }));
         for v in grand_validators.iter() {
-            v.validate(header, parent, grand_parent, great_grand_parent)?;
+            v.validate(header, parent, grand_parent, great_grand_parent, client)?;
         }
 
         Ok(())
@@ -564,13 +570,15 @@ impl Engine for Arc<UnityEngine> {
         parent: &Header,
         grand_parent: Option<&Header>,
         great_grand_parent: Option<&Header>,
+        client: &BlockChainClient,
     )
     {
         if header.number() == 0 {
             panic!("Can't calculate genesis block difficulty.");
         }
 
-        let difficulty = self.calculate_difficulty(parent, grand_parent, great_grand_parent);
+        let difficulty =
+            self.calculate_difficulty(parent, grand_parent, great_grand_parent, client);
         header.set_difficulty(difficulty);
     }
 

@@ -43,6 +43,7 @@ use kvdb::{MockDbRepository, DBTransaction, KeyValueDB};
 use machine::EthereumMachine;
 use std::collections::BTreeMap;
 use db;
+use tests::common::TestBlockChainClient;
 
 pub fn make_aion_machine() -> EthereumMachine {
     EthereumMachine::regular(Default::default(), BTreeMap::new(), U256::zero())
@@ -184,6 +185,7 @@ where
         IoChannel::disconnected(),
     )
     .unwrap();
+    let dummy_client = TestBlockChainClient::new_with_spec(test_spec.clone());
     let test_engine = &*test_spec.engine;
 
     let mut db = test_spec
@@ -222,6 +224,7 @@ where
             vec![],
             Arc::new(MockDbRepository::init(vec![String::new()])),
             None,
+            &dummy_client,
         )
         .unwrap();
         b.set_difficulty(U256::from(0x20000));

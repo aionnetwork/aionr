@@ -39,8 +39,10 @@ pub struct UnityEngineParams {
     pub difficulty_bound_divisor: Option<Uint>,
     #[serde(rename = "difficultyBoundDivisorUnity")]
     pub difficulty_bound_divisor_unity: Option<u64>,
-    #[serde(rename = "minimumDifficulty")]
-    pub minimum_difficulty: Option<Uint>,
+    #[serde(rename = "minimumPoWDifficulty")]
+    pub minimum_pow_difficulty: Option<Uint>,
+    #[serde(rename = "minimumPoSDifficulty")]
+    pub minimum_pos_difficulty: Option<Uint>,
     #[serde(rename = "blockTimeLowerBound")]
     pub block_time_lower_bound: Option<u64>,
     #[serde(rename = "blockTimeUpperBound")]

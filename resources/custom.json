@@ -14,8 +14,7 @@
     "maximumExtraDataSize": "0x20",
     "minGasLimit": "0x100590",
     "monetaryPolicyUpdate": "0",
-    "unityUpdate": "10",
-    "unityPoSInitialDifficulty": "2000000000"
+    "unityUpdate": "10"
   },
   "genesis": {
     "seal": {

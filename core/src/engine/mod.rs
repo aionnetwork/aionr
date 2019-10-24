@@ -34,6 +34,7 @@ use precompiled::builtin::BuiltinContract;
 use transaction::{UnverifiedTransaction, SignedTransaction};
 use aion_types::{U256, Address};
 use machine::EthereumMachine;
+use client::BlockChainClient;
 
 use aion_machine::{Machine, LocalizedMachine as Localized};
 use unexpected::{Mismatch, OutOfBounds};
@@ -121,6 +122,7 @@ pub trait Engine: Sync + Send {
         _parent: &Header,
         _grand_parent: Option<&Header>,
         _great_grand_parent: Option<&Header>,
+        _client: &BlockChainClient,
     ) -> U256
     {
         U256::from(0)
@@ -186,6 +188,7 @@ pub trait Engine: Sync + Send {
         _parent: &<EthereumMachine as Machine>::Header,
         _grand_parent: Option<&<EthereumMachine as Machine>::Header>,
         _great_grand_parent: Option<&<EthereumMachine as Machine>::Header>,
+        _client: &BlockChainClient,
     ) -> Result<(), Error>
     {
         Ok(())
@@ -199,6 +202,7 @@ pub trait Engine: Sync + Send {
         _parent: &<EthereumMachine as Machine>::Header,
         _grand_parent: Option<&<EthereumMachine as Machine>::Header>,
         _great_grand_parent: Option<&<EthereumMachine as Machine>::Header>,
+        _client: &BlockChainClient,
     )
     {
     }
