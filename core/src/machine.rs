@@ -198,7 +198,15 @@ impl EthereumMachine {
     }
 
     /// Does basic verification of the transaction.
-    pub fn verify_transaction_basic(&self, t: &UnverifiedTransaction) -> Result<(), Error> {
+    pub fn verify_transaction_basic(
+        &self,
+        t: &UnverifiedTransaction,
+        block_num: Option<BlockNumber>,
+    ) -> Result<(), Error>
+    {
+        if block_num.is_some() {
+            t.is_allowed_type(self.params().monetary_policy_update, block_num.unwrap())?;
+        }
         t.verify_basic(None)?;
 
         Ok(())

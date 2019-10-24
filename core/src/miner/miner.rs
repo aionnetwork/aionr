@@ -973,7 +973,7 @@ impl Miner {
         match self
             .engine
             .machine()
-            .verify_transaction_basic(&transaction)
+            .verify_transaction_basic(&transaction, None)
             .and_then(|_| {
                 self.engine
                     .machine()

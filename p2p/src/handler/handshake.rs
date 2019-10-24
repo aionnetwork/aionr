@@ -87,6 +87,12 @@ pub fn send(p2p: Mgr, hash: u64) {
 pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     debug!(target: "p2p", "handshake/receive_req");
 
+    // check channelbuffer len
+    if (cb_in.head.len as usize) < NODE_ID_LENGTH + 2 * mem::size_of::<i32>() + IP_LENGTH + 2 {
+        debug!(target: "p2p", "handshake req channelbuffer length is too short" );
+        return;
+    }
+
     let (node_id, req_body_rest) = cb_in.body.split_at(NODE_ID_LENGTH);
     if let Ok(id_set) = p2p.nodes_id.lock() {
         if id_set.contains(&String::from_utf8_lossy(&node_id).to_string()) {
@@ -105,10 +111,22 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     let (mut port, revision_version) = req_body_rest.split_at(mem::size_of::<i32>());
     let (revision_len, rest) = revision_version.split_at(1);
     let revision_len = revision_len[0] as usize;
+
+    // check revision length
+    if revision_len < rest.len() + 1 {
+        debug!(target: "p2p", "handshake req with wrong revision length" );
+        return;
+    }
+
     let (revision, rest) = rest.split_at(revision_len);
-    let (version_len, rest) = rest.split_at(1);
+    let (version_len, version) = rest.split_at(1);
     let version_len = version_len[0] as usize;
-    let (_version, _rest) = rest.split_at(version_len);
+
+    // check version length
+    if version_len != version.len() {
+        debug!(target: "p2p", "handshake req with wrong version length" );
+        return;
+    }
 
     if let Ok(mut write) = p2p.nodes.try_write() {
         if let Some(mut node) = write.get_mut(&hash) {
@@ -158,10 +176,21 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
 pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     debug!(target: "p2p", "handshake/receive_res");
 
+    // check channelbuffer len
+    if cb_in.head.len < 2 {
+        debug!(target: "p2p", "handshake res channelbuffer length is too short" );
+        return;
+    }
+
     let (_, revision) = cb_in.body.split_at(1);
-    let (revision_len, rest) = revision.split_at(1);
+    let (revision_len, revision_bytes) = revision.split_at(1);
     let revision_len = revision_len[0] as usize;
-    let (revision_bytes, _rest) = rest.split_at(revision_len);
+
+    // check revision length
+    if revision_len != revision_bytes.len() {
+        debug!(target: "p2p", "handshake req with wrong revision length" );
+        return;
+    }
 
     if let Ok(mut write) = p2p.nodes.try_write() {
         if let Some(mut node) = write.get_mut(&hash) {

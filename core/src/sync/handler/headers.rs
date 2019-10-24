@@ -172,15 +172,20 @@ fn send(p2p: Mgr, hash: u64, from: u64, size: u32) -> bool {
 pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
     trace!(target: "sync", "headers/receive_req");
 
+    // check channelbuffer len
+    if cb_in.head.len as usize != mem::size_of::<u64>() + mem::size_of::<u32>() {
+        debug!(target: "sync", "headers req channelbuffer length is wrong" );
+        return;
+    }
+
+    let (mut from, mut size) = cb_in.body.split_at(mem::size_of::<u64>());
+    let from = from.read_u64::<BigEndian>().unwrap_or(1);
+    let size = size.read_u32::<BigEndian>().unwrap_or(1);
+    let mut data = Vec::new();
+
     let mut res = channel_buffer_template_with_version(cb_in.head.ver, Action::HEADERSRES.value());
 
     let mut res_body = Vec::new();
-
-    let (mut from, req_body_rest) = cb_in.body.split_at(mem::size_of::<u64>());
-    let from = from.read_u64::<BigEndian>().unwrap_or(1);
-    let (mut size, _) = req_body_rest.split_at(mem::size_of::<u32>());
-    let size = size.read_u32::<BigEndian>().unwrap_or(1);
-    let mut data = Vec::new();
 
     if size <= LARGE_REQUEST_SIZE {
         for i in from..(from + size as u64) {
@@ -213,6 +218,12 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
 
 pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncStorage>) {
     trace!(target: "sync", "headers/receive_res");
+
+    // check channelbuffer len
+    if cb_in.head.len == 0 {
+        debug!(target: "sync", "headers res channelbuffer is empty" );
+        return;
+    }
 
     let downloaded_headers: &Mutex<VecDeque<HeadersWrapper>> = storage.downloaded_headers();
 

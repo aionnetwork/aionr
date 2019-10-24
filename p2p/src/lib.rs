@@ -719,6 +719,12 @@ impl Mgr {
     /// messages with module code other than p2p module
     /// should flow into external handlers
     fn handle(&self, hash: u64, cb: ChannelBuffer) {
+        // check body length
+        if cb.head.len as usize != cb.body.len() {
+            debug!(target: "p2p", "Length does not match!! hash/ver/ctrl/action {}/{}/{}/{}", hash, cb.head.ver, cb.head.ctrl, cb.head.action);
+            return;
+        }
+
         let p2p = self.clone();
         debug!(target: "p2p", "handle: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
         // verify if flag token has been set

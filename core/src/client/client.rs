@@ -946,6 +946,7 @@ impl Client {
             // block details
             let mut key_blk_detail = H264::default();
             key_blk_detail[0] = 0u8;
+            (*key_blk_detail)[1..].clone_from_slice(&hash);
             batch.delete(::db::COL_EXTRA, &key_blk_detail);
 
             // block hashes
@@ -973,7 +974,6 @@ impl Client {
             // block receipts
             let mut key_blk_receipts = H264::default();
             key_blk_receipts[0] = 4u8;
-            (*key_blk_detail)[1..].clone_from_slice(&hash);
             (*key_blk_receipts)[1..].clone_from_slice(&hash);
             batch.delete(::db::COL_EXTRA, &key_blk_receipts);
 

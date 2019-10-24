@@ -74,7 +74,7 @@ pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &Engine) -> Res
         .iter()
         .map(|rlp| rlp.as_val::<UnverifiedTransaction>())
     {
-        engine.verify_transaction_basic(&t?)?;
+        engine.verify_transaction_basic(&t?, header.number())?;
     }
     Ok(())
 }
