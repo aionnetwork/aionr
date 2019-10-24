@@ -962,6 +962,7 @@ impl Miner {
                 }
             }
         }
+
         let hash = transaction.hash().clone();
         if client
             .transaction_block(TransactionId::Hash(hash.clone()))
@@ -973,7 +974,7 @@ impl Miner {
         match self
             .engine
             .machine()
-            .verify_transaction_basic(&transaction, None)
+            .verify_transaction_basic(&transaction, Some(best_block_header.number()))
             .and_then(|_| {
                 self.engine
                     .machine()
