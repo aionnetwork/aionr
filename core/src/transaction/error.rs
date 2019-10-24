@@ -108,6 +108,7 @@ pub enum Error {
         /// Transaction gas
         got: U256,
     },
+    InvalidTransactionType,
     /// Invalid beacon hash
     InvalidBeaconHash(H256),
     /// beacon hash is banned
@@ -191,6 +192,7 @@ impl fmt::Display for Error {
                     minimal, maximal, got
                 )
             }
+            InvalidTransactionType => format!("Invalid transaction type. Expected 1 or 2"),
             InvalidBeaconHash(ref hash) => {
                 format!(
                     "Invalid transaction beacon hash :{}, not in canon chain.",

@@ -242,7 +242,12 @@ pub trait Engine: Sync + Send {
     /// Additional verification for transactions in blocks.
     // TODO: Add flags for which bits of the transaction to check.
     // TODO: consider including State in the params.
-    fn verify_transaction_basic(&self, t: &UnverifiedTransaction) -> Result<(), Error> {
-        self.machine().verify_transaction_basic(t)
+    fn verify_transaction_basic(
+        &self,
+        t: &UnverifiedTransaction,
+        block_num: BlockNumber,
+    ) -> Result<(), Error>
+    {
+        self.machine().verify_transaction_basic(t, Some(block_num))
     }
 }

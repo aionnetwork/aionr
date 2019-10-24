@@ -415,6 +415,7 @@ pub fn transaction_message(error: TransactionError) -> String {
                 minimal, maximal, got
             )
         }
+        InvalidTransactionType => format!("Invalid transaction type. Expected type = 1 or 2"),
         InvalidBeaconHash(ref hash) => {
             format!(
                 "Invalid transaction beacon hash :{}, not in canon chain.",

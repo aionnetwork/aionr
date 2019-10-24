@@ -339,7 +339,7 @@ impl rlp::Decodable for UnverifiedTransaction {
                 transaction_type: {
                     let transaction_type_vec = d.val_at::<Vec<u8>>(7)?;
                     if transaction_type_vec.len() == 0 {
-                        1u8.into()
+                        0u8.into()
                     } else {
                         transaction_type_vec[0].into()
                     }
@@ -464,6 +464,23 @@ impl UnverifiedTransaction {
             .into());
         }
         Ok(self)
+    }
+
+    pub fn is_allowed_type(
+        &self,
+        has_fork: Option<u64>,
+        current_blk: BlockNumber,
+    ) -> Result<(), error::Error>
+    {
+        match has_fork {
+            Some(ref fork)
+                if *fork < current_blk && !(self.transaction_type == AVM_TRANSACTION_TYPE
+                    || self.transaction_type == DEFAULT_TRANSACTION_TYPE) =>
+            {
+                Err(error::Error::InvalidTransactionType)
+            }
+            _ => Ok(()),
+        }
     }
 
     /// Verify basic signature params. Does not attempt sender recovery.
