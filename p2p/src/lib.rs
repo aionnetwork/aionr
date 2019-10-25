@@ -734,7 +734,11 @@ impl Mgr {
                 if let Some(mut node) = lock.get_mut(&hash) {
                     let clear_token = cb.head.get_route();
                     pass = self.token_check(clear_token, node);
+                } else {
+                    debug!(target: "p2p", "failed to get node with hash {}", hash);
                 }
+            } else {
+                debug!(target: "p2p", "failed to get nodes when handling message");
             }
         }
 
@@ -770,7 +774,7 @@ impl Mgr {
                 _ => trace!(target: "p2p", "invalid version {}", cb.head.ver),
             };
         } else {
-            warn!(target: "p2p", "handle: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
+            debug!(target: "p2p", "not pass token check: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
         }
     }
 }
