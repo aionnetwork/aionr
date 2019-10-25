@@ -35,7 +35,9 @@ use kvdb::MockDbRepository;
 use aion_types::Address;
 use vms::LastHashes;
 use tests::common::helpers::get_temp_state_db;
+use tests::common::TestBlockChainClient;
 use spec::Spec;
+use client::BlockChainClient;
 
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 fn enact_bytes(
@@ -47,6 +49,7 @@ fn enact_bytes(
     great_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
+    client: &BlockChainClient,
 ) -> Result<LockedBlock, Error>
 {
     let block = BlockView::new(block_bytes);
@@ -88,6 +91,7 @@ fn enact_bytes(
         vec![],
         Arc::new(MockDbRepository::init(vec![])),
         None,
+        client,
     )?;
 
     b.populate_from(&header);
@@ -106,6 +110,7 @@ fn enact_and_seal(
     great_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
+    client: &BlockChainClient,
 ) -> Result<SealedBlock, Error>
 {
     let header = BlockView::new(block_bytes).header_view();
@@ -118,6 +123,7 @@ fn enact_and_seal(
         great_grand_parent,
         last_hashes,
         factories,
+        client,
     )?
     .seal(engine, header.seal())?)
 }
@@ -126,6 +132,7 @@ fn enact_and_seal(
 fn open_block() {
     let spec = Spec::new_test();
     let genesis_header = spec.genesis_header();
+    let client = TestBlockChainClient::new_with_spec(spec.clone());
     let db = spec
         .ensure_db_good(get_temp_state_db(), &Default::default())
         .unwrap();
@@ -144,6 +151,7 @@ fn open_block() {
         vec![],
         Arc::new(MockDbRepository::init(vec![])),
         None,
+        &client,
     )
     .unwrap();
     let b = b.close_and_lock();
@@ -157,6 +165,7 @@ fn enact_block() {
     let spec = Spec::new_test();
     let engine = &*spec.engine;
     let genesis_header = spec.genesis_header();
+    let client = TestBlockChainClient::new_with_spec(spec.clone());
 
     let db = spec
         .ensure_db_good(get_temp_state_db(), &Default::default())
@@ -176,6 +185,7 @@ fn enact_block() {
         vec![],
         Arc::new(MockDbRepository::init(vec![])),
         None,
+        &client,
     )
     .unwrap()
     .close_and_lock()
@@ -196,6 +206,7 @@ fn enact_block() {
         None,
         last_hashes,
         Default::default(),
+        &client,
     )
     .unwrap();
 

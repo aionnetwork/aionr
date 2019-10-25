@@ -23,6 +23,7 @@ use super::DifficultyCalc;
 use types::error::{Error, BlockError};
 use header::Header;
 use unexpected::{Mismatch};
+use client::BlockChainClient;
 
 pub trait GrandParentHeaderValidator {
     fn validate(
@@ -31,6 +32,7 @@ pub trait GrandParentHeaderValidator {
         parent_header: &Header,
         grand_parent_header: Option<&Header>,
         great_grand_parent_header: Option<&Header>,
+        client: &BlockChainClient,
     ) -> Result<(), Error>;
 }
 
@@ -45,6 +47,7 @@ impl<'a> GrandParentHeaderValidator for DifficultyValidator<'a> {
         parent_header: &Header,
         grand_parent_header: Option<&Header>,
         great_grand_parent_header: Option<&Header>,
+        client: &BlockChainClient,
     ) -> Result<(), Error>
     {
         if header.number() == 0 {
@@ -56,6 +59,7 @@ impl<'a> GrandParentHeaderValidator for DifficultyValidator<'a> {
             parent_header,
             grand_parent_header,
             great_grand_parent_header,
+            client,
         );
         if difficulty != calc_difficulty {
             Err(BlockError::InvalidDifficulty(Mismatch {

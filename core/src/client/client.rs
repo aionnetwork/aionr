@@ -411,6 +411,7 @@ impl Client {
             last_hashes,
             self.factories.clone(),
             self.db.read().clone(),
+            self,
         );
         let locked_block = enact_result.map_err(|e| {
             warn!(target: "client", "Block import failed for #{} ({})\nError: {:?}", header.number(), header.hash(), e);
@@ -1137,6 +1138,11 @@ impl BlockChainClient for Client {
         })
     }
 
+    // Get the total stake (balance) of the staking contract at the given block
+    fn get_total_stake(&self, id: BlockId) -> Option<U256> {
+        self.balance(&self.config.stake_contract, id)
+    }
+
     fn estimate_gas(&self, t: &SignedTransaction, block: BlockId) -> Result<U256, CallError> {
         let (mut upper, max_upper, env_info) = {
             let mut env_info = self.env_info(block).ok_or(CallError::StatePruned)?;
@@ -1265,6 +1271,7 @@ impl BlockChainClient for Client {
             parent_header,
             grand_parent_header,
             great_grand_parent_header,
+            self,
         )
     }
 
@@ -1733,6 +1740,7 @@ impl MiningBlockChainClient for Client {
             extra_data,
             self.db.read().clone(),
             timestamp,
+            self,
         )
         .expect(
             "OpenBlock::new only fails if parent state root invalid; state root of best block's \

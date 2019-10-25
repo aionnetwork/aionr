@@ -47,6 +47,7 @@ use transaction::{
 };
 use verification::PreverifiedBlock;
 use kvdb::KeyValueDB;
+use client::BlockChainClient;
 
 use num_bigint::BigUint;
 
@@ -233,6 +234,7 @@ impl<'x> OpenBlock<'x> {
         extra_data: Bytes,
         kvdb: Arc<KeyValueDB>,
         timestamp: Option<u64>,
+        client: &BlockChainClient,
     ) -> Result<Self, Error>
     {
         let number = parent.number() + 1;
@@ -286,6 +288,7 @@ impl<'x> OpenBlock<'x> {
             parent,
             grand_parent,
             great_grand_parent,
+            client,
         );
 
         engine.machine().on_new_block(&mut r.block)?;
@@ -710,6 +713,7 @@ fn enact(
     last_hashes: Arc<LastHashes>,
     factories: Factories,
     kvdb: Arc<KeyValueDB>,
+    client: &BlockChainClient,
 ) -> Result<LockedBlock, Error>
 {
     {
@@ -740,6 +744,7 @@ fn enact(
         vec![],
         kvdb,
         None,
+        client,
     )?;
 
     b.populate_from(header);
@@ -869,6 +874,7 @@ pub fn enact_verified(
     last_hashes: Arc<LastHashes>,
     factories: Factories,
     kvdb: Arc<KeyValueDB>,
+    client: &BlockChainClient,
 ) -> Result<LockedBlock, Error>
 {
     enact(
@@ -882,5 +888,6 @@ pub fn enact_verified(
         last_hashes,
         factories,
         kvdb,
+        client,
     )
 }

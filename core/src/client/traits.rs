@@ -218,6 +218,8 @@ pub trait BlockChainClient: Sync + Send {
 
     fn get_stake(&self, a: &H256, ca: Address, block_id: BlockId) -> Option<BigUint>;
 
+    fn get_total_stake(&self, id: BlockId) -> Option<U256>;
+
     /// Estimates how much gas will be necessary for a call.
     fn estimate_gas(&self, t: &SignedTransaction, block: BlockId) -> Result<U256, CallError>;
 

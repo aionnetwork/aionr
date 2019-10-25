@@ -261,12 +261,13 @@ pub fn verify_block_family(
         parent,
         engine.machine().params().gas_limit_bound_divisor,
     )?;
-    engine.verify_block_family(header, parent, grand_parent, great_grand_parent)?;
 
-    let (_bytes, txs, bc, _client) = match do_full {
+    let (_bytes, txs, bc, client) = match do_full {
         Some(x) => x,
         None => return Ok(()),
     };
+
+    engine.verify_block_family(header, parent, grand_parent, great_grand_parent, client)?;
 
     beacon_check(engine, bc, &header, &parent, txs)?;
 

@@ -449,6 +449,7 @@ impl MiningBlockChainClient for TestBlockChainClient {
             extra_data,
             self.db.clone(),
             None,
+            self,
         )
         .expect("Opening block for tests will not fail.");
         // TODO [todr] Override timestamp for predictability (set_timestamp_now kind of sucks)
@@ -508,6 +509,8 @@ impl BlockChainClient for TestBlockChainClient {
     fn get_stake(&self, _pk: &H256, _a: Address, _block_id: BlockId) -> Option<BigUint> {
         Some(BigUint::from(10000u32))
     }
+
+    fn get_total_stake(&self, _id: BlockId) -> Option<U256> { Some(U256::from(10000u32)) }
 
     fn get_coinbase(&self, _address: Address) -> Option<Address> { None }
 
@@ -667,6 +670,7 @@ impl BlockChainClient for TestBlockChainClient {
             parent_header,
             grand_parent_header,
             great_grand_parent_header,
+            self,
         )
     }
 

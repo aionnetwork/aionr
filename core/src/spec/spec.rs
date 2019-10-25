@@ -71,8 +71,6 @@ pub struct CommonParams {
     pub transaction_permission_contract: Option<Address>,
     /// unity update block number.
     pub unity_update: Option<BlockNumber>,
-    /// unity pos initial difficulty
-    pub unity_initial_pos_difficulty: Option<U256>,
 }
 
 impl From<ajson::spec::Params> for CommonParams {
@@ -85,7 +83,6 @@ impl From<ajson::spec::Params> for CommonParams {
             monetary_policy_update: p.monetary_policy_update.map(Into::into),
             transaction_permission_contract: p.transaction_permission_contract.map(Into::into),
             unity_update: p.unity_update.map(Into::into),
-            unity_initial_pos_difficulty: p.unity_initial_pos_difficulty.map(Into::into),
         }
     }
 }
@@ -501,9 +498,10 @@ impl Spec {
             .map_err(fmt_err)
             .and_then(|x| load_from(x).map_err(fmt_err))
     }
-    #[cfg(test)]
+
     /// Loads spec from json file. Provide factories for executing contracts and ensuring
     /// storage goes to the right place.
+    #[cfg(test)]
     pub fn load_with_unity_update<'a, R>(reader: R, update_unity: u64) -> Result<Self, String>
     where R: Read {
         ajson::spec::Spec::load(reader)
