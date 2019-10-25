@@ -113,8 +113,8 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     let revision_len = revision_len[0] as usize;
 
     // check revision length
-    if revision_len < rest.len() + 1 {
-        debug!(target: "p2p", "handshake req with wrong revision length" );
+    if rest.len() < revision_len + 1 {
+        debug!(target: "p2p", "handshake req with wrong revision length: {} rest: {}", revision_len, rest.len() );
         return;
     }
 
@@ -123,7 +123,7 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     let version_len = version_len[0] as usize;
 
     // check version length
-    if version_len != version.len() {
+    if version_len * 2 != version.len() {
         debug!(target: "p2p", "handshake req with wrong version length" );
         return;
     }
