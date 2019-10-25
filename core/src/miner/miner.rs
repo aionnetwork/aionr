@@ -971,10 +971,11 @@ impl Miner {
             debug!(target: "block", "Rejected tx {:?}: already in the blockchain", &hash);
             return Err(Error::Transaction(TransactionError::AlreadyImported));
         }
+        // TIP: enable fork property right after fork point block
         match self
             .engine
             .machine()
-            .verify_transaction_basic(&transaction, Some(best_block_header.number()))
+            .verify_transaction_basic(&transaction, Some(best_block_header.number() + 1))
             .and_then(|_| {
                 self.engine
                     .machine()
