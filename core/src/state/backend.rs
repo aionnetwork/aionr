@@ -81,17 +81,18 @@ pub trait Backend: Send {
 // usage.
 #[derive(Clone, PartialEq)]
 pub struct ProofCheck(MemoryDB);
-
-impl ProofCheck {
-    /// Create a new `ProofCheck` backend from the given state items.
-    pub fn new(proof: &[DBValue]) -> Self {
-        let mut db = MemoryDB::new();
-        for item in proof {
-            db.insert(item);
-        }
-        ProofCheck(db)
-    }
-}
+//
+//impl ProofCheck {
+//    /// Create a new `ProofCheck` backend from the given state items.
+//    #[cfg(test)]
+//    pub fn new(proof: &[DBValue]) -> Self {
+//        let mut db = MemoryDB::new();
+//        for item in proof {
+//            db.insert(item);
+//        }
+//        ProofCheck(db)
+//    }
+//}
 
 impl HashStore for ProofCheck {
     fn keys(&self) -> HashMap<H256, i32> { self.0.keys() }
@@ -189,22 +190,6 @@ impl<H: AsHashStore + Send + Sync> Backend for Proving<H> {
     fn get_cached_code(&self, _: &H256) -> Option<Arc<Vec<u8>>> { None }
     fn note_non_null_account(&self, _: &Address) {}
     fn is_known_null(&self, _: &Address) -> bool { false }
-}
-
-impl<H: AsHashStore> Proving<H> {
-    /// Create a new `Proving` over a base database.
-    /// This will store all values ever fetched from that base.
-    pub fn new(base: H) -> Self {
-        Proving {
-            base: base,
-            changed: MemoryDB::new(),
-            proof: Mutex::new(HashSet::new()),
-        }
-    }
-
-    /// Consume the backend, extracting the gathered proof in lexicographical order
-    /// by value.
-    pub fn extract_proof(self) -> Vec<DBValue> { self.proof.into_inner().into_iter().collect() }
 }
 
 impl<H: AsHashStore + Clone> Clone for Proving<H> {

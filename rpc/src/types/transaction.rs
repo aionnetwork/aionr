@@ -22,10 +22,11 @@
 
 use acore::contract_address;
 use acore::transaction::{LocalizedTransaction, Action, PendingTransaction, SignedTransaction};
-use types::{Bytes, H256, U256, U64, TransactionCondition};
-use aion_types::{U256 as EthU256};
+use aion_types::{H256, U256};
 use bytes::u64_to_bytes;
 use serde::ser::{Serialize, Serializer, SerializeStruct};
+
+use types::{Bytes, TransactionCondition};
 
 /// Transaction
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -58,8 +59,6 @@ pub struct Transaction {
     pub raw: Bytes,
     /// Public key of the signer.
     pub public_key: Option<H256>,
-    /// The network id of the transaction, if any.
-    pub chain_id: Option<U64>,
     /// The standardised V field of the signature (0 or 1).
     pub standard_v: U256,
     /// Signature.
@@ -80,13 +79,13 @@ impl Serialize for Transaction {
     {
         let mut transaction = serializer.serialize_struct("Transaction", 15)?;
         transaction.serialize_field("hash", &self.hash)?;
-        transaction.serialize_field("nonce", &(to_u256(self.nonce).low_u64()))?;
+        transaction.serialize_field("nonce", &(self.nonce.low_u64()))?;
         transaction.serialize_field("blockHash", &self.block_hash)?;
         transaction.serialize_field("blockNumber", &self.block_number)?;
         if self.transaction_index.is_some() {
             transaction.serialize_field(
                 "transactionIndex",
-                &to_u256(self.transaction_index.unwrap()).low_u64(),
+                &self.transaction_index.unwrap().low_u64(),
             )?;
         } else {
             transaction.serialize_field("transactionIndex", &self.transaction_index)?;
@@ -95,9 +94,9 @@ impl Serialize for Transaction {
         transaction.serialize_field("from", &self.from)?;
         transaction.serialize_field("value", &self.value)?;
         transaction.serialize_field("gasPrice", &self.gas_price)?;
-        transaction.serialize_field("gas", &to_u256(self.gas).low_u64())?;
+        transaction.serialize_field("gas", &self.gas.low_u64())?;
         transaction.serialize_field("nrgPrice", &self.gas_price)?;
-        transaction.serialize_field("nrg", &to_u256(self.gas).low_u64())?;
+        transaction.serialize_field("nrg", &self.gas.low_u64())?;
         transaction.serialize_field("input", &self.input)?;
         transaction.serialize_field("contractAddress", &self.creates)?;
         // do not serialize raw
@@ -108,15 +107,10 @@ impl Serialize for Transaction {
         // do not serialize condition
         transaction.serialize_field(
             "timestamp",
-            &EthU256::from_big_endian(self.timestamp.0.as_slice()).low_u64(),
+            &U256::from_big_endian(self.timestamp.0.as_slice()).low_u64(),
         )?;
         transaction.end()
     }
-}
-
-fn to_u256(u: U256) -> EthU256 {
-    let u: EthU256 = u.into();
-    u
 }
 
 /// Geth-compatible output for eth_signTransaction method
@@ -145,22 +139,22 @@ impl Transaction {
     pub fn from_localized(mut t: LocalizedTransaction, timestamp: u64) -> Transaction {
         let signature = t.signature();
         Transaction {
-            hash: t.hash().into(),
-            nonce: t.nonce.into(),
-            block_hash: Some(t.block_hash.clone().into()),
+            hash: t.hash().clone(),
+            nonce: t.nonce,
+            block_hash: Some(t.block_hash.clone()),
             block_number: Some(t.block_number.into()),
             transaction_index: Some(t.transaction_index.into()),
-            from: t.sender().into(),
+            from: t.sender().clone(),
             to: match t.action {
                 Action::Create => None,
-                Action::Call(ref address) => Some(address.clone().into()),
+                Action::Call(ref address) => Some(address.clone()),
             },
-            value: t.value.into(),
-            gas_price: t.gas_price.into(),
-            gas: t.gas.into(),
+            value: t.value,
+            gas_price: t.gas_price,
+            gas: t.gas,
             input: Bytes::new(t.data.clone()),
             creates: match t.action {
-                Action::Create => Some(contract_address(&t.sender(), &t.nonce).0.into()),
+                Action::Create => Some(contract_address(&t.sender(), &t.nonce).0),
                 Action::Call(_) => None,
             },
             raw: ::rlp::encode(&t.signed).into_vec().into(),
@@ -170,7 +164,6 @@ impl Transaction {
                 pk.copy_from_slice(&t.recover_public().unwrap().0);
                 Some(H256(pk))
             },
-            chain_id: t.chain_id().map(U64::from),
             standard_v: t.standard_v().into(),
             sig: Bytes::new(signature.to_vec()),
             condition: None,
@@ -182,28 +175,27 @@ impl Transaction {
     pub fn from_signed(t: SignedTransaction) -> Transaction {
         let signature = t.signature();
         Transaction {
-            hash: t.hash().into(),
-            nonce: t.nonce.into(),
+            hash: t.hash().clone(),
+            nonce: t.nonce,
             block_hash: None,
             block_number: None,
             transaction_index: None,
-            from: t.sender().into(),
+            from: t.sender().clone(),
             to: match t.action {
                 Action::Create => None,
-                Action::Call(ref address) => Some(address.clone().into()),
+                Action::Call(ref address) => Some(address.clone()),
             },
-            value: t.value.into(),
-            gas_price: t.gas_price.into(),
-            gas: t.gas.into(),
+            value: t.value,
+            gas_price: t.gas_price,
+            gas: t.gas,
             input: Bytes::new(t.data.clone()),
             creates: match t.action {
-                Action::Create => Some(contract_address(&t.sender(), &t.nonce).0.into()),
+                Action::Create => Some(contract_address(&t.sender(), &t.nonce).0),
                 Action::Call(_) => None,
             },
             raw: ::rlp::encode(&t).into_vec().into(),
-            public_key: t.public_key().map(Into::into),
+            public_key: t.public_key(),
 
-            chain_id: t.chain_id().map(U64::from),
             standard_v: t.standard_v().into(),
             sig: Bytes::new(signature.clone().to_vec()),
             condition: None,

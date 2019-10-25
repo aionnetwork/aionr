@@ -21,15 +21,17 @@
  ******************************************************************************/
 
 use helpers::CallRequest as Request;
-use types::{Bytes, H256, U256};
+use aion_types::{U256, Address};
+
+use types::Bytes;
 
 /// Call request
 #[derive(Debug, Default, PartialEq, Deserialize)]
 pub struct CallRequest {
     /// From
-    pub from: Option<H256>,
+    pub from: Option<Address>,
     /// To
-    pub to: Option<H256>,
+    pub to: Option<Address>,
     /// Gas Price
     #[serde(rename = "gasPrice")]
     pub gas_price: Option<U256>,
@@ -46,13 +48,13 @@ pub struct CallRequest {
 impl Into<Request> for CallRequest {
     fn into(self) -> Request {
         Request {
-            from: self.from.map(Into::into),
-            to: self.to.map(Into::into),
-            gas_price: self.gas_price.map(Into::into),
-            gas: self.gas.map(Into::into),
-            value: self.value.map(Into::into),
+            from: self.from,
+            to: self.to,
+            gas_price: self.gas_price,
+            gas: self.gas,
+            value: self.value,
             data: self.data.map(Into::into),
-            nonce: self.nonce.map(Into::into),
+            nonce: self.nonce,
         }
     }
 }
@@ -62,7 +64,7 @@ mod tests {
     use std::str::FromStr;
     use rustc_hex::FromHex;
     use serde_json;
-    use types::{U256, H256};
+    use aion_types::{U256, H256};
     use super::CallRequest;
 
     #[test]

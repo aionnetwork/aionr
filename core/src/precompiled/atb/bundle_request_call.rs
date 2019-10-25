@@ -19,7 +19,7 @@
  *
  ******************************************************************************/
 
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use super::bridge_transfer::BridgeTransfer;
 
 #[derive(Debug, PartialEq)]

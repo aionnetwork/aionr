@@ -331,6 +331,7 @@ macro_rules! usage {
 
                 // print default config
                 if raw_args.flag_default_config {
+                    fs::create_dir_all(&::dir::default_data_path()).expect("Fail to create dir at: {}.");
                     let default_config_path = format!("{}/default_config.toml",&::dir::default_data_path());
                     let path = Path::new(&default_config_path);
                     Args::print_default_config(path);
@@ -339,20 +340,8 @@ macro_rules! usage {
                 }
 
                 // Skip loading config file if no_config flag is specified
-                if raw_args.flag_no_config {
+                if raw_args.flag_no_config /*|| raw_args.arg_config.is_none()*/ {
                     return Ok(raw_args.into_args(Config::default()));
-                }
-
-                if raw_args.arg_config.is_none(){
-                    fs::create_dir_all(&::dir::default_data_path()).expect("Fail to create dir at: {}.");
-                    let default_config_path = raw_args.clone().into_args(Config::default()).arg_config;
-                    let default_config_path = replace_home(&::dir::default_data_path(), &default_config_path);
-                    let path= Path::new(&default_config_path);
-                    if !path.exists() {
-                        Args::print_default_config(path);
-                        println_stderr!("Create config file {}, you can modify it if needed",&default_config_path);
-                    }
-                    // TODO:config file validator
                 }
 
                 let config_file = raw_args.arg_config.clone().unwrap_or(raw_args.clone().into_args(Config::default()).arg_config);
@@ -364,7 +353,7 @@ macro_rules! usage {
                         file.read_to_string(&mut config).map_err(|e| ArgsError::Config(config_file, e))?;
                         Ok(raw_args.into_args(Self::parse_config(&config)?))
                     },
-                    Err(e) => Err(ArgsError::Config(config_file,e)),
+                    Err(_e) => Ok(raw_args.into_args(Config::default())),
                 }
             }
 
@@ -383,7 +372,7 @@ macro_rules! usage {
             }
 
             pub fn print_version() -> String {
-                format!(include_str!("./version.txt"), version())
+                format!(include_str!("../../resources/version.txt"), version())
             }
 
             #[allow(unused_mut)] // subc_subc_exist may be assigned true by the macro
@@ -400,7 +389,7 @@ macro_rules! usage {
                     }
                 };
 
-                let mut help : String = include_str!("./usage_header.txt").to_owned();
+                let mut help : String = include_str!("../../resources/usage_header.txt").to_owned();
 
                 help.push_str("\n");
 
@@ -642,19 +631,16 @@ macro_rules! usage {
                     };
                 }
 
-                // Check if reseal_min_period > reseal_max_period
-                check!(low:arg_reseal_min_period,up:arg_reseal_max_period);
-
-                // Check if gas_floor_target > gas_cap
+                // Check if gas_floor_target < gas_cap
                 check!(low:arg_gas_floor_target,up:arg_gas_cap);
 
-                // Check if blk_price_window > max_blk_traverse
+                // Check if blk_price_window < max_blk_traverse
                 check!(low:arg_blk_price_window,up:arg_max_blk_traverse);
 
-                // Check if min_gas_price　> max_gas_price
+                // Check if min_gas_price　< max_gas_price
                 check!(low:arg_min_gas_price,up:arg_max_gas_price);
 
-                // Check if min_gas_price　> local_max_gas_price
+                // Check if min_gas_price　< local_max_gas_price
                 check!(low:arg_min_gas_price,up:arg_local_max_gas_price);
 
                 // Check if gas_price_percentile > 100 , usize never < 0

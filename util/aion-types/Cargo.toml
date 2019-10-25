@@ -17,6 +17,10 @@ authors = ["Aion Foundation <admin@aion.network>"]
 build = "build.rs"
 description = "Aion types"
 license = "MIT"
+
+[dependencies.num-bigint]
+version = "0.2"
+
 [dependencies.crunchy]
 version = "0.1.5"
 
@@ -33,6 +37,7 @@ optional = true
 
 [dependencies.uint]
 version = "0.1"
+
 [build-dependencies.rustc_version]
 version = "0.2"
 

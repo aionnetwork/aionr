@@ -20,33 +20,26 @@
  *
  ******************************************************************************/
 
-// uncomment below line to test precompile contract blake2b hash
-//#![feature(box_syntax)]
+#![warn(unused_extern_crates)]
 #![cfg_attr(feature = "benches", feature(test))]
 extern crate bloomchain;
-extern crate bn;
 extern crate byteorder;
 extern crate crossbeam;
-extern crate common_types as types;
 extern crate acore_bloom_journal as bloom_journal;
 extern crate acore_io as io;
-extern crate acore_bytes as bytes;
-extern crate logger;
-extern crate acore_stratum;
+extern crate acore_bytes;
+extern crate bytes;
 extern crate aion_types;
 extern crate ethbloom;
 extern crate ajson;
 extern crate key;
 extern crate crypto as rcrypto;
-extern crate futures_cpupool;
-extern crate futures;
 extern crate itertools;
 extern crate lru_cache;
 extern crate num_cpus;
 extern crate num;
 extern crate aion_machine;
 extern crate parking_lot;
-extern crate rand;
 extern crate rayon;
 extern crate rlp;
 extern crate rlp_compress;
@@ -58,18 +51,9 @@ extern crate ansi_term;
 extern crate unexpected;
 extern crate util_error;
 extern crate db as kvdb;
-extern crate dir;
 extern crate transient_hashmap;
-extern crate linked_hash_map;
-
-extern crate abi;
-#[macro_use]
-extern crate abi_derive;
-#[macro_use]
-extern crate abi_contract;
 #[macro_use]
 extern crate lazy_static;
-
 #[macro_use]
 extern crate rlp_derive;
 extern crate rustc_hex;
@@ -80,70 +64,89 @@ extern crate using_queue;
 extern crate table;
 extern crate memory_cache;
 extern crate journaldb;
-
-#[macro_use]
-extern crate macros;
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate trace_time;
-
-extern crate tempdir;
-
-pub extern crate keychain;
-
+extern crate keychain;
 extern crate equihash;
-
-// for Aion FastVM
 extern crate vms;
-// for aion token bridge
+extern crate futures;
+extern crate tokio;
+// extern crate state as crate_state;
 extern crate tiny_keccak;
 extern crate num_bigint;
-extern crate bincode;
 extern crate bytebuffer;
-
-extern crate tokio;
-
 extern crate avm_abi;
+extern crate fixed_point;
+extern crate delta_calc;
 
+#[cfg(test)]
+extern crate fastvm;
+#[cfg(test)]
+extern crate logger;
+#[cfg(test)]
+extern crate tempdir;
+#[cfg(test)]
+#[macro_use]
+extern crate macros;
+extern crate p2p;
+extern crate rand;
+extern crate ctrlc;
+extern crate serde;
+
+/// pub mod is used here to avoid name collision when used in other module
 pub mod account_provider;
+// encoded header
+pub mod encoded;
+pub mod blockchain;
+pub mod miner;
 pub mod block;
 pub mod client;
+// unverified transaction
 pub mod transaction;
-pub mod db;
-pub mod encoded;
-pub mod engines;
-pub mod error;
-pub mod ethereum;
-pub mod executed;
+// PoW Engine
+pub mod engine;
+//pub mod error;
 pub mod header;
-pub mod machine;
-pub mod miner;
-pub mod pod_state;
+pub mod views;
+pub mod sync;
+
+// boot
 pub mod service;
 pub mod spec;
-pub mod state;
-pub mod state_db;
 pub mod verification;
-pub mod views;
-pub mod account;
 
-mod cache_manager;
-mod blooms;
+mod machine;
+mod pod_state;
 mod pod_account;
-mod account_db;
+mod state;
+// mod state_db;
+mod db;
+mod factory;
+mod cache_manager;
+// mod account_db;
 mod precompiled;
 mod executive;
 mod externalities;
-pub mod blockchain;
-mod factory;
-mod tx_filter;
+mod types;
 
 #[cfg(test)]
-pub mod tests;
-#[cfg(test)]
-extern crate fastvm;
-extern crate core;
+mod tests;
 
-pub use types::*;
+pub use types::{
+    filter,
+    state::log_entry,
+    state::receipt,
+    state::state_diff,
+    block::status as block_status,
+    error::Error,
+    error::CallError,
+    error::ImportError,
+    error::BlockError
+};
+
 pub use executive::contract_address;
+
+#[cfg(test)]
+use tests::common::helpers;

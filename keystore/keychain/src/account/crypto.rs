@@ -28,7 +28,8 @@ use random::Random;
 use smallvec::SmallVec;
 use account::{Cipher, Kdf, Aes128Ctr, Pbkdf2, Prf};
 use rlp::{self, RlpStream, UntrustedRlp, DecoderError};
-use subtle;
+use subtle::ConstantTimeEq;
+use aion_types::H256;
 use key::Ed25519Secret;
 
 /// Encrypted data
@@ -79,7 +80,7 @@ impl From<Crypto> for String {
 impl Crypto {
     /// Encrypt account secret for ed25519
     pub fn with_secret_ed25519(secret: &Ed25519Secret, password: &str, iterations: u32) -> Self {
-        Crypto::with_plain(&*secret, password, iterations)
+        Crypto::with_plain(&*secret as &[u8], password, iterations)
     }
 
     /// Encrypt custom plain data
@@ -105,12 +106,12 @@ impl Crypto {
 
         Crypto {
             cipher: Cipher::Aes128Ctr(Aes128Ctr {
-                iv: iv,
+                iv,
             }),
             ciphertext: ciphertext.into_vec(),
             kdf: Kdf::Pbkdf2(Pbkdf2 {
                 dklen: crypto::KEY_LENGTH as u32,
-                salt: salt,
+                salt,
                 c: iterations,
                 prf: Prf::HmacSha256,
             }),
@@ -149,9 +150,8 @@ impl Crypto {
             }
         };
 
-        let mac = blake2b(crypto::derive_mac(&derived_right_bits, &self.ciphertext));
-
-        if subtle::slices_equal(&mac, &self.mac) == 0 {
+        let mac: H256 = blake2b(crypto::derive_mac(&derived_right_bits, &self.ciphertext));
+        if mac.ct_eq(&self.mac).unwrap_u8() == 0 {
             return Err(Error::InvalidPassword);
         }
 
@@ -231,59 +231,5 @@ impl rlp::Encodable for Crypto {
         stream.append(&self.kdf);
 
         s.append_internal(&stream.as_raw());
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use rustc_hex::ToHex;
-    use key::generate_keypair;
-    use super::{Crypto, Error};
-
-    #[test]
-    fn crypto_with_secret_create() {
-        let keypair = generate_keypair();
-        let crypto = Crypto::with_secret_ed25519(keypair.secret(), "this is sparta", 10240);
-        let secret = crypto.secret_ed25519("this is sparta").unwrap();
-        assert_eq!(keypair.secret().to_hex(), secret.to_hex());
-    }
-
-    #[test]
-    fn crypto_with_secret_invalid_password() {
-        let keypair = generate_keypair();
-        let crypto = Crypto::with_secret_ed25519(keypair.secret(), "this is sparta", 10240);
-
-        match crypto.secret_ed25519("this is sparta!") {
-            Err(Error::InvalidPassword) => {
-                assert!(true);
-            }
-            _ => {
-                assert!(false);
-            }
-        }
-    }
-
-    #[test]
-    fn crypto_with_null_plain_data() {
-        let original_data = b"";
-        let crypto = Crypto::with_plain(&original_data[..], "this is sparta", 10240);
-        let decrypted_data = crypto.decrypt("this is sparta").unwrap();
-        assert_eq!(original_data[..], *decrypted_data);
-    }
-
-    #[test]
-    fn crypto_with_tiny_plain_data() {
-        let original_data = b"{}";
-        let crypto = Crypto::with_plain(&original_data[..], "this is sparta", 10240);
-        let decrypted_data = crypto.decrypt("this is sparta").unwrap();
-        assert_eq!(original_data[..], *decrypted_data);
-    }
-
-    #[test]
-    fn crypto_with_huge_plain_data() {
-        let original_data: Vec<_> = (1..65536).map(|i| (i % 256) as u8).collect();
-        let crypto = Crypto::with_plain(&original_data, "this is sparta", 10240);
-        let decrypted_data = crypto.decrypt("this is sparta").unwrap();
-        assert_eq!(&original_data, &decrypted_data);
     }
 }

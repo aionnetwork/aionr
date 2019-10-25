@@ -22,29 +22,26 @@
 
 //! Ethereum-like state machine definition.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::BTreeMap;
 use std::cmp;
 use std::sync::Arc;
 
 use block::{ExecutedBlock, IsBlock};
 use precompiled::builtin::BuiltinContract;
-use client::BlockChainClient;
-use error::Error;
+use types::error::Error;
 use executive::{Executive};
 use header::{BlockNumber, Header};
 use spec::CommonParams;
 use state::{CleanupMode, Substate};
-use transaction::{self, SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
-use tx_filter::TransactionFilter;
-
+use transaction::{SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
 use aion_types::{U256, H256, Address};
 use vms::{ActionParams, ActionValue, CallType, ParamsType};
 
 /// An ethereum-like state machine.
+#[cfg_attr(test, derive(Default))]
 pub struct EthereumMachine {
     params: CommonParams,
     builtins: Arc<BTreeMap<Address, Box<BuiltinContract>>>,
-    tx_filter: Option<Arc<TransactionFilter>>,
     premine: U256,
 }
 
@@ -56,12 +53,10 @@ impl EthereumMachine {
         premine: U256,
     ) -> EthereumMachine
     {
-        let tx_filter = TransactionFilter::from_params(&params).map(Arc::new);
         EthereumMachine {
-            params: params,
+            params,
             builtins: Arc::new(builtins),
-            tx_filter: tx_filter,
-            premine: premine,
+            premine,
         }
     }
 }
@@ -88,12 +83,12 @@ impl EthereumMachine {
             address: contract_address.clone(),
             sender: SYSTEM_ADDRESS.clone(),
             origin: SYSTEM_ADDRESS.clone(),
-            gas: gas,
+            gas,
             gas_price: 0.into(),
             value: ActionValue::Transfer(0.into()),
             code: state.code(&contract_address)?,
             code_hash: Some(state.code_hash(&contract_address)?),
-            data: data,
+            data,
             call_type: CallType::Call,
             static_flag: false,
             params_type: ParamsType::Separate,
@@ -124,14 +119,13 @@ impl EthereumMachine {
     /// Logic to perform on a new block: updating last hashes.
     pub fn on_new_block(&self, block: &mut ExecutedBlock) -> Result<(), Error> {
         self.push_last_hash(block)?;
-
         Ok(())
     }
 
-    /// Populate a header's fields based on its parent's header.
+    /// Populate a header's gas limit based on its parent's header.
     /// Usually implements the chain scoring rule based on weight.
     /// The gas floor target must not be lower than the engine's minimum gas limit.
-    pub fn populate_from_parent(
+    pub fn set_gas_limit_from_parent(
         &self,
         header: &mut Header,
         parent: &Header,
@@ -139,8 +133,6 @@ impl EthereumMachine {
         gas_ceil_target: U256,
     )
     {
-        header.set_difficulty(parent.difficulty().clone());
-
         // clamped-decay
         header.set_gas_limit({
             let gas_limit = parent.gas_limit().clone();
@@ -161,6 +153,11 @@ impl EthereumMachine {
 
     /// Get the general parameters of the chain.
     pub fn params(&self) -> &CommonParams { &self.params }
+
+    /// set monetary policy
+    pub fn set_monetary(&mut self, block_number: u64) {
+        self.params.monetary_policy_update = Some(block_number);
+    }
 
     /// Builtin-contracts for the chain..
     pub fn builtins(&self) -> &BTreeMap<Address, Box<BuiltinContract>> { &*self.builtins }
@@ -201,36 +198,18 @@ impl EthereumMachine {
     }
 
     /// Does basic verification of the transaction.
-    pub fn verify_transaction_basic(&self, t: &UnverifiedTransaction) -> Result<(), Error> {
+    pub fn verify_transaction_basic(
+        &self,
+        t: &UnverifiedTransaction,
+        block_num: Option<BlockNumber>,
+    ) -> Result<(), Error>
+    {
+        if block_num.is_some() {
+            t.is_allowed_type(self.params().monetary_policy_update, block_num.unwrap())?;
+        }
         t.verify_basic(None)?;
 
         Ok(())
-    }
-
-    /// Does verification of the transaction against the parent state.
-    // TODO: refine the bound here to be a "state provider" or similar as opposed
-    // to full client functionality.
-    pub fn verify_transaction(
-        &self,
-        t: &SignedTransaction,
-        header: &Header,
-        client: &BlockChainClient,
-    ) -> Result<(), Error>
-    {
-        if let Some(ref filter) = self.tx_filter.as_ref() {
-            if !filter.transaction_allowed(header.parent_hash(), t, client) {
-                return Err(transaction::Error::NotAllowed.into());
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Additional params.
-    pub fn additional_params(&self) -> HashMap<String, String> {
-        hash_map![
-            "registrar".to_owned() => format!("{:x}", self.params.registrar)
-        ]
     }
 }
 

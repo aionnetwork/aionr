@@ -20,32 +20,30 @@
  *
  ******************************************************************************/
 
-use std::collections::BTreeMap;
 use std::time::Duration;
 
+use state::BasicAccount;
 use block::{OpenBlock, SealedBlock, ClosedBlock};
 use blockchain::TreeRoute;
 use encoded;
-use error::{ImportResult, CallError, BlockImportError};
-use vms::LastHashes;
+use types::error::{ImportResult, CallError, BlockImportError};
 use factory::VmFactory;
 use executive::Executed;
 use filter::Filter;
-use header::{BlockNumber};
+use header::{BlockNumber, SealType, Header};
 use log_entry::LocalizedLogEntry;
 use receipt::LocalizedReceipt;
 use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction};
 use verification::queue::QueueInfo as BlockQueueInfo;
-
 use aion_types::{H256, H128, U256, Address};
-use bytes::Bytes;
-use kvdb::DBValue;
+use vms::LastHashes;
+use acore_bytes::Bytes;
+use num_bigint::BigUint;
 
 use types::ids::*;
-use types::basic_account::BasicAccount;
 use types::call_analytics::CallAnalytics;
-use types::blockchain_info::BlockChainInfo;
-use types::block_status::BlockStatus;
+use types::blockchain::info::BlockChainInfo;
+use types::block::status::BlockStatus;
 use types::pruning_info::PruningInfo;
 
 use super::super::transaction::UnverifiedTransaction;
@@ -54,6 +52,9 @@ use super::super::transaction::UnverifiedTransaction;
 pub trait BlockChainClient: Sync + Send {
     /// Get raw block header data by block id.
     fn block_header(&self, id: BlockId) -> Option<encoded::Header>;
+
+    /// Get raw block header data by block hash.
+    fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header>;
 
     /// Look up the block number for the given block ID.
     fn block_number(&self, id: BlockId) -> Option<BlockNumber>;
@@ -64,6 +65,9 @@ pub trait BlockChainClient: Sync + Send {
 
     /// Get raw block data by block header hash.
     fn block(&self, id: BlockId) -> Option<encoded::Block>;
+
+    /// Get best pow block
+    fn best_pow_block(&self) -> Option<encoded::Block>;
 
     /// Get block status by block header hash.
     fn block_status(&self, id: BlockId) -> BlockStatus;
@@ -170,13 +174,6 @@ pub trait BlockChainClient: Sync + Send {
     /// Import a block into the blockchain.
     fn import_block(&self, bytes: Bytes) -> Result<H256, BlockImportError>;
 
-    /// Import a block with transaction receipts. Does no sealing and transaction validation.
-    fn import_block_with_receipts(
-        &self,
-        block_bytes: Bytes,
-        receipts_bytes: Bytes,
-    ) -> Result<H256, BlockImportError>;
-
     /// Get block queue information.
     fn queue_info(&self) -> BlockQueueInfo;
 
@@ -189,11 +186,16 @@ pub trait BlockChainClient: Sync + Send {
     /// Get blockchain information.
     fn chain_info(&self) -> BlockChainInfo;
 
-    /// Get the registrar address, if it exists.
-    fn additional_params(&self) -> BTreeMap<String, String>;
-
     /// Get the best block header.
     fn best_block_header(&self) -> encoded::Header;
+
+    /// Calculate difficulty
+    fn calculate_difficulty(
+        &self,
+        parent_header: &Header,
+        grand_parent_header: Option<&Header>,
+        great_grand_parent_header: Option<&Header>,
+    ) -> U256;
 
     /// Returns logs matching given filter.
     fn logs(&self, filter: Filter) -> Vec<LocalizedLogEntry>;
@@ -214,6 +216,10 @@ pub trait BlockChainClient: Sync + Send {
         block: BlockId,
     ) -> Result<Vec<Executed>, CallError>;
 
+    fn get_stake(&self, a: &H256, ca: Address, block_id: BlockId) -> Option<BigUint>;
+
+    fn get_total_stake(&self, id: BlockId) -> Option<U256>;
+
     /// Estimates how much gas will be necessary for a call.
     fn estimate_gas(&self, t: &SignedTransaction, block: BlockId) -> Result<U256, CallError>;
 
@@ -233,8 +239,8 @@ pub trait BlockChainClient: Sync + Send {
     /// Import queued transactions.
     fn import_queued_transactions(&self, transactions: Vec<UnverifiedTransaction>);
 
-    /// Queue conensus engine message.
-    fn queue_consensus_message(&self, message: Bytes);
+    /// New block chained message.
+    fn new_block_chained(&self);
 
     /// List all transactions that are allowed into the next block.
     fn ready_transactions(&self) -> Vec<PendingTransaction>;
@@ -293,20 +299,14 @@ pub trait BlockChainClient: Sync + Send {
     /// that a subsystem has reason to believe this executable incapable of syncing the chain.
     fn disable(&self);
 
-    /// Returns engine-related extra info for `BlockId`.
-    fn block_extra_info(&self, id: BlockId) -> Option<BTreeMap<String, String>>;
-
     /// Returns information about pruning/data availability.
     fn pruning_info(&self) -> PruningInfo;
 
-    /// Like `call`, but with various defaults. Designed to be used for calling contracts.
-    fn call_contract(&self, id: BlockId, address: Address, data: Bytes) -> Result<Bytes, String>;
+    // Like `call`, but with various defaults. Designed to be used for calling contracts.
+    //fn call_contract(&self, id: BlockId, address: Address, data: Bytes) -> Result<Bytes, String>;
 
-    /// Get the address of the registry itself.
-    fn registrar_address(&self) -> Option<Address>;
-
-    /// Get the address of a particular blockchain service, if available.
-    fn registry_address(&self, name: String, block: BlockId) -> Option<Address>;
+    /// Aion Unity helper function, get coinbase according to staker's identity address
+    fn get_coinbase(&self, address: Address) -> Option<Address>;
 }
 
 /// Extended client interface used for mining
@@ -317,6 +317,8 @@ pub trait MiningBlockChainClient: BlockChainClient {
         author: Address,
         gas_range_target: (U256, U256),
         extra_data: Bytes,
+        seal_type: Option<SealType>,
+        timestamp: Option<u64>,
     ) -> OpenBlock;
 
     /// Reopens an OpenBlock and updates uncles.
@@ -339,25 +341,18 @@ pub trait MiningBlockChainClient: BlockChainClient {
 
     /// get block preparation interval
     fn prepare_block_interval(&self) -> Duration;
+
+    /// get beacon hash number
+    fn is_beacon_hash(&self, hash: &H256) -> Option<BlockNumber>;
 }
 
 /// Client facilities used by internally sealing Engines.
 pub trait EngineClient: Sync + Send {
-    /// Make a new block and seal it.
-    fn update_sealing(&self);
-
     /// Submit a seal for a block in the mining queue.
     fn submit_seal(&self, block_hash: H256, seal: Vec<Bytes>);
 
     /// Broadcast a consensus message to the network.
     fn broadcast_consensus_message(&self, message: Bytes);
-
-    /// Get the transition to the epoch the given parent hash is part of
-    /// or transitions to.
-    /// This will give the epoch that any children of this parent belong to.
-    ///
-    /// The block corresponding the the parent hash must be stored already.
-    fn epoch_transition_for(&self, parent_hash: H256) -> Option<::engines::EpochTransition>;
 
     /// Get block chain info.
     fn chain_info(&self) -> BlockChainInfo;
@@ -384,16 +379,4 @@ pub trait ProvingBlockChainClient: BlockChainClient {
     /// The key is the blake2b hash of the account's address.
     /// Returns a vector of raw trie nodes (in order from the root) proving the query.
     fn prove_account(&self, key1: H256, id: BlockId) -> Option<(Vec<Bytes>, BasicAccount)>;
-
-    /// Prove execution of a transaction at the given block.
-    /// Returns the output of the call and a vector of database items necessary
-    /// to reproduce it.
-    fn prove_transaction(
-        &self,
-        transaction: SignedTransaction,
-        id: BlockId,
-    ) -> Option<(Bytes, Vec<DBValue>)>;
-
-    /// Get an epoch change signal by block hash.
-    fn epoch_signal(&self, hash: H256) -> Option<Vec<u8>>;
 }

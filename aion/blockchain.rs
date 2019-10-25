@@ -30,7 +30,7 @@ use bytes::ToPretty;
 use rlp::PayloadInfo;
 use acore::service::ClientService;
 use acore::client::{DatabaseCompactionProfile, VMType, BlockImportError, BlockChainClient, BlockId};
-use acore::error::ImportError;
+use acore::ImportError;
 use acore::miner::Miner;
 use acore::verification::queue::VerifierSettings;
 use cache::CacheConfig;
@@ -103,7 +103,6 @@ pub struct ImportBlockchain {
     pub wal: bool,
     pub fat_db: Switch,
     pub vm_type: VMType,
-    pub check_seal: bool,
     pub with_color: bool,
     pub verifier_settings: VerifierSettings,
 }
@@ -151,7 +150,7 @@ pub fn execute(cmd: BlockchainCmd) -> Result<(), String> {
 fn execute_import(cmd: ImportBlockchain) -> Result<(), String> {
     let timer = Instant::now();
     // load spec file
-    let spec = cmd.spec.spec(&cmd.dirs.cache)?;
+    let spec = cmd.spec.spec()?;
 
     // load genesis hash
     let genesis_hash = spec.genesis_header().hash();
@@ -190,7 +189,6 @@ fn execute_import(cmd: ImportBlockchain) -> Result<(), String> {
         algorithm,
         cmd.pruning_history,
         cmd.pruning_memory,
-        cmd.check_seal,
     );
 
     client_config.queue.verifier_settings = cmd.verifier_settings;
@@ -334,7 +332,7 @@ fn start_client(
 ) -> Result<ClientService, String>
 {
     // load spec file
-    let spec = spec.spec(&dirs.cache)?;
+    let spec = spec.spec()?;
 
     // load genesis hash
     let genesis_hash = spec.genesis_header().hash();
@@ -376,7 +374,6 @@ fn start_client(
         algorithm,
         pruning_history,
         pruning_memory,
-        true,
     );
 
     let service = ClientService::start(
@@ -460,7 +457,7 @@ fn execute_export(cmd: ExportBlockchain) -> Result<(), String> {
 }
 
 pub fn kill_db(cmd: KillBlockchain) -> Result<(), String> {
-    let spec = cmd.spec.spec(&cmd.dirs.cache)?;
+    let spec = cmd.spec.spec()?;
     let genesis_hash = spec.genesis_header().hash();
     let db_dirs = cmd.dirs.database(genesis_hash, None, spec.data_dir);
     let user_defaults_path = db_dirs.user_defaults_path();
@@ -511,9 +508,9 @@ fn execute_revert(cmd: RevertBlockchain) -> Result<(), String> {
         ));
     }
     match client.revert_block(to) {
-        Ok(()) => {
+        Ok(blk) => {
             let ms = timer.elapsed().as_milliseconds();
-            info!(target: "revert", "Revert BlockChain to #{} completed in {} ms", to, ms);
+            info!(target: "revert", "Revert BlockChain to #{} completed in {} ms", blk, ms);
         }
         Err(e) => {
             println!("{}", e);

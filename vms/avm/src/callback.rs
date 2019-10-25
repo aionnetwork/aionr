@@ -1,18 +1,19 @@
-extern crate rustc_hex;
-extern crate libc;
-extern crate num_bigint;
-
+use std::{mem, ptr};
+use std::convert::Into;
 use core::fmt;
 use core::slice;
 use libc::c_void;
-use std::{mem, ptr};
 use num_bigint::BigUint;
-use vm_common::Ext;
+use types::traits::Ext;
+use types::avm::NativeDecoder;
 use aion_types::{Address, U256, H256};
 use hash::blake2b;
-use codec::NativeDecoder;
 use crypto::{sha2::Sha256, digest::Digest, ed25519};
 use tiny_keccak::keccak256;
+
+const AVM_VERSION_MAGIC: &[u8] = b"avm-version-";
+const AVM_V1: u8 = 1;
+const AVM_V2: u8 = 2;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -35,7 +36,8 @@ pub struct avm_bytes {
 
 impl Into<Vec<u8>> for avm_bytes {
     fn into(self) -> Vec<u8> {
-        unsafe { slice::from_raw_parts(self.pointer, self.length as usize).into() }
+        let ret = unsafe { slice::from_raw_parts(self.pointer, self.length as usize) };
+        ret.into()
     }
 }
 
@@ -69,9 +71,13 @@ pub struct avm_callbacks {
         extern fn(sender: *const avm_address, nonce: *const avm_bytes) -> avm_bytes,
     pub add_log: extern fn(handle: *const c_void, logs: *const avm_bytes, idx: i32),
     pub get_transformed_code:
-        extern fn(handle: *const c_void, addr: *const avm_address) -> avm_bytes,
-    pub put_transformed_code:
-        extern fn(handle: *const c_void, addr: *const avm_address, code: *const avm_bytes),
+        extern fn(handle: *const c_void, addr: *const avm_address, version: u8) -> avm_bytes,
+    pub put_transformed_code: extern fn(
+        handle: *const c_void,
+        addr: *const avm_address,
+        code: *const avm_bytes,
+        version: u8,
+    ),
     pub get_objectgraph: extern fn(handle: *const c_void, addr: *const avm_address) -> avm_bytes,
     pub set_objectgraph:
         extern fn(handle: *const c_void, addr: *const avm_address, data: *const avm_bytes),
@@ -108,7 +114,7 @@ impl fmt::Display for avm_bytes {
     }
 }
 
-#[link(name = "avmjni")]
+#[link(name = "avmloader")]
 extern {
     pub static mut callbacks: avm_callbacks;
 
@@ -419,12 +425,13 @@ pub extern fn avm_add_log(handle: *const c_void, avm_log: *const avm_bytes, inde
 pub extern fn avm_get_transformed_code(
     handle: *const c_void,
     address: *const avm_address,
+    version: u8,
 ) -> avm_bytes
 {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
 
-    debug!(target: "vm", "avm_get_transformed_code: 0x{:?}", addr);
+    debug!(target: "vm", "avm_get_transformed_code: 0x{:?}, v{:?}", addr, version);
 
     match ext.get_transformed_code(addr) {
         None => unsafe { new_null_bytes() },
@@ -432,10 +439,48 @@ pub extern fn avm_get_transformed_code(
             if code.len() == 0 {
                 unsafe { new_null_bytes() }
             } else {
-                unsafe {
-                    let ret = new_fixed_bytes(code.len() as u32);
-                    ptr::copy(&code.as_slice()[0], ret.pointer, code.len());
-                    ret
+                match (version, code.as_slice().starts_with(AVM_VERSION_MAGIC)) {
+                    (AVM_V1, true) => {
+                        if code[AVM_VERSION_MAGIC.len()] != AVM_V1 {
+                            unsafe { new_null_bytes() }
+                        } else {
+                            unsafe {
+                                let ret = new_fixed_bytes(
+                                    (code.len() - AVM_VERSION_MAGIC.len() - 1) as u32,
+                                );
+                                ptr::copy(
+                                    &code.as_slice()[AVM_VERSION_MAGIC.len() + 1],
+                                    ret.pointer,
+                                    code.len(),
+                                );
+                                ret
+                            }
+                        }
+                    }
+                    (AVM_V1, false) => unsafe {
+                        let ret = new_fixed_bytes(code.len() as u32);
+                        ptr::copy(&code.as_slice()[0], ret.pointer, code.len());
+                        ret
+                    },
+                    (AVM_V2, true) => {
+                        if code[AVM_VERSION_MAGIC.len()] != AVM_V2 {
+                            unsafe { new_null_bytes() }
+                        } else {
+                            unsafe {
+                                let ret = new_fixed_bytes(
+                                    (code.len() - AVM_VERSION_MAGIC.len() - 1) as u32,
+                                );
+                                ptr::copy(
+                                    &code.as_slice()[AVM_VERSION_MAGIC.len() + 1],
+                                    ret.pointer,
+                                    code.len(),
+                                );
+                                ret
+                            }
+                        }
+                    }
+                    (AVM_V2, false) => unsafe { new_null_bytes() },
+                    (_, _) => unsafe { new_null_bytes() },
                 }
             }
         }
@@ -447,15 +492,19 @@ pub extern fn avm_put_transformed_code(
     handle: *const c_void,
     address: *const avm_address,
     code: *const avm_bytes,
+    version: u8,
 )
 {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
     let code: &avm_bytes = unsafe { mem::transmute(code) };
-    debug!(target: "vm", "avm_put_transformed_code at: {:?}", addr);
+    debug!(target: "vm", "avm_put_transformed_code at: {:?}, v{:?}", addr, version);
     let ext_code: &[u8] =
         unsafe { ::std::slice::from_raw_parts(code.pointer, code.length as usize) };
-    //debug!(target: "vm", "code = {:?}", ext_code);
+    let mut transformed_code = Vec::new();
+    transformed_code.extend_from_slice(AVM_VERSION_MAGIC);
+    transformed_code.push(version);
+    transformed_code.extend_from_slice(ext_code);
     ext.save_transformed_code(addr, ext_code.to_vec());
 }
 
@@ -464,7 +513,7 @@ pub extern fn avm_get_objectgraph(handle: *const c_void, address: *const avm_add
     let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
     let addr: &Address = unsafe { mem::transmute(address) };
 
-    debug!(target: "vm", "avm_get_transformed_code: 0x{:?}", addr);
+    debug!(target: "vm", "avm_get_objectgraph: 0x{:?}", addr);
 
     match ext.get_objectgraph(addr) {
         None => unsafe { new_null_bytes() },
@@ -533,6 +582,16 @@ pub extern fn avm_blake2b(input: *const avm_bytes) -> avm_bytes {
         ret
     }
 }
+
+#[cfg(test)]
+pub fn avm_blake2b_test(input: *const avm_bytes) -> Vec<u8> {
+    unsafe {
+        println!("input = {:?}", *input);
+    }
+    let data: Vec<u8> = unsafe { (*input).into() };
+    blake2b(data)[..].into()
+}
+
 #[no_mangle]
 pub extern fn avm_keccak256(input: *const avm_bytes) -> avm_bytes {
     let data: Vec<u8> = unsafe { (*input).into() };
@@ -643,12 +702,11 @@ mod tests {
     fn test_sha256() {
         let data = [1u8; 10];
         let input: *mut u8 = unsafe { mem::transmute(&data[0]) };
-        let avm_data: *const avm_bytes = unsafe {
-            mem::transmute(&avm_bytes {
-                length: data.len() as u32,
-                pointer: input,
-            })
+        let bytes = avm_bytes {
+            length: data.len() as u32,
+            pointer: input,
         };
+        let avm_data: *const avm_bytes = unsafe { mem::transmute(&bytes) };
         let output: Vec<u8> = avm_sha256(avm_data).into();
         assert_eq!(
             output,
@@ -663,12 +721,12 @@ mod tests {
     fn test_blake2b() {
         let data = [1u8; 10];
         let input: *mut u8 = unsafe { mem::transmute(&data[0]) };
-        let avm_data: *const avm_bytes = unsafe {
-            mem::transmute(&avm_bytes {
-                length: data.len() as u32,
-                pointer: input,
-            })
+        let bytes = avm_bytes {
+            length: data.len() as u32,
+            pointer: input,
         };
+        let avm_data: *const avm_bytes = unsafe { mem::transmute(&bytes) };
+        // unsafe {println!("raw = {:?}-{:?}", *avm_data, data.len());}
         let output: Vec<u8> = avm_blake2b(avm_data).into();
         assert_eq!(
             output,
@@ -683,12 +741,11 @@ mod tests {
     fn test_keccak256() {
         let data = [1u8; 10];
         let input: *mut u8 = unsafe { mem::transmute(&data[0]) };
-        let avm_data: *const avm_bytes = unsafe {
-            mem::transmute(&avm_bytes {
-                length: data.len() as u32,
-                pointer: input,
-            })
+        let bytes = avm_bytes {
+            length: data.len() as u32,
+            pointer: input,
         };
+        let avm_data: *const avm_bytes = unsafe { mem::transmute(&bytes) };
         let output: Vec<u8> = avm_keccak256(avm_data).into();
         assert_eq!(
             output,

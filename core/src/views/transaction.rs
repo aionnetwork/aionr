@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 //! View onto transaction rlp
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use aion_types::{H256, U256, to_u256};
 use blake2b::blake2b;
 use rlp::Rlp;

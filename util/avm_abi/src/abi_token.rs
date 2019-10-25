@@ -1,6 +1,8 @@
 #![allow(unused)]
 
 use std::mem;
+use std::fmt::{Display, Formatter, Error as FmtError};
+use num_bigint::BigUint;
 
 pub trait ToBytes {
     fn to_vm_bytes(&self) -> Vec<u8>;
@@ -84,12 +86,14 @@ pub enum AbiToken<'a> {
     STRING(String),
     // METHOD(String),
     ADDRESS([u8; 32]),
+    BIGINTEGER(&'a [u8]),
 }
 
 pub trait AVMEncoder {
     fn encode(&self) -> Vec<u8>;
 }
 
+/// Updates: add BigInterger in v1.0
 impl<'a> AVMEncoder for AbiToken<'a> {
     fn encode(&self) -> Vec<u8> {
         let mut res = Vec::new();
@@ -196,15 +200,120 @@ impl<'a> AVMEncoder for AbiToken<'a> {
                 res.push(0x22);
                 res.extend(addr.iter());
             }
+            AbiToken::BIGINTEGER(v) => {
+                res.push(0x23);
+                res.push(v.len() as u8);
+                res.append(&mut v.into());
+            }
         }
 
         res
     }
 }
 
+pub struct AVMDecoder {
+    bytes: Vec<u8>,
+    offset: usize,
+}
+
+#[derive(PartialEq, Debug, Clone)]
+pub enum DecodeError {
+    NoEnoughBytes,
+    UnknownFormat,
+}
+
+impl Display for DecodeError {
+    fn fmt(&self, f: &mut Formatter) -> Result<(), FmtError> {
+        match *self {
+            DecodeError::NoEnoughBytes => write!(f, "{}", "NoEnoughBytes"),
+            DecodeError::UnknownFormat => write!(f, "{}", "UnknownTargetFormat"),
+        }
+    }
+}
+
+impl AVMDecoder {
+    pub fn new(input: Vec<u8>) -> Self {
+        AVMDecoder {
+            bytes: input,
+            offset: 0,
+        }
+    }
+
+    fn eat(&mut self, num: usize) -> Result<(), DecodeError> {
+        if self.offset + num >= self.bytes.len() {
+            return Err(DecodeError::NoEnoughBytes);
+        }
+        self.offset += num;
+        Ok(())
+    }
+
+    fn require(&self, num: usize) -> Result<(), DecodeError> { Ok(()) }
+
+    pub fn decode_ulong(&mut self) -> Result<u64, DecodeError> {
+        self.eat(1)?;
+        self.require(8)?;
+        let mut ret = 0;
+        for i in self.offset..self.offset + 8 {
+            ret = ret | (self.bytes[i] as u64) << (7 + self.offset - i) * 8;
+        }
+
+        Ok(ret)
+    }
+
+    //TODO: decide corresbonding rust type for avm BigInteger
+    pub fn decode_one_bigint(&mut self) -> Result<BigUint, DecodeError> {
+        self.eat(1)?;
+        let length = self.bytes[self.offset] as usize;
+        self.require(length);
+        self.eat(1)?;
+
+        Ok(BigUint::from_bytes_be(&self.bytes[self.offset..]))
+    }
+
+    pub fn decode_one_address(&mut self) -> Result<[u8; 32], DecodeError> {
+        self.eat(1)?;
+        self.require(32)?;
+        let mut ret = [0u8; 32];
+        for i in self.offset..self.offset + 32 {
+            ret[i - self.offset] = self.bytes[i];
+        }
+
+        // deep copy
+        Ok(ret)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    extern crate num_bigint;
+
+    use self::num_bigint::BigUint;
+
+    // Test for abi v1.0 update
+    #[test]
+    fn encode_bigint() {
+        let data = AbiToken::BIGINTEGER(&[1, 2, 3, 4]);
+        assert_eq!(data.encode(), vec![0x23, 0x04, 1, 2, 3, 4]);
+        // parse from num_bigint::BigUint
+        let a = BigUint::parse_bytes(b"fffffffffffffffffffffffffffffffffffff", 16);
+        assert_eq!(
+            AbiToken::BIGINTEGER(a.unwrap().to_bytes_be().as_slice()).encode(),
+            vec![
+                35, 19, 15, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
+                255, 255, 255, 255
+            ]
+        );
+    }
+
+    #[test]
+    fn decode_bigint() {
+        let mut decoder = AVMDecoder::new(vec![0x23, 0x01, 0xdf, 0x12]);
+        assert_eq!(
+            decoder.decode_one_bigint(),
+            Ok(BigUint::from_bytes_be(&[0xdfu8, 0x12]))
+        );
+    }
 
     #[test]
     fn encode() {
@@ -234,16 +343,37 @@ mod tests {
             data_0.encode(),
             vec![0x08, 0x3f, 0xf0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]
         );
+        data_0 = AbiToken::ADDRESS([
+            0xa0, 0xb8, 0xae, 0x18, 0xd8, 0x1f, 0xe0, 0x58, 0x06, 0x8e, 0xbe, 0x7c, 0x2e, 0x9c,
+            0xcd, 0x3b, 0x77, 0x69, 0xd7, 0x14, 0x62, 0x98, 0x62, 0x91, 0x83, 0x89, 0x33, 0x09,
+            0x57, 0x06, 0xe6, 0x4b,
+        ]);
+        println!("{:x?}", data_0.encode());
         data_0 = AbiToken::ADOUBLE(&[1.0, 2.0]);
         assert_eq!(
             data_0.encode(),
             vec![24, 63, 240, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0]
         );
+
+        data_0 = AbiToken::STRING("vote".to_string());
+        println!("vote = {:x?}", data_0.encode());
+        println!(
+            "register = {:x?}",
+            AbiToken::STRING("register".to_string()).encode()
+        );
+        println!(
+            "getVote = {:x?}",
+            AbiToken::STRING("getVote".to_string()).encode()
+        );
+        assert_eq!(data_0.encode(), vec![33, 0, 4, 118, 111, 116, 101]);
     }
 
     #[test]
     fn decode() {
         let raw = [0x1u8, 0, 0, 0];
         assert_eq!(raw.to_u32(), 16777216);
+        // decode u64
+        let mut decoder = AVMDecoder::new(vec![0x11, 0, 0, 0, 0, 0, 0, 0, 99]);
+        assert_eq!(decoder.decode_ulong(), Ok(99));
     }
 }

@@ -19,17 +19,13 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-//#![feature(test)]
-//extern crate test;
+#![warn(unused_extern_crates)]
 
-extern crate time;
-extern crate byteorder;
 extern crate crypto as rcrypto;
 extern crate aion_types;
 extern crate rand;
 extern crate rustc_hex;
 extern crate blake2b as blake2b_util;
-extern crate rlp;
 
 mod error;
 mod ed25519;

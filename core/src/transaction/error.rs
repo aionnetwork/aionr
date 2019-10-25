@@ -22,7 +22,7 @@
 
 use std::fmt;
 
-use aion_types::U256;
+use aion_types::{U256,H256};
 use key;
 use unexpected::OutOfBounds;
 
@@ -108,6 +108,11 @@ pub enum Error {
         /// Transaction gas
         got: U256,
     },
+    InvalidTransactionType,
+    /// Invalid beacon hash
+    InvalidBeaconHash(H256),
+    /// beacon hash is banned
+    BeaconBanned,
 }
 
 impl From<key::Error> for Error {
@@ -187,6 +192,14 @@ impl fmt::Display for Error {
                     minimal, maximal, got
                 )
             }
+            InvalidTransactionType => format!("Invalid transaction type. Expected 1 or 2"),
+            InvalidBeaconHash(ref hash) => {
+                format!(
+                    "Invalid transaction beacon hash :{}, not in canon chain.",
+                    hash
+                )
+            }
+            BeaconBanned => "Not yet forked, Beacon hash is banned.".into(),
         };
 
         f.write_fmt(format_args!("Transaction error ({})", msg))

@@ -20,10 +20,7 @@
  *
  ******************************************************************************/
 
-//! General bytes-related utilities.
-//!
-//! Includes a pretty-printer for bytes, in the form of `ToPretty` and `PrettySlice`
-//! as
+#![warn(unused_extern_crates)]
 
 use std::fmt;
 use std::cmp::min;

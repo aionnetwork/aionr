@@ -1,0 +1,21 @@
+[aion]
+chain = "ci/ci.json"
+
+[network]
+sync_from_boot_nodes_only = true
+max_peers = 64
+net_id = 128
+local_node = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"
+boot_nodes = []
+ip_black_list = []
+
+[http]
+port = 8545
+interface = "0.0.0.0"
+
+[stratum]
+port = 8008
+interface = "0.0.0.0"
+
+[mining]
+author = "0xa07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137"

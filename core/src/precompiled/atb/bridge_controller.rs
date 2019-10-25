@@ -20,8 +20,9 @@
  ******************************************************************************/
 
 use std::cmp;
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use aion_types::{H256, U256};
+use vms::{ReturnData, ExecStatus, ExecutionResult};
 use num_bigint::BigInt;
 use num_bigint::ToBigInt;
 
@@ -33,7 +34,6 @@ use precompiled::atb::bridge_event_sig::BridgeEventSig;
 use precompiled::atb::bridge_strg_conn::BridgeStorageConnector;
 use precompiled::atb::bridge_transfer::BridgeTransfer;
 use precompiled::atb::bridge_utilities::compute_bundle_hash;
-use vms::{ExecutionResult, ReturnData, ExecStatus};
 
 pub struct BridgeController {
     connector: BridgeStorageConnector,
@@ -238,7 +238,6 @@ impl BridgeController {
         // an event indicating the transactionHash that the bundle was
         // previously successfully broadcast in.
         if self.bundle_processed(ext, hash) {
-            print!("4");
             // ATB 6-1, fixed bug: emit stored transactionHash instead of input transaction Hash
             let bundle = self.connector.get_bundle(ext, hash);
             self.emit_successful_transaction_hash(ext, bundle);
@@ -396,6 +395,7 @@ impl BridgeController {
             return_data: ReturnData::empty(),
             exception: String::default(),
             state_root: H256::default(),
+            invokable_hashes: Default::default(),
         })
     }
 }

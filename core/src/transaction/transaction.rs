@@ -24,12 +24,13 @@
 
 use super::error;
 use aion_types::{to_u256, Address, Ed25519Public, H256, U256};
-use ajson;
 use blake2b::blake2b;
 use heapsize::HeapSizeOf;
 use key::{
-    self, public_to_address_ed25519, recover_ed25519, sign_ed25519, Ed25519Secret, Ed25519Signature,
+    self, public_to_address_ed25519, recover_ed25519, Ed25519Signature,
 };
+#[cfg(test)]
+use key::{sign_ed25519, Ed25519Secret};
 use rlp::{self, DecoderError, Encodable, RlpStream, UntrustedRlp};
 use std::ops::Deref;
 use vms::constants::{
@@ -37,7 +38,9 @@ use vms::constants::{
     GAS_TX_DATA_ZERO,
 };
 
-use bytes::i64_to_bytes;
+#[cfg(test)]
+use acore_bytes::i64_to_bytes;
+#[cfg(test)]
 use trace_time::to_epoch_micro;
 
 type Bytes = Vec<u8>;
@@ -55,13 +58,13 @@ pub const SYSTEM_ADDRESS: Address = H256([
 pub const DEFAULT_TRANSACTION_TYPE: U256 = U256([1, 0, 0, 0]);
 pub const AVM_TRANSACTION_TYPE: U256 = U256([2, 0, 0, 0]);
 
+pub const BEACON_HASH_EXTENSION: u8 = 1;
+
 struct TransactionEnergyRule;
 impl TransactionEnergyRule {
-    pub fn is_valid_gas_create(gas: U256) -> bool {
-        (gas >= GAS_CREATE_MIN) && (gas <= GAS_CREATE_MAX)
-    }
+    fn is_valid_gas_create(gas: U256) -> bool { (gas >= GAS_CREATE_MIN) && (gas <= GAS_CREATE_MAX) }
 
-    pub fn is_valid_gas_call(gas: U256) -> bool { gas >= GAS_CALL_MIN && gas <= GAS_CALL_MAX }
+    fn is_valid_gas_call(gas: U256) -> bool { gas >= GAS_CALL_MIN && gas <= GAS_CALL_MAX }
 }
 
 /// Transaction action type.
@@ -128,6 +131,8 @@ pub struct Transaction {
     pub data: Bytes,
     /// Transaction Type.
     pub transaction_type: U256,
+    /// Extension data
+    pub beacon: Option<H256>,
 }
 
 impl Transaction {
@@ -139,6 +144,7 @@ impl Transaction {
         value: U256,
         data: Bytes,
         tx_type: U256,
+        beacon: Option<H256>,
     ) -> Transaction
     {
         Transaction {
@@ -153,18 +159,17 @@ impl Transaction {
             value_bytes: Bytes::new(),
             data,
             transaction_type: tx_type,
+            beacon,
         }
     }
 
     /// Append object with a without signature into RLP stream
-    pub fn rlp_append_unsigned_transaction(
-        &self,
-        s: &mut RlpStream,
-        chain_id: Option<u64>,
-        timestamp: &Bytes,
-    )
-    {
-        s.begin_list(if chain_id.is_none() { 8 } else { 11 });
+    pub fn rlp_append_unsigned_transaction(&self, s: &mut RlpStream, timestamp: &Bytes) {
+        if self.beacon.is_some() {
+            s.begin_list(10);
+        } else {
+            s.begin_list(8);
+        }
         if self.nonce_bytes.is_empty() {
             s.append(&self.nonce);
         } else {
@@ -189,10 +194,9 @@ impl Transaction {
             s.append(&self.gas_price_bytes);
         }
         s.append(&self.transaction_type);
-        if let Some(n) = chain_id {
-            s.append(&n);
-            s.append(&0u8);
-            s.append(&0u8);
+        if let Some(ref hash) = &self.beacon {
+            s.append(&BEACON_HASH_EXTENSION);
+            s.append(hash);
         }
     }
 }
@@ -201,61 +205,28 @@ impl HeapSizeOf for Transaction {
     fn heap_size_of_children(&self) -> usize { self.data.heap_size_of_children() }
 }
 
-impl From<ajson::transaction::Transaction> for UnverifiedTransaction {
-    fn from(t: ajson::transaction::Transaction) -> Self {
-        let to: Option<ajson::hash::Address> = t.to.into();
-        UnverifiedTransaction {
-            unsigned: Transaction {
-                nonce: t.nonce.into(),
-                nonce_bytes: Vec::new(),
-                gas_price: t.gas_price.into(),
-                gas_price_bytes: Vec::new(),
-                gas: t.gas_limit.into(),
-                gas_bytes: Vec::new(),
-                action: match to {
-                    Some(to) => Action::Call(to.into()),
-                    None => Action::Create,
-                },
-                value: t.value.into(),
-                value_bytes: Vec::new(),
-                data: t.data.into(),
-                transaction_type: t.transaction_type.into(),
-            },
-            timestamp: t.timestamp.into(),
-            sig: t.sig.into(),
-            hash: 0.into(),
-        }
-        .compute_hash()
-    }
-}
-
 impl Transaction {
     /// The message hash of the transaction.
-    pub fn hash(&self, chain_id: Option<u64>, timestamp: &Bytes) -> H256 {
+    pub fn hash(&self, timestamp: &Bytes) -> H256 {
         let mut stream = RlpStream::new();
-        self.rlp_append_unsigned_transaction(&mut stream, chain_id, timestamp);
+        self.rlp_append_unsigned_transaction(&mut stream, timestamp);
         blake2b(stream.as_raw())
     }
 
-    pub fn sign(self, key: &[u8], chain_id: Option<u64>) -> SignedTransaction {
+    #[cfg(test)]
+    pub fn sign(self, key: &[u8]) -> SignedTransaction {
         let timestamp = i64_to_bytes(to_epoch_micro());
         //        let sig = sign_with_secret(secret_from_slice(key), &self.hash(chain_id, &timestamp))
         //            .expect("data is valid and context has signing capabilities; qed");
         let key = Ed25519Secret::from_slice(key)
             .expect("key is valid and context has signing capabilities; qed");
-        let sig = sign_ed25519(&key, &self.hash(chain_id, &timestamp))
+        let sig = sign_ed25519(&key, &self.hash(&timestamp))
             .expect("data is valid and context has signing capabilities; qed");
-        SignedTransaction::new(self.with_signature(sig, chain_id, timestamp.to_vec()))
+        SignedTransaction::new(self.with_signature(sig, timestamp.to_vec()))
             .expect("secret is valid so it's recoverable")
     }
 
-    pub fn with_signature(
-        self,
-        sig: Ed25519Signature,
-        _chain_id: Option<u64>,
-        timestamp: Bytes,
-    ) -> UnverifiedTransaction
-    {
+    pub fn with_signature(self, sig: Ed25519Signature, timestamp: Bytes) -> UnverifiedTransaction {
         UnverifiedTransaction {
             unsigned: self,
             timestamp,
@@ -292,21 +263,6 @@ impl Transaction {
         }
     }
 
-    /// Add EIP-86 compatible empty signature.
-    pub fn null_sign(self, _chain_id: u64) -> SignedTransaction {
-        SignedTransaction {
-            transaction: UnverifiedTransaction {
-                unsigned: self,
-                timestamp: vec![0x00; 8],
-                sig: vec![0u8; 96],
-                hash: 0.into(),
-            }
-            .compute_hash(),
-            sender: UNSIGNED_SENDER,
-            public: None,
-        }
-    }
-
     /// Get the transaction cost in gas for the given params.
     pub fn gas_required(&self) -> U256 {
         self.data.iter().fold(
@@ -322,6 +278,9 @@ impl Transaction {
             },
         )
     }
+
+    /// Set beacon hash
+    fn _set_beacon(&mut self, hash: H256) { self.beacon = Some(hash) }
 }
 
 /// Signed transaction information without verified signature.
@@ -346,7 +305,8 @@ impl Deref for UnverifiedTransaction {
 
 impl rlp::Decodable for UnverifiedTransaction {
     fn decode(d: &UntrustedRlp) -> Result<Self, DecoderError> {
-        if d.item_count()? != 9 {
+        let count = d.item_count()?;
+        if count != 9 && count != 11 {
             return Err(DecoderError::RlpIncorrectListLen);
         }
         let hash = blake2b(d.as_raw());
@@ -384,10 +344,19 @@ impl rlp::Decodable for UnverifiedTransaction {
                         transaction_type_vec[0].into()
                     }
                 },
+                beacon: match count {
+                    9 => None,
+                    11 if d.val_at::<u8>(9)? == BEACON_HASH_EXTENSION => Some(d.val_at(10)?),
+                    _ => {
+                        error!(target: "tx", "should not be reached!!");
+                        return Err(DecoderError::RlpIncorrectListLen);
+                    }
+                },
             },
             timestamp: d.val_at(4)?,
             sig: d.val_at(8)?,
             hash: hash,
+            //            ext_id: d.val_at(9)?,
         })
     }
 }
@@ -416,7 +385,11 @@ impl UnverifiedTransaction {
 
     /// Append object with a signature into RLP stream
     fn rlp_append_sealed_transaction(&self, s: &mut RlpStream) {
-        s.begin_list(9);
+        if self.beacon.is_some() {
+            s.begin_list(11);
+        } else {
+            s.begin_list(9);
+        }
         if self.nonce_bytes.is_empty() {
             s.append(&self.nonce);
         } else {
@@ -442,6 +415,10 @@ impl UnverifiedTransaction {
         }
         s.append(&self.transaction_type);
         s.append(&self.sig);
+        if let Some(ref hash) = &self.beacon {
+            s.append(&BEACON_HASH_EXTENSION);
+            s.append(hash);
+        }
     }
 
     ///    Reference to unsigned part of this transaction.
@@ -449,24 +426,18 @@ impl UnverifiedTransaction {
 
     pub fn standard_v(&self) -> u8 { 0 }
 
-    /// The chain ID, or `None` if this is a global transaction.
-    pub fn chain_id(&self) -> Option<u64> { None }
-
     /// Construct a signature object from the sig.
     pub fn signature(&self) -> Ed25519Signature { Ed25519Signature::from(self.sig.clone()) }
 
     /// Get the hash of this header (blake2b of the RLP).
-    pub fn hash(&self) -> H256 { self.hash }
+    pub fn hash(&self) -> &H256 { &self.hash }
 
     /// Get the timestamp
     pub fn timestamp(&self) -> &Bytes { &self.timestamp }
 
     /// Recovers the public key of the sender.
     pub fn recover_public(&self) -> Result<Ed25519Public, key::Error> {
-        recover_ed25519(
-            &self.signature(),
-            &self.unsigned.hash(self.chain_id(), &self.timestamp),
-        )
+        recover_ed25519(&self.signature(), &self.unsigned.hash(&self.timestamp))
     }
 
     /// Do basic validation, checking for valid signature and minimum gas,
@@ -493,6 +464,23 @@ impl UnverifiedTransaction {
             .into());
         }
         Ok(self)
+    }
+
+    pub fn is_allowed_type(
+        &self,
+        has_fork: Option<u64>,
+        current_blk: BlockNumber,
+    ) -> Result<(), error::Error>
+    {
+        match has_fork {
+            Some(ref fork)
+                if *fork < current_blk && !(self.transaction_type == AVM_TRANSACTION_TYPE
+                    || self.transaction_type == DEFAULT_TRANSACTION_TYPE) =>
+            {
+                Err(error::Error::InvalidTransactionType)
+            }
+            _ => Ok(()),
+        }
     }
 
     /// Verify basic signature params. Does not attempt sender recovery.
@@ -547,8 +535,6 @@ impl UnverifiedTransaction {
             )));
         }
 
-        // signature is verified in SignedTransaction.
-
         Ok(())
     }
 }
@@ -599,21 +585,16 @@ impl SignedTransaction {
     }
 
     /// Returns transaction type.
-    pub fn tx_type(&self) -> U256 { self.transaction.unsigned.transaction_type }
+    pub fn tx_type(&self) -> U256 { self.transaction_type }
 
     /// Returns transaction sender.
-    pub fn sender(&self) -> Address { self.sender }
+    pub fn sender(&self) -> &Address { &self.sender }
 
     /// Returns a public key of the sender.
     pub fn public_key(&self) -> Option<Ed25519Public> { self.public }
 
     /// Checks is signature is empty.
     pub fn is_unsigned(&self) -> bool { self.transaction.is_unsigned() }
-
-    /// Deconstructs this transaction back into `UnverifiedTransaction`
-    pub fn deconstruct(self) -> (UnverifiedTransaction, Address, Option<Ed25519Public>) {
-        (self.transaction, self.sender, self.public)
-    }
 }
 
 /// Signed Transaction that is a part of canon blockchain.
@@ -731,7 +712,7 @@ mod tests {
             public_to_address_ed25519(&t.recover_public().unwrap()),
             "a00a2d0d10ce8a2ea47a76fbb935405df2a12b0e2bc932f188f84b5f16da9c2c".into()
         );
-        assert_eq!(t.chain_id(), None);
+        //        assert_eq!(t.chain_id(), None);
     }
 
     // verify_basic() tests
@@ -758,6 +739,7 @@ mod tests {
             value_bytes: Vec::new(),
             data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
             transaction_type: U256::from(1),
+            beacon: None,
         };
 
         let ut = UnverifiedTransaction {
@@ -790,6 +772,7 @@ mod tests {
             value_bytes: Vec::new(),
             data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
             transaction_type: U256::from(1),
+            beacon: None,
         };
 
         let ut = UnverifiedTransaction {
@@ -819,6 +802,7 @@ mod tests {
         //            value_bytes: Vec::new(),
         //            data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
         //            transaction_type: 1,
+        //            beacon: None
         //        };
         //
         //        let ut = UnverifiedTransaction {
@@ -857,6 +841,7 @@ mod tests {
         //            value_bytes: Vec::new(),
         //            data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
         //            transaction_type: 1,
+        //            beacon: None
         //        };
         //
         //        let ut = UnverifiedTransaction {
@@ -894,6 +879,7 @@ mod tests {
         //            value_bytes: Vec::new(),
         //            data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
         //            transaction_type: 1,
+        //            beacon: None
         //        };
         //
         //        let ut = UnverifiedTransaction {
@@ -933,6 +919,7 @@ mod tests {
         //            value_bytes: Vec::new(),
         //            data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
         //            transaction_type: 1,
+        //            beacon: None
         //        };
         //
         //        let ut = UnverifiedTransaction {
@@ -982,6 +969,7 @@ mod tests {
         //            value_bytes: Vec::new(),
         //            data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
         //            transaction_type: 1,
+        //            beacon: None
         //        };
         //
         //        let ut = UnverifiedTransaction {
@@ -1012,6 +1000,7 @@ mod tests {
         //            value_bytes: Vec::new(),
         //            data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
         //            transaction_type: 1,
+        //            beacon: None
         //        };
         //
         //        let ut = UnverifiedTransaction {
@@ -1061,6 +1050,36 @@ mod tests {
     }
 
     #[test]
+    fn beacon_rlp_test() {
+        use aion_types::H256;
+        let t = Transaction {
+            action: Action::Call(SYSTEM_ADDRESS),
+            nonce: U256::from(1),
+            nonce_bytes: Vec::new(),
+            gas_price: U256::from(3000),
+            gas_bytes: Vec::new(),
+            gas: U256::from(21000),
+            gas_price_bytes: Vec::new(),
+            value: U256::from(0),
+            value_bytes: Vec::new(),
+            data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
+            transaction_type: 1u64.into(),
+            beacon: Some(H256::from(233)),
+        };
+
+        let ut = UnverifiedTransaction {
+            unsigned: t,
+            sig: Vec::new(),
+            hash: H256::zero(),
+            timestamp: Vec::new(),
+        };
+        let rlp = rlp::encode(&ut);
+        println!("{}", rlp.to_hex());
+        let t: UnverifiedTransaction = rlp::decode(&rlp.into_vec());
+        assert_eq!(ut.beacon, t.beacon);
+    }
+
+    #[test]
     // test gas required
     fn gas_required() {
         let t = Transaction {
@@ -1075,6 +1094,7 @@ mod tests {
             value_bytes: Vec::new(),
             data: ::rustc_hex::FromHex::from_hex("26121ff0").unwrap(),
             transaction_type: U256::from(1),
+            beacon: None,
         };
         println!("data: {:?}", t.data);
         assert_eq!(t.gas_required().low_u64(), 21256);
@@ -1097,12 +1117,13 @@ mod tests {
             value_bytes: Vec::new(),
             data: b"Hello!".to_vec(),
             transaction_type: U256::from(1),
+            beacon: None,
         }
-        .sign(&key.secret(), None);
+        .sign(&key.secret());
         let mut slice = blake2b(key.public());
         slice[0] = 0xA0;
-        assert_eq!(Address::from(slice), t.sender());
-        assert_eq!(t.chain_id(), None);
+        assert_eq!(Address::from(slice), *t.sender());
+        //        assert_eq!(t.chain_id(), None);
     }
 
     #[test]
@@ -1121,14 +1142,15 @@ mod tests {
             value_bytes: Vec::new(),
             data: b"Hello!".to_vec(),
             transaction_type: U256::from(1),
+            beacon: None,
         }
         .fake_sign(Address::from(0x69));
-        assert_eq!(Address::from(0x69), t.sender());
-        assert_eq!(t.chain_id(), None);
+        assert_eq!(Address::from(0x69), *t.sender());
+        //        assert_eq!(t.chain_id(), None);
 
         let t = t.clone();
-        assert_eq!(Address::from(0x69), t.sender());
-        assert_eq!(t.chain_id(), None);
+        assert_eq!(Address::from(0x69), *t.sender());
+        //        assert_eq!(t.chain_id(), None);
 
         println!("{:?}", t.rlp_bytes().to_hex());
     }
@@ -1140,8 +1162,8 @@ mod tests {
         let test_vector = |tx_data: &str, address: &'static str| {
             let signed = rlp::decode(&FromHex::from_hex(tx_data).unwrap());
             let signed = SignedTransaction::new(signed).unwrap();
-            assert_eq!(signed.sender(), address.into());
-            println!("chainid: {:?}", signed.chain_id());
+            assert_eq!(signed.sender().clone(), address.into());
+            //            println!("chainid: {:?}", signed.chain_id());
         };
 
         test_vector("f89480a0a02c25e39471085ff8cae0882132d82c6490eb02f3e6906b303d8f990e86e6340a80880005748d2d576db18252080101b8608bc5c4e5599afac7cb0efcb0010540017dda3e80870bb543b356867b2a8cacbf7447205c145d35c2a4e6bd58e58e5894b37416247ed0330f4bb114984f869aa3ed914130be741856a664439cbd64d5583e85dd470ea448c8fc9102b2116c2a0a", "0xa00a2d0d10ce8a2ea47a76fbb935405df2a12b0e2bc932f188f84b5f16da9c2c");

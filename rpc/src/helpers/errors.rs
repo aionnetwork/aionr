@@ -26,7 +26,7 @@
 use std::fmt;
 
 use acore::account_provider::{SignError as AccountError};
-use acore::error::{Error as EthcoreError, CallError};
+use acore::{Error as EthcoreError, CallError};
 use jsonrpc_core::{futures, Error, ErrorCode, Value};
 use rlp::DecoderError;
 use acore::transaction::Error as TransactionError;
@@ -38,6 +38,8 @@ mod codes {
     pub const NO_AUTHOR: i64 = -32002;
     pub const NO_NEW_WORK: i64 = -32003;
     pub const NO_WORK_REQUIRED: i64 = -32004;
+    pub const POW_NOT_ALLOWED: i64 = -32005;
+    pub const POS_NOT_ALLOWED: i64 = -32006;
     pub const UNKNOWN_ERROR: i64 = -32009;
     pub const TRANSACTION_ERROR: i64 = -32010;
     pub const EXECUTION_ERROR: i64 = -32015;
@@ -174,6 +176,22 @@ pub fn no_work() -> Error {
     Error {
         code: ErrorCode::ServerError(codes::NO_WORK),
         message: "Still syncing.".into(),
+        data: None,
+    }
+}
+
+pub fn pow_not_allowed() -> Error {
+    Error {
+        code: ErrorCode::ServerError(codes::POW_NOT_ALLOWED),
+        message: "PoW mining not allowed.".into(),
+        data: None,
+    }
+}
+
+pub fn pos_not_allowed() -> Error {
+    Error {
+        code: ErrorCode::ServerError(codes::POS_NOT_ALLOWED),
+        message: "PoS mining not allowed.".into(),
         data: None,
     }
 }
@@ -362,8 +380,8 @@ pub fn transaction_message(error: TransactionError) -> String {
             got,
         } => {
             format!(
-                "Transaction cost exceeds current block gas limit. Limit: {}, got: {}. Try to \
-                 decrease supplied gas.",
+                "Transaction gas limit exceeded the gas limit set in configuration. Limit: {}, \
+                 got: {}. Try to decrease supplied gas or increase gas limit configuration.",
                 limit, got
             )
         }
@@ -397,6 +415,14 @@ pub fn transaction_message(error: TransactionError) -> String {
                 minimal, maximal, got
             )
         }
+        InvalidTransactionType => format!("Invalid transaction type. Expected type = 1 or 2"),
+        InvalidBeaconHash(ref hash) => {
+            format!(
+                "Invalid transaction beacon hash :{}, not in canon chain.",
+                hash
+            )
+        }
+        BeaconBanned => "Not yet forked, Beacon hash is banned.".into(),
     }
 }
 
@@ -437,6 +463,7 @@ pub fn call(error: CallError) -> Error {
                 CallError::TransactionNotFound,
             )
         }
+        CallError::AVMDecoder(e) => execution(e),
     }
 }
 

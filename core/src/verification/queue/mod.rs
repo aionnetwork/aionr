@@ -32,8 +32,8 @@ use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
 use parking_lot::{Condvar, Mutex, RwLock};
 use io::*;
-use error::*;
-use engines::EthEngine;
+use engine::Engine;
+use types::error::*;
 use service::*;
 
 use self::kind::{BlockLike, Kind};
@@ -144,7 +144,7 @@ struct Sizes {
 /// A queue of items to be verified. Sits between network or other I/O and the `BlockChain`.
 /// Keeps them in the same order as inserted, minus invalid items.
 pub struct VerificationQueue<K: Kind> {
-    engine: Arc<EthEngine>,
+    engine: Arc<Engine>,
     more_to_verify: Arc<SCondvar>,
     verification: Arc<Verification<K>>,
     deleting: Arc<AtomicBool>,
@@ -207,7 +207,6 @@ impl QueueSignal {
 }
 
 struct Verification<K: Kind> {
-    // All locks must be captured in the order declared here.
     unverified: Mutex<VecDeque<K::Unverified>>,
     verifying: Mutex<VecDeque<Verifying<K>>>,
     verified: Mutex<VecDeque<K::Verified>>,
@@ -215,16 +214,14 @@ struct Verification<K: Kind> {
     more_to_verify: SMutex<()>,
     empty: SMutex<()>,
     sizes: Sizes,
-    check_seal: bool,
 }
 
 impl<K: Kind> VerificationQueue<K> {
     /// Creates a new queue instance.
     pub fn new(
         config: Config,
-        engine: Arc<EthEngine>,
+        engine: Arc<Engine>,
         message_channel: IoChannel<ClientIoMessage>,
-        check_seal: bool,
     ) -> Self
     {
         let verification = Arc::new(Verification {
@@ -239,7 +236,6 @@ impl<K: Kind> VerificationQueue<K> {
                 verifying: AtomicUsize::new(0),
                 verified: AtomicUsize::new(0),
             },
-            check_seal: check_seal,
         });
         let more_to_verify = Arc::new(SCondvar::new());
         let deleting = Arc::new(AtomicBool::new(false));
@@ -283,26 +279,26 @@ impl<K: Kind> VerificationQueue<K> {
         }
 
         VerificationQueue {
-            engine: engine,
-            ready_signal: ready_signal,
-            more_to_verify: more_to_verify,
-            verification: verification,
-            deleting: deleting,
+            engine,
+            ready_signal,
+            more_to_verify,
+            verification,
+            deleting,
             processing: RwLock::new(HashMap::new()),
-            empty: empty,
+            empty,
             ticks_since_adjustment: AtomicUsize::new(0),
             max_queue_size: cmp::max(config.max_queue_size, MIN_QUEUE_LIMIT),
             max_mem_use: cmp::max(config.max_mem_use, MIN_MEM_LIMIT),
-            scale_verifiers: scale_verifiers,
-            verifier_handles: verifier_handles,
-            state: state,
+            scale_verifiers,
+            verifier_handles,
+            state,
             total_difficulty: RwLock::new(0.into()),
         }
     }
 
     fn verify(
         verification: Arc<Verification<K>>,
-        engine: Arc<EthEngine>,
+        engine: Arc<Engine>,
         wait: Arc<SCondvar>,
         ready: Arc<QueueSignal>,
         empty: Arc<SCondvar>,
@@ -379,7 +375,7 @@ impl<K: Kind> VerificationQueue<K> {
             };
 
             let hash = item.hash();
-            let is_ready = match K::verify(item, &*engine, verification.check_seal) {
+            let is_ready = match K::verify(item, &*engine) {
                 Ok(verified) => {
                     let mut verifying = verification.verifying.lock();
                     let mut idx = None;
@@ -803,11 +799,11 @@ impl<K: Kind> Drop for VerificationQueue<K> {
 mod tests {
     use io::*;
     use spec::*;
-    use super::{BlockQueue, Config, State};
+    use super::{BlockQueue,State, Config};
     use super::kind::blocks::Unverified;
-    use tests::helpers::*;
-    use error::*;
-    use views::*;
+    use helpers::*;
+    use types::error::{Error,ImportError};
+    use views::BlockView;
 
     // create a test block queue.
     // auto_scaling enables verifier adjustment.
@@ -817,7 +813,7 @@ mod tests {
 
         let mut config = Config::default();
         config.verifier_settings.scale_verifiers = auto_scale;
-        BlockQueue::new(config, engine, IoChannel::disconnected(), true)
+        BlockQueue::new(config, engine, IoChannel::disconnected())
     }
 
     #[test]
@@ -825,7 +821,7 @@ mod tests {
         // TODO better test
         let spec = Spec::new_test();
         let engine = spec.engine;
-        let _ = BlockQueue::new(Config::default(), engine, IoChannel::disconnected(), true);
+        let _ = BlockQueue::new(Config::default(), engine, IoChannel::disconnected());
     }
 
     #[test]
@@ -913,7 +909,7 @@ mod tests {
         let engine = spec.engine;
         let mut config = Config::default();
         config.max_mem_use = super::MIN_MEM_LIMIT; // empty queue uses about 15000
-        let queue = BlockQueue::new(config, engine, IoChannel::disconnected(), true);
+        let queue = BlockQueue::new(config, engine, IoChannel::disconnected());
         assert!(!queue.queue_info().is_full());
         let mut blocks = get_good_dummy_block_seq(50);
         for b in blocks.drain(..) {
@@ -933,7 +929,7 @@ mod tests {
 
         queue.scale_verifiers(0);
 
-        assert!(queue.num_verifiers() == 1);
+        assert_eq!(queue.num_verifiers(), 1);
     }
 
     #[test]

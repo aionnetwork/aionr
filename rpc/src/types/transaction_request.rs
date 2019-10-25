@@ -21,12 +21,13 @@
  ******************************************************************************/
 
 //! `TransactionRequest` type
+use std::fmt;
 
 use ansi_term::Colour;
 use helpers;
-use types::{Bytes, H256, TransactionCondition, U256};
+use aion_types::{U256, Address, H256};
 
-use std::fmt;
+use types::{Bytes, TransactionCondition};
 
 /// Transaction request coming from RPC
 #[derive(
@@ -42,9 +43,9 @@ use std::fmt;
 #[serde(deny_unknown_fields)]
 pub struct TransactionRequest {
     /// Sender
-    pub from: Option<H256>,
+    pub from: Option<Address>,
     /// Recipient
-    pub to: Option<H256>,
+    pub to: Option<Address>,
     /// Gas Price
     #[serde(rename = "gasPrice")]
     pub gas_price: Option<U256>,
@@ -61,6 +62,8 @@ pub struct TransactionRequest {
     pub tx_type: Option<U256>,
     /// Delay until this block condition.
     pub condition: Option<TransactionCondition>,
+    /// Beacon hash
+    pub beacon: Option<H256>,
 }
 
 pub fn format_ether(i: U256) -> String {
@@ -106,15 +109,16 @@ impl fmt::Display for TransactionRequest {
 impl From<helpers::TransactionRequest> for TransactionRequest {
     fn from(r: helpers::TransactionRequest) -> Self {
         TransactionRequest {
-            from: r.from.map(Into::into),
-            to: r.to.map(Into::into),
-            gas_price: r.gas_price.map(Into::into),
-            gas: r.gas.map(Into::into),
-            value: r.value.map(Into::into),
+            from: r.from,
+            to: r.to,
+            gas_price: r.gas_price,
+            gas: r.gas,
+            value: r.value,
             data: r.data.map(Into::into),
-            nonce: r.nonce.map(Into::into),
-            tx_type: r.tx_type.map(Into::into),
+            nonce: r.nonce,
+            tx_type: r.tx_type,
             condition: r.condition.map(Into::into),
+            beacon: r.beacon,
         }
     }
 }
@@ -122,15 +126,16 @@ impl From<helpers::TransactionRequest> for TransactionRequest {
 impl From<helpers::FilledTransactionRequest> for TransactionRequest {
     fn from(r: helpers::FilledTransactionRequest) -> Self {
         TransactionRequest {
-            from: Some(r.from.into()),
-            to: r.to.map(Into::into),
-            gas_price: Some(r.gas_price.into()),
-            gas: Some(r.gas.into()),
-            value: Some(r.value.into()),
+            from: Some(r.from),
+            to: r.to,
+            gas_price: Some(r.gas_price),
+            gas: Some(r.gas),
+            value: Some(r.value),
             data: Some(r.data.into()),
-            nonce: r.nonce.map(Into::into),
-            tx_type: Some(r.tx_type.into()),
+            nonce: r.nonce,
+            tx_type: Some(r.tx_type),
             condition: r.condition.map(Into::into),
+            beacon: r.beacon,
         }
     }
 }
@@ -138,15 +143,16 @@ impl From<helpers::FilledTransactionRequest> for TransactionRequest {
 impl Into<helpers::TransactionRequest> for TransactionRequest {
     fn into(self) -> helpers::TransactionRequest {
         helpers::TransactionRequest {
-            from: self.from.map(Into::into),
-            to: self.to.map(Into::into),
-            gas_price: self.gas_price.map(Into::into),
-            gas: self.gas.map(Into::into),
-            value: self.value.map(Into::into),
+            from: self.from,
+            to: self.to,
+            gas_price: self.gas_price,
+            gas: self.gas,
+            value: self.value,
             data: self.data.map(Into::into),
-            nonce: self.nonce.map(Into::into),
-            tx_type: self.tx_type.map(Into::into),
+            nonce: self.nonce,
+            tx_type: self.tx_type,
             condition: self.condition.map(Into::into),
+            beacon: self.beacon,
         }
     }
 }
@@ -157,7 +163,8 @@ mod tests {
     use rustc_hex::FromHex;
     use serde_json;
     use std::str::FromStr;
-    use types::{H256, TransactionCondition, U256};
+    use aion_types::{H256, U256};
+    use types::TransactionCondition;
 
     #[test]
     fn transaction_request_deserialize() {
@@ -186,6 +193,7 @@ mod tests {
                 nonce: Some(U256::from(4)),
                 tx_type: Some(U256::from(0x01)),
                 condition: Some(TransactionCondition::Number(0x13)),
+                beacon: None
             }
         );
     }
@@ -212,6 +220,7 @@ mod tests {
             nonce: None,
             condition: None,
             tx_type: None,
+            beacon: None
         });
     }
 
@@ -232,6 +241,7 @@ mod tests {
                 nonce: None,
                 condition: None,
                 tx_type: None,
+                beacon: None
             }
         );
     }
@@ -270,6 +280,7 @@ mod tests {
                 nonce: None,
                 condition: None,
                 tx_type: None,
+                beacon: None
             }
         );
     }

@@ -21,9 +21,9 @@
  ******************************************************************************/
 
 //! Definition of valid items for the verification queue.
-
-use engines::EthEngine;
-use error::Error;
+use engine::Engine;
+use types::error::Error;
+use header::SealType;
 
 use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
@@ -41,6 +41,9 @@ pub trait BlockLike {
 
     /// Get the difficulty of this item.
     fn difficulty(&self) -> U256;
+
+    /// Get the seal_type of this item.
+    fn seal_type(&self) -> &Option<SealType>;
 }
 
 /// Defines transitions between stages of verification.
@@ -64,28 +67,24 @@ pub trait Kind: 'static + Sized + Send + Sync {
     type Verified: Sized + Send + BlockLike + HeapSizeOf;
 
     /// Attempt to create the `Unverified` item from the input.
-    fn create(input: Self::Input, engine: &EthEngine) -> Result<Self::Unverified, Error>;
+    fn create(input: Self::Input, engine: &Engine) -> Result<Self::Unverified, Error>;
 
     /// Attempt to verify the `Unverified` item using the given engine.
-    fn verify(
-        unverified: Self::Unverified,
-        engine: &EthEngine,
-        check_seal: bool,
-    ) -> Result<Self::Verified, Error>;
+    fn verify(unverified: Self::Unverified, engine: &Engine) -> Result<Self::Verified, Error>;
 }
 
 /// The blocks verification module.
 pub mod blocks {
     use super::{Kind, BlockLike};
 
-    use engines::EthEngine;
-    use error::{Error, BlockError};
-    use header::Header;
+    use engine::Engine;
+    use types::error::{Error, BlockError};
+    use header::{Header,SealType};
     use verification::{PreverifiedBlock, verify_block_basic, verify_block_unordered};
 
     use heapsize::HeapSizeOf;
     use aion_types::{H256, U256};
-    use bytes::Bytes;
+    use acore_bytes::Bytes;
 
     /// A mode for verifying blocks.
     pub struct Blocks;
@@ -95,7 +94,7 @@ pub mod blocks {
         type Unverified = Unverified;
         type Verified = PreverifiedBlock;
 
-        fn create(input: Self::Input, engine: &EthEngine) -> Result<Self::Unverified, Error> {
+        fn create(input: Self::Input, engine: &Engine) -> Result<Self::Unverified, Error> {
             match verify_block_basic(&input.header, &input.bytes, engine) {
                 Ok(()) => Ok(input),
                 Err(Error::Block(BlockError::TemporarilyInvalid(oob))) => {
@@ -109,14 +108,9 @@ pub mod blocks {
             }
         }
 
-        fn verify(
-            un: Self::Unverified,
-            engine: &EthEngine,
-            check_seal: bool,
-        ) -> Result<Self::Verified, Error>
-        {
+        fn verify(un: Self::Unverified, engine: &Engine) -> Result<Self::Verified, Error> {
             let hash = un.hash();
-            match verify_block_unordered(un.header, un.bytes, engine, check_seal) {
+            match verify_block_unordered(un.header, un.bytes, engine) {
                 Ok(verified) => Ok(verified),
                 Err(e) => {
                     warn!(target: "client", "Stage 2 block verification failed for {}: {:?}", hash, e);
@@ -139,8 +133,8 @@ pub mod blocks {
 
             let header = BlockView::new(&bytes).header();
             Unverified {
-                header: header,
-                bytes: bytes,
+                header,
+                bytes,
             }
         }
     }
@@ -157,6 +151,8 @@ pub mod blocks {
         fn parent_hash(&self) -> H256 { self.header.parent_hash().clone() }
 
         fn difficulty(&self) -> U256 { self.header.difficulty().clone() }
+
+        fn seal_type(&self) -> &Option<SealType> { self.header.seal_type() }
     }
 
     impl BlockLike for PreverifiedBlock {
@@ -165,6 +161,8 @@ pub mod blocks {
         fn parent_hash(&self) -> H256 { self.header.parent_hash().clone() }
 
         fn difficulty(&self) -> U256 { self.header.difficulty().clone() }
+
+        fn seal_type(&self) -> &Option<SealType> { self.header.seal_type() }
     }
 }
 
@@ -172,9 +170,9 @@ pub mod blocks {
 pub mod headers {
     use super::{Kind, BlockLike};
 
-    use engines::EthEngine;
-    use error::Error;
-    use header::Header;
+    use engine::Engine;
+    use types::error::Error;
+    use header::{Header,SealType};
     use verification::verify_header_params;
 
     use aion_types::{H256, U256};
@@ -183,6 +181,7 @@ pub mod headers {
         fn hash(&self) -> H256 { self.hash() }
         fn parent_hash(&self) -> H256 { self.parent_hash().clone() }
         fn difficulty(&self) -> U256 { self.difficulty().clone() }
+        fn seal_type(&self) -> &Option<SealType> { self.seal_type() }
     }
 
     /// A mode for verifying headers.
@@ -193,24 +192,14 @@ pub mod headers {
         type Unverified = Header;
         type Verified = Header;
 
-        fn create(input: Self::Input, engine: &EthEngine) -> Result<Self::Unverified, Error> {
+        fn create(input: Self::Input, engine: &Engine) -> Result<Self::Unverified, Error> {
             verify_header_params(&input, engine, true).map(|_| input)
         }
 
-        fn verify(
-            unverified: Self::Unverified,
-            engine: &EthEngine,
-            check_seal: bool,
-        ) -> Result<Self::Verified, Error>
-        {
-            match check_seal {
-                true => {
-                    engine
-                        .verify_block_unordered(&unverified)
-                        .map(|_| unverified)
-                }
-                false => Ok(unverified),
-            }
+        fn verify(unverified: Self::Unverified, engine: &Engine) -> Result<Self::Verified, Error> {
+            engine
+                .verify_block_unordered(&unverified)
+                .map(|_| unverified)
         }
     }
 }

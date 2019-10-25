@@ -22,6 +22,7 @@
 
 use U256;
 use U128;
+use num_bigint::BigUint;
 
 #[cfg(feature = "serialize")]
 use serde::{Serialize, Serializer, Deserialize, Deserializer};
@@ -148,3 +149,7 @@ impl_serde!(H512, 64);
 impl_serde!(H520, 65);
 impl_serde!(H1024, 128);
 impl_serde!(H768, 96);
+
+impl From<H256> for BigUint {
+    fn from(value: H256) -> BigUint { BigUint::from_bytes_be(&value[..]) }
+}

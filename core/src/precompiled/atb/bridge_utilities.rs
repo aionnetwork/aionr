@@ -19,7 +19,7 @@
  *
  ******************************************************************************/
 
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use tiny_keccak::keccak256;
 use rustc_hex::FromHex;
 use num_bigint::ToBigInt;
@@ -98,7 +98,7 @@ pub fn compute_bundle_hash(source_block_hash: H256, bundles: &Vec<BridgeTransfer
 
 #[cfg(test)]
 mod tests {
-    use bytes::Bytes;
+    use acore_bytes::Bytes;
     use aion_types::H256;
     use super::{
         to_signature, to_event_signature, get_signature, or_default_word, or_default_d_word,

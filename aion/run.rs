@@ -24,14 +24,14 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
-use acore::client::{BlockChainClient, Client, DatabaseCompactionProfile, VMType};
+use acore::client::{Client, DatabaseCompactionProfile, VMType , ChainNotify
+};
 use acore::miner::external::ExternalMiner;
 use acore::miner::{Miner, MinerOptions, MinerService};
-use acore::miner::{Stratum, StratumOptions};
-use acore::service::ClientService;
-use acore::transaction::local_transactions::TxIoMessage;
+use acore::service::{ClientService, run_miner, run_staker, pos_sealing, run_transaction_pool};
 use acore::verification::queue::VerifierSettings;
-use aion_rpc::{dispatch::DynamicGasPrice, impls::EthClient, informant};
+use acore::sync::Sync;
+use aion_rpc::{dispatch::DynamicGasPrice, informant};
 use aion_version::version;
 use ansi_term::Colour;
 use cache::CacheConfig;
@@ -40,20 +40,19 @@ use dir::{DatabaseDirectories, Directories};
 use fdlimit::raise_fd_limit;
 use helpers::{passwords_from_files, to_client_config};
 use dir::helpers::absolute;
-use io::{IoChannel, IoService};
+use io::IoChannel;
 use logger::LogConfig;
-use modules;
-use num_cpus;
-use params::{fatdb_switch_to_bool, AccountsConfig, MinerExtras, Pruning, SpecType, Switch};
-use parking_lot::{Condvar, Mutex};
-use pb::{new_pb, WalletApiConfiguration};
-use rpc;
-use rpc_apis;
-use sync::p2p::{NetworkConfig, P2pMgr};
-use sync::sync::SyncConfig;
 use tokio;
 use tokio::prelude::*;
+use num_cpus;
+use params::{fatdb_switch_to_bool, AccountsConfig, StakeConfig, MinerExtras, Pruning, SpecType, Switch};
+use parking_lot::{Condvar, Mutex};
+use rpc;
+use rpc_apis;
+use p2p::Config;
+
 use user_defaults::UserDefaults;
+
 // Pops along with error messages when a password is missing or invalid.
 const VERIFY_PASSWORD_HINT: &'static str = "Make sure valid password is present in files passed \
                                             using `--password` or in the configuration file.";
@@ -74,45 +73,21 @@ pub struct RunCmd {
     pub ws_conf: rpc::WsConfiguration,
     pub http_conf: rpc::HttpConfiguration,
     pub ipc_conf: rpc::IpcConfiguration,
-    pub wallet_api_conf: WalletApiConfiguration,
-    pub net_conf: NetworkConfig,
+    pub net_conf: Config,
     pub acc_conf: AccountsConfig,
+    pub stake_conf: StakeConfig,
     pub miner_extras: MinerExtras,
     pub fat_db: Switch,
     pub compaction: DatabaseCompactionProfile,
     pub wal: bool,
     pub vm_type: VMType,
-    pub stratum: StratumOptions,
-    pub check_seal: bool,
     pub verifier_settings: VerifierSettings,
     pub no_persistent_txqueue: bool,
 }
 
-// node info fetcher for the local store.
-struct FullNodeInfo {
-    miner: Option<Arc<Miner>>, // TODO: only TXQ needed, just use that after decoupling.
-}
-
-impl ::local_store::NodeInfo for FullNodeInfo {
-    fn pending_transactions(&self) -> Vec<::acore::transaction::PendingTransaction> {
-        let miner = match self.miner.as_ref() {
-            Some(m) => m,
-            None => return Vec::new(),
-        };
-
-        let local_txs = miner.local_transactions();
-        miner
-            .pending_transactions()
-            .into_iter()
-            .chain(miner.future_transactions())
-            .filter(|tx| local_txs.contains_key(&tx.hash()))
-            .collect()
-    }
-}
-
 pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // load spec
-    let spec = cmd.spec.spec(&cmd.dirs.cache)?;
+    let spec = cmd.spec.spec()?;
 
     // load genesis hash
     let genesis_hash = spec.genesis_header().hash();
@@ -140,15 +115,9 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // create dirs used by aion
     cmd.dirs.create_dirs()?;
 
-    // run in daemon mode
-    if let Some(pid_file) = cmd.daemon {
-        daemonize(pid_file)?;
-    }
-
-    //print out running aion environment
-    print_running_environment(&cmd.spec, &spec.data_dir, &cmd.dirs, &db_dirs);
-
     print_logo();
+
+    print_running_environment(&cmd.spec, &spec.data_dir, &cmd.dirs, &db_dirs);
 
     let passwords = passwords_from_files(&cmd.acc_conf.password_files)?;
 
@@ -161,13 +130,8 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         &passwords,
     )?);
 
-    let tx_status_service = IoService::<TxIoMessage>::start()
-        .map_err(|e| format!("tx status server start failed : {}", e))?;
-    let tx_status_channel = if cmd.wallet_api_conf.enabled {
-        tx_status_service.channel()
-    } else {
-        IoChannel::disconnected()
-    };
+    let tx_status_channel = IoChannel::disconnected();
+
     // create miner
     let miner = Miner::new(
         cmd.miner_options,
@@ -179,6 +143,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     miner.set_gas_floor_target(cmd.miner_extras.gas_floor_target);
     miner.set_gas_ceil_target(cmd.miner_extras.gas_ceil_target);
     miner.set_extra_data(cmd.miner_extras.extra_data);
+
     // create client config
     let mut client_config = to_client_config(
         &cmd.cache_config,
@@ -190,13 +155,15 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         algorithm,
         cmd.pruning_history,
         cmd.pruning_memory,
-        cmd.check_seal,
     );
 
     client_config.queue.verifier_settings = cmd.verifier_settings;
+    client_config.stake_contract = cmd.stake_conf.contract;
 
-    // set up bootnodes
-    let net_conf = cmd.net_conf;
+    let (id, binding) = &cmd.net_conf.get_id_and_binding();
+
+    info!(target: "run","          id: {}", &id);
+    info!(target: "run","     binding: {}", &binding);
 
     // create client service.
     let service = ClientService::start(
@@ -208,20 +175,16 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     )
     .map_err(|e| format!("Client service error: {:?}", e))?;
 
-    info!(target: "run","Genesis hash: {:?}",genesis_hash);
-
-    // display info about used pruning algorithm
+    info!(target: "run","     genesis: {:?}",genesis_hash);
     info!(
         target: "run",
-        "State DB configuration: {}{}",
+        "    state db: {}{}",
         Colour::White.bold().paint(algorithm.as_str()),
         match fat_db {
             true => Colour::White.bold().paint(" +Fat").to_string(),
             false => "".to_owned(),
         }
     );
-
-    // display warning about using experimental journaldb algorithm
     if !algorithm.is_stable() {
         warn!(
             target: "run",
@@ -230,106 +193,50 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
         );
     }
 
-    if !cmd.wallet_api_conf.enabled {
-        info!(target: "run", "Wallet API is disabled.");
-    }
-
     let client = service.client();
 
     // drop the spec to free up genesis state.
     drop(spec);
 
-    // initialize the local node information store.
-    let store = {
-        let db = service.db();
-        let node_info = FullNodeInfo {
-            miner: match cmd.no_persistent_txqueue {
-                true => None,
-                false => Some(miner.clone()),
-            },
-        };
-
-        let store = ::local_store::create(db, ::acore::db::COL_NODE_INFO, node_info);
-
-        if cmd.no_persistent_txqueue {
-            info!(target: "run","Running without a persistent transaction queue.");
-
-            if let Err(e) = store.clear() {
-                warn!(target: "run","Error clearing persistent transaction queue: {}", e);
-            }
-        }
-
-        // re-queue pending transactions.
-        match store.pending_transactions() {
-            Ok(pending) => {
-                let len = pending.len();
-                if len > 0 {
-                    info!(target: "run","Importing the local pending transactions ...");
-                    for pending_tx in pending {
-                        if let Err(e) = miner.import_own_transaction(&*client, pending_tx) {
-                            warn!(target: "run","Error importing saved transaction: {}", e)
-                        }
-                    }
-                    info!(target: "run","Import completed, total = {}", len);
-                }
-            }
-            Err(e) => {
-                warn!(target: "run","Error loading cached pending transactions from disk: {}", e)
-            }
-        }
-
-        Arc::new(store)
-    };
-
-    // register it as an IO service to update periodically.
-    service
-        .register_io_handler(store)
-        .map_err(|_| "Unable to register local store handler".to_owned())?;
-
     // create external miner
     let external_miner = Arc::new(ExternalMiner::default());
 
-    // start stratum
-    if cmd.stratum.enable {
-        Stratum::register(&cmd.stratum, miner.clone(), Arc::downgrade(&client))
-            .map_err(|e| format!("Stratum start error: {:?}", e))?;
-    }
-
-    // create sync object
-    let sync_config = SyncConfig::default();
-
-    let (sync_provider, network_manager, chain_notify) = modules::sync(
-        sync_config,
-        net_conf,
-        client.clone() as Arc<BlockChainClient>,
-    )
-    .map_err(|e| format!("Sync error: {}", e))?;
-
-    service.add_notify(chain_notify.clone());
-
-    // spin up rpc eventloop
-    let runtime_rpc = tokio::runtime::Builder::new()
-        .name_prefix("rpc-eventloop-")
-        .build()
-        .expect("runtime_rpc init failed");
-    // set up dependencies for rpc servers
-    let rpc_stats = Arc::new(informant::RpcStats::default());
-    let account_store = Some(account_provider.clone());
-    let pb_client = EthClient::new(
-        &client.clone(),
-        &sync_provider.clone(),
-        &account_store,
-        &miner.clone(),
-        &external_miner.clone(),
-        cmd.dynamic_gas_price.clone(),
+    // log apis
+    info!(target: "run", "        apis: rpc-http({}) rpc-ws({}) rpc-ipc({})",
+          if cmd.http_conf.enabled { "y" } else { "n" },
+          if cmd.ws_conf.enabled { "y" } else { "n" },
+          if cmd.ipc_conf.enabled { "y" } else { "n" },
     );
 
-    // start pb server
-    let pb_handles = Arc::new(pb_client);
-    let pb_server = new_pb(cmd.wallet_api_conf, pb_handles, tx_status_service)?;
+    let sync = Arc::new(Sync::new(cmd.net_conf.clone(), client.clone()));
+    let weak_sync = Arc::downgrade(&sync);
+    sync.register_callback(weak_sync);
+    let sync_notify = sync.clone() as Arc<ChainNotify>;
+    let sync_run = sync.clone();
+    service.add_notify(sync_notify);
+
+    let runtime_sync = tokio::runtime::Builder::new()
+        .name_prefix("p2p-loop #")
+        .build()
+        .expect("p2p runtime loop init failed");
+    let executor_p2p = runtime_sync.executor();
+
+    if let Some(config_path) = cmd.dirs.config {
+        fill_back_local_node(config_path, sync_run.get_local_node_info());
+    }
+    sync_run.run(executor_p2p.clone());
+
+    // start rpc server
+    let runtime_rpc = tokio::runtime::Builder::new()
+        .name_prefix("rpc-")
+        .build()
+        .expect("runtime_rpc init failed");
+    let rpc_stats = Arc::new(informant::RpcStats::default());
+    let account_store = Some(account_provider.clone());
+
     let deps_for_rpc_apis = Arc::new(rpc_apis::FullDependencies {
         client: client.clone(),
-        sync: sync_provider.clone(),
+        sync: sync.clone(),
         account_store,
         miner: miner.clone(),
         external_miner: external_miner.clone(),
@@ -353,9 +260,14 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
             .map_err(|_| format!("can't spawn jsonrpc eventloop"))?
     };
     let executor_jsonrpc = runtime_jsonrpc.executor();
+
     // start rpc servers
     let ws_server = rpc::new_ws(cmd.ws_conf.clone(), &dependencies, executor_jsonrpc.clone())?;
-    let ipc_server = rpc::new_ipc(cmd.ipc_conf, &dependencies, executor_jsonrpc.clone())?;
+    let ipc_server = rpc::new_ipc(
+        cmd.ipc_conf.clone(),
+        &dependencies,
+        executor_jsonrpc.clone(),
+    )?;
     let http_server = rpc::new_http(
         "HTTP JSON-RPC",
         "jsonrpc",
@@ -371,28 +283,41 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     user_defaults.save(&user_defaults_path)?;
 
     // start miner module
-    // let runtime_miner = tokio::runtime::Builder::new()
-    //     .core_threads(1)
-    //     .name_prefix("seal-block-loop #")
-    //     .build()
-    //     .expect("seal block runtime loop init failed");
-    // let executor_miner = runtime_miner.executor();
-    // let close = run_miner(executor_miner.clone(), client.clone());
+    let runtime_transaction_pool = tokio::runtime::Builder::new()
+        .core_threads(1)
+        .name_prefix("transaction-pool-loop #")
+        .build()
+        .expect("seal block runtime loop init failed");
+    let executor_transaction_pool = runtime_transaction_pool.executor();
+    let close_transaction_pool =
+        run_transaction_pool(executor_transaction_pool.clone(), client.clone());
 
-    // enable Sync module
-    network_manager.start_network();
+    // start miner module
+    let runtime_miner = tokio::runtime::Builder::new()
+        .core_threads(1)
+        .name_prefix("seal-block-loop #")
+        .build()
+        .expect("seal block runtime loop init failed");
+    let executor_miner = runtime_miner.executor();
+    let close_miner = run_miner(executor_miner.clone(), client.clone());
 
-    if let Some(config_path) = cmd.dirs.config {
-        let local_node = P2pMgr::get_local_node();
-        fill_back_local_node(
-            config_path,
-            format!(
-                "p2p://{}@{}",
-                local_node.get_node_id(),
-                local_node.get_ip_addr()
-            ),
-        );
-    }
+    // start internal staker module
+    let runtime_staker = tokio::runtime::Builder::new()
+        .core_threads(1)
+        .name_prefix("seal-block-loop #")
+        .build()
+        .expect("internal staker runtime loop init failed");
+    let executor_internal_staker = runtime_staker.executor();
+    let close_staker = run_staker(executor_internal_staker.clone(), client.clone());
+
+    // start PoS invoker
+    let pos_invoker = tokio::runtime::Builder::new()
+        .core_threads(1)
+        .name_prefix("seal-block-loop #")
+        .build()
+        .expect("internal staker runtime loop init failed");
+    let executor_external_staker = pos_invoker.executor();
+    let close_pos_invoker = pos_sealing(executor_external_staker.clone(), client.clone());
 
     // Create a weak reference to the client so that we can wait on shutdown until it is dropped
     let weak_client = Arc::downgrade(&client);
@@ -400,21 +325,31 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // Handle exit
     wait_for_exit();
 
-    // let _ = close.send(());
+    info!(target: "run","AION is shutting down. Please wait for remaining tasks to finish.");
 
-    info!(target: "run","Finishing work, please wait...");
+    // close pool
+    let _ = close_transaction_pool.send(());
+    let _ = close_miner.send(());
+    let _ = close_staker.send(());
+    let _ = close_pos_invoker.send(());
 
-    ws_server.expect("Invalid WS server instance!").close();
-    http_server.expect("Invalid HTTP server instance!").close();
-    ipc_server.expect("Invalid IPC server instance!").close();
+    // close rpc
+    if ws_server.is_some() {
+        ws_server.unwrap().close();
+    }
+    if http_server.is_some() {
+        http_server.unwrap().close();
+    }
+    if ipc_server.is_some() {
+        ipc_server.unwrap().close();
+    }
 
-    network_manager.stop_network();
+    sync.shutdown();
 
-    // close/drop this stuff as soon as exit detected.
-    drop((sync_provider, network_manager, chain_notify, pb_server));
-
-    thread::sleep(Duration::from_secs(5));
-
+    runtime_sync
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown p2p&sync runtime instance!");
     runtime_rpc
         .shutdown_now()
         .wait()
@@ -422,10 +357,25 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     runtime_jsonrpc
         .shutdown_now()
         .wait()
-        .expect("Failed to shutdown jsonrpc runtime instance!");
+        .expect("Failed to shutdown json rpc runtime instance!");
+    runtime_transaction_pool
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown transaction pool runtime instance!");
+    runtime_miner
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown miner runtime instance!");
+    runtime_staker
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown internal staker runtime instance!");
+    pos_invoker
+        .shutdown_now()
+        .wait()
+        .expect("Failed to shutdown pos invoker!");
 
-    info!(target: "run","Shutdown.");
-
+    info!(target: "run","shutdown completed");
     Ok(weak_client)
 }
 
@@ -441,23 +391,6 @@ pub fn execute(cmd: RunCmd) -> Result<(), String> {
     wait(execute_impl(cmd))
 }
 
-#[cfg(not(windows))]
-fn daemonize(pid_file: String) -> Result<(), String> {
-    extern crate daemonize;
-
-    daemonize::Daemonize::new()
-        .pid_file(pid_file)
-        .chown_pid_file(true)
-        .start()
-        .map(|_| ())
-        .map_err(|e| format!("Couldn't daemonize; {}", e))
-}
-
-#[cfg(windows)]
-fn daemonize(_pid_file: String) -> Result<(), String> {
-    Err("daemon is no supported on windows".into())
-}
-
 fn print_running_environment(
     spec: &SpecType,
     spec_data_dir: &String,
@@ -468,7 +401,7 @@ fn print_running_environment(
     if let Some(config) = &dirs.config {
         info!(
             target: "run",
-            "Config path {}",
+            " config path: {}",
             Colour::White
                 .bold()
                 .paint(config)
@@ -477,13 +410,13 @@ fn print_running_environment(
         info!(target: "run", "Start without config.");
     }
     match spec {
-        SpecType::Foundation => {
+        SpecType::Default => {
             info!(target: "run", "Load built-in Mainnet Genesis Spec.");
         }
         SpecType::Custom(ref filename) => {
             info!(
                 target: "run",
-                "Genesis spec path {}",
+                "genesis path: {}",
             Colour::White
                 .bold()
                 .paint(absolute(filename.to_string()))
@@ -492,14 +425,14 @@ fn print_running_environment(
     }
     info!(
         target: "run",
-        "Keys path {}",
+        "   keys path: {}",
         Colour::White
             .bold()
             .paint(dirs.keys_path(spec_data_dir).to_string_lossy().into_owned())
     );
     info!(
         target: "run",
-        "DB path {}",
+        "     db path: {}",
         Colour::White
             .bold()
             .paint(db_dirs.db_root_path().to_string_lossy().into_owned())
@@ -529,7 +462,7 @@ fn print_logo() {
         Colour::Green.bold().paint("\\"),
         Colour::Blue.bold().paint("____/  |_| \\_|\n\n")
     );
-    info!(target: "run","Starting {}", Colour::White.bold().paint(version()));
+    info!(target: "run","       build: {}", Colour::White.bold().paint(version()));
 }
 
 fn prepare_account_provider(
@@ -540,8 +473,8 @@ fn prepare_account_provider(
     passwords: &[String],
 ) -> Result<AccountProvider, String>
 {
-    use acore::keychain::accounts_dir::RootDiskDirectory;
-    use acore::keychain::EthStore;
+    use keychain::accounts_dir::RootDiskDirectory;
+    use keychain::EthStore;
 
     let path = dirs.keys_path(data_dir);
     let dir = Box::new(
@@ -549,7 +482,7 @@ fn prepare_account_provider(
             .map_err(|e| format!("Could not open keys directory: {}", e))?,
     );
     let account_settings = AccountProviderSettings {
-        unlock_keep_secret: cfg.enable_fast_unlock,
+        unlock_keep_secret: cfg.enable_fast_signing,
         blacklisted_accounts: vec![
             // blacklist accounts for development. since we change account address to 32 bytes,
             // so just append zero to keep it work.
@@ -566,10 +499,10 @@ fn prepare_account_provider(
 
     for a in cfg.unlocked_accounts {
         // Check if the account exists
-        if !account_provider.has_account(a).unwrap_or(false) {
+        if !account_provider.has_account(&a).unwrap_or(false) {
             return Err(format!(
                 "Account {} not found for the current chain. {}",
-                a,
+                &a,
                 build_create_account_hint(spec, &dirs.keys)
             ));
         }
@@ -578,18 +511,18 @@ fn prepare_account_provider(
         if passwords.is_empty() {
             return Err(format!(
                 "No password found to unlock account {}. {}",
-                a, VERIFY_PASSWORD_HINT
+                &a, VERIFY_PASSWORD_HINT
             ));
         }
 
         if !passwords.iter().any(|p| {
             account_provider
-                .unlock_account_permanently(a, (*p).clone())
+                .unlock_account_permanently(&a, (*p).clone())
                 .is_ok()
         }) {
             return Err(format!(
                 "No valid password to unlock account {}. {}",
-                a, VERIFY_PASSWORD_HINT
+                &a, VERIFY_PASSWORD_HINT
             ));
         }
     }
@@ -605,7 +538,7 @@ fn build_create_account_hint(spec: &SpecType, keys: &str) -> String {
     )
 }
 
-fn fill_back_local_node(path: String, local_node_info: String) {
+fn fill_back_local_node(path: String, local_node_info: &String) {
     use std::fs;
     use std::io::BufRead;
     use std::io::BufReader;

@@ -25,7 +25,7 @@
 use transient_hashmap::{TransientHashMap, Timer, StandardTimer};
 
 /// Lifetime of poll (in seconds).
-const POLL_LIFETIME: u32 = 500;
+const POLL_LIFETIME: u32 = 300;
 
 pub type PollId = usize;
 
@@ -118,7 +118,7 @@ mod tests {
         *indexer.poll_mut(&1).unwrap() = 23;
         assert_eq!(*indexer.poll(&1).unwrap(), 23);
 
-        time.set(510);
+        time.set(310);
         assert!(indexer.poll(&0).is_none());
         assert_eq!(*indexer.poll(&1).unwrap(), 23);
 

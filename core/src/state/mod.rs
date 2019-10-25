@@ -32,8 +32,8 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 
-use error::Error;
-use executed::{Executed, ExecutionError};
+use types::error::Error;
+use types::executed::{Executed, ExecutionError};
 use executive::Executive;
 use factory::Factories;
 use factory::VmFactory;
@@ -41,31 +41,34 @@ use machine::EthereumMachine as Machine;
 use pod_account::*;
 use pod_state::{self, PodState};
 use receipt::Receipt;
-use state_db::StateDB;
+use db::StateDB;
 use transaction::SignedTransaction;
-use types::basic_account::BasicAccount;
-use types::state_diff::StateDiff;
+use types::state::state_diff::StateDiff;
 use vms::EnvInfo;
 
 use aion_types::{Address, H256, U256};
-use bytes::Bytes;
-use kvdb::{KeyValueDB, AsHashStore, DBValue, MemoryDBRepository};
+use acore_bytes::Bytes;
+use kvdb::{KeyValueDB};
 
 use trie;
 use trie::recorder::Recorder;
 use trie::{Trie, TrieDB, TrieError};
 
 mod account_state;
+mod account;
 mod substate;
 
 pub mod backend;
 
-pub use account::{
+#[cfg(test)]
+mod tests;
+
+pub use state::account::{
     AionVMAccount,
-// Account,
     VMAccount,
     AccType,
     RequireCache,
+    BasicAccount
 };
 pub use self::backend::Backend;
 pub use self::substate::Substate;
@@ -81,92 +84,6 @@ pub struct ApplyOutcome {
 
 /// Result type for the execution ("application") of a transaction.
 pub type ApplyResult = Result<ApplyOutcome, Error>;
-
-/// Return type of proof validity check.
-#[derive(Debug, Clone)]
-pub enum ProvedExecution {
-    /// Proof wasn't enough to complete execution.
-    BadProof,
-    /// The transaction failed, but not due to a bad proof.
-    Failed(ExecutionError),
-    /// The transaction successfully completd with the given proof.
-    Complete(Executed),
-}
-
-/// Check the given proof of execution.
-/// `Err(ExecutionError::Internal)` indicates failure, everything else indicates
-/// a successful proof (as the transaction itself may be poorly chosen).
-pub fn check_proof(
-    proof: &[DBValue],
-    root: H256,
-    transaction: &SignedTransaction,
-    machine: &Machine,
-    env_info: &EnvInfo,
-) -> ProvedExecution
-{
-    let backend = self::backend::ProofCheck::new(proof);
-    let mut factories = Factories::default();
-    factories.accountdb = ::account_db::Factory::Plain;
-
-    let res = State::from_existing(
-        backend,
-        root,
-        machine.account_start_nonce(env_info.number),
-        factories,
-        Arc::new(MemoryDBRepository::new()),
-    );
-
-    let mut state = match res {
-        Ok(state) => state,
-        Err(_) => return ProvedExecution::BadProof,
-    };
-
-    match state.execute(env_info, machine, transaction, true, true) {
-        Ok(executed) => ProvedExecution::Complete(executed),
-        Err(ExecutionError::Internal(_)) => ProvedExecution::BadProof,
-        Err(e) => ProvedExecution::Failed(e),
-    }
-}
-
-/// Prove a transaction on the given state.
-/// Returns `None` when the transacion could not be proved,
-/// and a proof otherwise.
-pub fn prove_transaction<H: AsHashStore + Send + Sync>(
-    db: H,
-    root: H256,
-    transaction: &SignedTransaction,
-    machine: &Machine,
-    env_info: &EnvInfo,
-    factories: Factories,
-    virt: bool,
-    kvdb: Arc<KeyValueDB>,
-) -> Option<(Bytes, Vec<DBValue>)>
-{
-    use self::backend::Proving;
-
-    let backend = Proving::new(db);
-    let res = State::from_existing(
-        backend,
-        root,
-        machine.account_start_nonce(env_info.number),
-        factories,
-        kvdb,
-    );
-
-    let mut state = match res {
-        Ok(state) => state,
-        Err(_) => return None,
-    };
-
-    match state.execute(env_info, machine, transaction, false, virt) {
-        Err(ExecutionError::Internal(_)) => None,
-        Err(e) => {
-            trace!(target: "state", "Proved call failed: {}", e);
-            Some((Vec::new(), state.drop().1.extract_proof()))
-        }
-        Ok(res) => Some((res.output, state.drop().1.extract_proof())),
-    }
-}
 
 /// Representation of the entire state of all accounts in the system.
 ///
@@ -549,7 +466,7 @@ impl<B: Backend> State<B> {
             .readonly(self.db.as_hashstore(), &self.root)
             .expect(SEC_TRIE_DB_UNWRAP_STR);
         let maybe_acc = db.get_with(address, AionVMAccount::from_rlp)?;
-        let r = maybe_acc.as_ref().map_or(Ok(Some(vec![])), |a| {
+        let r = maybe_acc.as_ref().map_or(Ok(None), |a| {
             let account_db = self
                 .factories
                 .accountdb
@@ -585,7 +502,7 @@ impl<B: Backend> State<B> {
             a.as_ref().map_or(None, |a| a.objectgraph().clone())
         });
 
-        debug!(target: "vm", "get object graph of: {:?} = {:?}", a, ret);
+        debug!(target: "vm", "get object graph of: {:?}", a);
 
         return ret;
     }
@@ -617,7 +534,7 @@ impl<B: Backend> State<B> {
             a.as_ref().map_or(None, |a| a.transformed_code().clone())
         });
 
-        debug!(target: "vm", "get transformed code of: {:?} = {:?}", a, ret);
+        debug!(target: "vm", "get transformed code of: {:?}", a);
 
         return ret;
     }
@@ -649,7 +566,7 @@ impl<B: Backend> State<B> {
         debug!(target: "state", "add_balance({}, {}): {}", a, incr, self.balance(a)?);
         let is_value_transfer = !incr.is_zero();
         if is_value_transfer || (cleanup_mode == CleanupMode::ForceCreate && !self.exists(a)?) {
-            self.require(a, false)?.add_balance(incr);
+            self.require(a, true)?.add_balance(incr);
         //panic!("hi");
         } else if let CleanupMode::TrackTouched(set) = cleanup_mode {
             if self.exists(a)? {
@@ -670,7 +587,7 @@ impl<B: Backend> State<B> {
     {
         debug!(target: "state", "sub_balance({}, {}): {}", a, decr, self.balance(a)?);
         if !decr.is_zero() || !self.exists(a)? {
-            self.require(a, false)?.sub_balance(decr);
+            self.require(a, true)?.sub_balance(decr);
         }
         if let CleanupMode::TrackTouched(ref mut set) = *cleanup_mode {
             set.insert(*a);
@@ -694,18 +611,18 @@ impl<B: Backend> State<B> {
 
     /// Increment the nonce of account `a` by 1.
     pub fn inc_nonce(&mut self, a: &Address) -> trie::Result<()> {
-        self.require(a, false).map(|mut x| x.inc_nonce())
+        self.require(a, true).map(|mut x| x.inc_nonce())
     }
 
     /// Mutate storage of account `a` so that it is `value` for `key`.
     pub fn set_storage(&mut self, a: &Address, key: Bytes, value: Bytes) -> trie::Result<()> {
         trace!(target: "state", "set_storage({}:{:?} to {:?})", a, key, value);
-        self.require(a, false)?.set_storage(key, value);
+        self.require(a, true)?.set_storage(key, value);
         Ok(())
     }
 
     pub fn remove_storage(&mut self, a: &Address, key: Bytes) -> trie::Result<()> {
-        self.require(a, false)?.remove_storage(key);
+        self.require(a, true)?.remove_storage(key);
         Ok(())
     }
 
@@ -752,9 +669,10 @@ impl<B: Backend> State<B> {
         env_info: &EnvInfo,
         machine: &Machine,
         t: &SignedTransaction,
+        check_gas_limit: bool,
     ) -> ApplyResult
     {
-        let e = self.execute(env_info, machine, t, true, false)?;
+        let e = self.execute(env_info, machine, t, true, false, check_gas_limit)?;
 
         self.commit()?;
         let state_root = self.root().clone();
@@ -779,9 +697,13 @@ impl<B: Backend> State<B> {
         env_info: &EnvInfo,
         machine: &Machine,
         txs: &[SignedTransaction],
+        check_gas: bool,
     ) -> Vec<ApplyResult>
     {
-        let exec_results = self.execute_bulk(env_info, machine, txs, false, false);
+        let exec_results = self.execute_bulk(env_info, machine, txs, false, false, check_gas);
+        if !exec_results.is_empty() && !exec_results[0].is_ok() {
+            return vec![Err(From::from(exec_results[0].clone().unwrap_err()))];
+        }
 
         let mut receipts = Vec::new();
         for result in exec_results {
@@ -818,13 +740,14 @@ impl<B: Backend> State<B> {
         txs: &[SignedTransaction],
         check_nonce: bool,
         virt: bool,
+        check_gas: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
         let mut e = Executive::new(self, env_info, machine);
 
         match virt {
             true => e.transact_virtual_bulk(txs, check_nonce),
-            false => e.transact_bulk(txs, check_nonce, false),
+            false => e.transact_bulk(txs, false, check_gas),
         }
     }
 
@@ -839,18 +762,19 @@ impl<B: Backend> State<B> {
         t: &SignedTransaction,
         check_nonce: bool,
         virt: bool,
+        check_gas_limit: bool,
     ) -> Result<Executed, ExecutionError>
     {
         let mut e = Executive::new(self, env_info, machine);
 
         match virt {
             true => e.transact_virtual(t, check_nonce),
-            false => e.transact(t, check_nonce, false),
+            false => e.transact(t, check_nonce, false, check_gas_limit),
         }
     }
 
     fn touch(&mut self, a: &Address) -> trie::Result<()> {
-        self.require(a, false)?;
+        self.require(a, true)?;
         Ok(())
     }
 
@@ -883,17 +807,14 @@ impl<B: Backend> State<B> {
                         ) {
                         account
                             .commit_storage(&self.factories.trie, account_db.as_hashstore_mut())?;
-                        account.update_root(address, self.kvdb.clone());
+                        account.update_root(self.kvdb.clone());
                     } else if !account.storage_changes().is_empty() {
                         // TODO: check key/value storage in avm
                         // to see whether discard is needed
                         account.discard_storage_changes();
                         a.state = AccountState::CleanFresh;
                     } else {
-                        if a.state == AccountState::Dirty
-                            && account.code_hash() == BLAKE2B_EMPTY
-                            && !account.get_empty_but_commit()
-                        {
+                        if !account.get_empty_but_commit() {
                             // Aion Java Kernel specific:
                             // 1. for code != NULL && return code == NULL && no storage chanage
                             // eg: [0x00, 0x60, 0x00]
@@ -909,7 +830,6 @@ impl<B: Backend> State<B> {
         }
 
         {
-            // commit fvm accounts
             let mut trie = self
                 .factories
                 .trie
@@ -926,7 +846,6 @@ impl<B: Backend> State<B> {
                 };
             }
         }
-        //println!("new state = {:?}", self);
         debug!(target: "cons", "after commit: accounts = {:?}, state root = {:?}", accounts, self.root);
 
         Ok(())
@@ -1278,516 +1197,5 @@ impl Clone for State<StateDB> {
             checkpoints: RefCell::new(Vec::new()),
             account_start_nonce: self.account_start_nonce.clone(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use aion_types::{Address, H256, U256};
-    use key::Ed25519Secret;
-    use logger::init_log;
-    use receipt::SimpleReceipt;
-    use rustc_hex::FromHex;
-    use std::str::FromStr;
-    use tests::helpers::*;
-    use transaction::*;
-
-    fn secret() -> Ed25519Secret {
-        Ed25519Secret::from_str("7ea8af7d0982509cd815096d35bc3a295f57b2a078e4e25731e3ea977b9544626702b86f33072a55f46003b1e3e242eb18556be54c5ab12044c3c20829e0abb5").unwrap()
-    }
-
-    fn make_frontier_machine() -> Machine {
-        let machine = ::ethereum::new_frontier_test_machine();
-        machine
-    }
-
-    #[test]
-    fn should_apply_create_transaction() {
-        init_log();
-
-        let mut state = get_temp_state();
-        let mut info = EnvInfo::default();
-        info.gas_limit = 1_000_000.into();
-        let machine = make_frontier_machine();
-
-        let t = Transaction {
-            nonce: 0.into(),
-            nonce_bytes: Vec::new(),
-            gas_price: 0.into(),
-            gas_price_bytes: Vec::new(),
-            gas: 500_000.into(),
-            gas_bytes: Vec::new(),
-            action: Action::Create,
-            value: 100.into(),
-            value_bytes: Vec::new(),
-            transaction_type: 1.into(),
-            data: FromHex::from_hex("601080600c6000396000f3006000355415600957005b60203560003555")
-                .unwrap(),
-        }
-        .sign(&secret(), None);
-
-        state
-            .add_balance(&t.sender(), &(100.into()), CleanupMode::NoEmpty)
-            .unwrap();
-        let result = state.apply(&info, &machine, &t).unwrap();
-
-        let expected_receipt = Receipt {
-            simple_receipt: SimpleReceipt{log_bloom: "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".into(),
-            logs: vec![], state_root: H256::from(
-                    "0xadfb0633de8b1effff5c6b4f347b435f99e48339164160ee04bac13115c90dc9"
-                ), },
-            output: vec![96, 0, 53, 84, 21, 96, 9, 87, 0, 91, 96, 32, 53, 96, 0, 53],
-            gas_used: U256::from(222506),
-            error_message:  String::new(),
-            transaction_fee: U256::from(0),
-        };
-
-        assert_eq!(result.receipt, expected_receipt);
-    }
-
-    #[test]
-    fn should_work_when_cloned() {
-        init_log();
-
-        let a = Address::zero();
-
-        let mut state = {
-            let mut state = get_temp_state();
-            assert_eq!(state.exists(&a).unwrap(), false);
-            state.inc_nonce(&a).unwrap();
-            state.commit().unwrap();
-            state.clone()
-        };
-
-        state.inc_nonce(&a).unwrap();
-        state.commit().unwrap();
-    }
-
-    #[test]
-    fn balance_from_database() {
-        let a = Address::zero();
-        let (root, db) = {
-            let mut state = get_temp_state();
-            state
-                .require_or_from(
-                    &a,
-                    false,
-                    || AionVMAccount::new_contract(42.into(), 0.into()),
-                    |_| {},
-                )
-                .unwrap();
-            state.commit().unwrap();
-            assert_eq!(state.balance(&a).unwrap(), 42.into());
-            state.drop()
-        };
-
-        let state = State::from_existing(
-            db,
-            root,
-            U256::from(0u8),
-            Default::default(),
-            Arc::new(MemoryDBRepository::new()),
-        )
-        .unwrap();
-        assert_eq!(state.balance(&a).unwrap(), 42.into());
-    }
-
-    #[test]
-    fn avm_empty_bytes_or_null() {
-        let a = Address::zero();
-        let mut state = get_temp_state();
-        state
-            .require_or_from(
-                &a,
-                false,
-                || {
-                    let mut acc = AionVMAccount::new_contract(42.into(), 0.into());
-                    acc.account_type = AccType::AVM;
-                    acc
-                },
-                |_| {},
-            )
-            .unwrap();
-        let key = vec![0x01];
-        let value = vec![];
-        state.set_storage(&a, key.clone(), value).unwrap();
-        assert_eq!(state.storage_at(&a, &key).unwrap(), Some(vec![]));
-        state.commit().unwrap();
-        state.remove_storage(&a, key.clone()).unwrap();
-        // remove unexisting key
-        state.remove_storage(&a, vec![0x02]).unwrap();
-        state.commit().unwrap();
-        state.set_storage(&a, vec![0x02], vec![0x03]).unwrap();
-        // clean local cache
-        state.commit().unwrap();
-        assert_eq!(state.storage_at(&a, &key).unwrap(), None);
-        assert_eq!(state.storage_at(&a, &vec![0x02]).unwrap(), Some(vec![0x03]));
-    }
-
-    #[test]
-    fn code_from_database() {
-        let a = Address::zero();
-
-        let (root, db) = {
-            let mut state = get_temp_state();
-            state
-                .require_or_from(
-                    &a,
-                    false,
-                    || AionVMAccount::new_contract(42.into(), 0.into()),
-                    |_| {},
-                )
-                .unwrap();
-            state.init_code(&a, vec![1, 2, 3]).unwrap();
-            assert_eq!(state.code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
-            state.commit().unwrap();
-            assert_eq!(state.code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
-            state.drop()
-        };
-
-        let state = State::from_existing(
-            db,
-            root,
-            U256::from(0u8),
-            Default::default(),
-            Arc::new(MemoryDBRepository::new()),
-        )
-        .unwrap();
-        assert_eq!(state.code(&a).unwrap(), Some(Arc::new(vec![1u8, 2, 3])));
-    }
-
-    #[test]
-    fn transformed_code_from_database() {
-        let a = Address::zero();
-        let (root, db) = {
-            let mut state = get_temp_state();
-            state
-                .require_or_from(
-                    &a,
-                    false,
-                    || AionVMAccount::new_contract(42.into(), 0.into()),
-                    |_| {},
-                )
-                .unwrap();
-            state.init_transformed_code(&a, vec![1, 2, 3]).unwrap();
-            assert_eq!(
-                state.transformed_code(&a).unwrap(),
-                Some(Arc::new(vec![1u8, 2, 3]))
-            );
-            state.commit().unwrap();
-            assert_eq!(
-                state.transformed_code(&a).unwrap(),
-                Some(Arc::new(vec![1u8, 2, 3]))
-            );
-            state.drop()
-        };
-
-        let state = State::from_existing(
-            db,
-            root,
-            U256::from(0u8),
-            Default::default(),
-            Arc::new(MemoryDBRepository::new()),
-        )
-        .unwrap();
-        assert_eq!(
-            state.transformed_code(&a).unwrap(),
-            Some(Arc::new(vec![1u8, 2, 3]))
-        );
-    }
-
-    #[test]
-    fn storage_at_from_database() {
-        let a = Address::zero();
-        let (root, db) = {
-            let mut state = get_temp_state_with_nonce();
-            state.set_storage(&a, vec![2], vec![69]).unwrap();
-            state.commit().unwrap();
-            state.drop()
-        };
-
-        let s = State::from_existing(
-            db,
-            root,
-            U256::from(0u8),
-            Default::default(),
-            Arc::new(MemoryDBRepository::new()),
-        )
-        .unwrap();
-        assert_eq!(s.storage_at(&a, &vec![2]).unwrap_or(None), Some(vec![69]));
-    }
-
-    #[test]
-    fn get_from_database() {
-        let a = Address::zero();
-        let (root, db) = {
-            let mut state = get_temp_state();
-            state.inc_nonce(&a).unwrap();
-            state
-                .add_balance(&a, &U256::from(69u64), CleanupMode::NoEmpty)
-                .unwrap();
-            state.commit().unwrap();
-            assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-            state.drop()
-        };
-
-        let state = State::from_existing(
-            db,
-            root,
-            U256::from(1u8),
-            Default::default(),
-            Arc::new(MemoryDBRepository::new()),
-        )
-        .unwrap();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        assert_eq!(state.nonce(&a).unwrap(), U256::from(1u64));
-    }
-
-    #[test]
-    fn remove() {
-        let a = Address::zero();
-        let mut state = get_temp_state();
-        assert_eq!(state.exists(&a).unwrap(), false);
-        assert_eq!(state.exists_and_not_null(&a).unwrap(), false);
-        state.inc_nonce(&a).unwrap();
-        assert_eq!(state.exists(&a).unwrap(), true);
-        assert_eq!(state.exists_and_not_null(&a).unwrap(), true);
-        assert_eq!(state.nonce(&a).unwrap(), U256::from(1u64));
-        state.kill_account(&a);
-        assert_eq!(state.exists(&a).unwrap(), false);
-        assert_eq!(state.exists_and_not_null(&a).unwrap(), false);
-        assert_eq!(state.nonce(&a).unwrap(), U256::from(0u64));
-    }
-
-    #[test]
-    fn empty_account_is_not_created() {
-        let a = Address::zero();
-        let db = get_temp_state_db();
-        let (root, db) = {
-            let mut state = State::new(
-                db,
-                U256::from(0),
-                Default::default(),
-                Arc::new(MemoryDBRepository::new()),
-            );
-            state
-                .add_balance(&a, &U256::default(), CleanupMode::NoEmpty)
-                .unwrap(); // create an empty account
-            state.commit().unwrap();
-            state.drop()
-        };
-        let state = State::from_existing(
-            db,
-            root,
-            U256::from(0u8),
-            Default::default(),
-            Arc::new(MemoryDBRepository::new()),
-        )
-        .unwrap();
-        assert!(!state.exists(&a).unwrap());
-        assert!(!state.exists_and_not_null(&a).unwrap());
-    }
-
-    #[test]
-    fn empty_account_exists_when_creation_forced() {
-        let a = Address::zero();
-        let db = get_temp_state_db();
-        let (root, db) = {
-            println!("default balance = {}", U256::default());
-            let mut state = State::new(
-                db,
-                U256::from(0),
-                Default::default(),
-                Arc::new(MemoryDBRepository::new()),
-            );
-            state
-                .add_balance(&a, &U256::default(), CleanupMode::ForceCreate)
-                .unwrap(); // create an empty account
-            state.commit().unwrap();
-            state.drop()
-        };
-        let state = State::from_existing(
-            db,
-            root,
-            U256::from(0u8),
-            Default::default(),
-            Arc::new(MemoryDBRepository::new()),
-        )
-        .unwrap();
-
-        assert!(!state.exists(&a).unwrap());
-        assert!(!state.exists_and_not_null(&a).unwrap());
-    }
-
-    #[test]
-    fn remove_from_database() {
-        let a = Address::zero();
-        let (root, db) = {
-            let mut state = get_temp_state();
-            state.inc_nonce(&a).unwrap();
-            state.commit().unwrap();
-            assert_eq!(state.exists(&a).unwrap(), true);
-            assert_eq!(state.nonce(&a).unwrap(), U256::from(1u64));
-            state.drop()
-        };
-
-        let (root, db) = {
-            let mut state = State::from_existing(
-                db,
-                root,
-                U256::from(0u8),
-                Default::default(),
-                Arc::new(MemoryDBRepository::new()),
-            )
-            .unwrap();
-            assert_eq!(state.exists(&a).unwrap(), true);
-            assert_eq!(state.nonce(&a).unwrap(), U256::from(1u64));
-            state.kill_account(&a);
-            state.commit().unwrap();
-            assert_eq!(state.exists(&a).unwrap(), false);
-            assert_eq!(state.nonce(&a).unwrap(), U256::from(0u64));
-            state.drop()
-        };
-
-        let state = State::from_existing(
-            db,
-            root,
-            U256::from(0u8),
-            Default::default(),
-            Arc::new(MemoryDBRepository::new()),
-        )
-        .unwrap();
-        assert_eq!(state.exists(&a).unwrap(), false);
-        assert_eq!(state.nonce(&a).unwrap(), U256::from(0u64));
-    }
-
-    #[test]
-    fn alter_balance() {
-        let mut state = get_temp_state();
-        let a = Address::zero();
-        let b = 1u64.into();
-        state
-            .add_balance(&a, &U256::from(69u64), CleanupMode::NoEmpty)
-            .unwrap();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.commit().unwrap();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state
-            .sub_balance(&a, &U256::from(42u64), &mut CleanupMode::NoEmpty)
-            .unwrap();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(27u64));
-        state.commit().unwrap();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(27u64));
-        state
-            .transfer_balance(&a, &b, &U256::from(18u64), CleanupMode::NoEmpty)
-            .unwrap();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(9u64));
-        assert_eq!(state.balance(&b).unwrap(), U256::from(18u64));
-        state.commit().unwrap();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(9u64));
-        assert_eq!(state.balance(&b).unwrap(), U256::from(18u64));
-    }
-
-    #[test]
-    fn alter_nonce() {
-        let mut state = get_temp_state();
-        let a = Address::zero();
-        state.inc_nonce(&a).unwrap();
-        assert_eq!(state.nonce(&a).unwrap(), U256::from(1u64));
-        state.inc_nonce(&a).unwrap();
-        assert_eq!(state.nonce(&a).unwrap(), U256::from(2u64));
-        state.commit().unwrap();
-        assert_eq!(state.nonce(&a).unwrap(), U256::from(2u64));
-        state.inc_nonce(&a).unwrap();
-        assert_eq!(state.nonce(&a).unwrap(), U256::from(3u64));
-        state.commit().unwrap();
-        assert_eq!(state.nonce(&a).unwrap(), U256::from(3u64));
-    }
-
-    #[test]
-    fn balance_nonce() {
-        let mut state = get_temp_state();
-        let a = Address::zero();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(0u64));
-        assert_eq!(state.nonce(&a).unwrap(), U256::from(0u64));
-        state.commit().unwrap();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(0u64));
-        assert_eq!(state.nonce(&a).unwrap(), U256::from(0u64));
-    }
-
-    #[test]
-    fn ensure_cached() {
-        let mut state = get_temp_state_with_nonce();
-        let a = Address::zero();
-        state.require(&a, false).unwrap();
-        state.commit().unwrap();
-        assert_eq!(
-            *state.root(),
-            "9d6d4b335038e1ffe0f060c29e52d6eed2aec4a085dfa37afba9d1e10cc7be85".into()
-        );
-    }
-
-    #[test]
-    fn checkpoint_basic() {
-        let mut state = get_temp_state();
-        let a = Address::zero();
-        state.checkpoint();
-        state
-            .add_balance(&a, &U256::from(69u64), CleanupMode::NoEmpty)
-            .unwrap();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.discard_checkpoint();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.checkpoint();
-        state
-            .add_balance(&a, &U256::from(1u64), CleanupMode::NoEmpty)
-            .unwrap();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(70u64));
-        state.revert_to_checkpoint();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-    }
-
-    #[test]
-    fn checkpoint_nested() {
-        let mut state = get_temp_state();
-        let a = Address::zero();
-        state.checkpoint();
-        state.checkpoint();
-        state
-            .add_balance(&a, &U256::from(69u64), CleanupMode::NoEmpty)
-            .unwrap();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.discard_checkpoint();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(69u64));
-        state.revert_to_checkpoint();
-        assert_eq!(state.balance(&a).unwrap(), U256::from(0));
-    }
-
-    #[test]
-    fn create_empty() {
-        let mut state = get_temp_state();
-        state.commit().unwrap();
-        assert_eq!(
-            *state.root(),
-            "45b0cfc220ceec5b7c1c62c4d4193d38e4eba48e8815729ce75f9c0ab0e4c1c0".into()
-        );
-    }
-
-    #[test]
-    fn should_not_panic_on_state_diff_with_storage() {
-        let mut state = get_temp_state();
-
-        let a: Address = 0xa.into();
-        state.init_code(&a, b"abcdefg".to_vec()).unwrap();;
-        state
-            .add_balance(&a, &256.into(), CleanupMode::NoEmpty)
-            .unwrap();
-        state.set_storage(&a, vec![0x0b], vec![0x0c]).unwrap();
-
-        let mut new_state = state.clone();
-        new_state.set_storage(&a, vec![0x0b], vec![0x0d]).unwrap();
-
-        new_state.diff_from(state).unwrap();
     }
 }

@@ -19,14 +19,18 @@
  *
  ******************************************************************************/
 
-use aion_types::{U128, U256, H256};
-use fastvm::{EvmStatusCode, FastVM};
+use std::convert::Into;
+use std::string::ToString;
+use std::sync::Arc;
+use avm::AVM;
+use fastvm::ffi::EvmStatusCode;
+use fastvm::core::FastVM;
 use fastvm::basetypes::{constants::GAS_CODE_DEPOSIT, DataWord};
 use fastvm::context::{execution_kind, ExecutionContext, TransactionResult};
-use vm_common::{ExecutionResult, ExecStatus, CallType, ReturnData, ActionParams, ActionValue, Ext};
-use std::sync::Arc;
-use avm::{AVM};
-use avm::types::{TransactionContext as AVMTxContext, AvmStatusCode};
+use types::{ExecutionResult, ExecStatus, CallType, ReturnData, ActionParams, ActionValue};
+use types::traits::Ext;
+use types::avm::{TransactionContext as AVMTxContext, AvmStatusCode};
+use aion_types::{U128, U256, H256};
 
 pub trait Factory {
     fn exec(
@@ -34,6 +38,7 @@ pub trait Factory {
         params: Vec<ActionParams>,
         ext: &mut Ext,
         is_local: bool,
+        unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>;
 }
 
@@ -58,6 +63,7 @@ impl Factory for FastVMFactory {
         params: Vec<ActionParams>,
         ext: &mut Ext,
         _is_local: bool,
+        _unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>
     {
         assert!(params.len() == 1);
@@ -76,6 +82,7 @@ impl Factory for FastVMFactory {
 
         let call_data = params.data.unwrap_or_else(Vec::new);
 
+        // AIP: needs fix that in java kernel
         if code.is_empty() {
             ext.set_special_empty_flag();
             return vec![ExecutionResult {
@@ -84,6 +91,7 @@ impl Factory for FastVMFactory {
                 return_data: ReturnData::empty(),
                 exception: String::default(),
                 state_root: H256::default(),
+                invokable_hashes: Default::default(),
             }];
         }
 
@@ -171,7 +179,7 @@ impl Factory for FastVMFactory {
         }
 
         vec![ExecutionResult {
-            gas_left: gas_left,
+            gas_left,
             status_code: status_code.into(),
             return_data: ReturnData::new(return_data, 0, return_data_length),
             exception: match status_code {
@@ -179,6 +187,7 @@ impl Factory for FastVMFactory {
                 code => code.to_string(),
             },
             state_root: H256::default(),
+            invokable_hashes: Default::default(),
         }]
     }
 }
@@ -186,7 +195,6 @@ impl Factory for FastVMFactory {
 const AVM_CREATE: i32 = 3;
 const AVM_CALL: i32 = 0;
 const AVM_BALANCE_TRANSFER: i32 = 4;
-// const AVM_GARBAGE_COLLECTION: i32 = 5;
 
 #[derive(Clone)]
 pub struct AVMFactory {
@@ -207,9 +215,12 @@ impl Factory for AVMFactory {
         params: Vec<ActionParams>,
         ext: &mut Ext,
         is_local: bool,
+        unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>
     {
         let mut avm_tx_contexts = Vec::new();
+
+        let mut version = 0;
 
         for params in params {
             assert!(
@@ -264,6 +275,14 @@ impl Factory for AVMFactory {
             }
             let nonce = params.nonce;
 
+            match unity_update {
+                Some(ref n) if &block_number > n => {
+                    // println!("start avm v2");
+                    version = 1;
+                }
+                _ => {}
+            }
+
             avm_tx_contexts.push(AVMTxContext::new(
                 tx_hash,
                 address,
@@ -286,7 +305,8 @@ impl Factory for AVMFactory {
 
         let inst = &mut self.instance;
         let ext_ptr: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(ext)) };
-        let mut res = inst.execute(ext_ptr as i64, &avm_tx_contexts, is_local);
+
+        let mut res = inst.execute(ext_ptr as i64, version, &avm_tx_contexts, is_local);
 
         let mut exec_results = Vec::new();
 
@@ -298,11 +318,11 @@ impl Factory for AVMFactory {
 
             for index in 0..tx_res.len() {
                 let result = tx_res[index].clone();
-                let mut status_code: AvmStatusCode = (result.code as i32).into();
+                let mut status_code: AvmStatusCode = (result.status as i32).into();
                 let mut gas_left =
                     U256::from(avm_tx_contexts[index].energy_limit - result.energy_used);
                 let return_data = result.return_data;
-                debug!(target: "vm", "avm status code = {:?}, gas left = {:?}", status_code, gas_left);
+                debug!(target: "vm", "tx: {:?}, avm status code = {:?}, gas left = {:?}", index, status_code, gas_left);
                 exec_results.push(ExecutionResult {
                     gas_left: gas_left.into(),
                     status_code: status_code.clone().into(),
@@ -312,6 +332,14 @@ impl Factory for AVMFactory {
                         code => code.to_string(),
                     },
                     state_root: result.state_root.clone(),
+                    invokable_hashes: {
+                        let mut invokable_res = Vec::<(H256, H256)>::new();
+                        for hash in result.invokable_hashes {
+                            invokable_res
+                                .push((hash, avm_tx_contexts[index].tx_hash().as_slice().into()));
+                        }
+                        invokable_res
+                    },
                 });
             }
         } else {

@@ -58,6 +58,7 @@ impl BuiltinContract for EDVerifyContract {
                 return_data: ReturnData::empty(),
                 exception: "Incorrect input length".into(),
                 state_root: H256::default(),
+                invokable_hashes: Default::default(),
             };
         }
 
@@ -72,6 +73,7 @@ impl BuiltinContract for EDVerifyContract {
                 return_data: ReturnData::new(pub_key.to_vec(), 0, pub_key.len()),
                 exception: String::default(),
                 state_root: H256::default(),
+                invokable_hashes: Default::default(),
             }
         } else {
             let return_data = Address::zero();
@@ -81,6 +83,7 @@ impl BuiltinContract for EDVerifyContract {
                 return_data: ReturnData::new(return_data.to_vec(), 0, return_data.len()),
                 exception: String::default(),
                 state_root: H256::default(),
+                invokable_hashes: Default::default(),
             }
         }
     }
@@ -93,11 +96,11 @@ mod tests {
     use tiny_keccak::keccak256;
     use super::EDVerifyContract;
     use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
-    use tests::helpers::get_temp_state;
+    use helpers::get_temp_state;
     use vms::ExecStatus;
     use state::{State, Substate};
     use aion_types::{Address, H256};
-    use bytes::to_hex;
+    use acore_bytes::to_hex;
 
     fn get_test_data() -> Vec<u8> {
         let sec = Ed25519Secret::from_slice("5a90d8e67da5d1dfbf17916ae83bae04ef334f53ce8763932eba2c1116a62426fff4317ae351bda5e4fa24352904a9366d3a89e38d1ffa51498ba9acfbc65724".from_hex().unwrap().as_slice()).unwrap();
@@ -124,9 +127,9 @@ mod tests {
     }
 
     fn get_ext_default<'a>(
-        state: &'a mut State<::state_db::StateDB>,
+        state: &'a mut State<::db::StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::state_db::StateDB>
+    ) -> BuiltinExtImpl<'a, ::db::StateDB>
     {
         BuiltinExtImpl::new(
             state,

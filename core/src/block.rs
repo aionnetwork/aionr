@@ -29,25 +29,27 @@ use blake2b::BLAKE2B_NULL_RLP;
 use triehash::ordered_trie_root;
 
 use rlp::{UntrustedRlp, RlpStream, Encodable, Decodable, DecoderError};
+use vms::{EnvInfo, LastHashes};
 use aion_types::{H256, U256, Address};
 use ethbloom::Bloom;
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use unexpected::Mismatch;
-
-use vms::{EnvInfo, LastHashes};
-use engines::EthEngine;
-use error::{Error, BlockError};
+use engine::{Engine};
+use types::error::{Error, BlockError};
 use factory::Factories;
-use header::{Header, Seal};
+use header::{Header, Seal, SealType};
 use receipt::Receipt;
 use state::State;
-use state_db::StateDB;
+use db::StateDB;
 use transaction::{
     UnverifiedTransaction, SignedTransaction, Error as TransactionError, AVM_TRANSACTION_TYPE,
     Action,
 };
 use verification::PreverifiedBlock;
 use kvdb::KeyValueDB;
+use client::BlockChainClient;
+
+use num_bigint::BigUint;
 
 /// A block, encoded as it is on the block chain.
 #[derive(Default, Debug, Clone, PartialEq)]
@@ -105,8 +107,8 @@ impl ExecutedBlock {
             transactions: Default::default(),
             receipts: Default::default(),
             transactions_set: Default::default(),
-            state: state,
-            last_hashes: last_hashes,
+            state,
+            last_hashes,
         }
     }
 
@@ -181,19 +183,13 @@ impl ::aion_machine::LiveBlock for ExecutedBlock {
     fn header(&self) -> &Header { &self.header }
 }
 
-impl ::aion_machine::Transactions for ExecutedBlock {
-    type Transaction = SignedTransaction;
-
-    fn transactions(&self) -> &[SignedTransaction] { &self.transactions }
-}
-
 /// Block that is ready for transactions to be added.
 ///
 /// It's a bit like a Vec<Transaction>, except that whenever a transaction is pushed, we execute it and
 /// maintain the system `state()`. We also archive execution receipts in preparation for later block creation.
 pub struct OpenBlock<'x> {
     block: ExecutedBlock,
-    engine: &'x EthEngine,
+    engine: &'x Engine,
 }
 
 /// Just like `OpenBlock`, except that we've applied `Engine::on_close_block`, finished up the non-seal header fields,
@@ -217,6 +213,7 @@ pub struct LockedBlock {
 /// A block that has a valid seal.
 ///
 /// The block's header has valid seal arguments. The block cannot be reversed into a `ClosedBlock` or `OpenBlock`.
+#[derive(Clone)]
 pub struct SealedBlock {
     block: ExecutedBlock,
 }
@@ -224,17 +221,20 @@ pub struct SealedBlock {
 impl<'x> OpenBlock<'x> {
     /// Create a new `OpenBlock` ready for transaction pushing.
     pub fn new(
-        engine: &'x EthEngine,
+        engine: &'x Engine,
         factories: Factories,
         db: StateDB,
         parent: &Header,
-        grant_parent: Option<&Header>,
+        seal_type: SealType,
+        grand_parent: Option<&Header>,
+        great_grand_parent: Option<&Header>,
         last_hashes: Arc<LastHashes>,
         author: Address,
         gas_range_target: (U256, U256),
         extra_data: Bytes,
-        is_epoch_begin: bool,
         kvdb: Arc<KeyValueDB>,
+        timestamp: Option<u64>,
+        client: &BlockChainClient,
     ) -> Result<Self, Error>
     {
         let number = parent.number() + 1;
@@ -242,35 +242,56 @@ impl<'x> OpenBlock<'x> {
         let state = State::from_existing(
             db,
             parent.state_root().clone(),
-            engine.account_start_nonce(number),
+            engine.machine().account_start_nonce(number),
             factories,
             kvdb.clone(),
         )?;
+
         let mut r = OpenBlock {
             block: ExecutedBlock::new(state, last_hashes),
-            engine: engine,
+            engine,
         };
 
         r.block.header.set_parent_hash(parent.hash());
         r.block.header.set_number(number);
         r.block.header.set_author(author);
-        r.block.header.set_timestamp_now(parent.timestamp());
+        match timestamp {
+            Some(timestamp) => {
+                r.block
+                    .header
+                    .set_timestamp_later_than(timestamp, parent.timestamp());
+            }
+            None => {
+                r.block
+                    .header
+                    .set_timestamp_now_later_than(parent.timestamp());
+            }
+        };
+        r.block.header.set_seal_type(seal_type);
         r.set_extra_data(extra_data);
         r.block.header.note_dirty();
 
-        let gas_floor_target = cmp::max(gas_range_target.0, engine.params().min_gas_limit);
+        let gas_floor_target =
+            cmp::max(gas_range_target.0, engine.machine().params().min_gas_limit);
         let gas_ceil_target = cmp::max(gas_range_target.1, gas_floor_target);
 
-        engine.machine().populate_from_parent(
+        // Set gas_limit
+        engine.machine().set_gas_limit_from_parent(
             &mut r.block.header,
             parent,
             gas_floor_target,
             gas_ceil_target,
         );
-        engine.populate_from_parent(&mut r.block.header, parent, grant_parent);
+        // Set difficulty
+        engine.set_difficulty_from_parent(
+            &mut r.block.header,
+            parent,
+            grand_parent,
+            great_grand_parent,
+            client,
+        );
 
         engine.machine().on_new_block(&mut r.block)?;
-        engine.on_new_block(&mut r.block, is_epoch_begin)?;
 
         Ok(r)
     }
@@ -280,6 +301,11 @@ impl<'x> OpenBlock<'x> {
 
     /// Alter the timestamp of the block.
     pub fn set_timestamp(&mut self, timestamp: u64) { self.block.header.set_timestamp(timestamp); }
+
+    /// Set the timestamp of the block to the current local time, but later than the given time.
+    pub fn set_timestamp_now_later_than(&mut self, later_than: u64) {
+        self.block.header.set_timestamp_now_later_than(later_than);
+    }
 
     /// Alter the difficulty for the block.
     pub fn set_difficulty(&mut self, a: U256) { self.block.header.set_difficulty(a); }
@@ -298,7 +324,7 @@ impl<'x> OpenBlock<'x> {
 
     /// Alter the extra_data for the block.
     pub fn set_extra_data(&mut self, extra_data: Bytes) {
-        let len = self.engine.maximum_extra_data_size();
+        let len = self.engine.machine().maximum_extra_data_size();
         let mut data = extra_data;
         data.resize(len, 0u8);
         self.block.header.set_extra_data(data);
@@ -312,6 +338,7 @@ impl<'x> OpenBlock<'x> {
         &mut self,
         txs: &[SignedTransaction],
         h: Option<H256>,
+        check_gas: bool,
     ) -> Vec<Result<Receipt, Error>>
     {
         //TODO: deal with AVM parallelism
@@ -327,16 +354,16 @@ impl<'x> OpenBlock<'x> {
         let mut idx = 0;
         let mut receipts_results = Vec::new();
         // avm should deal with exceptions correctly
-        for apply_result in self
-            .block
-            .state
-            .apply_batch(&env_info, self.engine.machine(), txs)
+        for apply_result in
+            self.block
+                .state
+                .apply_batch(&env_info, self.engine.machine(), txs, check_gas)
         {
             let result = match apply_result {
                 Ok(outcome) => {
                     self.block
                         .transactions_set
-                        .insert(h.unwrap_or_else(|| txs[idx].hash()));
+                        .insert(h.unwrap_or_else(|| txs[idx].hash().clone()));
                     self.block.transactions.push(txs[idx].clone().into());
                     self.block
                         .header
@@ -365,6 +392,7 @@ impl<'x> OpenBlock<'x> {
         &mut self,
         t: SignedTransaction,
         h: Option<H256>,
+        check_gas: bool,
     ) -> Result<&Receipt, Error>
     {
         if self.block.transactions_set.contains(&t.hash()) {
@@ -387,19 +415,29 @@ impl<'x> OpenBlock<'x> {
                     &env_info,
                     self.engine.machine(),
                     &[t.clone()],
+                    check_gas,
                 ));
             } else {
-                result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
+                result.push(self.block.state.apply(
+                    &env_info,
+                    self.engine.machine(),
+                    &t,
+                    check_gas,
+                ));
             }
         } else {
-            result.push(self.block.state.apply(&env_info, self.engine.machine(), &t));
+            result.push(
+                self.block
+                    .state
+                    .apply(&env_info, self.engine.machine(), &t, check_gas),
+            );
         }
 
         match result.pop().unwrap() {
             Ok(outcome) => {
                 self.block
                     .transactions_set
-                    .insert(h.unwrap_or_else(|| t.hash()));
+                    .insert(h.unwrap_or_else(|| t.hash().clone()));
                 self.block.transactions.push(t.into());
                 self.block
                     .header
@@ -468,7 +506,7 @@ impl<'x> OpenBlock<'x> {
 
         ClosedBlock {
             block: s.block,
-            unclosed_state: unclosed_state,
+            unclosed_state,
         }
     }
 
@@ -551,14 +589,20 @@ impl ClosedBlock {
         }
     }
 
+    pub fn pre_seal(self, seal: Vec<Bytes>) -> Self {
+        let mut s = self;
+        s.block.header.set_seal(seal);
+        s
+    }
+
     /// Given an engine reference, reopen the `ClosedBlock` into an `OpenBlock`.
-    pub fn reopen(self, engine: &EthEngine) -> OpenBlock {
+    pub fn reopen(self, engine: &Engine) -> OpenBlock {
         // revert rewards (i.e. set state back at last transaction's state).
         let mut block = self.block;
         block.state = self.unclosed_state;
         OpenBlock {
-            block: block,
-            engine: engine,
+            block,
+            engine,
         }
     }
 }
@@ -570,7 +614,7 @@ impl LockedBlock {
     /// Provide a valid seal in order to turn this into a `SealedBlock`.
     ///
     /// NOTE: This does not check the validity of `seal` with the engine.
-    pub fn seal(self, engine: &EthEngine, seal: Vec<Bytes>) -> Result<SealedBlock, BlockError> {
+    pub fn seal(self, engine: &Engine, seal: Vec<Bytes>) -> Result<SealedBlock, BlockError> {
         let expected_seal_fields = engine.seal_fields(self.header());
         let mut s = self;
         if seal.len() != expected_seal_fields {
@@ -585,20 +629,44 @@ impl LockedBlock {
         })
     }
 
-    /// Provide a valid seal in order to turn this into a `SealedBlock`.
+    /// Provide a valid PoW seal in order to turn this into a `SealedBlock`.
     /// This does check the validity of `seal` with the engine.
-    /// Returns the `ClosedBlock` back again if the seal is no good.
-    pub fn try_seal(
+    /// Returns the `LockedBlock` back again if the seal is no good.
+    pub fn try_seal_pow(
         self,
-        engine: &EthEngine,
+        engine: &Engine,
         seal: Vec<Bytes>,
     ) -> Result<SealedBlock, (Error, LockedBlock)>
     {
         let mut s = self;
         s.block.header.set_seal(seal);
 
-        // TODO: passing state context to avoid engines owning it?
-        match engine.verify_local_seal(&s.block.header) {
+        match engine.verify_local_seal_pow(&s.block.header) {
+            Err(e) => Err((e, s)),
+            _ => {
+                Ok(SealedBlock {
+                    block: s.block,
+                })
+            }
+        }
+    }
+
+    /// Provide a valid PoS seal in order to turn this into a `SealedBlock`.
+    /// This does check the validity of `seal` with the engine.
+    /// Returns the `LockedBlock` back again if the seal is no good.
+    pub fn try_seal_pos(
+        self,
+        engine: &Engine,
+        seal: Vec<Bytes>,
+        parent: &Header,
+        grand_parent: Option<&Header>,
+        stake: Option<BigUint>,
+    ) -> Result<SealedBlock, (Error, LockedBlock)>
+    {
+        let mut s = self;
+        s.block.header.set_seal(seal);
+
+        match engine.verify_seal_pos(&s.block.header, parent, grand_parent, stake) {
             Err(e) => Err((e, s)),
             _ => {
                 Ok(SealedBlock {
@@ -634,17 +702,18 @@ impl IsBlock for SealedBlock {
 }
 
 /// Enact the block given by block header, transactions
-pub fn enact(
+fn enact(
     header: &Header,
     transactions: &[SignedTransaction],
-    engine: &EthEngine,
+    engine: &Engine,
     db: StateDB,
     parent: &Header,
-    grant_parent: Option<&Header>,
+    grand_parent: Option<&Header>,
+    great_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
-    is_epoch_begin: bool,
     kvdb: Arc<KeyValueDB>,
+    client: &BlockChainClient,
 ) -> Result<LockedBlock, Error>
 {
     {
@@ -652,7 +721,7 @@ pub fn enact(
             let s = State::from_existing(
                 db.boxed_clone(),
                 parent.state_root().clone(),
-                engine.account_start_nonce(parent.number() + 1),
+                engine.machine().account_start_nonce(parent.number() + 1),
                 factories.clone(),
                 kvdb.clone(),
             )?;
@@ -660,22 +729,22 @@ pub fn enact(
                 header.number(), s.root(), header.author(), s.balance(&header.author())?);
         }
     }
-    // let s = State::from_existing(db.boxed_clone(), parent.state_root().clone(), engine.account_start_nonce(parent.number() + 1), factories.clone())?;
-    // error!(target: "enact", "num={}, root={}, author={}, author_balance={}\n",
-    //     header.number(), s.root(), header.author(), s.balance(&header.author())?);
 
     let mut b = OpenBlock::new(
         engine,
         factories,
         db,
         parent,
-        grant_parent,
+        header.seal_type().to_owned().unwrap_or_default(),
+        grand_parent,
+        great_grand_parent,
         last_hashes,
         Address::new(),
         (3141562.into(), 31415620.into()),
         vec![],
-        is_epoch_begin,
         kvdb,
+        None,
+        client,
     )?;
 
     b.populate_from(header);
@@ -737,10 +806,10 @@ fn push_transactions(
         for tx in transactions {
             if !is_for_avm(block, tx) {
                 if tx_batch.len() >= 1 {
-                    block.apply_batch_txs(tx_batch.as_slice(), None);
+                    block.apply_batch_txs(tx_batch.as_slice(), None, false);
                     tx_batch.clear();
                 }
-                block.push_transaction(tx.clone(), None)?;
+                block.push_transaction(tx.clone(), None, false)?;
             } else {
                 trace!(target: "vm", "found avm transaction");
                 tx_batch.push(tx.clone())
@@ -748,12 +817,12 @@ fn push_transactions(
         }
 
         if !tx_batch.is_empty() {
-            block.apply_batch_txs(tx_batch.as_slice(), None);
+            block.apply_batch_txs(tx_batch.as_slice(), None, false);
             tx_batch.clear();
         }
     } else {
         for t in transactions {
-            block.push_transaction(t.clone(), None)?;
+            block.push_transaction(t.clone(), None, false)?;
         }
     }
 
@@ -797,14 +866,15 @@ fn push_transactions(
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 pub fn enact_verified(
     block: &PreverifiedBlock,
-    engine: &EthEngine,
+    engine: &Engine,
     db: StateDB,
     parent: &Header,
-    grant_parent: Option<&Header>,
+    grand_parent: Option<&Header>,
+    great_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
-    is_epoch_begin: bool,
     kvdb: Arc<KeyValueDB>,
+    client: &BlockChainClient,
 ) -> Result<LockedBlock, Error>
 {
     enact(
@@ -813,191 +883,11 @@ pub fn enact_verified(
         engine,
         db,
         parent,
-        grant_parent,
+        grand_parent,
+        great_grand_parent,
         last_hashes,
         factories,
-        is_epoch_begin,
         kvdb,
+        client,
     )
-}
-
-#[cfg(test)]
-mod tests {
-    use tests::helpers::*;
-    use super::*;
-    use engines::EthEngine;
-    use vms::LastHashes;
-    use error::Error;
-    use header::Header;
-    use factory::Factories;
-    use state_db::StateDB;
-    use views::BlockView;
-    use aion_types::Address;
-    use std::sync::Arc;
-    use transaction::SignedTransaction;
-    use kvdb::MemoryDBRepository;
-
-    /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
-    fn enact_bytes(
-        block_bytes: &[u8],
-        engine: &EthEngine,
-        db: StateDB,
-        parent: &Header,
-        _grant_parent: Option<&Header>,
-        last_hashes: Arc<LastHashes>,
-        factories: Factories,
-    ) -> Result<LockedBlock, Error>
-    {
-        let block = BlockView::new(block_bytes);
-        let header = block.header();
-        let transactions: Result<Vec<_>, Error> = block
-            .transactions()
-            .into_iter()
-            .map(SignedTransaction::new)
-            .map(|r| r.map_err(Into::into))
-            .collect();
-        let transactions = transactions?;
-
-        {
-            if ::log::max_log_level() >= ::log::LogLevel::Trace {
-                let s = State::from_existing(
-                    db.boxed_clone(),
-                    parent.state_root().clone(),
-                    engine.account_start_nonce(parent.number() + 1),
-                    factories.clone(),
-                    Arc::new(MemoryDBRepository::new()),
-                )?;
-                trace!(target: "enact", "num={}, root={}, author={}, author_balance={}\n",
-                    header.number(), s.root(), header.author(), s.balance(&header.author())?);
-            }
-        }
-
-        let mut b = OpenBlock::new(
-            engine,
-            factories,
-            db,
-            parent,
-            None,
-            last_hashes,
-            Address::new(),
-            (3141562.into(), 31415620.into()),
-            vec![],
-            false,
-            Arc::new(MemoryDBRepository::new()),
-        )?;
-
-        b.populate_from(&header);
-        b.push_transactions(&transactions)?;
-
-        Ok(b.close_and_lock())
-    }
-
-    /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header. Seal the block afterwards
-    fn enact_and_seal(
-        block_bytes: &[u8],
-        engine: &EthEngine,
-        db: StateDB,
-        parent: &Header,
-        last_hashes: Arc<LastHashes>,
-        factories: Factories,
-    ) -> Result<SealedBlock, Error>
-    {
-        let header = BlockView::new(block_bytes).header_view();
-        Ok(enact_bytes(
-            block_bytes,
-            engine,
-            db,
-            parent,
-            None,
-            last_hashes,
-            factories,
-        )?
-        .seal(engine, header.seal())?)
-    }
-
-    #[test]
-    fn open_block() {
-        use spec::*;
-        let spec = Spec::new_test();
-        let genesis_header = spec.genesis_header();
-        let db = spec
-            .ensure_db_good(get_temp_state_db(), &Default::default())
-            .unwrap();
-        let last_hashes = Arc::new(vec![genesis_header.hash()]);
-        let b = OpenBlock::new(
-            &*spec.engine,
-            Default::default(),
-            db,
-            &genesis_header,
-            None,
-            last_hashes,
-            Address::zero(),
-            (3141562.into(), 31415620.into()),
-            vec![],
-            false,
-            Arc::new(MemoryDBRepository::new()),
-        )
-        .unwrap();
-        let b = b.close_and_lock();
-        let _ = b.seal(&*spec.engine, vec![]);
-    }
-
-    #[test]
-    fn enact_block() {
-        use spec::*;
-        let spec = Spec::new_test();
-        let engine = &*spec.engine;
-        let genesis_header = spec.genesis_header();
-
-        let db = spec
-            .ensure_db_good(get_temp_state_db(), &Default::default())
-            .unwrap();
-        let last_hashes = Arc::new(vec![genesis_header.hash()]);
-        let b = OpenBlock::new(
-            engine,
-            Default::default(),
-            db,
-            &genesis_header,
-            None,
-            last_hashes.clone(),
-            Address::zero(),
-            (3141562.into(), 31415620.into()),
-            vec![],
-            false,
-            Arc::new(MemoryDBRepository::new()),
-        )
-        .unwrap()
-        .close_and_lock()
-        .seal(engine, vec![])
-        .unwrap();
-        let orig_bytes = b.rlp_bytes();
-        let orig_db = b.drain();
-
-        let db = spec
-            .ensure_db_good(get_temp_state_db(), &Default::default())
-            .unwrap();
-        let e = enact_and_seal(
-            &orig_bytes,
-            engine,
-            db,
-            &genesis_header,
-            last_hashes,
-            Default::default(),
-        )
-        .unwrap();
-
-        assert_eq!(e.rlp_bytes(), orig_bytes);
-
-        let db = e.drain();
-        assert_eq!(orig_db.journal_db().keys(), db.journal_db().keys());
-        assert!(
-            orig_db
-                .journal_db()
-                .keys()
-                .iter()
-                .filter(|k| orig_db.journal_db().get(k.0) != db.journal_db().get(k.0))
-                .next()
-                == None
-        );
-    }
 }

@@ -26,6 +26,9 @@ use serde::{Serialize, Serializer, Deserialize, Deserializer};
 #[cfg(feature = "serialize")]
 use ethereum_types_serialize;
 
+use num_bigint::BigUint;
+
+construct_uint!(U64, 1);
 construct_uint!(U128, 2);
 construct_uint!(U256, 4);
 construct_uint!(U512, 8);
@@ -175,6 +178,26 @@ impl U256 {
     #[inline(always)]
     #[cfg(not(all(asm_available, target_arch = "x86_64")))]
     pub fn full_mul(self, other: U256) -> U512 { U512(uint_full_mul_reg!(U256, 4, self, other)) }
+
+    pub fn as_f64(self) -> f64 {
+        if self == U256::zero() {
+            return 0f64;
+        }
+        let bits = self.bits();
+        let exp = (bits as u64 - 2 + 0x3ff) << 52;
+        let t1;
+        if bits == 53 {
+            t1 = self;
+        } else if bits > 53 {
+            t1 = self >> (bits - 53);
+        } else {
+            t1 = self << (53 - bits);
+        }
+
+        let t2 = t1.as_u64() + exp;
+
+        f64::from_bits(t2)
+    }
 }
 
 impl From<U256> for U512 {
@@ -301,6 +324,22 @@ impl From<U256> for [u8; 32] {
     }
 }
 
+impl<'a> From<&'a [u8; 8]> for U64 {
+    fn from(bytes: &[u8; 8]) -> Self { bytes[..].into() }
+}
+
+impl From<[u8; 8]> for U64 {
+    fn from(bytes: [u8; 8]) -> Self { bytes[..].as_ref().into() }
+}
+
+impl From<U64> for [u8; 8] {
+    fn from(number: U64) -> Self {
+        let mut arr = [0u8; 8];
+        number.to_big_endian(&mut arr);
+        arr
+    }
+}
+
 impl<'a> From<&'a [u8; 16]> for U128 {
     fn from(bytes: &[u8; 16]) -> Self { bytes[..].into() }
 }
@@ -361,6 +400,46 @@ macro_rules! impl_serde {
     };
 }
 
+impl_serde!(U64, 1);
 impl_serde!(U128, 2);
 impl_serde!(U256, 4);
 impl_serde!(U512, 8);
+
+impl From<U256> for BigUint {
+    fn from(value: U256) -> BigUint {
+        let arr: [u8; 32] = value.into();
+        BigUint::from_bytes_be(&arr)
+    }
+}
+
+impl From<BigUint> for U256 {
+    fn from(value: BigUint) -> U256 {
+        let mut le = value.to_bytes_le();
+        // TODO: consider when bytes in BigUint is larger than 32
+        // it is enough for our calculation
+        le.resize(32, 0);
+        U256::from_little_endian(&le)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    #[test]
+    fn test_from_to() {
+        let a = U256::from(258u64);
+        let b: BigUint = a.into();
+        assert_eq!(b, BigUint::from(258u64));
+        let c: U256 = b.into();
+        assert_eq!(c, U256::from(258u64));
+    }
+
+    #[test]
+    fn test_as_f64() {
+        let a = U256::from("123456789abcdef01234567");
+        let a_s = format!("{}", a);
+        let f = a.as_f64();
+        let f_s = format!("{}", f);
+        assert_eq!(a_s[..15], f_s[..15]);
+    }
+}

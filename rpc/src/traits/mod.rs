@@ -25,21 +25,17 @@
 pub mod web3;
 pub mod eth;
 pub mod stratum;
-pub mod eth_pubsub;
 pub mod eth_signing;
 pub mod net;
 pub mod personal;
 pub mod rpc;
-pub mod pb;
 pub mod ping;
 
 pub use self::web3::Web3;
 pub use self::eth::{Eth, EthFilter};
 pub use self::stratum::Stratum;
-pub use self::eth_pubsub::EthPubSub;
 pub use self::eth_signing::EthSigning;
 pub use self::net::Net;
 pub use self::personal::Personal;
 pub use self::rpc::Rpc;
-pub use self::pb::Pb;
 pub use self::ping::Ping;

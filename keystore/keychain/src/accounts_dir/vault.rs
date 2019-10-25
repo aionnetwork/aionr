@@ -330,24 +330,19 @@ where P: AsRef<Path> {
 }
 
 #[cfg(test)]
-mod test {
-    extern crate tempdir;
-
+mod tests {
+    use super::{VAULT_FILE_NAME,check_vault_name, make_vault_dir_path, create_vault_file, read_vault_file, VaultDiskDirectory};
+    use tempdir::TempDir;
     use std::fs;
     use std::io::Write;
     use std::path::PathBuf;
-    use super::VaultKey;
-    use super::{
-        VAULT_FILE_NAME, check_vault_name, make_vault_dir_path, create_vault_file, read_vault_file,
-        VaultDiskDirectory,
-};
-    use self::tempdir::TempDir;
+    use super::super::VaultKey;
 
     #[test]
     fn check_vault_name_succeeds() {
         assert!(check_vault_name("vault"));
         assert!(check_vault_name("vault with spaces"));
-        assert!(check_vault_name("vault    with    tabs"));
+        assert!(check_vault_name("vault\twith\ttabs"));
         assert!(check_vault_name("vault_with_underscores"));
         assert!(check_vault_name("vault-with-dashes"));
         assert!(check_vault_name("vault-with-digits-123"));
@@ -406,14 +401,13 @@ mod test {
         assert!(vault_file_path.exists() && vault_file_path.is_file());
     }
 
-    /*
     #[test]
     fn read_vault_file_succeeds() {
         // given
         let temp_path = TempDir::new("").unwrap();
         let key = VaultKey::new("password", 1024);
-        let vault_file_contents = r#"{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"758696c8dc6378ab9b25bb42790da2f5"},"ciphertext":"54eb50683717d41caaeb12ea969f2c159daada5907383f26f327606a37dc7168","kdf":"pbkdf2","kdfparams":{"c":1024,"dklen":32,"prf":"hmac-sha256","salt":"3c320fa566a1a7963ac8df68a19548d27c8f40bf92ef87c84594dcd5bbc402b6"},"mac":"9e5c2314c2a0781962db85611417c614bd6756666b6b1e93840f5b6ed895f003"}}"#;
-        let dir: PathBuf = temp_path.path().into();
+        let vault_file_contents = r#"{"crypto":{"cipher":"aes-128-ctr","cipherparams":{"iv":"13fa1281120e3f356260f379a2e188ef"},"ciphertext":"4f22c64be6b928188893461e398152cc6c2ab6fe9b55b78abf0254036a6acd08","kdf":"pbkdf2","kdfparams":{"c":1024,"dklen":32,"prf":"hmac-sha256","salt":"fba91d65932511b40cd6cbac2737cc0fb6f6e779b91dcb03e7587c466d77d7c2"},"mac":"31aae0b74ddf436782595adf8cc71c58643f4c23023e9c7f8dad04ce7a30fb80"}}"#;
+        let dir: PathBuf = temp_path.path().into(); //      5e9a369e9e73ac3a8207a87a60311438f19891df3e305a346c10034e30bdb006 54eb50683717d41caaeb12ea969f2c159daada5907383f26f327606a37dc7168
         let mut vault_file_path: PathBuf = dir.clone();
         vault_file_path.push(VAULT_FILE_NAME);
         {
@@ -422,14 +416,15 @@ mod test {
                 .write_all(vault_file_contents.as_bytes())
                 .unwrap();
         }
-    
+
         // when
         let result = read_vault_file(&dir, Some(&key));
-    
+        println!("{:?}", result);
+
         // then
         assert!(result.is_ok());
     }
-    */
+
     #[test]
     fn read_vault_file_fails() {
         // given
@@ -511,4 +506,5 @@ mod test {
         // then
         assert!(vault.is_err());
     }
+
 }

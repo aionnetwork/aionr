@@ -1,6 +1,6 @@
 #!/usr/bin/env groovy
 
-def message, lastCommit,tag
+def message, lastCommit,tag, packageName
 
 @NonCPS
 def getCommit(){
@@ -54,23 +54,21 @@ pipeline {
             	echo 'clean compiled version.rs'
             	sh 'rm -r target/release/build/aion-version* target/release/build/avm-* || echo "no aion-version folders exist"'
             	echo "building..."
-                sh 'RUSTFLAGS="-D warnings" ./scripts/package.sh "aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"'
+                sh './resources/package.sh "aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)"'
             }
         }
 		stage('Unit Test'){
 			steps{
 					sh 'ls test_results || mkdir test_results'
-					sh 'RUSTFLAGS="-D warnings" cargo +nightly test --all --no-run --release --exclude fastvm --exclude solidity'
-					
 					script{
 						try{
 							sh '''#!/bin/bash
 							set -o pipefail
-							RUSTFLAGS="-D warnings" cargo +nightly test  --all --release -- --nocapture --test-threads 1 2>&1 | tee test_results/ut_result.txt'''
+							cargo test --release --all -- --nocapture --test-threads=1 2>&1 | tee test_results/ut_result.txt'''
 							sh 'echo $?'
 							lastCommit = sh(returnStdout: true, script: 'git rev-parse HEAD | cut -c 1-8')
 							echo "${lastCommit}"
-							sh "python scripts/bench.py -l test_results/ut_result.txt -r test_results/report.html -c ${lastCommit}"
+							sh "python resources/bench.py -l test_results/ut_result.txt -r test_results/report.html -c ${lastCommit}"
 						}
 						catch(Exception e){
 							echo "${e}"
@@ -82,18 +80,20 @@ pipeline {
 		}
 		stage('RPC Test'){
 			steps{
-				sh 'set -e'
-				script{
-					try{
-						sh './scripts/run_RPCtest.sh'
-					}
-					catch(Exception e){
-						echo "${e}"
-						
-						throw e
-					}
+				script {
+					packageName = sh(returnStdout:true,script: 'echo aionr-$(git describe --abbrev=0)-$(date +%Y%m%d)').trim();
 				}
-			}
+				echo "${env.WORKSPACE}"
+				echo "${packageName}"
+				build job: 'rpc-qa', parameters:[
+						string(name:'kernel_type',value:"aionr"),
+						string(name:'kernel_src',value:"${env.WORKSPACE}/package/${packageName}"),
+						string(name:'run_mode',value:"normal"),
+						string(name:'test_cases',value:"smoke-test"),
+						string(name:'test_socket',value:"http")
+					]
+				}
+		
 		}
     }
     post{

@@ -21,20 +21,15 @@
  ******************************************************************************/
 
 //! Engine deserialization.
-
-use super::{POWEquihashEngine, NullEngine};
+use super::{UnityEngine};
+use super::{NullEngine};
 
 /// Engine deserialization.
 #[derive(Debug, PartialEq, Deserialize)]
 pub enum Engine {
-    /// POW Equihash engine
-    POWEquihashEngine(POWEquihashEngine),
-    /// Null engine.
+    UnityEngine(UnityEngine),
     #[serde(rename = "null")]
     Null(NullEngine),
-    /// Instantly sealing engine.
-    #[serde(rename = "instantSeal")]
-    InstantSeal,
 }
 
 #[cfg(test)]
@@ -57,15 +52,5 @@ mod tests {
             Engine::Null(_) => {} // unit test in its own file.
             _ => panic!(),
         }
-
-        let s = r#"{
-            "instantSeal": null
-        }"#;
-
-        let deserialized: Engine = serde_json::from_str(s).unwrap();
-        match deserialized {
-            Engine::InstantSeal => {} // instant seal is unit tested in its own file.
-            _ => panic!(),
-        };
     }
 }

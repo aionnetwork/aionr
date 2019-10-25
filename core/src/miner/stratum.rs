@@ -29,14 +29,15 @@ use std::fmt;
 use block::IsBlock;
 use client::Client;
 use aion_types::{H256, clean_0x};
+// definitions of stratum spec, used as StratumService
 use acore_stratum::{
     JobDispatcher, PushWorkHandler, Stratum as StratumService, Error as StratumServiceError,
 };
-use miner::{self, Miner, MinerService};
+use miner::{Miner, MinerService};
 use dir::helpers::replace_home_and_local;
 use dir::{default_data_path, default_local_path, CHAINS_PATH};
 
-use bytes::Bytes;
+use acore_bytes::Bytes;
 use rustc_hex::FromHex;
 
 /// Trait for notifying about new mining work
@@ -248,9 +249,13 @@ impl NotifyWork for Stratum {
     }
 }
 
+/// stratum service accepts socket, dispatcher and an option as its initialization parameters
+/// Stratum Service - Socket Server
+///                 - dispatcher    -   miner
+///                                 -   client
 impl Stratum {
     /// New stratum job dispatcher, given the miner, client and dedicated stratum service
-    pub fn start(
+    fn start(
         options: &Options,
         miner: Weak<Miner>,
         client: Weak<Client>,
@@ -274,7 +279,7 @@ impl Stratum {
 
     /// Start STRATUM job dispatcher and register it in the miner
     pub fn register(cfg: &Options, miner: Arc<Miner>, client: Weak<Client>) -> Result<(), Error> {
-        let stratum = miner::Stratum::start(cfg, Arc::downgrade(&miner.clone()), client)?;
+        let stratum = Stratum::start(cfg, Arc::downgrade(&miner.clone()), client)?;
         miner.push_notifier(Box::new(stratum) as Box<NotifyWork>);
         Ok(())
     }

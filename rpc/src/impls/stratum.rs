@@ -28,13 +28,14 @@ use std::collections::{HashMap, LinkedList};
 use rustc_hex::FromHex;
 use rustc_hex::ToHex;
 
-use sync::sync::SyncProvider;
 use jsonrpc_macros::Trailing;
-use aion_types::{H256, U256};
+use aion_types::{H256, H512, U256};
 use acore::block::IsBlock;
+use acore::sync::SyncProvider;
 use acore::client::{MiningBlockChainClient, BlockId};
 use acore::miner::MinerService;
 use acore::account_provider::AccountProvider;
+use acore::header::SealType;
 use jsonrpc_core::{Error, Result};
 
 use helpers::errors;
@@ -42,9 +43,13 @@ use helpers::accounts::unwrap_provider;
 use traits::Stratum;
 use types::{
     Work, Info, AddressValidation, MiningInfo, MinerStats, TemplateParam, Bytes, StratumHeader,
-    SimpleHeader, BlockNumber,
+    SimpleHeader, BlockNumber
 };
 use aion_types::clean_0x;
+
+const MAX_QUEUE_SIZE_TO_MINE_ON: usize = 4;
+const STRATUM_BLKTIME_INCLUDED_COUNT: usize = 32;
+const STRATUM_RECENT_BLK_COUNT: usize = 128;
 
 /// Stratum rpc implementation.
 pub struct StratumClient<C, S: ?Sized, M>
@@ -88,11 +93,26 @@ where
     fn account_provider(&self) -> Result<Arc<AccountProvider>> {
         unwrap_provider(&self.account_provider)
     }
-}
 
-const MAX_QUEUE_SIZE_TO_MINE_ON: usize = 4;
-const STRATUM_BLKTIME_INCLUDED_COUNT: usize = 32;
-const STRATUM_RECENT_BLK_COUNT: usize = 128;
+    fn check_syncing(&self) -> Result<()> {
+        //TODO: check if initial sync is complete here
+        //let sync = self.sync;
+        if
+        /*sync.status().state != SyncState::Idle ||*/
+        self.client.queue_info().total_queue_size() > MAX_QUEUE_SIZE_TO_MINE_ON {
+            trace!(target: "miner", "Syncing. Cannot give any work.");
+            return Err(errors::no_work());
+        }
+
+        // Otherwise spin until our submitted block has been included.
+        let timeout = Instant::now() + Duration::from_millis(1000);
+        while Instant::now() < timeout && self.client.queue_info().total_queue_size() > 0 {
+            thread::sleep(Duration::from_millis(1));
+        }
+
+        Ok(())
+    }
+}
 
 impl<C, S: ?Sized, M> Stratum for StratumClient<C, S, M>
 where
@@ -102,28 +122,8 @@ where
 {
     /// Returns the work of current block
     fn work(&self, _tpl_param: Trailing<TemplateParam>) -> Result<Work> {
-        if !self.miner.can_produce_work_package() {
-            warn!(target: "miner", "Cannot give work package - engine seals internally.");
-            return Err(errors::no_work_required());
-        }
-
         // check if we're still syncing and return empty strings in that case
-        {
-            //TODO: check if initial sync is complete here
-            //let sync = self.sync;
-            if
-            /*sync.status().state != SyncState::Idle ||*/
-            self.client.queue_info().total_queue_size() > MAX_QUEUE_SIZE_TO_MINE_ON {
-                trace!(target: "miner", "Syncing. Cannot give any work.");
-                return Err(errors::no_work());
-            }
-
-            // Otherwise spin until our submitted block has been included.
-            let timeout = Instant::now() + Duration::from_millis(1000);
-            while Instant::now() < timeout && self.client.queue_info().total_queue_size() > 0 {
-                thread::sleep(Duration::from_millis(1));
-            }
-        }
+        self.check_syncing()?;
 
         if self.miner.author().is_zero() {
             warn!(target: "miner", "Cannot give work package - no author is configured. Use --author to configure!");
@@ -201,11 +201,6 @@ where
             .parse()
             .map_err(|_e| Error::invalid_params("invalid pow_hash"))?;
 
-        if !self.miner.can_produce_work_package() {
-            warn!(target: "miner", "Cannot submit work - engine seals internally.");
-            return Err(errors::no_work_required());
-        }
-
         trace!(target: "miner", "submit_work: Decoded: nonce={}, pow_hash={}, solution={:?}", nonce, pow_hash, solution);
 
         let seal = vec![nonce.to_vec(), solution.0];
@@ -217,6 +212,7 @@ where
 
     /// Get information
     fn get_info(&self) -> Result<Info> {
+        // TODO
         Ok(Info {
             balance: 0,
             blocks: 0,
@@ -232,7 +228,7 @@ where
     fn validate_address(&self, address: H256) -> Result<AddressValidation> {
         let isvalid: bool = address.0[0] == 0xa0 as u8;
         let account_provider = self.account_provider()?;
-        let ismine = match account_provider.has_account(address) {
+        let ismine = match account_provider.has_account(&address) {
             Ok(true) => true,
             _ => false,
         };
@@ -245,28 +241,35 @@ where
 
     /// Get the highest known difficulty
     fn get_difficulty(&self) -> Result<U256> {
-        let best_block = self.client.block(BlockId::Latest).expect("db crashed");
-        Ok(best_block.difficulty())
+        let best_pow_block = self
+            .client
+            .best_pow_block()
+            .expect("must have a best pow block");
+        Ok(best_pow_block.difficulty())
     }
 
     /// Get mining information
     fn get_mining_info(&self) -> Result<MiningInfo> {
-        let best_block = self.client.block(BlockId::Latest).expect("db crashed");
+        let best_pow_block = self
+            .client
+            .best_pow_block()
+            .expect("must have a best pow block");
         Ok(MiningInfo {
-            blocks: best_block.number(),
-            currentblocksize: best_block.0.len(),
-            currentblocktx: best_block.transactions_count(),
-            difficulty: best_block.difficulty(),
+            blocks: best_pow_block.number(),
+            currentblocksize: best_pow_block.0.len(),
+            currentblocktx: best_pow_block.transactions_count(),
+            difficulty: best_pow_block.difficulty(),
             testnet: true,
         })
     }
 
     /// Get miner stats
     fn get_miner_stats(&self, address: H256) -> Result<MinerStats> {
-        let mut header = self
+        let best_pow_block = self
             .client
-            .block_header(BlockId::Latest)
-            .expect("db crashed");
+            .best_pow_block()
+            .expect("must have a best pow block");
+        let mut header = best_pow_block.header();
         let latest_difficulty = header.difficulty();
         let mut index = 0;
         let mut new_blk_headers = Vec::new();
@@ -343,18 +346,73 @@ where
         let mut miner_hashrate = 0_f64;
 
         if block_time > 0 {
-            network_hashrate = latest_difficulty.as_u64() as f64 / block_time as f64;
+            network_hashrate = latest_difficulty.as_f64() / block_time as f64;
         }
 
+        // hashrate shared by miner: mined blocks / total blocks
         if index > 0 && mined_by_miner > 0 {
             miner_hashrate_share = mined_by_miner as f64 / index as f64;
             miner_hashrate = network_hashrate * miner_hashrate_share;
         }
 
         Ok(MinerStats {
-            miner_hashrate_share: miner_hashrate_share,
-            miner_hashrate: miner_hashrate,
-            network_hashrate: network_hashrate,
+            miner_hashrate_share,
+            miner_hashrate,
+            network_hashrate,
         })
+    }
+
+    /// PoS get seed
+    fn pos_get_seed(&self) -> Result<H512> {
+        // seal map:
+        // 64 bytes signature + 64 bytes seed + 32 public key
+        if !self
+            .miner
+            .new_block_allowed_with_seal_type(&*self.client, &SealType::PoS)
+        {
+            return Err(errors::pos_not_allowed());
+        }
+        let best_block = self.client.best_block_header();
+        let grand_parent = self.client.block_header_data(&best_block.parent_hash());
+        match grand_parent {
+            Some(ref header) if header.seal_type() == Some(SealType::PoS) => {
+                // seal length must be 3, since it is already validated
+                let seal = header.seal();
+                let mut s = [0u8; 64];
+                debug!(target: "miner", "seal = {:?}, len = {}", seal, seal.len());
+                s.copy_from_slice(seal[0].as_slice());
+                Ok(s.into())
+            }
+            _ => Ok(H512::zero()),
+        }
+    }
+
+    /// PoS submit seed
+    /// seed: signed seed by staker
+    /// psk: public key of staker
+    /// coinbase: the account who receives block reward
+    fn pos_submit_seed(&self, seed: H512, psk: H256, coinbase: H256) -> Result<H256> {
+        // try to get block hash
+        debug!(target: "miner", "submit seed: {:?} - {:?}", seed, psk);
+        let template = self
+            .miner
+            .get_pos_template(&*self.client, seed.into(), psk, coinbase);
+        if template.is_some() {
+            return Ok(template.unwrap().into());
+        } else {
+            return Err(errors::pos_not_allowed());
+        }
+    }
+
+    /// PoS submit work
+    fn pos_submit_work(&self, sig: H512, hash: H256) -> Result<bool> {
+        if let Some((block, mut seal)) = self.miner.get_ready_pos(&hash) {
+            debug!(target: "miner", "got PoS block template");
+            seal[1] = sig.to_vec();
+            let result = self.miner.try_seal_pos(&*self.client, seal, block);
+            Ok(result.is_ok())
+        } else {
+            Ok(false)
+        }
     }
 }

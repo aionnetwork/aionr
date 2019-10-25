@@ -19,15 +19,14 @@
  *
  ******************************************************************************/
 
-use callback::register_callbacks;
-use codec::NativeDecoder;
-use codec::NativeEncoder;
-use rjni::{Classpath, JavaVM, Options, Type, Value, Version};
-use rjni::ffi;
 use std::io::Error;
 use std::{fs, ptr, thread, env, path::Path, path::PathBuf};
 use std::sync::atomic::{AtomicPtr, Ordering};
-use types::{TransactionContext, TransactionResult};
+use callback::register_callbacks;
+use types::avm::{NativeDecoder, NativeEncoder};
+use rjni::{Classpath, JavaVM, Options, Type, Value, Version};
+use rjni::ffi;
+use types::avm::{TransactionContext, TransactionResult};
 
 /// We keep a single JVM instance in the background, which will be shared
 /// among multiple threads. Before invoking any JNI methods, the executing
@@ -48,21 +47,28 @@ pub fn launch_jvm() {
                 let mut libs;
                 if default_var.is_err() {
                     libs = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-                    warn!("AIONR_HOME is not set, use default path: {:?}", libs);
+                //warn!("AIONR_HOME is not set, use default path: {:?}", libs);
                 } else {
                     libs = PathBuf::from(default_var.unwrap());
                 }
 
-                libs.push("libs/aion_vm");
+                libs.push("libs/aion_vm/common/boot/");
+                // libs.push("libs/aion_vm");
+                // TODO: use avm version to manage classpath
                 classpath = add_jars(
                     classpath,
                     libs.to_str().expect("The `libs` folder is not found"),
                 );
 
+                debug!(target: "vm", "classpath: {:?}", classpath);
+
                 // prepare options
                 let mut options = Options::new();
                 options = options.version(Version::V18);
+                // TODO: use avm version to load resources
                 options = options.classpath(classpath);
+                options = options.initial_heap_size(512 * 1024 * 1024);
+                options = options.max_heap_size(512 * 1024 * 1024);
 
                 // launch jvm
                 let jvm = JavaVM::new(options).expect("Failed to launch a JVM instance");
@@ -129,10 +135,17 @@ fn find_files(path: &Path, extension: &str) -> Result<Vec<String>, Error> {
     return Ok(result);
 }
 
+#[derive(Clone, Default)]
+pub struct VmStatistics {
+    exec_count: i64,
+    total_exec_time: i64,
+}
+
 /// Aion virtual machine
 #[derive(Clone)]
 pub struct AVM {
     jvm: JavaVM,
+    state: VmStatistics,
 }
 
 impl Drop for AVM {
@@ -143,8 +156,6 @@ impl Drop for AVM {
         }
     }
 }
-
-// static mut ExecutorClass: AtomicPtr<Class> = AtomicPtr::new(ptr::null_mut());
 
 impl AVM {
     /// create a new AVM instance
@@ -157,13 +168,12 @@ impl AVM {
             let vm = JVM_SINGLETON.load(Ordering::Relaxed);
             let env: *mut ffi::JNIEnv = ptr::null_mut();
 
-            //((**vm).AttachCurrentThread)(vm, &mut env, ptr::null_mut());
-
             AVM {
                 jvm: JavaVM {
                     vm: ffi::from_raw(vm),
                     env: ffi::from_raw(env),
                 },
+                state: VmStatistics::default(),
             }
         }
     }
@@ -179,6 +189,7 @@ impl AVM {
                     vm: self.jvm.vm,
                     env: ffi::from_raw(env),
                 },
+                state: self.state.clone(),
             }
         }
     }
@@ -192,33 +203,48 @@ impl AVM {
 
     /// Executes a list of transactions
     pub fn execute(
-        &self,
+        &mut self,
         ext_hdl: i64,
+        version: i32,
         transactions: &Vec<TransactionContext>,
         is_local: bool,
     ) -> Result<Vec<TransactionResult>, &'static str>
     {
         trace!(target: "vm", "start rust jvm executor");
         let vm = self.attach();
-        // find the NativeTransactionExecutor class
+
         let class = vm
             .jvm
-            .class("org/aion/avm/jni/NativeTransactionExecutor")
+            .class("org/aion/avm/version/AvmVersion")
             .expect("NativeTransactionExecutor is missing in the classpath");
 
         trace!(target: "vm", "load native class");
-        // the method name
-        let name = "execute";
-
+        // method name: now defined in AvmVersion
+        // who is responsible to call correct version of avm
+        let method = "execute";
         // the method return type
         let return_type = Type::Object("[B");
 
+        let key = "AIONR_HOME";
+        let default_var = env::var(key);
+        let mut libs;
+        if default_var.is_err() {
+            libs = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        //warn!("AIONR_HOME is not set, use default path: {:?}", libs);
+        } else {
+            libs = PathBuf::from(default_var.unwrap());
+        }
+
+        libs.push("libs/aion_vm/");
+
         // the arguments
         let arguments = [
+            Value::Int(version),
+            Value::Str(libs.to_str().expect("Unknown root path").to_string()),
             Value::Long(ext_hdl), // handle
             Value::Object(
                 vm.jvm
-                    .new_byte_array_with_data(&Self::encode_transaction_contexts(&transactions))
+                    .new_byte_array_with_data(&Self::encode_transaction_contexts(transactions))
                     .expect("Failed to create new byte array in JVM"),
             ),
             Value::Boolean(is_local),
@@ -227,7 +253,7 @@ impl AVM {
         trace!(target: "vm", "rust jvm call_static");
         // invoke the method
         let ret = class
-            .call_static(name, &arguments, return_type)
+            .call_static(method, &arguments, return_type)
             .expect("Failed to call the execute() method");
 
         if let Value::Object(obj) = ret {

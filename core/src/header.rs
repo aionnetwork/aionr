@@ -23,7 +23,7 @@
 //! Block header.
 
 use blake2b::{blake2b, BLAKE2B_NULL_RLP};
-use bytes::{u64_to_bytes, Bytes};
+use acore_bytes::{u64_to_bytes, Bytes};
 use ethbloom::Bloom;
 use aion_types::{Address, H256, U128, U256, to_u256};
 use heapsize::HeapSizeOf;
@@ -31,9 +31,9 @@ use rlp::*;
 use std::cell::RefCell;
 use std::cmp;
 use time::get_time;
+use serde::{Serialize, Serializer};
 
 pub use types::BlockNumber;
-pub use types::HeaderVersion;
 
 // TODO: better location?
 pub fn u256_to_u128(value: U256) -> U128 {
@@ -56,15 +56,83 @@ pub fn u256_to_u16(value: U256) -> [u8; 2] {
 
 /// Semantic boolean for when a seal/signature is included.
 pub enum Seal {
-    /// The seal/signature is included.
+    /// The seal is included.
     With,
-    /// The seal/signature is not included.
+    /// The seal is not included.
     Without,
 }
 
-// define more versions here.
-/// header version v1
-pub const V1: HeaderVersion = 1;
+/// Seal type of a block header
+#[derive(Debug, Clone, Eq, PartialEq)]
+pub enum SealType {
+    /// Proof of Work header type
+    PoW,
+    /// Proof of Stake header type
+    PoS,
+}
+
+/// Implement default for SealType
+impl Default for SealType {
+    /// Default SealType is PoW
+    fn default() -> Self { SealType::PoW }
+}
+
+/// Implement display for SealType
+impl ::std::fmt::Display for SealType {
+    fn fmt(&self, f: &mut ::std::fmt::Formatter) -> ::std::fmt::Result {
+        f.write_str(match *self {
+            SealType::PoW => "PoW",
+            SealType::PoS => "PoS",
+        })
+    }
+}
+
+/// Implement from u8. 1 for PoW and 2 for PoS.
+impl From<u8> for SealType {
+    fn from(v: u8) -> Self {
+        match v {
+            1u8 => SealType::PoW,
+            2u8 => SealType::PoS,
+            _ => SealType::PoW, // Question: consider other numbers as PoW too?
+        }
+    }
+}
+
+/// Implement into u8. 1 for PoW and 2 for PoS.
+impl Into<u8> for SealType {
+    fn into(self) -> u8 {
+        match self {
+            SealType::PoW => 1u8,
+            SealType::PoS => 2u8,
+        }
+    }
+}
+
+/// Implement Encodable for SealType to get included in header's rlp
+impl Encodable for SealType {
+    fn rlp_append(&self, s: &mut RlpStream) {
+        let v: u8 = self.to_owned().into();
+        Encodable::rlp_append(&v, s);
+    }
+}
+
+/// Implement Dencodable for SealType to get parsed from header's rlp
+impl Decodable for SealType {
+    fn decode(rlp: &UntrustedRlp) -> ::std::result::Result<Self, DecoderError> {
+        rlp.as_val().and_then(|v: u8| Ok(SealType::from(v)))
+    }
+}
+
+/// Implement Serialize for SealType
+impl Serialize for SealType {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where S: Serializer {
+        match *self {
+            SealType::PoW => serializer.serialize_str("0x1"),
+            SealType::PoS => serializer.serialize_str("0x2"),
+        }
+    }
+}
 
 /// A block header.
 ///
@@ -74,48 +142,38 @@ pub const V1: HeaderVersion = 1;
 /// Doesn't do all that much on its own.
 #[derive(Debug, Clone, Eq)]
 pub struct Header {
-    /// Version rlp order 0
-    version: HeaderVersion,
-    /// Parent hash. rlp order 2
-    parent_hash: H256,
-    /// Block timestamp. rlp order 12
-    timestamp: u64,
-    /// Block number. rlp order 1
+    /// Seal Type
+    seal_type: Option<SealType>,
+    /// Block number
     number: BlockNumber,
-    /// Block author. rlp order 3
+    /// Parent hash
+    parent_hash: H256,
+    /// Block author
     author: Address,
-    /// Transactions root. rlp order 5
-    transactions_root: H256,
-    /// Block extra data. rlp order 9
-    extra_data: Bytes,
-    /// State root. rlp order 4
+    /// State root
     state_root: H256,
-    /// Block receipts root. rlp order 6
+    /// Transactions root
+    transactions_root: H256,
+    /// Block receipts root
     receipts_root: H256,
-    /// Block bloom. rlp order 7
+    /// Block bloom
     log_bloom: Bloom,
-    /// Gas used for contracts execution. rlp order 10
-    gas_used: U256,
-    /// Block gas limit. rlp order 11
-    gas_limit: U256,
-
-    /// Block difficulty. rlp order 8
+    /// Block difficulty
     difficulty: U256,
-    /// Vector of post-RLP-encoded fields.
-    // nonce rlp order 13
-    // solution rlp order 14
+    /// Block extra data
+    extra_data: Bytes,
+    /// Gas used for contracts execution
+    gas_used: U256,
+    /// Block gas limit
+    gas_limit: U256,
+    /// Block timestamp
+    timestamp: u64,
+    /// Vector of post-RLP-encoded fields. It includes (nonce, solution) for a PoW seal, or (seed, signature, public key) for a PoS seal
     seal: Vec<Bytes>,
     /// The memoized hash of the RLP representation *including* the seal fields.
     hash: RefCell<Option<H256>>,
     /// The memoized hash of the RLP representation *without* the seal fields.
     bare_hash: RefCell<Option<H256>>,
-    // [FZH] Put reward and transaction fee in the header to help miners to get this information.
-    // Transaction fee is calculated when a transaction is pushed into a block. In the original
-    // rust version, it is not stored after altered the state balance.
-    // Reward is calculated when closing a block. It is stored in the block trace if tracing
-    // option is activated (but by default it is not).
-    // To keep these two values availble for miners, put them here in the header of a block. They
-    // are not part of the header's rlp so will not be communicated with other nodes on syncing.
     /// transaction fee
     transaction_fee: U256,
     /// reward
@@ -124,7 +182,7 @@ pub struct Header {
 
 impl PartialEq for Header {
     fn eq(&self, c: &Header) -> bool {
-        self.version == c.version
+        self.seal_type == c.seal_type
             && self.parent_hash == c.parent_hash
             && self.timestamp == c.timestamp
             && self.number == c.number
@@ -146,7 +204,7 @@ impl PartialEq for Header {
 impl Default for Header {
     fn default() -> Self {
         Header {
-            version: V1,
+            seal_type: Some(SealType::PoW),
             parent_hash: H256::default(),
             timestamp: 0,
             number: 0,
@@ -171,20 +229,25 @@ impl Default for Header {
 impl Header {
     /// Create a new, default-valued, header.
     pub fn new() -> Self { Self::default() }
-    /// Get version field of the header
-    pub fn version(&self) -> HeaderVersion { self.version }
+
+    /// Get seal type of the header
+    pub fn seal_type(&self) -> &Option<SealType> { &self.seal_type }
 
     /// Get the parent_hash field of the header.
     pub fn parent_hash(&self) -> &H256 { &self.parent_hash }
+
     /// Get the timestamp field of the header.
     pub fn timestamp(&self) -> u64 { self.timestamp }
+
     /// Get the number field of the header.
     pub fn number(&self) -> BlockNumber { self.number }
+
     /// Get the author field of the header.
     pub fn author(&self) -> &Address { &self.author }
 
     /// Get the extra data field of the header.
     pub fn extra_data(&self) -> &Bytes { &self.extra_data }
+
     /// Get a mutable reference to extra_data
     pub fn extra_data_mut(&mut self) -> &mut Bytes {
         self.note_dirty();
@@ -193,14 +256,19 @@ impl Header {
 
     /// Get the state root field of the header.
     pub fn state_root(&self) -> &H256 { &self.state_root }
+
     /// Get the receipts root field of the header.
     pub fn receipts_root(&self) -> &H256 { &self.receipts_root }
+
     /// Get the log bloom field of the header.
     pub fn log_bloom(&self) -> &Bloom { &self.log_bloom }
+
     /// Get the transactions root field of the header.
     pub fn transactions_root(&self) -> &H256 { &self.transactions_root }
+
     /// Get the gas used field of the header.
     pub fn gas_used(&self) -> &U256 { &self.gas_used }
+
     /// Get the gas limit field of the header.
     pub fn gas_limit(&self) -> &U256 { &self.gas_limit }
 
@@ -218,17 +286,29 @@ impl Header {
     /// Get the seal field of the header.
     pub fn seal(&self) -> &[Bytes] { &self.seal }
 
+    /// Get the public key of seal in PoS header
+    pub fn get_pk_of_pos(&self) -> Option<H256> {
+        if self
+            .seal_type()
+            .to_owned()
+            .map_or(true, |t| t == SealType::PoW)
+            || self.seal.len() != 3
+        {
+            return None;
+        }
+
+        Some(self.seal[2].as_slice().into())
+    }
+
     /// Get the cumulative transaction fee
     pub fn transaction_fee(&self) -> &U256 { &self.transaction_fee }
 
     /// Get the reward
     pub fn reward(&self) -> &U256 { &self.reward }
 
-    // TODO: seal_at, set_seal_at &c.
-
-    /// Set the version field of the header.
-    pub fn set_version(&mut self, a: HeaderVersion) {
-        self.version = a;
+    /// Set the seal type of the header.
+    pub fn set_seal_type(&mut self, seal_type: SealType) {
+        self.seal_type = Some(seal_type);
         self.note_dirty();
     }
 
@@ -237,41 +317,55 @@ impl Header {
         self.parent_hash = a;
         self.note_dirty();
     }
+
     /// Set the state root field of the header.
     pub fn set_state_root(&mut self, a: H256) {
         self.state_root = a;
         self.note_dirty();
     }
+
     /// Set the transactions root field of the header.
     pub fn set_transactions_root(&mut self, a: H256) {
         self.transactions_root = a;
         self.note_dirty()
     }
+
     /// Set the receipts root field of the header.
     pub fn set_receipts_root(&mut self, a: H256) {
         self.receipts_root = a;
         self.note_dirty()
     }
+
     /// Set the log bloom field of the header.
     pub fn set_log_bloom(&mut self, a: Bloom) {
         self.log_bloom = a;
         self.note_dirty()
     }
+
     /// Set the timestamp field of the header.
     pub fn set_timestamp(&mut self, a: u64) {
         self.timestamp = a;
         self.note_dirty();
     }
-    /// Set the timestamp field of the header to the current time.
-    pub fn set_timestamp_now(&mut self, but_later_than: u64) {
+
+    /// Set the timestamp field of the header, but later than the specified time.
+    pub fn set_timestamp_later_than(&mut self, a: u64, but_later_than: u64) {
+        self.timestamp = cmp::max(a, but_later_than + 1);
+        self.note_dirty();
+    }
+
+    /// Set the timestamp field of the header to the current time, but later than the specified time.
+    pub fn set_timestamp_now_later_than(&mut self, but_later_than: u64) {
         self.timestamp = cmp::max(get_time().sec as u64, but_later_than + 1);
         self.note_dirty();
     }
+
     /// Set the number field of the header.
     pub fn set_number(&mut self, a: BlockNumber) {
         self.number = a;
         self.note_dirty();
     }
+
     /// Set the author field of the header.
     pub fn set_author(&mut self, a: Address) {
         if a != self.author {
@@ -293,6 +387,7 @@ impl Header {
         self.gas_used = a;
         self.note_dirty();
     }
+
     /// Set the gas limit field of the header.
     pub fn set_gas_limit(&mut self, a: U256) {
         self.gas_limit = a;
@@ -346,7 +441,7 @@ impl Header {
 
     pub fn mine_hash(&self) -> H256 {
         let mut mine_hash_bytes: Vec<u8> = Vec::with_capacity(256);
-        mine_hash_bytes.push(self.version);
+        mine_hash_bytes.push(self.seal_type.to_owned().unwrap_or_default().into());
         mine_hash_bytes.extend(u64_to_bytes(self.number).iter());
         mine_hash_bytes.extend_from_slice(self.parent_hash.as_ref());
         mine_hash_bytes.extend_from_slice(self.author.as_ref());
@@ -361,6 +456,14 @@ impl Header {
         mine_hash_bytes.extend(u64_to_bytes(self.gas_used.low_u64()).iter());
         mine_hash_bytes.extend(u64_to_bytes(self.gas_limit.low_u64()).iter());
         mine_hash_bytes.extend(u64_to_bytes(self.timestamp).iter());
+        if self.seal_type == Some(SealType::PoS) && self.seal.len() >= 1 {
+            mine_hash_bytes.extend(
+                self.seal
+                    .get(0)
+                    .expect("seal length greater than 0 tested before.")
+                    .iter(),
+            );
+        }
         blake2b(mine_hash_bytes)
     }
 
@@ -379,7 +482,8 @@ impl Header {
                 _ => 0,
             },
         );
-        s.append(&self.version);
+
+        s.append(&self.seal_type.clone().unwrap_or_default());
         s.append(&self.number);
         s.append(&self.parent_hash);
         s.append(&self.author);
@@ -426,15 +530,7 @@ impl Header {
 impl Decodable for Header {
     fn decode(r: &UntrustedRlp) -> Result<Self, DecoderError> {
         let mut blockheader = Header {
-            version: {
-                // consistent with java's impl
-                let version_vec = r.val_at::<Vec<u8>>(0)?;
-                if version_vec.len() != 1 {
-                    1
-                } else {
-                    version_vec[0]
-                }
-            },
+            seal_type: Some(r.val_at(0)?),
             number: r.val_at::<U256>(1)?.low_u64(),
             parent_hash: r.val_at(2)?,
             author: r.val_at(3)?,
@@ -482,9 +578,4 @@ impl ::aion_machine::Header for Header {
     fn author(&self) -> &Address { Header::author(self) }
 
     fn number(&self) -> BlockNumber { Header::number(self) }
-}
-
-impl ::aion_machine::ScoredHeader for Header {
-    fn score(&self) -> &U256 { self.difficulty() }
-    fn set_score(&mut self, score: U256) { self.set_difficulty(score) }
 }

@@ -24,7 +24,7 @@ use std::io::{Write, BufReader, BufRead};
 use std::fs::File;
 use aion_types::{U256, clean_0x, Address};
 use journaldb::Algorithm;
-use acore::client::{BlockId, VMType, DatabaseCompactionProfile, ClientConfig, VerifierType};
+use acore::client::{BlockId, VMType, DatabaseCompactionProfile, ClientConfig};
 use acore::miner::PendingSet;
 use acore::transaction::transaction_queue::PrioritizationStrategy;
 use cache::CacheConfig;
@@ -100,27 +100,6 @@ pub fn aion_ipc_path(base: &str, path: &str) -> String {
     replace_home(base, &path)
 }
 
-#[cfg(test)]
-pub fn default_network_config() -> ::sync::p2p::NetworkConfig {
-    use sync::p2p::NetworkConfig;
-    NetworkConfig {
-        boot_nodes: vec![
-            "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:30303".into(),
-            "p2p://c33d302f-216b-47d4-ac44-5d8181b56e7e@52.231.187.227:30303".into(),
-            "p2p://c33d4c07-6a29-4ca6-8b06-b2781ba7f9bf@191.232.164.119:30303".into(),
-            "p2p://c39d0a10-20d8-49d9-97d6-284f88da5c25@13.92.157.19:30303".into(),
-            "p2p://c38d2a32-20d8-49d9-97d6-284f88da5c83@40.78.84.78:30303".into(),
-            "p2p://c37d6b45-20d8-49d9-97d6-284f88da5c51@104.40.182.54:30303".into(),
-            "p2p://c36d4208-fe4b-41fa-989b-c7eeafdffe72@35.208.215.219:30303".into(),
-        ],
-        max_peers: 64,
-        local_node: "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303".to_string(),
-        net_id: 256,
-        sync_from_boot_nodes_only: false,
-        ip_black_list: Vec::new(),
-    }
-}
-
 pub fn to_client_config(
     cache_config: &CacheConfig,
     spec_name: String,
@@ -131,7 +110,6 @@ pub fn to_client_config(
     pruning: Algorithm,
     pruning_history: u64,
     pruning_memory: usize,
-    check_seal: bool,
 ) -> ClientConfig
 {
     let mut client_config = ClientConfig::default();
@@ -158,12 +136,8 @@ pub fn to_client_config(
     client_config.db_compaction = compaction;
     client_config.db_wal = wal;
     client_config.vm_type = vm_type;
-    client_config.verifier_type = if check_seal {
-        VerifierType::Canon
-    } else {
-        VerifierType::CanonNoSeal
-    };
     client_config.spec_name = spec_name;
+    client_config.stake_contract = Address::default();
     client_config
 }
 

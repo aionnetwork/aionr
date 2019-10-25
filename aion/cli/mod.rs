@@ -166,18 +166,14 @@ usage! {
             "--default-config",
             "Print DEFAULT configuration to $HOME/.aion/default_config.toml.",
 
-            FLAG flag_no_seal_check: (bool) = false, or |_| None,
-            "--no-seal-check",
-            "Skip block seal check. Used to make import and export blocks faster, if checking seal is not necessary.",
-
             ARG arg_config: (String) = "$HOME/.aion/config.toml", or |_| None,
             "-c, --config=[CONFIG]",
             "Specify a configuration. CONFIG may be a configuration file .",
 
         ["Account Options"]
-            FLAG flag_fast_unlock: (bool) = false, or |c: &Config| c.account.as_ref()?.fast_unlock.clone(),
-            "--fast-unlock",
-            "Use drastically faster unlocking mode. This setting causes raw secrets to be stored unprotected in memory, so use with care.",
+            FLAG flag_fast_signing: (bool) = false, or |c: &Config| c.account.as_ref()?.fast_signing.clone(),
+            "--fast-signing",
+            "Use drastically faster signing mode for permanently unlocked accounts. This setting causes raw secrets of these accounts to be stored unprotected in memory, so use with care.",
 
             ARG arg_keys_iterations: (u32) = 10240u32, or |c: &Config| c.account.as_ref()?.keys_iterations.clone(),
             "--keys-iterations=[NUM]",
@@ -194,6 +190,11 @@ usage! {
             ARG arg_password: (Vec<String>) = Vec::new(), or |c: &Config| c.account.as_ref()?.password.clone(),
             "--password=[FILE]...",
             "Provide a list of files containing passwords for unlocking accounts. Leading and trailing whitespace is trimmed.",
+
+            // NOTE: for MS2 test
+            ARG arg_stake_contract: (Option<String>) = None, or |c: &Config| c.account.as_ref()?.stake_contract.clone(),
+            "--stake-contract=[ADDRESS]",
+            "Specify the PoS staking contract address",
 
         ["Network Options"]
             FLAG flag_sync_from_boot_nodes_only: (bool) = false, or |c: &Config| c.network.as_ref()?.sync_from_boot_nodes_only.clone(),
@@ -232,7 +233,7 @@ usage! {
         ["Rpc Options"]
             ARG arg_rpc_processing_threads: (Option<usize>) = None, or |c: &Config| c.rpc.as_ref()?.processing_threads,
             "--rpc--processing-threads=[NUM]",
-            "Turn on additional processing threads for JSON-RPC servers (for all severs i.e for websocket and ipc). Setting this to a non-zero value allows parallel execution of cpu-heavy queries.",
+            "Turn on additional processing threads for JSON-RPC servers (for all severs http, websocket and ipc). Setting this to a non-zero value allows parallel execution of cpu-heavy queries.",
 
         ["Http Options"]
             FLAG flag_no_http: (bool) = false, or |c: &Config| c.http.as_ref()?.disable.clone(),
@@ -247,9 +248,9 @@ usage! {
             "--http-interface=[IP]",
             "Specify the hostname portion of the HTTP API server, IP should be an interface's IP address, or all (all interfaces) or local.",
 
-            ARG arg_http_apis: (Vec<String>) = vec!["all".into(),"-pubsub".into()], or |c: &Config| c.http.as_ref()?.apis.clone(),
+            ARG arg_http_apis: (Vec<String>) = vec!["all".into()], or |c: &Config| c.http.as_ref()?.apis.clone(),
             "--http-apis=[APIS]...",
-            "Specify the APIs available through the HTTP interface. APIS is a comma-delimited list of API name. Possible name are all, web3, eth, stratum, net, personal, rpc. You can also disable a specific API by putting '-' in the front: all,-personal.NOTE that rpc doesn’t support pubsub",
+            "Specify the APIs available through the HTTP interface. APIS is a comma-delimited list of API name. Possible name are all, web3, eth, stratum, net, personal, rpc. You can also disable a specific API by putting '-' in the front: all,-personal.",
 
             ARG arg_http_hosts: (Vec<String>) = vec!["none".into()], or |c: &Config| c.http.as_ref()?.hosts.clone(),
             "--http-hosts=[HOSTS]...",
@@ -276,9 +277,9 @@ usage! {
             "--ws-interface=[IP]",
             "Specify the hostname portion of the WebSockets server, IP should be an interface's IP address, or all (all interfaces) or local.",
 
-            ARG arg_ws_apis: (Vec<String>) = vec!["all".into(),"-pubsub".into()], or |c: &Config| c.websockets.as_ref()?.apis.clone(),
+            ARG arg_ws_apis: (Vec<String>) = vec!["all".into()], or |c: &Config| c.websockets.as_ref()?.apis.clone(),
             "--ws-apis=[APIS]...",
-            "Specify the APIs available through the WebSockets interface. APIS is a comma-delimited list of API name. Possible name are web3, eth, stratum, net, personal, rpc, pubsub.",
+            "Specify the APIs available through the WebSockets interface. APIS is a comma-delimited list of API name. Possible name are web3, eth, stratum, net, personal, rpc.",
 
             ARG arg_ws_origins: (Vec<String>) = vec!["none".into()], or |c: &Config| c.websockets.as_ref()?.origins.clone(),
             "--ws-origins=[URL]...",
@@ -301,9 +302,9 @@ usage! {
             "--ipc-path=[PATH]",
             "Specify custom path for JSON-RPC over IPC service.",
 
-            ARG arg_ipc_apis: (Vec<String>) = vec!["all".into(),"-pubsub".into()], or |c: &Config| c.ipc.as_ref()?.apis.clone(),
+            ARG arg_ipc_apis: (Vec<String>) = vec!["all".into()], or |c: &Config| c.ipc.as_ref()?.apis.clone(),
             "--ipc-apis=[APIS]...",
-            "Specify custom API set available via JSON-RPC over IPC. Possible name are web3, eth, stratum, net, personal, rpc, pubsub.",
+            "Specify custom API set available via JSON-RPC over IPC. Possible name are web3, eth, stratum, net, personal, rpc.",
 
         ["Wallet Options"]
             FLAG flag_enable_wallet: (bool) = false, or |c: &Config| c.wallet.as_ref()?.disable.clone().map(|a| !a),
@@ -350,7 +351,7 @@ usage! {
 
             FLAG flag_remove_solved: (bool) = false, or |c: &Config| c.mining.as_ref()?.remove_solved.clone(),
             "--remove-solved",
-            "Move solved blocks from the work package queue instead of cloning them. This gives a slightly faster import speed, but means that extra solutions submitted for the same work package will go unused.",
+            "Remove solved blocks from the work package queue instead of cloning them. This gives a slightly faster import speed, but means that extra solutions submitted for the same work package will go unused.",
 
             FLAG flag_infinite_pending_block: (bool) = false, or |c: &Config| c.mining.as_ref()?.infinite_pending_block.clone(),
             "--infinite-pending-block",
@@ -360,21 +361,13 @@ usage! {
             "--dynamic-gas-price",
             "use dynamic gas price which adjust with --gas-price-percentile, --max-blk-traverse, --blk-price-window",
 
-            ARG arg_reseal_on_txs: (String) = "own", or |c: &Config| c.mining.as_ref()?.reseal_on_txs.clone(),
-            "--reseal-on-txs=[SET]",
-            "Specify which transactions should force the node to reseal a block. SET is one of: none - never reseal on new transactions; own - reseal only on a new local transaction; ext - reseal only on a new external transaction; all - reseal on all new transactions.",
-
             ARG arg_reseal_min_period: (u64) = 4000u64, or |c: &Config| c.mining.as_ref()?.reseal_min_period.clone(),
             "--reseal-min-period=[MS]",
             "Specify the minimum time between reseals from incoming transactions. MS is time measured in milliseconds.",
 
-            ARG arg_reseal_max_period: (u64) = 120000u64, or |c: &Config| c.mining.as_ref()?.reseal_max_period.clone(),
-            "--reseal-max-period=[MS]",
-            "Specify the maximum time since last block to enable force-sealing. MS is time measured in milliseconds.",
-
-            ARG arg_work_queue_size: (usize) = 20usize, or |c: &Config| c.mining.as_ref()?.work_queue_size.clone(),
+            ARG arg_work_queue_size: (usize) = 100usize, or |c: &Config| c.mining.as_ref()?.work_queue_size.clone(),
             "--work-queue-size=[ITEMS]",
-            "Specify the number of historical work packages which are kept cached lest a solution is found for them later. High values take more memory but result in fewer unusable solutions.",
+            "Specify the number of pow work which are kept cached. The cache is clreared at every pow block height when a solution is found later. High values take more memory but result in fewer unusable solutions.",
 
             ARG arg_relay_set: (String) = "cheap", or |c: &Config| c.mining.as_ref()?.relay_set.clone(),
             "--relay-set=[SET]",
@@ -430,7 +423,14 @@ usage! {
 
             ARG arg_author: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.author.clone(),
             "--author=[ADDRESS]",
-            "Specify the block author (aka \"coinbase\") address for sending block rewards from sealed blocks. NOTE: MINING WILL NOT WORK WITHOUT THIS OPTION.", // Sealing/Mining Option
+            "Specify the block author (aka \"coinbase\") address for sending block rewards from sealed blocks. NOTE: MINING WILL NOT WORK WITHOUT THIS OPTION.",
+
+            // TOREMOVE: Unity MS1 use only
+            ARG arg_staker_private_key: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.staker_private_key.clone(),
+            "--staker-private-key=[ADDRESS]",
+            "Specify the PoS block author's private key for sending block rewards from sealed blocks. NOTE: INTERNAL STAKING WILL NOT WORK WITHOUT THIS OPTION.",
+
+
 
             ARG arg_tx_gas_limit: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.tx_gas_limit.clone(),
             "--tx-gas-limit=[GAS]",
@@ -555,7 +555,8 @@ struct Account {
     password: Option<Vec<String>>,
     keys_iterations: Option<u32>,
     refresh_time: Option<u64>,
-    fast_unlock: Option<bool>,
+    fast_signing: Option<bool>,
+    stake_contract: Option<String>,
 }
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
@@ -621,10 +622,9 @@ struct WalletApi {
 #[serde(deny_unknown_fields)]
 struct Mining {
     author: Option<String>,
+    staker_private_key: Option<String>,
     force_sealing: Option<bool>,
-    reseal_on_txs: Option<String>,
     reseal_min_period: Option<u64>,
-    reseal_max_period: Option<u64>,
     work_queue_size: Option<usize>,
     tx_gas_limit: Option<String>,
     tx_time_limit: Option<u64>,
@@ -816,160 +816,160 @@ mod tests {
 
         // when
         let args = Args::parse_with_config(&["aion", "--chain", "xyz"], config).unwrap();
+        let args_target = Args {
+            // Commands
+            cmd_daemon: false,
+            cmd_account: false,
+            cmd_account_new: false,
+            cmd_account_list: false,
+            cmd_account_import: false,
+            cmd_account_import_by_key: false,
+            cmd_account_export_to_key: false,
+            cmd_import: false,
+            cmd_export: false,
+            cmd_db: false,
+            cmd_db_kill: false,
+            cmd_revert: false,
+
+            // Arguments
+            arg_daemon_pid_file: None,
+            arg_import_file: None,
+            arg_import_format: None,
+            arg_export_blocks_file: None,
+            arg_export_blocks_format: None,
+            arg_export_blocks_from: "1".into(),
+            arg_export_blocks_to: "latest".into(),
+            arg_account_import_path: None,
+            arg_account_private_key: None,
+            arg_account_address: None,
+            arg_revert_blocks_to: "0".into(),
+
+            // -- Operating Options
+            arg_chain: "xyz".into(),
+            arg_base_path: Some("base".into()),
+            arg_db_path: Some("db".into()),
+            arg_keys_path: Some("keys".into()),
+
+            // -- Account Options
+            arg_unlock: vec!["0xdeadbeefcafe0000000000000000000000000000".into()],
+            arg_password: vec!["~/.safe/password.file".into()],
+            arg_keys_iterations: 10240u32,
+            arg_refresh_time: 2,
+            flag_fast_signing: true,
+            arg_stake_contract: None,
+
+            // -- Networking Options
+            arg_max_peers: 50u32,
+            arg_boot_nodes: vec![
+                "p2p://22345678-9abc-def0-1234-56789abcdef0@3.4.4.4:4444".into(),
+                "p2p://32345678-9abc-def0-1234-56789abcdef0@4.5.5.5:5555".into(),
+            ],
+            arg_local_node: "p2p://12345678-9abc-def0-1234-56789abcdef0@2.3.3.3:3333".into(),
+            arg_net_id: 128u32,
+            flag_sync_from_boot_nodes_only: true,
+            arg_ip_black_list: vec!["ip1".into(), "ip2".into()],
+
+            // -- API and Console Options
+            // RPC
+            arg_rpc_processing_threads: Some(3usize),
+
+            // Http
+            flag_no_http: true,
+            arg_http_port: 8545u16,
+            arg_http_interface: "local".into(),
+            arg_http_cors: vec!["cor1".into(), "cor2".into()],
+            arg_http_apis: vec!["api1".into(), "api2".into()],
+            arg_http_hosts: vec!["host1".into(), "host2".into()],
+            arg_http_server_threads: Some(5usize),
+
+            // WS
+            flag_no_ws: true,
+            arg_ws_port: 8546u16,
+            arg_ws_interface: "local".into(),
+            arg_ws_apis: vec!["api1".into(), "api2".into()],
+            arg_ws_origins: vec!["origin1".into(), "origin2".into()],
+            arg_ws_hosts: vec!["host1".into(), "host2".into()],
+            arg_ws_max_connections: 12usize,
+
+            // IPC
+            flag_no_ipc: true,
+            arg_ipc_path: "$HOME/.aion/jsonrpc.ipc".into(),
+            arg_ipc_apis: vec!["api1".into(), "api2".into()],
+
+            // Wallet
+            arg_wallet_interface: "local".into(),
+            arg_wallet_port: 8547u16,
+            flag_enable_wallet: false,
+            flag_secure_connect: true,
+            arg_zmq_key_path: Some("zmq".into()),
+
+            // -- Sealing/Mining Options
+            arg_author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
+            flag_force_sealing: true,
+            arg_reseal_min_period: 4000u64,
+            arg_work_queue_size: 100usize,
+            arg_tx_gas_limit: Some("6283184".into()),
+            arg_tx_time_limit: Some(100u64),
+            arg_relay_set: "cheap".into(),
+            arg_min_gas_price: 10000000000u64,
+            arg_max_gas_price: 9000000000000000000u64,
+            arg_gas_price_percentile: 60usize,
+            arg_gas_floor_target: "4700000".into(),
+            arg_gas_cap: "6283184".into(),
+            arg_extra_data: Some("Aion".into()),
+            arg_tx_queue_mem_limit: 2u32,
+            arg_tx_queue_strategy: "gas_factor".into(),
+            arg_tx_queue_ban_count: 1u16,
+            arg_tx_queue_ban_time: 180u64,
+            flag_remove_solved: true,
+            flag_infinite_pending_block: true,
+            arg_max_blk_traverse: 64usize,
+            arg_blk_price_window: 20usize,
+            flag_dynamic_gas_price: true,
+            arg_local_max_gas_price: 100000000000u64,
+            arg_staker_private_key: Some("staker_private_key".into()),
+
+            // -- Stratum Options
+            flag_no_stratum: true,
+            arg_stratum_interface: "127.0.0.2".to_owned(),
+            arg_stratum_port: 8089u16,
+            arg_stratum_secret: Some("secret".into()),
+
+            // -- Database Options
+            flag_no_persistent_txqueue: true,
+            arg_pruning: "auto".into(),
+            arg_pruning_history: 64u64,
+            arg_pruning_memory: 500usize,
+            //                arg_cache_size_db: 64u32,
+            arg_cache_size_blocks: 8u32,
+            arg_cache_size_queue: 50u32,
+            arg_cache_size_state: 25u32,
+            arg_cache_size: Some(128),
+            flag_disable_wal: true,
+            arg_db_compaction: "ssd".into(),
+            arg_fat_db: "auto".into(),
+            flag_scale_verifiers: true,
+            arg_num_verifiers: Some(6),
+
+            // -- Miscellaneous Options
+            flag_no_config: false,
+            flag_version: false,
+            flag_default_config: false,
+            flag_full_help: false,
+            arg_config: "$HOME/.aion/config.toml".into(),
+
+            // -- Log Options
+            flag_no_color: true,
+            arg_log_file: Some("log file".into()),
+            arg_log_level: "level".into(),
+            arg_log_targets: vec!["target1".into(), "target2".into()],
+        };
+
+        println!("{:?}", args);
+        println!("{:?}", args_target);
 
         // then
-        assert_eq!(
-            args,
-            Args {
-                // Commands
-                cmd_daemon: false,
-                cmd_account: false,
-                cmd_account_new: false,
-                cmd_account_list: false,
-                cmd_account_import: false,
-                cmd_account_import_by_key: false,
-                cmd_account_export_to_key: false,
-                cmd_import: false,
-                cmd_export: false,
-                cmd_db: false,
-                cmd_db_kill: false,
-                cmd_revert: false,
-
-                // Arguments
-                arg_daemon_pid_file: None,
-                arg_import_file: None,
-                arg_import_format: None,
-                arg_export_blocks_file: None,
-                arg_export_blocks_format: None,
-                arg_export_blocks_from: "1".into(),
-                arg_export_blocks_to: "latest".into(),
-                arg_account_import_path: None,
-                arg_account_private_key: None,
-                arg_account_address: None,
-                arg_revert_blocks_to: "0".into(),
-
-                // -- Operating Options
-                arg_chain: "xyz".into(),
-                arg_base_path: Some("base".into()),
-                arg_db_path: Some("db".into()),
-                arg_keys_path: Some("keys".into()),
-
-                // -- Account Options
-                arg_unlock: vec!["0xdeadbeefcafe0000000000000000000000000000".into()],
-                arg_password: vec!["~/.safe/password.file".into()],
-                arg_keys_iterations: 10240u32,
-                arg_refresh_time: 2,
-                flag_fast_unlock: true,
-
-                // -- Networking Options
-                arg_max_peers: 50u32,
-                arg_boot_nodes: vec![
-                    "p2p://22345678-9abc-def0-1234-56789abcdef0@3.4.4.4:4444".into(),
-                    "p2p://32345678-9abc-def0-1234-56789abcdef0@4.5.5.5:5555".into(),
-                ],
-                arg_local_node: "p2p://12345678-9abc-def0-1234-56789abcdef0@2.3.3.3:3333".into(),
-                arg_net_id: 128u32,
-                flag_sync_from_boot_nodes_only: true,
-                arg_ip_black_list: vec!["ip1".into(), "ip2".into()],
-
-                // -- API and Console Options
-                // RPC
-                arg_rpc_processing_threads: Some(3usize),
-
-                // Http
-                flag_no_http: true,
-                arg_http_port: 8545u16,
-                arg_http_interface: "local".into(),
-                arg_http_cors: vec!["cor1".into(), "cor2".into()],
-                arg_http_apis: vec!["api1".into(), "api2".into()],
-                arg_http_hosts: vec!["host1".into(), "host2".into()],
-                arg_http_server_threads: Some(5usize),
-
-                // WS
-                flag_no_ws: true,
-                arg_ws_port: 8546u16,
-                arg_ws_interface: "local".into(),
-                arg_ws_apis: vec!["api1".into(), "api2".into()],
-                arg_ws_origins: vec!["origin1".into(), "origin2".into()],
-                arg_ws_hosts: vec!["host1".into(), "host2".into()],
-                arg_ws_max_connections: 12usize,
-
-                // IPC
-                flag_no_ipc: true,
-                arg_ipc_path: "$HOME/.aion/jsonrpc.ipc".into(),
-                arg_ipc_apis: vec!["api1".into(), "api2".into()],
-
-                // Wallet
-                arg_wallet_interface: "local".into(),
-                arg_wallet_port: 8547u16,
-                flag_enable_wallet: false,
-                flag_secure_connect: true,
-                arg_zmq_key_path: Some("zmq".into()),
-
-                // -- Sealing/Mining Options
-                arg_author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
-                flag_force_sealing: true,
-                arg_reseal_on_txs: "all".into(),
-                arg_reseal_min_period: 4000u64,
-                arg_reseal_max_period: 60000u64,
-                arg_work_queue_size: 20usize,
-                arg_tx_gas_limit: Some("6283184".into()),
-                arg_tx_time_limit: Some(100u64),
-                arg_relay_set: "cheap".into(),
-                arg_min_gas_price: 10000000000u64,
-                arg_max_gas_price: 9000000000000000000u64,
-                arg_gas_price_percentile: 60usize,
-                arg_gas_floor_target: "4700000".into(),
-                arg_gas_cap: "6283184".into(),
-                arg_extra_data: Some("Aion".into()),
-                arg_tx_queue_mem_limit: 2u32,
-                arg_tx_queue_strategy: "gas_factor".into(),
-                arg_tx_queue_ban_count: 1u16,
-                arg_tx_queue_ban_time: 180u64,
-                flag_remove_solved: true,
-                flag_infinite_pending_block: true,
-                arg_max_blk_traverse: 64usize,
-                arg_blk_price_window: 20usize,
-                flag_dynamic_gas_price: true,
-                arg_local_max_gas_price: 100000000000u64,
-
-                // -- Stratum Options
-                flag_no_stratum: true,
-                arg_stratum_interface: "127.0.0.2".to_owned(),
-                arg_stratum_port: 8089u16,
-                arg_stratum_secret: Some("secret".into()),
-
-                // -- Database Options
-                flag_no_persistent_txqueue: true,
-                arg_pruning: "auto".into(),
-                arg_pruning_history: 64u64,
-                arg_pruning_memory: 500usize,
-                //                arg_cache_size_db: 64u32,
-                arg_cache_size_blocks: 8u32,
-                arg_cache_size_queue: 50u32,
-                arg_cache_size_state: 25u32,
-                arg_cache_size: Some(128),
-                flag_disable_wal: true,
-                arg_db_compaction: "ssd".into(),
-                arg_fat_db: "auto".into(),
-                flag_scale_verifiers: true,
-                arg_num_verifiers: Some(6),
-
-                // -- Miscellaneous Options
-                flag_no_seal_check: false,
-                flag_no_config: false,
-                flag_version: false,
-                flag_default_config: false,
-                flag_full_help: false,
-                arg_config: "$HOME/.aion/config.toml".into(),
-
-                // -- Log Options
-                flag_no_color: true,
-                arg_log_file: Some("log file".into()),
-                arg_log_level: "level".into(),
-                arg_log_targets: vec!["target1".into(), "target2".into()],
-            }
-        );
+        assert_eq!(args, args_target);
     }
 
     #[test]
@@ -1014,7 +1014,8 @@ mod tests {
                     password: Some(vec!["passwdfile path".into()]),
                     keys_iterations: None,
                     refresh_time: None,
-                    fast_unlock: None,
+                    fast_signing: None,
+                    stake_contract: None,
                 }),
                 network: Some(Network {
                     max_peers: Some(20),
@@ -1058,9 +1059,7 @@ mod tests {
                 mining: Some(Mining {
                     author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
                     force_sealing: Some(true),
-                    reseal_on_txs: Some("all".into()),
                     reseal_min_period: Some(4000),
-                    reseal_max_period: Some(60000),
                     work_queue_size: None,
                     relay_set: None,
                     min_gas_price: None,
@@ -1081,6 +1080,7 @@ mod tests {
                     dynamic_gas_price: None,
                     max_blk_traverse: None,
                     local_max_gas_price: None,
+                    staker_private_key: None
                 }),
                 db: Some(Database {
                     no_persistent_txqueue: None,
