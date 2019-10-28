@@ -442,25 +442,13 @@ fn print_running_environment(
 fn print_logo() {
     info!(
         target: "run",
-        "{}{}{}{}{}{}{}{}{}{}{}{}{}{}",
-        Colour::Blue
-            .bold()
-            .paint("\n             _____    ____    _   _ \n"),
-        Colour::Blue.bold().paint("     /\\     |_   _|  / __ "),
-        Colour::Green.bold().paint("\\"),
-        Colour::Blue.bold().paint("  | \\ | |\n"),
-        Colour::Blue
-            .bold()
-            .paint("    /  \\      | |   | |  | | |  \\| |\n"),
-        Colour::Blue.bold().paint("   / /\\ \\     | |   "),
-        Colour::Green.bold().paint("|"),
-        Colour::Blue.bold().paint(" |  | | | . ` |\n"),
-        Colour::Blue.bold().paint("  / ____ \\   _| |_  "),
-        Colour::Green.bold().paint("|"),
-        Colour::Blue.bold().paint(" |__| | | |\\  |\n"),
-        Colour::Blue.bold().paint(" /_/    \\_\\ |_____|  "),
-        Colour::Green.bold().paint("\\"),
-        Colour::Blue.bold().paint("____/  |_| \\_|\n\n")
+        "{}{}{}{}{}{}",
+        Colour::Blue.bold().paint("\n  ____                 _   _ \n"),
+        Colour::Blue.bold().paint(" / __ \\       /\\      | \\ | |\n"),
+        Colour::Blue.bold().paint("| |  | |     /  \\     |  \\| |\n"),
+        Colour::Blue.bold().paint("| |  | |    / /\\ \\    | . ` |\n"),
+        Colour::Blue.bold().paint("| |__| |   / ____ \\   | |\\  |\n"),
+        Colour::Blue.bold().paint(" \\____/   /_/    \\_\\  |_| \\_|\n\n")
     );
     info!(target: "run","       build: {}", Colour::White.bold().paint(version()));
 }
