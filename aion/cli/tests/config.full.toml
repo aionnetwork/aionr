@@ -89,7 +89,6 @@ port = 8089
 secret = "secret"
 
 [db]
-no_persistent_txqueue = true
 pruning = "auto"
 pruning_history = 64
 pruning_memory = 500

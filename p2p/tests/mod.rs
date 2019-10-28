@@ -36,19 +36,19 @@ fn test_multi_id_same_ip() {
     let executor_p2p = runtime_sync.executor();
 
     let mut c_0 = Config::new();
-    c_0.local_node = String::from("p2p://00000000-0000-0000-0000-000000000000@127.0.0.1:30303");
+    c_0.local_node = String::from("p2p://00000000-0000-0000-0000-000000000000@127.0.0.1:30302");
     let mut p2p_0: Mgr = Mgr::new(c_0, vec![]);
 
     let mut c_1 = Config::new();
     c_1.boot_nodes.push(String::from(
-        "p2p://00000000-0000-0000-0000-000000000000@127.0.0.1:30303",
+        "p2p://00000000-0000-0000-0000-000000000000@127.0.0.1:30302",
     ));
     c_1.local_node = String::from("p2p://11111111-1111-1111-1111-111111111111@127.0.0.1:30304");
     let mut p2p_1: Mgr = Mgr::new(c_1, vec![]);
 
     let mut c_2 = Config::new();
     c_2.boot_nodes.push(String::from(
-        "p2p://00000000-0000-0000-0000-000000000000@127.0.0.1:30303",
+        "p2p://00000000-0000-0000-0000-000000000000@127.0.0.1:30302",
     ));
     c_2.local_node = String::from("p2p://22222222-2222-2222-2222-222222222222@127.0.0.1:30305");
     let mut p2p_2: Mgr = Mgr::new(c_2, vec![]);

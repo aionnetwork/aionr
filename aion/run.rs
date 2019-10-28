@@ -41,7 +41,6 @@ use fdlimit::raise_fd_limit;
 use helpers::{passwords_from_files, to_client_config};
 use dir::helpers::absolute;
 use io::IoChannel;
-use logger::LogConfig;
 use tokio;
 use tokio::prelude::*;
 use num_cpus;
@@ -65,9 +64,6 @@ pub struct RunCmd {
     pub pruning: Pruning,
     pub pruning_history: u64,
     pub pruning_memory: usize,
-    /// Some if execution should be daemonized. Contains pid_file path.
-    pub daemon: Option<String>,
-    pub logger_config: LogConfig,
     pub miner_options: MinerOptions,
     pub dynamic_gas_price: Option<DynamicGasPrice>,
     pub ws_conf: rpc::WsConfiguration,
@@ -82,7 +78,6 @@ pub struct RunCmd {
     pub wal: bool,
     pub vm_type: VMType,
     pub verifier_settings: VerifierSettings,
-    pub no_persistent_txqueue: bool,
 }
 
 pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {

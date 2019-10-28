@@ -200,17 +200,6 @@ impl Configuration {
             };
             Cmd::Blockchain(BlockchainCmd::Revert(revert_cmd))
         } else {
-            let daemon = if self.args.cmd_daemon {
-                Some(
-                    self.args
-                        .arg_daemon_pid_file
-                        .clone()
-                        .expect("CLI argument is required; qed"),
-                )
-            } else {
-                None
-            };
-
             let verifier_settings = self.verifier_settings();
 
             let run_cmd = RunCmd {
@@ -220,8 +209,6 @@ impl Configuration {
                 pruning,
                 pruning_history,
                 pruning_memory,
-                daemon,
-                logger_config: logger_config.clone(),
                 miner_options: self.miner_options()?,
                 dynamic_gas_price: self.dynamic_gas_price()?,
                 ws_conf,
@@ -236,7 +223,6 @@ impl Configuration {
                 wal,
                 vm_type,
                 verifier_settings,
-                no_persistent_txqueue: self.args.flag_no_persistent_txqueue,
             };
             Cmd::Run(run_cmd)
         };
@@ -793,8 +779,6 @@ mod tests {
             pruning: Default::default(),
             pruning_history: 64,
             pruning_memory: 32,
-            daemon: None,
-            logger_config: Default::default(),
             miner_options: Default::default(),
             dynamic_gas_price: Default::default(),
             ws_conf: Default::default(),
@@ -809,7 +793,6 @@ mod tests {
             vm_type: Default::default(),
             fat_db: Default::default(),
             verifier_settings: Default::default(),
-            no_persistent_txqueue: false,
         };
         assert_eq!(conf.into_command().unwrap().cmd, Cmd::Run(expected));
     }
