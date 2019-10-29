@@ -31,15 +31,6 @@ usage! {
         // Arguments must start with arg_
         // Flags must start with flag_
 
-        CMD cmd_daemon
-        {
-            "Use Aion as a daemon",
-
-            ARG arg_daemon_pid_file: (Option<String>) = None,
-            "<PID-FILE>",
-            "Path to the pid file",
-        }
-
         CMD cmd_account
         {
             "Manage accounts",
@@ -430,8 +421,6 @@ usage! {
             "--staker-private-key=[ADDRESS]",
             "Specify the PoS block author's private key for sending block rewards from sealed blocks. NOTE: INTERNAL STAKING WILL NOT WORK WITHOUT THIS OPTION.",
 
-
-
             ARG arg_tx_gas_limit: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.tx_gas_limit.clone(),
             "--tx-gas-limit=[GAS]",
             "Apply a limit of GAS as the maximum amount of gas a single transaction may have for it to be mined.",
@@ -445,10 +434,6 @@ usage! {
             "Specify a custom extra-data for authored blocks, no more than 32 characters.",
 
         ["Database Options"]
-            FLAG flag_no_persistent_txqueue: (bool) = false, or |c: &Config| c.db.as_ref()?.no_persistent_txqueue,
-            "--no-persistent-txqueue",
-            "Don't save pending local transactions to disk to be restored whenever the node restarts.",
-
             FLAG flag_disable_wal: (bool) = false, or |c: &Config| c.db.as_ref()?.disable_wal.clone(),
             "--disable-wal",
             "Disables DB WAL, which gives a significant speed up but means an unclean exit is unrecoverable.",
@@ -659,7 +644,6 @@ struct Stratum {
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Database {
-    no_persistent_txqueue: Option<bool>,
     pruning: Option<String>,
     pruning_history: Option<u64>,
     pruning_memory: Option<usize>,
@@ -818,7 +802,6 @@ mod tests {
         let args = Args::parse_with_config(&["aion", "--chain", "xyz"], config).unwrap();
         let args_target = Args {
             // Commands
-            cmd_daemon: false,
             cmd_account: false,
             cmd_account_new: false,
             cmd_account_list: false,
@@ -832,7 +815,6 @@ mod tests {
             cmd_revert: false,
 
             // Arguments
-            arg_daemon_pid_file: None,
             arg_import_file: None,
             arg_import_format: None,
             arg_export_blocks_file: None,
@@ -936,7 +918,6 @@ mod tests {
             arg_stratum_secret: Some("secret".into()),
 
             // -- Database Options
-            flag_no_persistent_txqueue: true,
             arg_pruning: "auto".into(),
             arg_pruning_history: 64u64,
             arg_pruning_memory: 500usize,
@@ -1083,7 +1064,6 @@ mod tests {
                     staker_private_key: None
                 }),
                 db: Some(Database {
-                    no_persistent_txqueue: None,
                     pruning: Some("fast".into()),
                     pruning_history: Some(64),
                     pruning_memory: None,

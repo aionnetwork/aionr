@@ -136,15 +136,15 @@ $ ./aion
 > 2019-01-23 09:12:40 Keys path /home/aion/.aion/keys/mainnet
 > 2019-01-23 09:12:40 DB path /home/aion/.aion/chains/mainnet/db/a98e36807c1b0211
 > 2019-01-23 09:12:40
->              _____    ____    _   _
->      /\     |_   _|  / __ \  | \ | |
->     /  \      | |   | |  | | |  \| |
->    / /\ \     | |   | |  | | | . ` |
->   / ____ \   _| |_  | |__| | | |\  |
->  /_/    \_\ |_____|  \____/  |_| \_|
+>   ____                 _   _ 
+>  / __ \       /\      | \ | |
+> | |  | |     /  \     |  \| |
+> | |  | |    / /\ \    | . ` |
+> | |__| |   / ____ \   | |\  |
+>  \____/   /_/    \_\  |_| \_|
 >
 >
-> 2019-01-23 09:12:40 Starting Aion(R)/v0.1.1.f9610e1/x86_64-linux-gnu/rustc-1.28.0
+> 2019-01-23 09:12:40 Starting Aion(R)/v1.0.0.9946fa0/x86_64-linux-gnu/rustc-1.28.0
 > 2019-01-23 09:12:40 Configured for Mainnet using UnityEngine engine
 > 2019-01-23 09:12:41 Genesis hash: 30793b4ea012c6d3a58c85c5b049962669369807a98e36807c1b02116417f823
 > 2019-01-23 09:12:41 State DB configuration: archive

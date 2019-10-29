@@ -84,7 +84,6 @@ staker_private_key = "0x1bfd08a5840c6e8e4a381210f0d7c5cc6702037ff2309a84171981d1
 
 
 [db]
-no_persistent_txqueue = false
 disable_wal = false
 scale_verifiers = false
 pruning = "archive"

@@ -16,6 +16,7 @@ public final class AvmDependencyInfo {
     public static final String rtJarPathVersion2 = "v2/org-aion-avm-rt.jar";
     public static final String userlibJarPathVersion2 = "v2/org-aion-avm-userlib.jar";
     public static final String rustJniVersion2 = "v2/org-aion-avm-jni.jar";
+    public static final String utils = "v2/org-aion-avm-utilities.jar";
     public static final String aionTypes = "common/aion-types-22a3be9.jar";
     public static final String asm = "common/asm-6.2.1.jar";
     public static final String asm_analysis = "common/asm-analysis-6.2.1.jar";

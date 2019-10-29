@@ -76,6 +76,7 @@ public final class AvmResourcesV2 implements Closeable {
         File spongycastle = new File(projectRootPath + org.aion.avm.version.AvmDependencyInfo.spongycastle);
         File hamcrest = new File(projectRootPath + AvmDependencyInfo.hamcrest);
         File embed = new File(projectRootPath + AvmDependencyInfo.embed);
+        File utilities = new File(projectRootPath + AvmDependencyInfo.utils);
         URL[] urls = new URL[]{
                 avmCoreJar.toURI().toURL(),
                 avmRtJar.toURI().toURL(),
@@ -92,7 +93,8 @@ public final class AvmResourcesV2 implements Closeable {
                 slf4j_simple.toURI().toURL(),
                 spongycastle.toURI().toURL(),
                 hamcrest.toURI().toURL(),
-                embed.toURI().toURL()
+                embed.toURI().toURL(),
+                utilities.toURI().toURL()
         };
         return new URLClassLoader(urls);
     }
