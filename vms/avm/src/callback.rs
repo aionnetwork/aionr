@@ -33,7 +33,6 @@ use tiny_keccak::keccak256;
 
 const AVM_VERSION_MAGIC: &[u8] = b"avm-version-";
 const AVM_V1: u8 = 1;
-const AVM_V2: u8 = 2;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -460,8 +459,8 @@ pub extern fn avm_get_transformed_code(
                 unsafe { new_null_bytes() }
             } else {
                 match (version, code.as_slice().starts_with(AVM_VERSION_MAGIC)) {
-                    (AVM_V1, true) => {
-                        if code[AVM_VERSION_MAGIC.len()] != AVM_V1 {
+                    (expected_version, true) => {
+                        if code[AVM_VERSION_MAGIC.len()] != expected_version {
                             unsafe { new_null_bytes() }
                         } else {
                             unsafe {
@@ -482,25 +481,7 @@ pub extern fn avm_get_transformed_code(
                         ptr::copy(&code.as_slice()[0], ret.pointer, code.len());
                         ret
                     },
-                    (AVM_V2, true) => {
-                        if code[AVM_VERSION_MAGIC.len()] != AVM_V2 {
-                            unsafe { new_null_bytes() }
-                        } else {
-                            unsafe {
-                                let ret = new_fixed_bytes(
-                                    (code.len() - AVM_VERSION_MAGIC.len() - 1) as u32,
-                                );
-                                ptr::copy(
-                                    &code.as_slice()[AVM_VERSION_MAGIC.len() + 1],
-                                    ret.pointer,
-                                    code.len(),
-                                );
-                                ret
-                            }
-                        }
-                    }
-                    (AVM_V2, false) => unsafe { new_null_bytes() },
-                    (_, _) => unsafe { new_null_bytes() },
+                    (_, false) => unsafe { new_null_bytes() },
                 }
             }
         }
