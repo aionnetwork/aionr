@@ -915,7 +915,7 @@ fn error_cases_rejected() {
     assert_eq!(
         result.unwrap_err(),
         ExecutionError::NotEnoughBaseGas {
-            required: U256::from(246_240),
+            required: U256::from(200_000),
             got: U256::from(1_000),
         }
     );
@@ -941,7 +941,7 @@ fn error_cases_rejected() {
     assert_eq!(
         result.unwrap_err(),
         ExecutionError::NotEnoughBaseGas {
-            required: U256::from(21_256),
+            required: U256::from(21_000),
             got: U256::from(1_000),
         }
     );

@@ -362,13 +362,19 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // 2. Check gas limit
         // 2.1 Gas limit should not be less than the basic gas requirement
         let base_gas_required: U256 = t.gas_required();
-        if t.gas < base_gas_required {
+        // AKI-174
+        let gas_required_against_rejection: U256 = match self.machine.params().unity_update {
+            Some(ref fork_number) if &self.info.number > fork_number => t.gas_required(),
+            _ => t.gas_required_before_unity(),
+        };
+        if t.gas < gas_required_against_rejection {
             return Err(From::from(ExecutionError::NotEnoughBaseGas {
-                required: base_gas_required,
+                required: gas_required_against_rejection,
                 got: t.gas,
             }));
         }
         debug!(target: "vm", "base_gas_required = {}", base_gas_required);
+        debug!(target: "vm", "gas_required_against_rejection = {}", gas_required_against_rejection);
 
         // 2.2 Gas limit should not exceed the maximum gas limit depending on
         // the transaction's action type
@@ -408,7 +414,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         }
 
         // Deduct the basic gas requirement and pass the remaining gas limit to VM
-        let init_gas = t.gas - base_gas_required;
+        // Make sure to pass non-negative gas to vm
+        let init_gas: U256 = if t.gas < base_gas_required {
+            U256::from(0u64)
+        } else {
+            t.gas - base_gas_required
+        };
         let mut substate = Substate::new();
 
         // NOTE: there can be no invalid transactions from this point.

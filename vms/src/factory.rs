@@ -22,6 +22,7 @@
 use std::convert::Into;
 use std::string::ToString;
 use std::sync::Arc;
+use std::cmp;
 use avm::AVM;
 use fastvm::ffi::EvmStatusCode;
 use fastvm::core::FastVM;
@@ -156,7 +157,7 @@ impl Factory for FastVMFactory {
 
         let ext_post: &mut Box<Ext> = unsafe { ::std::mem::transmute(ext_ptr) };
         let mut status_code = res.0;
-        let mut gas_left = U256::from(res.1);
+        let mut gas_left = U256::from(cmp::max(res.1, 0i64));
         let return_data = res.2;
         let return_data_length = return_data.len();
 

@@ -263,6 +263,14 @@ impl Transaction {
         }
     }
 
+    /// Get the transaction cost in gas for the given params, before the unity hard-fork.
+    pub fn gas_required_before_unity(&self) -> U256 {
+        match self.action {
+            Action::Create => GAS_CREATE_MIN,
+            Action::Call(_) => GAS_CALL_MIN,
+        }
+    }
+
     /// Get the transaction cost in gas for the given params.
     pub fn gas_required(&self) -> U256 {
         self.data.iter().fold(
