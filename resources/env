@@ -6,8 +6,8 @@ echo -e "\033[32mHello $USERNAME, welcome to Aion Rust Kernel \033[0m"
 
 if [ ! -f "custom.env" ];then
     echo -e "\033[33mWARN: Seems this is your first time to run Aion Rust Kernel, resolving dependencies \033[0m"
-    SYSINFO=`uname -a | sed -n '/18.04.*Ubuntu/p'`
-    if [ -z "$SYSINFO" ];then
+    SYSINFO=`uname -a | sed -n '/18.04.*-Ubuntu/p'`
+    if [ -n "$SYSINFO" ];then
         echo "Found Ubuntu 18.04" 
     else
         echo -e "\033[33mWARN: Not Official Support Version \033[0m"
@@ -23,7 +23,10 @@ if [ ! -f "custom.env" ];then
 
     touch ./custom.env
     ## Step 2: install dependencies
-    sudo apt update;apt install -y libboost-filesystem1.65-dev libboost-program-options1.65-dev llvm-4.0-dev
+    echo -e "\033[33mupdating repositories\033[0m"
+    sudo apt update 2> /dev/null 1>&2
+    echo -e "\033[33minstalling local dependencies\033[0m"
+    sudo apt install -y libboost-filesystem1.65-dev libboost-program-options1.65-dev llvm-4.0-dev 1> /dev/null 2>&1
 fi
 
 echo -e "\033[32mCongratulations! Aion Rust Kernel is ready to run\033[0m"
