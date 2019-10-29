@@ -44,7 +44,7 @@ fn test_calculate_rewards_number1() {
         block_time_upper_bound: 0u64,
         block_time_unity: 0u64,
     };
-    let calculator = RewardsCalculator::new(&params, None, U256::from(0));
+    let calculator = RewardsCalculator::new(&params, None, None, U256::from(0));
     let mut header = Header::default();
     header.set_number(1);
     assert_eq!(
@@ -70,7 +70,7 @@ fn test_calculate_rewards_number10000() {
         block_time_upper_bound: 0u64,
         block_time_unity: 0u64,
     };
-    let calculator = RewardsCalculator::new(&params, None, U256::from(0));
+    let calculator = RewardsCalculator::new(&params, None, None, U256::from(0));
     let mut header = Header::default();
     header.set_number(10000);
     assert_eq!(
@@ -96,7 +96,7 @@ fn test_calculate_rewards_number259200() {
         block_time_upper_bound: 0u64,
         block_time_unity: 0u64,
     };
-    let calculator = RewardsCalculator::new(&params, None, U256::from(0));
+    let calculator = RewardsCalculator::new(&params, None, None, U256::from(0));
     let mut header = Header::default();
     header.set_number(259200);
     assert_eq!(
@@ -122,12 +122,64 @@ fn test_calculate_rewards_number300000() {
         block_time_upper_bound: 0u64,
         block_time_unity: 0u64,
     };
-    let calculator = RewardsCalculator::new(&params, None, U256::from(0));
+    let calculator = RewardsCalculator::new(&params, None, None, U256::from(0));
     let mut header = Header::default();
     header.set_number(300000);
     assert_eq!(
         calculator.calculate_reward(&header),
         U256::from(1497989283243310185u64)
+    );
+}
+
+#[test]
+fn test_calculate_rewards_monetary_policy() {
+    let params = UnityEngineParams {
+        rampup_upper_bound: U256::from(259200),
+        rampup_lower_bound: U256::zero(),
+        rampup_start_value: U256::from(748994641621655092u64),
+        rampup_end_value: U256::from(1497989283243310185u64),
+        lower_block_reward: U256::from(748994641621655092u64),
+        upper_block_reward: U256::from(1497989283243310185u64),
+        difficulty_bound_divisor: U256::from(1u64),
+        difficulty_bound_divisor_unity: 1u64,
+        minimum_pow_difficulty: U256::zero(),
+        minimum_pos_difficulty: U256::zero(),
+        block_time_lower_bound: 0u64,
+        block_time_upper_bound: 0u64,
+        block_time_unity: 0u64,
+    };
+    let calculator = RewardsCalculator::new(&params, Some(300000), None, U256::from(0));
+    let mut header = Header::default();
+    header.set_number(300001);
+    assert_eq!(
+        calculator.calculate_reward(&header),
+        U256::from(1132740013876480u64)
+    );
+}
+
+#[test]
+fn test_calculate_rewards_unity() {
+    let params = UnityEngineParams {
+        rampup_upper_bound: U256::from(259200),
+        rampup_lower_bound: U256::zero(),
+        rampup_start_value: U256::from(748994641621655092u64),
+        rampup_end_value: U256::from(1497989283243310185u64),
+        lower_block_reward: U256::from(748994641621655092u64),
+        upper_block_reward: U256::from(1497989283243310185u64),
+        difficulty_bound_divisor: U256::from(1u64),
+        difficulty_bound_divisor_unity: 1u64,
+        minimum_pow_difficulty: U256::zero(),
+        minimum_pos_difficulty: U256::zero(),
+        block_time_lower_bound: 0u64,
+        block_time_upper_bound: 0u64,
+        block_time_unity: 0u64,
+    };
+    let calculator = RewardsCalculator::new(&params, None, Some(300000), U256::from(0));
+    let mut header = Header::default();
+    header.set_number(300001);
+    assert_eq!(
+        calculator.calculate_reward(&header),
+        U256::from(4_500_000_000_000_000_000u64)
     );
 }
 

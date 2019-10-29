@@ -279,6 +279,7 @@ pub struct RewardsCalculator {
     lower_block_reward: U256,
     upper_block_reward: U256,
     monetary_policy_update: Option<BlockNumber>,
+    unity_update: Option<BlockNumber>,
     m: U256,
     current_term: Mutex<u64>,
     current_reward: Mutex<U256>,
@@ -289,6 +290,7 @@ impl RewardsCalculator {
     fn new(
         params: &UnityEngineParams,
         monetary_policy_update: Option<BlockNumber>,
+        unity_update: Option<BlockNumber>,
         premine: U256,
     ) -> RewardsCalculator
     {
@@ -313,6 +315,7 @@ impl RewardsCalculator {
             lower_block_reward: params.lower_block_reward,
             upper_block_reward: params.upper_block_reward,
             monetary_policy_update,
+            unity_update,
             m,
             current_term: Mutex::new(0),
             current_reward: Mutex::new(U256::from(0)),
@@ -321,6 +324,12 @@ impl RewardsCalculator {
     }
 
     fn calculate_reward(&self, header: &Header) -> U256 {
+        if let Some(n) = self.unity_update {
+            if header.number() > n {
+                return U256::from(4_500_000_000_000_000_000u64);
+            }
+        }
+
         if let Some(n) = self.monetary_policy_update {
             if header.number() > n {
                 return self.calculate_reward_after_monetary_update(header.number());
@@ -417,6 +426,7 @@ impl UnityEngine {
         let rewards_calculator = RewardsCalculator::new(
             &params,
             machine.params().monetary_policy_update,
+            machine.params().unity_update,
             machine.premine(),
         );
         let difficulty_calc = DifficultyCalc::new(&params, machine.params().unity_update);
