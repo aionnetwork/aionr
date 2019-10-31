@@ -57,7 +57,7 @@ use sync::sync_provider::SyncStatus;
 pub use sync::sync_provider::SyncProvider;
 
 const INTERVAL_TRANSACTIONS_BROADCAST: u64 = 50;
-const INTERVAL_STATUS: u64 = 5000;
+const INTERVAL_STATUS: u64 = 1000;
 const INTERVAL_HEADERS: u64 = 100;
 const INTERVAL_BODIES: u64 = 100;
 const INTERVAL_IMPORT: u64 = 50;
