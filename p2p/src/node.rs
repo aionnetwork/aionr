@@ -57,6 +57,7 @@ pub struct Node {
     pub id: [u8; NODE_ID_LENGTH],
     pub net_id: u32,
     pub addr: IpAddr,
+    pub real_addr: IpAddr,
     pub genesis_hash: H256,
 
     pub if_boot: bool,
@@ -86,11 +87,13 @@ impl Node {
     {
         let mut tx_thread_vec = Vec::new();
         tx_thread_vec.push(tx_thread);
+        let addr = IpAddr::parse(ts.peer_addr().unwrap());
         Node {
             hash: 0,
             id,
             net_id: 0,
-            addr: IpAddr::parse(ts.peer_addr().unwrap()),
+            real_addr: addr.clone(),
+            addr,
             genesis_hash: H256::default(),
 
             if_boot: false,
@@ -122,6 +125,10 @@ impl Node {
             id: [b'0'; NODE_ID_LENGTH],
             net_id: 0,
             addr: IpAddr::parse(ts.peer_addr().unwrap()),
+            real_addr: IpAddr {
+                ip: [0u8; 8],
+                port: 0,
+            },
             genesis_hash: H256::default(),
 
             if_boot: false,

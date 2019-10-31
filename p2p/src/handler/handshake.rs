@@ -133,10 +133,14 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
             debug!(target: "p2p", "inbound node state: connected -> active");
             node.id.copy_from_slice(node_id);
             trace!(target: "p2p", "ip:{:?} - {:?}", node.addr.ip, ip);
+            if ip == &[0u8; 8] {
+                node.real_addr.ip.copy_from_slice(&node.addr.ip);
+            } else {
+                node.real_addr.ip.copy_from_slice(ip);
+            }
             let port = port.read_u32::<BigEndian>().unwrap_or(30303);
             trace!(target: "p2p", "port:{} - {}", node.addr.port, port);
-            // use tcp random port now
-            // node.addr.port = port;
+            node.real_addr.port = port;
             node.state = STATE::ACTIVE;
             if let Ok(mut id_set) = p2p.nodes_id.lock() {
                 id_set.insert(node.get_id_string());

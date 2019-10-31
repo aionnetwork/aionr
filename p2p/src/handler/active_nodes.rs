@@ -65,9 +65,9 @@ pub fn receive_req(p2p: Mgr, hash: u64, version: u16) {
             res_body.push(active_nodes_to_send.len() as u8);
             for n in active_nodes_to_send.iter() {
                 res_body.put_slice(&n.id);
-                res_body.put_slice(&n.addr.ip);
+                res_body.put_slice(&n.real_addr.ip);
                 let mut port = [0; 4];
-                BigEndian::write_u32(&mut port, n.addr.port);
+                BigEndian::write_u32(&mut port, n.real_addr.port);
                 res_body.put_slice(&port);
             }
         } else {
@@ -121,6 +121,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
             temp.addr.ip.copy_from_slice(ip);
             temp.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
             temp.id.copy_from_slice(id);
+            trace!(target:"p2p", "get nodes {}: id: {} addr: {} ",_i,temp.get_id_string(),temp.addr.to_string());
 
             // TODO: complete if should add
             temp_list.push(temp);
