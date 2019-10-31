@@ -371,7 +371,7 @@ impl ChainNotify for Sync {
         &self,
         imported: Vec<H256>,
         _invalid: Vec<H256>,
-        _enacted: Vec<H256>,
+        enacted: Vec<H256>,
         retracted: Vec<H256>,
         sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
@@ -400,8 +400,8 @@ impl ChainNotify for Sync {
             }
         }
 
-        // For locally sealed blocks, record them and broadcast them
-        if !sealed.is_empty() {
+        // For locally sealed main-chain blocks, record them and broadcast them
+        if !sealed.is_empty() && !enacted.is_empty() {
             trace!(target: "sync", "Propagating blocks...");
             self.storage.insert_imported_blocks_hashes(sealed.clone());
             broadcast::propagate_new_blocks(self.p2p.clone(), &sealed[0], self.client.clone());
