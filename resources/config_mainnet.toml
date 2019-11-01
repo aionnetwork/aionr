@@ -25,8 +25,3 @@ disable = true
 
 [ipc]
 disable = true
-
-[stratum]
-disable = true
-port = 8008
-interface = "0.0.0.0"
