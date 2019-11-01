@@ -9,12 +9,10 @@ password = []
 stake_contract = "0xa056337bb14e818f3f53e13ab0d93b6539aa570cba91ce65c716058241989be9"
 
 [network]
-sync_from_boot_nodes_only = false
 max_peers = 128
 net_id = 256
-local_node = "p2p://5c7d5055-f6ad-4875-b30e-03ae4deab7ef@0.0.0.0:30303"
+local_node = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"
 boot_nodes = []
-ip_black_list = []
 
 #[rpc]
 #processing_threads = 1
@@ -22,7 +20,7 @@ ip_black_list = []
 [http]
 disable = false
 port = 8545
-interface = "local"
+interface = "127.0.0.1"
 apis = ["all"]
 hosts = ["none"]
 cors = ["none"]
@@ -30,7 +28,7 @@ cors = ["none"]
 [websockets]
 disable = false
 port = 8546
-interface = "local"
+interface = "127.0.0.1"
 apis = ["all"]
 origins = ["none"]
 hosts = ["none"]
@@ -40,19 +38,6 @@ max_connections = 100
 disable = false
 path = "$BASE/jsonrpc.ipc"
 apis = ["all"]
-
-[wallet]
-disable = true
-secure_connect = false
-interface = "local"
-port = 8547
-#zmq_key_path = None
-
-[stratum]
-disable = false
-interface = "local"
-port = 8008
-#secret = None
 
 [mining]
 remove_solved = false
@@ -74,7 +59,7 @@ blk_price_window = 20
 max_blk_traverse = 64
 gas_price_percentile = 60
 author = "0xa07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137"
-staker_private_key = "0xcc76648ce8798bc18130bc9d637995e5c42a922ebeab78795fac58081b9cf9d4"
+#staker_private_key = None
 #tx_gas_limit = None
 #tx_time_limit = None
 #extra_data = None

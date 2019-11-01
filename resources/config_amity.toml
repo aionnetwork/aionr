@@ -14,7 +14,6 @@ boot_nodes = [
 "p2p://a8031211-729a-4584-86f1-e19ab97cf9cq@34.68.147.170:30303",
 "p2p://a8041211-8c7e-496c-9c4e-c89318280275@35.228.234.246:30303"
 ]
-ip_black_list = []
 
 [http]
 disable = false
@@ -26,11 +25,5 @@ disable = true
 [ipc]
 disable = true
 
-[stratum]
-disable = true
-port = 8008
-interface = "0.0.0.0"
-
 [mining]
 author = "0xa07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137"
-#staker_private_key = "0xcc76648ce8798bc18130bc9d637995e5c42a922ebeab78795fac58081b9cf9d4"
