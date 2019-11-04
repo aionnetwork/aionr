@@ -1,6 +1,9 @@
 [aion]
 chain = "mainnet/mainnet.json"
 
+[account]
+stake_contract = "0xa0733306c2ee0c60224b0e59efeae8eee558c0ca1b39e7e5a14a575124549416"
+
 [network]
 max_peers = 64
 net_id = 256
@@ -25,8 +28,3 @@ disable = true
 
 [ipc]
 disable = true
-
-[stratum]
-disable = true
-port = 8008
-interface = "0.0.0.0"
