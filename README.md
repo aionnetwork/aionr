@@ -22,7 +22,7 @@ Follow this guide to install the Aion Rust kernel on your system.
 - Ubuntu 16.04 or Ubuntu 18.04
 - 4GB RAM
 - 2 core CPU
-- 24GB Hard Drive Space (Mainnet DB about 12GB)
+- 50GB Hard Drive Space (Current Mainnet DB about 30GB)
 
 ### Prerequisites Installation
 
@@ -69,20 +69,13 @@ Follow this guide to install the Aion Rust kernel on your system.
         sudo apt-get install libboost-all-dev -y
         ```
 
-5. Install ZMQ:
-
-    ```bash
-    sudo apt-get install libzmq3-dev -y
-    ```
-6. Install JAVA JDK: :new:
+5. Install JAVA JDK: :new:
     * [JDK 11](https://download.java.net/java/GA/jdk11/13/GPL/openjdk-11.0.1_linux-x64_bin.tar.gz) or higher.
 
-7. **This step is optional**. If you plan on modifying the _Protobuf_ message, you need to install [Google Protobuf](https://github.com/stepancheg/rust-protobuf). You will also need to make sure that `protoc` is added to your `PATH` once _Profobuf_ is installed.
-
-8. Install Apache Ant 10: :new:
+6. Install Apache Ant 10: :new:
     * [Apache Ant 10](http://ftp.tsukuba.wide.ad.jp/software/apache//ant/binaries/apache-ant-1.10.5-bin.tar.gz)
 
-9. Set Environment Variables: :new:
+7. Set Environment Variables: :new:
     ```bash
     export JAVA_HOME=<jdk_directory_location>
     export ANT_HOME=<apache_ant_directory>	
@@ -104,13 +97,13 @@ Once you have installed the prerequisites, follow these steps to build the kerne
 2. Build the kernel from source:
 
     ```bash
-    ./scripts/package.sh aionr-package
+    ./resources/package.sh aionr-package
     ```
 
     `aionr-package` is the name that will be given to the Rust package when it as finished building. You can set this to anything you want by changing the last argument in the script call:
 
     ```bash
-    ./scripts/package.sh example-package-name
+    ./resources/package.sh [example-package-name]
     ```
 
     The package takes about 10 minutes to finish building.
@@ -128,8 +121,10 @@ Once you have installed the prerequisites, follow these steps to build the kerne
 2. Run the `aion` package. Make sure to include any commands you want the kernel to execute. You can find more information on supplying commands in the [user manual](https://github.com/aionnetwork/aionr/wiki/User-Manual#launch-rust-kernel).
 Kernel will print **configuration path**, **genesis file path**, **db directory** and **keystore location** at the top of its log.
 
+**We provides quick launch scripts to connect to Mainnet, Mastery and custom network. Running the quick scripts will load the configuration and the genesis in each network folder. You can modify those files in each directory. See launch examples [Kernel Deployment Examples](https://github.com/aionnetwork/aionr/wiki/Kernel-Deployment-Examples)**
+
 ```bash
-$ ./aion
+$ ./mainnet.sh
 > Create config file /home/aion/.aion/config.toml, you can modify it if needed
 > 2019-01-23 09:12:40 Config path /home/aion/.aion/config.toml
 > 2019-01-23 09:12:40 Load built-in Mainnet Genesis Spec.
@@ -155,7 +150,6 @@ $ ./aion
 > 2019-01-23 09:12:46 ======================================================== Sync Statics =========================================================
 
 ```
-**We provides quick launch scripts to connect to Mainnet, Mastery and custom network. Running the quick scripts will load the configuration and the genesis in each network folder. You can modify those files in each directory. See launch examples [Kernel Deployment Examples](https://github.com/aionnetwork/aionr/wiki/Kernel-Deployment-Examples)**
 
 ### Connecting to JSON RPC Services
 
@@ -163,7 +157,7 @@ RPC services can be connected from the following addresses:
 
 - **HTTP**: Port `8545`
 - **WebSocket**: Port `8546`
-- **ICP**: `$Home/.aion/jsonrpc.ipc`
+- **IPC**: `$Home/.aion/jsonrpc.ipc`
 
 See the [user manual](https://github.com/aionnetwork/aionr/wiki/User-Manual) or [CMD & Config](https://github.com/aionnetwork/aionr/wiki/CMD-&-Config) wiki to find how to change RPC port settings.
 
