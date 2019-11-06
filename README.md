@@ -125,12 +125,7 @@ Kernel will print **configuration path**, **genesis file path**, **db directory*
 
 ```bash
 $ ./mainnet.sh
-> Create config file /home/aion/.aion/config.toml, you can modify it if needed
-> 2019-01-23 09:12:40 Config path /home/aion/.aion/config.toml
-> 2019-01-23 09:12:40 Load built-in Mainnet Genesis Spec.
-> 2019-01-23 09:12:40 Keys path /home/aion/.aion/keys/mainnet
-> 2019-01-23 09:12:40 DB path /home/aion/.aion/chains/mainnet/db/a98e36807c1b0211
-> 2019-01-23 09:12:40
+
 >   ____                 _   _ 
 >  / __ \       /\      | \ | |
 > | |  | |     /  \     |  \| |
@@ -139,15 +134,14 @@ $ ./mainnet.sh
 >  \____/   /_/    \_\  |_| \_|
 >
 >
-> 2019-01-23 09:12:40 Starting Aion(R)/v1.0.0.9946fa0/x86_64-linux-gnu/rustc-1.28.0
-> 2019-01-23 09:12:40 Configured for Mainnet using UnityEngine engine
-> 2019-01-23 09:12:41 Genesis hash: 30793b4ea012c6d3a58c85c5b049962669369807a98e36807c1b02116417f823
-> 2019-01-23 09:12:41 State DB configuration: archive
-> 2019-01-23 09:12:41 Wallet API is disabled.
-> 2019-01-23 09:12:41 local node loaded: 48859e8a-0717-4354-bd9e-447ed35f27ac@0.0.0.0:30303
-> 2019-01-23 09:12:46 Listening on: 0.0.0.0:30303
-> 2019-01-23 09:12:46 Local node fill back!
-> 2019-01-23 09:12:46 ======================================================== Sync Statics =========================================================
+> 2019-11-06 13:54:03        build: Aion(R)/v1.0.0.706f7dc/x86_64-linux-gnu/rustc-1.28.0
+> 2019-11-06 13:54:03  config path: /home/yzha/Works/kernel/aionr/package/oanr-v1.0.0.706f7dc-2019-11-05/mainnet/mainnet.toml
+> 2019-11-06 13:54:03 genesis path: /home/yzha/Works/kernel/aionr/package/oanr-v1.0.0.706f7dc-2019-11-05/mainnet/mainnet.json
+> 2019-11-06 13:54:03    keys path: /home/yzha/.aion/keys/mainnet
+> 2019-11-06 13:54:03      db path: /home/yzha/.aion/chains/mainnet/db/a98e36807c1b0211
+> 2019-11-06 13:54:03      binding: 0.0.0.0:30303
+> 2019-11-06 13:54:03      network: Mainnet
+> 2019-11-06 13:54:10      genesis: 30793b4ea012c6d3a58c85c5b049962669369807a98e36807c1b02116417f823
 
 ```
 
