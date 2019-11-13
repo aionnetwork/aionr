@@ -327,9 +327,6 @@ impl Sync {
     }
 
     pub fn shutdown(&self) {
-        // Shutdown p2p
-        &self.p2p.clear_callback();
-        &self.p2p.shutdown();
         info!(target:"sync", "sync shutdown start");
         // Shutdown runtime tasks
         let mut shutdown_hooks = self.shutdown_hooks.lock();
@@ -345,6 +342,9 @@ impl Sync {
                 }
             }
         }
+        // Shutdown p2p
+        &self.p2p.shutdown();
+        &self.p2p.clear_callback();
         info!(target:"sync", "sync shutdown finished");
     }
 

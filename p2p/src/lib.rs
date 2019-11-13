@@ -37,6 +37,7 @@ extern crate uuid;
 extern crate aion_version as version;
 extern crate bytes;
 extern crate byteorder;
+extern crate parking_lot;
 
 #[cfg(test)]
 mod test;
@@ -80,6 +81,7 @@ use state::STATE;
 use handler::handshake;
 use handler::active_nodes;
 use node::TempNode;
+use parking_lot::RwLock as RwLockP;
 
 pub use msg::ChannelBuffer;
 pub use node::Node;
@@ -106,7 +108,7 @@ pub struct Mgr {
     /// temp queue storing seeds and active nodes queried from other nodes
     temp: Arc<Mutex<VecDeque<TempNode>>>,
     /// nodes
-    nodes: Arc<RwLock<HashMap<u64, Node>>>,
+    nodes: Arc<RwLockP<HashMap<u64, RwLockP<Node>>>>,
     /// tokens rule
     tokens_rule: Arc<HashMap<u32, u32>>,
     /// nodes ID
@@ -153,7 +155,7 @@ impl Mgr {
             callback: Arc::new(RwLock::new(None)),
             config: Arc::new(config),
             temp: Arc::new(Mutex::new(temp_queue)),
-            nodes: Arc::new(RwLock::new(HashMap::new())),
+            nodes: Arc::new(RwLockP::new(HashMap::new())),
             tokens_rule: Arc::new(tokens_rule),
             nodes_id: Arc::new(Mutex::new(id_set)),
         }
@@ -166,6 +168,9 @@ impl Mgr {
     }
 
     pub fn clear_callback(&self) {
+        while Arc::strong_count(&self.callback) > 2 {
+            ::std::thread::sleep(Duration::from_secs(2));
+        }
         if let Ok(mut lock) = self.callback.write() {
             *lock = None;
         }
@@ -198,40 +203,56 @@ impl Mgr {
             cb.head.get_route()
         );
 
-        // TODO: need more thoughts on write or try_write
-        match nodes.write() {
-            Ok(mut lock) => {
-                let mut send_success = true;
-                if let Some(mut node) = lock.get_mut(&hash) {
-                    let mut tx = node.tx.clone();
-                    let route = cb.head.get_route();
-                    match tx.try_send(cb) {
-                        Ok(_) => {
-                            // add flag token
-                            node.tokens.insert(route);
-                            trace!(target: "p2p", "p2p/send: {}", node.addr.get_ip());
-                        }
-                        Err(err) => {
-                            send_success = false;
-                            trace!(target: "p2p", "p2p/send: ip:{} err:{}", node.addr.get_ip(), err);
-                        }
+        let tx_send;
+        let ip;
+        if let Some(node_lock) = nodes.read().get(&hash) {
+            let node = node_lock.read();
+            ip = node.addr.get_ip();
+            tx_send = Some(node.tx.clone());
+        } else {
+            warn!(target:"p2p", "send: node not found hash {}", hash);
+            return false;
+        }
+
+        if let Some(mut tx) = tx_send {
+            let mut send_success = false;
+            let route = cb.head.get_route();
+            match tx.try_send(cb) {
+                Ok(_) => {
+                    send_success = true;
+                    trace!(target: "p2p", "p2p/send: {}", ip);
+                }
+                Err(err) => {
+                    trace!(target: "p2p", "p2p/send: ip:{} err:{}", ip, err);
+                }
+            }
+
+            if !send_success {
+                let mut removed_node = None;
+                {
+                    let mut nodes_write = nodes.write();
+                    if let Some(node_lock) = nodes_write.remove(&hash) {
+                        let node = node_lock.read();
+                        trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
+                        removed_node = Some(node.clone());
                     }
+                }
+                if let Some(node) = removed_node {
+                    self.disconnect(hash, node.get_id_string());
+                }
+            } else {
+                if let Some(node_lock) = nodes.read().get(&hash) {
+                    let mut node = node_lock.write();
+                    node.tokens.insert(route);
                 } else {
                     warn!(target:"p2p", "send: node not found hash {}", hash);
                     return false;
                 }
-                if !send_success {
-                    if let Some(node) = lock.remove(&hash) {
-                        trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
-                        self.disconnect(hash, node.get_id_string());
-                    }
-                }
-                send_success
             }
-            Err(err) => {
-                warn!(target:"p2p", "send: nodes read {:?}", err);
-                false
-            }
+            send_success
+        } else {
+            warn!(target:"p2p", "unreachable!!");
+            false
         }
     }
 
@@ -255,27 +276,36 @@ impl Mgr {
                 Duration::from_secs(INTERVAL_TIMEOUT)
             ).for_each(move|_|{
                 let mut index: Vec<u64> = vec![];
-                if let Ok(mut write) = p2p_timeout.nodes.try_write(){
-                    for (hash, node) in write.iter_mut() {
+                {
+                    let nodes_read = p2p_timeout.nodes.read();
+                    for (hash, node_lock) in nodes_read.iter() {
+                        let node = node_lock.read();
                         if let Ok(interval) = node.update.elapsed() {
                             if interval.as_secs() >= TIMEOUT_MAX {
-                                index.push( * hash);
+                                index.push(*hash);
                             }
                         }
                     }
-
-                    for i in 0 .. index.len() {
-                        let hash = index[i];
-                        match write.remove(&hash) {
-                            Some(mut node) => {
-                                node.tx.close().unwrap();
-
-                                // dispatch node remove event
-                                p2p_timeout.disconnect(hash, node.get_id_string());
-                                debug!(target: "p2p", "timeout hash/id/ip {}/{}/{}", &node.get_hash(), &node.get_id_string(), &node.addr.to_string());
-                            },
-                            None => {}
+                }
+                if index.len() > 0 {
+                    let mut removed_nodes: HashMap<u64, String> = HashMap::new();
+                    {
+                        let mut nodes_write = p2p_timeout.nodes.write();
+                        for i in 0 .. index.len() {
+                            let hash = index[i];
+                            match nodes_write.remove(&hash) {
+                                Some(node_lock) => {
+                                    let mut node = node_lock.write();
+                                    node.tx.close().unwrap();
+                                    removed_nodes.insert(hash, node.get_id_string());
+                                    debug!(target: "p2p", "timeout hash/id/ip {}/{}/{}", &node.get_hash(), &node.get_id_string(), &node.addr.to_string());
+                                },
+                                None => {}
+                            }
                         }
+                    }
+                    for (hash, id_string) in removed_nodes {
+                        p2p_timeout.disconnect(hash, id_string);
                     }
                 }
                 Ok(())
@@ -329,18 +359,12 @@ impl Mgr {
                     // return if exist
                     let hash = temp_node.get_hash();
                     {
-                        match p2p_outbound_0.nodes.try_read() {
-                            Ok(read) => {
-                                // return at node existing
-                                if let Some(node) = read.get(&hash) {
-                                    debug!(target: "p2p", "exist hash/id/ip {}/{}/{}", &hash, node.get_id_string(), node.addr.to_string());
-                                    return Ok(());
-                                }
-                            },
-                            Err(_err) => {
-                                // return if read lock is unable to be rechieved
-                                return Ok(())
-                            }
+                        let nodes_read = p2p_outbound_0.nodes.read();
+                        // return at node existing
+                        if let Some(node_lock) = nodes_read.get(&hash) {
+                            let node = node_lock.read();
+                            debug!(target: "p2p", "exist hash/id/ip {}/{}/{}", &hash, node.get_id_string(), node.addr.to_string());
+                            return Ok(());
                         }
                     }
 
@@ -381,13 +405,19 @@ impl Mgr {
                                             tx_thread,
                                         );
 
-                                        if let Ok(mut write) = p2p_outbound_0.nodes.try_write() {
-                                            if !write.contains_key(&hash) {
-                                                let id = node.get_id_string();
-                                                let ip = node.addr.get_ip();
-                                                if let None = write.insert(hash.clone(), node) {
-                                                    debug!(target: "p2p", "outbound node added: {} {} {}", hash, id, ip);
-                                                }
+                                        let mut new_node = false;
+                                        {
+                                            let nodes_read = p2p_outbound_0.nodes.read();
+                                            if !nodes_read.contains_key(&hash) {
+                                                new_node = true;
+                                            }
+                                        }
+                                        if new_node {
+                                            let mut nodes_write = p2p_outbound_0.nodes.write();
+                                            let id = node.get_id_string();
+                                            let ip = node.addr.get_ip();
+                                            if let None = nodes_write.insert(hash.clone(), RwLockP::new(node)) {
+                                                debug!(target: "p2p", "outbound node added: {} {} {}", hash, id, ip);
                                             }
                                         }
                                     } else {
@@ -497,13 +527,19 @@ impl Mgr {
                     );
                     let hash = node.get_hash();
 
-                    if let Ok(mut write) = p2p_inbound.nodes.try_write() {
+                    let mut new_node = false;
+                    {
+                        let nodes_read = p2p_inbound.nodes.read();
+                        if !nodes_read.contains_key(&node.get_hash()) {
+                            new_node = true;
+                        }
+                    }
+                    if new_node {
+                        let mut nodes_write = p2p_inbound.nodes.write();
                         let id: String = node.get_id_string();
                         let binding: String = node.addr.to_string();
-                        if !write.contains_key(&node.get_hash()) {
-                            if let None = write.insert(node.get_hash(), node) {
-                                info!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
-                            }
+                        if let None = nodes_write.insert(node.get_hash(), RwLockP::new(node)) {
+                            info!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
                         }
                     }
 
@@ -571,28 +607,28 @@ impl Mgr {
         }
 
         // Disconnect nodes
-        if let Ok(mut lock) = self.nodes.write() {
-            for (_hash, mut node) in lock.iter_mut() {
-                match node.ts.shutdown(Shutdown::Both) {
-                    Ok(_) => {
-                        info!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
-                    }
-                    Err(err) => {
-                        info!(target: "p2p", "shutdown err: {:?}", err);
-                    }
+        let mut nodes_write = self.nodes.write();
+        for (_hash, node_lock) in nodes_write.iter_mut() {
+            let mut node = node_lock.write();
+            match node.ts.shutdown(Shutdown::Both) {
+                Ok(_) => {
+                    info!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
                 }
-
-                match node.shutdown_tcp_thread() {
-                    Ok(_) => {
-                        info!(target: "p2p", "tcp connection thread shutdown signal sent");
-                    }
-                    Err(err) => {
-                        info!(target: "p2p", "shutdown err: {:?}", err);
-                    }
+                Err(err) => {
+                    info!(target: "p2p", "shutdown err: {:?}", err);
                 }
             }
-            lock.clear();
+
+            match node.shutdown_tcp_thread() {
+                Ok(_) => {
+                    info!(target: "p2p", "tcp connection thread shutdown signal sent");
+                }
+                Err(err) => {
+                    info!(target: "p2p", "shutdown err: {:?}", err);
+                }
+            }
         }
+        nodes_write.clear();
 
         info!(target: "p2p" , "p2p shutdown finished");
     }
@@ -605,11 +641,11 @@ impl Mgr {
     /// get copy of active nodes as vec
     pub fn get_active_nodes(&self) -> Vec<Node> {
         let mut active_nodes: Vec<Node> = Vec::new();
-        if let Ok(read) = &self.nodes.read() {
-            for node in read.values() {
-                if node.state == STATE::ACTIVE {
-                    active_nodes.push(node.clone())
-                }
+        let nodes_read = &self.nodes.read();
+        for node_lock in nodes_read.values() {
+            let node = node_lock.read();
+            if node.state == STATE::ACTIVE {
+                active_nodes.push(node.clone())
             }
         }
         active_nodes
@@ -646,25 +682,24 @@ impl Mgr {
 
     /// get total nodes count
     pub fn get_statics_info(&self) -> (usize, HashMap<u64, (String, String, String, &str)>) {
-        let mut len = 0;
         let mut statics_info = HashMap::new();
-        if let Ok(read) = self.nodes.read() {
-            len = read.len();
-            for node in read.values() {
-                if node.state == STATE::ACTIVE {
-                    statics_info.insert(
-                        node.get_hash(),
-                        (
-                            node.addr.to_formatted_string(),
-                            format!("{}", String::from_utf8_lossy(&node.revision).trim()),
-                            format!("{}", node.connection),
-                            match node.if_seed {
-                                true => "y",
-                                _ => " ",
-                            },
-                        ),
-                    );
-                }
+        let nodes_read = self.nodes.read();
+        let len = nodes_read.len();
+        for node_lock in nodes_read.values() {
+            let node = node_lock.read();
+            if node.state == STATE::ACTIVE {
+                statics_info.insert(
+                    node.get_hash(),
+                    (
+                        node.addr.to_formatted_string(),
+                        format!("{}", String::from_utf8_lossy(&node.revision).trim()),
+                        format!("{}", node.connection),
+                        match node.if_seed {
+                            true => "y",
+                            _ => " ",
+                        },
+                    ),
+                );
             }
         }
         (len, statics_info)
@@ -673,11 +708,11 @@ impl Mgr {
     /// get total active nodes count
     pub fn get_active_nodes_len(&self) -> u32 {
         let mut len: u32 = 0;
-        if let Ok(read) = &self.nodes.try_read() {
-            for node in read.values() {
-                if node.state == STATE::ACTIVE {
-                    len += 1;
-                }
+        let read = &self.nodes.read();
+        for node_lock in read.values() {
+            let node = node_lock.read();
+            if node.state == STATE::ACTIVE {
+                len += 1;
             }
         }
         len
@@ -685,18 +720,11 @@ impl Mgr {
 
     /// get node by hash
     pub fn get_node(&self, hash: &u64) -> Option<Node> {
-        match &self.nodes.read() {
-            Ok(read) => {
-                match read.get(hash) {
-                    Some(node) => Some(node.clone()),
-                    None => {
-                        warn!(target: "p2p", "get_node: node not found: hash {}", hash);
-                        None
-                    }
-                }
-            }
-            Err(err) => {
-                warn!(target: "p2p", "get_node: {:?}", err);
+        let nodes_read = &self.nodes.read();
+        match nodes_read.get(hash) {
+            Some(node_lock) => Some(node_lock.read().clone()),
+            None => {
+                warn!(target: "p2p", "get_node: node not found: hash {}", hash);
                 None
             }
         }
@@ -705,12 +733,12 @@ impl Mgr {
     /// refresh node timestamp in order to keep target in loop
     /// otherwise, target will be timeout and removed
     pub fn update_node(&self, hash: &u64) {
-        if let Ok(mut nodes) = self.nodes.try_write() {
-            if let Some(mut node) = nodes.get_mut(hash) {
-                node.update();
-            } else {
-                warn!(target:"p2p", "node {} is timeout before update", hash)
-            }
+        let nodes_read = self.nodes.read();
+        if let Some(node_lock) = nodes_read.get(hash) {
+            let mut node = node_lock.write();
+            node.update();
+        } else {
+            warn!(target:"p2p", "node {} is timeout before update", hash)
         }
     }
 
@@ -730,15 +758,13 @@ impl Mgr {
         // verify if flag token has been set
         let mut pass = false;
         {
-            if let Ok(mut lock) = self.nodes.write() {
-                if let Some(mut node) = lock.get_mut(&hash) {
-                    let clear_token = cb.head.get_route();
-                    pass = self.token_check(clear_token, node);
-                } else {
-                    debug!(target: "p2p", "failed to get node with hash {}", hash);
-                }
+            let nodes_read = self.nodes.read();
+            if let Some(node_lock) = nodes_read.get(&hash) {
+                let mut node = node_lock.write();
+                let clear_token = cb.head.get_route();
+                pass = self.token_check(clear_token, &mut node);
             } else {
-                debug!(target: "p2p", "failed to get nodes when handling message");
+                debug!(target: "p2p", "failed to get node with hash {}", hash);
             }
         }
 
