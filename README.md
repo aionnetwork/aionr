@@ -22,7 +22,7 @@ Follow this guide to install the Aion Rust kernel on your system.
 - Ubuntu 16.04 or Ubuntu 18.04
 - 4GB RAM
 - 2 core CPU
-- 24GB Hard Drive Space (Mainnet DB about 12GB)
+- 50GB Hard Drive Space (Current Mainnet DB about 30GB)
 
 ### Prerequisites Installation
 
@@ -69,20 +69,13 @@ Follow this guide to install the Aion Rust kernel on your system.
         sudo apt-get install libboost-all-dev -y
         ```
 
-5. Install ZMQ:
-
-    ```bash
-    sudo apt-get install libzmq3-dev -y
-    ```
-6. Install JAVA JDK: :new:
+5. Install JAVA JDK: :new:
     * [JDK 11](https://download.java.net/java/GA/jdk11/13/GPL/openjdk-11.0.1_linux-x64_bin.tar.gz) or higher.
 
-7. **This step is optional**. If you plan on modifying the _Protobuf_ message, you need to install [Google Protobuf](https://github.com/stepancheg/rust-protobuf). You will also need to make sure that `protoc` is added to your `PATH` once _Profobuf_ is installed.
-
-8. Install Apache Ant 10: :new:
+6. Install Apache Ant 10: :new:
     * [Apache Ant 10](http://ftp.tsukuba.wide.ad.jp/software/apache//ant/binaries/apache-ant-1.10.5-bin.tar.gz)
 
-9. Set Environment Variables: :new:
+7. Set Environment Variables: :new:
     ```bash
     export JAVA_HOME=<jdk_directory_location>
     export ANT_HOME=<apache_ant_directory>	
@@ -104,13 +97,13 @@ Once you have installed the prerequisites, follow these steps to build the kerne
 2. Build the kernel from source:
 
     ```bash
-    ./scripts/package.sh aionr-package
+    ./resources/package.sh aionr-package
     ```
 
     `aionr-package` is the name that will be given to the Rust package when it as finished building. You can set this to anything you want by changing the last argument in the script call:
 
     ```bash
-    ./scripts/package.sh example-package-name
+    ./resources/package.sh [example-package-name]
     ```
 
     The package takes about 10 minutes to finish building.
@@ -128,14 +121,11 @@ Once you have installed the prerequisites, follow these steps to build the kerne
 2. Run the `aion` package. Make sure to include any commands you want the kernel to execute. You can find more information on supplying commands in the [user manual](https://github.com/aionnetwork/aionr/wiki/User-Manual#launch-rust-kernel).
 Kernel will print **configuration path**, **genesis file path**, **db directory** and **keystore location** at the top of its log.
 
+**We provides quick launch scripts to connect to Mainnet, Mastery and custom network. Running the quick scripts will load the configuration and the genesis in each network folder. You can modify those files in each directory. See launch examples [Kernel Deployment Examples](https://github.com/aionnetwork/aionr/wiki/Kernel-Deployment-Examples)**
+
 ```bash
-$ ./aion
-> Create config file /home/aion/.aion/config.toml, you can modify it if needed
-> 2019-01-23 09:12:40 Config path /home/aion/.aion/config.toml
-> 2019-01-23 09:12:40 Load built-in Mainnet Genesis Spec.
-> 2019-01-23 09:12:40 Keys path /home/aion/.aion/keys/mainnet
-> 2019-01-23 09:12:40 DB path /home/aion/.aion/chains/mainnet/db/a98e36807c1b0211
-> 2019-01-23 09:12:40
+$ ./mainnet.sh
+
 >   ____                 _   _ 
 >  / __ \       /\      | \ | |
 > | |  | |     /  \     |  \| |
@@ -144,18 +134,16 @@ $ ./aion
 >  \____/   /_/    \_\  |_| \_|
 >
 >
-> 2019-01-23 09:12:40 Starting Aion(R)/v1.0.0.9946fa0/x86_64-linux-gnu/rustc-1.28.0
-> 2019-01-23 09:12:40 Configured for Mainnet using UnityEngine engine
-> 2019-01-23 09:12:41 Genesis hash: 30793b4ea012c6d3a58c85c5b049962669369807a98e36807c1b02116417f823
-> 2019-01-23 09:12:41 State DB configuration: archive
-> 2019-01-23 09:12:41 Wallet API is disabled.
-> 2019-01-23 09:12:41 local node loaded: 48859e8a-0717-4354-bd9e-447ed35f27ac@0.0.0.0:30303
-> 2019-01-23 09:12:46 Listening on: 0.0.0.0:30303
-> 2019-01-23 09:12:46 Local node fill back!
-> 2019-01-23 09:12:46 ======================================================== Sync Statics =========================================================
+> 2019-11-06 13:54:03        build: Aion(R)/v1.0.0.706f7dc/x86_64-linux-gnu/rustc-1.28.0
+> 2019-11-06 13:54:03  config path: /home/yzha/Works/kernel/aionr/package/oanr-v1.0.0.706f7dc-2019-11-05/mainnet/mainnet.toml
+> 2019-11-06 13:54:03 genesis path: /home/yzha/Works/kernel/aionr/package/oanr-v1.0.0.706f7dc-2019-11-05/mainnet/mainnet.json
+> 2019-11-06 13:54:03    keys path: /home/yzha/.aion/keys/mainnet
+> 2019-11-06 13:54:03      db path: /home/yzha/.aion/chains/mainnet/db/a98e36807c1b0211
+> 2019-11-06 13:54:03      binding: 0.0.0.0:30303
+> 2019-11-06 13:54:03      network: Mainnet
+> 2019-11-06 13:54:10      genesis: 30793b4ea012c6d3a58c85c5b049962669369807a98e36807c1b02116417f823
 
 ```
-**We provides quick launch scripts to connect to Mainnet, Mastery and custom network. Running the quick scripts will load the configuration and the genesis in each network folder. You can modify those files in each directory. See launch examples [Kernel Deployment Examples](https://github.com/aionnetwork/aionr/wiki/Kernel-Deployment-Examples)**
 
 ### Connecting to JSON RPC Services
 
@@ -163,7 +151,7 @@ RPC services can be connected from the following addresses:
 
 - **HTTP**: Port `8545`
 - **WebSocket**: Port `8546`
-- **ICP**: `$Home/.aion/jsonrpc.ipc`
+- **IPC**: `$Home/.aion/jsonrpc.ipc`
 
 See the [user manual](https://github.com/aionnetwork/aionr/wiki/User-Manual) or [CMD & Config](https://github.com/aionnetwork/aionr/wiki/CMD-&-Config) wiki to find how to change RPC port settings.
 

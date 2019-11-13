@@ -128,48 +128,48 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
         return;
     }
 
-    if let Ok(mut write) = p2p.nodes.try_write() {
-        if let Some(mut node) = write.get_mut(&hash) {
-            debug!(target: "p2p", "inbound node state: connected -> active");
-            node.id.copy_from_slice(node_id);
-            trace!(target: "p2p", "ip:{:?} - {:?}", node.addr.ip, ip);
-            if ip == &[0u8; 8] {
-                node.real_addr.ip.copy_from_slice(&node.addr.ip);
-            } else {
-                node.real_addr.ip.copy_from_slice(ip);
-            }
-            let port = port.read_u32::<BigEndian>().unwrap_or(30303);
-            trace!(target: "p2p", "port:{} - {}", node.addr.port, port);
-            node.real_addr.port = port;
-            node.state = STATE::ACTIVE;
-            if let Ok(mut id_set) = p2p.nodes_id.lock() {
-                id_set.insert(node.get_id_string());
-            }
-            if revision_len > MAX_REVISION_LENGTH {
-                node.revision[0..MAX_REVISION_LENGTH]
-                    .copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
-            } else {
-                node.revision[0..revision_len].copy_from_slice(revision);
-            }
+    let nodes_read = p2p.nodes.read();
+    if let Some(node_lock) = nodes_read.get(&hash) {
+        let mut node = node_lock.write();
+        debug!(target: "p2p", "inbound node state: connected -> active");
+        node.id.copy_from_slice(node_id);
+        let addr_ip = node.addr.ip;
+        trace!(target: "p2p", "ip:{:?} - {:?}", addr_ip, ip);
+        if ip == &[0u8; 8] {
+            node.real_addr.ip.copy_from_slice(&addr_ip);
+        } else {
+            node.real_addr.ip.copy_from_slice(ip);
+        }
+        let port = port.read_u32::<BigEndian>().unwrap_or(30303);
+        trace!(target: "p2p", "port:{} - {}", node.addr.port, port);
+        node.real_addr.port = port;
+        node.state = STATE::ACTIVE;
+        if let Ok(mut id_set) = p2p.nodes_id.lock() {
+            id_set.insert(node.get_id_string());
+        }
+        if revision_len > MAX_REVISION_LENGTH {
+            node.revision[0..MAX_REVISION_LENGTH].copy_from_slice(&revision[..MAX_REVISION_LENGTH]);
+        } else {
+            node.revision[0..revision_len].copy_from_slice(revision);
+        }
 
-            let mut cb_out =
-                channel_buffer_template_with_version(cb_in.head.ver, Action::HANDSHAKERES.value());;
-            let mut res_body = Vec::new();
+        let mut cb_out =
+            channel_buffer_template_with_version(cb_in.head.ver, Action::HANDSHAKERES.value());;
+        let mut res_body = Vec::new();
 
-            res_body.push(1 as u8);
-            let mut revision = short_version();
-            revision.insert_str(0, REVISION_PREFIX);
-            res_body.push(revision.len() as u8);
-            res_body.put_slice(revision.as_bytes());
-            cb_out.body.put_slice(res_body.as_slice());
-            cb_out.head.len = cb_out.body.len() as u32;
+        res_body.push(1 as u8);
+        let mut revision = short_version();
+        revision.insert_str(0, REVISION_PREFIX);
+        res_body.push(revision.len() as u8);
+        res_body.put_slice(revision.as_bytes());
+        cb_out.body.put_slice(res_body.as_slice());
+        cb_out.head.len = cb_out.body.len() as u32;
 
-            let mut tx = node.tx.clone();
-            match tx.try_send(cb_out) {
-                Ok(_) => trace!(target: "p2p", "succeed sending handshake res"),
-                Err(err) => {
-                    error!(target: "p2p", "failed sending handshake res: {:?}", err);
-                }
+        let mut tx = node.tx.clone();
+        match tx.try_send(cb_out) {
+            Ok(_) => trace!(target: "p2p", "succeed sending handshake res"),
+            Err(err) => {
+                error!(target: "p2p", "failed sending handshake res: {:?}", err);
             }
         }
     }
@@ -196,19 +196,19 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
         return;
     }
 
-    if let Ok(mut write) = p2p.nodes.try_write() {
-        if let Some(mut node) = write.get_mut(&hash) {
-            if revision_len > MAX_REVISION_LENGTH {
-                node.revision[0..MAX_REVISION_LENGTH]
-                    .copy_from_slice(&revision_bytes[..MAX_REVISION_LENGTH]);
-            } else {
-                node.revision[0..revision_len].copy_from_slice(revision_bytes);
-            }
+    let nodes_read = p2p.nodes.read();
+    if let Some(node_lock) = nodes_read.get(&hash) {
+        let mut node = node_lock.write();
+        if revision_len > MAX_REVISION_LENGTH {
+            node.revision[0..MAX_REVISION_LENGTH]
+                .copy_from_slice(&revision_bytes[..MAX_REVISION_LENGTH]);
+        } else {
+            node.revision[0..revision_len].copy_from_slice(revision_bytes);
+        }
 
-            node.state = STATE::ACTIVE;
-            if let Ok(mut id_set) = p2p.nodes_id.lock() {
-                id_set.insert(node.get_id_string());
-            }
+        node.state = STATE::ACTIVE;
+        if let Ok(mut id_set) = p2p.nodes_id.lock() {
+            id_set.insert(node.get_id_string());
         }
     }
 }
