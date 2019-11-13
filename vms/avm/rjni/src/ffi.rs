@@ -118,7 +118,6 @@ pub type SetFieldFn = extern fn(env: *mut JNIEnv, obj: jobject, fieldID: jfieldI
 pub struct jvalue {
     pub data: u64,
 }
-
 impl jvalue {
     pub fn z(&self) -> jboolean { unsafe { mem::transmute(self.data as u8) } }
     pub fn b(&self) -> jbyte { unsafe { mem::transmute(self.data as u8) } }
@@ -128,7 +127,7 @@ impl jvalue {
     pub fn j(&self) -> jlong { unsafe { mem::transmute(self.data) } }
     pub fn f(&self) -> jfloat { unsafe { mem::transmute(self.data as u32) } }
     pub fn d(&self) -> jdouble { unsafe { mem::transmute(self.data) } }
-    pub fn l(&self) -> jobject { unsafe { mem::transmute(self.data) } }
+    pub fn l(&self) -> jobject { unsafe { mem::transmute(self.data as u32) } }
 }
 
 #[derive(Clone, Copy)]
@@ -729,6 +728,7 @@ extern {
         -> JNIError;
 }
 
-pub fn into_raw<T>(handler: i64) -> *mut T { unsafe { mem::transmute(handler) } }
+pub fn into_raw<T>(handler: i32) -> *mut T { unsafe { mem::transmute(handler) } }
 
-pub fn from_raw<T>(ptr: *mut T) -> i64 { unsafe { mem::transmute(ptr) } }
+
+pub fn from_raw<T>(ptr: *mut T) -> i32 { unsafe { mem::transmute(ptr) } }
