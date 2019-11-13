@@ -135,10 +135,10 @@ $ ./mainnet.sh
 >
 >
 > 2019-11-06 13:54:03        build: Aion(R)/v1.0.0.706f7dc/x86_64-linux-gnu/rustc-1.28.0
-> 2019-11-06 13:54:03  config path: /home/yzha/Works/kernel/aionr/package/oanr-v1.0.0.706f7dc-2019-11-05/mainnet/mainnet.toml
-> 2019-11-06 13:54:03 genesis path: /home/yzha/Works/kernel/aionr/package/oanr-v1.0.0.706f7dc-2019-11-05/mainnet/mainnet.json
-> 2019-11-06 13:54:03    keys path: /home/yzha/.aion/keys/mainnet
-> 2019-11-06 13:54:03      db path: /home/yzha/.aion/chains/mainnet/db/a98e36807c1b0211
+> 2019-11-06 13:54:03  config path: kernel_package_path/mainnet/mainnet.toml
+> 2019-11-06 13:54:03 genesis path: kernel_package_path/mainnet/mainnet.json
+> 2019-11-06 13:54:03    keys path: /home/username/.aion/keys/mainnet
+> 2019-11-06 13:54:03      db path: /home/username/.aion/chains/mainnet/db/a98e36807c1b0211
 > 2019-11-06 13:54:03      binding: 0.0.0.0:30303
 > 2019-11-06 13:54:03      network: Mainnet
 > 2019-11-06 13:54:10      genesis: 30793b4ea012c6d3a58c85c5b049962669369807a98e36807c1b02116417f823
