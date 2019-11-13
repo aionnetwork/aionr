@@ -15,14 +15,11 @@ The [Aion White Papers](https://aion.network/developers/#whitepapers) provides m
 
 ## Install the Kernel
 
-Follow this guide to install the Aion Rust kernel on your system.
+Follow this guide to install the Aion Rust kernel on your PI 4.
 
 ### System Requirements
 
-- Ubuntu 16.04 or Ubuntu 18.04
-- 4GB RAM
-- 2 core CPU
-- 50GB Hard Drive Space (Current Mainnet DB about 30GB)
+Raspberry pi 4B
 
 ### Prerequisites Installation
 
