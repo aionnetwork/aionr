@@ -133,9 +133,9 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
         }
     }
 
-    if let Ok(mut lock) = p2p.nodes.try_write() {
-        if let Some(node) = lock.get_mut(&hash) {
-            node.update();
-        }
+    let nodes_read = p2p.nodes.read();
+    if let Some(node_lock) = nodes_read.get(&hash) {
+        let mut node = node_lock.write();
+        node.update();
     }
 }
