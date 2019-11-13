@@ -166,6 +166,9 @@ impl Mgr {
     }
 
     pub fn clear_callback(&self) {
+        while Arc::strong_count(&self.callback) > 2 {
+            ::std::thread::sleep(Duration::from_secs(2));
+        }
         if let Ok(mut lock) = self.callback.write() {
             *lock = None;
         }
