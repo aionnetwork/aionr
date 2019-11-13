@@ -834,6 +834,7 @@ mod tests {
     use node::Node;
     use config::Config;
     use super::PROTOCAL_VERSION;
+    use parking_lot::RwLock as RwLockP;
 
     #[test]
     fn test_version() {
@@ -876,7 +877,7 @@ mod tests {
             let nodes_read = nodes_1.read();
             if let Some(node_lock) = nodes_read.get(&node_hash) {
                 let mut node = node_lock.write();
-                p2p.token_check(clear_token_0, node);
+                p2p.token_check(clear_token_0, &mut node);
                 assert_eq!(node.tokens.len(), 0);
             }
 
