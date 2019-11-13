@@ -26,7 +26,7 @@
 static_assert(sizeof(evm_hash) == 32, "evm_uint256be is too big");
 static_assert(sizeof(evm_address) == 32, "evm_address is too big");
 static_assert(sizeof(evm_word) == 16, "evm_address is too big");
-static_assert(sizeof(evm_result) == 64, "evm_result does not fit cache line");
+//static_assert(sizeof(evm_result) == 64, "evm_result does not fit cache line");
 static_assert(sizeof(evm_message) <= 20*8, "evm_message not optimally packed");
 static_assert(offsetof(evm_message, code_hash) % 8 == 0, "evm_message.code_hash not aligned");
 
