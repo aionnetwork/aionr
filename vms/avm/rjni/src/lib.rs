@@ -299,8 +299,8 @@ impl Classpath {
 pub struct JavaVM {
     // pub vm: *mut ffi::JavaVM,
     // pub env: *mut ffi::JNIEnv,
-    pub vm: i64,
-    pub env: i64,
+    pub vm: i32,
+    pub env: i32,
 }
 
 impl JavaVM {
@@ -402,7 +402,7 @@ impl JavaVM {
         let env: *mut ffi::JNIEnv = ffi::into_raw(self.env);
         unsafe {
             let src: *const i8 = mem::transmute(data.as_ptr());
-            ((**env).SetByteArrayRegion)(env, array.raw, 0, data.len() as i32, src);
+            ((**env).SetByteArrayRegion)(env, array.raw, 0, data.len() as i32, src as *const u8);
         }
 
         Ok(array)
@@ -414,7 +414,7 @@ impl JavaVM {
         let size = unsafe { ((**env).GetArrayLength)(env, array.raw) };
         let mut result = vec![0u8; size as usize];
         unsafe {
-            ((**env).GetByteArrayRegion)(env, array.raw, 0, size, result.as_mut_ptr() as *mut i8);
+            ((**env).GetByteArrayRegion)(env, array.raw, 0, size, result.as_mut_ptr() as *mut u8);
         };
 
         result
@@ -653,8 +653,8 @@ impl<'a> Class<'a> {
     }
 }
 
-impl<'a> Into<i64> for Class<'a> {
-    fn into(self) -> i64 { unsafe { mem::transmute(&self) } }
+impl<'a> Into<i32> for Class<'a> {
+    fn into(self) -> i32 { unsafe { mem::transmute(&self) } }
 }
 
 /// An object (an instance of a class), which can have methods called on it and
@@ -1004,7 +1004,7 @@ impl<'a> Value<'a> {
         // Depending on the type of the jvalue
         match kind {
             &Type::Boolean => Value::Boolean(value.z() == ffi::JNI_TRUE),
-            &Type::Byte => Value::Byte(value.b()),
+            &Type::Byte => Value::Byte(value.b() as i8),
             &Type::Char => Value::Char(unsafe { char::from_u32_unchecked(value.c() as u32) }),
             &Type::Short => Value::Short(value.s()),
             &Type::Int => Value::Int(value.i()),
