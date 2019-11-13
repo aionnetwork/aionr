@@ -834,6 +834,7 @@ mod tests {
     use node::Node;
     use config::Config;
     use super::PROTOCAL_VERSION;
+    use parking_lot::RwLock as RwLockP;
 
     #[test]
     fn test_version() {
@@ -869,16 +870,15 @@ mod tests {
             let node_hash = node.get_hash();
 
             let nodes_0 = p2p.nodes.clone();
-            if let Ok(mut lock) = nodes_0.write() {
-                lock.insert(node_hash.clone(), node);
-            }
+            let mut nodes_write = nodes_0.write();
+            nodes_write.insert(node_hash.clone(), RwLockP::new(node));
 
             let nodes_1 = p2p.nodes.clone();
-            if let Ok(mut lock) = nodes_1.write() {
-                if let Some(mut node) = lock.get_mut(&node_hash) {
-                    p2p.token_check(clear_token_0, node);
-                    assert_eq!(node.tokens.len(), 0);
-                }
+            let nodes_read = nodes_1.read();
+            if let Some(node_lock) = nodes_read.get(&node_hash) {
+                let mut node = node_lock.write();
+                p2p.token_check(clear_token_0, &mut node);
+                assert_eq!(node.tokens.len(), 0);
             }
 
             p2p.shutdown();
