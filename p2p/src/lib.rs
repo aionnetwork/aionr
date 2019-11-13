@@ -203,45 +203,57 @@ impl Mgr {
             cb.head.get_route()
         );
 
-        let mut send_success = true;
-        {
-            let nodes_read = nodes.read();
-            if let Some(node_lock) = nodes_read.get(&hash) {
-                let mut node = node_lock.write();
-                let mut tx = node.tx.clone();
-                let route = cb.head.get_route();
-                match tx.try_send(cb) {
-                    Ok(_) => {
-                        // add flag token
-                        node.tokens.insert(route);
-                        trace!(target: "p2p", "p2p/send: {}", node.addr.get_ip());
-                    }
-                    Err(err) => {
-                        send_success = false;
-                        trace!(target: "p2p", "p2p/send: ip:{} err:{}", node.addr.get_ip(), err);
-                    }
-                }
-            } else {
-                warn!(target:"p2p", "send: node not found hash {}", hash);
-                return false;
-            }
+        let tx_send;
+        let ip;
+        if let Some(node_lock) = nodes.read().get(&hash) {
+            let node = node_lock.read();
+            ip = node.addr.get_ip();
+            tx_send = Some(node.tx.clone());
+        } else {
+            warn!(target:"p2p", "send: node not found hash {}", hash);
+            return false;
         }
 
-        if !send_success {
-            let mut removed_node = None;
-            {
-                let mut nodes_write = nodes.write();
-                if let Some(node_lock) = nodes_write.remove(&hash) {
-                    let node = node_lock.read();
-                    trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
-                    removed_node = Some(node.clone());
+        if let Some(mut tx) = tx_send {
+            let mut send_success = false;
+            let route = cb.head.get_route();
+            match tx.try_send(cb) {
+                Ok(_) => {
+                    send_success = true;
+                    trace!(target: "p2p", "p2p/send: {}", ip);
+                }
+                Err(err) => {
+                    trace!(target: "p2p", "p2p/send: ip:{} err:{}", ip, err);
                 }
             }
-            if let Some(node) = removed_node {
-                self.disconnect(hash, node.get_id_string());
+
+            if !send_success {
+                let mut removed_node = None;
+                {
+                    let mut nodes_write = nodes.write();
+                    if let Some(node_lock) = nodes_write.remove(&hash) {
+                        let node = node_lock.read();
+                        trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
+                        removed_node = Some(node.clone());
+                    }
+                }
+                if let Some(node) = removed_node {
+                    self.disconnect(hash, node.get_id_string());
+                }
+            } else {
+                if let Some(node_lock) = nodes.read().get(&hash) {
+                    let mut node = node_lock.write();
+                    node.tokens.insert(route);
+                } else {
+                    warn!(target:"p2p", "send: node not found hash {}", hash);
+                    return false;
+                }
             }
+            send_success
+        } else {
+            warn!(target:"p2p", "unreachable!!");
+            false
         }
-        send_success
     }
 
     /// run p2p instance
