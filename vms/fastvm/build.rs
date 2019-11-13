@@ -41,7 +41,7 @@ fn main() {
         .stdout;
     let (_, plat_name) = plat_info.split_at("Distributor ID:	".len());
 
-    match b"Ubuntu" == &plat_name[0..6] {
+    /*match b"Ubuntu" == &plat_name[0..6] {
         false => panic!("Unsupported on Non-Ubuntu platform"),
         true => {
             let sys_version = Command::new("lsb_release")
@@ -55,7 +55,7 @@ fn main() {
                 _ => panic!("Unsupported version, needs 18.04/16.04"),
             }
         }
-    }
+    }*/
 
     // rebuild fastvm library
     let status = Command::new("make")
