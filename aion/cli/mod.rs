@@ -417,9 +417,14 @@ usage! {
             "Specify the block author (aka \"coinbase\") address for sending block rewards from sealed blocks. NOTE: MINING WILL NOT WORK WITHOUT THIS OPTION.",
 
             // TOREMOVE: Unity MS1 use only
-            ARG arg_staker_private_key: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.staker_private_key.clone(),
-            "--staker-private-key=[ADDRESS]",
-            "Specify the PoS block author's private key for sending block rewards from sealed blocks. NOTE: INTERNAL STAKING WILL NOT WORK WITHOUT THIS OPTION.",
+            ARG arg_staker_identity_address: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.staker_identity_address.clone(),
+            "--staker-identity-address=[ADDRESS]",
+            "Specify the staker's identity address. NOTE: INTERNAL STAKING WILL NOT WORK WITHOUT THIS OPTION.",
+
+            // TOREMOVE: Unity MS1 use only
+            ARG arg_staker_signing_key: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.staker_signing_key.clone(),
+            "--staker-signing-key=[ADDRESS]",
+            "Specify the private key of the staker's signing address to sign PoS blocks internally. NOTE: INTERNAL STAKING WILL NOT WORK WITHOUT THIS OPTION.",
 
             ARG arg_tx_gas_limit: (Option<String>) = None, or |c: &Config| c.mining.as_ref()?.tx_gas_limit.clone(),
             "--tx-gas-limit=[GAS]",
@@ -607,7 +612,8 @@ struct WalletApi {
 #[serde(deny_unknown_fields)]
 struct Mining {
     author: Option<String>,
-    staker_private_key: Option<String>,
+    staker_identity_address: Option<String>,
+    staker_signing_key: Option<String>,
     force_sealing: Option<bool>,
     reseal_min_period: Option<u64>,
     work_queue_size: Option<usize>,
@@ -909,7 +915,8 @@ mod tests {
             arg_blk_price_window: 20usize,
             flag_dynamic_gas_price: true,
             arg_local_max_gas_price: 100000000000u64,
-            arg_staker_private_key: Some("staker_private_key".into()),
+            arg_staker_identity_address: Some("staker_identity_address".into()),
+            arg_staker_signing_key: Some("staker_signing_key".into()),
 
             // -- Stratum Options
             flag_no_stratum: true,
@@ -1061,7 +1068,8 @@ mod tests {
                     dynamic_gas_price: None,
                     max_blk_traverse: None,
                     local_max_gas_price: None,
-                    staker_private_key: None
+                    staker_identity_address: None
+                    staker_signing_key: None
                 }),
                 db: Some(Database {
                     pruning: Some("fast".into()),

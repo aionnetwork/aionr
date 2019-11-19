@@ -127,8 +127,10 @@ pub struct MinerOptions {
     pub maximal_gas_price: U256,
     /// maximal gas price of a new local transaction to be accepted by the miner/transaction queue when using dynamic gas price
     pub local_max_gas_price: U256,
+    /// Staker identity address
+    pub staker_identity_address: Address,
     /// Staker private key
-    pub staker_private_key: Option<String>,
+    pub staker_signing_key: Option<String>,
 }
 
 impl Default for MinerOptions {
@@ -148,7 +150,8 @@ impl Default for MinerOptions {
             minimal_gas_price: 10_000_000_000u64.into(),
             maximal_gas_price: 9_000_000_000_000_000_000u64.into(),
             local_max_gas_price: 100_000_000_000u64.into(),
-            staker_private_key: None,
+            staker_identity_address: Address::default(),
+            staker_signing_key: None,
         }
     }
 }
@@ -320,7 +323,7 @@ impl Miner {
         }
 
         // Return if no internal staker
-        if self.staker.is_none() {
+        if self.options.staker_identity_address == Address::default() || self.staker.is_none() {
             return;
         }
 
@@ -332,7 +335,7 @@ impl Miner {
         let sk: [u8; 64] = staker.secret().0;
         let pk: [u8; 32] = staker.public().0;
         let coinbase: Address = client
-            .get_coinbase(staker.address())
+            .get_coinbase(self.options.staker_identity_address)
             .unwrap_or(Address::default());
 
         // 1. Get the stake. Stop proceeding if stake is 0.
@@ -524,7 +527,7 @@ impl Miner {
             TransactionPool::new(RwLock::new(transaction_queue));
 
         // TOREMOVE: Unity MS1 use only
-        let staker: Option<Ed25519KeyPair> = match options.staker_private_key.to_owned() {
+        let staker: Option<Ed25519KeyPair> = match options.staker_signing_key.to_owned() {
             Some(key) => parse_staker(key).ok(),
             None => None,
         };
@@ -1837,7 +1840,8 @@ mod tests {
                 minimal_gas_price: 0u64.into(),
                 maximal_gas_price: 9_000_000_000_000_000_000u64.into(),
                 local_max_gas_price: 100_000_000_000u64.into(),
-                staker_private_key: None,
+                staker_identity_address: Address::default(),
+                staker_signing_key: None,
             },
             &Spec::new_test(),
             None, // accounts provider
@@ -1864,7 +1868,8 @@ mod tests {
                 minimal_gas_price: 0u64.into(),
                 maximal_gas_price: 9_000_000_000_000_000_000u64.into(),
                 local_max_gas_price: 100_000_000_000u64.into(),
-                staker_private_key: None,
+                staker_identity_address: Address::default(),
+                staker_signing_key: None,
             },
             spec,
             None, // accounts provider
