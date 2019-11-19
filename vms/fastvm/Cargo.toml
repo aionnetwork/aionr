@@ -21,3 +21,6 @@ log = "0.3"
 rand = "0.4.3"
 rustc-hex = "2.0.1"
 rlp = { path = "../../util/rlp" }
+
+[build-dependencies]
+cmake = "0.1"
