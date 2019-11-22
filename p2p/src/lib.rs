@@ -298,7 +298,7 @@ impl Mgr {
                                     let mut node = node_lock.write();
                                     node.tx.close().unwrap();
                                     removed_nodes.insert(hash, node.get_id_string());
-                                    debug!(target: "p2p", "timeout hash/id/ip {}/{}/{}", &node.get_hash(), &node.get_id_string(), &node.addr.to_string());
+                                    debug!(target: "p2p", "timeout hash/id/ip {}/{}/{}", &node.hash, &node.get_id_string(), &node.addr.to_string());
                                 },
                                 None => {}
                             }
@@ -525,12 +525,12 @@ impl Mgr {
                         false,
                         tx_thread,
                     );
-                    let hash = node.get_hash();
+                    let hash = node.hash;
 
                     let mut new_node = false;
                     {
                         let nodes_read = p2p_inbound.nodes.read();
-                        if !nodes_read.contains_key(&node.get_hash()) {
+                        if !nodes_read.contains_key(&hash) {
                             new_node = true;
                         }
                     }
@@ -538,7 +538,7 @@ impl Mgr {
                         let mut nodes_write = p2p_inbound.nodes.write();
                         let id: String = node.get_id_string();
                         let binding: String = node.addr.to_string();
-                        if let None = nodes_write.insert(node.get_hash(), RwLockP::new(node)) {
+                        if let None = nodes_write.insert(hash.clone(), RwLockP::new(node)) {
                             info!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
                         }
                     }
@@ -657,7 +657,7 @@ impl Mgr {
         let len: usize = active.len();
         if len > 0 {
             let random = random::<usize>() % len;
-            Some(active[random].get_hash())
+            Some(active[random].hash)
         } else {
             None
         }
@@ -689,7 +689,7 @@ impl Mgr {
             let node = node_lock.read();
             if node.state == STATE::ACTIVE {
                 statics_info.insert(
-                    node.get_hash(),
+                    node.hash,
                     (
                         node.addr.to_formatted_string(),
                         format!("{}", String::from_utf8_lossy(&node.revision).trim()),
@@ -867,7 +867,7 @@ mod tests {
             );
             node.tokens.insert(flat_token_0);
 
-            let node_hash = node.get_hash();
+            let node_hash = node.hash;
 
             let nodes_0 = p2p.nodes.clone();
             let mut nodes_write = nodes_0.write();

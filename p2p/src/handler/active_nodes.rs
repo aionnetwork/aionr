@@ -39,7 +39,7 @@ pub fn send(p2p: Mgr) {
     let len: usize = active.len();
     if len > 0 {
         let random = random::<usize>() % len;
-        let hash = active[random].get_hash();
+        let hash = active[random].hash;
         debug!(target: "p2p", "active_nodes/send:  hash {}", &hash);
         p2p.send(
             hash,
