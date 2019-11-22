@@ -126,7 +126,8 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
             // TODO: complete if should add
             temp_list.push(temp);
         }
-        if let Ok(mut lock) = p2p.temp.try_lock() {
+        if !temp_list.is_empty() {
+            let mut lock = p2p.temp.lock();
             for t in temp_list.iter() {
                 lock.push_back(t.to_owned());
             }

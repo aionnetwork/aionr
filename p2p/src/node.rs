@@ -34,7 +34,7 @@ use tokio::net::TcpStream;
 use super::msg::*;
 use super::state::STATE;
 use futures::sync::oneshot::Sender;
-use std::sync::Mutex;
+use parking_lot::Mutex;
 
 const EMPTY_ID: &str = "00000000-0000-0000-0000-000000000000";
 
@@ -156,17 +156,14 @@ impl Node {
     pub fn is_active(&self) -> bool { self.state == STATE::ACTIVE }
 
     pub fn shutdown_tcp_thread(&self) -> Result<(), ()> {
-        if let Ok(mut tx_thread_vec) = self.tx_thread.lock() {
-            let mut result = Ok(());
-            while !tx_thread_vec.is_empty() {
-                if let Some(tx_thread) = tx_thread_vec.pop() {
-                    result = tx_thread.send(())
-                }
+        let mut tx_thread_vec = self.tx_thread.lock();
+        let mut result = Ok(());
+        while !tx_thread_vec.is_empty() {
+            if let Some(tx_thread) = tx_thread_vec.pop() {
+                result = tx_thread.send(())
             }
-            result
-        } else {
-            Ok(())
         }
+        result
     }
 }
 

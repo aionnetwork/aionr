@@ -94,7 +94,8 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     }
 
     let (node_id, req_body_rest) = cb_in.body.split_at(NODE_ID_LENGTH);
-    if let Ok(id_set) = p2p.nodes_id.lock() {
+    {
+        let id_set = p2p.nodes_id.lock();
         if id_set.contains(&String::from_utf8_lossy(&node_id).to_string()) {
             return;
         }
@@ -144,7 +145,8 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
         trace!(target: "p2p", "port:{} - {}", node.addr.port, port);
         node.real_addr.port = port;
         node.state = STATE::ACTIVE;
-        if let Ok(mut id_set) = p2p.nodes_id.lock() {
+        {
+            let mut id_set = p2p.nodes_id.lock();
             id_set.insert(node.get_id_string());
         }
         if revision_len > MAX_REVISION_LENGTH {
@@ -207,8 +209,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
         }
 
         node.state = STATE::ACTIVE;
-        if let Ok(mut id_set) = p2p.nodes_id.lock() {
-            id_set.insert(node.get_id_string());
-        }
+        let mut id_set = p2p.nodes_id.lock();
+        id_set.insert(node.get_id_string());
     }
 }
