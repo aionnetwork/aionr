@@ -171,9 +171,9 @@ impl Sync {
                     debug!(target: "sync", "download record cache size/capacity {}/{}", downloaded_blocks_size, downloaded_blocks_capacity);
                     debug!(target: "sync", "staged cache size/capacity {}/{}", staged_blocks_size, staged_blocks_capacity);
                     debug!(target: "sync", "lightning syncing height: {}", storage_statics.lightning_base());
-                    info!(target: "sync", "{:-^127}", "");
-                    info!(target: "sync", "                              td         bn          bh                    addr                 rev      conn  seed       mode");
-                    info!(target: "sync", "{:-^127}", "");
+                    info!(target: "sync", "{:-^130}", "");
+                    info!(target: "sync", "                                 td         bn          bh                    addr                 rev      conn  seed       mode");
+                    info!(target: "sync", "{:-^130}", "");
 
                     if active_len > 0 {
                         let mut nodes_info = HashMap::new();
@@ -195,7 +195,7 @@ impl Sync {
                             {
                                 if let Some((addr, revision, connection, seed)) = active_nodes.get(*hash) {
                                     info!(target: "sync",
-                                          "{:>32}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}{:>11}",
+                                          "{:>35}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}{:>11}",
                                           format!("{}", info.total_difficulty),
                                           format!("{}", info.best_block_number),
                                           format!("{}", info.best_block_hash),
@@ -209,7 +209,7 @@ impl Sync {
                             }
                     }
 
-                    info!(target: "sync", "{:-^127}", "");
+                    info!(target: "sync", "{:-^130}", "");
                 }
                 Ok(())
             })

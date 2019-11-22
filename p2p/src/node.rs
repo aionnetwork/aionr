@@ -237,7 +237,7 @@ impl IpAddr {
 
     pub fn to_formatted_string(&self) -> String {
         format!(
-            "{:>3}.{:>3}.{:>3}.{:>3}:{}",
+            "{:>3}.{:>3}.{:>3}.{:>3}:{:<5}",
             self.ip[1], self.ip[3], self.ip[5], self.ip[7], self.port
         )
         .to_string()
