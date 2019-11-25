@@ -608,7 +608,7 @@ impl Mgr {
             let mut node = node_lock.write();
             match node.ts.shutdown(Shutdown::Both) {
                 Ok(_) => {
-                    info!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
+                    info!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.addr.to_string());
                 }
                 Err(err) => {
                     info!(target: "p2p", "shutdown err: {:?}", err);
@@ -645,6 +645,19 @@ impl Mgr {
             }
         }
         active_nodes
+    }
+
+    /// get copy of active nodes hashes as vec
+    pub fn get_active_nodes_hashes(&self) -> Vec<u64> {
+        let mut active_nodes_hashes: Vec<u64> = Vec::new();
+        let nodes_read = &self.nodes.read();
+        for node_lock in nodes_read.values() {
+            let node = node_lock.read();
+            if node.state == STATE::ACTIVE {
+                active_nodes_hashes.push(node.hash);
+            }
+        }
+        active_nodes_hashes
     }
 
     /// get randome active node hash

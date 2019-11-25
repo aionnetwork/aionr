@@ -57,7 +57,7 @@ use sync::sync_provider::SyncStatus;
 pub use sync::sync_provider::SyncProvider;
 
 const INTERVAL_TRANSACTIONS_BROADCAST: u64 = 50;
-const INTERVAL_STATUS: u64 = 1000;
+const INTERVAL_STATUS: u64 = 5000;
 const INTERVAL_HEADERS: u64 = 100;
 const INTERVAL_BODIES: u64 = 100;
 const INTERVAL_IMPORT: u64 = 50;
@@ -227,7 +227,7 @@ impl Sync {
         executor.spawn(
             Interval::new(Instant::now(), Duration::from_millis(INTERVAL_STATUS))
                 .for_each(move |_| {
-                    status::send_random(p2p_status.clone(), node_info_status.clone());
+                    status::send_req(p2p_status.clone(), node_info_status.clone());
                     Ok(())
                 })
                 .map_err(|err| error!(target: "sync", "executor status: {:?}", err))
