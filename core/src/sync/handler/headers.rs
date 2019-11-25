@@ -47,7 +47,7 @@ const NORMAL_REQUEST_SIZE: u32 = 24;
 const LARGE_REQUEST_SIZE: u32 = 44;
 const LIGHTNING_REQUEST_SIZE: u32 = 40;
 const REQUEST_COOLDOWN: u64 = 5000;
-const BACKWARD_SYNC_STEP: u64 = NORMAL_REQUEST_SIZE as u64 * 6 - 1;
+const DISTANCE_FLAG: u64 = NORMAL_REQUEST_SIZE as u64 * 6 - 1;
 const FAR_OVERLAPPING_BLOCKS: u64 = 3;
 const CLOSE_OVERLAPPING_BLOCKS: u64 = 15;
 const JUMP_SIZE: u64 = 200;
@@ -107,12 +107,12 @@ fn prepare_send(
 
     match node_info.mode {
         Mode::Normal => {
-            if node_best_number >= local_best_number + BACKWARD_SYNC_STEP {
+            if node_best_number >= local_best_number + DISTANCE_FLAG {
                 if local_best_number > FAR_OVERLAPPING_BLOCKS {
                     from = local_best_number - FAR_OVERLAPPING_BLOCKS;
                 }
-            } else if local_best_number <= BACKWARD_SYNC_STEP
-                || node_best_number >= local_best_number - BACKWARD_SYNC_STEP
+            } else if local_best_number <= DISTANCE_FLAG
+                || node_best_number >= local_best_number - DISTANCE_FLAG
             {
                 if local_best_number > CLOSE_OVERLAPPING_BLOCKS {
                     from = local_best_number - CLOSE_OVERLAPPING_BLOCKS;
@@ -141,9 +141,10 @@ fn prepare_send(
             size = LIGHTNING_REQUEST_SIZE;
         }
         Mode::Backward => {
-            if sync_base_number > BACKWARD_SYNC_STEP {
-                from = sync_base_number - BACKWARD_SYNC_STEP;
+            if sync_base_number > LARGE_REQUEST_SIZE as u64 {
+                from = sync_base_number - LARGE_REQUEST_SIZE as u64;
             }
+            size = LARGE_REQUEST_SIZE;
         }
         Mode::Forward => {
             from = sync_base_number;
