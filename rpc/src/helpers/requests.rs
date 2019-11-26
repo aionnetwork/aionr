@@ -23,7 +23,7 @@
 use aion_types::{Address, U256, H256};
 use bytes::Bytes;
 
-use types::{Origin, TransactionCondition};
+use types::{TransactionCondition};
 
 /// Transaction request coming from RPC
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
@@ -131,17 +131,17 @@ pub struct CallRequest {
     /// Nonce
     pub nonce: Option<U256>,
 }
-
-/// Confirmation object
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct ConfirmationRequest {
-    /// Id of this confirmation
-    pub id: U256,
-    /// Payload to confirm
-    pub payload: ConfirmationPayload,
-    /// Request origin
-    pub origin: Origin,
-}
+//
+///// Confirmation object
+//#[derive(Debug, Clone, Eq, PartialEq, Hash)]
+//pub struct ConfirmationRequest {
+//    /// Id of this confirmation
+//    pub id: U256,
+//    /// Payload to confirm
+//    pub payload: ConfirmationPayload,
+//    /// Request origin
+//    pub origin: Origin,
+//}
 
 /// Payload to confirm in Trusted Signer
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]

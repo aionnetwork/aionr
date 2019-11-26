@@ -67,6 +67,8 @@ pub struct Transaction {
     pub condition: Option<TransactionCondition>,
     /// Timestamp
     pub timestamp: Bytes,
+    /// beacon
+    pub beacon: Option<H256>,
 }
 
 impl Serialize for Transaction {
@@ -109,6 +111,9 @@ impl Serialize for Transaction {
             "timestamp",
             &U256::from_big_endian(self.timestamp.0.as_slice()).low_u64(),
         )?;
+        if let Some(beacon) = &self.beacon {
+            transaction.serialize_field("beacon", beacon)?;
+        }
         transaction.end()
     }
 }
@@ -168,6 +173,7 @@ impl Transaction {
             sig: Bytes::new(signature.to_vec()),
             condition: None,
             timestamp: Bytes::new(u64_to_bytes(timestamp)),
+            beacon: t.beacon.clone(),
         }
     }
 
@@ -200,6 +206,7 @@ impl Transaction {
             sig: Bytes::new(signature.clone().to_vec()),
             condition: None,
             timestamp: Bytes::new(t.timestamp().clone()),
+            beacon: t.beacon,
         }
     }
 
