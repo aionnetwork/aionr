@@ -49,7 +49,6 @@ extern crate key;
 extern crate solidity;
 extern crate aion_version as version;
 extern crate rlp;
-extern crate stats;
 
 extern crate tiny_keccak;
 

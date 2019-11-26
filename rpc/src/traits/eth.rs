@@ -25,10 +25,10 @@ use std::collections::HashMap;
 
 use jsonrpc_core::{Result, BoxFuture};
 use jsonrpc_macros::Trailing;
-use aion_types::{H64, H256, U256, U128, H128, Address};
+use aion_types::{H256, U256, U128, H128, Address};
 
 use types::{Block, BlockNumber, Bytes, CallRequest, Filter, FilterChanges, Index};
-use types::{Log, Receipt, SyncStatus, Transaction, Work, Contract};
+use types::{Log, Receipt, SyncStatus, Transaction, Contract};
 
 build_rpc_trait! {
     /// Eth rpc interface.
@@ -135,32 +135,14 @@ build_rpc_trait! {
         #[rpc(name = "eth_getCompilers")]
         fn compilers(&self) -> Result<Vec<String>>;
 
-        /// Compiles lll code.
-        /// @deprecated
-        #[rpc(name = "eth_compileLLL")]
-        fn compile_lll(&self, String) -> Result<Bytes>;
-
         /// Compiles solidity.
         /// @deprecated
         #[rpc(name = "eth_compileSolidity")]
         fn compile_solidity(&self, String) -> Result<HashMap<String, Contract>>;
 
-        /// Compiles serpent.
-        /// @deprecated
-        #[rpc(name = "eth_compileSerpent")]
-        fn compile_serpent(&self, String) -> Result<Bytes>;
-
         /// Returns logs matching given filter object.
         #[rpc(name = "eth_getLogs")]
         fn logs(&self, Filter) -> BoxFuture<Vec<Log>>;
-
-        /// Returns the hash of the current block, the seedHash, and the boundary condition to be met.
-        #[rpc(name = "eth_getWork")]
-        fn work(&self, Trailing<u64>) -> Result<Work>;
-
-        /// Used for submitting a proof-of-work solution.
-        #[rpc(name = "eth_submitWork")]
-        fn submit_work(&self, H64, H256, Bytes) -> Result<bool>;
 
         /// Used for submitting mining hashrate.
         #[rpc(name = "eth_submitHashrate")]

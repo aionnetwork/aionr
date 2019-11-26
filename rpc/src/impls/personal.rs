@@ -196,18 +196,4 @@ impl<D: Dispatcher + 'static> Personal for PersonalClient<D> {
             },
         ))
     }
-
-    fn sign_and_send_transaction(
-        &self,
-        request: TransactionRequest,
-        password: String,
-    ) -> BoxFuture<H256>
-    {
-        warn!(
-            target:"personal",
-            "Using deprecated personal_signAndSendTransaction, use personal_sendTransaction \
-             instead."
-        );
-        self.send_transaction(request, password)
-    }
 }

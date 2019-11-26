@@ -237,7 +237,7 @@ mod tests {
     fn test_serialize_block_transactions() {
         let t = BlockTransactions::Full(vec![Transaction::default()]);
         let serialized = serde_json::to_string(&t).unwrap();
-        assert_eq!(serialized, r#"[{"hash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":0,"blockHash":null,"blockNumber":null,"transactionIndex":null,"to":null,"from":"0x0000000000000000000000000000000000000000000000000000000000000000","value":"0x0","gasPrice":"0x0","gas":0,"nrgPrice":"0x0","nrg":0,"input":"0x","contractAddress":null,"timestamp":0}]"#);
+        assert_eq!(serialized, r#"[{"hash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":0,"blockHash":null,"blockNumber":null,"transactionIndex":null,"to":null,"from":"0x0000000000000000000000000000000000000000000000000000000000000000","value":"0x0","gasPrice":"0x0","gas":0,"nrgPrice":"0x0","nrg":0,"input":"0x","contractAddress":null,"timestamp":0,"beacon":null}]"#);
 
         let t = BlockTransactions::Hashes(vec![H256::default().into()]);
         let serialized = serde_json::to_string(&t).unwrap();

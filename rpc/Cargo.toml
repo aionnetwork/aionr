@@ -36,7 +36,6 @@ ethbloom = { path = "../util/ethbloom"}
 key = { path = "../keystore/key" }
 aion-version = { path = "../util/version" }
 rlp = { path = "../util/rlp" }
-stats = { path = "../util/stats" }
 solidity = { path = "../vms/solidity" }
 
 [dev-dependencies]

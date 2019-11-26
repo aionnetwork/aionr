@@ -28,7 +28,6 @@ use std::collections::{HashMap, LinkedList};
 use rustc_hex::FromHex;
 use rustc_hex::ToHex;
 
-use jsonrpc_macros::Trailing;
 use aion_types::{H256, H512, U256};
 use acore::block::IsBlock;
 use acore::sync::SyncProvider;
@@ -42,7 +41,7 @@ use helpers::errors;
 use helpers::accounts::unwrap_provider;
 use traits::Stratum;
 use types::{
-    Work, Info, AddressValidation, MiningInfo, MinerStats, TemplateParam, Bytes, StratumHeader,
+    Work, Info, AddressValidation, MiningInfo, MinerStats, Bytes, StratumHeader,
     SimpleHeader, BlockNumber
 };
 use aion_types::clean_0x;
@@ -121,7 +120,7 @@ where
     M: MinerService + 'static,
 {
     /// Returns the work of current block
-    fn work(&self, _tpl_param: Trailing<TemplateParam>) -> Result<Work> {
+    fn work(&self) -> Result<Work> {
         // check if we're still syncing and return empty strings in that case
         self.check_syncing()?;
 

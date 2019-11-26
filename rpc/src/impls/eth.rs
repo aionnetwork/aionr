@@ -28,7 +28,7 @@ use std::thread;
 use std::time;
 
 use rlp::UntrustedRlp;
-use aion_types::{H64, H128, U128, H256, U256, Address};
+use aion_types::{H128, U128, H256, U256, Address};
 use serde_json::{self, Value};
 use serde_json::map::Map;
 use dispatch::DynamicGasPrice;
@@ -55,8 +55,7 @@ use helpers::accounts::unwrap_provider;
 use traits::Eth;
 use types::{
     Block, BlockTransactions, BlockNumber, Bytes, SyncStatus, Transaction, CallRequest, Index,
-Filter, Log, Receipt, Work, Contract, ContractInfo, Abi, AbiIO , SyncInfo, /*AcitvePeerInfo, PbSyncInfo,
-                                                                           SimpleReceipt, SimpleReceiptLog,*/
+Filter, Log, Receipt, Contract, ContractInfo, Abi, AbiIO , SyncInfo,
 };
 
 // const EXTRA_INFO_PROOF: &'static str = "Object exists in in blockchain (fetched earlier), extra_info is always available if object exists; qed";
@@ -463,18 +462,6 @@ where
         Box::new(future::ok(logs))
     }
 
-    fn work(&self, _no_new_work_timeout: Trailing<u64>) -> Result<Work> {
-        Err(errors::deprecated(
-            "eth_getWork is deprecated, use stratum api getblocktemplate instead".to_string(),
-        ))
-    }
-
-    fn submit_work(&self, _nonce: H64, _pow_hash: H256, _solution: Bytes) -> Result<bool> {
-        Err(errors::deprecated(
-            "eth_submitWork is deprecated, use stratum api submitblock instead".to_string(),
-        ))
-    }
-
     fn submit_hashrate(&self, rate: U256, id: H256) -> Result<bool> {
         self.external_miner.submit_hashrate(rate, id);
         Ok(true)
@@ -516,18 +503,6 @@ where
             self.client
                 .estimate_gas(&signed, num.unwrap_or_default().into())
                 .map_err(errors::call),
-        ))
-    }
-
-    fn compile_lll(&self, _: String) -> Result<Bytes> {
-        Err(errors::deprecated(
-            "Compilation of LLL via RPC is deprecated".to_string(),
-        ))
-    }
-
-    fn compile_serpent(&self, _: String) -> Result<Bytes> {
-        Err(errors::deprecated(
-            "Compilation of Serpent via RPC is deprecated".to_string(),
         ))
     }
 

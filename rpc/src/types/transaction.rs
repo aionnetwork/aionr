@@ -67,6 +67,8 @@ pub struct Transaction {
     pub condition: Option<TransactionCondition>,
     /// Timestamp
     pub timestamp: Bytes,
+    /// beacon
+    pub beacon: Option<H256>,
 }
 
 impl Serialize for Transaction {
@@ -77,7 +79,7 @@ impl Serialize for Transaction {
     where
         S: Serializer,
     {
-        let mut transaction = serializer.serialize_struct("Transaction", 15)?;
+        let mut transaction = serializer.serialize_struct("Transaction", 16)?;
         transaction.serialize_field("hash", &self.hash)?;
         transaction.serialize_field("nonce", &(self.nonce.low_u64()))?;
         transaction.serialize_field("blockHash", &self.block_hash)?;
@@ -109,6 +111,11 @@ impl Serialize for Transaction {
             "timestamp",
             &U256::from_big_endian(self.timestamp.0.as_slice()).low_u64(),
         )?;
+        if let Some(beacon) = &self.beacon {
+            transaction.serialize_field("beacon", beacon)?;
+        } else {
+            transaction.serialize_field("beacon", &None::<H256>)?;
+        }
         transaction.end()
     }
 }
@@ -168,6 +175,7 @@ impl Transaction {
             sig: Bytes::new(signature.to_vec()),
             condition: None,
             timestamp: Bytes::new(u64_to_bytes(timestamp)),
+            beacon: t.beacon.clone(),
         }
     }
 
@@ -200,6 +208,7 @@ impl Transaction {
             sig: Bytes::new(signature.clone().to_vec()),
             condition: None,
             timestamp: Bytes::new(t.timestamp().clone()),
+            beacon: t.beacon,
         }
     }
 
@@ -220,7 +229,7 @@ mod tests {
     fn test_transaction_serialize() {
         let t = Transaction::default();
         let serialized = serde_json::to_string(&t).unwrap();
-        assert_eq!(serialized, r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":0,"blockHash":null,"blockNumber":null,"transactionIndex":null,"to":null,"from":"0x0000000000000000000000000000000000000000000000000000000000000000","value":"0x0","gasPrice":"0x0","gas":0,"nrgPrice":"0x0","nrg":0,"input":"0x","contractAddress":null,"timestamp":0}"#);
+        assert_eq!(serialized, r#"{"hash":"0x0000000000000000000000000000000000000000000000000000000000000000","nonce":0,"blockHash":null,"blockNumber":null,"transactionIndex":null,"to":null,"from":"0x0000000000000000000000000000000000000000000000000000000000000000","value":"0x0","gasPrice":"0x0","gas":0,"nrgPrice":"0x0","nrg":0,"input":"0x","contractAddress":null,"timestamp":0,"beacon":null}"#);
     }
 
     #[test]

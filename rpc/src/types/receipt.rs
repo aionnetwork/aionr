@@ -27,21 +27,8 @@ use aion_types::{H256, U256, Address};
 use ethbloom::Bloom;
 
 use types::{Log, Bytes};
-
-#[derive(Debug, Clone)]
-pub struct SimpleReceiptLog {
-    pub address: Address,
-    pub topics: Vec<H256>,
-    pub data: Bytes,
-}
-
-#[derive(Debug, Clone)]
-pub struct SimpleReceipt {
-    pub logs: Vec<SimpleReceiptLog>,
-}
-
 #[derive(Debug, Serialize, PartialEq, Eq, Hash, Clone)]
-pub struct ReceiptLog {
+struct ReceiptLog {
     /// H256
     pub address: H256,
     /// Topics

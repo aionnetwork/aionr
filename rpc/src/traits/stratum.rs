@@ -22,16 +22,15 @@
 //! Stratum rpc interface.
 use jsonrpc_core::Result;
 use aion_types::{H256, H512, U256};
-use jsonrpc_macros::Trailing;
 
-use types::{Work, AddressValidation, Info, MiningInfo, MinerStats, TemplateParam, StratumHeader, BlockNumber};
+use types::{Work, AddressValidation, Info, MiningInfo, MinerStats, StratumHeader, BlockNumber};
 
 build_rpc_trait! {
     /// Stratum rpc interface.
     pub trait Stratum {
         /// Returns the work of current block
         #[rpc(name = "getblocktemplate")]
-        fn work(&self, Trailing<TemplateParam>) -> Result<Work>;
+        fn work(&self) -> Result<Work>;
 
         /// Submit a proof-of-work solution
         #[rpc(name = "submitblock")]

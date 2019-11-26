@@ -68,10 +68,5 @@ build_rpc_trait! {
         /// Sends transaction and signs it in single call. The account is not unlocked in such case.
         #[rpc(name = "personal_sendTransaction")]
         fn send_transaction(&self, TransactionRequest, String) -> BoxFuture<H256>;
-
-        /// @deprecated alias for `personal_sendTransaction`.
-        #[rpc(name = "personal_signAndSendTransaction")]
-        fn sign_and_send_transaction(&self, TransactionRequest, String) -> BoxFuture<H256>;
-
     }
 }

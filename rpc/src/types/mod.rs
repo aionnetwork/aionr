@@ -23,7 +23,6 @@
 //! RPC types
 
 mod stratum_header;
-mod template_param;
 mod block;
 mod block_number;
 mod bytes;
@@ -31,14 +30,10 @@ mod call_request;
 mod confirmations;
 mod contract;
 mod filter;
-mod histogram;
 mod index;
 mod log;
-mod node_kind;
 mod provenance;
 mod receipt;
-mod rpc_settings;
-mod secretstore;
 mod sync;
 mod transaction;
 mod transaction_request;
@@ -48,23 +43,17 @@ mod mining;
 pub use self::bytes::Bytes;
 pub use self::block::{Block, BlockTransactions, Header};
 pub use self::block_number::BlockNumber;
-pub use self::template_param::TemplateParam;
 pub use self::stratum_header::{SimpleHeader, StratumHeader};
 pub use self::call_request::CallRequest;
 pub use self::confirmations::{
-    ConfirmationPayload, ConfirmationRequest, ConfirmationResponse, ConfirmationResponseWithToken,
-    TransactionModification, SignRequest, DecryptRequest,
+    ConfirmationPayload, ConfirmationResponse, SignRequest,
 };
 pub use self::contract::{Contract, ContractInfo, Abi, AbiIO};
 pub use self::filter::{Filter, FilterChanges};
-pub use self::histogram::Histogram;
 pub use self::index::Index;
 pub use self::log::Log;
-pub use self::node_kind::{NodeKind, Availability, Capability};
 pub use self::provenance::Origin;
-pub use self::receipt::{Receipt, SimpleReceipt, SimpleReceiptLog};
-pub use self::rpc_settings::RpcSettings;
-pub use self::secretstore::EncryptedDocumentKey;
+pub use self::receipt::{Receipt};
 pub use self::sync::{
 SyncStatus, SyncInfo, /* Peers, PeerInfo, PeerNetworkInfo, TransactionStats, ChainStatus,
                       AcitvePeerInfo, PbSyncInfo,*/

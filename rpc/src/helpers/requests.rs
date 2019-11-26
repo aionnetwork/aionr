@@ -23,7 +23,7 @@
 use aion_types::{Address, U256, H256};
 use bytes::Bytes;
 
-use types::{Origin, TransactionCondition};
+use types::{TransactionCondition};
 
 /// Transaction request coming from RPC
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
@@ -48,27 +48,6 @@ pub struct TransactionRequest {
     pub condition: Option<TransactionCondition>,
     /// Beacon hash
     pub beacon: Option<H256>,
-}
-
-/// Transaction request coming from RPC in decimal
-#[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]
-pub struct DecimalTransactionRequest {
-    /// Sender
-    pub from: Option<Address>,
-    /// Recipient
-    pub to: Option<Address>,
-    /// Gas Price
-    pub gas_price: Option<u64>,
-    /// Gas
-    pub gas: Option<u64>,
-    /// Value of transaction in wei
-    pub value: Option<u64>,
-    /// Additional data sent with transaction
-    pub data: Option<Bytes>,
-    /// Transaction's nonce
-    pub nonce: Option<U256>,
-    /// Delay until this condition is met.
-    pub condition: Option<TransactionCondition>,
 }
 
 /// Transaction request coming from RPC with default values filled in.
@@ -132,17 +111,6 @@ pub struct CallRequest {
     pub nonce: Option<U256>,
 }
 
-/// Confirmation object
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub struct ConfirmationRequest {
-    /// Id of this confirmation
-    pub id: U256,
-    /// Payload to confirm
-    pub payload: ConfirmationPayload,
-    /// Request origin
-    pub origin: Origin,
-}
-
 /// Payload to confirm in Trusted Signer
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
 pub enum ConfirmationPayload {
@@ -152,8 +120,6 @@ pub enum ConfirmationPayload {
     SignTransaction(FilledTransactionRequest),
     /// Sign a message with an Ethereum specific security prefix.
     EthSignMessage(Address, Bytes),
-    //// Decrypt request
-    // Decrypt(Address, Bytes),
 }
 
 impl ConfirmationPayload {
