@@ -844,11 +844,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             for address in &substate.suicides {
                 self.state.kill_account(address);
             }
-            let gas_left = match result.status_code {
-                ExecStatus::Success | ExecStatus::Revert => result.gas_left,
-                _ => 0.into(),
-            };
-            let gas_used = t.gas - gas_left;
+
+            let gas_used = t.gas - result.gas_left;
 
             //TODO: check whether avm has already refunded
             //let refund_value = gas_left * t.gas_price;
@@ -871,7 +868,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     exception: result.exception,
                     gas: t.gas,
                     gas_used: gas_used,
-                    refunded: gas_left,
+                    refunded: result.gas_left,
                     cumulative_gas_used: self.info.gas_used + gas_used,
                     logs: substate.logs,
                     contracts_created: substate.contracts_created,
