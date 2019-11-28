@@ -380,7 +380,7 @@ impl<K: Kind> VerificationQueue<K> {
                     let mut verifying = verification.verifying.lock();
                     let mut idx = None;
                     for (i, e) in verifying.iter_mut().enumerate() {
-                        if e.hash == hash {
+                        if e.hash == hash && e.output.is_none() {
                             idx = Some(i);
 
                             verification.sizes.verifying.fetch_add(
