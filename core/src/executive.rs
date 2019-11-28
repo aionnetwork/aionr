@@ -923,7 +923,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             self.state
                 .export_kvdb()
                 .write(batch)
-                .expect("GRAPH DB write failed");
+                .expect("EXTRA DB write failed");
         }
 
         return final_results;
