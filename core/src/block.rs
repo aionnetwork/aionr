@@ -369,13 +369,13 @@ impl<'x> OpenBlock<'x> {
                         .header
                         .add_transaction_fee(&outcome.receipt.transaction_fee);
                     self.block.receipts.push(outcome.receipt.clone());
-                    idx += 1;
                     Ok(outcome.receipt)
                 }
                 Err(x) => Err(From::from(x)),
             };
 
             receipts_results.push(result);
+            idx += 1;
         }
 
         receipts_results

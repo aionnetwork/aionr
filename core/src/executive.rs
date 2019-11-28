@@ -859,7 +859,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 touched.insert(account);
             }
 
-            if total_gas_used + self.info.gas_used > self.info.gas_limit {
+            if gas_used + total_gas_used + self.info.gas_used > self.info.gas_limit {
                 final_results.push(Err(ExecutionError::BlockGasLimitReached {
                     gas_limit: self.info.gas_limit,
                     gas_used: self.info.gas_used + total_gas_used,

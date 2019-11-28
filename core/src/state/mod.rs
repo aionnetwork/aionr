@@ -42,7 +42,7 @@ use pod_account::*;
 use pod_state::{self, PodState};
 use receipt::Receipt;
 use db::StateDB;
-use transaction::SignedTransaction;
+use transaction::{SignedTransaction, Action};
 use types::state::state_diff::StateDiff;
 use vms::EnvInfo;
 use vms::AvmStatusCode;
@@ -702,13 +702,39 @@ impl<B: Backend> State<B> {
                 // If importing external block, accept it but do not commit state
                 else {
                     let state_root = self.root().clone();
+                    let gas_used = match x {
+                        ExecutionError::InvalidNonce {
+                            expected: _,
+                            got: _,
+                        }
+                        | ExecutionError::NotEnoughCash {
+                            required: _,
+                            got: _,
+                        } => t.gas,
+                        ExecutionError::BlockGasLimitReached {
+                            gas_used: _,
+                            gas_limit: _,
+                            gas: _,
+                        } => {
+                            if let Action::Call(address) = t.action {
+                                match self.code(&address) {
+                                    Ok(Some(_)) => U256::from(0u64),
+                                    _ => t.gas,
+                                }
+                            } else {
+                                U256::from(0u64)
+                            }
+                        }
+                        _ => U256::from(0u64),
+                    };
+
                     let receipt = Receipt::new(
                         state_root,
-                        U256::from(0u64),
-                        U256::from(0u64),
+                        gas_used,
+                        gas_used * t.gas_price,
                         vec![],
                         vec![],
-                        String::default(),
+                        x.to_string(),
                     );
                     trace!(target: "state", "Transaction receipt: {:?}", receipt);
                     Ok(ApplyOutcome {
@@ -730,9 +756,6 @@ impl<B: Backend> State<B> {
         // Only avm transactions will go here
         let exec_results =
             self.execute_bulk(env_info, machine, txs, false, false, is_building_block);
-        if !exec_results.is_empty() && !exec_results[0].is_ok() {
-            return vec![Err(From::from(exec_results[0].clone().unwrap_err()))];
-        }
 
         let mut receipts = Vec::new();
         let mut index = 0;
@@ -747,7 +770,7 @@ impl<B: Backend> State<B> {
                         )))
                     } else {
                         if e.exception == AvmStatusCode::Rejected.to_string() {
-                            println!("AAA");
+                            println!("rejected avm transaction: {:?}", txs[index].hash());
                         }
                         let state_root = e.state_root.clone();
                         let receipt = Receipt::new(
@@ -777,7 +800,7 @@ impl<B: Backend> State<B> {
                             txs[index].gas * txs[index].gas_price,
                             vec![],
                             vec![],
-                            String::default(),
+                            x.to_string(),
                         );
                         trace!(target: "state", "Transaction receipt: {:?}", receipt);
                         Ok(ApplyOutcome {
