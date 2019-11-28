@@ -45,6 +45,7 @@ use db::StateDB;
 use transaction::SignedTransaction;
 use types::state::state_diff::StateDiff;
 use vms::EnvInfo;
+use vms::AvmStatusCode;
 
 use aion_types::{Address, H256, U256};
 use acore_bytes::Bytes;
@@ -669,27 +670,53 @@ impl<B: Backend> State<B> {
         env_info: &EnvInfo,
         machine: &Machine,
         t: &SignedTransaction,
-        check_gas_limit: bool,
+        is_building_block: bool,
     ) -> ApplyResult
     {
-        let e = self.execute(env_info, machine, t, true, false, check_gas_limit)?;
-
-        self.commit()?;
-        let state_root = self.root().clone();
-
-        let receipt = Receipt::new(
-            state_root,
-            e.gas_used,
-            e.transaction_fee,
-            e.logs,
-            e.output,
-            e.exception,
-        );
-        trace!(target: "state", "Transaction receipt: {:?}", receipt);
-
-        Ok(ApplyOutcome {
-            receipt,
-        })
+        // Only fvm transactions (including precompiled) and balance transfers are executed in this function
+        let result = self.execute(env_info, machine, t, true, false, is_building_block);
+        match result {
+            // Include the transaction into block if the execution result if ok
+            Ok(e) => {
+                self.commit()?;
+                let state_root = self.root().clone();
+                let receipt = Receipt::new(
+                    state_root,
+                    e.gas_used,
+                    e.transaction_fee,
+                    e.logs,
+                    e.output,
+                    e.exception,
+                );
+                trace!(target: "state", "Transaction receipt: {:?}", receipt);
+                Ok(ApplyOutcome {
+                    receipt,
+                })
+            }
+            // For rejected transactions...
+            Err(x) => {
+                // If building local block, reject it
+                if is_building_block {
+                    Err(From::from(x))
+                }
+                // If importing external block, accept it but do not commit state
+                else {
+                    let state_root = self.root().clone();
+                    let receipt = Receipt::new(
+                        state_root,
+                        U256::from(0u64),
+                        U256::from(0u64),
+                        vec![],
+                        vec![],
+                        String::default(),
+                    );
+                    trace!(target: "state", "Transaction receipt: {:?}", receipt);
+                    Ok(ApplyOutcome {
+                        receipt,
+                    })
+                }
+            }
+        }
     }
 
     pub fn apply_batch(
@@ -697,35 +724,70 @@ impl<B: Backend> State<B> {
         env_info: &EnvInfo,
         machine: &Machine,
         txs: &[SignedTransaction],
-        check_gas: bool,
+        is_building_block: bool,
     ) -> Vec<ApplyResult>
     {
-        let exec_results = self.execute_bulk(env_info, machine, txs, false, false, check_gas);
+        // Only avm transactions will go here
+        let exec_results =
+            self.execute_bulk(env_info, machine, txs, false, false, is_building_block);
         if !exec_results.is_empty() && !exec_results[0].is_ok() {
             return vec![Err(From::from(exec_results[0].clone().unwrap_err()))];
         }
 
         let mut receipts = Vec::new();
+        let mut index = 0;
         for result in exec_results {
             //self.commit_touched(result.clone().unwrap().touched);
             let outcome = match result {
                 Ok(e) => {
-                    let state_root = e.state_root.clone();
-                    let receipt = Receipt::new(
-                        state_root,
-                        e.gas_used,
-                        e.transaction_fee,
-                        e.logs,
-                        e.output,
-                        e.exception,
-                    );
-                    Ok(ApplyOutcome {
-                        receipt,
-                    })
+                    // For avm rejected transactions, reject if building local blocks, or accept if importing external blocks
+                    if e.exception == AvmStatusCode::Rejected.to_string() && is_building_block {
+                        Err(From::from(ExecutionError::Internal(
+                            "AVM rejected".to_string(),
+                        )))
+                    } else {
+                        if e.exception == AvmStatusCode::Rejected.to_string() {
+                            println!("AAA");
+                        }
+                        let state_root = e.state_root.clone();
+                        let receipt = Receipt::new(
+                            state_root,
+                            e.gas_used,
+                            e.transaction_fee,
+                            e.logs,
+                            e.output,
+                            e.exception,
+                        );
+                        Ok(ApplyOutcome {
+                            receipt,
+                        })
+                    }
                 }
-                Err(x) => Err(From::from(x)),
+                Err(x) => {
+                    // If building local block, reject it
+                    if is_building_block {
+                        Err(From::from(x))
+                    }
+                    // If importing external block, accept it but do not commit state
+                    else {
+                        let state_root = self.root().clone();
+                        let receipt = Receipt::new(
+                            state_root,
+                            txs[index].gas,
+                            txs[index].gas * txs[index].gas_price,
+                            vec![],
+                            vec![],
+                            String::default(),
+                        );
+                        trace!(target: "state", "Transaction receipt: {:?}", receipt);
+                        Ok(ApplyOutcome {
+                            receipt,
+                        })
+                    }
+                }
             };
             receipts.push(outcome);
+            index += 1;
         }
 
         trace!(target: "state", "Transaction receipt: {:?}", receipts);
@@ -740,14 +802,14 @@ impl<B: Backend> State<B> {
         txs: &[SignedTransaction],
         check_nonce: bool,
         virt: bool,
-        check_gas: bool,
+        is_building_block: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
         let mut e = Executive::new(self, env_info, machine);
 
         match virt {
             true => e.transact_virtual_bulk(txs, check_nonce),
-            false => e.transact_bulk(txs, false, check_gas),
+            false => e.transact_bulk(txs, false, is_building_block),
         }
     }
 
@@ -762,14 +824,14 @@ impl<B: Backend> State<B> {
         t: &SignedTransaction,
         check_nonce: bool,
         virt: bool,
-        check_gas_limit: bool,
+        is_building_block: bool,
     ) -> Result<Executed, ExecutionError>
     {
         let mut e = Executive::new(self, env_info, machine);
 
         match virt {
             true => e.transact_virtual(t, check_nonce),
-            false => e.transact(t, check_nonce, false, check_gas_limit),
+            false => e.transact(t, check_nonce, false, is_building_block),
         }
     }
 
