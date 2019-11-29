@@ -34,3 +34,4 @@ mod test;
 mod fvm;
 
 pub use fvm::*;
+pub use avm::*;
