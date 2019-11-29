@@ -60,13 +60,6 @@ pub const AVM_TRANSACTION_TYPE: U256 = U256([2, 0, 0, 0]);
 
 pub const BEACON_HASH_EXTENSION: u8 = 1;
 
-struct TransactionEnergyRule;
-impl TransactionEnergyRule {
-    fn is_valid_gas_create(gas: U256) -> bool { (gas >= GAS_CREATE_MIN) && (gas <= GAS_CREATE_MAX) }
-
-    fn is_valid_gas_call(gas: U256) -> bool { gas >= GAS_CALL_MIN && gas <= GAS_CALL_MAX }
-}
-
 /// Transaction action type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
@@ -285,6 +278,19 @@ impl Transaction {
                 }
             },
         )
+    }
+
+    /// Get the max gas limit depending on the type of the transaction
+    pub fn max_gas_limit(&self) -> U256 {
+        match self.action {
+            Action::Create => GAS_CREATE_MAX,
+            Action::Call(_) => GAS_CALL_MAX,
+        }
+    }
+
+    /// Check if the gas limit of the transaction is valid
+    pub fn is_gas_limit_valid(&self) -> bool {
+        self.gas >= self.gas_required() && self.gas <= self.max_gas_limit()
     }
 
     /// Set beacon hash
@@ -509,25 +515,12 @@ impl UnverifiedTransaction {
         }
 
         // verify energy
-        match &self.unsigned.action {
-            Action::Create => {
-                if !TransactionEnergyRule::is_valid_gas_create(self.gas) {
-                    return Err(error::Error::InvalidContractCreateGas {
-                        minimal: GAS_CREATE_MIN,
-                        maximal: GAS_CREATE_MAX,
-                        got: self.gas,
-                    });
-                }
-            }
-            Action::Call(_) => {
-                if !TransactionEnergyRule::is_valid_gas_call(self.gas) {
-                    return Err(error::Error::InvalidTransactionGas {
-                        minimal: GAS_CALL_MIN,
-                        maximal: GAS_CALL_MAX,
-                        got: self.gas,
-                    });
-                }
-            }
+        if !self.is_gas_limit_valid() {
+            return Err(error::Error::InvalidTransactionGas {
+                minimal: self.gas_required(),
+                maximal: self.max_gas_limit(),
+                got: self.gas,
+            });
         }
 
         // verify energy price
@@ -729,7 +722,7 @@ mod tests {
     fn test_verify_basic_success() {
         let mut t: UnverifiedTransaction = rlp::decode(&::rustc_hex::FromHex::from_hex("f87c80800184646174618800057a9d04e38ebe83030d408398968001b860fdc74311a02604a1171e984d64363a5c6073b7dff9e063d1c2eee84f7364021bbea5d2484bc0adc48f4eff40d2d41ab142f38cc66c7df9051792f03196042dd4d8d200f595f5775bd66417d26ef79e2d2bd8ec6faed5f35f28422c9b3c36f700").unwrap());
         // assert!(t.verify_basic(Some(0)).is_err());
-        t.unsigned.gas = U256::from(221000);
+        t.unsigned.gas = U256::from(221256);
         assert!(t.verify_basic(Some(0)).is_ok());
     }
 
@@ -827,8 +820,8 @@ mod tests {
         assert_eq!(
             e,
             error::Error::InvalidTransactionGas {
-                minimal: GAS_CALL_MIN,
-                maximal: GAS_CALL_MAX,
+                minimal: U256::from(21256),
+                maximal: U256::from(2000000),
                 got: t.gas,
             }
         );
@@ -865,8 +858,8 @@ mod tests {
         assert_eq!(
             e,
             error::Error::InvalidTransactionGas {
-                minimal: GAS_CALL_MIN,
-                maximal: GAS_CALL_MAX,
+                minimal: U256::from(21256),
+                maximal: U256::from(2000000),
                 got: t.gas,
             }
         );
@@ -904,9 +897,9 @@ mod tests {
         let e = r.err().unwrap();
         assert_eq!(
             e,
-            error::Error::InvalidContractCreateGas {
-                minimal: GAS_CREATE_MIN,
-                maximal: GAS_CREATE_MAX,
+            error::Error::InvalidTransactionGas {
+                minimal: U256::from(221256),
+                maximal: U256::from(5000000),
                 got: t.gas,
             }
         );
@@ -944,9 +937,9 @@ mod tests {
         let e = r.err().unwrap();
         assert_eq!(
             e,
-            error::Error::InvalidContractCreateGas {
-                minimal: GAS_CREATE_MIN,
-                maximal: GAS_CREATE_MAX,
+            error::Error::InvalidTransactionGas {
+                minimal: U256::from(221256),
+                maximal: U256::from(5000000),
                 got: t.gas,
             }
         );

@@ -133,18 +133,19 @@ pub fn receive_res(
 
         // Update node info
         // TODO: improve this
-        let mut node_info_write = node_info.write();
-        if !node_info_write.contains_key(&hash) {
-            trace!(target: "sync", "new node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, best_hash, total_difficulty);
+        {
+            let mut node_info_write = node_info.write();
+            if !node_info_write.contains_key(&hash) {
+                trace!(target: "sync", "new node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, best_hash, total_difficulty);
+            }
+            let info_lock = node_info_write
+                .entry(hash)
+                .or_insert(RwLock::new(NodeInfo::new()));
+            let mut info = info_lock.write();
+            info.best_block_hash = best_hash;
+            info.best_block_number = best_block_num;
+            info.total_difficulty = total_difficulty;
         }
-        let info_lock = node_info_write
-            .entry(hash)
-            .or_insert(RwLock::new(NodeInfo::new()));
-        let mut info = info_lock.write();
-        info.best_block_hash = best_hash;
-        info.best_block_number = best_block_num;
-        info.total_difficulty = total_difficulty;
-        drop(info);
 
         p2p.update_node(&hash);
     } else {
