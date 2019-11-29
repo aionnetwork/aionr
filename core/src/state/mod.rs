@@ -760,7 +760,6 @@ impl<B: Backend> State<B> {
         let mut receipts = Vec::new();
         let mut index = 0;
         for result in exec_results {
-            //self.commit_touched(result.clone().unwrap().touched);
             let outcome = match result {
                 Ok(e) => {
                     // For avm rejected transactions, reject if building local blocks, or accept if importing external blocks
