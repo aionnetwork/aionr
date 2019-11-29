@@ -722,7 +722,7 @@ mod tests {
     fn test_verify_basic_success() {
         let mut t: UnverifiedTransaction = rlp::decode(&::rustc_hex::FromHex::from_hex("f87c80800184646174618800057a9d04e38ebe83030d408398968001b860fdc74311a02604a1171e984d64363a5c6073b7dff9e063d1c2eee84f7364021bbea5d2484bc0adc48f4eff40d2d41ab142f38cc66c7df9051792f03196042dd4d8d200f595f5775bd66417d26ef79e2d2bd8ec6faed5f35f28422c9b3c36f700").unwrap());
         // assert!(t.verify_basic(Some(0)).is_err());
-        t.unsigned.gas = U256::from(221000);
+        t.unsigned.gas = U256::from(221256);
         assert!(t.verify_basic(Some(0)).is_ok());
     }
 
@@ -820,8 +820,8 @@ mod tests {
         assert_eq!(
             e,
             error::Error::InvalidTransactionGas {
-                minimal: GAS_CALL_MIN,
-                maximal: GAS_CALL_MAX,
+                minimal: U256::from(21256),
+                maximal: U256::from(2000000),
                 got: t.gas,
             }
         );
@@ -858,8 +858,8 @@ mod tests {
         assert_eq!(
             e,
             error::Error::InvalidTransactionGas {
-                minimal: GAS_CALL_MIN,
-                maximal: GAS_CALL_MAX,
+                minimal: U256::from(21256),
+                maximal: U256::from(2000000),
                 got: t.gas,
             }
         );
@@ -897,9 +897,9 @@ mod tests {
         let e = r.err().unwrap();
         assert_eq!(
             e,
-            error::Error::InvalidContractCreateGas {
-                minimal: GAS_CREATE_MIN,
-                maximal: GAS_CREATE_MAX,
+            error::Error::InvalidTransactionGas {
+                minimal: U256::from(221256),
+                maximal: U256::from(5000000),
                 got: t.gas,
             }
         );
@@ -937,9 +937,9 @@ mod tests {
         let e = r.err().unwrap();
         assert_eq!(
             e,
-            error::Error::InvalidContractCreateGas {
-                minimal: GAS_CREATE_MIN,
-                maximal: GAS_CREATE_MAX,
+            error::Error::InvalidTransactionGas {
+                minimal: U256::from(221256),
+                maximal: U256::from(5000000),
                 got: t.gas,
             }
         );
