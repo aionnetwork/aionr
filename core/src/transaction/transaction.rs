@@ -60,13 +60,6 @@ pub const AVM_TRANSACTION_TYPE: U256 = U256([2, 0, 0, 0]);
 
 pub const BEACON_HASH_EXTENSION: u8 = 1;
 
-struct TransactionEnergyRule;
-impl TransactionEnergyRule {
-    fn is_valid_gas_create(gas: U256) -> bool { (gas >= GAS_CREATE_MIN) && (gas <= GAS_CREATE_MAX) }
-
-    fn is_valid_gas_call(gas: U256) -> bool { gas >= GAS_CALL_MIN && gas <= GAS_CALL_MAX }
-}
-
 /// Transaction action type.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
@@ -285,6 +278,19 @@ impl Transaction {
                 }
             },
         )
+    }
+
+    /// Get the max gas limit depending on the type of the transaction
+    pub fn max_gas_limit(&self) -> U256 {
+        match self.action {
+            Action::Create => GAS_CREATE_MAX,
+            Action::Call(_) => GAS_CALL_MAX,
+        }
+    }
+
+    /// Check if the gas limit of the transaction is valid
+    pub fn is_gas_limit_valid(&self) -> bool {
+        self.gas >= self.gas_required() && self.gas <= self.max_gas_limit()
     }
 
     /// Set beacon hash
@@ -509,25 +515,12 @@ impl UnverifiedTransaction {
         }
 
         // verify energy
-        match &self.unsigned.action {
-            Action::Create => {
-                if !TransactionEnergyRule::is_valid_gas_create(self.gas) {
-                    return Err(error::Error::InvalidContractCreateGas {
-                        minimal: GAS_CREATE_MIN,
-                        maximal: GAS_CREATE_MAX,
-                        got: self.gas,
-                    });
-                }
-            }
-            Action::Call(_) => {
-                if !TransactionEnergyRule::is_valid_gas_call(self.gas) {
-                    return Err(error::Error::InvalidTransactionGas {
-                        minimal: GAS_CALL_MIN,
-                        maximal: GAS_CALL_MAX,
-                        got: self.gas,
-                    });
-                }
-            }
+        if !self.is_gas_limit_valid() {
+            return Err(error::Error::InvalidTransactionGas {
+                minimal: self.gas_required(),
+                maximal: self.max_gas_limit(),
+                got: self.gas,
+            });
         }
 
         // verify energy price
