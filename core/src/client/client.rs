@@ -412,22 +412,15 @@ impl Client {
             Ok(s) => {
                 let mut nonce_cache = HashMap::<Address, U256>::new();
                 for t in block.transactions.clone() {
-                    match nonce_cache.clone().get(t.sender()) {
-                        Some(n) => {
-                            if *n != t.nonce {
-                                warn!(target: "client", "Invalid transaction: Tx nonce {} != expected nonce {}\n{:?}", t.nonce, n, t);
-                                return Err(());
-                            } else {
-                                nonce_cache.insert(*t.sender(), *n + U256::from(1));
-                            }
-                        }
-                        None => {
-                            nonce_cache.insert(
-                                *t.sender(),
-                                s.nonce(t.sender()).unwrap_or(U256::zero()) + U256::from(1),
-                            );
-                        }
+                    let expected_nonce: U256 = nonce_cache
+                        .get(t.sender())
+                        .unwrap_or(&s.nonce(t.sender()).unwrap_or(U256::zero()))
+                        .clone();
+                    if expected_nonce != t.nonce {
+                        warn!(target: "client", "Stage 4 block verification failed for #{}. Invalid transaction {}: Tx nonce {} != expected nonce {}\n", header.number(), t.hash(), t.nonce, expected_nonce);
+                        return Err(());
                     }
+                    nonce_cache.insert(t.sender().clone(), t.nonce + U256::from(1u64));
                 }
             }
             _ => {
