@@ -45,7 +45,7 @@ pub fn send_req(p2p: Mgr, node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>
     if nodes_hahses.len() == 0 {
         return;
     }
-    let interval = Duration::from_millis(INTERVAL_STATUS / nodes_hahses.len() as u64);
+    let interval = Duration::from_millis(INTERVAL_STATUS / nodes_hahses.len() as u64 / 2);
     for hash in nodes_hahses {
         let mut node_info = node_info.write();
         if !node_info.contains_key(&hash) {
