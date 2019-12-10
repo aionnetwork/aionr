@@ -43,6 +43,9 @@ pub struct CallRequest {
     pub data: Option<Bytes>,
     /// Nonce
     pub nonce: Option<U256>,
+    /// type
+    #[serde(rename = "type")]
+    pub tx_type: Option<U256>,
 }
 
 impl Into<Request> for CallRequest {
@@ -55,6 +58,7 @@ impl Into<Request> for CallRequest {
             value: self.value,
             data: self.data.map(Into::into),
             nonce: self.nonce,
+            req_type: self.tx_type,
         }
     }
 }
@@ -90,6 +94,7 @@ mod tests {
                 value: Some(U256::from(3)),
                 data: Some(vec![0x12, 0x34, 0x56].into()),
                 nonce: Some(U256::from(4)),
+                tx_type: None,
             }
         );
     }
@@ -113,7 +118,8 @@ mod tests {
             gas: Some(U256::from_str("76c0").unwrap()),
             value: Some(U256::from_str("9184e72a").unwrap()),
             data: Some("d46e8dd67c5d32be8d46e8dd67c5d32be8058bb8eb970870f072445675058bb8eb970870f072445675".from_hex().unwrap().into()),
-            nonce: None
+            nonce: None,
+            tx_type: None,
         });
     }
 
@@ -132,6 +138,7 @@ mod tests {
                 value: None,
                 data: None,
                 nonce: None,
+                tx_type: None,
             }
         );
     }

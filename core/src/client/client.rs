@@ -842,19 +842,6 @@ impl Client {
         analytics: CallAnalytics,
     ) -> Result<Executed, CallError>
     {
-        fn for_local_avm(state: &mut State<StateDB>, transaction: &SignedTransaction) -> bool {
-            if transaction.tx_type() == AVM_TRANSACTION_TYPE {
-                return true;
-            } else if let Action::Call(a) = transaction.action {
-                let code = state.code(&a).unwrap_or(None);
-                if let Some(c) = code {
-                    return c[0..2] != [0x60u8, 0x50];
-                }
-            }
-
-            return false;
-        }
-
         fn call(
             state: &mut State<StateDB>,
             env_info: &EnvInfo,
@@ -1085,6 +1072,20 @@ impl Client {
     }
 }
 
+// helper function to tell is this transaction is for avm
+fn for_local_avm(state: &mut State<StateDB>, transaction: &SignedTransaction) -> bool {
+    if transaction.tx_type() == AVM_TRANSACTION_TYPE {
+        return true;
+    } else if let Action::Call(a) = transaction.action {
+        let code = state.code(&a).unwrap_or(None);
+        if let Some(c) = code {
+            return c[0..2] != [0x60u8, 0x50];
+        }
+    }
+
+    return false;
+}
+
 impl BlockChainClient for Client {
     fn call(
         &self,
@@ -1190,10 +1191,19 @@ impl BlockChainClient for Client {
             let tx = tx.fake_sign(sender.clone());
 
             let mut state = original_state.clone();
-            Ok(Executive::new(&mut state, &env_info, self.engine.machine())
-                .transact_virtual(&tx, false)
-                .map(|r| r.exception.as_str() == "")
-                .unwrap_or(false))
+
+            if for_local_avm(&mut state, &tx) {
+                Ok(Executive::new(&mut state, &env_info, self.engine.machine())
+                    .transact_virtual_bulk(&[tx.clone()], false)[0]
+                    .clone()
+                    .map(|r| r.exception.as_str() == "")
+                    .unwrap_or(false))
+            } else {
+                Ok(Executive::new(&mut state, &env_info, self.engine.machine())
+                    .transact_virtual(&tx, false)
+                    .map(|r| r.exception.as_str() == "")
+                    .unwrap_or(false))
+            }
         };
 
         if !cond(upper)? {
