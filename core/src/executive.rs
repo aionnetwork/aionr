@@ -59,7 +59,7 @@ const STACK_SIZE_ENTRY_OVERHEAD: usize = 100 * 1024;
 /// Entry stack overhead prior to execution.
 const STACK_SIZE_ENTRY_OVERHEAD: usize = 20 * 1024;
 
-/// VM lock
+// VM lock
 lazy_static! {
     static ref VM_LOCK: Mutex<bool> = Mutex::new(false);
     static ref AVM_LOCK: Mutex<bool> = Mutex::new(false);

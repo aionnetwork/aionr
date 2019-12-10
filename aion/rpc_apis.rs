@@ -152,7 +152,7 @@ pub trait Dependencies {
 /// RPC dependencies for a full node.
 pub struct FullDependencies {
     pub client: Arc<Client>,
-    pub sync: Arc<SyncProvider>,
+    pub sync: Arc<dyn SyncProvider>,
     pub account_store: Option<Arc<AccountProvider>>,
     pub miner: Arc<Miner>,
     pub external_miner: Arc<ExternalMiner>,

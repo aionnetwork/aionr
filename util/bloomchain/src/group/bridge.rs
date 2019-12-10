@@ -30,11 +30,11 @@ use super::BloomGroupDatabase;
 /// Bridge between `BloomDatabase` and `BloomGroupDatabase`.
 pub struct GroupDatabaseBridge<'a> {
     positioner: PositionManager,
-    db: &'a BloomGroupDatabase,
+    db: &'a dyn BloomGroupDatabase,
 }
 
 impl<'a> GroupDatabaseBridge<'a> {
-    pub fn new(config: Config, db: &'a BloomGroupDatabase) -> Self {
+    pub fn new(config: Config, db: &'a dyn BloomGroupDatabase) -> Self {
         let positioner = PositionManager::new(config.elements_per_index);
 
         GroupDatabaseBridge {

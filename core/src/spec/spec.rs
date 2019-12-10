@@ -93,7 +93,7 @@ pub struct Spec {
     /// User friendly spec name
     pub name: String,
     /// What engine are we using for this?
-    pub engine: Arc<Engine>,
+    pub engine: Arc<dyn Engine>,
     /// Name of the subdir inside the main data dir to use for chain data and settings.
     pub data_dir: String,
     /// The genesis block's parent hash field.
@@ -299,7 +299,7 @@ impl Spec {
     // create an instance of an Ethereum state machine, minus consensus logic.
     fn machine(
         params: CommonParams,
-        builtins: BTreeMap<Address, Box<BuiltinContract>>,
+        builtins: BTreeMap<Address, Box<dyn BuiltinContract>>,
         premine: U256,
     ) -> EthereumMachine
     {
@@ -311,9 +311,9 @@ impl Spec {
     fn engine(
         engine_spec: ajson::spec::Engine,
         params: CommonParams,
-        builtins: BTreeMap<Address, Box<BuiltinContract>>,
+        builtins: BTreeMap<Address, Box<dyn BuiltinContract>>,
         premine: U256,
-    ) -> Arc<Engine>
+    ) -> Arc<dyn Engine>
     {
         let machine = Self::machine(params, builtins, premine);
 

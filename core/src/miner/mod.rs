@@ -102,14 +102,14 @@ pub trait MinerService: Send + Sync {
     /// Imports transactions to transaction queue.
     fn import_external_transactions(
         &self,
-        chain: &MiningBlockChainClient,
+        chain: &dyn MiningBlockChainClient,
         transactions: Vec<UnverifiedTransaction>,
     ) -> Vec<Result<(), Error>>;
 
     /// Imports own (node owner) transaction to queue.
     fn import_own_transaction(
         &self,
-        chain: &MiningBlockChainClient,
+        chain: &dyn MiningBlockChainClient,
         transaction: PendingTransaction,
     ) -> Result<(), Error>;
 
@@ -117,12 +117,12 @@ pub trait MinerService: Send + Sync {
     fn pending_transactions_hashes(&self, best_block: BlockNumber) -> Vec<H256>;
 
     /// Removes all transactions from the queue and restart mining operation.
-    fn clear_and_reset(&self, chain: &MiningBlockChainClient);
+    fn clear_and_reset(&self, chain: &dyn MiningBlockChainClient);
 
     /// Called when blocks are imported to chain, updates transactions queue.
     fn chain_new_blocks(
         &self,
-        chain: &MiningBlockChainClient,
+        chain: &dyn MiningBlockChainClient,
         imported: &[H256],
         invalid: &[H256],
         enacted: &[H256],
@@ -133,7 +133,7 @@ pub trait MinerService: Send + Sync {
     /// Will check the seal, but not actually insert the block into the chain.
     fn submit_seal(
         &self,
-        chain: &MiningBlockChainClient,
+        chain: &dyn MiningBlockChainClient,
         pow_hash: H256,
         seal: Vec<Bytes>,
     ) -> Result<(), Error>;
@@ -144,7 +144,7 @@ pub trait MinerService: Send + Sync {
         b: ClosedBlock,
         seed: [u8; 64],
         timestamp: u64,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
     ) -> Result<(), Error>;
 
     fn get_ready_pos(&self, h: &H256) -> Option<(ClosedBlock, Vec<Bytes>)>;
@@ -153,7 +153,7 @@ pub trait MinerService: Send + Sync {
 
     fn get_pos_template(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         seed: [u8; 64],
         public_key: H256,
         coinbase: H256,
@@ -161,26 +161,26 @@ pub trait MinerService: Send + Sync {
 
     fn try_seal_pos(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         seal: Vec<Bytes>,
         block: ClosedBlock,
     ) -> Result<(), Error>;
 
     // AION 2.0
     // Check if next block is on the unity hard fork
-    fn unity_update(&self, client: &MiningBlockChainClient) -> bool;
+    fn unity_update(&self, client: &dyn MiningBlockChainClient) -> bool;
 
     // AION 2.0
     // Check if it's allowed to produce a new block with given seal type.
     // A block's seal type must be different than its parent's seal type.
     fn new_block_allowed_with_seal_type(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         seal_type: &SealType,
     ) -> bool;
 
     /// Get the sealing work package and if `Some`, apply some transform.
-    fn map_sealing_work<F, T>(&self, chain: &MiningBlockChainClient, f: F) -> Option<T>
+    fn map_sealing_work<F, T>(&self, chain: &dyn MiningBlockChainClient, f: F) -> Option<T>
     where
         F: FnOnce(&ClosedBlock) -> T,
         Self: Sized;

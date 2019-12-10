@@ -39,7 +39,7 @@ impl<'db> SecTrieDB<'db> {
     /// Initialise to the state entailed by the genesis block.
     /// This guarantees the trie is built correctly.
     /// Returns an error if root does not exist.
-    pub fn new(db: &'db HashStore, root: &'db H256) -> super::Result<Self> {
+    pub fn new(db: &'db dyn HashStore, root: &'db H256) -> super::Result<Self> {
         Ok(SecTrieDB {
             raw: TrieDB::new(db, root)?,
         })
@@ -53,7 +53,7 @@ impl<'db> SecTrieDB<'db> {
 }
 
 impl<'db> Trie for SecTrieDB<'db> {
-    fn iter<'a>(&'a self) -> super::Result<Box<TrieIterator<Item = TrieItem> + 'a>> {
+    fn iter<'a>(&'a self) -> super::Result<Box<dyn TrieIterator<Item = TrieItem> + 'a>> {
         TrieDB::iter(&self.raw)
     }
 

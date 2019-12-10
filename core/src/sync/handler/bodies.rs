@@ -61,7 +61,7 @@ pub fn sync_bodies(p2p: Mgr, storage: Arc<SyncStorage>) {
         }
 
         let node_hash = headers_wrapper.node_hash;
-        let mut headers_with_bodies_requested = storage.headers_with_bodies_requested().lock();
+        let headers_with_bodies_requested = storage.headers_with_bodies_requested().lock();
         if !headers_with_bodies_requested.contains_key(&node_hash) {
             drop(headers_with_bodies_requested);
             if send(p2p.clone(), node_hash.clone(), hashes) {
@@ -85,7 +85,7 @@ pub fn send(p2p: Mgr, hash: u64, hashes: Vec<u8>) -> bool {
     p2p.send(hash, cb)
 }
 
-pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
+pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<dyn BlockChainClient>, cb_in: ChannelBuffer) {
     trace!(target: "sync", "bodies/receive_req");
 
     // check channelbuffer len

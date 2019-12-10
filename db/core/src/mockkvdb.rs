@@ -58,7 +58,7 @@ impl KeyValueDAO for Mockkvdb {
         self.db.remove(&ekey)
     }
 
-    fn iter(&self) -> Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)>> {
+    fn iter(&self) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)>> {
         Box::new(self.db.clone().into_iter().map(|(k, v)| {
             (
                 k.into_vec().into_boxed_slice(),
@@ -78,7 +78,7 @@ impl KeyValueDAO for Mockkvdb {
     fn iter_from_prefix(
         &self,
         prefix: &'static [u8],
-    ) -> Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)>>
+    ) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)>>
     {
         Box::new(
             self.db

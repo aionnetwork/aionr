@@ -156,7 +156,7 @@ macro_rules! usage {
         use std::fs::File;
         use std::path::Path;
         use std::collections::HashMap;
-        use cli::group::Group;
+        use crate::cli::group::Group;
 
         extern crate textwrap;
         extern crate term_size;

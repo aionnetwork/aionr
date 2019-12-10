@@ -25,7 +25,6 @@
 extern crate blake2b;
 extern crate crypto;
 extern crate itertools;
-extern crate libc;
 extern crate parking_lot;
 extern crate rand;
 extern crate rustc_hex;

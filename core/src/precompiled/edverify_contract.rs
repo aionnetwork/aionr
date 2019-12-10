@@ -50,7 +50,7 @@ impl BuiltinContract for EDVerifyContract {
 
     /// @param input 128 bytes of data input, [32-bytes message, 32-bytes public key, 64-bytes signature]
     //  @return the verification result of the given input (publickey address for pass, all-0's address for fail)
-    fn execute(&self, _ext: &mut BuiltinExt, input: &[u8]) -> ExecutionResult {
+    fn execute(&self, _ext: &mut dyn BuiltinExt, input: &[u8]) -> ExecutionResult {
         if input.len() != 128 {
             return ExecutionResult {
                 gas_left: U256::zero(),

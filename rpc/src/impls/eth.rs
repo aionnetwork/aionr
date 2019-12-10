@@ -598,7 +598,7 @@ where
                                     Some(value) => value.as_bool(),
                                     _ => None,
                                 };
-                                let mut inputs = match abi_json.get("inputs") {
+                                let inputs = match abi_json.get("inputs") {
                                     Some(value) => {
                                         let inputs_json =
                                             value.as_array().ok_or(field_error.clone())?;
@@ -646,7 +646,7 @@ where
                                     }
                                     _ => None,
                                 };
-                                let mut outputs = match abi_json.get("outputs") {
+                                let outputs = match abi_json.get("outputs") {
                                     Some(value) => {
                                         let outputs_json =
                                             value.as_array().ok_or(field_error.clone())?;

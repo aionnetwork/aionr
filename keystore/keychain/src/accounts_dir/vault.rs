@@ -140,7 +140,7 @@ impl VaultDiskDirectory {
 }
 
 impl VaultKeyDirectory for VaultDiskDirectory {
-    fn as_key_directory(&self) -> &KeyDirectory { self }
+    fn as_key_directory(&self) -> &dyn KeyDirectory { self }
 
     fn name(&self) -> &str { &self.key_manager().name }
 

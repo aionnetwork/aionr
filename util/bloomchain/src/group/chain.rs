@@ -34,12 +34,12 @@ use super::position::Manager as PositionManager;
 /// Performs all bloom database operations using `BloomGroup`s.
 pub struct BloomGroupChain<'a> {
     config: Config,
-    db: &'a BloomGroupDatabase,
+    db: &'a dyn BloomGroupDatabase,
     bridge: GroupDatabaseBridge<'a>,
 }
 
 impl<'a> BloomGroupChain<'a> {
-    pub fn new(config: Config, db: &'a BloomGroupDatabase) -> Self {
+    pub fn new(config: Config, db: &'a dyn BloomGroupDatabase) -> Self {
         let bridge = GroupDatabaseBridge::new(config, db);
 
         BloomGroupChain {
@@ -94,7 +94,7 @@ impl<'a> BloomGroupChain<'a> {
         bloom_chain.with_bloom(range, bloom)
     }
 
-    pub fn filter(&self, filter: &Filter) -> Vec<Number> {
+    pub fn filter(&self, filter: &dyn Filter) -> Vec<Number> {
         let bloom_chain = BloomChain::new(self.config, &self.bridge);
         bloom_chain.filter(filter)
     }

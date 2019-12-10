@@ -89,7 +89,7 @@ pub fn broad_new_transactions(p2p: Mgr, storage: Arc<SyncStorage>) {
 }
 
 /// Broadcast new blocks
-pub fn propagate_new_blocks(p2p: Mgr, block_hash: &H256, client: Arc<BlockChainClient>) {
+pub fn propagate_new_blocks(p2p: Mgr, block_hash: &H256, client: Arc<dyn BlockChainClient>) {
     let active_nodes = p2p.get_active_nodes();
     if active_nodes.len() > 0 {
         let mut req = channel_buffer_template(Action::BROADCASTBLOCK.value());
@@ -112,7 +112,7 @@ pub fn handle_broadcast_block(
     p2p: Mgr,
     node_hash: u64,
     req: ChannelBuffer,
-    client: Arc<BlockChainClient>,
+    client: Arc<dyn BlockChainClient>,
     storage: Arc<SyncStorage>,
     network_best_block_number: Arc<RwLock<u64>>,
 )
@@ -196,7 +196,7 @@ pub fn handle_broadcast_tx(
     p2p: Mgr,
     node_hash: u64,
     req: ChannelBuffer,
-    client: Arc<BlockChainClient>,
+    client: Arc<dyn BlockChainClient>,
     node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
     storage: Arc<SyncStorage>,
     network_best_block_number: Arc<RwLock<u64>>,

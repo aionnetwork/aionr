@@ -55,7 +55,7 @@ impl BridgeController {
         }
     }
 
-    pub fn initialize(&self, ext: &mut BuiltinExt) {
+    pub fn initialize(&self, ext: &mut dyn BuiltinExt) {
         if !self.connector.get_initialized(ext) {
             self.connector.set_owner(ext, self.owner_address);
             self.connector.set_initialized(ext, true);
@@ -63,19 +63,19 @@ impl BridgeController {
     }
 
     /// Checks whether the given address is the owner of the contract or not.
-    fn is_owner(&self, ext: &mut BuiltinExt, address: H256) -> bool {
+    fn is_owner(&self, ext: &mut dyn BuiltinExt, address: H256) -> bool {
         self.connector.get_owner(ext) == address
     }
 
     /// Checks whether the given address is the intended newOwner of the contract
-    fn is_new_owner(&self, ext: &mut BuiltinExt, address: H256) -> bool {
+    fn is_new_owner(&self, ext: &mut dyn BuiltinExt, address: H256) -> bool {
         self.connector.get_new_owner(ext) == address
     }
 
     /// logic
     pub fn set_new_owner(
         &self,
-        ext: &mut BuiltinExt,
+        ext: &mut dyn BuiltinExt,
         caller: H256,
         new_owner: H256,
     ) -> Result<(), ErrCode>
@@ -87,7 +87,7 @@ impl BridgeController {
         Ok(())
     }
 
-    pub fn accept_ownership(&self, ext: &mut BuiltinExt, caller: H256) -> Result<(), ErrCode> {
+    pub fn accept_ownership(&self, ext: &mut dyn BuiltinExt, caller: H256) -> Result<(), ErrCode> {
         if !self.is_new_owner(ext, caller) {
             return Err(ErrCode::NotNewOwner);
         }
@@ -98,13 +98,13 @@ impl BridgeController {
         Ok(())
     }
 
-    fn is_relayer(&self, ext: &mut BuiltinExt, caller: H256) -> bool {
+    fn is_relayer(&self, ext: &mut dyn BuiltinExt, caller: H256) -> bool {
         self.connector.get_relayer(ext) == caller
     }
 
     pub fn set_relayer(
         &self,
-        ext: &mut BuiltinExt,
+        ext: &mut dyn BuiltinExt,
         caller: H256,
         new_owner: H256,
     ) -> Result<(), ErrCode>
@@ -116,15 +116,15 @@ impl BridgeController {
         Ok(())
     }
 
-    fn is_ring_locked(&self, ext: &mut BuiltinExt) -> bool { self.connector.get_ring_locked(ext) }
+    fn is_ring_locked(&self, ext: &mut dyn BuiltinExt) -> bool { self.connector.get_ring_locked(ext) }
 
-    fn is_ring_member(&self, ext: &mut BuiltinExt, address: H256) -> bool {
+    fn is_ring_member(&self, ext: &mut dyn BuiltinExt, address: H256) -> bool {
         self.connector.get_active_member(ext, address)
     }
 
     pub fn ring_initialize(
         &self,
-        ext: &mut BuiltinExt,
+        ext: &mut dyn BuiltinExt,
         caller: H256,
         members: Vec<H256>,
     ) -> Result<(), ErrCode>
@@ -147,7 +147,7 @@ impl BridgeController {
 
     pub fn ring_add_member(
         &self,
-        ext: &mut BuiltinExt,
+        ext: &mut dyn BuiltinExt,
         caller: H256,
         address: H256,
     ) -> Result<(), ErrCode>
@@ -172,7 +172,7 @@ impl BridgeController {
 
     pub fn ring_remove_member(
         &self,
-        ext: &mut BuiltinExt,
+        ext: &mut dyn BuiltinExt,
         caller: H256,
         address: H256,
     ) -> Result<(), ErrCode>
@@ -195,12 +195,12 @@ impl BridgeController {
         Ok(())
     }
 
-    fn is_with_signature_bounds(&self, ext: &mut BuiltinExt, signature_length: i32) -> bool {
+    fn is_with_signature_bounds(&self, ext: &mut dyn BuiltinExt, signature_length: i32) -> bool {
         signature_length >= self.connector.get_min_thresh(ext)
             && signature_length <= self.connector.get_member_count(ext)
     }
 
-    fn bundle_processed(&self, ext: &mut BuiltinExt, hash: H256) -> bool {
+    fn bundle_processed(&self, ext: &mut dyn BuiltinExt, hash: H256) -> bool {
         self.connector.get_bundle(ext, hash) != H256::from_slice(&vec![0; WORD_LENGTH])
     }
 
@@ -209,7 +209,7 @@ impl BridgeController {
     /// was being created.
     pub fn process_bundles(
         &self,
-        ext: &mut BuiltinExt,
+        ext: &mut dyn BuiltinExt,
         caller: H256,
         transaction_hash: H256,
         source_block_hash: H256,
@@ -283,7 +283,7 @@ impl BridgeController {
              * interface documentation.
              */
 
-            let mut result = match self.transfer(ext, b.get_recipient(), b.get_transfer_value()) {
+            let result = match self.transfer(ext, b.get_recipient(), b.get_transfer_value()) {
                 Ok(value) => value,
                 Err(error) => {
                     return Err(error);
@@ -305,26 +305,26 @@ impl BridgeController {
         Ok(results)
     }
 
-    fn add_log(&self, ext: &mut BuiltinExt, topics: Vec<H256>) { ext.log(topics, None); }
+    fn add_log(&self, ext: &mut dyn BuiltinExt, topics: Vec<H256>) { ext.log(topics, None); }
 
-    fn emit_add_member(&self, ext: &mut BuiltinExt, address: H256) {
+    fn emit_add_member(&self, ext: &mut dyn BuiltinExt, address: H256) {
         let topics: Vec<H256> = vec![BridgeEventSig::AddMember.hash().into(), address];
         self.add_log(ext, topics);
     }
 
-    fn emit_remove_member(&self, ext: &mut BuiltinExt, address: H256) {
+    fn emit_remove_member(&self, ext: &mut dyn BuiltinExt, address: H256) {
         let topics: Vec<H256> = vec![BridgeEventSig::RemoveMember.hash().into(), address];
         self.add_log(ext, topics);
     }
 
-    fn emit_change_owner(&self, ext: &mut BuiltinExt, owner_address: H256) {
+    fn emit_change_owner(&self, ext: &mut dyn BuiltinExt, owner_address: H256) {
         let topics: Vec<H256> = vec![BridgeEventSig::ChangedOwner.hash().into(), owner_address];
         self.add_log(ext, topics);
     }
 
     fn emit_distributed(
         &self,
-        ext: &mut BuiltinExt,
+        ext: &mut dyn BuiltinExt,
         source_block_hash: H256,
         recipient: H256,
         value: BigInt,
@@ -348,7 +348,7 @@ impl BridgeController {
 
     fn emit_processed_bundle(
         &self,
-        ext: &mut BuiltinExt,
+        ext: &mut dyn BuiltinExt,
         source_block_hash: H256,
         bundle_hash: H256,
     )
@@ -361,7 +361,7 @@ impl BridgeController {
         self.add_log(ext, topics);
     }
 
-    fn emit_successful_transaction_hash(&self, ext: &mut BuiltinExt, aion_transaction_hash: H256) {
+    fn emit_successful_transaction_hash(&self, ext: &mut dyn BuiltinExt, aion_transaction_hash: H256) {
         let topics: Vec<H256> = vec![
             BridgeEventSig::SuccessfulTxHash.hash().into(),
             aion_transaction_hash,
@@ -371,7 +371,7 @@ impl BridgeController {
 
     pub fn transfer(
         &self,
-        ext: &mut BuiltinExt,
+        ext: &mut dyn BuiltinExt,
         to: H256,
         value: BigInt,
     ) -> Result<ExecutionResult, ErrCode>

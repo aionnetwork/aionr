@@ -46,7 +46,7 @@ impl BuiltinContract for TxHashContract {
 
     fn name(&self) -> &str { &self.name }
 
-    fn execute(&self, ext: &mut BuiltinExt, _input: &[u8]) -> ExecutionResult {
+    fn execute(&self, ext: &mut dyn BuiltinExt, _input: &[u8]) -> ExecutionResult {
         let tx_hash = ext.context().origin_tx_hash.clone();
         ExecutionResult {
             gas_left: U256::zero(),

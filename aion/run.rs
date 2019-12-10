@@ -34,23 +34,23 @@ use acore::sync::Sync;
 use aion_rpc::{dispatch::DynamicGasPrice, informant};
 use aion_version::version;
 use ansi_term::Colour;
-use cache::CacheConfig;
+use crate::cache::CacheConfig;
 use ctrlc::CtrlC;
 use dir::{DatabaseDirectories, Directories};
 use fdlimit::raise_fd_limit;
-use helpers::{passwords_from_files, to_client_config};
+use crate::helpers::{passwords_from_files, to_client_config};
 use dir::helpers::absolute;
-use io::IoChannel;
+use crate::io::IoChannel;
 use tokio;
 use tokio::prelude::*;
 use num_cpus;
-use params::{fatdb_switch_to_bool, AccountsConfig, StakeConfig, MinerExtras, Pruning, SpecType, Switch};
+use crate::params::{fatdb_switch_to_bool, AccountsConfig, StakeConfig, MinerExtras, Pruning, SpecType, Switch};
 use parking_lot::{Condvar, Mutex};
-use rpc;
-use rpc_apis;
+use crate::rpc;
+use crate::rpc_apis;
 use p2p::Config;
 
-use user_defaults::UserDefaults;
+use crate::user_defaults::UserDefaults;
 
 // Pops along with error messages when a password is missing or invalid.
 const VERIFY_PASSWORD_HINT: &'static str = "Make sure valid password is present in files passed \
@@ -206,7 +206,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     let sync = Arc::new(Sync::new(cmd.net_conf.clone(), client.clone()));
     let weak_sync = Arc::downgrade(&sync);
     sync.register_callback(weak_sync);
-    let sync_notify = sync.clone() as Arc<ChainNotify>;
+    let sync_notify = sync.clone() as Arc<dyn ChainNotify>;
     let sync_run = sync.clone();
     service.add_notify(sync_notify);
 

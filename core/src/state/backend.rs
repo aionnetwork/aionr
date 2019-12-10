@@ -38,10 +38,10 @@ use kvdb::{AsHashStore, HashStore, DBValue, MemoryDB};
 /// State backend. See module docs for more details.
 pub trait Backend: Send {
     /// Treat the backend as a read-only hashdb.
-    fn as_hashstore(&self) -> &HashStore;
+    fn as_hashstore(&self) -> &dyn HashStore;
 
     /// Treat the backend as a writeable hashdb.
-    fn as_hashstore_mut(&mut self) -> &mut HashStore;
+    fn as_hashstore_mut(&mut self) -> &mut dyn HashStore;
 
     /// Add an account entry to the cache.
     fn add_to_account_cache(&mut self, addr: Address, data: Option<AionVMAccount>, modified: bool);
@@ -108,8 +108,8 @@ impl HashStore for ProofCheck {
 }
 
 impl Backend for ProofCheck {
-    fn as_hashstore(&self) -> &HashStore { self }
-    fn as_hashstore_mut(&mut self) -> &mut HashStore { self }
+    fn as_hashstore(&self) -> &dyn HashStore { self }
+    fn as_hashstore_mut(&mut self) -> &mut dyn HashStore { self }
     fn add_to_account_cache(
         &mut self,
         _addr: Address,
@@ -172,9 +172,9 @@ impl<H: AsHashStore + Send + Sync> HashStore for Proving<H> {
 }
 
 impl<H: AsHashStore + Send + Sync> Backend for Proving<H> {
-    fn as_hashstore(&self) -> &HashStore { self }
+    fn as_hashstore(&self) -> &dyn HashStore { self }
 
-    fn as_hashstore_mut(&mut self) -> &mut HashStore { self }
+    fn as_hashstore_mut(&mut self) -> &mut dyn HashStore { self }
 
     fn add_to_account_cache(&mut self, _: Address, _: Option<AionVMAccount>, _: bool) {}
 
@@ -207,9 +207,9 @@ impl<H: AsHashStore + Clone> Clone for Proving<H> {
 pub struct Basic<H>(pub H);
 
 impl<H: AsHashStore + Send + Sync> Backend for Basic<H> {
-    fn as_hashstore(&self) -> &HashStore { self.0.as_hashstore() }
+    fn as_hashstore(&self) -> &dyn HashStore { self.0.as_hashstore() }
 
-    fn as_hashstore_mut(&mut self) -> &mut HashStore { self.0.as_hashstore_mut() }
+    fn as_hashstore_mut(&mut self) -> &mut dyn HashStore { self.0.as_hashstore_mut() }
 
     fn add_to_account_cache(&mut self, _: Address, _: Option<AionVMAccount>, _: bool) {}
 

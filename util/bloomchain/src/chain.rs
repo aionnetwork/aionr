@@ -32,12 +32,12 @@ use database::BloomDatabase;
 /// Prepares all bloom database operations.
 pub struct BloomChain<'a> {
     positioner: PositionManager,
-    db: &'a BloomDatabase,
+    db: &'a dyn BloomDatabase,
 }
 
 impl<'a> BloomChain<'a> {
     /// Creates new bloom chain.
-    pub fn new(config: Config, db: &'a BloomDatabase) -> Self {
+    pub fn new(config: Config, db: &'a dyn BloomDatabase) -> Self {
         let positioner = PositionManager::new(config.elements_per_index, config.levels);
 
         BloomChain {
@@ -182,7 +182,7 @@ impl<'a> BloomChain<'a> {
     }
 
     /// Filter the chain returing all numbers matching the filter.
-    pub fn filter(&self, filter: &Filter) -> Vec<Number> {
+    pub fn filter(&self, filter: &dyn Filter) -> Vec<Number> {
         let range = filter.range();
         let mut blocks = filter
             .bloom_possibilities()

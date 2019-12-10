@@ -41,7 +41,7 @@ use vms::{ActionParams, ActionValue, CallType, ParamsType};
 #[cfg_attr(test, derive(Default))]
 pub struct EthereumMachine {
     params: CommonParams,
-    builtins: Arc<BTreeMap<Address, Box<BuiltinContract>>>,
+    builtins: Arc<BTreeMap<Address, Box<dyn BuiltinContract>>>,
     premine: U256,
 }
 
@@ -49,7 +49,7 @@ impl EthereumMachine {
     /// Regular ethereum machine.
     pub fn regular(
         params: CommonParams,
-        builtins: BTreeMap<Address, Box<BuiltinContract>>,
+        builtins: BTreeMap<Address, Box<dyn BuiltinContract>>,
         premine: U256,
     ) -> EthereumMachine
     {
@@ -160,7 +160,7 @@ impl EthereumMachine {
     }
 
     /// Builtin-contracts for the chain..
-    pub fn builtins(&self) -> &BTreeMap<Address, Box<BuiltinContract>> { &*self.builtins }
+    pub fn builtins(&self) -> &BTreeMap<Address, Box<dyn BuiltinContract>> { &*self.builtins }
 
     pub fn premine(&self) -> U256 { self.premine }
 
@@ -168,7 +168,7 @@ impl EthereumMachine {
     /// Only returns references to activated built-ins.
     // TODO: builtin contract routing - to do this properly, it will require removing the built-in configuration-reading logic
     // from Spec into here and removing the Spec::builtins field.
-    pub fn builtin(&self, a: &Address, block_number: BlockNumber) -> Option<&Box<BuiltinContract>> {
+    pub fn builtin(&self, a: &Address, block_number: BlockNumber) -> Option<&Box<dyn BuiltinContract>> {
         self.builtins().get(a).and_then(|b| {
             if b.is_active(block_number) {
                 Some(b)
@@ -225,7 +225,7 @@ pub struct AuxiliaryData<'a> {
 
 /// Type alias for a function we can make calls through synchronously.
 /// Returns the call result and state proof for each call.
-pub type Call<'a> = Fn(Address, Vec<u8>) -> Result<(Vec<u8>, Vec<Vec<u8>>), String> + 'a;
+pub type Call<'a> = dyn Fn(Address, Vec<u8>) -> Result<(Vec<u8>, Vec<Vec<u8>>), String> + 'a;
 
 /// Request for auxiliary data of a block.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -242,7 +242,7 @@ impl ::aion_machine::Machine for EthereumMachine {
     type Header = Header;
 
     type LiveBlock = ExecutedBlock;
-    type EngineClient = ::client::EngineClient;
+    type EngineClient = dyn (::client::EngineClient);
     type AuxiliaryRequest = AuxiliaryRequest;
 
     type Error = Error;

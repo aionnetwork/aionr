@@ -102,7 +102,7 @@ pub struct Mgr {
     /// shutdown hook
     shutdown_hooks: Arc<Mutex<Vec<Sender<()>>>>,
     /// callback
-    callback: Arc<RwLock<Option<Weak<Callable>>>>,
+    callback: Arc<RwLock<Option<Weak<dyn Callable>>>>,
     /// config
     config: Arc<Config>,
     /// temp queue storing seeds and active nodes queried from other nodes
@@ -161,7 +161,7 @@ impl Mgr {
         }
     }
 
-    pub fn register_callback(&self, callback: Weak<Callable>) {
+    pub fn register_callback(&self, callback: Weak<dyn Callable>) {
         if let Ok(mut lock) = self.callback.write() {
             *lock = Some(callback);
         }
@@ -394,8 +394,8 @@ impl Mgr {
                                     }
 
                                     // construct node instance and store it
-                                    let (mut tx, rx) = mpsc::channel(409600);
-                                    let (mut tx_thread, rx_thread) = oneshot::channel::<()>();
+                                    let (tx, rx) = mpsc::channel(409600);
+                                    let (tx_thread, rx_thread) = oneshot::channel::<()>();
                                     if let Ok(ts_0) = ts.try_clone() {
                                         let node = Node::new_outbound(
                                             ts_0,
@@ -609,7 +609,7 @@ impl Mgr {
         // Disconnect nodes
         let mut nodes_write = self.nodes.write();
         for (_hash, node_lock) in nodes_write.iter_mut() {
-            let mut node = node_lock.write();
+            let node = node_lock.write();
             match node.ts.shutdown(Shutdown::Both) {
                 Ok(_) => {
                     info!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());

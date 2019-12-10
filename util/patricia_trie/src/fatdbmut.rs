@@ -37,7 +37,7 @@ impl<'db> FatDBMut<'db> {
     /// Create a new trie with the backing database `db` and empty `root`
     /// Initialise to the state entailed by the genesis block.
     /// This guarantees the trie is built correctly.
-    pub fn new(db: &'db mut HashStore, root: &'db mut H256) -> Self {
+    pub fn new(db: &'db mut dyn HashStore, root: &'db mut H256) -> Self {
         FatDBMut {
             raw: TrieDBMut::new(db, root),
         }
@@ -46,17 +46,17 @@ impl<'db> FatDBMut<'db> {
     /// Create a new trie with the backing database `db` and `root`.
     ///
     /// Returns an error if root does not exist.
-    pub fn from_existing(db: &'db mut HashStore, root: &'db mut H256) -> super::Result<Self> {
+    pub fn from_existing(db: &'db mut dyn HashStore, root: &'db mut H256) -> super::Result<Self> {
         Ok(FatDBMut {
             raw: TrieDBMut::from_existing(db, root)?,
         })
     }
 
     /// Get the backing database.
-    pub fn db(&self) -> &HashStore { self.raw.db() }
+    pub fn db(&self) -> &dyn HashStore { self.raw.db() }
 
     /// Get the backing database.
-    pub fn db_mut(&mut self) -> &mut HashStore { self.raw.db_mut() }
+    pub fn db_mut(&mut self) -> &mut dyn HashStore { self.raw.db_mut() }
 
     fn to_aux_key(key: &[u8]) -> H256 { blake2b(key) }
 }

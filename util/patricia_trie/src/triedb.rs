@@ -55,7 +55,7 @@ use bytes::{ToPretty, Bytes};
 /// }
 /// ```
 pub struct TrieDB<'db> {
-    db: &'db HashStore,
+    db: &'db dyn HashStore,
     root: &'db H256,
     /// The number of hashes performed so far in operations on this trie.
     pub hash_count: usize,
@@ -64,7 +64,7 @@ pub struct TrieDB<'db> {
 impl<'db> TrieDB<'db> {
     /// Create a new trie with the backing database `db` and `root`
     /// Returns an error if `root` does not exist
-    pub fn new(db: &'db HashStore, root: &'db H256) -> super::Result<Self> {
+    pub fn new(db: &'db dyn HashStore, root: &'db H256) -> super::Result<Self> {
         if !db.contains(root) {
             Err(Box::new(TrieError::InvalidStateRoot(*root)))
         } else {
@@ -77,7 +77,7 @@ impl<'db> TrieDB<'db> {
     }
 
     /// Get the backing database.
-    pub fn db(&'db self) -> &'db HashStore { self.db }
+    pub fn db(&'db self) -> &'db dyn HashStore { self.db }
 
     /// Get the data of the root node.
     fn root_data(&self) -> super::Result<DBValue> {
@@ -152,7 +152,7 @@ impl<'db> TrieDB<'db> {
 }
 
 impl<'db> Trie for TrieDB<'db> {
-    fn iter<'a>(&'a self) -> super::Result<Box<TrieIterator<Item = TrieItem> + 'a>> {
+    fn iter<'a>(&'a self) -> super::Result<Box<dyn TrieIterator<Item = TrieItem> + 'a>> {
         TrieDBIterator::new(self).map(|iter| Box::new(iter) as Box<_>)
     }
 

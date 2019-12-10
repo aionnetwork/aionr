@@ -63,7 +63,7 @@ impl BuiltinContract for Blake2bHashContract {
     /// Returns the hash of given input
     /// @param input data input; must be less or equal than 2 MB
     /// @return the returned blake2b 256bits hash is in ExecutionResult.getOutput
-    fn execute(&self, _ext: &mut BuiltinExt, input: &[u8]) -> ExecutionResult {
+    fn execute(&self, _ext: &mut dyn BuiltinExt, input: &[u8]) -> ExecutionResult {
         // check length
         let len = input.len();
         if len == 0 || len > 2_097_152 {

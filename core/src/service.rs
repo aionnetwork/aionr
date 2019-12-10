@@ -190,7 +190,7 @@ impl ClientService {
     /// Get general IO interface
     pub fn register_io_handler(
         &self,
-        handler: Arc<IoHandler<ClientIoMessage> + Send>,
+        handler: Arc<dyn IoHandler<ClientIoMessage> + Send>,
     ) -> Result<(), IoError>
     {
         self.io_service.register_handler(handler)
@@ -203,13 +203,13 @@ impl ClientService {
     pub fn io(&self) -> Arc<IoService<ClientIoMessage>> { self.io_service.clone() }
 
     /// Set the actor to be notified on certain chain events
-    pub fn add_notify(&self, notify: Arc<ChainNotify>) { self.client.add_notify(notify); }
+    pub fn add_notify(&self, notify: Arc<dyn ChainNotify>) { self.client.add_notify(notify); }
 
     /// Get a handle to the database.
-    pub fn db(&self) -> Arc<KeyValueDB> { self.database.clone() }
+    pub fn db(&self) -> Arc<dyn KeyValueDB> { self.database.clone() }
 
     fn check_db(
-        dbs: Arc<KeyValueDB>,
+        dbs: Arc<dyn KeyValueDB>,
         best_block_number: u64,
         best_block_hash: H256,
     ) -> Result<Option<H256>, String>
@@ -249,10 +249,10 @@ impl ClientService {
     }
 
     #[cfg(test)]
-    pub fn test_correct_db(dbs: Arc<KeyValueDB>) -> Result<(), String> { Self::correct_db(dbs) }
+    pub fn test_correct_db(dbs: Arc<dyn KeyValueDB>) -> Result<(), String> { Self::correct_db(dbs) }
 
     /// check db if correct
-    fn correct_db(dbs: Arc<KeyValueDB>) -> Result<(), String> {
+    fn correct_db(dbs: Arc<dyn KeyValueDB>) -> Result<(), String> {
         use db::Readable;
         use rlp_compress::{decompress,blocks_swapper};
         use types::blockchain::extra::BlockDetails;

@@ -77,8 +77,8 @@ mod user_defaults;
 
 use std::{process, env};
 use std::io::{self as stdio, Write};
-use cli::Args;
-use configuration::{Cmd, Execute, Configuration};
+use crate::cli::Args;
+use crate::configuration::{Cmd, Execute, Configuration};
 use logger::setup_log;
 
 enum PostExecutionAction {

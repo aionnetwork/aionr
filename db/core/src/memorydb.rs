@@ -55,11 +55,11 @@ impl MemoryDB {
 
     pub fn put(&mut self, _k: &[u8], _v: &DBValue) -> Option<DBValue> { unimplemented!() }
 
-    pub fn iter(&self) -> Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)>> { unimplemented!() }
+    pub fn iter(&self) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)>> { unimplemented!() }
 
     pub fn get_by_prefix(&self, _prefix: &[u8]) -> Option<Box<[u8]>> { unimplemented!() }
 
-    pub fn iter_from_prefix(&self, _prefix: &[u8]) -> Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)>> {
+    pub fn iter_from_prefix(&self, _prefix: &[u8]) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)>> {
         unimplemented!()
     }
 

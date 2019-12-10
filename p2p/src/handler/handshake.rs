@@ -154,7 +154,7 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
         }
 
         let mut cb_out =
-            channel_buffer_template_with_version(cb_in.head.ver, Action::HANDSHAKERES.value());;
+            channel_buffer_template_with_version(cb_in.head.ver, Action::HANDSHAKERES.value());
         let mut res_body = Vec::new();
 
         res_body.push(1 as u8);

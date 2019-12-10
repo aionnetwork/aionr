@@ -78,11 +78,11 @@ pub trait VMAccount: Sync + Send {
     fn is_objectgraph_cached(&self) -> bool;
 
     /// Provide a database to get `code_hash`. Should not be called if it is a contract without code.
-    fn cache_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>>;
+    fn cache_code(&mut self, db: &dyn HashStore) -> Option<Arc<Bytes>>;
 
-    fn cache_transformed_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>>;
-    fn cache_objectgraph(&mut self, a: &Address, db: &HashStore) -> Option<Arc<Bytes>>;
-    fn cache_objectgraph_size(&mut self, db: &HashStore) -> bool;
+    fn cache_transformed_code(&mut self, db: &dyn HashStore) -> Option<Arc<Bytes>>;
+    fn cache_objectgraph(&mut self, a: &Address, db: &dyn HashStore) -> Option<Arc<Bytes>>;
+    fn cache_objectgraph_size(&mut self, db: &dyn HashStore) -> bool;
 
     /// Provide code to cache. For correctness, should be the correct code for the
     /// account.
@@ -91,8 +91,8 @@ pub trait VMAccount: Sync + Send {
     fn cache_given_objectgraph(&mut self, data: Arc<Bytes>);
 
     /// Provide a database to get `code_size`. Should not be called if it is a contract without code.
-    fn cache_code_size(&mut self, db: &HashStore) -> bool;
-    fn cache_transformed_code_size(&mut self, db: &HashStore) -> bool;
+    fn cache_code_size(&mut self, db: &dyn HashStore) -> bool;
+    fn cache_transformed_code_size(&mut self, db: &dyn HashStore) -> bool;
 
     /// Check if account has zero nonce, balance, no code and no storage.
     ///
@@ -119,7 +119,7 @@ pub trait VMAccount: Sync + Send {
     fn sub_balance(&mut self, x: &U256);
 
     /// Commit any unsaved code. `code_hash` will always return the hash of the `code_cache` after this.
-    fn commit_code(&mut self, db: &mut HashStore);
+    fn commit_code(&mut self, db: &mut dyn HashStore);
 
     /// Export to RLP.
     fn rlp(&self) -> Bytes;
@@ -134,13 +134,13 @@ pub trait VMAccount: Sync + Send {
         a: &Address,
         require: RequireCache,
         state_db: &B,
-        db: &HashStore,
-        graph_db: Arc<KeyValueDB>,
+        db: &dyn HashStore,
+        graph_db: Arc<dyn KeyValueDB>,
     );
 
     fn prove_storage(
         &self,
-        db: &HashStore,
+        db: &dyn HashStore,
         storage_key: H256,
     ) -> Result<(Vec<Bytes>, H256), Box<TrieError>>;
 }

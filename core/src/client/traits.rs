@@ -231,7 +231,7 @@ pub trait BlockChainClient: Sync + Send {
         &self,
         block: BlockId,
         analytics: CallAnalytics,
-    ) -> Result<Box<Iterator<Item = Executed>>, CallError>;
+    ) -> Result<Box<dyn Iterator<Item = Executed>>, CallError>;
 
     /// Get last hashes starting from best block.
     fn last_hashes(&self) -> LastHashes;
@@ -337,7 +337,7 @@ pub trait MiningBlockChainClient: BlockChainClient {
     fn import_sealed_block(&self, block: SealedBlock) -> ImportResult;
 
     /// Returns base of this trait
-    fn as_block_chain_client(&self) -> &BlockChainClient;
+    fn as_block_chain_client(&self) -> &dyn BlockChainClient;
 
     /// get block preparation interval
     fn prepare_block_interval(&self) -> Duration;
@@ -358,7 +358,7 @@ pub trait EngineClient: Sync + Send {
     fn chain_info(&self) -> BlockChainInfo;
 
     /// Attempt to cast the engine client to a full client.
-    fn as_full_client(&self) -> Option<&BlockChainClient>;
+    fn as_full_client(&self) -> Option<&dyn BlockChainClient>;
 
     /// Get a block number by ID.
     fn block_number(&self, id: BlockId) -> Option<BlockNumber>;

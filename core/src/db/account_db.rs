@@ -62,7 +62,7 @@ impl Default for Factory {
 impl Factory {
     /// Create a read-only accountdb.
     /// This will panic when write operations are called.
-    pub fn readonly<'db>(&self, db: &'db HashStore, address_hash: H256) -> Box<HashStore + 'db> {
+    pub fn readonly<'db>(&self, db: &'db dyn HashStore, address_hash: H256) -> Box<dyn HashStore + 'db> {
         match *self {
             Factory::Mangled => Box::new(AccountDB::from_hash(db, address_hash)),
             Factory::Plain => Box::new(Wrapping(db)),
@@ -70,7 +70,7 @@ impl Factory {
     }
 
     /// Create a new mutable hashdb.
-    pub fn create<'db>(&self, db: &'db mut HashStore, address_hash: H256) -> Box<HashStore + 'db> {
+    pub fn create<'db>(&self, db: &'db mut dyn HashStore, address_hash: H256) -> Box<dyn HashStore + 'db> {
         match *self {
             Factory::Mangled => Box::new(AccountDBMut::from_hash(db, address_hash)),
             Factory::Plain => Box::new(WrappingMut(db)),
@@ -82,13 +82,13 @@ impl Factory {
 /// DB backend wrapper for Account trie
 /// Transforms trie node keys for the database
 pub struct AccountDB<'db> {
-    db: &'db HashStore,
+    db: &'db dyn HashStore,
     address_hash: H256,
 }
 
 impl<'db> AccountDB<'db> {
     /// Create a new AcountDB from an address' hash.
-    pub fn from_hash(db: &'db HashStore, address_hash: H256) -> Self {
+    pub fn from_hash(db: &'db dyn HashStore, address_hash: H256) -> Self {
         AccountDB {
             db: db,
             address_hash: address_hash,
@@ -122,19 +122,19 @@ impl<'db> HashStore for AccountDB<'db> {
 
 /// DB backend wrapper for Account trie
 pub struct AccountDBMut<'db> {
-    db: &'db mut HashStore,
+    db: &'db mut dyn HashStore,
     address_hash: H256,
 }
 
 impl<'db> AccountDBMut<'db> {
     /// Create a new AccountDB from an address.
     #[cfg(test)]
-    pub fn new(db: &'db mut HashStore, address: &Address) -> Self {
+    pub fn new(db: &'db mut dyn HashStore, address: &Address) -> Self {
         Self::from_hash(db, blake2b(address))
     }
 
     /// Create a new AcountDB from an address' hash.
-    pub fn from_hash(db: &'db mut HashStore, address_hash: H256) -> Self {
+    pub fn from_hash(db: &'db mut dyn HashStore, address_hash: H256) -> Self {
         AccountDBMut {
             db: db,
             address_hash: address_hash,
@@ -194,7 +194,7 @@ impl<'db> HashStore for AccountDBMut<'db> {
     }
 }
 
-struct Wrapping<'db>(&'db HashStore);
+struct Wrapping<'db>(&'db dyn HashStore);
 
 impl<'db> HashStore for Wrapping<'db> {
     fn keys(&self) -> HashMap<H256, i32> { unimplemented!() }
@@ -220,7 +220,7 @@ impl<'db> HashStore for Wrapping<'db> {
     fn remove(&mut self, _key: &H256) { unimplemented!() }
 }
 
-struct WrappingMut<'db>(&'db mut HashStore);
+struct WrappingMut<'db>(&'db mut dyn HashStore);
 
 impl<'db> HashStore for WrappingMut<'db> {
     fn keys(&self) -> HashMap<H256, i32> { unimplemented!() }

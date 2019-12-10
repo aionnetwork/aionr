@@ -39,21 +39,21 @@ pub trait BuiltinContract: Send + Sync {
     /// contract name.
     fn name(&self) -> &str;
     /// execute the contract.
-    fn execute(&self, ext: &mut BuiltinExt, input: &[u8]) -> ExecutionResult;
+    fn execute(&self, ext: &mut dyn BuiltinExt, input: &[u8]) -> ExecutionResult;
 }
 
 /// aion precompiled contracts
-pub fn builtin_contract(params: BuiltinParams) -> Box<BuiltinContract> {
+pub fn builtin_contract(params: BuiltinParams) -> Box<dyn BuiltinContract> {
     trace!(target:"builtin","initialize builtin contract: {}", params);
     let name = params.name.clone();
     match name.as_ref() {
         "total_currency_contract" => {
-            Box::new(TotalCurrencyContract::new(params)) as Box<BuiltinContract>
+            Box::new(TotalCurrencyContract::new(params)) as Box<dyn BuiltinContract>
         }
-        "atb" => Box::new(TokenBridgeContract::new(params)) as Box<BuiltinContract>,
-        "ed_verify" => Box::new(EDVerifyContract::new(params)) as Box<BuiltinContract>,
-        "tx_hash" => Box::new(TxHashContract::new(params)) as Box<BuiltinContract>,
-        "blake2b_hash" => Box::new(Blake2bHashContract::new(params)) as Box<BuiltinContract>,
+        "atb" => Box::new(TokenBridgeContract::new(params)) as Box<dyn BuiltinContract>,
+        "ed_verify" => Box::new(EDVerifyContract::new(params)) as Box<dyn BuiltinContract>,
+        "tx_hash" => Box::new(TxHashContract::new(params)) as Box<dyn BuiltinContract>,
+        "blake2b_hash" => Box::new(Blake2bHashContract::new(params)) as Box<dyn BuiltinContract>,
         _ => panic!("invalid builtin name: {}", name),
     }
 }

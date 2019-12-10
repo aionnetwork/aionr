@@ -42,14 +42,14 @@ use client::BlockChainClient;
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 fn enact_bytes(
     block_bytes: &[u8],
-    engine: &Engine,
+    engine: &dyn Engine,
     db: StateDB,
     parent: &Header,
     grand_parent: Option<&Header>,
     great_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
-    client: &BlockChainClient,
+    client: &dyn BlockChainClient,
 ) -> Result<LockedBlock, Error>
 {
     let block = BlockView::new(block_bytes);
@@ -103,14 +103,14 @@ fn enact_bytes(
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header. Seal the block afterwards
 fn enact_and_seal(
     block_bytes: &[u8],
-    engine: &Engine,
+    engine: &dyn Engine,
     db: StateDB,
     parent: &Header,
     grand_parent: Option<&Header>,
     great_grand_parent: Option<&Header>,
     last_hashes: Arc<LastHashes>,
     factories: Factories,
-    client: &BlockChainClient,
+    client: &dyn BlockChainClient,
 ) -> Result<SealedBlock, Error>
 {
     let header = BlockView::new(block_bytes).header_view();

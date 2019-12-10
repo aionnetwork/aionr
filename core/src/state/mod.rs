@@ -141,7 +141,7 @@ pub struct State<B: Backend> {
     account_start_nonce: U256,
 
     factories: Factories,
-    kvdb: Arc<KeyValueDB>,
+    kvdb: Arc<dyn KeyValueDB>,
 }
 
 /// Mode of dealing with null accounts.
@@ -166,7 +166,7 @@ impl<B: Backend> State<B> {
         mut db: B,
         account_start_nonce: U256,
         factories: Factories,
-        kvdb: Arc<KeyValueDB>,
+        kvdb: Arc<dyn KeyValueDB>,
     ) -> State<B>
     {
         let mut root = H256::new();
@@ -192,7 +192,7 @@ impl<B: Backend> State<B> {
         root: H256,
         account_start_nonce: U256,
         factories: Factories,
-        kvdb: Arc<KeyValueDB>,
+        kvdb: Arc<dyn KeyValueDB>,
     ) -> Result<State<B>, TrieError>
     {
         if !db.as_hashstore().contains(&root) {
@@ -212,7 +212,7 @@ impl<B: Backend> State<B> {
         Ok(state)
     }
 
-    pub fn export_kvdb(&self) -> Arc<KeyValueDB> { self.kvdb.clone() }
+    pub fn export_kvdb(&self) -> Arc<dyn KeyValueDB> { self.kvdb.clone() }
 
     /// Get a VM factory that can execute on this state.
     pub fn vm_factory(&self) -> VmFactory { self.factories.vm.clone() }

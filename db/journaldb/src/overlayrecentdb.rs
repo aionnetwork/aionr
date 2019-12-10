@@ -69,7 +69,7 @@ use bytes::Bytes;
 
 pub struct OverlayRecentDB {
     transaction_overlay: MemoryDB,
-    backing: Arc<KeyValueDB>,
+    backing: Arc<dyn KeyValueDB>,
     journal_overlay: Arc<RwLock<JournalOverlay>>,
     db_name: &'static str,
 }
@@ -112,7 +112,7 @@ const PADDING: [u8; 10] = [0u8; 10];
 
 impl OverlayRecentDB {
     /// Create a new instance.
-    pub fn new(backing: Arc<KeyValueDB>, db_name: &'static str) -> OverlayRecentDB {
+    pub fn new(backing: Arc<dyn KeyValueDB>, db_name: &'static str) -> OverlayRecentDB {
         let journal_overlay = Arc::new(RwLock::new(OverlayRecentDB::read_overlay(
             &*backing, db_name,
         )));
@@ -141,7 +141,7 @@ impl OverlayRecentDB {
             .expect("Low-level database error. Some issue with your hard disk?")
     }
 
-    fn read_overlay(db: &KeyValueDB, db_name: &str) -> JournalOverlay {
+    fn read_overlay(db: &dyn KeyValueDB, db_name: &str) -> JournalOverlay {
         let mut journal = HashMap::new();
         let mut overlay = MemoryDB::new();
         let mut count = 0;
@@ -228,7 +228,7 @@ fn to_short_key(key: &H256) -> H256 {
 }
 
 impl JournalDB for OverlayRecentDB {
-    fn boxed_clone(&self) -> Box<JournalDB> { Box::new(self.clone()) }
+    fn boxed_clone(&self) -> Box<dyn JournalDB> { Box::new(self.clone()) }
 
     fn mem_used(&self) -> usize {
         let mut mem = self.transaction_overlay.mem_used();
@@ -250,7 +250,7 @@ impl JournalDB for OverlayRecentDB {
             .is_none()
     }
 
-    fn backing(&self) -> &Arc<KeyValueDB> { &self.backing }
+    fn backing(&self) -> &Arc<dyn KeyValueDB> { &self.backing }
 
     fn latest_era(&self) -> Option<u64> { self.journal_overlay.read().latest_era }
 

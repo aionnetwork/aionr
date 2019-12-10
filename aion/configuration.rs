@@ -20,30 +20,30 @@
  ******************************************************************************/
 
 use std::time::Duration;
-use cli::{Args, ArgsError};
+use crate::cli::{Args, ArgsError};
 use aion_types::{U256, Address};
-use bytes::Bytes;
+use crate::bytes::Bytes;
 use p2p::Config;
 use acore::client::{VMType};
 use acore::miner::{MinerOptions, Banning};
 use acore::verification::queue::VerifierSettings;
 
-use rpc::{IpcConfiguration, HttpConfiguration, WsConfiguration};
+use crate::rpc::{IpcConfiguration, HttpConfiguration, WsConfiguration};
 use aion_rpc::dispatch::DynamicGasPrice;
-use cache::CacheConfig;
-use helpers::{
+use crate::cache::CacheConfig;
+use crate::helpers::{
     to_block_id, to_u256, to_pending_set, aion_ipc_path, parse_log_target, to_addresses,
     to_address, to_queue_strategy, validate_log_level,
 };
 use dir::helpers::{replace_home, replace_home_and_local, absolute};
-use params::{AccountsConfig, StakeConfig, MinerExtras, SpecType};
+use crate::params::{AccountsConfig, StakeConfig, MinerExtras, SpecType};
 use logger::{LogConfig};
 use dir::{self, Directories, default_local_path, default_data_path};
-use run::RunCmd;
-use blockchain::{
+use crate::run::RunCmd;
+use crate::blockchain::{
     BlockchainCmd, ImportBlockchain, ExportBlockchain, KillBlockchain, RevertBlockchain, DataFormat,
 };
-use account::{AccountCmd, NewAccount, ListAccounts, ImportAccounts, ImportAccount, ExportAccount};
+use crate::account::{AccountCmd, NewAccount, ListAccounts, ImportAccounts, ImportAccount, ExportAccount};
 
 #[derive(Debug, PartialEq)]
 pub enum Cmd {
@@ -610,11 +610,11 @@ impl Configuration {
 mod tests {
     use acore::client::{BlockId};
     use acore::transaction::transaction_queue::PrioritizationStrategy;
-    use account::{AccountCmd, NewAccount, ImportAccounts, ListAccounts};
-    use blockchain::{BlockchainCmd, ImportBlockchain, ExportBlockchain, DataFormat};
-    use cli::Args;
+    use crate::account::{AccountCmd, NewAccount, ImportAccounts, ListAccounts};
+    use crate::blockchain::{BlockchainCmd, ImportBlockchain, ExportBlockchain, DataFormat};
+    use crate::cli::Args;
     use dir::Directories;
-    use run::RunCmd;
+    use crate::run::RunCmd;
     use p2p::Config;
     use super::*;
 

@@ -97,7 +97,7 @@ pub fn read_u64v_be(dst: &mut [u64], input: &[u8]) {
         let mut x: *mut u64 = dst.get_unchecked_mut(0);
         let mut y: *const u8 = input.get_unchecked(0);
         for _ in 0..dst.len() {
-            let mut tmp: u64 = mem::uninitialized();
+            let mut tmp: u64 = mem::MaybeUninit::uninit().assume_init();
             ptr::copy_nonoverlapping(y, &mut tmp as *mut _ as *mut u8, 8);
             *x = u64::from_be(tmp);
             x = x.offset(1);
@@ -113,7 +113,7 @@ pub fn read_u64v_le(dst: &mut [u64], input: &[u8]) {
         let mut x: *mut u64 = dst.get_unchecked_mut(0);
         let mut y: *const u8 = input.get_unchecked(0);
         for _ in 0..dst.len() {
-            let mut tmp: u64 = mem::uninitialized();
+            let mut tmp: u64 = mem::MaybeUninit::uninit().assume_init();
             ptr::copy_nonoverlapping(y, &mut tmp as *mut _ as *mut u8, 8);
             *x = u64::from_le(tmp);
             x = x.offset(1);
@@ -129,7 +129,7 @@ pub fn read_u32v_be(dst: &mut [u32], input: &[u8]) {
         let mut x: *mut u32 = dst.get_unchecked_mut(0);
         let mut y: *const u8 = input.get_unchecked(0);
         for _ in 0..dst.len() {
-            let mut tmp: u32 = mem::uninitialized();
+            let mut tmp: u32 = mem::MaybeUninit::uninit().assume_init();
             ptr::copy_nonoverlapping(y, &mut tmp as *mut _ as *mut u8, 4);
             *x = u32::from_be(tmp);
             x = x.offset(1);
@@ -145,7 +145,7 @@ pub fn read_u32v_le(dst: &mut [u32], input: &[u8]) {
         let mut x: *mut u32 = dst.get_unchecked_mut(0);
         let mut y: *const u8 = input.get_unchecked(0);
         for _ in 0..dst.len() {
-            let mut tmp: u32 = mem::uninitialized();
+            let mut tmp: u32 = mem::MaybeUninit::uninit().assume_init();
             ptr::copy_nonoverlapping(y, &mut tmp as *mut _ as *mut u8, 4);
             *x = u32::from_le(tmp);
             x = x.offset(1);
@@ -158,7 +158,7 @@ pub fn read_u32v_le(dst: &mut [u32], input: &[u8]) {
 pub fn read_u32_le(input: &[u8]) -> u32 {
     assert!(input.len() == 4);
     unsafe {
-        let mut tmp: u32 = mem::uninitialized();
+        let mut tmp: u32 = mem::MaybeUninit::uninit().assume_init();
         ptr::copy_nonoverlapping(input.get_unchecked(0), &mut tmp as *mut _ as *mut u8, 4);
         u32::from_le(tmp)
     }
@@ -168,7 +168,7 @@ pub fn read_u32_le(input: &[u8]) -> u32 {
 pub fn read_u32_be(input: &[u8]) -> u32 {
     assert!(input.len() == 4);
     unsafe {
-        let mut tmp: u32 = mem::uninitialized();
+        let mut tmp: u32 = mem::MaybeUninit::uninit().assume_init();
         ptr::copy_nonoverlapping(input.get_unchecked(0), &mut tmp as *mut _ as *mut u8, 4);
         u32::from_be(tmp)
     }

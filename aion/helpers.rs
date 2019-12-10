@@ -27,7 +27,7 @@ use journaldb::Algorithm;
 use acore::client::{BlockId, VMType, DatabaseCompactionProfile, ClientConfig};
 use acore::miner::PendingSet;
 use acore::transaction::transaction_queue::PrioritizationStrategy;
-use cache::CacheConfig;
+use crate::cache::CacheConfig;
 use dir::helpers::replace_home;
 
 pub fn to_block_id(s: &str) -> Result<BlockId, String> {

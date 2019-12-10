@@ -32,7 +32,7 @@ pub struct VmFactory {
 }
 
 impl VmFactory {
-    pub fn create(&mut self, vm: VMType) -> &mut Factory {
+    pub fn create(&mut self, vm: VMType) -> &mut dyn Factory {
         match vm {
             VMType::FastVM => &mut self.fastvm,
             VMType::AVM => &mut self.avm,

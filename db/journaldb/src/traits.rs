@@ -32,7 +32,7 @@ use bytes::Bytes;
 /// exclusive actions.
 pub trait JournalDB: HashStore {
     /// Return a copy of ourself, in a box.
-    fn boxed_clone(&self) -> Box<JournalDB>;
+    fn boxed_clone(&self) -> Box<dyn JournalDB>;
 
     /// Returns heap memory size used
     fn mem_used(&self) -> usize;
@@ -84,7 +84,7 @@ pub trait JournalDB: HashStore {
     fn is_pruned(&self) -> bool { true }
 
     /// Get backing database.
-    fn backing(&self) -> &Arc<kvdb::KeyValueDB>;
+    fn backing(&self) -> &Arc<dyn kvdb::KeyValueDB>;
 
     /// Clear internal strucutres. This should called after changes have been written
     /// to the backing strage

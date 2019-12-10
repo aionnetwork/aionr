@@ -334,7 +334,7 @@ pub fn get_test_client_with_blocks(blocks: Vec<Bytes>) -> Arc<Client> {
     client
 }
 
-pub fn new_db() -> Arc<KeyValueDB> {
+pub fn new_db() -> Arc<dyn KeyValueDB> {
     let mut db_configs = Vec::new();
     for db_name in db::DB_NAMES.to_vec() {
         db_configs.push(db_name.into());
@@ -363,7 +363,7 @@ pub fn generate_dummy_blockchain(block_number: u32) -> BlockChain {
     bc
 }
 
-pub fn generate_dummy_blockchain_with_db(block_number: u32, db: Arc<KeyValueDB>) -> BlockChain {
+pub fn generate_dummy_blockchain_with_db(block_number: u32, db: Arc<dyn KeyValueDB>) -> BlockChain {
     let bc = BlockChain::new(
         BlockChainConfig::default(),
         &create_unverifiable_block(0, H256::zero()),

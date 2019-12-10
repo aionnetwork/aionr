@@ -122,7 +122,7 @@ where B: StateBackend
     depth: usize,
     origin_info: Vec<OriginInfo>,
     substate: &'a mut Substate,
-    db: Arc<KeyValueDB>,
+    db: Arc<dyn KeyValueDB>,
 }
 
 impl<'a, B: 'a> Externalities<'a, B>
@@ -136,7 +136,7 @@ where B: StateBackend
         depth: usize,
         origin_info: Vec<OriginInfo>,
         substate: &'a mut Substate,
-        kvdb: Arc<KeyValueDB>,
+        kvdb: Arc<dyn KeyValueDB>,
     ) -> Self
     {
         Externalities {

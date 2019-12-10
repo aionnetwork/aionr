@@ -81,7 +81,7 @@ impl PodAccount {
     }
 
     /// Place additional data into given hash DB.
-    pub fn insert_additional(&self, db: &mut HashStore, factory: &TrieFactory) {
+    pub fn insert_additional(&self, db: &mut dyn HashStore, factory: &TrieFactory) {
         match self.code {
             Some(ref c) if !c.is_empty() => {
                 db.insert(c);

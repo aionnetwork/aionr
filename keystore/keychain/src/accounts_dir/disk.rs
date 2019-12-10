@@ -42,7 +42,6 @@ const IGNORED_FILES: &'static [&'static str] = &[
 #[cfg(not(windows))]
 fn restrict_permissions_to_owner(file_path: &Path) -> Result<(), i32> {
     use std::ffi;
-    use libc;
 
     let cstr = ffi::CString::new(&*file_path.to_string_lossy()).map_err(|_| -1)?;
     match unsafe { libc::chmod(cstr.as_ptr(), libc::S_IWUSR | libc::S_IRUSR) } {
@@ -260,7 +259,7 @@ where T: KeyFileManager
 
     fn path(&self) -> Option<&PathBuf> { Some(&self.path) }
 
-    fn as_vault_provider(&self) -> Option<&VaultKeyDirectoryProvider> { Some(self) }
+    fn as_vault_provider(&self) -> Option<&dyn VaultKeyDirectoryProvider> { Some(self) }
 
     fn unique_repr(&self) -> Result<u64, Error> { self.last_modification_date() }
 }
@@ -268,12 +267,12 @@ where T: KeyFileManager
 impl<T> VaultKeyDirectoryProvider for DiskDirectory<T>
 where T: KeyFileManager
 {
-    fn create(&self, name: &str, key: VaultKey) -> Result<Box<VaultKeyDirectory>, Error> {
+    fn create(&self, name: &str, key: VaultKey) -> Result<Box<dyn VaultKeyDirectory>, Error> {
         let vault_dir = VaultDiskDirectory::create(&self.path, name, key)?;
         Ok(Box::new(vault_dir))
     }
 
-    fn open(&self, name: &str, key: VaultKey) -> Result<Box<VaultKeyDirectory>, Error> {
+    fn open(&self, name: &str, key: VaultKey) -> Result<Box<dyn VaultKeyDirectory>, Error> {
         let vault_dir = VaultDiskDirectory::at(&self.path, name, key)?;
         Ok(Box::new(vault_dir))
     }

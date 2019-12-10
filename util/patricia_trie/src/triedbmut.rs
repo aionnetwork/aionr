@@ -88,7 +88,7 @@ enum Node {
 
 impl Node {
     // load an inline node into memory or get the hash to do the lookup later.
-    fn inline_or_hash(node: &[u8], db: &HashStore, storage: &mut NodeStorage) -> NodeHandle {
+    fn inline_or_hash(node: &[u8], db: &dyn HashStore, storage: &mut NodeStorage) -> NodeHandle {
         let r = Rlp::new(node);
         if r.is_data() && r.size() == 32 {
             NodeHandle::Hash(r.as_val::<H256>())
@@ -99,7 +99,7 @@ impl Node {
     }
 
     // decode a node from rlp without getting its children.
-    fn from_rlp(rlp: &[u8], db: &HashStore, storage: &mut NodeStorage) -> Self {
+    fn from_rlp(rlp: &[u8], db: &dyn HashStore, storage: &mut NodeStorage) -> Self {
         match RlpNode::decoded(rlp) {
             RlpNode::Empty => Node::Empty,
             RlpNode::Leaf(k, v) => Node::Leaf(k.encoded(true), DBValue::from_slice(&v)),
@@ -286,7 +286,7 @@ impl<'a> Index<&'a StorageHandle> for NodeStorage {
 /// ```
 pub struct TrieDBMut<'a> {
     storage: NodeStorage,
-    db: &'a mut HashStore,
+    db: &'a mut dyn HashStore,
     root: &'a mut H256,
     root_handle: NodeHandle,
     death_row: HashSet<H256>,
@@ -297,7 +297,7 @@ pub struct TrieDBMut<'a> {
 
 impl<'a> TrieDBMut<'a> {
     /// Create a new trie with backing database `db` and empty `root`.
-    pub fn new(db: &'a mut HashStore, root: &'a mut H256) -> Self {
+    pub fn new(db: &'a mut dyn HashStore, root: &'a mut H256) -> Self {
         *root = BLAKE2B_NULL_RLP;
         let root_handle = NodeHandle::Hash(BLAKE2B_NULL_RLP);
 
@@ -313,7 +313,7 @@ impl<'a> TrieDBMut<'a> {
 
     /// Create a new trie with the backing database `db` and `root.
     /// Returns an error if `root` does not exist.
-    pub fn from_existing(db: &'a mut HashStore, root: &'a mut H256) -> super::Result<Self> {
+    pub fn from_existing(db: &'a mut dyn HashStore, root: &'a mut H256) -> super::Result<Self> {
         if !db.contains(root) {
             return Err(Box::new(TrieError::InvalidStateRoot(*root)));
         }
@@ -329,10 +329,10 @@ impl<'a> TrieDBMut<'a> {
         })
     }
     /// Get the backing database.
-    pub fn db(&self) -> &HashStore { self.db }
+    pub fn db(&self) -> &dyn HashStore { self.db }
 
     /// Get the backing database mutably.
-    pub fn db_mut(&mut self) -> &mut HashStore { self.db }
+    pub fn db_mut(&mut self) -> &mut dyn HashStore { self.db }
 
     // cache a node by hash
     fn cache(&mut self, hash: H256) -> super::Result<StorageHandle> {

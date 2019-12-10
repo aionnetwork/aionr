@@ -105,7 +105,7 @@ struct BlockChanges {
 /// `StateDB` is propagated into the global cache.
 pub struct StateDB {
     /// Backing database.
-    db: Box<JournalDB>,
+    db: Box<dyn JournalDB>,
     /// Shared canonical state cache.
     account_cache: Arc<Mutex<AccountCache>>,
     /// DB Code cache. Maps code hashes to shared bytes.
@@ -129,7 +129,7 @@ impl StateDB {
     /// of the LRU cache in bytes. Actual used memory may (read: will) be higher due to bookkeeping.
     // TODO: make the cache size actually accurate by moving the account storage cache
     // into the `AccountCache` structure as its own `LruCache<(Address, H256), H256>`.
-    pub fn new(db: Box<JournalDB>, cache_size: usize) -> StateDB {
+    pub fn new(db: Box<dyn JournalDB>, cache_size: usize) -> StateDB {
         let bloom = Self::load_bloom(&**db.backing());
         let acc_cache_size = cache_size * ACCOUNT_CACHE_RATIO / 100;
         let code_cache_size = cache_size - acc_cache_size;
@@ -153,7 +153,7 @@ impl StateDB {
 
     /// Loads accounts bloom from the database
     /// This bloom is used to handle request for the non-existant account fast
-    pub fn load_bloom(db: &KeyValueDB) -> Bloom {
+    pub fn load_bloom(db: &dyn KeyValueDB) -> Bloom {
         let hash_count_entry = db
             .get(COL_ACCOUNT_BLOOM, ACCOUNT_BLOOM_HASHCOUNT_KEY)
             .expect("Low-level database error");
@@ -348,10 +348,10 @@ impl StateDB {
     }
 
     /// Returns immutable reference to underlying hashdb.
-    pub fn as_hashstore(&self) -> &HashStore { self.db.as_hashstore() }
+    pub fn as_hashstore(&self) -> &dyn HashStore { self.db.as_hashstore() }
 
     /// Returns mutable reference to underlying hashdb.
-    pub fn as_hashstore_mut(&mut self) -> &mut HashStore { self.db.as_hashstore_mut() }
+    pub fn as_hashstore_mut(&mut self) -> &mut dyn HashStore { self.db.as_hashstore_mut() }
 
     /// Clone the database.
     pub fn boxed_clone(&self) -> StateDB {
@@ -397,7 +397,7 @@ impl StateDB {
     }
 
     /// Returns underlying `JournalDB`.
-    pub fn journal_db(&self) -> &JournalDB { &*self.db }
+    pub fn journal_db(&self) -> &dyn JournalDB { &*self.db }
 
     /// Query how much memory is set aside for the accounts cache (in bytes).
     pub fn cache_size(&self) -> usize { self.cache_size }
@@ -451,9 +451,9 @@ impl StateDB {
 }
 
 impl state::Backend for StateDB {
-    fn as_hashstore(&self) -> &HashStore { self.db.as_hashstore() }
+    fn as_hashstore(&self) -> &dyn HashStore { self.db.as_hashstore() }
 
-    fn as_hashstore_mut(&mut self) -> &mut HashStore { self.db.as_hashstore_mut() }
+    fn as_hashstore_mut(&mut self) -> &mut dyn HashStore { self.db.as_hashstore_mut() }
 
     fn add_to_account_cache(&mut self, addr: Address, data: Option<AionVMAccount>, modified: bool) {
         self.local_cache.push(CacheQueueItem {

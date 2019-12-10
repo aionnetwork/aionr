@@ -125,7 +125,7 @@ impl Serialize for Receipt {
 
         let mut receipt_logs = Vec::new();
         for l in &self.logs {
-            let mut rlogs = ReceiptLog {
+            let rlogs = ReceiptLog {
                 address: l.address.clone(),
                 topics: l.topics.clone(),
                 data: l.data.clone(),

@@ -333,7 +333,7 @@ fn should_not_panic_on_state_diff_with_storage() {
     let mut state = get_temp_state();
 
     let a: Address = 0xa.into();
-    state.init_code(&a, b"abcdefg".to_vec()).unwrap();;
+    state.init_code(&a, b"abcdefg".to_vec()).unwrap();
     state
         .add_balance(&a, &256.into(), CleanupMode::NoEmpty)
         .unwrap();

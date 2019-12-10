@@ -229,7 +229,7 @@ impl KeyValueDAO for Rockskvdb {
         Some(DBValue::from_slice(k))
     }
 
-    fn iter(&self) -> Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)>> {
+    fn iter(&self) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)>> {
         let mut overlay_data = self
             .overlay
             .iter()
@@ -272,7 +272,7 @@ impl KeyValueDAO for Rockskvdb {
         }
     }
 
-    fn iter_from_prefix(&self, prefix: &[u8]) -> Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)>> {
+    fn iter_from_prefix(&self, prefix: &[u8]) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)>> {
         Box::new(self.db.iterator_opt(
             IteratorMode::From(prefix, Direction::Forward),
             &self.read_options,

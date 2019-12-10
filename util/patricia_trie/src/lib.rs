@@ -161,7 +161,7 @@ pub trait Trie {
     where 'a: 'key;
 
     /// Returns a depth-first iterator over the elements of trie.
-    fn iter<'a>(&'a self) -> Result<Box<TrieIterator<Item = TrieItem> + 'a>>;
+    fn iter<'a>(&'a self) -> Result<Box<dyn TrieIterator<Item = TrieItem> + 'a>>;
 }
 
 /// A key-value datastore implemented as a database-backed modified Merkle tree.
@@ -255,7 +255,7 @@ impl<'db> Trie for TrieKinds<'db> {
         wrapper!(self, get_with, key, query)
     }
 
-    fn iter<'a>(&'a self) -> Result<Box<TrieIterator<Item = TrieItem> + 'a>> {
+    fn iter<'a>(&'a self) -> Result<Box<dyn TrieIterator<Item = TrieItem> + 'a>> {
         wrapper!(self, iter,)
     }
 }
@@ -269,7 +269,7 @@ impl TrieFactory {
     }
 
     /// Create new immutable instance of Trie.
-    pub fn readonly<'db>(&self, db: &'db HashStore, root: &'db H256) -> Result<TrieKinds<'db>> {
+    pub fn readonly<'db>(&self, db: &'db dyn HashStore, root: &'db H256) -> Result<TrieKinds<'db>> {
         match self.spec {
             TrieSpec::Generic => Ok(TrieKinds::Generic(TrieDB::new(db, root)?)),
             TrieSpec::Secure => Ok(TrieKinds::Secure(SecTrieDB::new(db, root)?)),
@@ -278,7 +278,7 @@ impl TrieFactory {
     }
 
     /// Create new mutable instance of Trie.
-    pub fn create<'db>(&self, db: &'db mut HashStore, root: &'db mut H256) -> Box<TrieMut + 'db> {
+    pub fn create<'db>(&self, db: &'db mut dyn HashStore, root: &'db mut H256) -> Box<dyn TrieMut + 'db> {
         match self.spec {
             TrieSpec::Generic => Box::new(TrieDBMut::new(db, root)),
             TrieSpec::Secure => Box::new(SecTrieDBMut::new(db, root)),
@@ -289,9 +289,9 @@ impl TrieFactory {
     /// Create new mutable instance of trie and check for errors.
     pub fn from_existing<'db>(
         &self,
-        db: &'db mut HashStore,
+        db: &'db mut dyn HashStore,
         root: &'db mut H256,
-    ) -> Result<Box<TrieMut + 'db>>
+    ) -> Result<Box<dyn TrieMut + 'db>>
     {
         match self.spec {
             TrieSpec::Generic => Ok(Box::new(TrieDBMut::from_existing(db, root)?)),

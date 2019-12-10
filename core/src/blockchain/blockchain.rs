@@ -238,7 +238,7 @@ pub struct BlockChain {
     blocks_blooms: RwLock<HashMap<GroupPosition, BloomGroup>>,
     block_receipts: RwLock<HashMap<H256, BlockReceipts>>,
 
-    db: Arc<KeyValueDB>,
+    db: Arc<dyn KeyValueDB>,
 
     cache_man: Mutex<CacheManager<CacheId>>,
 
@@ -565,7 +565,7 @@ impl<'a> Iterator for AncestryIter<'a> {
 
 impl BlockChain {
     /// Create new instance of blockchain from given Genesis.
-    pub fn new(config: Config, genesis: &[u8], db: Arc<KeyValueDB>) -> BlockChain {
+    pub fn new(config: Config, genesis: &[u8], db: Arc<dyn KeyValueDB>) -> BlockChain {
         // 400 is the avarage size of the key
         let cache_man = CacheManager::new(config.pref_cache_size, config.max_cache_size, 400);
 

@@ -38,7 +38,7 @@ use log_entry::{LogEntry, LocalizedLogEntry};
 use keychain;
 use db;
 
-fn new_db() -> Arc<KeyValueDB> {
+fn new_db() -> Arc<dyn KeyValueDB> {
     let mut db_configs = Vec::new();
     for db_name in db::DB_NAMES.to_vec() {
         db_configs.push(db_name.into());
@@ -46,7 +46,7 @@ fn new_db() -> Arc<KeyValueDB> {
     Arc::new(MockDbRepository::init(db_configs))
 }
 
-fn new_chain(genesis: &[u8], db: Arc<KeyValueDB>) -> BlockChain {
+fn new_chain(genesis: &[u8], db: Arc<dyn KeyValueDB>) -> BlockChain {
     BlockChain::new(Default::default(), genesis, db)
 }
 
@@ -565,7 +565,7 @@ fn find_transaction_by_hash() {
 }
 
 fn insert_block(
-    db: &Arc<KeyValueDB>,
+    db: &Arc<dyn KeyValueDB>,
     bc: &BlockChain,
     bytes: &[u8],
     receipts: Vec<Receipt>,

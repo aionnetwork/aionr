@@ -110,10 +110,10 @@ impl fmt::Display for Algorithm {
 
 /// Create a new `JournalDB` trait object over a generic key-value database.
 pub fn new(
-    backing: Arc<::kvdb::KeyValueDB>,
+    backing: Arc<dyn (::kvdb::KeyValueDB)>,
     algorithm: Algorithm,
     db_name: &'static str,
-) -> Box<JournalDB>
+) -> Box<dyn JournalDB>
 {
     match algorithm {
         Algorithm::Archive => Box::new(archivedb::ArchiveDB::new(backing, db_name)),

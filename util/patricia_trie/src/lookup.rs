@@ -33,7 +33,7 @@ use super::node::Node;
 /// Trie lookup helper object.
 pub struct Lookup<'a, Q: Query> {
     /// database to query from.
-    pub db: &'a HashStore,
+    pub db: &'a dyn HashStore,
     /// Query object to record nodes and transform data.
     pub query: Q,
     /// Hash to start at

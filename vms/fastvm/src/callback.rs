@@ -65,7 +65,7 @@ impl Deref for EvmAddress {
 // 1 - get block hash
 pub extern fn get_blockhash(obj: *mut libc::c_void, number: u64) -> HashValue {
     debug!(target: "vm", "get_blockhash");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    let ext: &mut Box<dyn Ext> = unsafe { mem::transmute(obj) };
     debug!(target: "vm", "blockhash = {:?}, number = {:?}", ext.blockhash(&(number.into())), number);
     println!("blockhash = {:?}", ext.blockhash(&(number.into())));
     HashValue {
@@ -77,7 +77,7 @@ pub extern fn get_blockhash(obj: *mut libc::c_void, number: u64) -> HashValue {
 // 2 - get contract code
 pub extern fn get_code(obj: *mut libc::c_void, code_info: *mut u8, address: EvmAddress) {
     debug!(target: "vm", "get_code");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    let ext: &mut Box<dyn Ext> = unsafe { mem::transmute(obj) };
 
     #[repr(C)]
     struct code_info {
@@ -101,7 +101,7 @@ pub extern fn get_code(obj: *mut libc::c_void, code_info: *mut u8, address: EvmA
 // 3 - get account balance
 pub extern fn get_balance(obj: *mut libc::c_void, address: EvmAddress) -> EvmWord {
     debug!(target: "vm", "get_balance");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    let ext: &mut Box<dyn Ext> = unsafe { mem::transmute(obj) };
     let balance = ext.balance(&(address.bytes.into()));
     let evm_strg: [u8; 16] = U128::from(U256::from(balance)).into();
     EvmWord {
@@ -113,7 +113,7 @@ pub extern fn get_balance(obj: *mut libc::c_void, address: EvmAddress) -> EvmWor
 // 4 - check account exists
 pub extern fn exists(obj: *mut libc::c_void, address: EvmAddress) -> i32 {
     debug!(target: "vm", "check exists");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    let ext: &mut Box<dyn Ext> = unsafe { mem::transmute(obj) };
     match ext.exists(&((*address).into())) {
         true => 1,
         false => 0,
@@ -123,7 +123,7 @@ pub extern fn exists(obj: *mut libc::c_void, address: EvmAddress) -> i32 {
 #[no_mangle]
 // 5 - get storage
 pub extern fn get_storage(obj: *mut libc::c_void, _address: EvmAddress, key: EvmWord) -> EvmWord {
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    let ext: &mut Box<dyn Ext> = unsafe { mem::transmute(obj) };
     debug!(target: "vm", "ext<get_storage>: key = {:?}, raw_env = {:?}", key, obj);
     let storage = ext.storage_at(&(key.bytes).into());
     debug!(target: "vm",
@@ -141,7 +141,7 @@ pub extern fn get_storage(obj: *mut libc::c_void, _address: EvmAddress, key: Evm
 #[no_mangle]
 // 6 - put storage
 pub extern fn put_storage(obj: *mut libc::c_void, _addr: EvmAddress, key: EvmWord, value: EvmWord) {
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    let ext: &mut Box<dyn Ext> = unsafe { mem::transmute(obj) };
 
     debug!(target: "vm",
         "callback.rs put_storage() key: {:?}",
@@ -155,7 +155,7 @@ pub extern fn put_storage(obj: *mut libc::c_void, _addr: EvmAddress, key: EvmWor
 // 7 - self destroy
 pub extern fn selfdestruct(obj: *mut libc::c_void, _owner: EvmAddress, beneficiary: EvmAddress) {
     debug!(target: "vm", "selfdestruct");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    let ext: &mut Box<dyn Ext> = unsafe { mem::transmute(obj) };
     ext.suicide(&((*beneficiary).into()));
 }
 
@@ -171,7 +171,7 @@ pub extern fn vm_log(
 )
 {
     debug!(target: "vm", "log");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    let ext: &mut Box<dyn Ext> = unsafe { mem::transmute(obj) };
     let data: &[u8] = unsafe { slice::from_raw_parts(data, data_size) };
     let mut new_topics: Vec<H256> = Vec::new();
     // topics count is calculated by 16 bytes in evm
@@ -187,7 +187,7 @@ pub extern fn vm_log(
 // 9 - call
 pub extern fn call(obj: *mut libc::c_void, info: *mut u8, msg: *const u8) -> *const u8 {
     debug!(target: "vm", "enter vm call");
-    let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
+    let ext: &mut Box<dyn Ext> = unsafe { mem::transmute(obj) };
     let result_info: &mut EvmResult = unsafe { mem::transmute(info) };
     let evm_msg: &EvmMessage = unsafe { mem::transmute(msg) };
     let call_data_size = evm_msg.input_size.clone();

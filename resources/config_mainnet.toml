@@ -7,7 +7,7 @@ stake_contract = "0xa0733306c2ee0c60224b0e59efeae8eee558c0ca1b39e7e5a14a57512454
 [network]
 max_peers = 64
 net_id = 256
-local_node = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"
+local_node = "p2p://60e937ec-399b-4b52-83b1-29dbacac70a7@0.0.0.0:30303"
 boot_nodes = [
 "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:30303",
 "p2p://c33d302f-216b-47d4-ac44-5d8181b56e7e@52.231.187.227:30303",
@@ -28,3 +28,6 @@ disable = true
 
 [ipc]
 disable = true
+
+[mining]
+relay_set = "cheap"

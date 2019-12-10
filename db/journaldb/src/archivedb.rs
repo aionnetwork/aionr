@@ -42,14 +42,14 @@ use bytes::Bytes;
 /// that the states of any block the node has ever processed will be accessible.
 pub struct ArchiveDB {
     overlay: MemoryDB,
-    backing: Arc<KeyValueDB>,
+    backing: Arc<dyn KeyValueDB>,
     latest_era: Option<u64>,
     db_name: &'static str,
 }
 
 impl ArchiveDB {
     /// Create a new instance from a key-value db.
-    pub fn new(backing: Arc<KeyValueDB>, db_name: &'static str) -> ArchiveDB {
+    pub fn new(backing: Arc<dyn KeyValueDB>, db_name: &'static str) -> ArchiveDB {
         let latest_era = backing
             .get(db_name, &LATEST_ERA_KEY)
             .expect("Low-level database error.")
@@ -109,7 +109,7 @@ impl HashStore for ArchiveDB {
 }
 
 impl JournalDB for ArchiveDB {
-    fn boxed_clone(&self) -> Box<JournalDB> {
+    fn boxed_clone(&self) -> Box<dyn JournalDB> {
         Box::new(ArchiveDB {
             overlay: self.overlay.clone(),
             backing: self.backing.clone(),
@@ -208,7 +208,7 @@ impl JournalDB for ArchiveDB {
 
     fn is_pruned(&self) -> bool { false }
 
-    fn backing(&self) -> &Arc<KeyValueDB> { &self.backing }
+    fn backing(&self) -> &Arc<dyn KeyValueDB> { &self.backing }
 
     fn consolidate(&mut self, with: MemoryDB) { self.overlay.consolidate(with); }
 }

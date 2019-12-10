@@ -37,7 +37,7 @@ impl<'db> FatDB<'db> {
     /// Create a new trie with the backing database `db` and empty `root`
     /// Initialise to the state entailed by the genesis block.
     /// This guarantees the trie is built correctly.
-    pub fn new(db: &'db HashStore, root: &'db H256) -> super::Result<Self> {
+    pub fn new(db: &'db dyn HashStore, root: &'db H256) -> super::Result<Self> {
         let fatdb = FatDB {
             raw: TrieDB::new(db, root)?,
         };
@@ -46,11 +46,11 @@ impl<'db> FatDB<'db> {
     }
 
     /// Get the backing database.
-    pub fn db(&self) -> &HashStore { self.raw.db() }
+    pub fn db(&self) -> &dyn HashStore { self.raw.db() }
 }
 
 impl<'db> Trie for FatDB<'db> {
-    fn iter<'a>(&'a self) -> super::Result<Box<TrieIterator<Item = TrieItem> + 'a>> {
+    fn iter<'a>(&'a self) -> super::Result<Box<dyn TrieIterator<Item = TrieItem> + 'a>> {
         FatDBIterator::new(&self.raw).map(|iter| Box::new(iter) as Box<_>)
     }
 

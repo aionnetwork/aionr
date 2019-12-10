@@ -98,13 +98,13 @@ pub trait Key<T> {
 /// Should be used to write value into database.
 pub trait Writable {
     /// Writes the value into the database.
-    fn write<T, R>(&mut self, db_name: &'static str, key: &Key<T, Target = R>, value: &T)
+    fn write<T, R>(&mut self, db_name: &'static str, key: &dyn Key<T, Target = R>, value: &T)
     where
         T: rlp::Encodable,
         R: Deref<Target = [u8]>;
 
     /// Deletes key from the databse.
-    fn delete<T, R>(&mut self, db_name: &'static str, key: &Key<T, Target = R>)
+    fn delete<T, R>(&mut self, db_name: &'static str, key: &dyn Key<T, Target = R>)
     where
         T: rlp::Encodable,
         R: Deref<Target = [u8]>;
@@ -113,7 +113,7 @@ pub trait Writable {
     fn write_with_cache<K, T, R>(
         &mut self,
         db_name: &'static str,
-        cache: &mut Cache<K, T>,
+        cache: &mut dyn Cache<K, T>,
         key: K,
         value: T,
         policy: CacheUpdatePolicy,
@@ -137,7 +137,7 @@ pub trait Writable {
     fn extend_with_cache<K, T, R>(
         &mut self,
         db_name: &'static str,
-        cache: &mut Cache<K, T>,
+        cache: &mut dyn Cache<K, T>,
         values: HashMap<K, T>,
         policy: CacheUpdatePolicy,
     ) where
@@ -165,7 +165,7 @@ pub trait Writable {
     fn extend_with_option_cache<K, T, R>(
         &mut self,
         db_name: &'static str,
-        cache: &mut Cache<K, Option<T>>,
+        cache: &mut dyn Cache<K, Option<T>>,
         values: HashMap<K, Option<T>>,
         policy: CacheUpdatePolicy,
     ) where
@@ -199,7 +199,7 @@ pub trait Writable {
 /// Should be used to read values from database.
 pub trait Readable {
     /// Returns value for given key.
-    fn read<T, R>(&self, db_name: &'static str, key: &Key<T, Target = R>) -> Option<T>
+    fn read<T, R>(&self, db_name: &'static str, key: &dyn Key<T, Target = R>) -> Option<T>
     where
         T: rlp::Decodable,
         R: Deref<Target = [u8]>;
@@ -231,7 +231,7 @@ pub trait Readable {
     }
 
     /// Returns true if given value exists.
-    fn exists<T, R>(&self, db_name: &'static str, key: &Key<T, Target = R>) -> bool
+    fn exists<T, R>(&self, db_name: &'static str, key: &dyn Key<T, Target = R>) -> bool
     where R: Deref<Target = [u8]>;
 
     /// Returns true if given value exists either in cache or in database.
@@ -258,7 +258,7 @@ pub trait Readable {
 }
 
 impl Writable for DBTransaction {
-    fn write<T, R>(&mut self, db_name: &'static str, key: &Key<T, Target = R>, value: &T)
+    fn write<T, R>(&mut self, db_name: &'static str, key: &dyn Key<T, Target = R>, value: &T)
     where
         T: rlp::Encodable,
         R: Deref<Target = [u8]>,
@@ -266,7 +266,7 @@ impl Writable for DBTransaction {
         self.put(db_name, &key.key(), &rlp::encode(value));
     }
 
-    fn delete<T, R>(&mut self, db_name: &'static str, key: &Key<T, Target = R>)
+    fn delete<T, R>(&mut self, db_name: &'static str, key: &dyn Key<T, Target = R>)
     where
         T: rlp::Encodable,
         R: Deref<Target = [u8]>,
@@ -276,7 +276,7 @@ impl Writable for DBTransaction {
 }
 
 impl<KVDB: KeyValueDB + ?Sized> Readable for KVDB {
-    fn read<T, R>(&self, db_name: &'static str, key: &Key<T, Target = R>) -> Option<T>
+    fn read<T, R>(&self, db_name: &'static str, key: &dyn Key<T, Target = R>) -> Option<T>
     where
         T: rlp::Decodable,
         R: Deref<Target = [u8]>,
@@ -295,7 +295,7 @@ impl<KVDB: KeyValueDB + ?Sized> Readable for KVDB {
         }
     }
 
-    fn exists<T, R>(&self, db_name: &'static str, key: &Key<T, Target = R>) -> bool
+    fn exists<T, R>(&self, db_name: &'static str, key: &dyn Key<T, Target = R>) -> bool
     where R: Deref<Target = [u8]> {
         let result = self.get(db_name, &key.key());
 

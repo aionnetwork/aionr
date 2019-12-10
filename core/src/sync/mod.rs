@@ -67,7 +67,7 @@ const MAX_BLOCK_CACHE: usize = 32;
 
 pub struct Sync {
     /// Blockchain kernel interface
-    client: Arc<BlockChainClient>,
+    client: Arc<dyn BlockChainClient>,
 
     /// Oneshots to shutdown threads
     shutdown_hooks: Arc<Mutex<Vec<Sender<()>>>>,
@@ -101,7 +101,7 @@ pub struct Sync {
 }
 
 impl Sync {
-    pub fn new(config: Config, client: Arc<BlockChainClient>) -> Sync {
+    pub fn new(config: Config, client: Arc<dyn BlockChainClient>) -> Sync {
         let local_best_td: U256 = client.chain_info().total_difficulty;
         let local_best_block_number: u64 = client.chain_info().best_block_number;
 
@@ -136,7 +136,7 @@ impl Sync {
         }
     }
 
-    pub fn register_callback(&self, callback: Weak<Callable>) {
+    pub fn register_callback(&self, callback: Weak<dyn Callable>) {
         self.p2p.register_callback(callback);
     }
 

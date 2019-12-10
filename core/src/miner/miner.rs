@@ -213,7 +213,7 @@ pub struct Miner {
     // TOREMOVE: Unity MS1 use only.
     staker: Option<Ed25519KeyPair>,
     extra_data: RwLock<Bytes>,
-    engine: Arc<Engine>,
+    engine: Arc<dyn Engine>,
     accounts: Option<Arc<AccountProvider>>,
     tx_message: Mutex<IoChannel<TxIoMessage>>,
     transaction_pool_update_lock: Mutex<bool>,
@@ -260,7 +260,7 @@ impl Miner {
     /// Try to prepare a PoW work.
     /// Create a new work if no work exists or update an existing work depending on the
     /// configurations and the current conditions.
-    pub fn try_prepare_block_pow(&self, client: &MiningBlockChainClient, is_forced: bool) {
+    pub fn try_prepare_block_pow(&self, client: &dyn MiningBlockChainClient, is_forced: bool) {
         // Create new PoW work only when the current best is PoS, and cooldown allows.
         if (is_forced || self.reseal_cooldown_reached())
             && self.new_block_allowed_with_seal_type(client, &SealType::PoW)
@@ -279,10 +279,10 @@ impl Miner {
         }
     }
 
-    pub fn invoke_pos_interval(&self, client: &MiningBlockChainClient) {
+    pub fn invoke_pos_interval(&self, client: &dyn MiningBlockChainClient) {
         // compete with import_lock, if another is imported, block will be None, or else try importing pending_best
         let block = {
-            let mut pending_best = self.best_pos.lock();
+            let pending_best = self.best_pos.lock();
             pending_best.clone()
         };
 
@@ -313,7 +313,7 @@ impl Miner {
     }
 
     /// Try to internally generate PoS block if minimum resealing duration is met
-    pub fn try_produce_pos_block_internal(&self, client: &MiningBlockChainClient) {
+    pub fn try_produce_pos_block_internal(&self, client: &dyn MiningBlockChainClient) {
         // Not before the Unity fork point
         if !self.new_block_allowed_with_seal_type(client, &SealType::PoS) {
             return;
@@ -412,7 +412,7 @@ impl Miner {
     /// sk/pk is public/private key of signer
     pub fn produce_pos_block_internal(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         timestamp: u64,
         seed: [u8; 64],
         sk: &[u8; 64],
@@ -467,7 +467,7 @@ impl Miner {
     }
 
     /// Update transaction pool
-    pub fn update_transaction_pool(&self, client: &MiningBlockChainClient, is_forced: bool) {
+    pub fn update_transaction_pool(&self, client: &dyn MiningBlockChainClient, is_forced: bool) {
         let update_lock = self.transaction_pool_update_lock.try_lock();
         if !is_forced && update_lock.is_none() {
             return;
@@ -562,7 +562,7 @@ impl Miner {
     /// Prepares new block for sealing including top transactions from queue.
     fn prepare_block(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         seal_type: &Option<SealType>,
         timestamp: Option<u64>,
         author: Option<Address>,
@@ -588,8 +588,8 @@ impl Miner {
 
             let mut open_block = match seal_type {
                 Some(SealType::PoS) => {
-                    let mut maybe_work = self.maybe_work.lock();
-                    let mut resealing_work = self.sealing_work_pos.lock();
+                    let maybe_work = self.maybe_work.lock();
+                    let resealing_work = self.sealing_work_pos.lock();
                     assert!(seed.is_some());
                     let hash = resealing_work.get(&Seed(*seed.unwrap()));
                     match maybe_work.get(hash.unwrap_or(&H256::default())) {
@@ -852,7 +852,7 @@ impl Miner {
     }
 
     /// Returns true if we had to prepare new pending block.
-    fn prepare_work_sealing(&self, client: &MiningBlockChainClient) -> bool {
+    fn prepare_work_sealing(&self, client: &dyn MiningBlockChainClient) -> bool {
         trace!(target: "block", "prepare_work_sealing: entering");
         let prepare_new = {
             let mut sealing_work = self.sealing_work.lock();
@@ -889,7 +889,7 @@ impl Miner {
     /// be added into transaction queue.
     fn verify_transaction_miner(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         transaction: SignedTransaction,
     ) -> Result<SignedTransaction, Error>
     {
@@ -941,7 +941,7 @@ impl Miner {
     /// Verify transaction
     fn verify_transaction(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         transaction: UnverifiedTransaction,
     ) -> Result<SignedTransaction, Error>
     {
@@ -996,7 +996,7 @@ impl Miner {
 
     fn add_transaction_to_queue(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         transaction: SignedTransaction,
         default_origin: TransactionOrigin,
         condition: Option<TransactionCondition>,
@@ -1079,7 +1079,7 @@ impl Miner {
 const SEALING_TIMEOUT_IN_BLOCKS: u64 = 5;
 
 impl MinerService for Miner {
-    fn clear_and_reset(&self, client: &MiningBlockChainClient) {
+    fn clear_and_reset(&self, client: &dyn MiningBlockChainClient) {
         self.transaction_pool.clear();
         self.try_prepare_block_pow(client, true);
     }
@@ -1147,7 +1147,7 @@ impl MinerService for Miner {
     /// Verify and import external transactions to transaction queue, from client
     fn import_external_transactions(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         transactions: Vec<UnverifiedTransaction>,
     ) -> Vec<Result<(), Error>>
     {
@@ -1179,7 +1179,7 @@ impl MinerService for Miner {
     /// Verify and import own transaction to transaction queue, tx from rpc
     fn import_own_transaction(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         pending: PendingTransaction,
     ) -> Result<(), Error>
     {
@@ -1407,7 +1407,7 @@ impl MinerService for Miner {
         b: ClosedBlock,
         s: [u8; 64],
         t: u64,
-        _client: &MiningBlockChainClient,
+        _client: &dyn MiningBlockChainClient,
     ) -> Result<(), Error>
     {
         self.maybe_work.lock().insert(
@@ -1442,7 +1442,7 @@ impl MinerService for Miner {
     /// Generate PoS block template
     fn get_pos_template(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         seed: [u8; 64],
         pk: H256,
         coinbase: H256,
@@ -1511,7 +1511,7 @@ impl MinerService for Miner {
     // public key must be in seal[2]
     fn try_seal_pos(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         seal: Vec<Bytes>,
         block: ClosedBlock,
     ) -> Result<(), Error>
@@ -1592,7 +1592,7 @@ impl MinerService for Miner {
     fn is_currently_sealing(&self) -> bool { self.sealing_work.lock().queue.is_in_use() }
 
     // Stratum server receives a finished job, and updates sealing work
-    fn map_sealing_work<F, T>(&self, client: &MiningBlockChainClient, f: F) -> Option<T>
+    fn map_sealing_work<F, T>(&self, client: &dyn MiningBlockChainClient, f: F) -> Option<T>
     where F: FnOnce(&ClosedBlock) -> T {
         // AION 2.0
         // Return if PoW mining is not allowed
@@ -1613,7 +1613,7 @@ impl MinerService for Miner {
     /// stratum server receives a finished job, import as a sealed block
     fn submit_seal(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         block_hash: H256,
         seal: Vec<Bytes>,
     ) -> Result<(), Error>
@@ -1649,7 +1649,7 @@ impl MinerService for Miner {
     /// Client
     fn chain_new_blocks(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         _imported: &[H256],
         _invalid: &[H256],
         enacted: &[H256],
@@ -1713,7 +1713,7 @@ impl MinerService for Miner {
 
     // AION 2.0
     // Check if next block is on the unity hard fork
-    fn unity_update(&self, client: &MiningBlockChainClient) -> bool {
+    fn unity_update(&self, client: &dyn MiningBlockChainClient) -> bool {
         self.engine
             .machine()
             .params()
@@ -1728,7 +1728,7 @@ impl MinerService for Miner {
     // A block's seal type must be different than its parent's seal type.
     fn new_block_allowed_with_seal_type(
         &self,
-        client: &MiningBlockChainClient,
+        client: &dyn MiningBlockChainClient,
         seal_type: &SealType,
     ) -> bool
     {

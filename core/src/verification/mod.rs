@@ -64,7 +64,7 @@ impl HeapSizeOf for PreverifiedBlock {
 }
 
 /// Phase 1 quick block verification. Only does checks that are cheap. Operates on a single block
-pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &Engine) -> Result<(), Error> {
+pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &dyn Engine) -> Result<(), Error> {
     verify_header_params(&header, engine, true)?;
     verify_block_integrity(bytes, &header.transactions_root())?;
     engine.verify_block_basic(&header)?;
@@ -85,7 +85,7 @@ pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &Engine) -> Res
 pub fn verify_block_unordered(
     header: Header,
     bytes: Bytes,
-    engine: &Engine,
+    engine: &dyn Engine,
 ) -> Result<PreverifiedBlock, Error>
 {
     engine.verify_block_unordered(&header)?;
@@ -108,14 +108,14 @@ pub fn verify_block_unordered(
 pub type FullFamilyParams<'a> = (
     &'a [u8],
     &'a [SignedTransaction],
-    &'a BlockProvider,
-    &'a BlockChainClient,
+    &'a dyn BlockProvider,
+    &'a dyn BlockChainClient,
 );
 
 /// check every txs' beacon hashes in block
 fn beacon_check(
-    engine: &Engine,
-    chain: &BlockProvider,
+    engine: &dyn Engine,
+    chain: &dyn BlockProvider,
     header: &Header,
     parent: &Header,
     txs: &[SignedTransaction],
@@ -252,7 +252,7 @@ pub fn verify_block_family(
     parent: &Header,
     grand_parent: Option<&Header>,
     great_grand_parent: Option<&Header>,
-    engine: &Engine,
+    engine: &dyn Engine,
     do_full: Option<FullFamilyParams>,
 ) -> Result<(), Error>
 {
@@ -304,7 +304,7 @@ pub fn verify_block_final(expected: &Header, got: &Header) -> Result<(), Error> 
 }
 
 /// Check basic header parameters.
-pub fn verify_header_params(header: &Header, engine: &Engine, is_full: bool) -> Result<(), Error> {
+pub fn verify_header_params(header: &Header, engine: &dyn Engine, is_full: bool) -> Result<(), Error> {
     let expected_seal_fields = engine.seal_fields(header);
     if header.seal().len() != expected_seal_fields {
         return Err(From::from(BlockError::InvalidSealArity(Mismatch {
@@ -591,12 +591,12 @@ mod tests {
         }
     }
 
-    fn basic_test(bytes: &[u8], engine: &Engine) -> Result<(), Error> {
+    fn basic_test(bytes: &[u8], engine: &dyn Engine) -> Result<(), Error> {
         let header = BlockView::new(bytes).header();
         verify_block_basic(&header, bytes, engine)
     }
 
-    fn family_test<BC>(bytes: &[u8], engine: &Engine, bc: &BC) -> Result<(), Error>
+    fn family_test<BC>(bytes: &[u8], engine: &dyn Engine, bc: &BC) -> Result<(), Error>
     where BC: BlockProvider {
         let view = BlockView::new(bytes);
         let header = view.header();
@@ -619,8 +619,8 @@ mod tests {
         let full_params: FullFamilyParams = (
             bytes,
             &transactions[..],
-            bc as &BlockProvider,
-            &client as &::client::BlockChainClient,
+            bc as &dyn BlockProvider,
+            &client as &dyn (::client::BlockChainClient),
         );
         verify_block_family(&header, &parent, None, None, engine, Some(full_params))?;
         Ok(())

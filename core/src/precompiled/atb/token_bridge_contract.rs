@@ -65,7 +65,7 @@ impl TokenBridgeContract {
         }
     }
 
-    fn is_from_address(&self, ext: &BuiltinExt, address: Address) -> bool {
+    fn is_from_address(&self, ext: &dyn BuiltinExt, address: Address) -> bool {
         // TODO: does address impl equal
         return ext.context().sender == address;
     }
@@ -99,7 +99,7 @@ impl BuiltinContract for TokenBridgeContract {
 
     fn name(&self) -> &str { &self.name }
 
-    fn execute(&self, ext: &mut BuiltinExt, input: &[u8]) -> ExecutionResult {
+    fn execute(&self, ext: &mut dyn BuiltinExt, input: &[u8]) -> ExecutionResult {
         // as a preset, try to initialize before execution
         // this should be placed before the 0 into return, rationale is that we want to
         // activate the contract the first time the owner interacts with it. Which is
@@ -418,7 +418,7 @@ mod test {
     }
 
     fn setup_for_test(
-        ext: &mut BuiltinExt,
+        ext: &mut dyn BuiltinExt,
         transfers: &Vec<BridgeTransfer>,
     ) -> ReturnDataFromSetup
     {

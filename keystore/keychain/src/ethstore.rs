@@ -41,13 +41,13 @@ pub struct EthStore {
 
 impl EthStore {
     /// Open a new accounts store with given key directory backend.
-    pub fn open(directory: Box<KeyDirectory>) -> Result<Self, Error> {
+    pub fn open(directory: Box<dyn KeyDirectory>) -> Result<Self, Error> {
         Self::open_with_iterations(directory, KEY_ITERATIONS as u32)
     }
 
     /// Open a new account store with given key directory backend and custom number of iterations.
     pub fn open_with_iterations(
-        directory: Box<KeyDirectory>,
+        directory: Box<dyn KeyDirectory>,
         iterations: u32,
     ) -> Result<Self, Error>
     {
@@ -206,11 +206,11 @@ impl SecretStore for EthStore {
 
 /// Similar to `EthStore` but may store many accounts (with different passwords) for the same `Address`
 pub struct EthMultiStore {
-    dir: Box<KeyDirectory>,
+    dir: Box<dyn KeyDirectory>,
     iterations: u32,
     // order lock: cache, then vaults
     cache: RwLock<BTreeMap<StoreAccountRef, Vec<SafeAccount>>>,
-    vaults: Mutex<HashMap<String, Box<VaultKeyDirectory>>>,
+    vaults: Mutex<HashMap<String, Box<dyn VaultKeyDirectory>>>,
     timestamp: Mutex<Timestamp>,
 }
 
@@ -222,13 +222,13 @@ struct Timestamp {
 
 impl EthMultiStore {
     /// Open new multi-accounts store with given key directory backend.
-    pub fn open(directory: Box<KeyDirectory>) -> Result<Self, Error> {
+    pub fn open(directory: Box<dyn KeyDirectory>) -> Result<Self, Error> {
         Self::open_with_iterations(directory, KEY_ITERATIONS as u32)
     }
 
     /// Open new multi-accounts store with given key directory backend and custom number of iterations for new keys.
     pub fn open_with_iterations(
-        directory: Box<KeyDirectory>,
+        directory: Box<dyn KeyDirectory>,
         iterations: u32,
     ) -> Result<Self, Error>
     {

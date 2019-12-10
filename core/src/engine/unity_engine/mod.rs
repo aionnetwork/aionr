@@ -158,7 +158,7 @@ impl DifficultyCalc {
         parent: &Header,
         grand_parent: Option<&Header>,
         great_grand_parent: Option<&Header>,
-        client: &BlockChainClient,
+        client: &dyn BlockChainClient,
     ) -> U256
     {
         match self.unity_update {
@@ -442,7 +442,7 @@ impl UnityEngine {
     }
 
     pub fn validate_block_header(header: &Header) -> Result<(), Error> {
-        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(3);
+        let mut cheap_validators: Vec<Box<dyn HeaderValidator>> = Vec::with_capacity(3);
         cheap_validators.push(Box::new(EnergyConsumedValidator {}));
         cheap_validators.push(Box::new(FutureTimestampValidator {}));
         if header.seal_type() == &Some(SealType::PoW) {
@@ -467,7 +467,7 @@ impl Engine for Arc<UnityEngine> {
         parent: &Header,
         grand_parent: Option<&Header>,
         great_grand_parent: Option<&Header>,
-        client: &BlockChainClient,
+        client: &dyn BlockChainClient,
     ) -> U256
     {
         self.difficulty_calc
@@ -482,7 +482,7 @@ impl Engine for Arc<UnityEngine> {
     }
 
     fn verify_block_basic(&self, header: &Header) -> Result<(), Error> {
-        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(2);
+        let mut cheap_validators: Vec<Box<dyn HeaderValidator>> = Vec::with_capacity(2);
         cheap_validators.push(Box::new(EnergyConsumedValidator {}));
         if header.seal_type() == &Some(SealType::PoW) {
             cheap_validators.push(Box::new(POWValidator {}));
@@ -496,7 +496,7 @@ impl Engine for Arc<UnityEngine> {
     }
 
     fn verify_block_unordered(&self, header: &Header) -> Result<(), Error> {
-        let mut costly_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(1);
+        let mut costly_validators: Vec<Box<dyn HeaderValidator>> = Vec::with_capacity(1);
         if header.seal_type() == &Some(SealType::PoW) {
             costly_validators.push(Box::new(EquihashSolutionValidator {
                 solution_validator: EquihashValidator::new(210, 9),
@@ -541,11 +541,11 @@ impl Engine for Arc<UnityEngine> {
         parent: &Header,
         grand_parent: Option<&Header>,
         great_grand_parent: Option<&Header>,
-        client: &BlockChainClient,
+        client: &dyn BlockChainClient,
     ) -> Result<(), Error>
     {
         // Verifications related to direct parent
-        let mut parent_validators: Vec<Box<DependentHeaderValidator>> = Vec::with_capacity(3);
+        let mut parent_validators: Vec<Box<dyn DependentHeaderValidator>> = Vec::with_capacity(3);
         parent_validators.push(Box::new(NumberValidator {}));
         parent_validators.push(Box::new(TimestampValidator {}));
         // AION 2.0
@@ -563,7 +563,7 @@ impl Engine for Arc<UnityEngine> {
         }
 
         // Verifications related to seal parent and seal grand parent
-        let mut grand_validators: Vec<Box<GrandParentHeaderValidator>> = Vec::with_capacity(1);
+        let mut grand_validators: Vec<Box<dyn GrandParentHeaderValidator>> = Vec::with_capacity(1);
         grand_validators.push(Box::new(DifficultyValidator {
             difficulty_calc: &self.difficulty_calc,
         }));
@@ -580,7 +580,7 @@ impl Engine for Arc<UnityEngine> {
         parent: &Header,
         grand_parent: Option<&Header>,
         great_grand_parent: Option<&Header>,
-        client: &BlockChainClient,
+        client: &dyn BlockChainClient,
     )
     {
         if header.number() == 0 {

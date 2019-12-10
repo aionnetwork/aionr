@@ -37,17 +37,17 @@ pub trait HashStore: AsHashStore + Send + Sync {
 }
 
 pub trait AsHashStore {
-    fn as_hashstore(&self) -> &HashStore;
-    fn as_hashstore_mut(&mut self) -> &mut HashStore;
+    fn as_hashstore(&self) -> &dyn HashStore;
+    fn as_hashstore_mut(&mut self) -> &mut dyn HashStore;
 }
 
 impl<T: HashStore> AsHashStore for T {
-    fn as_hashstore(&self) -> &HashStore { self }
-    fn as_hashstore_mut(&mut self) -> &mut HashStore { self }
+    fn as_hashstore(&self) -> &dyn HashStore { self }
+    fn as_hashstore_mut(&mut self) -> &mut dyn HashStore { self }
 }
 
-impl<'a> AsHashStore for &'a mut HashStore {
-    fn as_hashstore(&self) -> &HashStore { &**self }
+impl<'a> AsHashStore for &'a mut dyn HashStore {
+    fn as_hashstore(&self) -> &dyn HashStore { &**self }
 
-    fn as_hashstore_mut(&mut self) -> &mut HashStore { &mut **self }
+    fn as_hashstore_mut(&mut self) -> &mut dyn HashStore { &mut **self }
 }

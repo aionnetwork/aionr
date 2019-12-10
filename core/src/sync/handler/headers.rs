@@ -67,7 +67,7 @@ pub fn sync_headers(
     // Pick a random node among all candidates
     if let Some(candidate) = pick_random_node(&candidates) {
         let candidate_hash = candidate.get_hash();
-        let mut node_info;
+        let node_info;
         let nodes_info_read = nodes_info.read();
         if let Some(node_info_lock) = nodes_info_read.get(&candidate_hash) {
             node_info = node_info_lock.read().clone();
@@ -170,7 +170,7 @@ fn send(p2p: Mgr, hash: u64, from: u64, size: u32) -> bool {
     p2p.send(hash, cb)
 }
 
-pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
+pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<dyn BlockChainClient>, cb_in: ChannelBuffer) {
     trace!(target: "sync", "headers/receive_req");
 
     // check channelbuffer len

@@ -57,7 +57,7 @@ impl TotalCurrencyContract {
         }
     }
 
-    fn query_network_balance(&self, ext: &mut BuiltinExt, input: &[u8]) -> ExecutionResult {
+    fn query_network_balance(&self, ext: &mut dyn BuiltinExt, input: &[u8]) -> ExecutionResult {
         let result: Vec<u8> = ext.storage_at(&H128::from(input)).to_vec();
         let length: usize = result.len();
         ExecutionResult {
@@ -70,7 +70,7 @@ impl TotalCurrencyContract {
         }
     }
 
-    fn execute_update_total_balance(&self, ext: &mut BuiltinExt, input: &[u8]) -> ExecutionResult {
+    fn execute_update_total_balance(&self, ext: &mut dyn BuiltinExt, input: &[u8]) -> ExecutionResult {
         if input.len() < 114 {
             return self.fail(String::from("internal error: input length < 114."));
         }
@@ -190,7 +190,7 @@ impl BuiltinContract for TotalCurrencyContract {
     ///     }
     /// </pre>
     ///
-    fn execute(&self, ext: &mut BuiltinExt, input: &[u8]) -> ExecutionResult {
+    fn execute(&self, ext: &mut dyn BuiltinExt, input: &[u8]) -> ExecutionResult {
         if input.len() == 1 {
             // query
             self.query_network_balance(ext, input)

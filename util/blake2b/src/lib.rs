@@ -321,7 +321,7 @@ pub fn blake2b<T: AsRef<[u8]>>(s: T) -> H256 {
     H256(result)
 }
 
-pub fn blake2b_buffer(r: &mut io::BufRead) -> Result<H256, io::Error> {
+pub fn blake2b_buffer(r: &mut dyn io::BufRead) -> Result<H256, io::Error> {
     let mut output = [0u8; 32];
     let mut input = [0u8; 1024];
     let mut blake2b = Blake2b::new(32);

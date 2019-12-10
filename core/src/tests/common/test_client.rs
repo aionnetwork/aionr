@@ -117,7 +117,7 @@ pub struct TestBlockChainClient {
     /// Pruning history size to report.
     pub history: RwLock<Option<u64>>,
     // db
-    pub db: Arc<KeyValueDB>,
+    pub db: Arc<dyn KeyValueDB>,
 }
 
 /// Used for generating test client blocks.
@@ -415,7 +415,7 @@ pub fn get_temp_state_db() -> (StateDB, TempDir) {
 }
 
 impl MiningBlockChainClient for TestBlockChainClient {
-    fn as_block_chain_client(&self) -> &BlockChainClient { self }
+    fn as_block_chain_client(&self) -> &dyn BlockChainClient { self }
 
     fn prepare_open_block(
         &self,
@@ -526,7 +526,7 @@ impl BlockChainClient for TestBlockChainClient {
         &self,
         _block: BlockId,
         _analytics: CallAnalytics,
-    ) -> Result<Box<Iterator<Item = Executed>>, CallError>
+    ) -> Result<Box<dyn Iterator<Item = Executed>>, CallError>
     {
         Ok(Box::new(
             self.execution_result.read().clone().unwrap().into_iter(),
@@ -992,7 +992,7 @@ impl ::client::EngineClient for TestBlockChainClient {
 
     fn chain_info(&self) -> BlockChainInfo { BlockChainClient::chain_info(self) }
 
-    fn as_full_client(&self) -> Option<&BlockChainClient> { Some(self) }
+    fn as_full_client(&self) -> Option<&dyn BlockChainClient> { Some(self) }
 
     fn block_number(&self, id: BlockId) -> Option<BlockNumber> {
         BlockChainClient::block_number(self, id)

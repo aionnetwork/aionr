@@ -156,7 +156,7 @@ impl MockDbRepository {
         let dbconfigs = configs.clone();
         let mut dbs = HashMap::new();
         for db_name in configs {
-            let mut db = mockkvdb::Mockkvdb::new_default();
+            let db = mockkvdb::Mockkvdb::new_default();
             dbs.insert(db_name, RwLock::new(db));
         }
         MockDbRepository {
@@ -240,7 +240,7 @@ macro_rules! impl_keyvaluedb {
                 }
             }
 
-            fn iter(&self, db_name: &'static str) -> Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)>> {
+            fn iter(&self, db_name: &'static str) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)>> {
                 match self.dbs.get(db_name) {
                     Some(db) => {
                         let db = db.read();
@@ -271,7 +271,7 @@ macro_rules! impl_keyvaluedb {
                 &'a self,
                 db_name: &str,
                 prefix: &'static [u8],
-            ) -> Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)> + 'a>
+            ) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)> + 'a>
             {
                 match self.dbs.get(db_name) {
                     Some(db) => {

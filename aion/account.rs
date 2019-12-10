@@ -24,8 +24,8 @@ use keychain::{EthStore, StoreAccountRef, import_account, import_accounts};
 use keychain::accounts_dir::RootDiskDirectory;
 use key::Ed25519KeyPair;
 use acore::account_provider::{AccountProvider, AccountProviderSettings};
-use helpers::{password_prompt, password_from_file, password_once};
-use params::SpecType;
+use crate::helpers::{password_prompt, password_from_file, password_once};
+use crate::params::SpecType;
 use aion_types::clean_0x;
 use rustc_hex::ToHex;
 #[derive(Debug, PartialEq)]

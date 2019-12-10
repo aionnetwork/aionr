@@ -101,7 +101,7 @@ pub enum Proof<M: Machine> {
     /// Known proof (extracted from signal)
     Known(Vec<u8>),
     /// State dependent proof.
-    WithState(Arc<StateDependentProof<M>>),
+    WithState(Arc<dyn StateDependentProof<M>>),
 }
 
 /// Common type alias for an engine coupled with an Ethereum-like state machine.
@@ -122,7 +122,7 @@ pub trait Engine: Sync + Send {
         _parent: &Header,
         _grand_parent: Option<&Header>,
         _great_grand_parent: Option<&Header>,
-        _client: &BlockChainClient,
+        _client: &dyn BlockChainClient,
     ) -> U256
     {
         U256::from(0)
@@ -188,7 +188,7 @@ pub trait Engine: Sync + Send {
         _parent: &<EthereumMachine as Machine>::Header,
         _grand_parent: Option<&<EthereumMachine as Machine>::Header>,
         _great_grand_parent: Option<&<EthereumMachine as Machine>::Header>,
-        _client: &BlockChainClient,
+        _client: &dyn BlockChainClient,
     ) -> Result<(), Error>
     {
         Ok(())
@@ -202,7 +202,7 @@ pub trait Engine: Sync + Send {
         _parent: &<EthereumMachine as Machine>::Header,
         _grand_parent: Option<&<EthereumMachine as Machine>::Header>,
         _great_grand_parent: Option<&<EthereumMachine as Machine>::Header>,
-        _client: &BlockChainClient,
+        _client: &dyn BlockChainClient,
     )
     {
     }
@@ -217,11 +217,11 @@ pub trait Engine: Sync + Send {
     fn params(&self) -> &CommonParams { self.machine().params() }
 
     /// Builtin-contracts for the chain..
-    fn builtins(&self) -> &BTreeMap<Address, Box<BuiltinContract>> { self.machine().builtins() }
+    fn builtins(&self) -> &BTreeMap<Address, Box<dyn BuiltinContract>> { self.machine().builtins() }
 
     /// Attempt to get a handle to a built-in contract.
     /// Only returns references to activated built-ins.
-    fn builtin(&self, a: &Address, block_number: BlockNumber) -> Option<&Box<BuiltinContract>> {
+    fn builtin(&self, a: &Address, block_number: BlockNumber) -> Option<&Box<dyn BuiltinContract>> {
         self.machine().builtin(a, block_number)
     }
 

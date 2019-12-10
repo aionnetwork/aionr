@@ -31,7 +31,7 @@ use sync::storage::SyncStorage;
 use sync::node_info::{NodeInfo, Mode};
 use aion_types::H256;
 
-pub fn import_staged_blocks(hash: &H256, client: Arc<BlockChainClient>, storage: Arc<SyncStorage>) {
+pub fn import_staged_blocks(hash: &H256, client: Arc<dyn BlockChainClient>, storage: Arc<SyncStorage>) {
     let mut blocks_to_import = Vec::new();
     let mut staged_blocks = storage.staged_blocks().lock();
     if staged_blocks.contains_key(&hash) {
@@ -72,7 +72,7 @@ pub fn import_staged_blocks(hash: &H256, client: Arc<BlockChainClient>, storage:
 }
 
 pub fn import_blocks(
-    client: Arc<BlockChainClient>,
+    client: Arc<dyn BlockChainClient>,
     storage: Arc<SyncStorage>,
     nodes_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
 )

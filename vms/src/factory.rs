@@ -37,7 +37,7 @@ pub trait Factory {
     fn exec(
         &mut self,
         params: Vec<ActionParams>,
-        ext: &mut Ext,
+        ext: &mut dyn Ext,
         is_local: bool,
         unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>;
@@ -62,7 +62,7 @@ impl Factory for FastVMFactory {
     fn exec(
         &mut self,
         params: Vec<ActionParams>,
-        ext: &mut Ext,
+        ext: &mut dyn Ext,
         _is_local: bool,
         _unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>
@@ -155,7 +155,7 @@ impl Factory for FastVMFactory {
         inst.init(ext_ptr);
         let res = inst.run(code, &mut ctx);
 
-        let ext_post: &mut Box<Ext> = unsafe { ::std::mem::transmute(ext_ptr) };
+        let ext_post: &mut Box<dyn Ext> = unsafe { ::std::mem::transmute(ext_ptr) };
         let mut status_code = res.0;
         let mut gas_left = U256::from(cmp::max(res.1, 0i64));
         let return_data = res.2;
@@ -214,7 +214,7 @@ impl Factory for AVMFactory {
     fn exec(
         &mut self,
         params: Vec<ActionParams>,
-        ext: &mut Ext,
+        ext: &mut dyn Ext,
         is_local: bool,
         unity_update: Option<u64>,
     ) -> Vec<ExecutionResult>
@@ -319,8 +319,8 @@ impl Factory for AVMFactory {
 
             for index in 0..tx_res.len() {
                 let result = tx_res[index].clone();
-                let mut status_code: AvmStatusCode = (result.status as i32).into();
-                let mut gas_left =
+                let status_code: AvmStatusCode = (result.status as i32).into();
+                let gas_left =
                     U256::from(avm_tx_contexts[index].energy_limit - result.energy_used);
                 let return_data = result.return_data;
                 debug!(target: "vm", "tx: {:?}, avm status code = {:?}, gas left = {:?}", index, status_code, gas_left);

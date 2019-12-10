@@ -180,7 +180,7 @@ impl AionVMAccount {
     pub fn commit_storage(
         &mut self,
         trie_factory: &TrieFactory,
-        db: &mut HashStore,
+        db: &mut dyn HashStore,
     ) -> trie::Result<()>
     {
         let account_type = self.acc_type().clone();
@@ -377,7 +377,7 @@ impl VMAccount for AionVMAccount {
 
     fn is_objectgraph_cached(&self) -> bool { !self.object_graph_cache.is_empty() }
 
-    fn cache_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>> {
+    fn cache_code(&mut self, db: &dyn HashStore) -> Option<Arc<Bytes>> {
         // TODO: fill out self.code_cache;
         trace!(
             target: "account",
@@ -405,7 +405,7 @@ impl VMAccount for AionVMAccount {
         }
     }
 
-    fn cache_transformed_code(&mut self, db: &HashStore) -> Option<Arc<Bytes>> {
+    fn cache_transformed_code(&mut self, db: &dyn HashStore) -> Option<Arc<Bytes>> {
         if self.is_transformed_cached() {
             return Some(self.transformed_code_cache.clone());
         }
@@ -426,7 +426,7 @@ impl VMAccount for AionVMAccount {
 
     // objectgraph uses delta_root as key,
     // it is cached during updating account cache
-    fn cache_objectgraph(&mut self, a: &Address, db: &HashStore) -> Option<Arc<Bytes>> {
+    fn cache_objectgraph(&mut self, a: &Address, db: &dyn HashStore) -> Option<Arc<Bytes>> {
         if let Some(root) = db.get(a) {
             self.storage_root = root[..].into();
             // if storage_root has been stored, it should be avm created account
@@ -482,7 +482,7 @@ impl VMAccount for AionVMAccount {
         self.object_graph_cache = data;
     }
 
-    fn cache_code_size(&mut self, db: &HashStore) -> bool {
+    fn cache_code_size(&mut self, db: &dyn HashStore) -> bool {
         // TODO: fill out self.code_cache;
         trace!(
             target: "account",
@@ -507,7 +507,7 @@ impl VMAccount for AionVMAccount {
         }
     }
 
-    fn cache_transformed_code_size(&mut self, db: &HashStore) -> bool {
+    fn cache_transformed_code_size(&mut self, db: &dyn HashStore) -> bool {
         self.transformed_code_size.is_some()
             || if self.transformed_code_hash != BLAKE2B_EMPTY {
                 match db.get(&self.transformed_code_hash) {
@@ -525,7 +525,7 @@ impl VMAccount for AionVMAccount {
             }
     }
 
-    fn cache_objectgraph_size(&mut self, db: &HashStore) -> bool {
+    fn cache_objectgraph_size(&mut self, db: &dyn HashStore) -> bool {
         self.object_graph_size.is_some() || if self.object_graph_hash != BLAKE2B_EMPTY {
             match db.get(&self.object_graph_hash) {
                 Some(x) => {
@@ -581,7 +581,7 @@ impl VMAccount for AionVMAccount {
     }
 
     /// Commit any unsaved code. `code_hash` will always return the hash of the `code_cache` after this.
-    fn commit_code(&mut self, db: &mut HashStore) {
+    fn commit_code(&mut self, db: &mut dyn HashStore) {
         trace!(
             target: "account",
             "Commiting code of {:?} - {:?}, {:?}",
@@ -671,8 +671,8 @@ impl VMAccount for AionVMAccount {
         a: &Address,
         require: RequireCache,
         state_db: &B,
-        db: &HashStore,
-        graph_db: Arc<KeyValueDB>,
+        db: &dyn HashStore,
+        graph_db: Arc<dyn KeyValueDB>,
     )
     {
         if self.object_graph_hash == BLAKE2B_EMPTY {
@@ -770,11 +770,11 @@ impl VMAccount for AionVMAccount {
     /// this will only work correctly under a secure trie.
     fn prove_storage(
         &self,
-        db: &HashStore,
+        db: &dyn HashStore,
         storage_key: H256,
     ) -> Result<(Vec<Bytes>, H256), Box<TrieError>>
     {
-        use trie::{Trie, TrieDB};
+        use trie::{TrieDB};
         use trie::recorder::Recorder;
 
         let mut recorder = Recorder::new();
@@ -798,7 +798,7 @@ impl AionVMAccount {
     /// 1. 'removable' which means it needs to be removed from database when commit.
     /// 2. 'storage_changes' which means latest write access.
     /// 3. 'storage_cache' latest read access and previous commit results
-    pub fn storage_at(&self, db: &HashStore, key: &Bytes) -> trie::Result<Option<Bytes>> {
+    pub fn storage_at(&self, db: &dyn HashStore, key: &Bytes) -> trie::Result<Option<Bytes>> {
         if self.storage_removable.contains(key) {
             return Ok(None);
         }
@@ -853,7 +853,7 @@ impl AionVMAccount {
         self.storage_removable.insert(key.clone());
     }
 
-    pub fn update_root(&mut self, graph_db: Arc<KeyValueDB>) {
+    pub fn update_root(&mut self, graph_db: Arc<dyn KeyValueDB>) {
         debug!(target: "vm", "account type: {:?}", self.acc_type());
         if self.account_type == AccType::AVM {
             let mut concatenated_root = Vec::new();

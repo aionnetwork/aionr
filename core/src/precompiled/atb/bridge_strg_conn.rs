@@ -79,7 +79,7 @@ impl BridgeStorageConnector {
         }
     }
 
-    pub fn set_initialized(&self, ext: &mut BuiltinExt, init: bool) {
+    pub fn set_initialized(&self, ext: &mut dyn BuiltinExt, init: bool) {
         let value = match init {
             true => data_with_byte(0x1u8),
             false => data_with_byte(0x0u8),
@@ -87,37 +87,37 @@ impl BridgeStorageConnector {
         ext.set_storage(self.initialized.into(), value.into());
     }
 
-    pub fn get_initialized(&self, ext: &mut BuiltinExt) -> bool {
+    pub fn get_initialized(&self, ext: &mut dyn BuiltinExt) -> bool {
         let data = ext.storage_at(&self.initialized.into());
         (data[15] & 0x1) == 1
     }
 
-    pub fn set_owner(&self, ext: &mut BuiltinExt, owner_addr: Address) {
+    pub fn set_owner(&self, ext: &mut dyn BuiltinExt, owner_addr: Address) {
         ext.set_storage_dword(self.owner.into(), owner_addr);
     }
 
     // None means some error happens; may not trigger in Aion
-    pub fn get_owner(&self, ext: &mut BuiltinExt) -> Address {
+    pub fn get_owner(&self, ext: &mut dyn BuiltinExt) -> Address {
         ext.storage_at_dword(&self.owner.into())
     }
 
-    pub fn set_new_owner(&self, ext: &mut BuiltinExt, owner_addr: Address) {
+    pub fn set_new_owner(&self, ext: &mut dyn BuiltinExt, owner_addr: Address) {
         ext.set_storage_dword(self.new_owner.into(), owner_addr);
     }
 
-    pub fn get_new_owner(&self, ext: &mut BuiltinExt) -> Address {
+    pub fn get_new_owner(&self, ext: &mut dyn BuiltinExt) -> Address {
         ext.storage_at_dword(&self.new_owner.into())
     }
 
-    pub fn set_relayer(&self, ext: &mut BuiltinExt, relayer_addr: Address) {
+    pub fn set_relayer(&self, ext: &mut dyn BuiltinExt, relayer_addr: Address) {
         ext.set_storage_dword(self.relayer.into(), relayer_addr);
     }
 
-    pub fn get_relayer(&self, ext: &mut BuiltinExt) -> Address {
+    pub fn get_relayer(&self, ext: &mut dyn BuiltinExt) -> Address {
         ext.storage_at_dword(&self.relayer.into())
     }
 
-    pub fn set_member_count(&self, ext: &mut BuiltinExt, amount: i32) {
+    pub fn set_member_count(&self, ext: &mut dyn BuiltinExt, amount: i32) {
         let bytes: [u8; 4] = unsafe { ::std::mem::transmute(amount.to_be()) };
         let mut data = Vec::new();
         data.extend(&[0u8; 12]);
@@ -126,14 +126,14 @@ impl BridgeStorageConnector {
         ext.set_storage(self.member_count.into(), data.as_slice().into());
     }
 
-    pub fn get_member_count(&self, ext: &mut BuiltinExt) -> i32 {
+    pub fn get_member_count(&self, ext: &mut dyn BuiltinExt) -> i32 {
         let count_word = ext.storage_at(&self.member_count.into());
         let bytes: [u8; 16] = count_word.into();
         debug!(target: "vm", "ATB conn:member count = {:?}, bytes = {:?}", count_word, bytes);
         from_signed_bytes_be(&bytes[12..16])
     }
 
-    pub fn set_min_thresh(&self, ext: &mut BuiltinExt, amount: i32) {
+    pub fn set_min_thresh(&self, ext: &mut dyn BuiltinExt, amount: i32) {
         let bytes: [u8; 4] = unsafe { ::std::mem::transmute(amount.to_be()) };
         let mut data = Vec::new();
         data.extend(&[0u8; 12]);
@@ -141,14 +141,14 @@ impl BridgeStorageConnector {
         ext.set_storage(self.min_thresh.into(), data.as_slice().into());
     }
 
-    pub fn get_min_thresh(&self, ext: &mut BuiltinExt) -> i32 {
+    pub fn get_min_thresh(&self, ext: &mut dyn BuiltinExt) -> i32 {
         let thresh_word = ext.storage_at(&self.min_thresh.into());
         debug!(target: "vm", "ATB conn:thresh word = {:?}", thresh_word);
         let bytes: [u8; 16] = thresh_word.into();
         from_signed_bytes_be(&bytes[12..16])
     }
 
-    pub fn set_ring_locked(&self, ext: &mut BuiltinExt, value: bool) {
+    pub fn set_ring_locked(&self, ext: &mut dyn BuiltinExt, value: bool) {
         let value = match value {
             true => data_with_byte(0x1u8),
             false => data_with_byte(0x0u8),
@@ -156,12 +156,12 @@ impl BridgeStorageConnector {
         ext.set_storage(self.ring_locked.into(), value.into());
     }
 
-    pub fn get_ring_locked(&self, ext: &mut BuiltinExt) -> bool {
+    pub fn get_ring_locked(&self, ext: &mut dyn BuiltinExt) -> bool {
         let data = ext.storage_at(&self.ring_locked.into());
         (data[15] & 0x1) == 1
     }
 
-    pub fn set_active_member(&self, ext: &mut BuiltinExt, key: H256, value: bool) {
+    pub fn set_active_member(&self, ext: &mut dyn BuiltinExt, key: H256, value: bool) {
         let mut _data = Vec::<u8>::new();
         _data.extend_from_slice(&[self.active_map]);
         let key_bytes: [u8; 32] = key.into();
@@ -176,7 +176,7 @@ impl BridgeStorageConnector {
         ext.set_storage(my_key.into(), data.into());
     }
 
-    pub fn get_active_member(&self, ext: &mut BuiltinExt, key: H256) -> bool {
+    pub fn get_active_member(&self, ext: &mut dyn BuiltinExt, key: H256) -> bool {
         let mut _data = Vec::<u8>::new();
         _data.extend_from_slice(&[self.active_map]);
         let key_bytes: [u8; 32] = key.into();
@@ -188,7 +188,7 @@ impl BridgeStorageConnector {
         (ans[15] & 0x1) == 1
     }
 
-    pub fn set_bundle(&self, ext: &mut BuiltinExt, key: H256, value: H256) {
+    pub fn set_bundle(&self, ext: &mut dyn BuiltinExt, key: H256, value: H256) {
         let mut _data = Vec::<u8>::new();
         _data.extend_from_slice(&[self.bundle_map]);
         let key_bytes: [u8; 32] = key.into();
@@ -200,7 +200,7 @@ impl BridgeStorageConnector {
     }
 
     // None means some error happened
-    pub fn get_bundle(&self, ext: &mut BuiltinExt, key: H256) -> H256 {
+    pub fn get_bundle(&self, ext: &mut dyn BuiltinExt, key: H256) -> H256 {
         let mut _data = Vec::<u8>::new();
         _data.extend_from_slice(&[self.bundle_map]);
         let key_bytes: [u8; 32] = key.into();

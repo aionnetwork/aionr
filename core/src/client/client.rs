@@ -144,16 +144,16 @@ impl<'a> ::std::ops::Sub<&'a ClientReport> for ClientReport {
 pub struct Client {
     enabled: AtomicBool,
     chain: RwLock<Arc<BlockChain>>,
-    engine: Arc<Engine>,
+    engine: Arc<dyn Engine>,
     config: ClientConfig,
-    db: RwLock<Arc<KeyValueDB>>,
+    db: RwLock<Arc<dyn KeyValueDB>>,
     state_db: RwLock<StateDB>,
     block_queue: BlockQueue,
     report: RwLock<ClientReport>,
     import_lock: Mutex<()>,
     miner: Arc<Miner>,
     io_channel: Mutex<IoChannel<ClientIoMessage>>,
-    notify: RwLock<Vec<Weak<ChainNotify>>>,
+    notify: RwLock<Vec<Weak<dyn ChainNotify>>>,
     last_hashes: RwLock<VecDeque<H256>>,
     factories: Factories,
     history: u64,
@@ -165,7 +165,7 @@ impl Client {
     pub fn new(
         config: ClientConfig,
         spec: &Spec,
-        db: Arc<KeyValueDB>,
+        db: Arc<dyn KeyValueDB>,
         miner: Arc<Miner>,
         message_channel: IoChannel<ClientIoMessage>,
     ) -> Result<Arc<Client>, ::types::error::Error>
@@ -261,15 +261,15 @@ impl Client {
     }
 
     /// Adds an actor to be notified on certain events
-    pub fn add_notify(&self, target: Arc<ChainNotify>) {
+    pub fn add_notify(&self, target: Arc<dyn ChainNotify>) {
         self.notify.write().push(Arc::downgrade(&target));
     }
 
     /// Returns engine reference.
-    pub fn engine(&self) -> &Engine { &*self.engine }
+    pub fn engine(&self) -> &dyn Engine { &*self.engine }
 
     fn notify<F>(&self, f: F)
-    where F: Fn(&ChainNotify) {
+    where F: Fn(&dyn ChainNotify) {
         for np in self.notify.read().iter() {
             if let Some(n) = np.upgrade() {
                 f(&*n);
@@ -506,7 +506,7 @@ impl Client {
         ) = {
             let mut imported_blocks = Vec::with_capacity(max_blocks_to_import);
             let mut invalid_blocks = HashSet::new();
-            let mut proposed_blocks = Vec::with_capacity(max_blocks_to_import);
+            let proposed_blocks = Vec::with_capacity(max_blocks_to_import);
             let mut import_results = Vec::with_capacity(max_blocks_to_import);
             let mut first_header: Option<Header> = None;
             let mut last_header: Option<Header> = None;
@@ -1254,7 +1254,7 @@ impl BlockChainClient for Client {
         &self,
         block: BlockId,
         analytics: CallAnalytics,
-    ) -> Result<Box<Iterator<Item = Executed>>, CallError>
+    ) -> Result<Box<dyn Iterator<Item = Executed>>, CallError>
     {
         let mut env_info = self.env_info(block).ok_or(CallError::StatePruned)?;
         let body = self.block_body(block).ok_or(CallError::StatePruned)?;
@@ -1730,7 +1730,7 @@ impl BlockChainClient for Client {
 }
 
 impl MiningBlockChainClient for Client {
-    fn as_block_chain_client(&self) -> &BlockChainClient { self }
+    fn as_block_chain_client(&self) -> &dyn BlockChainClient { self }
 
     fn prepare_open_block(
         &self,

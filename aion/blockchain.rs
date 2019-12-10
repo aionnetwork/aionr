@@ -26,18 +26,18 @@ use std::time::{Instant, Duration};
 use std::thread::sleep;
 use std::sync::Arc;
 use rustc_hex::FromHex;
-use bytes::ToPretty;
+use crate::bytes::ToPretty;
 use rlp::PayloadInfo;
 use acore::service::ClientService;
 use acore::client::{DatabaseCompactionProfile, VMType, BlockImportError, BlockChainClient, BlockId};
 use acore::ImportError;
 use acore::miner::Miner;
 use acore::verification::queue::VerifierSettings;
-use cache::CacheConfig;
-use params::{SpecType, Pruning, Switch, fatdb_switch_to_bool};
-use helpers::{to_client_config};
+use crate::cache::CacheConfig;
+use crate::params::{SpecType, Pruning, Switch, fatdb_switch_to_bool};
+use crate::helpers::{to_client_config};
 use dir::Directories;
-use user_defaults::UserDefaults;
+use crate::user_defaults::UserDefaults;
 use fdlimit;
 
 /// Something that can be converted to milliseconds.
@@ -208,7 +208,7 @@ fn execute_import(cmd: ImportBlockchain) -> Result<(), String> {
 
     let client = service.client();
 
-    let mut instream: Box<io::Read> = match cmd.file_path {
+    let mut instream: Box<dyn io::Read> = match cmd.file_path {
         Some(f) => {
             Box::new(fs::File::open(&f).map_err(|_| format!("Cannot open given file: {}", f))?)
         }
@@ -407,7 +407,7 @@ fn execute_export(cmd: ExportBlockchain) -> Result<(), String> {
 
     let client = service.client();
 
-    let mut out: Box<io::Write> = match cmd.file_path {
+    let mut out: Box<dyn io::Write> = match cmd.file_path {
         Some(f) => {
             Box::new(
                 fs::File::create(&f).map_err(|_| format!("Cannot write to file given: {}", f))?,

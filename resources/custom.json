@@ -14,7 +14,7 @@
     "maximumExtraDataSize": "0x20",
     "minGasLimit": "0x100590",
     "monetaryPolicyUpdate": "0",
-    "unityUpdate": "10"
+    "unityUpdate": "10000"
   },
   "genesis": {
     "seal": {
@@ -67,6 +67,7 @@
       }
     },
     "a02df9004be3c4a20aeb50c459212412b1d0a58da3e1ac70ba74dde6b4accf4b": { "balance": "1000000000000000000000000" },
-    "a027e3441b6283222e3ce56d4c08b95f9cc2146dfe43ca697833ebdf413cd24a": { "balance": "3140000000000000000000000000000000" }
+    "a027e3441b6283222e3ce56d4c08b95f9cc2146dfe43ca697833ebdf413cd24a": { "balance": "3140000000000000000000000000000000" },
+    "a036c0b1d3e748773ca242205121200594cd0a8060e54dfed7063528ae32e7b6": { "balance": "3140000000000000000000000000000000" }
   }
 }

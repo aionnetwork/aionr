@@ -100,7 +100,7 @@ pub struct AccountProvider {
     /// Unlocked account data.
     unlocked: RwLock<HashMap<StoreAccountRef, AccountData>>,
     /// Accounts on disk
-    sstore: Box<SecretStore>,
+    sstore: Box<dyn SecretStore>,
     /// Accounts unlocked with rolling tokens
     transient_sstore: EthMultiStore,
     /// When unlocking account permanently we additionally keep a raw secret in memory
@@ -129,7 +129,7 @@ impl Default for AccountProviderSettings {
 
 impl AccountProvider {
     /// Creates new account provider.
-    pub fn new(sstore: Box<SecretStore>, settings: AccountProviderSettings) -> Self {
+    pub fn new(sstore: Box<dyn SecretStore>, settings: AccountProviderSettings) -> Self {
         if let Ok(accounts) = sstore.accounts() {
             for account in accounts
                 .into_iter()

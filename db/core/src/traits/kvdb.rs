@@ -30,14 +30,14 @@ pub trait KeyValueDAO: Sync + Send {
     /// Delete from db. return the value if the db has the pair.
     fn delete(&mut self, k: &[u8]) -> Option<DBValue>;
     /// Return an iterator
-    fn iter(&self) -> Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)>>;
+    fn iter(&self) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)>>;
     /// Get value by partial key. Prefix size should match configured prefix size. Only searches flushed values.
     fn get_by_prefix(&self, prefix: &[u8]) -> Option<Box<[u8]>>;
     /// Return an iterator, from the beginning the key that prefix size matching the configured prefix size
     fn iter_from_prefix(
         &self,
         prefix: &'static [u8],
-    ) -> Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)>>;
+    ) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)>>;
 }
 /// db repository operation.
 pub trait KeyValueDB: Sync + Send {
@@ -54,7 +54,7 @@ pub trait KeyValueDB: Sync + Send {
     /// Flush db
     fn flush(&self) -> Result<()> { Ok(()) }
     /// Return a specified db' iterator
-    fn iter(&self, db_name: &'static str) -> Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)>>;
+    fn iter(&self, db_name: &'static str) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)>>;
     /// Get value by partial key. Prefix size should match configured prefix size. Only searches flushed values.
     fn get_by_prefix(&self, db_name: &'static str, prefix: &[u8]) -> Option<Box<[u8]>>;
     /// Return an iterator, from the beginning the key that prefix size matching the configured prefix size
@@ -62,7 +62,7 @@ pub trait KeyValueDB: Sync + Send {
         &'a self,
         db_name: &'static str,
         prefix: &'static [u8],
-    ) -> Box<Iterator<Item = (Box<[u8]>, Box<[u8]>)> + 'a>;
+    ) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)> + 'a>;
     /// Close all dbs
     #[cfg(test)]
     fn close_all(&mut self);

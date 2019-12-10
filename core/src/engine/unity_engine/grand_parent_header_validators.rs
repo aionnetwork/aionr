@@ -32,7 +32,7 @@ pub trait GrandParentHeaderValidator {
         parent_header: &Header,
         grand_parent_header: Option<&Header>,
         great_grand_parent_header: Option<&Header>,
-        client: &BlockChainClient,
+        client: &dyn BlockChainClient,
     ) -> Result<(), Error>;
 }
 
@@ -47,7 +47,7 @@ impl<'a> GrandParentHeaderValidator for DifficultyValidator<'a> {
         parent_header: &Header,
         grand_parent_header: Option<&Header>,
         great_grand_parent_header: Option<&Header>,
-        client: &BlockChainClient,
+        client: &dyn BlockChainClient,
     ) -> Result<(), Error>
     {
         if header.number() == 0 {
