@@ -244,7 +244,6 @@ mod tests {
                 transaction_index: Some(0.into()),
                 transaction_log_index: None,
                 log_index: Some(1.into()),
-                log_type: "mined".into(),
             }],
             logs_bloom: 15.into(),
             state_root: Some(10.into()),

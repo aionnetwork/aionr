@@ -23,10 +23,9 @@
 use acore::log_entry::{LocalizedLogEntry, LogEntry};
 use aion_types::{H256, U256, Address};
 use types::{Bytes};
-use serde::ser::{Serialize, Serializer, SerializeStruct};
 
 /// Log
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone, Serialize)]
 pub struct Log {
     /// H256
     pub address: Address,
@@ -46,30 +45,6 @@ pub struct Log {
     pub log_index: Option<U256>,
     /// Log Index in Transaction
     pub transaction_log_index: Option<U256>,
-    /// Log Type
-    pub log_type: String,
-}
-
-impl Serialize for Log {
-    fn serialize<S>(
-        &self,
-        serializer: S,
-    ) -> Result<<S as Serializer>::Ok, <S as Serializer>::Error>
-    where
-        S: Serializer,
-    {
-        let mut log = serializer.serialize_struct("Log", 9)?;
-        log.serialize_field("removed", &false)?;
-        log.serialize_field("logIndex", &self.log_index)?;
-        log.serialize_field("transactionIndex", &self.transaction_index)?;
-        log.serialize_field("transactionHash", &self.transaction_hash)?;
-        log.serialize_field("blockHash", &self.block_hash)?;
-        log.serialize_field("blockNumber", &self.block_number)?;
-        log.serialize_field("address", &self.address)?;
-        log.serialize_field("data", &self.data)?;
-        log.serialize_field("topics", &self.topics)?;
-        log.end()
-    }
 }
 
 impl From<LocalizedLogEntry> for Log {
@@ -84,7 +59,6 @@ impl From<LocalizedLogEntry> for Log {
             transaction_index: Some(e.transaction_index.into()),
             log_index: Some(e.log_index.into()),
             transaction_log_index: Some(e.transaction_log_index.into()),
-            log_type: "mined".to_owned(),
         }
     }
 }
@@ -101,7 +75,6 @@ impl From<LogEntry> for Log {
             transaction_index: None,
             log_index: None,
             transaction_log_index: None,
-            log_type: "pending".to_owned(),
         }
     }
 }
@@ -139,7 +112,6 @@ mod tests {
             transaction_index: Some(U256::default()),
             transaction_log_index: Some(1.into()),
             log_index: Some(U256::from(1)),
-            log_type: "mined".to_owned(),
         };
 
         let serialized = serde_json::to_string(&log).unwrap();
