@@ -32,20 +32,29 @@ use bytes::BufMut;
 use sync::node_info::NodeInfo;
 use sync::action::Action;
 use p2p::{ChannelBuffer, Mgr};
+use std::time::Duration;
+use std::thread::sleep;
 
 use super::{channel_buffer_template_with_version,channel_buffer_template};
+use super::super::INTERVAL_STATUS;
 
 const HASH_LENGTH: usize = 32;
 
-pub fn send_random(p2p: Mgr, node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>) {
-    if let Some(hash) = p2p.get_random_active_node_hash() {
+pub fn send_req(p2p: Mgr, node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>) {
+    let nodes_hahses = p2p.get_active_nodes_hashes();
+    if nodes_hahses.len() == 0 {
+        return;
+    }
+    let interval = Duration::from_millis(INTERVAL_STATUS / nodes_hahses.len() as u64 / 2);
+    for hash in nodes_hahses {
         let mut node_info = node_info.write();
         if !node_info.contains_key(&hash) {
             trace!(target: "sync", "new node info: hash:{}", hash);
             node_info.insert(hash, RwLock::new(NodeInfo::new()));
         }
         drop(node_info);
-        send(p2p, hash)
+        send(p2p.clone(), hash);
+        sleep(interval);
     }
 }
 

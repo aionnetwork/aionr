@@ -34,7 +34,7 @@ use tokio::net::TcpStream;
 use super::msg::*;
 use super::state::STATE;
 use futures::sync::oneshot::Sender;
-use std::sync::Mutex;
+use parking_lot::Mutex;
 
 const EMPTY_ID: &str = "00000000-0000-0000-0000-000000000000";
 
@@ -89,7 +89,7 @@ impl Node {
         tx_thread_vec.push(tx_thread);
         let addr = IpAddr::parse(ts.peer_addr().unwrap());
         Node {
-            hash: 0,
+            hash: calculate_hash(&addr.to_string()),
             id,
             net_id: 0,
             real_addr: addr.clone(),
@@ -120,11 +120,12 @@ impl Node {
     {
         let mut tx_thread_vec = Vec::new();
         tx_thread_vec.push(tx_thread);
+        let addr = IpAddr::parse(ts.peer_addr().unwrap());
         Node {
-            hash: 0,
+            hash: calculate_hash(&addr.to_string()),
             id: [b'0'; NODE_ID_LENGTH],
             net_id: 0,
-            addr: IpAddr::parse(ts.peer_addr().unwrap()),
+            addr,
             real_addr: IpAddr {
                 ip: [0u8; 8],
                 port: 0,
@@ -145,11 +146,6 @@ impl Node {
         }
     }
 
-    pub fn get_hash(&self) -> u64 {
-        let addr: String = self.addr.to_string();
-        calculate_hash(&addr)
-    }
-
     pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
 
     pub fn update(&mut self) {
@@ -160,17 +156,14 @@ impl Node {
     pub fn is_active(&self) -> bool { self.state == STATE::ACTIVE }
 
     pub fn shutdown_tcp_thread(&self) -> Result<(), ()> {
-        if let Ok(mut tx_thread_vec) = self.tx_thread.lock() {
-            let mut result = Ok(());
-            while !tx_thread_vec.is_empty() {
-                if let Some(tx_thread) = tx_thread_vec.pop() {
-                    result = tx_thread.send(())
-                }
+        let mut tx_thread_vec = self.tx_thread.lock();
+        let mut result = Ok(());
+        while !tx_thread_vec.is_empty() {
+            if let Some(tx_thread) = tx_thread_vec.pop() {
+                result = tx_thread.send(())
             }
-            result
-        } else {
-            Ok(())
         }
+        result
     }
 }
 
@@ -237,7 +230,7 @@ impl IpAddr {
 
     pub fn to_formatted_string(&self) -> String {
         format!(
-            "{:>3}.{:>3}.{:>3}.{:>3}:{}",
+            "{:>3}.{:>3}.{:>3}.{:>3}:{:<5}",
             self.ip[1], self.ip[3], self.ip[5], self.ip[7], self.port
         )
         .to_string()

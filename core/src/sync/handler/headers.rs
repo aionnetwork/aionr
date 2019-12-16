@@ -66,7 +66,7 @@ pub fn sync_headers(
         filter_nodes_to_sync_headers(active_nodes, nodes_info.clone(), local_total_diff);
     // Pick a random node among all candidates
     if let Some(candidate) = pick_random_node(&candidates) {
-        let candidate_hash = candidate.get_hash();
+        let candidate_hash = candidate.hash;
         let mut node_info;
         let nodes_info_read = nodes_info.read();
         if let Some(node_info_lock) = nodes_info_read.get(&candidate_hash) {
@@ -304,7 +304,7 @@ fn filter_nodes_to_sync_headers(
     nodes
         .into_iter()
         .filter(|node| {
-            let node_hash = node.get_hash();
+            let node_hash = node.hash;
             nodes_info_read
                 .get(&node_hash)
                 .map_or(false, |node_info_lock| {

@@ -74,7 +74,7 @@ pub fn broad_new_transactions(p2p: Mgr, storage: Arc<SyncStorage>) {
 
         let mut node_count = 0;
         for node in active_nodes.iter() {
-            p2p.send(node.get_hash(), req.clone());
+            p2p.send(node.hash, req.clone());
             trace!(target: "sync", "Sync broadcast new transactions sent...");
             node_count += 1;
             // TODO: To reconsider why only broadcast to 10 nodes at maximum
@@ -100,7 +100,7 @@ pub fn propagate_new_blocks(p2p: Mgr, block_hash: &H256, client: Arc<BlockChainC
             req.head.len = req.body.len() as u32;
 
             for node in active_nodes.iter() {
-                p2p.send(node.get_hash(), req.clone());
+                p2p.send(node.hash, req.clone());
                 trace!(target: "sync", "Sync broadcast new block sent...");
             }
         }
@@ -161,7 +161,7 @@ pub fn handle_broadcast_block(
                                     for n in active_nodes.iter() {
                                         // Re-broadcast this block
                                         trace!(target: "sync", "Sync broadcast new block sent...");
-                                        p2p.send(n.get_hash(), req.clone());
+                                        p2p.send(n.hash, req.clone());
                                     }
                                 }
                                 Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {

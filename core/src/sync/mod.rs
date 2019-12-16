@@ -57,7 +57,7 @@ use sync::sync_provider::SyncStatus;
 pub use sync::sync_provider::SyncProvider;
 
 const INTERVAL_TRANSACTIONS_BROADCAST: u64 = 50;
-const INTERVAL_STATUS: u64 = 1000;
+const INTERVAL_STATUS: u64 = 5000;
 const INTERVAL_HEADERS: u64 = 100;
 const INTERVAL_BODIES: u64 = 100;
 const INTERVAL_IMPORT: u64 = 50;
@@ -171,9 +171,9 @@ impl Sync {
                     debug!(target: "sync", "download record cache size/capacity {}/{}", downloaded_blocks_size, downloaded_blocks_capacity);
                     debug!(target: "sync", "staged cache size/capacity {}/{}", staged_blocks_size, staged_blocks_capacity);
                     debug!(target: "sync", "lightning syncing height: {}", storage_statics.lightning_base());
-                    info!(target: "sync", "{:-^127}", "");
-                    info!(target: "sync", "                              td         bn          bh                    addr                 rev      conn  seed       mode");
-                    info!(target: "sync", "{:-^127}", "");
+                    info!(target: "sync", "{:-^130}", "");
+                    info!(target: "sync", "                                 td         bn          bh                    addr                 rev      conn  seed       mode");
+                    info!(target: "sync", "{:-^130}", "");
 
                     if active_len > 0 {
                         let mut nodes_info = HashMap::new();
@@ -195,7 +195,7 @@ impl Sync {
                             {
                                 if let Some((addr, revision, connection, seed)) = active_nodes.get(*hash) {
                                     info!(target: "sync",
-                                          "{:>32}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}{:>11}",
+                                          "{:>35}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}{:>11}",
                                           format!("{}", info.total_difficulty),
                                           format!("{}", info.best_block_number),
                                           format!("{}", info.best_block_hash),
@@ -209,7 +209,7 @@ impl Sync {
                             }
                     }
 
-                    info!(target: "sync", "{:-^127}", "");
+                    info!(target: "sync", "{:-^130}", "");
                 }
                 Ok(())
             })
@@ -227,7 +227,7 @@ impl Sync {
         executor.spawn(
             Interval::new(Instant::now(), Duration::from_millis(INTERVAL_STATUS))
                 .for_each(move |_| {
-                    status::send_random(p2p_status.clone(), node_info_status.clone());
+                    status::send_req(p2p_status.clone(), node_info_status.clone());
                     Ok(())
                 })
                 .map_err(|err| error!(target: "sync", "executor status: {:?}", err))

@@ -26,9 +26,7 @@ use byteorder::ByteOrder;
 use rand::random;
 use byteorder::ReadBytesExt;
 use ChannelBuffer;
-use node::NODE_ID_LENGTH;
-use node::IP_LENGTH;
-use node::Node;
+use node::{NODE_ID_LENGTH,IP_LENGTH,Node,IpAddr};
 use node::TempNode;
 use route::Action;
 use super::super::Mgr;
@@ -39,7 +37,7 @@ pub fn send(p2p: Mgr) {
     let len: usize = active.len();
     if len > 0 {
         let random = random::<usize>() % len;
-        let hash = active[random].get_hash();
+        let hash = active[random].hash;
         debug!(target: "p2p", "active_nodes/send:  hash {}", &hash);
         p2p.send(
             hash,
@@ -126,9 +124,23 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
             // TODO: complete if should add
             temp_list.push(temp);
         }
-        if let Ok(mut lock) = p2p.temp.try_lock() {
+
+        {
+            let nodes_id = p2p.nodes_id.lock();
+            temp_list = temp_list
+                .into_iter()
+                .filter(move |node| !nodes_id.contains(&node.get_id_string()))
+                .collect();
+        }
+
+        if !temp_list.is_empty() {
+            let mut lock = p2p.temp.lock();
+            let temp_addr: Vec<IpAddr> = lock.iter().map(|node| node.addr.clone()).collect();
             for t in temp_list.iter() {
-                lock.push_back(t.to_owned());
+                if !temp_addr.contains(&t.addr) {
+                    trace!(target:"p2p", "add to temp node id: {} addr: {} ",t.get_id_string(),t.addr.to_string());
+                    lock.push_back(t.to_owned());
+                }
             }
         }
     }
