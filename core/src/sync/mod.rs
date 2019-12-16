@@ -334,10 +334,10 @@ impl Sync {
             if let Some(shutdown_hook) = shutdown_hooks.pop() {
                 match shutdown_hook.send(()) {
                     Ok(_) => {
-                        info!(target: "sync", "shutdown signal sent");
+                        debug!(target: "sync", "shutdown signal sent");
                     }
                     Err(err) => {
-                        info!(target: "sync", "shutdown err: {:?}", err);
+                        debug!(target: "sync", "shutdown err: {:?}", err);
                     }
                 }
             }
@@ -393,7 +393,7 @@ impl ChainNotify for Sync {
         // Reset mode of all connecting nodes to NORMAL.
         // TODO: need more thoughts whether this is a good idea
         if !retracted.is_empty() {
-            info!(target: "sync", "Chain reorg. Reset the syncing mode of all connecting nodes to NORMAL.");
+            debug!(target: "sync", "Chain reorg. Reset the syncing mode of all connecting nodes to NORMAL.");
             for (_, node_info_lock) in &*self.node_info.read() {
                 let mut node_info = node_info_lock.write();
                 node_info.mode = Mode::Normal;
@@ -499,7 +499,7 @@ impl Callable for Sync {
     }
 
     fn disconnect(&self, hash: u64) {
-        info!(target: "sync", "stop syncing from disconnected node: {}", &hash);
+        debug!(target: "sync", "stop syncing from disconnected node: {}", &hash);
         let mut node_info = self.node_info.write();
         node_info.remove(&hash);
         drop(node_info);

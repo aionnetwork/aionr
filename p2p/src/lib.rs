@@ -210,7 +210,7 @@ impl Mgr {
             ip = node.addr.get_ip();
             tx_send = Some(node.tx.clone());
         } else {
-            warn!(target:"p2p", "send: node not found hash {}", hash);
+            trace!(target:"p2p", "send: node not found hash {}", hash);
             return false;
         }
 
@@ -245,13 +245,13 @@ impl Mgr {
                     let mut node = node_lock.write();
                     node.tokens.insert(route);
                 } else {
-                    warn!(target:"p2p", "send: node not found hash {}", hash);
+                    trace!(target:"p2p", "send: node not found hash {}", hash);
                     return false;
                 }
             }
             send_success
         } else {
-            warn!(target:"p2p", "unreachable!!");
+            error!(target:"p2p", "unreachable!!");
             false
         }
     }
@@ -596,10 +596,10 @@ impl Mgr {
                 if let Some(shutdown_hook) = shutdown_hooks.pop() {
                     match shutdown_hook.send(()) {
                         Ok(_) => {
-                            info!(target: "p2p", "shutdown signal sent");
+                            debug!(target: "p2p", "shutdown signal sent");
                         }
                         Err(err) => {
-                            info!(target: "p2p", "shutdown err: {:?}", err);
+                            debug!(target: "p2p", "shutdown err: {:?}", err);
                         }
                     }
                 }
@@ -612,19 +612,19 @@ impl Mgr {
             let mut node = node_lock.write();
             match node.ts.shutdown(Shutdown::Both) {
                 Ok(_) => {
-                    info!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
+                    debug!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.get_id_string());
                 }
                 Err(err) => {
-                    info!(target: "p2p", "shutdown err: {:?}", err);
+                    debug!(target: "p2p", "shutdown err: {:?}", err);
                 }
             }
 
             match node.shutdown_tcp_thread() {
                 Ok(_) => {
-                    info!(target: "p2p", "tcp connection thread shutdown signal sent");
+                    debug!(target: "p2p", "tcp connection thread shutdown signal sent");
                 }
                 Err(err) => {
-                    info!(target: "p2p", "shutdown err: {:?}", err);
+                    debug!(target: "p2p", "shutdown err: {:?}", err);
                 }
             }
         }
@@ -738,7 +738,7 @@ impl Mgr {
             let mut node = node_lock.write();
             node.update();
         } else {
-            warn!(target:"p2p", "node {} is timeout before update", hash)
+            debug!(target:"p2p", "node {} is timeout before update", hash)
         }
     }
 

@@ -103,7 +103,7 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     let peer_net_id = net_id.read_u32::<BigEndian>().unwrap_or(0);
     let local_net_id = p2p.config.net_id;
     if peer_net_id != local_net_id {
-        warn!(target: "p2p", "Node: {:?}, invalid net id {}, should be {}.", node_id, peer_net_id, local_net_id);
+        debug!(target: "p2p", "Node: {:?}, invalid net id {}, should be {}.", node_id, peer_net_id, local_net_id);
         return;
     }
 

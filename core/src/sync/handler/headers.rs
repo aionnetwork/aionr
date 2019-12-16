@@ -212,7 +212,7 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
         p2p.update_node(&hash);
         p2p.send(hash, res);
     } else {
-        warn!(target:"sync","headers/receive_req max headers size requested");
+        debug!(target:"sync","headers/receive_req max headers size requested");
         return;
     }
 }
