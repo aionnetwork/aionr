@@ -465,108 +465,110 @@ impl Mgr {
             shutdown_hooks.push(tx);
         }
 
-        // interval active nodes
-        let p2p_active_nodes = self.clone();
-        let (tx, rx) = oneshot::channel::<()>();
-        executor.spawn(
-            Interval::new(Instant::now(), Duration::from_secs(INTERVAL_ACTIVE_NODES))
-                .for_each(move |_| {
-                    let p2p_active_nodes_0 = p2p_active_nodes.clone();
-                    active_nodes::send(p2p_active_nodes_0);
+        if !self.config.sync_from_boot_nodes_only {
+            // interval active nodes
+            let p2p_active_nodes = self.clone();
+            let (tx, rx) = oneshot::channel::<()>();
+            executor.spawn(
+                Interval::new(Instant::now(), Duration::from_secs(INTERVAL_ACTIVE_NODES))
+                    .for_each(move |_| {
+                        let p2p_active_nodes_0 = p2p_active_nodes.clone();
+                        active_nodes::send(p2p_active_nodes_0);
+                        Ok(())
+                    })
+                    .map_err(|err| error!(target: "p2p", "executor active nodes: {:?}", err))
+                    .select(rx.map_err(|_| {}))
+                    .map(|_| ())
+                    .map_err(|_| ()),
+            );
+            {
+                let mut shutdown_hooks = self.shutdown_hooks.lock();
+                shutdown_hooks.push(tx);
+            }
+
+            // interval inbound
+            let executor_inbound_0 = executor.clone();
+            let executor_inbound_1 = executor.clone();
+            let p2p_inbound = self.clone();
+            let (tx, rx) = oneshot::channel::<()>();
+            let listener = TcpListener::bind(&binding).expect("binding failed");
+            let tcp_executor = listener
+                .incoming()
+                .for_each(move |ts: TcpStream| {
+                    // counters
+                    let p2p_inbound_1 = p2p_inbound.clone();
+
+                    // TODO: black list check
+                    if p2p_inbound.get_active_nodes_len() >= p2p_inbound.config.max_peers {
+                        debug!(target: "p2p", "max peers reached");
+                        return Ok(());
+                    }
+
+                    // config stream
+                    match config_stream(&ts) {
+                        Err(e) => {
+                            error!(target: "p2p", "fail to connect to {} : {}", &ts.peer_addr().unwrap().to_string(), e);
+                            return Ok(())
+                        }
+                        _ => ()
+                    }
+
+                    // construct node instance and store it
+                    let (tx_channel, rx_channel) = mpsc::channel(409600);
+                    let (tx_thread, rx_thread) = oneshot::channel::<()>();
+                    if let Ok(ts_0) = ts.try_clone() {
+                        let node = Node::new_inbound(
+                            ts_0,
+                            tx_channel,
+                            false,
+                            tx_thread,
+                        );
+                        let hash = node.hash;
+
+                        let mut new_node = false;
+                        {
+                            let nodes_read = p2p_inbound.nodes.read();
+                            if !nodes_read.contains_key(&hash) {
+                                new_node = true;
+                            }
+                        }
+                        if new_node {
+                            let mut nodes_write = p2p_inbound.nodes.write();
+                            let id: String = node.get_id_string();
+                            let binding: String = node.addr.to_string();
+                            if let None = nodes_write.insert(hash.clone(), RwLock::new(node)) {
+                                info!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
+                            }
+                        }
+
+                        // binding io futures
+                        let (sink, stream) = split_frame(ts);
+                        let read = stream.for_each(move |cb| {
+                            p2p_inbound_1.handle(hash.clone(), cb);
+                            Ok(())
+                        })
+                            .map_err(|err| trace!(target: "p2p", "tcp inbound read: {:?}", err))
+                            .select(rx_thread.map_err(|_| {}))
+                            .map(|_| ())
+                            .map_err(|_| ());
+                        executor_inbound_0.spawn(read.then(|_| { Ok(()) }));
+                        let write = sink.send_all(rx_channel.map_err(|()| {
+                            io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")
+                        }));
+                        executor_inbound_1.spawn(write.then(|_| { Ok(()) }));
+                    } else {
+                        trace!(target: "p2p", "failed to clone TcpStream, stop connecting to {}", &ts.peer_addr().unwrap().to_string());
+                    }
                     Ok(())
                 })
-                .map_err(|err| error!(target: "p2p", "executor active nodes: {:?}", err))
+                .map_err(|err| error!(target: "p2p", "executor server: {:?}", err))
                 .select(rx.map_err(|_| {}))
                 .map(|_| ())
-                .map_err(|_| ()),
-        );
-        {
+                .map_err(|_| ());
+            executor.spawn(tcp_executor);
             let mut shutdown_hooks = self.shutdown_hooks.lock();
             shutdown_hooks.push(tx);
         }
-
-        // interval inbound
-        let executor_inbound_0 = executor.clone();
-        let executor_inbound_1 = executor.clone();
-        let p2p_inbound = self.clone();
-        let (tx, rx) = oneshot::channel::<()>();
-        let listener = TcpListener::bind(&binding).expect("binding failed");
-        let tcp_executor = listener
-            .incoming()
-            .for_each(move |ts: TcpStream| {
-                // counters
-                let p2p_inbound_1 = p2p_inbound.clone();
-
-                // TODO: black list check
-                if p2p_inbound.get_active_nodes_len() >= p2p_inbound.config.max_peers {
-                    debug!(target:"p2p", "max peers reached");
-                    return Ok(());
-                }
-
-                // config stream
-                match config_stream(&ts){
-                    Err(e) => {
-                        error!(target: "p2p", "fail to connect to {} : {}",&ts.peer_addr().unwrap().to_string(),e);
-                        return Ok(())
-                    }
-                    _ => ()
-                }
-
-                // construct node instance and store it
-                let (tx_channel, rx_channel) = mpsc::channel(409600);
-                let (tx_thread, rx_thread) = oneshot::channel::<()>();
-                if let Ok(ts_0) = ts.try_clone() {
-                    let node = Node::new_inbound(
-                        ts_0,
-                        tx_channel,
-                        false,
-                        tx_thread,
-                    );
-                    let hash = node.hash;
-
-                    let mut new_node = false;
-                    {
-                        let nodes_read = p2p_inbound.nodes.read();
-                        if !nodes_read.contains_key(&hash) {
-                            new_node = true;
-                        }
-                    }
-                    if new_node {
-                        let mut nodes_write = p2p_inbound.nodes.write();
-                        let id: String = node.get_id_string();
-                        let binding: String = node.addr.to_string();
-                        if let None = nodes_write.insert(hash.clone(), RwLock::new(node)) {
-                            info!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
-                        }
-                    }
-
-                    // binding io futures
-                    let (sink, stream) = split_frame(ts);
-                    let read = stream.for_each(move |cb| {
-                        p2p_inbound_1.handle(hash.clone(), cb);
-                        Ok(())
-                    })
-                        .map_err(|err| trace!(target: "p2p", "tcp inbound read: {:?}", err))
-                        .select(rx_thread.map_err(|_| {}))
-                        .map(|_| ())
-                        .map_err(|_| ());
-                    executor_inbound_0.spawn(read.then(|_| { Ok(()) }));
-                    let write = sink.send_all(rx_channel.map_err(|()| {
-                        io::Error::new(io::ErrorKind::Other, "rx shouldn't have an error")
-                    }));
-                    executor_inbound_1.spawn(write.then(|_| { Ok(()) }));
-                } else {
-                    trace!(target: "p2p", "failed to clone TcpStream, stop connecting to {}", &ts.peer_addr().unwrap().to_string());
-                }
-                Ok(())
-            })
-            .map_err(|err| error!(target: "p2p", "executor server: {:?}", err))
-            .select(rx.map_err(|_| {}))
-            .map(|_| ())
-            .map_err(|_| ());
-        executor.spawn(tcp_executor);
-        let mut shutdown_hooks = self.shutdown_hooks.lock();
-        shutdown_hooks.push(tx);
     }
 
     fn disconnect(&self, hash: u64, id: String) {
