@@ -392,13 +392,19 @@ impl Mgr {
                                     let (mut tx, rx) = mpsc::channel(409600);
                                     let (mut tx_thread, rx_thread) = oneshot::channel::<()>();
                                     if let Ok(ts_0) = ts.try_clone() {
-                                        let node = Node::new_outbound(
+                                        let node = match Node::new_outbound(
                                             ts_0,
                                             tx,
                                             temp_node.id,
                                             temp_node.if_seed,
                                             tx_thread,
-                                        );
+                                        ){
+                                            Some(node) => node,
+                                            _ => {
+                                                debug!(target: "p2p", "TcpStream closed");
+                                                return Ok(());
+                                            }
+                                        };
 
                                         let mut new_node = false;
                                         {
@@ -517,12 +523,18 @@ impl Mgr {
                     let (tx_channel, rx_channel) = mpsc::channel(409600);
                     let (tx_thread, rx_thread) = oneshot::channel::<()>();
                     if let Ok(ts_0) = ts.try_clone() {
-                        let node = Node::new_inbound(
+                        let node = match Node::new_inbound(
                             ts_0,
                             tx_channel,
                             false,
                             tx_thread,
-                        );
+                        ){
+                            Some(node) => node,
+                            _ => {
+                                debug!(target: "p2p", "TcpStream closed");
+                                return Ok(());
+                            }
+                        };
                         let hash = node.hash;
 
                         let mut new_node = false;

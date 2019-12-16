@@ -83,12 +83,16 @@ impl Node {
         id: [u8; NODE_ID_LENGTH],
         if_seed: bool,
         tx_thread: Sender<()>,
-    ) -> Node
+    ) -> Option<Node>
     {
         let mut tx_thread_vec = Vec::new();
         tx_thread_vec.push(tx_thread);
-        let addr = IpAddr::parse(ts.peer_addr().unwrap());
-        Node {
+        let ts_addr = match ts.peer_addr() {
+            Ok(addr) => addr,
+            _ => return None,
+        };
+        let addr = IpAddr::parse(ts_addr);
+        Some(Node {
             hash: calculate_hash(&addr.to_string()),
             id,
             net_id: 0,
@@ -107,7 +111,7 @@ impl Node {
 
             tokens: HashSet::new(),
             tx_thread: Arc::new(Mutex::new(tx_thread_vec)),
-        }
+        })
     }
 
     // construct outbound node
@@ -116,12 +120,16 @@ impl Node {
         tx: mpsc::Sender<ChannelBuffer>,
         if_seed: bool,
         tx_thread: Sender<()>,
-    ) -> Node
+    ) -> Option<Node>
     {
         let mut tx_thread_vec = Vec::new();
         tx_thread_vec.push(tx_thread);
-        let addr = IpAddr::parse(ts.peer_addr().unwrap());
-        Node {
+        let ts_addr = match ts.peer_addr() {
+            Ok(addr) => addr,
+            _ => return None,
+        };
+        let addr = IpAddr::parse(ts_addr);
+        Some(Node {
             hash: calculate_hash(&addr.to_string()),
             id: [b'0'; NODE_ID_LENGTH],
             net_id: 0,
@@ -143,7 +151,7 @@ impl Node {
 
             tokens: HashSet::new(),
             tx_thread: Arc::new(Mutex::new(tx_thread_vec)),
-        }
+        })
     }
 
     pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
