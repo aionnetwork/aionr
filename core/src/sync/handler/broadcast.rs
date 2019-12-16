@@ -27,7 +27,7 @@ use std::time::{Duration,SystemTime};
 use std::collections::{HashMap};
 // use lru_cache::LruCache;
 use client::{BlockChainClient, BlockId, BlockImportError};
-use types::error::{BlockError, ImportError, Error};
+use types::error::{BlockError, ImportError};
 use header::Header;
 use transaction::UnverifiedTransaction;
 use aion_types::H256;
@@ -180,10 +180,7 @@ pub fn handle_broadcast_block(
                         }
                         Err(e) => {
                             // ignore this batch if any invalidated header
-                            if let Error::Block(BlockError::InvalidFutureTimestamp(_)) = e {
-                            } else {
-                                error ! (target: "sync", "Invalid header: {:?}, header: {}", e, to_hex(header_rlp.as_raw()));
-                            }
+                            debug! (target: "sync", "Invalid header: {:?}, header: {}", e, to_hex(header_rlp.as_raw()));
                         }
                     }
                 }

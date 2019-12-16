@@ -244,7 +244,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
                             || prev_header.hash() != *header.parent_hash())
                     {
                         error!(target: "sync",
-                            "<inconsistent-block-headers num={}, prev+1={}, hash={}, p_hash={}>, hash={}>",
+                            "<inconsistent-block-headers num={}, prev+1={}, parent_hash={}, prev_hash={}, hash={}>",
                             header.number(),
                             prev_header.number() + 1,
                             header.parent_hash(),
@@ -269,12 +269,12 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
                 }
                 Err(e) => {
                     // ignore this batch if any invalidated header
-                    error!(target: "sync", "Invalid header: {:?}, header: {}", e, to_hex(header_rlp.as_raw()));
+                    debug!(target: "sync", "Invalid header: {:?}, header: {}", e, to_hex(header_rlp.as_raw()));
                     break;
                 }
             }
         } else {
-            error!(target: "sync", "Invalid header: {}", to_hex(header_rlp.as_raw()));
+            debug!(target: "sync", "Invalid header: {}", to_hex(header_rlp.as_raw()));
             break;
         }
     }
