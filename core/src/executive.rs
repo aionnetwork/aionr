@@ -182,7 +182,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         &'a mut self,
         txs: &[SignedTransaction],
         is_local_call: bool,
-        check_gas: bool,
+        is_building_block: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
         let _vm_lock = AVM_LOCK.lock().unwrap();
@@ -205,7 +205,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                             .add_balance(&sender, &(needed_balance), CleanupMode::NoEmpty);
                 }
                 debug!(target: "vm", "sender: {:?}, balance: {:?}", sender, self.state.balance(&sender).unwrap_or(0.into()));
-            } else if check_gas && self.info.gas_used + t.gas > self.info.gas_limit {
+            } else if is_building_block && self.info.gas_used + t.gas > self.info.gas_limit {
                 // check gas limit
                 return vec![Err(From::from(ExecutionError::BlockGasLimitReached {
                     gas_limit: self.info.gas_limit,
@@ -344,7 +344,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         t: &SignedTransaction,
         check_nonce: bool,
         is_local_call: bool,
-        check_gas_limit: bool,
+        is_building_block: bool,
     ) -> Result<Executed, ExecutionError>
     {
         let _vm_lock = VM_LOCK.lock().unwrap();
@@ -385,7 +385,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         // Don't check max gas limit for local call.
         // Local node has the right (and is free) to execute "big" calls with its own resources.
         // NOTE check gas limit during mining, always try vm execution on import
-        if !is_local_call && check_gas_limit && t.gas > max_gas_limit {
+        if !is_local_call && t.gas > max_gas_limit {
             return Err(From::from(ExecutionError::ExceedMaxGasLimit {
                 max: max_gas_limit,
                 got: t.gas,
@@ -393,7 +393,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         }
 
         // 2.3 Gas limit should not exceed the remaining gas limit of the current block
-        if check_gas_limit && self.info.gas_used + t.gas > self.info.gas_limit {
+        if is_building_block && self.info.gas_used + t.gas > self.info.gas_limit {
             return Err(From::from(ExecutionError::BlockGasLimitReached {
                 gas_limit: self.info.gas_limit,
                 gas_used: self.info.gas_used,
@@ -844,11 +844,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             for address in &substate.suicides {
                 self.state.kill_account(address);
             }
-            let gas_left = match result.status_code {
-                ExecStatus::Success | ExecStatus::Revert => result.gas_left,
-                _ => 0.into(),
-            };
-            let gas_used = t.gas - gas_left;
+
+            let gas_used = t.gas - result.gas_left;
 
             //TODO: check whether avm has already refunded
             //let refund_value = gas_left * t.gas_price;
@@ -859,19 +856,19 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 touched.insert(account);
             }
 
-            total_gas_used = total_gas_used + gas_used;
-            if total_gas_used + self.info.gas_used > self.info.gas_limit {
+            if gas_used + total_gas_used + self.info.gas_used > self.info.gas_limit {
                 final_results.push(Err(ExecutionError::BlockGasLimitReached {
                     gas_limit: self.info.gas_limit,
                     gas_used: self.info.gas_used + total_gas_used,
                     gas: t.gas,
                 }));
             } else {
+                total_gas_used = total_gas_used + gas_used;
                 final_results.push(Ok(Executed {
                     exception: result.exception,
                     gas: t.gas,
                     gas_used: gas_used,
-                    refunded: gas_left,
+                    refunded: result.gas_left,
                     cumulative_gas_used: self.info.gas_used + gas_used,
                     logs: substate.logs,
                     contracts_created: substate.contracts_created,
@@ -926,7 +923,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             self.state
                 .export_kvdb()
                 .write(batch)
-                .expect("GRAPH DB write failed");
+                .expect("EXTRA DB write failed");
         }
 
         return final_results;

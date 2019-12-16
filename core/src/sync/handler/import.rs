@@ -45,7 +45,7 @@ pub fn import_staged_blocks(hash: &H256, client: Arc<BlockChainClient>, storage:
         return;
     }
 
-    info!(target: "sync", "Importing {} staged blocks...", blocks_to_import.len());
+    debug!(target: "sync", "Importing {} staged blocks...", blocks_to_import.len());
 
     for block in &blocks_to_import {
         let block_number = BlockView::new(block).header_view().number();
@@ -57,7 +57,7 @@ pub fn import_staged_blocks(hash: &H256, client: Arc<BlockChainClient>, storage:
                 trace!(target: "sync", "Staged block #{} imported...", block_number);
             }
             Err(e) => {
-                warn!(target: "sync", "Failed to import staged block #{}, due to {:?}", block_number, e);
+                debug!(target: "sync", "Failed to import staged block #{}, due to {:?}", block_number, e);
                 // Remove records so that they can be downloaded again.
                 storage.remove_downloaded_blocks_hashes(
                     &blocks_to_import
@@ -176,7 +176,7 @@ pub fn import_blocks(
                 if info.mode == Mode::Lightning {
                     // Try to stage blocks if not staged yet
                     if storage.stage_blocks(unknown_parent_hash, unknown_blocks) {
-                        info!(target: "sync", "Node: {}, {} blocks staged for future import.", &node_hash, blocks_to_import.len());
+                        debug!(target: "sync", "Node: {}, {} blocks staged for future import.", &node_hash, blocks_to_import.len());
                         // Get last block number
                         let last_block = blocks_to_import.last().expect(
                             "checked collection is not empty. Should be able to get the last",
@@ -215,7 +215,7 @@ pub fn import_blocks(
             match info.mode {
                 // Fork point found, switch to forward mode
                 Mode::Backward => {
-                    info!(target: "sync", "Node: {}, found the fork point #{}", &node_hash, first_imported_number);
+                    debug!(target: "sync", "Node: {}, found the fork point #{}", &node_hash, first_imported_number);
                     info.switch_mode(Mode::Forward, &local_best_block, &node_hash);
                     info.sync_base_number = last_imported_number + 1;
                 }
@@ -243,7 +243,7 @@ pub fn import_blocks(
                     info.switch_mode(mode, &local_best_block, &node_hash);
                 }
             }
-            info!(target: "sync", "Node: {}, {} blocks imported", &node_hash, last_imported_number - first_imported_number + 1);
+            debug!(target: "sync", "Node: {}, {} blocks imported", &node_hash, last_imported_number - first_imported_number + 1);
             trace!(target: "sync", "Node: {}, NORMAL: {}, THUNDER: {}, LIGHTNING: {}", &node_hash, normal_nodes, thunder_nodes, lightning_nodes);
         }
         drop(nodes_info);
