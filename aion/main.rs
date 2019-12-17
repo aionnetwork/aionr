@@ -91,9 +91,6 @@ fn execute(command: Execute) -> Result<PostExecutionAction, String> {
     manifest_dir.push_str("/resources/log_config.yaml");
     let _ = setup_compression_log(command.logger.config.unwrap_or(manifest_dir).as_str());
 
-    // test error log
-    error!("test error");
-
     match command.cmd {
         Cmd::Run(run_cmd) => {
             run::execute(run_cmd)?;
