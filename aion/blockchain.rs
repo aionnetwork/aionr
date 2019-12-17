@@ -156,7 +156,7 @@ fn execute_import(cmd: ImportBlockchain) -> Result<(), String> {
     let genesis_hash = spec.genesis_header().hash();
 
     // database paths
-    let db_dirs = cmd.dirs.database(genesis_hash, None, spec.data_dir.clone());
+    let db_dirs = cmd.dirs.database(genesis_hash, spec.data_dir.clone());
 
     // user defaults path
     let user_defaults_path = db_dirs.user_defaults_path();
@@ -338,7 +338,7 @@ fn start_client(
     let genesis_hash = spec.genesis_header().hash();
 
     // database paths
-    let db_dirs = dirs.database(genesis_hash, None, spec.data_dir.clone());
+    let db_dirs = dirs.database(genesis_hash, spec.data_dir.clone());
 
     // user defaults path
     let user_defaults_path = db_dirs.user_defaults_path();
@@ -459,7 +459,7 @@ fn execute_export(cmd: ExportBlockchain) -> Result<(), String> {
 pub fn kill_db(cmd: KillBlockchain) -> Result<(), String> {
     let spec = cmd.spec.spec()?;
     let genesis_hash = spec.genesis_header().hash();
-    let db_dirs = cmd.dirs.database(genesis_hash, None, spec.data_dir);
+    let db_dirs = cmd.dirs.database(genesis_hash, spec.data_dir);
     let user_defaults_path = db_dirs.user_defaults_path();
     let mut user_defaults = UserDefaults::load(&user_defaults_path)?;
     let algorithm = cmd.pruning.to_algorithm(&user_defaults);

@@ -119,14 +119,10 @@ pub fn to_client_config(
     client_config.blockchain.max_cache_size = cache_config.blockchain() as usize * mb;
     // in bytes
     client_config.blockchain.pref_cache_size = cache_config.blockchain() as usize * 3 / 4 * mb;
-    // db cache size, in megabytes
-    client_config.db_cache_size = Some(cache_config.db_cache_size() as usize);
     // db queue cache size, in bytes
     client_config.queue.max_mem_use = cache_config.queue() as usize * mb;
     // in bytes
     client_config.state_cache_size = cache_config.state() as usize * mb;
-    // in bytes
-    client_config.jump_table_size = cache_config.jump_tables() as usize * mb;
     // in bytes
     client_config.history_mem = pruning_memory * mb;
 
