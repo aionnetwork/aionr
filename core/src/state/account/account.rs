@@ -832,6 +832,8 @@ impl AionVMAccount {
         None
     }
 
+    pub fn is_removed(&self, key: &Bytes) -> bool { return self.storage_removable.contains(key); }
+
     pub fn set_storage(&mut self, key: Bytes, value: Bytes) {
         // update removable set
         if self.storage_removable.contains(&key) {
