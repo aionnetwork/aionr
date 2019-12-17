@@ -61,10 +61,7 @@ impl SpecType {
         let file;
         match *self {
             SpecType::Default => {
-                let filename = "resources/mainnet.json";
-                file = fs::File::open(filename).map_err(|e| {
-                    format!("Could not load specification file at {}: {}", filename, e)
-                })?;
+                return Ok(Spec::new_foundation());
             }
             SpecType::Custom(ref filename) => {
                 file = fs::File::open(filename).map_err(|e| {
