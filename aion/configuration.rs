@@ -32,8 +32,8 @@ use rpc::{IpcConfiguration, HttpConfiguration, WsConfiguration};
 use aion_rpc::dispatch::DynamicGasPrice;
 use cache::CacheConfig;
 use helpers::{
-    to_block_id, to_u256, to_pending_set, aion_ipc_path, parse_log_target, to_addresses,
-    to_address, to_queue_strategy, validate_log_level,
+    to_block_id, to_u256, to_pending_set, aion_ipc_path, to_addresses,
+    to_address, to_queue_strategy,
 };
 use dir::helpers::{replace_home, replace_home_and_local, absolute};
 use params::{AccountsConfig, StakeConfig, MinerExtras, SpecType};
@@ -164,7 +164,7 @@ impl Configuration {
                 wal,
                 fat_db,
                 vm_type,
-                with_color: logger_config.color,
+                // with_color: logger_config.color,
                 verifier_settings: self.verifier_settings(),
             };
             Cmd::Blockchain(BlockchainCmd::Import(import_cmd))
@@ -273,17 +273,20 @@ impl Configuration {
     }
 
     fn logger_config(&self) -> LogConfig {
-        let level = validate_log_level(self.args.arg_log_level.clone(), "total");
-        let targets = parse_log_target(self.args.arg_log_targets.clone());
+        // let level = validate_log_level(self.args.arg_log_level.clone(), "total");
+        // let targets = parse_log_target(self.args.arg_log_targets.clone());
+        // LogConfig {
+        //     targets,
+        //     level,
+        //     color: !self.args.flag_no_color && !cfg!(windows),
+        //     file: self
+        //         .args
+        //         .arg_log_file
+        //         .as_ref()
+        //         .map(|log_file| replace_home(&self.directories().base, log_file)),
+        // }
         LogConfig {
-            targets,
-            level,
-            color: !self.args.flag_no_color && !cfg!(windows),
-            file: self
-                .args
-                .arg_log_file
-                .as_ref()
-                .map(|log_file| replace_home(&self.directories().base, log_file)),
+            config: self.args.arg_log_config.clone()
         }
     }
 

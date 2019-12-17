@@ -19,6 +19,9 @@
  *
  ******************************************************************************/
 
+ #![allow(deprecated)]
+ #![allow(dead_code)]
+
 use std::io;
 use std::io::{Write, BufReader, BufRead};
 use std::fs::File;
@@ -207,6 +210,10 @@ pub fn passwords_from_files(files: &[String]) -> Result<Vec<String>, String> {
     Ok(passwords?.into_iter().flat_map(|x| x).collect())
 }
 
+#[deprecated(
+    since = "1.0.3",
+    note = "Use log4rs instead"
+)]
 pub fn validate_log_level(level: String, target: &str) -> String {
     match level.clone().to_lowercase().as_str() {
         "off" | "error" | "warn" | "info" | "debug" | "trace" => level,
@@ -221,6 +228,10 @@ pub fn validate_log_level(level: String, target: &str) -> String {
     }
 }
 
+#[deprecated(
+    since = "1.0.3",
+    note = "Use log4rs instead"
+)]
 pub fn parse_log_target(targets: Vec<String>) -> Option<String> {
     if targets.is_empty() {
         return None;

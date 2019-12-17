@@ -503,7 +503,9 @@ usage! {
             "--log-file=[FILENAME]",
             "Specify a filename into which logging should be appended.",
 
-
+            ARG arg_log_config: (Option<String>) = None, or |c: &Config| c.log.as_ref()?.config.clone(),
+            "--log-config=[FILENAME]",
+            "Specify a yaml file path as log configuration",
     }
 }
 
@@ -666,6 +668,7 @@ struct Log {
     level: Option<String>,
     targets: Option<Vec<String>>,
     log_file: Option<String>,
+    config: Option<String>,
 }
 
 #[cfg(test)]
