@@ -1231,12 +1231,13 @@ static H224: [u32; STATE_LEN] = [
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "benches")]
     use std::time::Instant;
     use cryptoutil::test::test_digest_1million_random;
     use digest::Digest;
     use sha2::{Sha512, Sha384, Sha512Trunc256, Sha512Trunc224, Sha256, Sha224};
-    use sha2::{STATE_LEN, BLOCK_LEN};
-    use sha2::{sha256_digest_block_u32, sha512_digest_block_u64};
+    #[cfg(feature = "benches")]
+    use sha2::{STATE_LEN, BLOCK_LEN, sha256_digest_block_u32, sha512_digest_block_u64};
 
     struct Test {
         input: &'static str,
@@ -1441,6 +1442,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sha256_block() {
         let mut state = [0u32; STATE_LEN];
         let words = [1u32; BLOCK_LEN];
@@ -1460,6 +1462,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sha512_block() {
         let mut state = [0u64; STATE_LEN];
         let words = [1u64; BLOCK_LEN];
@@ -1479,6 +1482,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sha256_10() {
         let mut sh = Sha256::new();
         let bytes = [1u8; 10];
@@ -1498,6 +1502,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sha256_1k() {
         let mut sh = Sha256::new();
         let bytes = [1u8; 1024];
@@ -1517,6 +1522,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sha256_64k() {
         let mut sh = Sha256::new();
         let bytes = [1u8; 65536];
@@ -1536,6 +1542,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sha512_10() {
         let mut sh = Sha512::new();
         let bytes = [1u8; 10];
@@ -1555,6 +1562,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sha512_1k() {
         let mut sh = Sha512::new();
         let bytes = [1u8; 1024];
@@ -1574,6 +1582,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sha512_64k() {
         let mut sh = Sha512::new();
         let bytes = [1u8; 65536];

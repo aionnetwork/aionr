@@ -10,3 +10,6 @@ homepage = "https://github.com/paritytech/plain_hasher"
 [dependencies]
 crunchy = "0.1.6"
 aion-types = { path = "../../util/aion-types"}
+
+[features]
+benches = []
