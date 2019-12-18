@@ -78,7 +78,7 @@ pub fn sync_bodies(p2p: Mgr, storage: Arc<SyncStorage>) {
 }
 
 pub fn send(p2p: Mgr, hash: u64, hashes: Vec<u8>) -> bool {
-    trace!(target: "sync", "bodies/send req");
+    trace!(target: "sync_send", "bodies/send req");
     let mut cb = channel_buffer_template(Action::BODIESREQ.value());
     cb.body = hashes;
     cb.head.len = cb.body.len() as u32;
@@ -86,15 +86,15 @@ pub fn send(p2p: Mgr, hash: u64, hashes: Vec<u8>) -> bool {
 }
 
 pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
-    trace!(target: "sync", "bodies/receive_req");
+    trace!(target: "sync_req", "bodies/receive_req");
 
     // check channelbuffer len
     if cb_in.head.len == 0 {
-        debug!(target: "sync", "bodies req channelbuffer is empty" );
+        debug!(target: "sync_req", "bodies req channelbuffer is empty" );
         return;
     }
     if cb_in.head.len as usize % HASH_LEN != 0 {
-        debug!(target: "sync", "bodies res channelbuffer is invalid" );
+        debug!(target: "sync_req", "bodies res channelbuffer is invalid" );
         return;
     }
 
@@ -133,7 +133,7 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
 }
 
 pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncStorage>) {
-    trace!(target: "sync", "bodies/receive_res");
+    trace!(target: "sync_res", "bodies/receive_res");
 
     // end if no body
     if cb_in.body.len() <= 0 {
@@ -174,7 +174,7 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
     // match bodies with headers
     let mut blocks = Vec::new();
     if headers.len() == bodies.len() {
-        trace!(target: "sync", "Node : {}, downloading {} blocks.",  &node_hash, bodies.len());
+        trace!(target: "sync_res", "Node : {}, downloading {} blocks.",  &node_hash, bodies.len());
         // Get the lock before iteration to keep the operation atomic, so that the downloaded blocks in the batch will be consecutive
         let mut downloaded_blocks_hashes = storage.downloaded_blocks_hashes().lock();
         for i in 0..headers.len() {
@@ -186,12 +186,12 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
             if !downloaded_blocks_hashes.contains_key(&hash) {
                 blocks.push(block);
                 downloaded_blocks_hashes.insert(hash, 0);
-                debug!(target: "sync", "downloaded block hash: {}.", hash);
+                debug!(target: "sync_res", "downloaded block hash: {}.", hash);
             }
         }
     } else {
         debug!(
-            target: "sync",
+            target: "sync_res",
             "Count mismatch, headers count: {}, bodies count: {}, node id hash: {}",
             headers.len(),
             bodies.len(),

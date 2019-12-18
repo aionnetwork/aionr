@@ -157,7 +157,7 @@ impl Node {
     pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
 
     pub fn update(&mut self) {
-        trace!(target: "p2p", "node timestamp updated");
+        trace!(target: "p2p_node", "node timestamp updated");
         self.update = SystemTime::now();
     }
 

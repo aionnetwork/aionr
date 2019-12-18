@@ -42,7 +42,7 @@ const VERSION: &str = "02";
 
 // TODO: validate len
 pub fn send(p2p: Mgr, hash: u64) {
-    debug!(target: "p2p", "handshake/send");
+    debug!(target: "p2p_send", "handshake/send");
 
     // header
     let mut req = channel_buffer_template(Action::HANDSHAKEREQ.value());
@@ -85,11 +85,11 @@ pub fn send(p2p: Mgr, hash: u64) {
 /// 3. acknowledge sender if it is proved
 /// 4. update new hash
 pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
-    debug!(target: "p2p", "handshake/receive_req");
+    debug!(target: "p2p_req", "handshake/receive_req");
 
     // check channelbuffer len
     if (cb_in.head.len as usize) < NODE_ID_LENGTH + 2 * mem::size_of::<i32>() + IP_LENGTH + 2 {
-        debug!(target: "p2p", "handshake req channelbuffer length is too short" );
+        debug!(target: "p2p_req", "handshake req channelbuffer length is too short" );
         return;
     }
 
@@ -104,7 +104,7 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
     let peer_net_id = net_id.read_u32::<BigEndian>().unwrap_or(0);
     let local_net_id = p2p.config.net_id;
     if peer_net_id != local_net_id {
-        debug!(target: "p2p", "Node: {:?}, invalid net id {}, should be {}.", node_id, peer_net_id, local_net_id);
+        debug!(target: "p2p_req", "Node: {:?}, invalid net id {}, should be {}.", node_id, peer_net_id, local_net_id);
         return;
     }
 
@@ -115,7 +115,7 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
 
     // check revision length
     if rest.len() < revision_len + 1 {
-        debug!(target: "p2p", "handshake req with wrong revision length: {} rest: {}", revision_len, rest.len() );
+        debug!(target: "p2p_req", "handshake req with wrong revision length: {} rest: {}", revision_len, rest.len() );
         return;
     }
 
@@ -125,24 +125,24 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
 
     // check version length
     if version_len * 2 != version.len() {
-        debug!(target: "p2p", "handshake req with wrong version length" );
+        debug!(target: "p2p_req", "handshake req with wrong version length" );
         return;
     }
 
     let nodes_read = p2p.nodes.read();
     if let Some(node_lock) = nodes_read.get(&hash) {
         let mut node = node_lock.write();
-        debug!(target: "p2p", "inbound node state: connected -> active");
+        debug!(target: "p2p_req", "inbound node state: connected -> active");
         node.id.copy_from_slice(node_id);
         let addr_ip = node.addr.ip;
-        trace!(target: "p2p", "ip:{:?} - {:?}", addr_ip, ip);
+        trace!(target: "p2p_req", "ip:{:?} - {:?}", addr_ip, ip);
         if ip == &[0u8; 8] {
             node.real_addr.ip.copy_from_slice(&addr_ip);
         } else {
             node.real_addr.ip.copy_from_slice(ip);
         }
         let port = port.read_u32::<BigEndian>().unwrap_or(30303);
-        trace!(target: "p2p", "port:{} - {}", node.addr.port, port);
+        trace!(target: "p2p_req", "port:{} - {}", node.addr.port, port);
         node.real_addr.port = port;
         node.state = STATE::ACTIVE;
         {
@@ -169,9 +169,9 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
 
         let mut tx = node.tx.clone();
         match tx.try_send(cb_out) {
-            Ok(_) => trace!(target: "p2p", "succeed sending handshake res"),
+            Ok(_) => trace!(target: "p2p_req", "succeed sending handshake res"),
             Err(err) => {
-                error!(target: "p2p", "failed sending handshake res: {:?}", err);
+                error!(target: "p2p_req", "failed sending handshake res: {:?}", err);
             }
         }
     }
@@ -180,11 +180,11 @@ pub fn receive_req(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
 /// 1. decode handshake res msg
 /// 2. update outbound node to active
 pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
-    debug!(target: "p2p", "handshake/receive_res");
+    debug!(target: "p2p_res", "handshake/receive_res");
 
     // check channelbuffer len
     if cb_in.head.len < 2 {
-        debug!(target: "p2p", "handshake res channelbuffer length is too short" );
+        debug!(target: "p2p_res", "handshake res channelbuffer length is too short" );
         return;
     }
 
@@ -194,7 +194,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
 
     // check revision length
     if revision_len != revision_bytes.len() {
-        debug!(target: "p2p", "handshake req with wrong revision length" );
+        debug!(target: "p2p_res", "handshake req with wrong revision length" );
         return;
     }
 

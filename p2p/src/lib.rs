@@ -189,7 +189,7 @@ impl Mgr {
     /// send msg
     pub fn send(&self, hash: u64, cb: ChannelBuffer) -> bool {
         let nodes = &self.nodes;
-        trace!(target: "p2p", "send: hash/ver/ctrl/action/route {}/{}/{}/{}/{}",
+        trace!(target: "p2p_send", "send: hash/ver/ctrl/action/route {}/{}/{}/{}/{}",
             &hash,
             cb.head.ver,
             cb.head.ctrl,
@@ -204,7 +204,7 @@ impl Mgr {
             ip = node.addr.get_ip();
             tx_send = Some(node.tx.clone());
         } else {
-            trace!(target:"p2p", "send: node not found hash {}", hash);
+            trace!(target:"p2p_send", "send: node not found hash {}", hash);
             return false;
         }
 
@@ -214,10 +214,10 @@ impl Mgr {
             match tx.try_send(cb) {
                 Ok(_) => {
                     send_success = true;
-                    trace!(target: "p2p", "p2p/send: {}", ip);
+                    trace!(target: "p2p_send", "p2p/send: {}", ip);
                 }
                 Err(err) => {
-                    trace!(target: "p2p", "p2p/send: ip:{} err:{}", ip, err);
+                    trace!(target: "p2p_send", "p2p/send: ip:{} err:{}", ip, err);
                 }
             }
 
@@ -227,7 +227,7 @@ impl Mgr {
                     let mut nodes_write = nodes.write();
                     if let Some(node_lock) = nodes_write.remove(&hash) {
                         let node = node_lock.read();
-                        trace!(target: "p2p", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
+                        trace!(target: "p2p_send", "failed send, remove hash/id {}/{}", node.get_id_string(), node.addr.get_ip());
                         removed_node = Some(node.clone());
                     }
                 }
@@ -239,13 +239,13 @@ impl Mgr {
                     let mut node = node_lock.write();
                     node.tokens.insert(route);
                 } else {
-                    trace!(target:"p2p", "send: node not found hash {}", hash);
+                    trace!(target:"p2p_send", "send: node not found hash {}", hash);
                     return false;
                 }
             }
             send_success
         } else {
-            error!(target:"p2p", "unreachable!!");
+            error!(target:"p2p_send", "unreachable!!");
             false
         }
     }
@@ -292,7 +292,7 @@ impl Mgr {
                                     let mut node = node_lock.write();
                                     node.tx.close().unwrap();
                                     removed_nodes.insert(hash, node.get_id_string());
-                                    debug!(target: "p2p", "timeout hash/id/ip {}/{}/{}", &node.hash, &node.get_id_string(), &node.addr.to_string());
+                                    debug!(target: "p2p_timeout", "timeout hash/id/ip {}/{}/{}", &node.hash, &node.get_id_string(), &node.addr.to_string());
                                 },
                                 None => {}
                             }
@@ -304,7 +304,7 @@ impl Mgr {
                 }
                 Ok(())
             })
-            .map_err(|err| error!(target: "p2p", "executor timeout: {:?}", err))
+            .map_err(|err| error!(target: "p2p_timeout", "executor timeout: {:?}", err))
             .select(rx.map_err(|_| {}))
             .map(|_| ())
             .map_err(|_| ())
@@ -358,7 +358,7 @@ impl Mgr {
                         // return at node existing
                         if let Some(node_lock) = nodes_read.get(&hash) {
                             let node = node_lock.read();
-                            debug!(target: "p2p", "exist hash/id/ip {}/{}/{}", &hash, node.get_id_string(), node.addr.to_string());
+                            debug!(target: "p2p_outbound", "exist hash/id/ip {}/{}/{}", &hash, node.get_id_string(), node.addr.to_string());
                             return Ok(());
                         }
                     }
@@ -369,12 +369,12 @@ impl Mgr {
                     let executor_outbound_3 = executor_outbound_0.clone();
 
                     if let Ok(addr) = temp_node.addr.to_string().parse() {
-                        debug!(target: "p2p", "connecting to: {}", &addr);
+                        debug!(target: "p2p_outbound", "connecting to: {}", &addr);
 
                         match StdTcpStream::connect_timeout(&addr, Duration::from_millis(1000)) {
                             Ok(stdts)=>{
                                 if let Ok(ts) = TcpStream::from_std(stdts, &Handle::default()) {
-                                    debug!(target: "p2p", "connected to: {}", &temp_node.addr.to_string());
+                                    debug!(target: "p2p_outbound", "connected to: {}", &temp_node.addr.to_string());
 
                                     let p2p_outbound_1 = p2p_outbound_0.clone();
                                     let p2p_outbound_2 = p2p_outbound_0.clone();
@@ -382,7 +382,7 @@ impl Mgr {
                                     // config stream
                                     match config_stream(&ts){
                                         Err(e) => {
-                                            error!(target: "p2p", "fail to connect to {} : {}",&temp_node.addr.to_string(),e);
+                                            error!(target: "p2p_outbound", "fail to connect to {} : {}",&temp_node.addr.to_string(),e);
                                             return Ok(())
                                         }
                                         _ => ()
@@ -401,7 +401,7 @@ impl Mgr {
                                         ){
                                             Some(node) => node,
                                             _ => {
-                                                debug!(target: "p2p", "TcpStream closed");
+                                                debug!(target: "p2p_outbound", "TcpStream closed");
                                                 return Ok(());
                                             }
                                         };
@@ -418,11 +418,11 @@ impl Mgr {
                                             let id = node.get_id_string();
                                             let ip = node.addr.get_ip();
                                             if let None = nodes_write.insert(hash.clone(), RwLock::new(node)) {
-                                                debug!(target: "p2p", "outbound node added: {} {} {}", hash, id, ip);
+                                                debug!(target: "p2p_outbound", "outbound node added: {} {} {}", hash, id, ip);
                                             }
                                         }
                                     } else {
-                                        trace!(target: "p2p", "failed to clone TcpStream, stop connecting to {}",&temp_node.addr.to_string());
+                                        trace!(target: "p2p_outbound", "failed to clone TcpStream, stop connecting to {}",&temp_node.addr.to_string());
                                         return Ok(())
                                     }
 
@@ -432,7 +432,7 @@ impl Mgr {
                                         p2p_outbound_2.handle(hash.clone(), cb);
                                         Ok(())
                                     })
-                                    .map_err(|err| trace!(target: "p2p", "tcp outbound read: {:?}", err))
+                                    .map_err(|err| trace!(target: "p2p_outbound", "tcp outbound read: {:?}", err))
                                     .select(rx_thread.map_err(|_| {}))
                                     .map(|_| ())
                                     .map_err(|_| ());
@@ -461,7 +461,7 @@ impl Mgr {
                 }
                 Ok(())
             })
-            .map_err(|err| error!(target: "p2p", "executor outbound: {:?}", err))
+            .map_err(|err| error!(target: "p2p_outbound", "executor outbound: {:?}", err))
             .select(rx.map_err(|_| {}))
             .map(|_| ())
             .map_err(|_| ())
@@ -482,7 +482,7 @@ impl Mgr {
                         active_nodes::send(p2p_active_nodes_0);
                         Ok(())
                     })
-                    .map_err(|err| error!(target: "p2p", "executor active nodes: {:?}", err))
+                    .map_err(|err| error!(target: "p2p_active_nodes", "executor active nodes: {:?}", err))
                     .select(rx.map_err(|_| {}))
                     .map(|_| ())
                     .map_err(|_| ()),
@@ -506,14 +506,14 @@ impl Mgr {
 
                     // TODO: black list check
                     if p2p_inbound.get_active_nodes_len() >= p2p_inbound.config.max_peers {
-                        debug!(target: "p2p", "max peers reached");
+                        debug!(target: "p2p_inbound", "max peers reached");
                         return Ok(());
                     }
 
                     // config stream
                     match config_stream(&ts) {
                         Err(e) => {
-                            error!(target: "p2p", "fail to connect to {} : {}", &ts.peer_addr().unwrap().to_string(), e);
+                            error!(target: "p2p_inbound", "fail to connect to {} : {}", &ts.peer_addr().unwrap().to_string(), e);
                             return Ok(())
                         }
                         _ => ()
@@ -531,7 +531,7 @@ impl Mgr {
                         ){
                             Some(node) => node,
                             _ => {
-                                debug!(target: "p2p", "TcpStream closed");
+                                debug!(target: "p2p_inbound", "TcpStream closed");
                                 return Ok(());
                             }
                         };
@@ -549,7 +549,7 @@ impl Mgr {
                             let id: String = node.get_id_string();
                             let binding: String = node.addr.to_string();
                             if let None = nodes_write.insert(hash.clone(), RwLock::new(node)) {
-                                info!(target: "p2p", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
+                                info!(target: "p2p_inbound", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
                             }
                         }
 
@@ -559,7 +559,7 @@ impl Mgr {
                             p2p_inbound_1.handle(hash.clone(), cb);
                             Ok(())
                         })
-                            .map_err(|err| trace!(target: "p2p", "tcp inbound read: {:?}", err))
+                            .map_err(|err| trace!(target: "p2p_inbound", "tcp inbound read: {:?}", err))
                             .select(rx_thread.map_err(|_| {}))
                             .map(|_| ())
                             .map_err(|_| ());
@@ -569,11 +569,11 @@ impl Mgr {
                         }));
                         executor_inbound_1.spawn(write.then(|_| { Ok(()) }));
                     } else {
-                        trace!(target: "p2p", "failed to clone TcpStream, stop connecting to {}", &ts.peer_addr().unwrap().to_string());
+                        trace!(target: "p2p_inbound", "failed to clone TcpStream, stop connecting to {}", &ts.peer_addr().unwrap().to_string());
                     }
                     Ok(())
                 })
-                .map_err(|err| error!(target: "p2p", "executor server: {:?}", err))
+                .map_err(|err| error!(target: "p2p_inbound", "executor server: {:?}", err))
                 .select(rx.map_err(|_| {}))
                 .map(|_| ())
                 .map_err(|_| ());
@@ -591,14 +591,14 @@ impl Mgr {
         if let Some(ref callback) = *self.callback.read() {
             match Weak::upgrade(callback) {
                 Some(arc_callback) => arc_callback.disconnect(hash),
-                None => warn!(target: "p2p", "sync has been shutdown?" ),
+                None => warn!(target: "p2p_disconnect", "sync has been shutdown?" ),
             }
         }
     }
 
     /// shutdown routine
     pub fn shutdown(&self) {
-        info!(target: "p2p" , "p2p shutdown start");
+        info!(target: "p2p_shutdown" , "p2p shutdown start");
         // Shutdown runtime tasks
         {
             let mut shutdown_hooks = self.shutdown_hooks.lock();
@@ -606,10 +606,10 @@ impl Mgr {
                 if let Some(shutdown_hook) = shutdown_hooks.pop() {
                     match shutdown_hook.send(()) {
                         Ok(_) => {
-                            debug!(target: "p2p", "shutdown signal sent");
+                            debug!(target: "p2p_shutdown", "shutdown signal sent");
                         }
                         Err(err) => {
-                            debug!(target: "p2p", "shutdown err: {:?}", err);
+                            debug!(target: "p2p_shutdown", "shutdown err: {:?}", err);
                         }
                     }
                 }
@@ -622,25 +622,25 @@ impl Mgr {
             let mut node = node_lock.write();
             match node.ts.shutdown(Shutdown::Both) {
                 Ok(_) => {
-                    debug!(target: "p2p", "close connection id/ip {}/{}", &node.get_id_string(), &node.addr.to_string());
+                    debug!(target: "p2p_shutdown", "close connection id/ip {}/{}", &node.get_id_string(), &node.addr.to_string());
                 }
                 Err(err) => {
-                    debug!(target: "p2p", "shutdown err: {:?}", err);
+                    debug!(target: "p2p_shutdown", "shutdown err: {:?}", err);
                 }
             }
 
             match node.shutdown_tcp_thread() {
                 Ok(_) => {
-                    debug!(target: "p2p", "tcp connection thread shutdown signal sent");
+                    debug!(target: "p2p_shutdown", "tcp connection thread shutdown signal sent");
                 }
                 Err(err) => {
-                    debug!(target: "p2p", "shutdown err: {:?}", err);
+                    debug!(target: "p2p_shutdown", "shutdown err: {:?}", err);
                 }
             }
         }
         nodes_write.clear();
 
-        info!(target: "p2p" , "p2p shutdown finished");
+        info!(target: "p2p_shutdown" , "p2p shutdown finished");
     }
 
     pub fn get_net_id(&self) -> u32 { self.config.net_id }
@@ -747,7 +747,7 @@ impl Mgr {
         match nodes_read.get(hash) {
             Some(node_lock) => Some(node_lock.read().clone()),
             None => {
-                warn!(target: "p2p", "get_node: node not found: hash {}", hash);
+                warn!(target: "p2p_node", "get_node: node not found: hash {}", hash);
                 None
             }
         }
@@ -761,7 +761,7 @@ impl Mgr {
             let mut node = node_lock.write();
             node.update();
         } else {
-            debug!(target:"p2p", "node {} is timeout before update", hash)
+            debug!(target:"p2p_node", "node {} is timeout before update", hash)
         }
     }
 
@@ -772,12 +772,12 @@ impl Mgr {
     fn handle(&self, hash: u64, cb: ChannelBuffer) {
         // check body length
         if cb.head.len as usize != cb.body.len() {
-            debug!(target: "p2p", "Length does not match!! hash/ver/ctrl/action {}/{}/{}/{}", hash, cb.head.ver, cb.head.ctrl, cb.head.action);
+            debug!(target: "p2p_handle", "Length does not match!! hash/ver/ctrl/action {}/{}/{}/{}", hash, cb.head.ver, cb.head.ctrl, cb.head.action);
             return;
         }
 
         let p2p = self.clone();
-        debug!(target: "p2p", "handle: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
+        debug!(target: "p2p_handle", "handle: hash/ver/ctrl/action/route {}/{}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action, cb.head.get_route());
         // verify if flag token has been set
         let mut pass = false;
         {
@@ -787,7 +787,7 @@ impl Mgr {
                 let clear_token = cb.head.get_route();
                 pass = self.token_check(clear_token, &mut node);
             } else {
-                debug!(target: "p2p", "failed to get node with hash {}", hash);
+                debug!(target: "p2p_handle", "failed to get node with hash {}", hash);
             }
         }
 
@@ -803,25 +803,29 @@ impl Mgr {
                                     active_nodes::receive_req(p2p, hash, cb.head.ver)
                                 }
                                 Action::ACTIVENODESRES => active_nodes::receive_res(p2p, hash, cb),
-                                _ => trace!(target: "p2p", "invalid action {}", cb.head.action),
+                                _ => {
+                                    trace!(target: "p2p_handle", "invalid action {}", cb.head.action)
+                                }
                             };
                         }
                         Module::SYNC => {
                             if let Some(ref callback) = *p2p.callback.read() {
                                 match Weak::upgrade(callback) {
                                     Some(arc_callback) => arc_callback.handle(hash, cb),
-                                    None => warn!(target: "p2p", "sync has been shutdown?" ),
+                                    None => warn!(target: "p2p_handle", "sync has been shutdown?" ),
                                 }
                             }
                         }
-                        Module::UNKNOWN => trace!(target: "p2p", "invalid ctrl {}", cb.head.ctrl),
+                        Module::UNKNOWN => {
+                            trace!(target: "p2p_handle", "invalid ctrl {}", cb.head.ctrl)
+                        }
                     }
                 }
                 //Version::V1 => handshake::send(p2p, hash),
-                _ => trace!(target: "p2p", "invalid version {}", cb.head.ver),
+                _ => trace!(target: "p2p_handle", "invalid version {}", cb.head.ver),
             };
         } else {
-            debug!(target: "p2p", "not pass token check: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
+            debug!(target: "p2p_handle", "not pass token check: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
         }
     }
 }
