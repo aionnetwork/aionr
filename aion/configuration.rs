@@ -324,7 +324,7 @@ impl Configuration {
                 .map(|s| replace_home(&self.directories().base, s))
                 .collect(),
             unlocked_accounts: to_addresses(&self.args.arg_unlock)?,
-            enable_fast_signing: self.args.flag_fast_signing,
+            enable_fast_signing: false,
         };
 
         Ok(cfg)
