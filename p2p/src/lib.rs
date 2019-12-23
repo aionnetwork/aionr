@@ -258,7 +258,7 @@ impl Mgr {
             .get_id_and_binding()
             .1
             .parse::<SocketAddr>()
-            .unwrap()
+            .expect("Invalid local node!!!")
             .clone();
 
         // interval timeout
@@ -889,7 +889,8 @@ mod tests {
                 ],
                 false,
                 tx_thread,
-            );
+            )
+            .unwrap();
             node.tokens.insert(flat_token_0);
 
             let node_hash = node.hash;

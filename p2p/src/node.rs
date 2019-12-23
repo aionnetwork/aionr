@@ -179,13 +179,9 @@ pub fn convert_ip_string(ip_str: String) -> [u8; 8] {
     let mut ip: [u8; 8] = [0u8; 8];
     let ip_vec: Vec<&str> = ip_str.split(".").collect();
     if ip_vec.len() == 4 {
-        ip[0] = 0;
         ip[1] = ip_vec[0].parse::<u8>().unwrap_or(0);
-        ip[2] = 0;
         ip[3] = ip_vec[1].parse::<u8>().unwrap_or(0);
-        ip[4] = 0;
         ip[5] = ip_vec[2].parse::<u8>().unwrap_or(0);
-        ip[6] = 0;
         ip[7] = ip_vec[3].parse::<u8>().unwrap_or(0);
     }
     ip
