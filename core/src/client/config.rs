@@ -84,8 +84,6 @@ pub struct ClientConfig {
     pub fat_db: bool,
     /// The JournalDB ("pruning") algorithm to use.
     pub pruning: journaldb::Algorithm,
-    /// RocksDB column cache-size if not default
-    pub db_cache_size: Option<usize>,
     /// State db compaction profile
     pub db_compaction: DatabaseCompactionProfile,
     /// Should db have WAL enabled?
@@ -94,8 +92,6 @@ pub struct ClientConfig {
     pub spec_name: String,
     /// State db cache-size.
     pub state_cache_size: usize,
-    /// EVM jump-tables cache size.
-    pub jump_table_size: usize,
     /// Minimum state pruning history size.
     pub history: u64,
     /// Ideal memory usage for state pruning history.

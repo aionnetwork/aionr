@@ -22,16 +22,45 @@
 
 //! Logger for Aion executables
 #![warn(unused_extern_crates)]
-
+extern crate log;
 extern crate log4rs;
+
+use log::LogLevelFilter;
+use log4rs::append::console::ConsoleAppender;
+use log4rs::encode::pattern::PatternEncoder;
+use log4rs::config::{Appender, Config, Logger, Root};
 
 pub struct LogConfig {
     pub config: Option<String>,
 }
 
-pub fn setup_compression_log(path: &str) -> Result<(), String> {
-    
-    log4rs::init_file(path, Default::default()).unwrap();
+fn default_config() -> Result<(), String> {
+    let stdout = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(
+            "{d(%Y-%m-%d %H:%M:%S)} {h({l})} {t}: {m}{n}",
+        )))
+        .build();
 
+    let config = Config::builder()
+        .appender(Appender::builder().build("stdout", Box::new(stdout)))
+        .logger(Logger::builder().build("sync", LogLevelFilter::Info))
+        .build(
+            Root::builder()
+                .appender("stdout")
+                .build(LogLevelFilter::Info),
+        )
+        .unwrap();
+
+    log4rs::init_config(config).expect("init log config");
     Ok(())
+}
+
+pub fn setup_compression_log(path: Option<String>) -> Result<(), String> {
+    path.map_or_else(
+        || default_config(),
+        |path| {
+            log4rs::init_file(path, Default::default())
+                .map_err(|e| format!("log4rs: {}, pls check your log config path", e))
+        },
+    )
 }

@@ -87,9 +87,7 @@ enum PostExecutionAction {
 }
 
 fn execute(command: Execute) -> Result<PostExecutionAction, String> {
-    let mut manifest_dir = env!("CARGO_MANIFEST_DIR").to_string();
-    manifest_dir.push_str("/resources/log_config.yaml");
-    let _ = setup_compression_log(command.logger.config.unwrap_or(manifest_dir).as_str());
+    let _ = setup_compression_log(command.logger.config)?;
 
     match command.cmd {
         Cmd::Run(run_cmd) => {

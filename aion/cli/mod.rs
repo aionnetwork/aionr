@@ -182,8 +182,7 @@ usage! {
             "--password=[FILE]...",
             "Provide a list of files containing passwords for unlocking accounts. Leading and trailing whitespace is trimmed.",
 
-            // NOTE: for MS2 test
-            ARG arg_stake_contract: (Option<String>) = None, or |c: &Config| c.account.as_ref()?.stake_contract.clone(),
+            ARG arg_stake_contract: (String) = "0xa0733306c2ee0c60224b0e59efeae8eee558c0ca1b39e7e5a14a575124549416", or |c: &Config| c.account.as_ref()?.stake_contract.clone(),
             "--stake-contract=[ADDRESS]",
             "Specify the PoS staking contract address",
 
@@ -235,7 +234,7 @@ usage! {
             "--http-port=[PORT]",
             "Specify the port portion of the HTTP API server.",
 
-            ARG arg_http_interface: (String)  = "local", or |c: &Config| c.http.as_ref()?.interface.clone(),
+            ARG arg_http_interface: (String)  = "127.0.0.1", or |c: &Config| c.http.as_ref()?.interface.clone(),
             "--http-interface=[IP]",
             "Specify the hostname portion of the HTTP API server, IP should be an interface's IP address, or all (all interfaces) or local.",
 
@@ -264,7 +263,7 @@ usage! {
             "--ws-port=[PORT]",
             "Specify the port portion of the WebSockets server.",
 
-            ARG arg_ws_interface: (String)  = "local", or |c: &Config| c.websockets.as_ref()?.interface.clone(),
+            ARG arg_ws_interface: (String)  = "127.0.0.1", or |c: &Config| c.websockets.as_ref()?.interface.clone(),
             "--ws-interface=[IP]",
             "Specify the hostname portion of the WebSockets server, IP should be an interface's IP address, or all (all interfaces) or local.",
 
@@ -296,44 +295,6 @@ usage! {
             ARG arg_ipc_apis: (Vec<String>) = vec!["all".into()], or |c: &Config| c.ipc.as_ref()?.apis.clone(),
             "--ipc-apis=[APIS]...",
             "Specify custom API set available via JSON-RPC over IPC. Possible name are web3, eth, stratum, net, personal, rpc.",
-
-        ["Wallet Options"]
-            FLAG flag_enable_wallet: (bool) = false, or |c: &Config| c.wallet.as_ref()?.disable.clone().map(|a| !a),
-            "--enable-wallet",
-            "Enable Wallet API",
-
-            FLAG flag_secure_connect: (bool) = false, or |c: &Config| c.wallet.as_ref()?.secure_connect.clone(),
-            "--secure-connect",
-            "Run wallet server for secure connect",
-
-            ARG arg_wallet_interface: (String) = "local", or |c: &Config| c.wallet.as_ref()?.interface.clone(),
-            "--wallet-interface=[IP]",
-            "Specify the hostname portion of the Wallet API server, IP should be an interface's IP address, or all (all interfaces) or local.",
-
-            ARG arg_wallet_port: (u16) = 8547u16, or |c: &Config| c.wallet.as_ref()?.port.clone(),
-            "--wallet-port=[PORT]",
-            "Specify the port portion of the Wallet API server.",
-
-            ARG arg_zmq_key_path: (Option<String>) = None, or |c: &Config| c.wallet.as_ref()?.zmq_key_path.clone(),
-            "--zmq-key-path=[PATH]",
-            "Specify zmq key path for wallet server secure connect ",
-
-        ["Stratum Options"]
-            FLAG flag_no_stratum: (bool) = false, or |c: &Config| c.stratum.as_ref()?.disable.clone(),
-            "--no-stratum",
-            "Run Stratum server for miner push notification.",
-
-            ARG arg_stratum_interface: (String) = "local", or |c: &Config| c.stratum.as_ref()?.interface.clone(),
-            "--stratum-interface=[IP]",
-            "Interface address for Stratum server.",
-
-            ARG arg_stratum_port: (u16) = 8008u16, or |c: &Config| c.stratum.as_ref()?.port.clone(),
-            "--stratum-port=[PORT]",
-            "Port for Stratum server to listen on.",
-
-            ARG arg_stratum_secret: (Option<String>) = None, or |c: &Config| c.stratum.as_ref()?.secret.clone(),
-            "--stratum-secret=[STRING]",
-            "Secret for authorizing Stratum server for peers.",
 
         ["Sealing/Mining Options"]
             FLAG flag_force_sealing: (bool) = false, or |c: &Config| c.mining.as_ref()?.force_sealing.clone(),
@@ -453,10 +414,6 @@ usage! {
             ARG arg_pruning_memory: (usize) = 32usize, or |c: &Config| c.db.as_ref()?.pruning_memory.clone(),
             "--pruning-memory=[MB]",
             "The ideal amount of memory in megabytes to use to store recent states. As many states as possible will be kept within this limit, and at least --pruning-history states will always be kept.",
-//
-//            ARG arg_cache_size_db: (u32) = 128u32, or |c: &Config| c.db.as_ref()?.cache_size_db.clone(),
-//            "--cache-size-db=[MB]",
-//            "Override database cache size.",
 
             ARG arg_cache_size_blocks: (u32) = 8u32, or |c: &Config| c.db.as_ref()?.cache_size_blocks.clone(),
             "--cache-size-blocks=[MB]",
@@ -519,10 +476,8 @@ struct Config {
     http: Option<Http>,
     websockets: Option<Ws>,
     ipc: Option<Ipc>,
-    wallet: Option<WalletApi>,
     mining: Option<Mining>,
     db: Option<Database>,
-    stratum: Option<Stratum>,
     log: Option<Log>,
 }
 
@@ -597,16 +552,6 @@ struct Ipc {
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct WalletApi {
-    disable: Option<bool>,
-    interface: Option<String>,
-    port: Option<u16>,
-    secure_connect: Option<bool>,
-    zmq_key_path: Option<String>,
-}
-
-#[derive(Default, Debug, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct Mining {
     author: Option<String>,
     staker_private_key: Option<String>,
@@ -632,15 +577,6 @@ struct Mining {
     gas_price_percentile: Option<usize>,
     max_blk_traverse: Option<usize>,
     local_max_gas_price: Option<u64>,
-}
-
-#[derive(Default, Debug, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
-struct Stratum {
-    disable: Option<bool>,
-    interface: Option<String>,
-    port: Option<u16>,
-    secret: Option<String>,
 }
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
@@ -674,7 +610,7 @@ struct Log {
 #[cfg(test)]
 mod tests {
     use super::{
-        Args, ArgsError, Config, Operating, Account, Network, Ws, Ipc, WalletApi, Mining, Database,
+        Args, ArgsError, Config, Operating, Account, Network, Ws, Ipc, Mining, Database,
         Http,
 };
     use toml;
@@ -841,7 +777,8 @@ mod tests {
             arg_keys_iterations: 10240u32,
             arg_refresh_time: 2,
             flag_fast_signing: true,
-            arg_stake_contract: None,
+            arg_stake_contract:
+                "0xa0733306c2ee0c60224b0e59efeae8eee558c0ca1b39e7e5a14a575124549416".into(),
 
             // -- Networking Options
             arg_max_peers: 50u32,
@@ -881,13 +818,6 @@ mod tests {
             arg_ipc_path: "$HOME/.aion/jsonrpc.ipc".into(),
             arg_ipc_apis: vec!["api1".into(), "api2".into()],
 
-            // Wallet
-            arg_wallet_interface: "local".into(),
-            arg_wallet_port: 8547u16,
-            flag_enable_wallet: false,
-            flag_secure_connect: true,
-            arg_zmq_key_path: Some("zmq".into()),
-
             // -- Sealing/Mining Options
             arg_author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
             flag_force_sealing: true,
@@ -913,18 +843,10 @@ mod tests {
             flag_dynamic_gas_price: true,
             arg_local_max_gas_price: 100000000000u64,
             arg_staker_private_key: Some("staker_private_key".into()),
-
-            // -- Stratum Options
-            flag_no_stratum: true,
-            arg_stratum_interface: "127.0.0.2".to_owned(),
-            arg_stratum_port: 8089u16,
-            arg_stratum_secret: Some("secret".into()),
-
             // -- Database Options
             arg_pruning: "auto".into(),
             arg_pruning_history: 64u64,
             arg_pruning_memory: 500usize,
-            //                arg_cache_size_db: 64u32,
             arg_cache_size_blocks: 8u32,
             arg_cache_size_queue: 50u32,
             arg_cache_size_state: 25u32,
@@ -1033,13 +955,6 @@ mod tests {
                     path: None,
                     apis: Some(vec!["rpc".into(), "eth".into()]),
                 }),
-                wallet: Some(WalletApi {
-                    disable: None,
-                    interface: None,
-                    port: Some(8181),
-                    secure_connect: None,
-                    zmq_key_path: None,
-                }),
                 mining: Some(Mining {
                     author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
                     force_sealing: Some(true),
@@ -1081,7 +996,6 @@ mod tests {
                     scale_verifiers: Some(false),
                     num_verifiers: None,
                 }),
-                stratum: None,
                 log: None,
             }
         );
