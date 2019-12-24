@@ -182,8 +182,7 @@ usage! {
             "--password=[FILE]...",
             "Provide a list of files containing passwords for unlocking accounts. Leading and trailing whitespace is trimmed.",
 
-            // NOTE: for MS2 test
-            ARG arg_stake_contract: (Option<String>) = None, or |c: &Config| c.account.as_ref()?.stake_contract.clone(),
+            ARG arg_stake_contract: (String) = "0xa0733306c2ee0c60224b0e59efeae8eee558c0ca1b39e7e5a14a575124549416", or |c: &Config| c.account.as_ref()?.stake_contract.clone(),
             "--stake-contract=[ADDRESS]",
             "Specify the PoS staking contract address",
 
@@ -775,7 +774,8 @@ mod tests {
             arg_keys_iterations: 10240u32,
             arg_refresh_time: 2,
             flag_fast_signing: true,
-            arg_stake_contract: None,
+            arg_stake_contract:
+                "0xa0733306c2ee0c60224b0e59efeae8eee558c0ca1b39e7e5a14a575124549416".into(),
 
             // -- Networking Options
             arg_max_peers: 50u32,

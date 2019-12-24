@@ -33,7 +33,7 @@ use aion_rpc::dispatch::DynamicGasPrice;
 use cache::CacheConfig;
 use helpers::{
     to_block_id, to_u256, to_pending_set, aion_ipc_path, parse_log_target, to_addresses,
-    to_address, to_queue_strategy, validate_log_level,
+    to_address, to_queue_strategy, validate_log_level, string_to_address
 };
 use dir::helpers::{replace_home, replace_home_and_local, absolute};
 use params::{AccountsConfig, StakeConfig, MinerExtras, SpecType};
@@ -306,8 +306,9 @@ impl Configuration {
     }
 
     fn stake_config(&self) -> Result<StakeConfig, String> {
+        let stake_contract = &self.args.arg_stake_contract;
         let cfg = StakeConfig {
-            contract: to_address(self.args.arg_stake_contract.clone())?,
+            contract: string_to_address(stake_contract)?,
         };
 
         Ok(cfg)

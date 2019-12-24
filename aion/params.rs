@@ -132,7 +132,9 @@ pub struct StakeConfig {
 impl Default for StakeConfig {
     fn default() -> Self {
         StakeConfig {
-            contract: Address::default(),
+            contract: Address::from(
+                "a0733306c2ee0c60224b0e59efeae8eee558c0ca1b39e7e5a14a575124549416",
+            ),
         }
     }
 }

@@ -70,25 +70,21 @@ pub fn to_queue_strategy(s: &str) -> Result<PrioritizationStrategy, String> {
     }
 }
 
+pub fn string_to_address(s: &String) -> Result<Address, String> {
+    clean_0x(s)
+        .parse()
+        .map_err(|_| format!("Invalid address: {:?}", s))
+}
+
 pub fn to_address(s: Option<String>) -> Result<Address, String> {
     match s {
-        Some(ref a) => {
-            clean_0x(a)
-                .parse()
-                .map_err(|_| format!("Invalid address: {:?}", a))
-        }
+        Some(ref a) => string_to_address(a),
         None => Ok(Address::default()),
     }
 }
 
 pub fn to_addresses(s: &Vec<String>) -> Result<Vec<Address>, String> {
-    s.into_iter()
-        .map(|s1| {
-            clean_0x(s1)
-                .parse()
-                .map_err(|_| format!("Invalid address: {:?}", s1))
-        })
-        .collect()
+    s.into_iter().map(|s1| string_to_address(s1)).collect()
 }
 
 /// Flush output buffer.
