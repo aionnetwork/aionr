@@ -401,6 +401,34 @@ impl Client {
         let last_hashes = self.build_last_hashes(header.parent_hash().clone());
         let db = self.state_db.read().boxed_clone_canon(&parent_hash);
 
+        // check transaction nonce and type
+        match State::from_existing(
+            db.boxed_clone(),
+            parent.state_root().clone(),
+            engine.machine().account_start_nonce(parent.number() + 1),
+            self.factories.clone(),
+            self.db.read().clone(),
+        ) {
+            Ok(s) => {
+                let mut nonce_cache = HashMap::<Address, U256>::new();
+                for t in block.transactions.clone() {
+                    let expected_nonce: U256 = nonce_cache
+                        .get(t.sender())
+                        .unwrap_or(&s.nonce(t.sender()).unwrap_or(U256::zero()))
+                        .clone();
+                    if expected_nonce != t.nonce {
+                        warn!(target: "client", "Stage 4 block verification failed for #{}. Invalid transaction {}: Tx nonce {} != expected nonce {}\n", header.number(), t.hash(), t.nonce, expected_nonce);
+                        return Err(());
+                    }
+                    nonce_cache.insert(t.sender().clone(), t.nonce + U256::from(1u64));
+                }
+            }
+            _ => {
+                error!(target: "client", "statedb fatal error");
+                return Err(());
+            }
+        }
+
         let enact_result = enact_verified(
             block,
             engine,

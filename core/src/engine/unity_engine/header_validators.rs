@@ -163,7 +163,7 @@ impl HeaderValidator for FutureTimestampValidator {
             .unwrap()
             .as_secs();
         if timestamp > timestamp_now + FUTURE_TIME_TOLERANCE {
-            error!(target: "validator", "block timestamp ({}) > local system time ({}) + {}", timestamp, timestamp_now, FUTURE_TIME_TOLERANCE);
+            debug!(target: "validator", "block timestamp ({}) > local system time ({}) + {}", timestamp, timestamp_now, FUTURE_TIME_TOLERANCE);
             return Err(BlockError::InvalidFutureTimestamp(OutOfBounds {
                 min: None,
                 max: Some(timestamp_now + FUTURE_TIME_TOLERANCE),
