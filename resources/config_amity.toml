@@ -27,3 +27,6 @@ disable = true
 
 [mining]
 author = "0xa07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137"
+
+[log]
+config = "log_config.yaml"

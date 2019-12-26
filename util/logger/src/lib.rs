@@ -44,6 +44,7 @@ fn default_config() -> Result<(), String> {
     let config = Config::builder()
         .appender(Appender::builder().build("stdout", Box::new(stdout)))
         .logger(Logger::builder().build("sync", LogLevelFilter::Info))
+        .logger(Logger::builder().build("ws", LogLevelFilter::Warn))
         .build(
             Root::builder()
                 .appender("stdout")

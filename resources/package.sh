@@ -47,17 +47,17 @@ chmod +x package/$PACKAGE_NAME/mainnet.sh
 
 cp resources/config_mastery.toml $MASTT
 cp resources/mastery.json $MASTJ
-echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mastery/mastery.toml --log-config=log_config.yaml $*'>package/$PACKAGE_NAME/mastery.sh
+echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mastery/mastery.toml $*'>package/$PACKAGE_NAME/mastery.sh
 chmod +x package/$PACKAGE_NAME/mastery.sh
 
 cp resources/config_custom.toml $CUSTT
 cp resources/custom.json $CUSTJ
-echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=custom/custom.toml --log-config=log_config.yaml $*'>package/$PACKAGE_NAME/custom.sh
+echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=custom/custom.toml $*'>package/$PACKAGE_NAME/custom.sh
 chmod +x package/$PACKAGE_NAME/custom.sh
 
 cp resources/config_amity.toml $AMITYT
 cp resources/amity.json $AMITYJ
-echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=amity/amity.toml --log-config=log_config.yaml $*'>package/$PACKAGE_NAME/amity.sh
+echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=amity/amity.toml $*'>package/$PACKAGE_NAME/amity.sh
 chmod +x package/$PACKAGE_NAME/amity.sh
 
 ## Step 5: copy env script and log config file

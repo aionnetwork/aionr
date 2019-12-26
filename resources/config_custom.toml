@@ -83,7 +83,4 @@ fat_db = "auto"
 #num_verifiers = None
 
 [log]
-no_color = false
-level = "info"
-targets = []
-#log_file = None
+config = "log_config.yaml"

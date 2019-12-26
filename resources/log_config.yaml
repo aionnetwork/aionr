@@ -44,3 +44,8 @@ loggers:
     appenders:
       - stdout
     additive: false
+  ws:
+    level: warn
+    appenders:
+      - stdout
+    additive: false
