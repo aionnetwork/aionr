@@ -78,7 +78,6 @@ staker_private_key = "staker_private_key"
 pruning = "auto"
 pruning_history = 64
 pruning_memory = 500
-#cache_size_db = 64
 cache_size_blocks = 8
 cache_size_queue = 50
 cache_size_state = 25
@@ -90,8 +89,4 @@ scale_verifiers = true
 num_verifiers = 6
 
 [log]
-no_color = true
-level = "level"
-targets = ["target1","target2"]
-log_file = "log file"
-
+config = "log/config.yaml"

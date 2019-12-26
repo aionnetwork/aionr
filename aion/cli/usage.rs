@@ -353,9 +353,13 @@ macro_rules! usage {
                         file.read_to_string(&mut config).map_err(|e| ArgsError::Config(config_file, e))?;
                         Ok(raw_args.into_args(Self::parse_config(&config)?))
                     },
-                    Err(_e) => {
+                    Err(_) if raw_args.arg_config.is_none() => {
                         raw_args.flag_no_config = true;
-                        Ok(raw_args.into_args(Config::default()))
+                        return Ok(raw_args.into_args(Config::default()));
+                    }
+                    Err(e) => {
+                        println_stderr!("Err:{:?} \nCannot open the config file {} \nPlease check your config path ",e ,&config_file);
+                        process::exit(0);
                     },
                 }
             }
@@ -549,9 +553,8 @@ macro_rules! usage {
                             let mut add_arg = &stringify!($arg)[4..];
                             add_arg = match title{
                                 "websockets" => &add_arg[3..],
-                                "rpc" | "ipc" => &add_arg[4..],
+                                "rpc" | "ipc" | "log" => &add_arg[4..],
                                 "http" => &add_arg[5..],
-                                "log" if add_arg != "log_file" => &add_arg[4..],
                                 _ => add_arg,
                             };
                             let add_default: $($arg_type_tt)+ = $arg_default.into();

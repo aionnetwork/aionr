@@ -103,7 +103,6 @@ pub struct ImportBlockchain {
     pub wal: bool,
     pub fat_db: Switch,
     pub vm_type: VMType,
-    // pub with_color: bool,
     pub verifier_settings: VerifierSettings,
 }
 

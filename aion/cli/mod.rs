@@ -444,22 +444,6 @@ usage! {
             "Amount of verifier threads to use or to begin with, if verifier auto-scaling is enabled.",
 
         ["Log Options"]
-            FLAG flag_no_color: (bool) = false, or |c: &Config| c.log.as_ref()?.no_color.clone(),
-            "--no-color",
-            "Don't use terminal color codes in output.",
-
-            ARG arg_log_level: (String) = "info", or |c: &Config| c.log.as_ref()?.level.clone(),
-            "--log-level=[LEVEL]",
-            "Specify all modules' log level. LEVEL may be one of: off, error, warn, info, debug, trace.",
-
-            ARG arg_log_targets: (Vec<String>) = Vec::new(), or |c: &Config| c.log.as_ref()?.targets.clone(),
-            "--log-targets=[LOGGINGs]...",
-            "Specify the log target you want and specify it's log level. Must conform to the same format as RUST_LOG.eq 'own_tx=debug'.",
-
-            ARG arg_log_file: (Option<String>) = None, or |c: &Config| c.log.as_ref()?.log_file.clone(),
-            "--log-file=[FILENAME]",
-            "Specify a filename into which logging should be appended.",
-
             ARG arg_log_config: (Option<String>) = None, or |c: &Config| c.log.as_ref()?.config.clone(),
             "--log-config=[FILENAME]",
             "Specify a yaml file path as log configuration",
@@ -600,10 +584,6 @@ struct Database {
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Log {
-    no_color: Option<bool>,
-    level: Option<String>,
-    targets: Option<Vec<String>>,
-    log_file: Option<String>,
     config: Option<String>,
 }
 
@@ -865,10 +845,7 @@ mod tests {
             arg_config: "$HOME/.aion/config.toml".into(),
 
             // -- Log Options
-            flag_no_color: true,
-            arg_log_file: Some("log file".into()),
-            arg_log_level: "level".into(),
-            arg_log_targets: vec!["target1".into(), "target2".into()],
+            arg_log_config: Some("log/config.yaml".into()),
         };
 
         println!("{:?}", args);

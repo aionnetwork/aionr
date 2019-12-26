@@ -703,7 +703,6 @@ mod tests {
                 wal: true,
                 fat_db: Default::default(),
                 vm_type: Default::default(),
-                with_color: !cfg!(windows),
                 verifier_settings: Default::default(),
             }))
         );
