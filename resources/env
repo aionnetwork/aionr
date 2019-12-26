@@ -5,17 +5,27 @@ BOOST_TAR="boost_1_65_1.tar.bz2"
 BOOST_SHA1SUM=4a5b0c3c1b1b9a4d6cb6a6cc395e903e76f76720
 JDK_TAR="openjdk-11.0.1_linux-x64_bin.tar.gz"
 JDK_SHA1SUM=2737d3c1c67d5629383d6da4c4c33b1e3427c3d6
+WHEREJAVAC=`javac --version | awk '{print$2}' | awk 'BEGIN{FS="."}{print$1}'`
+
+function prepare {
+    echo "try to update from repository"
+    if [[ "$USERNAME" == "root" ]];then
+        apt update; apt -y install lsb-release wget bzip2 gawk
+    else
+        sudo apt update; apt -y install lsb-release wget bzip2 gawk
+    fi
+}
 
 ## Step 0: check system version
 USERNAME=`whoami`
 echo -e "\033[32mHello $USERNAME, welcome to Aion Rust Kernel \033[0m"
-apt install -y lsb-release wget bzip2 gawk
+prepare
 
 function resolve_u1804 {
     ## Step 1: check java environment
-    if [ -z "$JAVA_HOME" ];then
-        echo -e "\033[33mWARN: JAVA_HOME not found, try to install jdk first \033[0m"
-        apt install -y openjdk-11-jdk
+    if [ "$WHEREJAVAC" != "11" ];then
+        echo -e "\033[33mWARN: jdk11 is not found,try to install jdk first \033[0m"
+        apt -qq -y install openjdk-11-jdk
         echo "export JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64" > ./custom.env
         echo -e "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$JAVA_HOME/lib/server" >> ./custom.env
     fi
@@ -23,16 +33,14 @@ function resolve_u1804 {
     touch ./custom.env
     
     ## Step 2: install dependencies
-    echo -e "\033[33mupdating repositories\033[0m"
-    apt update 2> /dev/null 1>&2
     echo -e "\033[33minstalling local dependencies\033[0m"
-    apt install -y libboost-filesystem1.65-dev libboost-program-options1.65-dev llvm-4.0-dev 1> /dev/null 2>&1
+    apt -y -qq install libboost-filesystem1.65-dev libboost-program-options1.65-dev llvm-4.0-dev 1> /dev/null 2>&1
 }
 
 function resolve_u1604 {
-    if [ -z "$JAVA_HOME" ];then
+    if [ "$WHEREJAVAC" != "11" ];then
         # Download jdk 11
-        if [ ! -f "$JDK_TAR" -o "`sha1sum $JDK_TAR | awk '{print$1}'`" != "$JDK_SHA1SUM" ]; then
+        if [[ ! -f "$JDK_TAR" || "`sha1sum $JDK_TAR | awk '{print$1}'`" != "$JDK_SHA1SUM" ]]; then
             wget https://download.java.net/java/GA/jdk11/13/GPL/openjdk-11.0.1_linux-x64_bin.tar.gz
             if [ `sha1sum $JDK_TAR != $JDK_SHA1SUM` ];then
                 echo "Download openjdk failed"
@@ -41,28 +49,28 @@ function resolve_u1604 {
         fi
 
         mkdir jdk
-        tar xvf openjdk-11.0.1_linux-x64_bin.tar.gz -C jdk
+        tar xf openjdk-11.0.1_linux-x64_bin.tar.gz -C jdk
         echo "export JAVA_HOME=$PWD/jdk/jdk-11.0.1" > ./custom.env
         echo -e "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$JAVA_HOME/lib/server" >> ./custom.env
-
-        ## install boost
-        if [ ! -f "$BOOST_TAR" -o "`sha1sum $BOOST_TAR | awk '{print$1}'`" != "$BOOST_SHA1SUM" ]; then
-            wget https://dl.bintray.com/boostorg/release/1.65.1/source/boost_1_65_1.tar.bz2
-            if [ `sha1sum $BOOST_TAR != $BOOST_SHA1SUM` ];then
-                echo "Download boost failed"
-                exit -1
-            fi
-        fi
-        sudo apt -y install gcc g++
-        tar xvf boost_1_65_1.tar.bz2
-        cd boost_1_65_1
-        ./bootstrap.sh --libdir=/usr/lib/x86_64-linux-gnu/
-        ./b2
-        ./b2 install
     fi
 
+    ## ubuntu 16.04 does not maintain boost1.65 officially, so just install boost-v1.65 mannually
+    if [[ ! -f $BOOST_TAR || "`sha1sum $BOOST_TAR | awk '{print$1}'`" != "$BOOST_SHA1SUM" ]]; then
+        wget https://dl.bintray.com/boostorg/release/1.65.1/source/boost_1_65_1.tar.bz2
+        if [ "`sha1sum $BOOST_TAR | awk '{print$1}'`" != "$BOOST_SHA1SUM" ];then
+            echo "Download boost failed"
+            exit -1
+        fi
+    fi
+    apt -y -qq install gcc g++
+    tar xf boost_1_65_1.tar.bz2
+    cd boost_1_65_1
+    ./bootstrap.sh --libdir=/usr/lib/x86_64-linux-gnu/
+    ./b2
+    ./b2 install
+
     ## install llvm-4.0
-    apt -y install libllvm4.0
+    apt -y -qq install libllvm4.0
 }
 
 if [ ! -f "custom.env" ];then
