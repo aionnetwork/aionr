@@ -751,7 +751,6 @@ mod tests {
             arg_password: vec!["~/.safe/password.file".into()],
             arg_keys_iterations: 10240u32,
             arg_refresh_time: 2,
-            arg_stake_contract: None,
             arg_stake_contract:
                 "0xa0733306c2ee0c60224b0e59efeae8eee558c0ca1b39e7e5a14a575124549416".into(),
 
