@@ -84,8 +84,6 @@ extern crate delta_calc;
 #[cfg(test)]
 extern crate fastvm;
 #[cfg(test)]
-extern crate logger;
-#[cfg(test)]
 extern crate tempdir;
 #[cfg(test)]
 #[macro_use]

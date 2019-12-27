@@ -33,7 +33,6 @@ use acore_bytes::Bytes;
 use journaldb;
 use kvdb::{DBTransaction, KeyValueDB};
 use trie::{Trie, TrieFactory, TrieSpec};
-use ansi_term::Colour;
 
 // other
 use aion_types::{Address, H128, H256, H264, U256};
@@ -568,18 +567,18 @@ impl Client {
                 let (_, _, _, hour, minute, second) = utc_from_secs(first.timestamp() as i64);
                 info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}",
                     first.seal_type().clone().unwrap_or_default(),
-                    Colour::White.bold().paint(format!("{}", first.number())),
-                    Colour::White.bold().paint(format!("{:x}", first.hash())),
-                    Colour::White.bold().paint(format!("{:x}", first.difficulty())),
-                    Colour::White.bold().paint(format!("{:x}", first.timestamp())),
-                    Colour::White.bold().paint(format!("{}", hour)),
-                    Colour::White.bold().paint(format!("{}", minute)),
-                    Colour::White.bold().paint(format!("{}", second)));
+                    format!("{}", first.number()),
+                    format!("{:x}", first.hash()),
+                    format!("{:x}", first.difficulty()),
+                    format!("{:x}", first.timestamp()),
+                    format!("{}", hour),
+                    format!("{}", minute),
+                    format!("{}", second));
             }
             (Some(first), Some(last)) => {
                 info!(target: "miner", "External blocks added from #{} to #{}",
-                    Colour::White.bold().paint(format!("{}", first.number())),
-                    Colour::White.bold().paint(format!("{}", last.number())));
+                    format!("{}", first.number()),
+                    format!("{}", last.number()));
             }
             (_, _) => {}
         }
@@ -1850,13 +1849,13 @@ impl MiningBlockChainClient for Client {
         // Print log
         info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}",
             seal_type.unwrap_or_default(),
-            Colour::White.bold().paint(format!("{}", number)),
-            Colour::White.bold().paint(format!("{:x}", hash)),
-            Colour::White.bold().paint(format!("{:x}", difficulty)),
-            Colour::White.bold().paint(format!("{:x}", timestamp)),
-            Colour::White.bold().paint(format!("{}", hour)),
-            Colour::White.bold().paint(format!("{}", minute)),
-            Colour::White.bold().paint(format!("{}", second)));
+            format!("{}", number),
+            format!("{:x}", hash),
+            format!("{:x}", difficulty),
+            format!("{:x}", timestamp),
+            format!("{}", hour),
+            format!("{}", minute),
+            format!("{}", second));
         Ok(hash)
     }
 

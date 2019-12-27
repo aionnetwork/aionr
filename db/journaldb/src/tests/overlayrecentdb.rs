@@ -1,7 +1,6 @@
 use blake2b::blake2b;
 use super::*;
 use kvdb::{HashStore, DBValue};
-use logger::init_log;
 use {kvdb::MockDbRepository, JournalDB, kvdb::DBTransaction};
 
 use aion_types::H256;
@@ -315,7 +314,6 @@ fn reopen() {
 
 #[test]
 fn insert_delete_insert_delete_insert_expunge() {
-    init_log();
     let mut jdb = new_db();
 
     // history is 4
@@ -343,7 +341,6 @@ fn insert_delete_insert_delete_insert_expunge() {
 
 #[test]
 fn forked_insert_delete_insert_delete_insert_expunge() {
-    init_log();
     let mut jdb = new_db();
 
     // history is 4
@@ -462,8 +459,6 @@ fn reopen_test() {
 
 #[test]
 fn reopen_remove_three() {
-    init_log();
-
     let shared_db = Arc::new(MockDbRepository::init(vec!["test".into()]));
     let foo = blake2b(b"foo");
 
