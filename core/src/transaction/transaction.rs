@@ -454,32 +454,6 @@ impl UnverifiedTransaction {
         recover_ed25519(&self.signature(), &self.unsigned.hash(&self.timestamp))
     }
 
-    /// Do basic validation, checking for valid signature and minimum gas,
-    // TODO: consider use in block validation.
-    // TODO-aion: add other validation as java version does.
-    #[cfg(feature = "json-tests")]
-    pub fn validate(
-        self,
-        allow_chain_id_of_one: bool,
-        allow_empty_signature: bool,
-    ) -> Result<UnverifiedTransaction, error::Error>
-    {
-        let chain_id = if allow_chain_id_of_one { Some(1) } else { None };
-        self.verify_basic(chain_id)?;
-        if !allow_empty_signature || !self.is_unsigned() {
-            self.recover_public()?;
-        }
-        if self.gas < self.gas_required() {
-            return Err(error::Error::InvalidGasLimit(::unexpected::OutOfBounds {
-                min: Some(self.gas_required()),
-                max: None,
-                found: self.gas,
-            })
-            .into());
-        }
-        Ok(self)
-    }
-
     pub fn is_allowed_type(
         &self,
         has_fork: Option<u64>,
