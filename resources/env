@@ -34,10 +34,9 @@ function resolve_u1804 {
         echo -e "\033[33mWARN: jdk11 is not found,try to install jdk first \033[0m"
         install openjdk-11-jdk
         echo "export JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64" > ./custom.env
-        echo -e "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$JAVA_HOME/lib/server" >> ./custom.env
     fi
 
-    touch ./custom.env
+    echo -e "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$JAVA_HOME/lib/server" >> ./custom.env
 
     ## Step 2: install dependencies
     echo -e "\033[33minstalling local dependencies\033[0m"
