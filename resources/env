@@ -27,7 +27,6 @@ function install {
 ## Step 0: check system version
 USERNAME=`whoami`
 echo -e "\033[32mHello $USERNAME, welcome to Aion Rust Kernel \033[0m"
-prepare
 
 function resolve_u1804 {
     ## Step 1: check java environment
@@ -39,7 +38,7 @@ function resolve_u1804 {
     fi
 
     touch ./custom.env
-    
+
     ## Step 2: install dependencies
     echo -e "\033[33minstalling local dependencies\033[0m"
     install libboost-filesystem1.65-dev
@@ -64,7 +63,7 @@ function resolve_u1604 {
         echo -e "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$JAVA_HOME/lib/server" >> ./custom.env
     else
         # jdk11 is already installed
-        echo -e "You have jdk 11 installed, make sure that JAVA_HOME is set correctly."
+        echo -e "\033[33mWARN: You have jdk 11 installed, make sure that JAVA_HOME is set correctly. \033[0m"
         echo -e "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$JAVA_HOME/lib/server" >> ./custom.env
     fi
 
@@ -88,6 +87,7 @@ function resolve_u1604 {
 }
 
 if [ ! -f "custom.env" ];then
+    prepare
     echo -e "\033[33mWARN: Seems this is your first time to run Aion Rust Kernel, resolving dependencies \033[0m"
     SYSINFO=`lsb_release -r | awk '{print$2}'`
     if [ "$SYSINFO" == "18.04" ];then
