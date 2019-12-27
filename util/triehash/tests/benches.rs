@@ -19,22 +19,19 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
 #![warn(unused_extern_crates)]
+#![cfg(feature = "benches")]
 
-extern crate patricia_trie;
-extern crate acore_bytes;
-extern crate aion_types;
 extern crate trie_standardmap;
+extern crate aion_types;
 extern crate blake2b;
-extern crate db;
 
+extern crate triehash;
+
+use triehash::trie_root;
 use std::time::Instant;
-use acore_bytes::Bytes;
 use aion_types::H256;
 use blake2b::blake2b;
-use db::MemoryDB;
-use patricia_trie::{TrieDBMut, TrieDB, TrieMut, Trie};
 use trie_standardmap::{Alphabet, ValueMode, StandardMap};
 
 fn random_word(alphabet: &[u8], min_count: usize, diff_count: usize, seed: &mut H256) -> Vec<u8> {
@@ -55,7 +52,7 @@ fn random_bytes(min_count: usize, diff_count: usize, seed: &mut H256) -> Vec<u8>
     seed[0..r].to_vec()
 }
 
-fn random_value(seed: &mut H256) -> Bytes {
+fn random_value(seed: &mut H256) -> Vec<u8> {
     *seed = blake2b(&seed);
     match seed[0] % 2 {
         1 => vec![seed[31]; 1],
@@ -64,7 +61,7 @@ fn random_value(seed: &mut H256) -> Bytes {
 }
 
 #[test]
-fn benchtest_trie_insertions_32_mir_1k() {
+fn benchtest_triehash_insertions_32_mir_1k() {
     let st = StandardMap {
         alphabet: Alphabet::All,
         min_key: 32,
@@ -74,61 +71,25 @@ fn benchtest_trie_insertions_32_mir_1k() {
     };
     let d = st.make();
 
-    let count = 100;
+    let count = 1000;
     let time = Instant::now();
 
+    let mut result = H256::default();
     for _ in 0..count {
-        let mut memdb = MemoryDB::new();
-        let mut root = H256::new();
-        let mut t = TrieDBMut::new(&mut memdb, &mut root);
-        for i in d.iter() {
-            t.insert(&i.0, &i.1).unwrap();
-        }
+        result = trie_root(d.clone()).clone();
     }
+
+    assert!(result.0.len() != 0);
 
     let took = time.elapsed();
     println!(
-        "[benchtest_trie_insertions_32_mir_1k] trie insertions 32 mir 1k (ns/call): {}",
+        "[benchtest_triehash_insertions_32_mir_1k] triehash insertions 32 mirror 1k (ns/call): {}",
         (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
     );
 }
 
 #[test]
-fn benchtest_trie_iter() {
-    let st = StandardMap {
-        alphabet: Alphabet::All,
-        min_key: 32,
-        journal_key: 0,
-        value_mode: ValueMode::Mirror,
-        count: 1000,
-    };
-    let d = st.make();
-    let mut memdb = MemoryDB::new();
-    let mut root = H256::new();
-    {
-        let mut t = TrieDBMut::new(&mut memdb, &mut root);
-        for i in d.iter() {
-            t.insert(&i.0, &i.1).unwrap();
-        }
-    }
-
-    let count = 100;
-    let time = Instant::now();
-
-    for _ in 0..count {
-        let t = TrieDB::new(&memdb, &root).unwrap();
-        for _ in t.iter().unwrap() {}
-    }
-
-    let took = time.elapsed();
-    println!(
-        "[benchtest_trie_iter] trie iter (ns/call): {}",
-        (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
-    );
-}
-
-#[test]
-fn benchtest_trie_insertions_32_ran_1k() {
+fn benchtest_triehash_insertions_32_ran_1k() {
     let st = StandardMap {
         alphabet: Alphabet::All,
         min_key: 32,
@@ -137,32 +98,27 @@ fn benchtest_trie_insertions_32_ran_1k() {
         count: 1000,
     };
     let d = st.make();
-    let mut r = H256::new();
 
-    let count = 100;
+    let count = 1000;
     let time = Instant::now();
 
+    let mut result = H256::default();
     for _ in 0..count {
-        let mut memdb = MemoryDB::new();
-        let mut root = H256::new();
-        let mut t = TrieDBMut::new(&mut memdb, &mut root);
-        for i in d.iter() {
-            t.insert(&i.0, &i.1).unwrap();
-        }
-        r = t.root().clone();
+        result = trie_root(d.clone()).clone();
     }
+
+    assert!(result.0.len() != 0);
 
     let took = time.elapsed();
     println!(
-        "[benchtest_trie_insertions_32_ran_1k] trie insertions 32 random 1k (ns/call): {}",
+        "[benchtest_triehash_insertions_32_ran_1k] triehash insertions 32 random 1k (ns/call): {}",
         (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
     );
-    assert!(r.0.len() != 0);
 }
 
 #[test]
-fn benchtest_trie_insertions_six_high() {
-    let mut d: Vec<(Bytes, Bytes)> = Vec::new();
+fn benchtest_triehash_insertions_six_high() {
+    let mut d: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     let mut seed = H256::new();
     for _ in 0..1000 {
         let k = random_bytes(6, 0, &mut seed);
@@ -170,28 +126,24 @@ fn benchtest_trie_insertions_six_high() {
         d.push((k, v))
     }
 
-    let count = 100;
+    let count = 1000;
     let time = Instant::now();
 
     for _ in 0..count {
-        let mut memdb = MemoryDB::new();
-        let mut root = H256::new();
-        let mut t = TrieDBMut::new(&mut memdb, &mut root);
-        for i in d.iter() {
-            t.insert(&i.0, &i.1).unwrap();
-        }
+        trie_root(d.clone());
     }
+
     let took = time.elapsed();
     println!(
-        "[benchtest_trie_insertions_six_high] trie insertions six high (ns/call): {}",
+        "[benchtest_triehash_insertions_six_high] triehash insertions six high (ns/call): {}",
         (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
     );
 }
 
 #[test]
-fn benchtest_trie_insertions_six_mid() {
+fn benchtest_triehash_insertions_six_mid() {
     let alphabet = b"@QWERTYUIOPASDFGHJKLZXCVBNM[/]^_";
-    let mut d: Vec<(Bytes, Bytes)> = Vec::new();
+    let mut d: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     let mut seed = H256::new();
     for _ in 0..1000 {
         let k = random_word(alphabet, 6, 0, &mut seed);
@@ -199,27 +151,24 @@ fn benchtest_trie_insertions_six_mid() {
         d.push((k, v))
     }
 
-    let count = 100;
+    let count = 1000;
     let time = Instant::now();
+
     for _ in 0..count {
-        let mut memdb = MemoryDB::new();
-        let mut root = H256::new();
-        let mut t = TrieDBMut::new(&mut memdb, &mut root);
-        for i in d.iter() {
-            t.insert(&i.0, &i.1).unwrap();
-        }
+        trie_root(d.clone());
     }
+
     let took = time.elapsed();
     println!(
-        "[benchtest_trie_insertions_six_mid] trie insertions six mid (ns/call): {}",
+        "[benchtest_triehash_insertions_six_mid] triehash insertions six mid (ns/call): {}",
         (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
     );
 }
 
 #[test]
-fn benchtest_trie_insertions_random_mid() {
+fn benchtest_triehash_insertions_random_mid() {
     let alphabet = b"@QWERTYUIOPASDFGHJKLZXCVBNM[/]^_";
-    let mut d: Vec<(Bytes, Bytes)> = Vec::new();
+    let mut d: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     let mut seed = H256::new();
     for _ in 0..1000 {
         let k = random_word(alphabet, 1, 5, &mut seed);
@@ -227,27 +176,25 @@ fn benchtest_trie_insertions_random_mid() {
         d.push((k, v))
     }
 
-    let count = 100;
+    let count = 1000;
     let time = Instant::now();
+
     for _ in 0..count {
-        let mut memdb = MemoryDB::new();
-        let mut root = H256::new();
-        let mut t = TrieDBMut::new(&mut memdb, &mut root);
-        for i in d.iter() {
-            t.insert(&i.0, &i.1).unwrap();
-        }
+        trie_root(d.clone());
     }
+
     let took = time.elapsed();
     println!(
-        "[benchtest_trie_insertions_random_mid] trie insertions random mid (ns/call): {}",
+        "[benchtest_triehash_insertions_random_mid] triehash insertions six random mid (ns/call): \
+         {}",
         (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
     );
 }
 
 #[test]
-fn benchtest_trie_insertions_six_low() {
+fn benchtest_triehash_insertions_six_low() {
     let alphabet = b"abcdef";
-    let mut d: Vec<(Bytes, Bytes)> = Vec::new();
+    let mut d: Vec<(Vec<u8>, Vec<u8>)> = Vec::new();
     let mut seed = H256::new();
     for _ in 0..1000 {
         let k = random_word(alphabet, 6, 0, &mut seed);
@@ -255,19 +202,16 @@ fn benchtest_trie_insertions_six_low() {
         d.push((k, v))
     }
 
-    let count = 100;
+    let count = 1000;
     let time = Instant::now();
+
     for _ in 0..count {
-        let mut memdb = MemoryDB::new();
-        let mut root = H256::new();
-        let mut t = TrieDBMut::new(&mut memdb, &mut root);
-        for i in d.iter() {
-            t.insert(&i.0, &i.1).unwrap();
-        }
+        trie_root(d.clone());
     }
+
     let took = time.elapsed();
     println!(
-        "[benchtest_trie_insertions_six_low] trie insertions six low (ns/call): {}",
+        "[benchtest_triehash_insertions_six_low] triehash insertions six low (ns/call): {}",
         (took.as_secs() * 1000_000_000 + took.subsec_nanos() as u64) / count
     );
 }

@@ -480,6 +480,14 @@ impl state::Backend for StateDB {
             .map(|a| a.as_ref().map(|a| a.clone_basic()))
     }
 
+    fn force_update(&mut self, addr: &Address, account: &AionVMAccount) {
+        let mut cache = self.account_cache.lock();
+
+        if let Some(&mut Some(ref mut existing)) = cache.accounts.get_mut(addr) {
+            existing.overwrite_with(account.clone());
+        }
+    }
+
     fn get_cached_code(&self, hash: &H256) -> Option<Arc<Vec<u8>>> {
         let mut cache = self.code_cache.lock();
 
@@ -522,12 +530,9 @@ mod tests {
     use kvdb::DBTransaction;
     use helpers::*;
     use state::{VMAccount, Backend, AionVMAccount};
-    use logger::init_log;
 
     #[test]
     fn state_db_smoke() {
-        init_log();
-
         let state_db = get_temp_state_db();
         let root_parent = H256::random();
         let address = Address::random();

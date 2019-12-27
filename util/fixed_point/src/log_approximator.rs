@@ -133,6 +133,7 @@ impl LogApproximator for FixedPoint {
 mod test {
     use super::*;
     use num_traits::{ToPrimitive};
+    #[cfg(feature = "benches")]
     use rand::{thread_rng, Rng};
     use std::cmp::Ordering;
 
@@ -198,6 +199,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     fn test_random_ln() {
         use std::time::Instant;
         let mut rng = thread_rng();
@@ -217,6 +219,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     fn test_collisions() {
         use std::collections::HashSet;
         let mut lns = HashSet::new();

@@ -33,7 +33,6 @@ use acore_bytes::Bytes;
 use journaldb;
 use kvdb::{DBTransaction, KeyValueDB};
 use trie::{Trie, TrieFactory, TrieSpec};
-use ansi_term::Colour;
 
 // other
 use aion_types::{Address, H128, H256, H264, U256};
@@ -401,6 +400,34 @@ impl Client {
         let last_hashes = self.build_last_hashes(header.parent_hash().clone());
         let db = self.state_db.read().boxed_clone_canon(&parent_hash);
 
+        // check transaction nonce and type
+        match State::from_existing(
+            db.boxed_clone(),
+            parent.state_root().clone(),
+            engine.machine().account_start_nonce(parent.number() + 1),
+            self.factories.clone(),
+            self.db.read().clone(),
+        ) {
+            Ok(s) => {
+                let mut nonce_cache = HashMap::<Address, U256>::new();
+                for t in block.transactions.clone() {
+                    let expected_nonce: U256 = nonce_cache
+                        .get(t.sender())
+                        .unwrap_or(&s.nonce(t.sender()).unwrap_or(U256::zero()))
+                        .clone();
+                    if expected_nonce != t.nonce {
+                        warn!(target: "client", "Stage 4 block verification failed for #{}. Invalid transaction {}: Tx nonce {} != expected nonce {}\n", header.number(), t.hash(), t.nonce, expected_nonce);
+                        return Err(());
+                    }
+                    nonce_cache.insert(t.sender().clone(), t.nonce + U256::from(1u64));
+                }
+            }
+            _ => {
+                error!(target: "client", "statedb fatal error");
+                return Err(());
+            }
+        }
+
         let enact_result = enact_verified(
             block,
             engine,
@@ -540,18 +567,18 @@ impl Client {
                 let (_, _, _, hour, minute, second) = utc_from_secs(first.timestamp() as i64);
                 info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}",
                     first.seal_type().clone().unwrap_or_default(),
-                    Colour::White.bold().paint(format!("{}", first.number())),
-                    Colour::White.bold().paint(format!("{:x}", first.hash())),
-                    Colour::White.bold().paint(format!("{:x}", first.difficulty())),
-                    Colour::White.bold().paint(format!("{:x}", first.timestamp())),
-                    Colour::White.bold().paint(format!("{}", hour)),
-                    Colour::White.bold().paint(format!("{}", minute)),
-                    Colour::White.bold().paint(format!("{}", second)));
+                    format!("{}", first.number()),
+                    format!("{:x}", first.hash()),
+                    format!("{:x}", first.difficulty()),
+                    format!("{:x}", first.timestamp()),
+                    format!("{}", hour),
+                    format!("{}", minute),
+                    format!("{}", second));
             }
             (Some(first), Some(last)) => {
                 info!(target: "miner", "External blocks added from #{} to #{}",
-                    Colour::White.bold().paint(format!("{}", first.number())),
-                    Colour::White.bold().paint(format!("{}", last.number())));
+                    format!("{}", first.number()),
+                    format!("{}", last.number()));
             }
             (_, _) => {}
         }
@@ -814,19 +841,6 @@ impl Client {
         analytics: CallAnalytics,
     ) -> Result<Executed, CallError>
     {
-        fn for_local_avm(state: &mut State<StateDB>, transaction: &SignedTransaction) -> bool {
-            if transaction.tx_type() == AVM_TRANSACTION_TYPE {
-                return true;
-            } else if let Action::Call(a) = transaction.action {
-                let code = state.code(&a).unwrap_or(None);
-                if let Some(c) = code {
-                    return c[0..2] != [0x60u8, 0x50];
-                }
-            }
-
-            return false;
-        }
-
         fn call(
             state: &mut State<StateDB>,
             env_info: &EnvInfo,
@@ -1057,6 +1071,20 @@ impl Client {
     }
 }
 
+// helper function to tell is this transaction is for avm
+fn for_local_avm(state: &mut State<StateDB>, transaction: &SignedTransaction) -> bool {
+    if transaction.tx_type() == AVM_TRANSACTION_TYPE {
+        return true;
+    } else if let Action::Call(a) = transaction.action {
+        let code = state.code(&a).unwrap_or(None);
+        if let Some(c) = code {
+            return c[0..2] != [0x60u8, 0x50];
+        }
+    }
+
+    return false;
+}
+
 impl BlockChainClient for Client {
     fn call(
         &self,
@@ -1162,10 +1190,19 @@ impl BlockChainClient for Client {
             let tx = tx.fake_sign(sender.clone());
 
             let mut state = original_state.clone();
-            Ok(Executive::new(&mut state, &env_info, self.engine.machine())
-                .transact_virtual(&tx, false)
-                .map(|r| r.exception.as_str() == "")
-                .unwrap_or(false))
+
+            if for_local_avm(&mut state, &tx) {
+                Ok(Executive::new(&mut state, &env_info, self.engine.machine())
+                    .transact_virtual_bulk(&[tx.clone()], false)[0]
+                    .clone()
+                    .map(|r| r.exception.as_str() == "")
+                    .unwrap_or(false))
+            } else {
+                Ok(Executive::new(&mut state, &env_info, self.engine.machine())
+                    .transact_virtual(&tx, false)
+                    .map(|r| r.exception.as_str() == "")
+                    .unwrap_or(false))
+            }
         };
 
         if !cond(upper)? {
@@ -1822,13 +1859,13 @@ impl MiningBlockChainClient for Client {
         // Print log
         info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}",
             seal_type.unwrap_or_default(),
-            Colour::White.bold().paint(format!("{}", number)),
-            Colour::White.bold().paint(format!("{:x}", hash)),
-            Colour::White.bold().paint(format!("{:x}", difficulty)),
-            Colour::White.bold().paint(format!("{:x}", timestamp)),
-            Colour::White.bold().paint(format!("{}", hour)),
-            Colour::White.bold().paint(format!("{}", minute)),
-            Colour::White.bold().paint(format!("{}", second)));
+            format!("{}", number),
+            format!("{:x}", hash),
+            format!("{:x}", difficulty),
+            format!("{:x}", timestamp),
+            format!("{}", hour),
+            format!("{}", minute),
+            format!("{}", second));
         Ok(hash)
     }
 

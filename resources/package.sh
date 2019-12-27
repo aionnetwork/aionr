@@ -23,6 +23,7 @@ CUSTT="package/$PACKAGE_NAME/custom/custom.toml"
 CUSTJ="package/$PACKAGE_NAME/custom/custom.json"
 AMITYT="package/$PACKAGE_NAME/amity/amity.toml"
 AMITYJ="package/$PACKAGE_NAME/amity/amity.json"
+LOG_CONFIG="package/$PACKAGE_NAME/log_config.yaml"
 
 ## Step 2-1: remove old packages, build template release
 rm -rf package/$PACKAGE_NAME
@@ -42,7 +43,7 @@ cp -r vms/avm/libs/aion_vm package/$PACKAGE_NAME/libs
 ## Step 2-3: generate configuration files
 cp resources/config_mainnet.toml $MAINT
 cp resources/mainnet.json $MAINJ
-echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mainnet/mainnet.toml $*'>package/$PACKAGE_NAME/mainnet.sh
+echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mainnet/mainnet.toml --log-config=log_config.yaml $*'>package/$PACKAGE_NAME/mainnet.sh
 chmod +x package/$PACKAGE_NAME/mainnet.sh
 
 cp resources/config_mastery.toml $MASTT
@@ -60,8 +61,13 @@ cp resources/amity.json $AMITYJ
 echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=amity/amity.toml $*'>package/$PACKAGE_NAME/amity.sh
 chmod +x package/$PACKAGE_NAME/amity.sh
 
+<<<<<<< HEAD
 ## Step 2-4: copy env script
+=======
+## Step 5: copy env script and log config file
+>>>>>>> 5b6df132e4186c588a468b71a2a62928adaee05e
 cp resources/env package/$PACKAGE_NAME
+cp resources/log_config.yaml package/$PACKAGE_NAME
 
 ## Step 2-5: compress
 tar -C package -czf ${PACKAGE_NAME}.tar.gz $PACKAGE_NAME

@@ -21,7 +21,6 @@
  ******************************************************************************/
 
 #![warn(unused_extern_crates)]
-#![cfg_attr(feature = "benches", feature(test))]
 extern crate bloomchain;
 extern crate byteorder;
 extern crate crossbeam;
@@ -83,8 +82,6 @@ extern crate delta_calc;
 
 #[cfg(test)]
 extern crate fastvm;
-#[cfg(test)]
-extern crate logger;
 #[cfg(test)]
 extern crate tempdir;
 #[cfg(test)]

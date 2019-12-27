@@ -21,13 +21,12 @@
  ******************************************************************************/
 
 #![warn(unused_extern_crates)]
+#![cfg(feature = "benches")]
 
 extern crate ethbloom;
 extern crate rand;
 extern crate fixed_hash;
 extern crate blake2b;
-#[macro_use]
-extern crate hex_literal;
 #[macro_use]
 extern crate crunchy;
 
@@ -62,26 +61,6 @@ fn test_address() -> Vec<u8> {
 fn test_dummy() -> Vec<u8> { b"123456".to_vec() }
 
 fn test_dummy2() -> Vec<u8> { b"654321".to_vec() }
-
-#[test]
-fn it_works() {
-    let bloom: Bloom = "0x00000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000000000000000000000000000000000000000000900000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000000000000000000000000000400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".into();
-    let address = hex!("ef2d6d194084c2de36e0dabfce45d046b37d1106");
-    let topic = hex!("02c69be41d0b7e40352fc85be1cd65eb03d40ef8427a0ca4596b1ead9a00e9fc");
-
-    let mut my_bloom = Bloom::default();
-    assert!(!my_bloom.contains_input(Input::Raw(&address)));
-    assert!(!my_bloom.contains_input(Input::Raw(&topic)));
-
-    my_bloom.accrue(Input::Raw(&address));
-    assert!(my_bloom.contains_input(Input::Raw(&address)));
-    assert!(!my_bloom.contains_input(Input::Raw(&topic)));
-
-    my_bloom.accrue(Input::Raw(&topic));
-    assert!(my_bloom.contains_input(Input::Raw(&address)));
-    assert!(my_bloom.contains_input(Input::Raw(&topic)));
-    assert_eq!(my_bloom, bloom);
-}
 
 #[test]
 fn benchtest_forwards_with_crunchy() {

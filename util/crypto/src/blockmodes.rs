@@ -854,6 +854,7 @@ impl<A: BlockEncryptorX8> Decryptor for CtrModeX8<A> {
 #[cfg(test)]
 mod test {
     use std::iter::repeat;
+    #[cfg(feature = "benches")]
     use std::time::Instant;
 
     use aessafe;
@@ -1361,6 +1362,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_aes_ecb_no_padding() {
         let key = [1u8; 16];
         let plain = [3u8; 512];
@@ -1393,6 +1395,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_aes_cbc_pkcs_padding() {
         let key = [1u8; 16];
         let iv = [2u8; 16];
@@ -1426,6 +1429,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_aes_ctr() {
         let key = [1u8; 16];
         let ctr = [2u8; 16];
@@ -1459,6 +1463,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_aes_ctr_x8() {
         let key = [1u8; 16];
         let ctr = [2u8; 16];

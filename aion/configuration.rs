@@ -32,8 +32,8 @@ use rpc::{IpcConfiguration, HttpConfiguration, WsConfiguration};
 use aion_rpc::dispatch::DynamicGasPrice;
 use cache::CacheConfig;
 use helpers::{
-    to_block_id, to_u256, to_pending_set, aion_ipc_path, parse_log_target, to_addresses,
-    to_address, to_queue_strategy, validate_log_level,
+    to_block_id, to_u256, to_pending_set, aion_ipc_path, to_addresses,
+    to_address, to_queue_strategy,string_to_address
 };
 use dir::helpers::{replace_home, replace_home_and_local, absolute};
 use params::{AccountsConfig, StakeConfig, MinerExtras, SpecType};
@@ -164,7 +164,7 @@ impl Configuration {
                 wal,
                 fat_db,
                 vm_type,
-                with_color: logger_config.color,
+                // with_color: logger_config.color,
                 verifier_settings: self.verifier_settings(),
             };
             Cmd::Blockchain(BlockchainCmd::Import(import_cmd))
@@ -273,17 +273,20 @@ impl Configuration {
     }
 
     fn logger_config(&self) -> LogConfig {
-        let level = validate_log_level(self.args.arg_log_level.clone(), "total");
-        let targets = parse_log_target(self.args.arg_log_targets.clone());
+        // let level = validate_log_level(self.args.arg_log_level.clone(), "total");
+        // let targets = parse_log_target(self.args.arg_log_targets.clone());
+        // LogConfig {
+        //     targets,
+        //     level,
+        //     color: !self.args.flag_no_color && !cfg!(windows),
+        //     file: self
+        //         .args
+        //         .arg_log_file
+        //         .as_ref()
+        //         .map(|log_file| replace_home(&self.directories().base, log_file)),
+        // }
         LogConfig {
-            targets,
-            level,
-            color: !self.args.flag_no_color && !cfg!(windows),
-            file: self
-                .args
-                .arg_log_file
-                .as_ref()
-                .map(|log_file| replace_home(&self.directories().base, log_file)),
+            config: self.args.arg_log_config.clone(),
         }
     }
 
@@ -306,8 +309,9 @@ impl Configuration {
     }
 
     fn stake_config(&self) -> Result<StakeConfig, String> {
+        let stake_contract = &self.args.arg_stake_contract;
         let cfg = StakeConfig {
-            contract: to_address(self.args.arg_stake_contract.clone())?,
+            contract: string_to_address(stake_contract)?,
         };
 
         Ok(cfg)
@@ -324,7 +328,7 @@ impl Configuration {
                 .map(|s| replace_home(&self.directories().base, s))
                 .collect(),
             unlocked_accounts: to_addresses(&self.args.arg_unlock)?,
-            enable_fast_signing: self.args.flag_fast_signing,
+            enable_fast_signing: false,
         };
 
         Ok(cfg)
@@ -527,15 +531,6 @@ impl Configuration {
             dir::CACHE_PATH
         };
 
-        let base_zmq_path = if is_using_base_path && self.args.arg_zmq_key_path.is_none() {
-            "$BASE/zmq"
-        } else {
-            self.args
-                .arg_zmq_key_path
-                .as_ref()
-                .map_or(dir::ZMQ_PATH, |s| &s)
-        };
-
         let db_path = absolute(replace_home_and_local(
             &data_path,
             &local_path,
@@ -546,11 +541,6 @@ impl Configuration {
             &data_path,
             &local_path,
             base_keys_path,
-        ));
-        let zmq_path = absolute(replace_home_and_local(
-            &data_path,
-            &local_path,
-            base_zmq_path,
         ));
         let config_path = if self.args.flag_no_config {
             None
@@ -566,7 +556,6 @@ impl Configuration {
             base: data_path,
             cache: cache_path,
             db: db_path,
-            zmq: zmq_path,
             config: config_path,
         }
     }
@@ -714,7 +703,6 @@ mod tests {
                 wal: true,
                 fat_db: Default::default(),
                 vm_type: Default::default(),
-                with_color: !cfg!(windows),
                 verifier_settings: Default::default(),
             }))
         );
