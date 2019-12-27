@@ -17,3 +17,6 @@ db = {path = "../../db/core" }
 
 [dev-dependencies]
 trie-standardmap = { path = "../trie-standardmap" }
+
+[features]
+benches = []

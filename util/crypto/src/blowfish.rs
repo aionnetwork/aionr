@@ -359,6 +359,7 @@ impl BlockDecryptor for Blowfish {
 
 #[cfg(test)]
 mod test {
+    #[cfg(feature = "benches")]
     use std::time::Instant;
     use blowfish::Blowfish;
     use symmetriccipher::{BlockEncryptor, BlockDecryptor};
@@ -770,6 +771,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     fn benchtest_blowfish() {
         let key = [0u8; 16];
         let plaintext = [1u8; 8];

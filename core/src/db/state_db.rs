@@ -530,12 +530,9 @@ mod tests {
     use kvdb::DBTransaction;
     use helpers::*;
     use state::{VMAccount, Backend, AionVMAccount};
-    use logger::init_log;
 
     #[test]
     fn state_db_smoke() {
-        init_log();
-
         let state_db = get_temp_state_db();
         let root_parent = H256::random();
         let address = Address::random();

@@ -77,11 +77,3 @@ vms =              { path = "../vms" }
 logger =           { path = "../util/logger" }
 aion-types =       { path = "../util/aion-types" }
 db =               { path = "../db/core" }
-
-
-[features]
-slow-blocks = [] # Use SLOW_TX_DURATION="50" (compile time!) to track transactions over 50ms
-json-tests = []
-test-heavy = []
-default = []
-benches = []
