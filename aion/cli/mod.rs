@@ -162,10 +162,6 @@ usage! {
             "Specify a configuration. CONFIG may be a configuration file .",
 
         ["Account Options"]
-            FLAG flag_fast_signing: (bool) = false, or |c: &Config| c.account.as_ref()?.fast_signing.clone(),
-            "--fast-signing",
-            "Use drastically faster signing mode for permanently unlocked accounts. This setting causes raw secrets of these accounts to be stored unprotected in memory, so use with care.",
-
             ARG arg_keys_iterations: (u32) = 10240u32, or |c: &Config| c.account.as_ref()?.keys_iterations.clone(),
             "--keys-iterations=[NUM]",
             "Specify the number of iterations to use when deriving key from the password (bigger is more secure)",
@@ -481,7 +477,6 @@ struct Account {
     password: Option<Vec<String>>,
     keys_iterations: Option<u32>,
     refresh_time: Option<u64>,
-    fast_signing: Option<bool>,
     stake_contract: Option<String>,
 }
 
@@ -756,7 +751,6 @@ mod tests {
             arg_password: vec!["~/.safe/password.file".into()],
             arg_keys_iterations: 10240u32,
             arg_refresh_time: 2,
-            flag_fast_signing: true,
             arg_stake_contract:
                 "0xa0733306c2ee0c60224b0e59efeae8eee558c0ca1b39e7e5a14a575124549416".into(),
 
@@ -897,7 +891,6 @@ mod tests {
                     password: Some(vec!["passwdfile path".into()]),
                     keys_iterations: None,
                     refresh_time: None,
-                    fast_signing: None,
                     stake_contract: None,
                 }),
                 network: Some(Network {
