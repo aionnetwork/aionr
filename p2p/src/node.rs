@@ -34,7 +34,7 @@ use tokio::net::TcpStream;
 use super::msg::*;
 use super::state::STATE;
 use futures::sync::oneshot::Sender;
-use std::sync::Mutex;
+use parking_lot::Mutex;
 
 const EMPTY_ID: &str = "00000000-0000-0000-0000-000000000000";
 
@@ -83,13 +83,17 @@ impl Node {
         id: [u8; NODE_ID_LENGTH],
         if_seed: bool,
         tx_thread: Sender<()>,
-    ) -> Node
+    ) -> Option<Node>
     {
         let mut tx_thread_vec = Vec::new();
         tx_thread_vec.push(tx_thread);
-        let addr = IpAddr::parse(ts.peer_addr().unwrap());
-        Node {
-            hash: 0,
+        let ts_addr = match ts.peer_addr() {
+            Ok(addr) => addr,
+            _ => return None,
+        };
+        let addr = IpAddr::parse(ts_addr);
+        Some(Node {
+            hash: calculate_hash(&addr.to_string()),
             id,
             net_id: 0,
             real_addr: addr.clone(),
@@ -107,7 +111,7 @@ impl Node {
 
             tokens: HashSet::new(),
             tx_thread: Arc::new(Mutex::new(tx_thread_vec)),
-        }
+        })
     }
 
     // construct outbound node
@@ -116,15 +120,20 @@ impl Node {
         tx: mpsc::Sender<ChannelBuffer>,
         if_seed: bool,
         tx_thread: Sender<()>,
-    ) -> Node
+    ) -> Option<Node>
     {
         let mut tx_thread_vec = Vec::new();
         tx_thread_vec.push(tx_thread);
-        Node {
-            hash: 0,
+        let ts_addr = match ts.peer_addr() {
+            Ok(addr) => addr,
+            _ => return None,
+        };
+        let addr = IpAddr::parse(ts_addr);
+        Some(Node {
+            hash: calculate_hash(&addr.to_string()),
             id: [b'0'; NODE_ID_LENGTH],
             net_id: 0,
-            addr: IpAddr::parse(ts.peer_addr().unwrap()),
+            addr,
             real_addr: IpAddr {
                 ip: [0u8; 8],
                 port: 0,
@@ -142,35 +151,27 @@ impl Node {
 
             tokens: HashSet::new(),
             tx_thread: Arc::new(Mutex::new(tx_thread_vec)),
-        }
-    }
-
-    pub fn get_hash(&self) -> u64 {
-        let addr: String = self.addr.to_string();
-        calculate_hash(&addr)
+        })
     }
 
     pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
 
     pub fn update(&mut self) {
-        trace!(target: "p2p", "node timestamp updated");
+        trace!(target: "p2p_node", "node timestamp updated");
         self.update = SystemTime::now();
     }
 
     pub fn is_active(&self) -> bool { self.state == STATE::ACTIVE }
 
     pub fn shutdown_tcp_thread(&self) -> Result<(), ()> {
-        if let Ok(mut tx_thread_vec) = self.tx_thread.lock() {
-            let mut result = Ok(());
-            while !tx_thread_vec.is_empty() {
-                if let Some(tx_thread) = tx_thread_vec.pop() {
-                    result = tx_thread.send(())
-                }
+        let mut tx_thread_vec = self.tx_thread.lock();
+        let mut result = Ok(());
+        while !tx_thread_vec.is_empty() {
+            if let Some(tx_thread) = tx_thread_vec.pop() {
+                result = tx_thread.send(())
             }
-            result
-        } else {
-            Ok(())
         }
+        result
     }
 }
 
@@ -178,13 +179,9 @@ pub fn convert_ip_string(ip_str: String) -> [u8; 8] {
     let mut ip: [u8; 8] = [0u8; 8];
     let ip_vec: Vec<&str> = ip_str.split(".").collect();
     if ip_vec.len() == 4 {
-        ip[0] = 0;
         ip[1] = ip_vec[0].parse::<u8>().unwrap_or(0);
-        ip[2] = 0;
         ip[3] = ip_vec[1].parse::<u8>().unwrap_or(0);
-        ip[4] = 0;
         ip[5] = ip_vec[2].parse::<u8>().unwrap_or(0);
-        ip[6] = 0;
         ip[7] = ip_vec[3].parse::<u8>().unwrap_or(0);
     }
     ip
@@ -237,7 +234,7 @@ impl IpAddr {
 
     pub fn to_formatted_string(&self) -> String {
         format!(
-            "{:>3}.{:>3}.{:>3}.{:>3}:{}",
+            "{:>3}.{:>3}.{:>3}.{:>3}:{:<5}",
             self.ip[1], self.ip[3], self.ip[5], self.ip[7], self.port
         )
         .to_string()
