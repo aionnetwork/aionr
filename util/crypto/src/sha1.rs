@@ -449,11 +449,13 @@ impl Digest for Sha1 {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "benches")]
     use std::time::Instant;
     use cryptoutil::test::test_digest_1million_random;
     use digest::Digest;
-    use sha1::{STATE_LEN, BLOCK_LEN};
-    use sha1::{Sha1, sha1_digest_block_u32};
+    #[cfg(feature = "benches")]
+    use sha1::{STATE_LEN, BLOCK_LEN, sha1_digest_block_u32};
+    use sha1::Sha1;
 
     #[derive(Clone)]
     struct Test {
@@ -545,6 +547,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sha1_block() {
         let mut state = [0u32; STATE_LEN];
         let words = [1u32; BLOCK_LEN];
@@ -564,6 +567,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sha1_10() {
         let mut sh = Sha1::new();
         let bytes = [1u8; 10];
@@ -583,6 +587,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sha1_1k() {
         let mut sh = Sha1::new();
         let bytes = [1u8; 1024];
@@ -602,6 +607,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sha1_64k() {
         let mut sh = Sha1::new();
         let bytes = [1u8; 65536];

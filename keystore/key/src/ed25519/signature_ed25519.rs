@@ -138,6 +138,7 @@ pub fn recover_ed25519(
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
+    #[cfg(feature = "benches")]
     use std::time::Instant;
     use Message;
     use rcrypto::ed25519::verify;
@@ -165,6 +166,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_sign_ed25519() {
         let keypair = generate_keypair();
         let message =
@@ -192,6 +194,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_verify_ed25519() {
         let keypair = generate_keypair();
         let message =

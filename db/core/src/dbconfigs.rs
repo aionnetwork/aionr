@@ -48,8 +48,6 @@ pub struct DatabaseConfig {
     pub use_fsync: bool,
     /// Sector align
     pub bytes_per_sync: u64,
-    /// Block cache size (MB).
-    pub block_cache_size: u64,
     /// Table shard cache (bit).
     pub table_cache_num_shard: i32,
     /// Write buffer number
@@ -85,7 +83,6 @@ impl Default for DatabaseConfig {
             compact_options: CompactionProfile::default(),
             use_fsync: false,
             bytes_per_sync: 4 * 1024 * 1024,
-            block_cache_size: 16 * 1024,
             table_cache_num_shard: 6,
             max_write_buffer_number: 32,
             write_buffer_size: 128 * 1024 * 1024,

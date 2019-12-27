@@ -48,8 +48,10 @@ use types::{
 use aion_types::clean_0x;
 
 const MAX_QUEUE_SIZE_TO_MINE_ON: usize = 4;
+// The maximum number of the latest pow blocks to count block time
 const STRATUM_BLKTIME_INCLUDED_COUNT: usize = 32;
-const STRATUM_RECENT_BLK_COUNT: usize = 128;
+// The maximum latest blocks to cache
+const STRATUM_RECENT_BLK_COUNT: usize = 256;
 
 /// Stratum rpc implementation.
 pub struct StratumClient<C, S: ?Sized, M>
@@ -63,7 +65,7 @@ where
     miner: Arc<M>,
     account_provider: Option<Arc<AccountProvider>>,
     recent_block_hash: Mutex<LinkedList<H256>>,
-    recent_block_header: Mutex<HashMap<H256, (H256, u64)>>,
+    recent_block_header: Mutex<HashMap<H256, (H256, u64, SealType)>>,
 }
 
 impl<C, S: ?Sized, M> StratumClient<C, S, M>
@@ -265,41 +267,47 @@ where
 
     /// Get miner stats
     fn get_miner_stats(&self, address: H256) -> Result<MinerStats> {
-        let best_pow_block = self
+        let mut best_header = self
+            .client
+            .block_header(BlockId::Latest)
+            .expect("must have a best block header");
+        let latest_pow_difficulty = self
             .client
             .best_pow_block()
-            .expect("must have a best pow block");
-        let mut header = best_pow_block.header();
-        let latest_difficulty = header.difficulty();
+            .expect("must have a best pow block")
+            .header()
+            .difficulty();
         let mut index = 0;
         let mut new_blk_headers = Vec::new();
         let mut recent_block_hash = self.recent_block_hash.lock().unwrap();
 
+        // Get latest 128 pow blocks and 128 pos blocks
         if let Some(last_blk_hash) = recent_block_hash.front() {
-            while *last_blk_hash != header.hash()
+            while *last_blk_hash != best_header.hash()
                 && index < STRATUM_RECENT_BLK_COUNT
-                && header.number() > 2
+                && best_header.number() > 2
             {
-                let parent_hash = header.parent_hash();
-                new_blk_headers.push(header);
+                let parent_hash = best_header.parent_hash();
+                new_blk_headers.push(best_header);
                 match self.client.block_header(BlockId::Hash(parent_hash.into())) {
-                    Some(h) => header = h,
+                    Some(h) => best_header = h,
                     None => break,
                 }
                 index = index + 1;
             }
         } else {
-            while index < STRATUM_RECENT_BLK_COUNT && header.number() > 2 {
-                let parent_hash = header.parent_hash();
-                new_blk_headers.push(header);
+            while index < STRATUM_RECENT_BLK_COUNT && best_header.number() > 2 {
+                let parent_hash = best_header.parent_hash();
+                new_blk_headers.push(best_header);
                 match self.client.block_header(BlockId::Hash(parent_hash.into())) {
-                    Some(h) => header = h,
+                    Some(h) => best_header = h,
                     None => break,
                 }
                 index = index + 1;
             }
         }
 
+        // Update latest 256 block headers cache
         let mut recent_block_header = self.recent_block_header.lock().unwrap();
         while let Some(top) = new_blk_headers.pop() {
             if recent_block_hash.len() == STRATUM_RECENT_BLK_COUNT {
@@ -308,50 +316,63 @@ where
                 }
             }
             recent_block_hash.push_front(top.hash());
-            recent_block_header.insert(top.hash(), (top.author(), top.timestamp()));
+            recent_block_header.insert(
+                top.hash(),
+                (
+                    top.author(),
+                    top.timestamp(),
+                    top.seal_type().unwrap_or_default(),
+                ),
+            );
         }
 
+        // Calculate the average pow block time (only count for latest 32 pow blocks) and count the blocks mined by the miner
         let mut last_block_timestamp = 0;
         let mut block_time_accumulator = 0;
         let mut block_time_accumulated = 0;
         let mut mined_by_miner = 0;
-
-        index = 0;
+        let mut pow_index = 0;
         for hash in recent_block_hash.iter() {
-            if let Some((author, timestamp)) = recent_block_header.get(hash) {
-                if index <= STRATUM_BLKTIME_INCLUDED_COUNT {
-                    if last_block_timestamp != 0 {
-                        block_time_accumulator =
-                            block_time_accumulator + (last_block_timestamp - timestamp);
-                        block_time_accumulated = block_time_accumulated + 1;
+            if let Some((author, timestamp, seal_type)) = recent_block_header.get(hash) {
+                // Only count the latest 32 pow blocks' block time
+                if pow_index <= STRATUM_BLKTIME_INCLUDED_COUNT {
+                    // If it's a pow block, record its timestamp
+                    if *seal_type == SealType::PoW {
+                        last_block_timestamp = *timestamp;
                     }
-                    last_block_timestamp = *timestamp;
+                    // If it's a pos block, calculate the delta of its timestamp and the recorded last timestamp to get pow block time
+                    else {
+                        if last_block_timestamp != 0 {
+                            block_time_accumulator =
+                                block_time_accumulator + (last_block_timestamp - timestamp);
+                            block_time_accumulated = block_time_accumulated + 1;
+                        }
+                    }
                 }
 
-                if *author == address {
-                    mined_by_miner = mined_by_miner + 1;
+                if *seal_type == SealType::PoW {
+                    if *author == address {
+                        mined_by_miner = mined_by_miner + 1;
+                    }
+                    pow_index = pow_index + 1;
                 }
             }
-
-            index = index + 1;
         }
-
-        let mut block_time = 0;
+        let mut block_time: f64 = 0_f64;
         if block_time_accumulator > 0 {
-            block_time = block_time_accumulator / block_time_accumulated;
+            block_time = block_time_accumulator as f64 / block_time_accumulated as f64;
         }
 
+        // Calculate the network hashrate and the miner's hash share and hash rate
         let mut network_hashrate = 0_f64;
         let mut miner_hashrate_share = 0_f64;
         let mut miner_hashrate = 0_f64;
-
-        if block_time > 0 {
-            network_hashrate = latest_difficulty.as_f64() / block_time as f64;
+        if block_time > 0_f64 {
+            network_hashrate = latest_pow_difficulty.as_f64() / block_time;
         }
-
         // hashrate shared by miner: mined blocks / total blocks
-        if index > 0 && mined_by_miner > 0 {
-            miner_hashrate_share = mined_by_miner as f64 / index as f64;
+        if pow_index > 0 && mined_by_miner > 0 {
+            miner_hashrate_share = mined_by_miner as f64 / pow_index as f64;
             miner_hashrate = network_hashrate * miner_hashrate_share;
         }
 
