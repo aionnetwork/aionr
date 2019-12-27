@@ -549,7 +549,7 @@ impl Mgr {
                             let id: String = node.get_id_string();
                             let binding: String = node.addr.to_string();
                             if let None = nodes_write.insert(hash.clone(), RwLock::new(node)) {
-                                info!(target: "p2p_inbound", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
+                                debug!(target: "p2p_inbound", "inbound node added: hash/id/ip {:?}/{:?}/{:?}", &hash, &id, &binding);
                             }
                         }
 
