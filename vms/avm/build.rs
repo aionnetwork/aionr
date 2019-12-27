@@ -18,25 +18,15 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
+extern crate cmake;
 
-use std::env;
 use std::process::Command;
 
 fn main() {
-    let outdir: String = env::var("OUT_DIR").unwrap();
-    let profile = env::var("PROFILE").unwrap();
-    // build avm library
-    if !Command::new("make")
-        .arg("-C")
-        .arg("libs/native_loader/native")
-        .arg(format!("{}={}", "OUTDIR", outdir))
-        .arg(profile.clone())
-        .status()
-        .expect("failed to build native loader library")
-        .success()
-    {
-        panic!("build native loader failed");
-    }
+    let mut config = cmake::Config::new("libs/native_loader/native");
+    let outdir = config.build_target("avmloader").build();
+
+    println!("cargo:rustc-link-search=native={}/build", outdir.display());
 
     if !Command::new("ant")
         .arg("-f")
@@ -57,8 +47,6 @@ fn main() {
     {
         panic!("failed to build avm version provider");
     }
-
-    println!("cargo:rustc-link-search=native={}", outdir);
 
     // NOTE: build jni jar package
     if !Command::new("ant")

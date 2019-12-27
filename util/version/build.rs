@@ -49,6 +49,21 @@ fn main() {
             version = version,
         ),
     );
+
+    let aion_version = env::var("CARGO_PKG_VERSION").expect(ERROR_MSG);
+    let current_dir = env::var("CARGO_MANIFEST_DIR").expect(ERROR_MSG);
+    create_package_version(
+        format!(
+            "{}/../../release", current_dir
+        ).as_str(),
+        aion_version
+    );
+}
+
+fn create_package_version(filename: &str, data: String) {
+    let dest_path = Path::new(filename);
+    let mut f = File::create(&dest_path).expect(ERROR_MSG);
+    f.write_all(data.as_bytes()).expect(ERROR_MSG);
 }
 
 fn create_file(filename: &str, data: String) {

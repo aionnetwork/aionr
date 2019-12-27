@@ -17,3 +17,6 @@ log = "0.3"
 rlp = {path = "../../util/rlp"}
 crypto = {path = "../../util/crypto"}
 tiny-keccak = "1.4.2"
+
+[build-dependencies]
+cmake = "0.1"
