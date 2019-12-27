@@ -53,10 +53,8 @@ fn main() {
     let aion_version = env::var("CARGO_PKG_VERSION").expect(ERROR_MSG);
     let current_dir = env::var("CARGO_MANIFEST_DIR").expect(ERROR_MSG);
     create_package_version(
-        format!(
-            "{}/../../release", current_dir
-        ).as_str(),
-        aion_version
+        format!("{}/../../release", current_dir).as_str(),
+        aion_version,
     );
 }
 
