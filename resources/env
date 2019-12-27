@@ -12,7 +12,7 @@ function prepare {
     if [[ "$USERNAME" == "root" ]];then
         apt update; apt -y install lsb-release wget bzip2 gawk
     else
-        sudo apt update; apt -y install lsb-release wget bzip2 gawk
+        sudo apt update; sudo apt -y install lsb-release wget bzip2 gawk
     fi
 }
 
@@ -52,6 +52,10 @@ function resolve_u1604 {
         tar xf openjdk-11.0.1_linux-x64_bin.tar.gz -C jdk
         echo "export JAVA_HOME=$PWD/jdk/jdk-11.0.1" > ./custom.env
         echo -e "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$JAVA_HOME/lib/server" >> ./custom.env
+    else
+        # jdk11 is already installed
+        echo -e "You have jdk 11 installed, make sure that JAVA_HOME is set correctly."
+        echo -e "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$JAVA_HOME/lib/server" >> ./custom.env
     fi
 
     ## ubuntu 16.04 does not maintain boost1.65 officially, so just install boost-v1.65 mannually
@@ -70,7 +74,7 @@ function resolve_u1604 {
     ./b2 install
 
     ## install llvm-4.0
-    apt -y -qq install libllvm4.0
+    sudo apt -y -qq install libllvm4.0
 }
 
 if [ ! -f "custom.env" ];then
