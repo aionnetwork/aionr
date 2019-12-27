@@ -16,6 +16,14 @@ function prepare {
     fi
 }
 
+function install {
+    if [[ "USERNAME" == "root" ]];then
+        apt -qq -y install $1
+    else
+        sudo apt -qq -y install $1
+    fi
+}
+
 ## Step 0: check system version
 USERNAME=`whoami`
 echo -e "\033[32mHello $USERNAME, welcome to Aion Rust Kernel \033[0m"
@@ -25,7 +33,7 @@ function resolve_u1804 {
     ## Step 1: check java environment
     if [ "$WHEREJAVAC" != "11" ];then
         echo -e "\033[33mWARN: jdk11 is not found,try to install jdk first \033[0m"
-        apt -qq -y install openjdk-11-jdk
+        install openjdk-11-jdk
         echo "export JAVA_HOME=/usr/lib/jvm/java-1.11.0-openjdk-amd64" > ./custom.env
         echo -e "export LD_LIBRARY_PATH=\$LD_LIBRARY_PATH:\$JAVA_HOME/lib/server" >> ./custom.env
     fi
@@ -34,7 +42,9 @@ function resolve_u1804 {
     
     ## Step 2: install dependencies
     echo -e "\033[33minstalling local dependencies\033[0m"
-    apt -y -qq install libboost-filesystem1.65-dev libboost-program-options1.65-dev llvm-4.0-dev 1> /dev/null 2>&1
+    install libboost-filesystem1.65-dev
+    install libboost-program-options1.65-dev
+    install llvm-4.0-dev
 }
 
 function resolve_u1604 {
@@ -66,7 +76,7 @@ function resolve_u1604 {
             exit -1
         fi
     fi
-    apt -y -qq install gcc g++
+    install gcc g++
     tar xf boost_1_65_1.tar.bz2
     cd boost_1_65_1
     ./bootstrap.sh --libdir=/usr/lib/x86_64-linux-gnu/
