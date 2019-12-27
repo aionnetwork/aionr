@@ -43,7 +43,7 @@ cp -r vms/avm/libs/aion_vm package/$PACKAGE_NAME/libs
 ## Step 2-3: generate configuration files
 cp resources/config_mainnet.toml $MAINT
 cp resources/mainnet.json $MAINJ
-echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mainnet/mainnet.toml --log-config=log_config.yaml $*'>package/$PACKAGE_NAME/mainnet.sh
+echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mainnet/mainnet.toml $*'>package/$PACKAGE_NAME/mainnet.sh
 chmod +x package/$PACKAGE_NAME/mainnet.sh
 
 cp resources/config_mastery.toml $MASTT
