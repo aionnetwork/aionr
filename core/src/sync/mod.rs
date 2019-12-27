@@ -98,6 +98,10 @@ pub struct Sync {
 
     /// cache block hash which has been committed and broadcasted
     _cached_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
+
+    // TODO: refactor with a better way
+    /// use to reset downloaded blocks hashes temporarily
+    cache_reset_count: Arc<Mutex<(u64, u8)>>,
 }
 
 impl Sync {
@@ -133,6 +137,7 @@ impl Sync {
             _local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
             _cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
             _cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
+            cache_reset_count: Arc::new(Mutex::new((0u64, 0u8))),
         }
     }
 
@@ -153,6 +158,7 @@ impl Sync {
         let p2p_statics = p2p.clone();
         let client_statics = self.client.clone();
         let storage_statics = self.storage.clone();
+        let reset = self.cache_reset_count.clone();
         let (tx, rx) = oneshot::channel::<()>();
         executor.spawn(
             Interval::new(
@@ -162,6 +168,19 @@ impl Sync {
                 let (total_len, active_nodes) = p2p_statics.get_statics_info();
                 {
                     let local_best_number = client_statics.chain_info().best_block_number;
+                    {
+                        let mut reset_lock = reset.lock();
+                        if reset_lock.0 != local_best_number {
+                            reset_lock.0 = local_best_number;
+                            reset_lock.1 = 0;
+                        } else if reset_lock.1 >= 3 {
+                            debug!(target: "sync_reset", "cache reset!!!!!!!!!!!!!!");
+                            storage_statics.reset_downloaded_blocks_hashes();
+                            reset_lock.1 = 0;
+                        } else {
+                            reset_lock.1 += 1;
+                        }
+                    }
                     let local_best_hash = client_statics.chain_info().best_block_hash;
                     let local_total_difficulty = client_statics.chain_info().total_difficulty;
                     let active_len = active_nodes.len();
