@@ -73,7 +73,7 @@ Follow this guide to install the Aion Rust kernel on your system.
     * [JDK 11](https://download.java.net/java/GA/jdk11/13/GPL/openjdk-11.0.1_linux-x64_bin.tar.gz) or higher.
 
 6. Install Apache Ant 10: :new:
-    * [Apache Ant 10](http://ftp.tsukuba.wide.ad.jp/software/apache//ant/binaries/apache-ant-1.10.5-bin.tar.gz)
+    * [Apache Ant 10](https://archive.apache.org/dist/ant/binaries/apache-ant-1.10.5-bin.tar.gz)
 
 7. Set Environment Variables: :new:
     ```bash
