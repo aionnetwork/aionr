@@ -281,7 +281,7 @@ where
         let mut new_blk_headers = Vec::new();
         let mut recent_block_hash = self.recent_block_hash.lock().unwrap();
 
-        // Get latest 128 pow blocks and 128 pos blocks
+        // Get latest 256 blocks to make sure it has at least 128 PoW blocks
         if let Some(last_blk_hash) = recent_block_hash.front() {
             while *last_blk_hash != best_header.hash()
                 && index < STRATUM_RECENT_BLK_COUNT
@@ -332,21 +332,20 @@ where
         let mut block_time_accumulated = 0;
         let mut mined_by_miner = 0;
         let mut pow_index = 0;
+        let mut last_seal_type = Default::default();
         for hash in recent_block_hash.iter() {
             if let Some((author, timestamp, seal_type)) = recent_block_header.get(hash) {
                 // Only count the latest 32 pow blocks' block time
                 if pow_index <= STRATUM_BLKTIME_INCLUDED_COUNT {
+                    // If last block is a pow block, calculate the delta of its timestamp and the recorded last timestamp to get pow block time
+                    if last_seal_type == SealType::PoW && last_block_timestamp != 0 {
+                        block_time_accumulator =
+                            block_time_accumulator + (last_block_timestamp - timestamp);
+                        block_time_accumulated = block_time_accumulated + 1;
+                    }
                     // If it's a pow block, record its timestamp
                     if *seal_type == SealType::PoW {
                         last_block_timestamp = *timestamp;
-                    }
-                    // If it's a pos block, calculate the delta of its timestamp and the recorded last timestamp to get pow block time
-                    else {
-                        if last_block_timestamp != 0 {
-                            block_time_accumulator =
-                                block_time_accumulator + (last_block_timestamp - timestamp);
-                            block_time_accumulated = block_time_accumulated + 1;
-                        }
                     }
                 }
 
@@ -356,6 +355,7 @@ where
                     }
                     pow_index = pow_index + 1;
                 }
+                last_seal_type = seal_type.clone();
             }
         }
         let mut block_time: f64 = 0_f64;
