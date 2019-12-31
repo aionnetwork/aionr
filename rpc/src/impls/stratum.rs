@@ -283,7 +283,7 @@ where
         let mut new_blk_headers = Vec::new();
         let mut recent_block_hash = self.recent_block_hash.lock().unwrap();
 
-        // Get latest 256 blocks to make sure it has at least 128 PoW blocks
+        // Get latest blocks to make sure it has at least 128 PoW blocks
         if let Some(last_blk_hash) = recent_block_hash.front() {
             while *last_blk_hash != best_header.hash()
                 && index < STRATUM_RECENT_POW_BLK_COUNT
