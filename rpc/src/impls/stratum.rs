@@ -52,6 +52,8 @@ const MAX_QUEUE_SIZE_TO_MINE_ON: usize = 4;
 const STRATUM_BLKTIME_INCLUDED_COUNT: usize = 32;
 // The maximum latest blocks to cache
 const STRATUM_RECENT_BLK_COUNT: usize = 256;
+// The maximum latest PoW blocks to cache
+const STRATUM_RECENT_POW_BLK_COUNT: usize = 128;
 
 /// Stratum rpc implementation.
 pub struct StratumClient<C, S: ?Sized, M>
@@ -281,29 +283,33 @@ where
         let mut new_blk_headers = Vec::new();
         let mut recent_block_hash = self.recent_block_hash.lock().unwrap();
 
-        // Get latest 128 pow blocks and 128 pos blocks
+        // Get latest blocks to make sure it has at least 128 PoW blocks
         if let Some(last_blk_hash) = recent_block_hash.front() {
             while *last_blk_hash != best_header.hash()
-                && index < STRATUM_RECENT_BLK_COUNT
+                && index < STRATUM_RECENT_POW_BLK_COUNT
                 && best_header.number() > 2
             {
                 let parent_hash = best_header.parent_hash();
+                if best_header.seal_type().unwrap_or_default() == SealType::PoW {
+                    index = index + 1;
+                }
                 new_blk_headers.push(best_header);
                 match self.client.block_header(BlockId::Hash(parent_hash.into())) {
                     Some(h) => best_header = h,
                     None => break,
                 }
-                index = index + 1;
             }
         } else {
-            while index < STRATUM_RECENT_BLK_COUNT && best_header.number() > 2 {
+            while index < STRATUM_RECENT_POW_BLK_COUNT && best_header.number() > 2 {
                 let parent_hash = best_header.parent_hash();
+                if best_header.seal_type().unwrap_or_default() == SealType::PoW {
+                    index = index + 1;
+                }
                 new_blk_headers.push(best_header);
                 match self.client.block_header(BlockId::Hash(parent_hash.into())) {
                     Some(h) => best_header = h,
                     None => break,
                 }
-                index = index + 1;
             }
         }
 
@@ -332,22 +338,25 @@ where
         let mut block_time_accumulated = 0;
         let mut mined_by_miner = 0;
         let mut pow_index = 0;
+        let mut last_seal_type = Default::default();
         for hash in recent_block_hash.iter() {
             if let Some((author, timestamp, seal_type)) = recent_block_header.get(hash) {
                 // Only count the latest 32 pow blocks' block time
                 if pow_index <= STRATUM_BLKTIME_INCLUDED_COUNT {
+                    // If last block is a pow block, calculate the delta of its timestamp and the recorded last timestamp to get pow block time
+                    if last_seal_type == SealType::PoW && last_block_timestamp != 0 {
+                        block_time_accumulator =
+                            block_time_accumulator + (last_block_timestamp - timestamp);
+                        block_time_accumulated = block_time_accumulated + 1;
+                    }
                     // If it's a pow block, record its timestamp
                     if *seal_type == SealType::PoW {
                         last_block_timestamp = *timestamp;
                     }
-                    // If it's a pos block, calculate the delta of its timestamp and the recorded last timestamp to get pow block time
-                    else {
-                        if last_block_timestamp != 0 {
-                            block_time_accumulator =
-                                block_time_accumulator + (last_block_timestamp - timestamp);
-                            block_time_accumulated = block_time_accumulated + 1;
-                        }
-                    }
+                }
+                // Only calculate recent 128 pow blocks' hash rate
+                if pow_index > STRATUM_RECENT_POW_BLK_COUNT {
+                    break;
                 }
 
                 if *seal_type == SealType::PoW {
@@ -356,6 +365,7 @@ where
                     }
                     pow_index = pow_index + 1;
                 }
+                last_seal_type = seal_type.clone();
             }
         }
         let mut block_time: f64 = 0_f64;
