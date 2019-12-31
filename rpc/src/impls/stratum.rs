@@ -52,6 +52,8 @@ const MAX_QUEUE_SIZE_TO_MINE_ON: usize = 4;
 const STRATUM_BLKTIME_INCLUDED_COUNT: usize = 32;
 // The maximum latest blocks to cache
 const STRATUM_RECENT_BLK_COUNT: usize = 256;
+// The maximum latest PoW blocks to cache
+const STRATUM_RECENT_POW_BLK_COUNT: usize = 128;
 
 /// Stratum rpc implementation.
 pub struct StratumClient<C, S: ?Sized, M>
@@ -284,26 +286,30 @@ where
         // Get latest 256 blocks to make sure it has at least 128 PoW blocks
         if let Some(last_blk_hash) = recent_block_hash.front() {
             while *last_blk_hash != best_header.hash()
-                && index < STRATUM_RECENT_BLK_COUNT
+                && index < STRATUM_RECENT_POW_BLK_COUNT
                 && best_header.number() > 2
             {
                 let parent_hash = best_header.parent_hash();
+                if best_header.seal_type().unwrap_or_default() == SealType::PoW {
+                    index = index + 1;
+                }
                 new_blk_headers.push(best_header);
                 match self.client.block_header(BlockId::Hash(parent_hash.into())) {
                     Some(h) => best_header = h,
                     None => break,
                 }
-                index = index + 1;
             }
         } else {
-            while index < STRATUM_RECENT_BLK_COUNT && best_header.number() > 2 {
+            while index < STRATUM_RECENT_POW_BLK_COUNT && best_header.number() > 2 {
                 let parent_hash = best_header.parent_hash();
+                if best_header.seal_type().unwrap_or_default() == SealType::PoW {
+                    index = index + 1;
+                }
                 new_blk_headers.push(best_header);
                 match self.client.block_header(BlockId::Hash(parent_hash.into())) {
                     Some(h) => best_header = h,
                     None => break,
                 }
-                index = index + 1;
             }
         }
 
@@ -347,6 +353,10 @@ where
                     if *seal_type == SealType::PoW {
                         last_block_timestamp = *timestamp;
                     }
+                }
+                // Only calculate recent 128 pow blocks' hash rate
+                if pow_index > STRATUM_RECENT_POW_BLK_COUNT {
+                    break;
                 }
 
                 if *seal_type == SealType::PoW {
