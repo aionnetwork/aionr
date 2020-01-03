@@ -31,7 +31,8 @@ use p2p::{ChannelBuffer, Mgr};
 use sync::action::Action;
 use sync::storage::SyncStorage;
 use sync::wrappers::{HeadersWrapper, BlocksWrapper};
-use header::Header;
+use header::{Header,Seal};
+use verification::verify_block_integrity;
 
 use super::{channel_buffer_template,channel_buffer_template_with_version};
 
@@ -182,11 +183,22 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
                 header: headers[i].clone(),
                 transactions: bodies[i].clone(),
             };
-            let hash = block.header.hash();
-            if !downloaded_blocks_hashes.contains_key(&hash) {
-                blocks.push(block);
-                downloaded_blocks_hashes.insert(hash, 0);
-                debug!(target: "sync_res", "downloaded block hash: {}.", hash);
+            match verify_block_integrity(
+                &block.rlp_bytes(Seal::Without),
+                headers[i].transactions_root(),
+            ) {
+                Ok(_) => {
+                    let hash = block.header.hash();
+                    if !downloaded_blocks_hashes.contains_key(&hash) {
+                        blocks.push(block);
+                        downloaded_blocks_hashes.insert(hash, 0);
+                        debug!(target: "sync_res", "downloaded block hash: {}.", hash);
+                    }
+                }
+                Err(_e) => {
+                    debug!(target: "sync_res", "Incomplete block body.");
+                    break;
+                }
             }
         }
     } else {

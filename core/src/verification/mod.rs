@@ -66,7 +66,7 @@ impl HeapSizeOf for PreverifiedBlock {
 /// Phase 1 quick block verification. Only does checks that are cheap. Operates on a single block
 pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &Engine) -> Result<(), Error> {
     verify_header_params(&header, engine, true)?;
-    verify_block_integrity(bytes, &header.transactions_root())?;
+    //    verify_block_integrity(bytes, &header.transactions_root())?;
     engine.verify_block_basic(&header)?;
 
     for t in UntrustedRlp::new(bytes)
@@ -416,7 +416,7 @@ fn verify_parent(header: &Header, parent: &Header, gas_limit_divisor: U256) -> R
 }
 
 /// Verify block data against header: transactions root and uncles hash.
-fn verify_block_integrity(block: &[u8], transactions_root: &H256) -> Result<(), Error> {
+pub fn verify_block_integrity(block: &[u8], transactions_root: &H256) -> Result<(), Error> {
     let block = UntrustedRlp::new(block);
     let tx = block.at(1)?;
     let expected_root = &ordered_trie_root(tx.iter().map(|r| r.as_raw()));
