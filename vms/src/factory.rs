@@ -278,7 +278,6 @@ impl Factory for AVMFactory {
 
             match unity_update {
                 Some(ref n) if &block_number > n => {
-                    // println!("start avm v2");
                     version = 1;
                 }
                 _ => {}
@@ -320,6 +319,9 @@ impl Factory for AVMFactory {
             for index in 0..tx_res.len() {
                 let result = tx_res[index].clone();
                 let mut status_code: AvmStatusCode = (result.status as i32).into();
+                if status_code.is_fatal() {
+                    panic!("AvmInternalError: please check avm runtime logs");
+                }
                 let mut gas_left =
                     U256::from(avm_tx_contexts[index].energy_limit - result.energy_used);
                 let return_data = result.return_data;
