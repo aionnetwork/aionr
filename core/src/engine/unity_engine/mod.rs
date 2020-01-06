@@ -23,6 +23,7 @@ mod header_validators;
 mod dependent_header_validators;
 mod grand_parent_header_validators;
 mod pos_validator;
+mod block_integrity_validator;
 #[cfg(test)]
 mod test;
 
@@ -37,6 +38,7 @@ use aion_machine::{LiveBlock, WithBalances};
 use aion_types::{U256, U512};
 use header::{Header, SealType};
 use block::ExecutedBlock;
+use transaction::UnverifiedTransaction;
 use types::error::{BlockError, Error};
 use types::BlockNumber;
 use equihash::EquihashValidator;
@@ -59,6 +61,7 @@ use self::header_validators::{
 };
 use self::grand_parent_header_validators::{GrandParentHeaderValidator, DifficultyValidator};
 use self::pos_validator::PoSValidator;
+use self::block_integrity_validator::{BlockIntegrityValidator,TxRootValidator};
 use num_bigint::BigUint;
 
 const ANNUAL_BLOCK_MOUNT: u64 = 3110400;
@@ -455,6 +458,20 @@ impl UnityEngine {
 
         Ok(())
     }
+
+    pub fn validate_block_body(
+        header: &Header,
+        body: &Vec<UnverifiedTransaction>,
+    ) -> Result<(), Error>
+    {
+        let mut cheap_validators: Vec<Box<BlockIntegrityValidator>> = Vec::with_capacity(1);
+        cheap_validators.push(Box::new(TxRootValidator {}));
+
+        for v in cheap_validators.iter() {
+            v.validate(body, header)?
+        }
+        Ok(())
+    }
 }
 
 impl Engine for Arc<UnityEngine> {
@@ -607,4 +624,24 @@ impl Engine for Arc<UnityEngine> {
         self.machine
             .note_rewards(block, &[(author, result_block_reward)])
     }
+}
+
+#[cfg(test)]
+mod tests {
+
+    // TODO： add uts for block header/body validator
+    //    #[test]
+    //    fn test_block_bodies_validatore() {
+    //        header = good.clone();
+    //        check_fail(
+    //            basic_test(
+    //                &create_test_block_with_data(&header, &good_transactions),
+    //                engine,
+    //            ),
+    //            InvalidTransactionsRoot(Mismatch {
+    //                expected: good_transactions_root.clone(),
+    //                found: header.transactions_root().clone(),
+    //            }),
+    //        );
+    //    }
 }

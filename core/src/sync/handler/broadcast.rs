@@ -133,12 +133,11 @@ pub fn handle_broadcast_block(
         if let Ok(h) = header_rlp.as_val() {
             let header: Header = h;
             let hash = header.hash();
+            let number = header.number();
 
             // Only accept side chain blocks within MAX_NEW_BLOCK_AGE
-            if best_block_number > header.number()
-                && best_block_number - header.number() > MAX_NEW_BLOCK_AGE
-            {
-                trace!(target: "sync_broadcast", "Ignored ancient new block {:?}", header.hash());
+            if best_block_number > number && best_block_number - number > MAX_NEW_BLOCK_AGE {
+                trace!(target: "sync_broadcast", "Ignored ancient new block {:?}", hash);
                 return;
             }
 
@@ -151,32 +150,62 @@ pub fn handle_broadcast_block(
                     let result = UnityEngine::validate_block_header(&header);
                     match result {
                         Ok(()) => {
-                            let result = client.import_block(block_rlp.as_raw().to_vec());
-
-                            match result {
-                                Ok(_) => {
-                                    trace!(target: "sync_broadcast", "New broadcast block imported {:?} ({})", hash, header.number());
-                                    imported_blocks_hashes.insert(hash, 0);
-                                    let active_nodes = p2p.get_active_nodes();
-                                    for n in active_nodes.iter() {
-                                        // Re-broadcast this block
-                                        trace!(target: "sync_broadcast", "Sync broadcast new block sent...");
-                                        p2p.send(n.hash, req.clone());
+                            if let Ok(body_rlp) = block_rlp.at(1) {
+                                // parse body
+                                let mut transactions = Vec::new();
+                                if !body_rlp.is_empty() {
+                                    for transaction_rlp in body_rlp.iter() {
+                                        if !transaction_rlp.is_empty() {
+                                            if let Ok(transaction) = transaction_rlp.as_val() {
+                                                transactions.push(transaction);
+                                            }
+                                        }
                                     }
                                 }
-                                Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
-                                    trace!(target: "sync_broadcast", "New block already in chain {:?}", hash);
+
+                                let result =
+                                    UnityEngine::validate_block_body(&header, &transactions);
+                                match result {
+                                    Ok(_) => {
+                                        let result =
+                                            client.import_block(block_rlp.as_raw().to_vec());
+
+                                        match result {
+                                            Ok(_) => {
+                                                trace!(target: "sync_broadcast", "New broadcast block imported {:?} ({})", hash, number);
+                                                imported_blocks_hashes.insert(hash, 0);
+                                                let active_nodes = p2p.get_active_nodes();
+                                                for n in active_nodes.iter() {
+                                                    // Re-broadcast this block
+                                                    trace!(target: "sync_broadcast", "Sync broadcast new block sent...");
+                                                    p2p.send(n.hash, req.clone());
+                                                }
+                                            }
+                                            Err(BlockImportError::Import(
+                                                ImportError::AlreadyInChain,
+                                            )) => {
+                                                trace!(target: "sync_broadcast", "New block already in chain {:?}", hash);
+                                            }
+                                            Err(BlockImportError::Import(
+                                                ImportError::AlreadyQueued,
+                                            )) => {
+                                                trace!(target: "sync_broadcast", "New block already queued {:?}", hash);
+                                            }
+                                            Err(BlockImportError::Block(
+                                                BlockError::UnknownParent(p),
+                                            )) => {
+                                                info!(target: "sync_broadcast", "New block with unknown parent ({:?}) {:?}", p, hash);
+                                            }
+                                            Err(e) => {
+                                                error!(target: "sync_broadcast", "Bad new block {:?} : {:?}", hash, e);
+                                            }
+                                        };
+                                    }
+                                    Err(_e) => {
+                                        debug!(target: "sync_broadcast", "Incomplete block body #{} from node {}.", number, node_hash);
+                                    }
                                 }
-                                Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
-                                    trace!(target: "sync_broadcast", "New block already queued {:?}", hash);
-                                }
-                                Err(BlockImportError::Block(BlockError::UnknownParent(p))) => {
-                                    info!(target: "sync_broadcast", "New block with unknown parent ({:?}) {:?}", p, hash);
-                                }
-                                Err(e) => {
-                                    error!(target: "sync_broadcast", "Bad new block {:?} : {:?}", hash, e);
-                                }
-                            };
+                            }
                         }
                         Err(e) => {
                             // ignore this batch if any invalidated header
