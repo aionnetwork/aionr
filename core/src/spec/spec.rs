@@ -71,6 +71,8 @@ pub struct CommonParams {
     pub transaction_permission_contract: Option<Address>,
     /// unity update block number.
     pub unity_update: Option<BlockNumber>,
+    /// avm v3 update.
+    pub avm_v3: Option<BlockNumber>,
 }
 
 impl From<ajson::spec::Params> for CommonParams {
@@ -83,6 +85,7 @@ impl From<ajson::spec::Params> for CommonParams {
             monetary_policy_update: p.monetary_policy_update.map(Into::into),
             transaction_permission_contract: p.transaction_permission_contract.map(Into::into),
             unity_update: p.unity_update.map(Into::into),
+            avm_v3: p.avm_v3.map(Into::into),
         }
     }
 }

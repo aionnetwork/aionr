@@ -9,10 +9,7 @@ import java.io.ObjectOutputStream;
 public class AvmVersion {
     private static AvmResourcesV1 resource_v1;
     private static AvmResourcesV2 resource_v2;
-
-    public static void main(String[] args) {
-        System.out.println("Hello");
-    }
+    private static AvmResourcesV3 resource_v3;
 
     public static void init_avm_with_version(int version, String root_path) {
         System.out.println("AvmVersion: start init avm resources");
@@ -23,12 +20,20 @@ public class AvmVersion {
                 resource_v1 = null;
             }
             resource_v2 = null;
-        } else {
+        } else if (version == 1) {
             resource_v1 = null;
             try {
                 AvmResourcesV2.loadResources(root_path);
             } catch (Exception e) {
                 resource_v2 = null;
+            }
+        } else {
+            resource_v1 = null;
+            resource_v2 = null;
+            try {
+                AvmResourcesV3.loadResources(root_path);
+            } catch (Exception e) {
+                resource_v3 = null;
             }
         }
     }
@@ -75,7 +80,10 @@ public class AvmVersion {
                 if (resource_v2 != null) {
                     resource_v2.close();
                     resource_v2 = null;
-                    //System.gc();
+                }
+                if (resource_v3 != null) {
+                    resource_v3.close();
+                    resource_v3 = null;
                 }
                 if (resource_v1 == null) {
                     resource_v1 = AvmResourcesV1.loadResources(root_path);
@@ -92,17 +100,50 @@ public class AvmVersion {
                 callMethod.setAccessible(true);
 
                 return (byte[])callMethod.invoke(null, handle, txs, is_local);
-            } else {
+            } else if (version == 1 ) {
                 if (resource_v1 != null) {
                     System.out.println("AvmVersion: close v1");
                     resource_v1.close();
                     resource_v1 = null;
-                    //System.gc();
+                }
+                if (resource_v3 != null) {
+                    System.out.println("AvmVersion: close v3");
+                    resource_v3.close();
+                    resource_v3 = null;
                 }
                 if (resource_v2 == null) {
                     resource_v2 = AvmResourcesV2.loadResources(root_path);
                 }
                 Class<?> clazz = resource_v2.loadClass(AvmDependencyInfo.avmExecutor);
+                Method[] methods = clazz.getDeclaredMethods();
+                Method callMethod = null;
+                for(Method method:methods){
+                    if( method.getName().equals("execute")) {
+                        callMethod = method;
+                        break;
+                    }
+                }
+                callMethod.setAccessible(true);
+
+                return (byte[])callMethod.invoke(null, handle, txs, is_local);
+            } else {
+                // the newest avm version
+                // close the last version, and start new version
+                // v3 is the newest curretly.
+                if (resource_v1 != null) {
+                    System.out.println("AvmVersion: close v1");
+                    resource_v1.close();
+                    resource_v1 = null;
+                }
+                if (resource_v2 != null) {
+                    System.out.println("AvmVersion: close v2");
+                    resource_v2.close();
+                    resource_v2 = null;
+                }
+                if (resource_v3 == null) {
+                    resource_v3 = AvmResourcesV3.loadResources(root_path);
+                }
+                Class<?> clazz = resource_v3.loadClass(AvmDependencyInfo.avmExecutor);
                 Method[] methods = clazz.getDeclaredMethods();
                 Method callMethod = null;
                 for(Method method:methods){

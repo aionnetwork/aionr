@@ -49,6 +49,9 @@ pub struct Params {
     /// Unity update block number.
     #[serde(rename = "unityUpdate")]
     pub unity_update: Option<Uint>,
+    /// AVM v3 update block number.
+    #[serde(rename = "avmV3")]
+    pub avm_v3: Option<Uint>,
 }
 
 #[cfg(test)]
