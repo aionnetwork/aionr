@@ -445,12 +445,8 @@ impl UnityEngine {
     }
 
     pub fn validate_block_header(header: &Header) -> Result<(), Error> {
-        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(3);
-        cheap_validators.push(Box::new(EnergyConsumedValidator {}));
+        let mut cheap_validators: Vec<Box<HeaderValidator>> = Vec::with_capacity(1);
         cheap_validators.push(Box::new(FutureTimestampValidator {}));
-        if header.seal_type() == &Some(SealType::PoW) {
-            cheap_validators.push(Box::new(POWValidator {}));
-        }
 
         for v in cheap_validators.iter() {
             v.validate(header)?;
@@ -630,18 +626,123 @@ impl Engine for Arc<UnityEngine> {
 mod tests {
 
     // TODO： add uts for block header/body validator
-    //    #[test]
-    //    fn test_block_bodies_validatore() {
-    //        header = good.clone();
-    //        check_fail(
-    //            basic_test(
-    //                &create_test_block_with_data(&header, &good_transactions),
-    //                engine,
-    //            ),
-    //            InvalidTransactionsRoot(Mismatch {
-    //                expected: good_transactions_root.clone(),
-    //                found: header.transactions_root().clone(),
-    //            }),
-    //        );
-    //    }
+    use super::*;
+    use std::time::SystemTime;
+    use types::error::{Error,BlockError};
+    use acore_bytes::Bytes;
+    use unexpected::{OutOfBounds,Mismatch};
+    use transaction::{Transaction,Action};
+    use triehash::ordered_trie_root;
+    use rlp::Encodable;
+    use keychain;
+
+    #[test]
+    fn test_block_headers_validator() {
+        let mut header = Header::new();
+        // tolerance is 1s , now + 1 can pass the validation
+        header.set_timestamp(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + 1,
+        );
+        assert!(UnityEngine::validate_block_header(&header).is_ok());
+
+        // tolerance is 1s , now + 2 cannot pass the validation
+        header.set_timestamp(
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs()
+                + 2,
+        );
+        let res = UnityEngine::validate_block_header(&header);
+        assert!(res.is_err());
+        if let Error::Block(BlockError::InvalidFutureTimestamp(OutOfBounds {
+            min,
+            max,
+            found,
+        })) = res.unwrap_err()
+        {
+            assert!(min.is_none());
+            assert_eq!(found - max.unwrap(), 1);
+        } else {
+            panic!("Invalid error type")
+        }
+    }
+
+    #[test]
+    fn test_block_bodies_validator() {
+        let mut header = Header::new();
+
+        let keypair = keychain::ethkey::generate_keypair();
+        let tr1 = Transaction {
+            action: Action::Create,
+            value: U256::from(0),
+            data: Bytes::new(),
+            gas: U256::from(300_000),
+            gas_price: U256::from(40_000),
+            nonce: U256::one(),
+            nonce_bytes: Vec::new(),
+            gas_bytes: Vec::new(),
+            gas_price_bytes: Vec::new(),
+            value_bytes: Vec::new(),
+            transaction_type: U256::from(1),
+            beacon: None,
+        }
+        .sign(keypair.secret());
+
+        let tr2 = Transaction {
+            action: Action::Create,
+            value: U256::from(0),
+            data: Bytes::new(),
+            gas: U256::from(300_000),
+            gas_price: U256::from(40_000),
+            nonce: U256::from(2),
+            nonce_bytes: Vec::new(),
+            gas_bytes: Vec::new(),
+            gas_price_bytes: Vec::new(),
+            value_bytes: Vec::new(),
+            transaction_type: U256::from(1),
+            beacon: None,
+        }
+        .sign(keypair.secret());
+
+        let txs: Vec<UnverifiedTransaction> = vec![(*tr1).clone(), (*tr2).clone()];
+        let empty: Vec<UnverifiedTransaction> = Vec::new();
+
+        let txs_root = ordered_trie_root(txs.iter().map(|t| t.rlp_bytes()));
+        let empty_tx_root = ordered_trie_root(empty.iter().map(|t| t.rlp_bytes()));
+
+        assert!(UnityEngine::validate_block_body(&header, &vec![]).is_ok());
+
+        let res = UnityEngine::validate_block_body(&header, &txs);
+        if let Error::Block(BlockError::InvalidTransactionsRoot(Mismatch {
+            expected,
+            found,
+        })) = res.unwrap_err()
+        {
+            assert_eq!(expected, txs_root); // calculated txs root
+            assert_eq!(found, empty_tx_root); // tx_root in header
+        } else {
+            panic!("Invalid error type")
+        };
+
+        // set tx_root from empty root to two txs root
+        header.set_transactions_root(txs_root.clone());
+        assert!(UnityEngine::validate_block_body(&header, &txs).is_ok());
+
+        let res = UnityEngine::validate_block_body(&header, &vec![]);
+        if let Error::Block(BlockError::InvalidTransactionsRoot(Mismatch {
+            expected,
+            found,
+        })) = res.unwrap_err()
+        {
+            assert_eq!(expected, empty_tx_root); // calculated txs root
+            assert_eq!(found, txs_root); // tx_root in header
+        } else {
+            panic!("Invalid error type")
+        };
+    }
 }
