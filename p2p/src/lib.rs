@@ -32,7 +32,6 @@ extern crate tokio;
 extern crate tokio_codec;
 extern crate tokio_reactor;
 extern crate acore_bytes;
-extern crate aion_types;
 extern crate uuid;
 extern crate aion_version as version;
 extern crate bytes;

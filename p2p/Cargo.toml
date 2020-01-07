@@ -25,5 +25,4 @@ tokio-reactor = "0.1.6"
 tokio-tcp = "0.1.2"
 parking_lot = "0.5"
 acore-bytes =  { path = "../util/bytes" }
-aion-types =   { path = "../util/aion-types"}
 aion-version = { path = "../util/version" }

@@ -176,10 +176,4 @@ impl SyncStorage {
     pub fn lightning_base(&self) -> u64 { *self.lightning_base.read() }
 
     pub fn set_lightning_base(&self, base: u64) { *self.lightning_base.write() = base; }
-
-    // TODO: refactor with a better way
-    /// use to reset downloaded blocks hashes temporarily
-    pub fn reset_downloaded_blocks_hashes(&self) {
-        *self.downloaded_blocks_hashes.lock() = LruCache::new(MAX_CACHED_BLOCK_HASHES * 40);
-    }
 }
