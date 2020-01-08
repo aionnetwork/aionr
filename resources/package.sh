@@ -36,7 +36,7 @@ mkdir package/$PACKAGE_NAME/libs
 
 ## Step 2-2: copy binary and libraries into target directory(package/$1)
 cp target/release/aion package/$PACKAGE_NAME
-LIBAVMJNI=$(readlink -f target/release/build/avm*/out/libavmloader.so | xargs ls -t | sed -n '1p')
+LIBAVMJNI=$(readlink -f target/release/build/avm*/out/build/libavmloader.so | xargs ls -t | sed -n '1p')
 cp $LIBAVMJNI package/$PACKAGE_NAME/libs/libavmloader.so
 cp -r vms/avm/libs/aion_vm package/$PACKAGE_NAME/libs
 
