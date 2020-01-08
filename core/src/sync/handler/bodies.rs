@@ -174,31 +174,7 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
 
     // match bodies with headers
     let mut blocks = Vec::new();
-    if headers.len() == bodies.len() {
-        trace!(target: "sync_res", "Node : {}, downloading {} blocks.",  &node_hash, bodies.len());
-        // Get the lock before iteration to keep the operation atomic, so that the downloaded blocks in the batch will be consecutive
-        let mut downloaded_blocks_hashes = storage.downloaded_blocks_hashes().lock();
-        for i in 0..headers.len() {
-            match UnityEngine::validate_block_body(&headers[i], &bodies[i]) {
-                Ok(_) => {
-                    let block = Block {
-                        header: headers[i].clone(),
-                        transactions: bodies[i].clone(),
-                    };
-                    let hash = block.header.hash();
-                    if !downloaded_blocks_hashes.contains_key(&hash) {
-                        blocks.push(block);
-                        downloaded_blocks_hashes.insert(hash, 0);
-                        debug!(target: "sync_res", "downloaded block hash: {}.", hash);
-                    }
-                }
-                Err(_e) => {
-                    debug!(target: "sync_res", "Incomplete block body #{} from node {}.", headers[i].number(), node_hash);
-                    break;
-                }
-            }
-        }
-    } else {
+    if headers.len() != bodies.len() {
         debug!(
             target: "sync_res",
             "Count mismatch, headers count: {}, bodies count: {}, node id hash: {}",
@@ -208,9 +184,34 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
         );
     }
 
+    // Get the lock before iteration to keep the operation atomic, so that the downloaded blocks in the batch will be consecutive
+    let mut downloaded_blocks_hashes = storage.downloaded_blocks_hashes().lock();
+    for i in 0..headers.len() {
+        match UnityEngine::validate_block_body(&headers[i], &bodies[i]) {
+            Ok(_) => {
+                let block = Block {
+                    header: headers[i].clone(),
+                    transactions: bodies[i].clone(),
+                };
+                let hash = block.header.hash();
+                if !downloaded_blocks_hashes.contains_key(&hash) {
+                    blocks.push(block);
+                    downloaded_blocks_hashes.insert(hash, 0);
+                    debug!(target: "sync_res", "downloaded block hash: {}.", hash);
+                }
+            }
+            Err(_e) => {
+                debug!(target: "sync_res", "Incomplete block body #{} from node {}.", headers[i].number(), node_hash);
+                break;
+            }
+        }
+    }
+
     // end if no block to download
     if blocks.is_empty() {
         return;
+    } else {
+        debug!(target: "sync_res", "Node : {}, downloading {} blocks.", &node_hash, blocks.len());
     }
 
     // Save blocks
