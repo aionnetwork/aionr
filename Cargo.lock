@@ -1462,7 +1462,6 @@ name = "p2p"
 version = "0.1.0"
 dependencies = [
  "acore-bytes 0.1.0",
- "aion-types 0.1.0",
  "aion-version 1.0.3",
  "bincode 1.0.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "byteorder 1.2.7 (registry+https://github.com/rust-lang/crates.io-index)",
