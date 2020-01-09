@@ -275,9 +275,7 @@ impl Mgr {
                         let node = node_lock.read();
                         if let Ok(interval) = node.update.elapsed() {
                             if interval.as_secs() >= TIMEOUT_MAX {
-                                if !node.if_seed {
-                                    index.push(*hash);
-                                }
+                                index.push(*hash);
                             }
                         }
                     }
