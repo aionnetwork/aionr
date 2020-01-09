@@ -36,7 +36,6 @@ use transaction::UnverifiedTransaction;
 use aion_types::{H256,U256};
 use futures::Future;
 use futures::Stream;
-use lru_cache::LruCache;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use futures::sync::oneshot;
@@ -62,8 +61,6 @@ const INTERVAL_HEADERS: u64 = 100;
 const INTERVAL_BODIES: u64 = 100;
 const INTERVAL_IMPORT: u64 = 50;
 const INTERVAL_STATISICS: u64 = 10;
-const MAX_TX_CACHE: usize = 20480;
-const MAX_BLOCK_CACHE: usize = 32;
 
 pub struct Sync {
     /// Blockchain kernel interface
@@ -81,27 +78,11 @@ pub struct Sync {
     /// active nodes info
     node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
 
-    /// local best td
-    _local_best_td: Arc<RwLock<U256>>,
-
-    /// local best block number
-    _local_best_block_number: Arc<RwLock<u64>>,
-
     /// network best td
     network_best_td: Arc<RwLock<U256>>,
 
     /// network best block number
     network_best_block_number: Arc<RwLock<u64>>,
-
-    /// cache tx hash which has been stored and broadcasted
-    _cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
-
-    /// cache block hash which has been committed and broadcasted
-    _cached_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
-
-    // TODO: refactor with a better way
-    /// use to reset downloaded blocks hashes temporarily
-    cache_reset_count: Arc<Mutex<(u64, u8)>>,
 }
 
 impl Sync {
@@ -133,11 +114,6 @@ impl Sync {
             node_info: Arc::new(RwLock::new(HashMap::new())),
             network_best_td: Arc::new(RwLock::new(local_best_td)),
             network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
-            _local_best_td: Arc::new(RwLock::new(local_best_td)),
-            _local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
-            _cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
-            _cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
-            cache_reset_count: Arc::new(Mutex::new((0u64, 0u8))),
         }
     }
 
@@ -158,7 +134,6 @@ impl Sync {
         let p2p_statics = p2p.clone();
         let client_statics = self.client.clone();
         let storage_statics = self.storage.clone();
-        let reset = self.cache_reset_count.clone();
         let (tx, rx) = oneshot::channel::<()>();
         executor.spawn(
             Interval::new(
@@ -168,19 +143,6 @@ impl Sync {
                 let (total_len, active_nodes) = p2p_statics.get_statics_info();
                 {
                     let local_best_number = client_statics.chain_info().best_block_number;
-                    {
-                        let mut reset_lock = reset.lock();
-                        if reset_lock.0 != local_best_number {
-                            reset_lock.0 = local_best_number;
-                            reset_lock.1 = 0;
-                        } else if reset_lock.1 >= 3 {
-                            debug!(target: "sync_reset", "cache reset!!!!!!!!!!!!!!");
-                            storage_statics.reset_downloaded_blocks_hashes();
-                            reset_lock.1 = 0;
-                        } else {
-                            reset_lock.1 += 1;
-                        }
-                    }
                     let local_best_hash = client_statics.chain_info().best_block_hash;
                     let local_total_difficulty = client_statics.chain_info().total_difficulty;
                     let active_len = active_nodes.len();

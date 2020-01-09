@@ -32,7 +32,6 @@ extern crate tokio;
 extern crate tokio_codec;
 extern crate tokio_reactor;
 extern crate acore_bytes;
-extern crate aion_types;
 extern crate uuid;
 extern crate aion_version as version;
 extern crate bytes;
@@ -276,7 +275,9 @@ impl Mgr {
                         let node = node_lock.read();
                         if let Ok(interval) = node.update.elapsed() {
                             if interval.as_secs() >= TIMEOUT_MAX {
-                                index.push(*hash);
+                                if !node.if_seed {
+                                    index.push(*hash);
+                                }
                             }
                         }
                     }
