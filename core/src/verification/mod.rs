@@ -65,7 +65,6 @@ impl HeapSizeOf for PreverifiedBlock {
 /// Phase 1 quick block verification. Only does checks that are cheap. Operates on a single block
 pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &Engine) -> Result<(), Error> {
     verify_header_params(&header, engine, true)?;
-    //    verify_block_integrity(bytes, &header.transactions_root())?;
     engine.verify_block_basic(&header)?;
 
     for t in UntrustedRlp::new(bytes)

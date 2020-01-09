@@ -182,27 +182,30 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
             bodies.len(),
             node_hash
         );
+        // also do body validation to import right blocks
     }
-
-    // Get the lock before iteration to keep the operation atomic, so that the downloaded blocks in the batch will be consecutive
-    let mut downloaded_blocks_hashes = storage.downloaded_blocks_hashes().lock();
-    for i in 0..headers.len() {
-        match UnityEngine::validate_block_body(&headers[i], &bodies[i]) {
-            Ok(_) => {
-                let block = Block {
-                    header: headers[i].clone(),
-                    transactions: bodies[i].clone(),
-                };
-                let hash = block.header.hash();
-                if !downloaded_blocks_hashes.contains_key(&hash) {
-                    blocks.push(block);
-                    downloaded_blocks_hashes.insert(hash, 0);
-                    debug!(target: "sync_res", "downloaded block hash: {}.", hash);
+    {
+        // Get the lock before iteration to keep the operation atomic, so that the downloaded blocks in the batch will be consecutive
+        let mut downloaded_blocks_hashes = storage.downloaded_blocks_hashes().lock();
+        for i in 0..::std::cmp::min(headers.len(), bodies.len()) {
+            match UnityEngine::validate_block_body(&headers[i], &bodies[i]) {
+                Ok(_) => {
+                    let block = Block {
+                        header: headers[i].clone(),
+                        transactions: bodies[i].clone(),
+                    };
+                    let hash = block.header.hash();
+                    if !downloaded_blocks_hashes.contains_key(&hash) {
+                        blocks.push(block);
+                        downloaded_blocks_hashes.insert(hash, 0);
+                        debug!(target: "sync_res", "downloaded block hash: {}.", hash);
+                    }
                 }
-            }
-            Err(_e) => {
-                debug!(target: "sync_res", "Incomplete block body #{} from node {}.", headers[i].number(), node_hash);
-                break;
+                Err(_e) => {
+                    // if body does not match header, break the loop, only download the right blocks before this bad one.
+                    debug!(target: "sync_res", "Incomplete block body #{} from node {}.", headers[i].number(), node_hash);
+                    break;
+                }
             }
         }
     }

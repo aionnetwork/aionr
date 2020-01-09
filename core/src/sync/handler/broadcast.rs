@@ -162,7 +162,7 @@ pub fn handle_broadcast_block(
                                         }
                                     }
                                 }
-
+                                // Do block integrity validation before proceed
                                 let result =
                                     UnityEngine::validate_block_body(&header, &transactions);
                                 match result {
