@@ -60,14 +60,13 @@ public class NativeTransactionExecutor {
             }
 
             AvmConfiguration config = new AvmConfiguration();
-            config.threadCount = 1;
             if (Constants.DEBUG) {
                 config.enableVerboseContractErrors = true;
                 config.enableVerboseConcurrentExecutor = true;
             }
             AionCapabilitiesV2 cap = new AionCapabilitiesV2();
             AvmImpl avm = CommonAvmFactory.buildAvmInstanceForConfiguration(cap, config);
-            FutureResult[] futures = avm.run(substate, contexts, ExecutionType.MINING, blockNumber-1);
+            FutureResult[] futures = avm.run(substate, contexts, ExecutionType.ASSUME_MAINCHAIN, blockNumber-1);
 
             // wait for the transaction results and serialize them into bytes
             NativeEncoder encoder = new NativeEncoder();
