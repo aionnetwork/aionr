@@ -22,7 +22,7 @@ Follow this guide to install the Aion Rust kernel on your system.
 - Ubuntu 16.04 or Ubuntu 18.04
 - 4GB RAM
 - 2 core CPU
-- 50GB Hard Drive Space (Current Mainnet DB about 30GB)
+- 60GB Hard Drive Space (Current Mainnet DB about 40GB)
 
 ### Prerequisites Installation
 
@@ -69,13 +69,13 @@ Follow this guide to install the Aion Rust kernel on your system.
         sudo apt-get install libboost-all-dev -y
         ```
 
-5. Install JAVA JDK: :new:
+5. Install JAVA JDK:
     * [JDK 11](https://download.java.net/java/GA/jdk11/13/GPL/openjdk-11.0.1_linux-x64_bin.tar.gz) or higher.
 
-6. Install Apache Ant 10: :new:
+6. Install Apache Ant 10:
     * [Apache Ant 10](https://archive.apache.org/dist/ant/binaries/apache-ant-1.10.5-bin.tar.gz)
 
-7. Set Environment Variables: :new:
+7. Set Environment Variables:
     ```bash
     export JAVA_HOME=<jdk_directory_location>
     export ANT_HOME=<apache_ant_directory>	
@@ -118,7 +118,9 @@ Once you have installed the prerequisites, follow these steps to build the kerne
     cd package/aionr-package
     ```
 
-2. Run the `aion` package. Make sure to include any commands you want the kernel to execute. You can find more information on supplying commands in the [user manual](https://github.com/aionnetwork/aionr/wiki/User-Manual#launch-rust-kernel).
+2. Make sure your `JAVA_HOME` is right. :new:
+
+3. Run the `aion` package. Make sure to include any commands you want the kernel to execute. You can find more information on supplying commands in the [user manual](https://github.com/aionnetwork/aionr/wiki/User-Manual#launch-rust-kernel).
 Kernel will print **configuration path**, **genesis file path**, **db directory** and **keystore location** at the top of its log.
 
 **We provides quick launch scripts to connect to Mainnet, Mastery and custom network. Running the quick scripts will load the configuration and the genesis in each network folder. You can modify those files in each directory. See launch examples [Kernel Deployment Examples](https://github.com/aionnetwork/aionr/wiki/Kernel-Deployment-Examples)**
