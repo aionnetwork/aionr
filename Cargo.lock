@@ -165,7 +165,7 @@ dependencies = [
 
 [[package]]
 name = "aionr"
-version = "1.0.3"
+version = "1.1.0"
 dependencies = [
  "acore 0.1.0",
  "acore-bytes 0.1.0",
