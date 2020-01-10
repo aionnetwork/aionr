@@ -79,7 +79,6 @@ members = [
 "util/rlp_compress",
 "util/rlp_derive",
 "util/stats",
-"util/stop-guard",
 "util/table",
 "util/trace-time",
 "util/trie-standardmap",
