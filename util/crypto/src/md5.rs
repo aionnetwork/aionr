@@ -246,6 +246,7 @@ impl Digest for Md5 {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "benches")]
     use std::time::Instant;
     use cryptoutil::test::test_digest_1million_random;
     use digest::Digest;
@@ -316,6 +317,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_md5_10() {
         let mut sh = Md5::new();
         let bytes = [1u8; 10];
@@ -335,6 +337,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_md5_1k() {
         let mut sh = Md5::new();
         let bytes = [1u8; 1024];
@@ -354,6 +357,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_md5_64k() {
         let mut sh = Md5::new();
         let bytes = [1u8; 65536];

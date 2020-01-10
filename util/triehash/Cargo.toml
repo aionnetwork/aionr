@@ -12,3 +12,6 @@ aion-types = { path = "../../util/aion-types"}
 
 [dev-dependencies]
 trie-standardmap = { path = "../trie-standardmap" }
+
+[features]
+benches = []

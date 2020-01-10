@@ -296,6 +296,11 @@ impl Spec {
         }
     }
 
+    /// Create a new Foundation Mainnet chain spec.
+    pub fn new_foundation() -> Spec {
+        Spec::load(include_bytes!("../../../resources/mainnet.json") as &[u8]).unwrap()
+    }
+
     // create an instance of an Ethereum state machine, minus consensus logic.
     fn machine(
         params: CommonParams,

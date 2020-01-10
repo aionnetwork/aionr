@@ -66,7 +66,7 @@ pub fn sync_headers(
         filter_nodes_to_sync_headers(active_nodes, nodes_info.clone(), local_total_diff);
     // Pick a random node among all candidates
     if let Some(candidate) = pick_random_node(&candidates) {
-        let candidate_hash = candidate.get_hash();
+        let candidate_hash = candidate.hash;
         let mut node_info;
         let nodes_info_read = nodes_info.read();
         if let Some(node_info_lock) = nodes_info_read.get(&candidate_hash) {
@@ -155,7 +155,7 @@ fn prepare_send(
 }
 
 fn send(p2p: Mgr, hash: u64, from: u64, size: u32) -> bool {
-    debug!(target:"sync", "headers.rs/send: from {}, size: {}, node hash: {}", from, size, hash);
+    debug!(target:"sync_send", "headers.rs/send: from {}, size: {}, node hash: {}", from, size, hash);
     let mut cb = channel_buffer_template(Action::HEADERSREQ.value());
 
     let mut from_buf = [0u8; 8];
@@ -171,11 +171,11 @@ fn send(p2p: Mgr, hash: u64, from: u64, size: u32) -> bool {
 }
 
 pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: ChannelBuffer) {
-    trace!(target: "sync", "headers/receive_req");
+    trace!(target: "sync_req", "headers/receive_req");
 
     // check channelbuffer len
     if cb_in.head.len as usize != mem::size_of::<u64>() + mem::size_of::<u32>() {
-        debug!(target: "sync", "headers req channelbuffer length is wrong" );
+        debug!(target: "sync_req", "headers req channelbuffer length is wrong" );
         return;
     }
 
@@ -212,17 +212,17 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
         p2p.update_node(&hash);
         p2p.send(hash, res);
     } else {
-        warn!(target:"sync","headers/receive_req max headers size requested");
+        debug!(target:"sync_req","headers/receive_req max headers size requested");
         return;
     }
 }
 
 pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncStorage>) {
-    trace!(target: "sync", "headers/receive_res");
+    trace!(target: "sync_res", "headers/receive_res");
 
     // check channelbuffer len
     if cb_in.head.len == 0 {
-        debug!(target: "sync", "headers res channelbuffer is empty" );
+        debug!(target: "sync_res", "headers res channelbuffer is empty" );
         return;
     }
 
@@ -243,8 +243,8 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
                         && (header.number() != prev_header.number() + 1
                             || prev_header.hash() != *header.parent_hash())
                     {
-                        error!(target: "sync",
-                            "<inconsistent-block-headers num={}, prev+1={}, hash={}, p_hash={}>, hash={}>",
+                        error!(target: "sync_res",
+                            "<inconsistent-block-headers num={}, prev+1={}, parent_hash={}, prev_hash={}, hash={}>",
                             header.number(),
                             prev_header.number() + 1,
                             header.parent_hash(),
@@ -269,18 +269,18 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
                 }
                 Err(e) => {
                     // ignore this batch if any invalidated header
-                    debug!(target: "sync", "Invalid header: {:?}, header: {}", e, to_hex(header_rlp.as_raw()));
+                    debug!(target: "sync_res", "Invalid header: {:?}, header: {}", e, to_hex(header_rlp.as_raw()));
                     break;
                 }
             }
         } else {
-            debug!(target: "sync", "Invalid header: {}", to_hex(header_rlp.as_raw()));
+            debug!(target: "sync_res", "Invalid header: {}", to_hex(header_rlp.as_raw()));
             break;
         }
     }
 
     if !headers.is_empty() {
-        debug!(target: "sync", "Node: {}, saved headers from {} to {}", hash, headers.first().expect("headers empty checked").number(), headers.last().expect("headers empty checked").number());
+        debug!(target: "sync_res", "Node: {}, saved headers from {} to {}", hash, headers.first().expect("headers empty checked").number(), headers.last().expect("headers empty checked").number());
         header_wrapper.node_hash = hash;
         header_wrapper.headers = headers;
         header_wrapper.timestamp = SystemTime::now();
@@ -288,7 +288,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
         let mut downloaded_headers = downloaded_headers.lock();
         downloaded_headers.push_back(header_wrapper);
     } else {
-        trace!(target: "sync", "Came too late............");
+        trace!(target: "sync_res", "Came too late............");
     }
 }
 
@@ -304,7 +304,7 @@ fn filter_nodes_to_sync_headers(
     nodes
         .into_iter()
         .filter(|node| {
-            let node_hash = node.get_hash();
+            let node_hash = node.hash;
             nodes_info_read
                 .get(&node_hash)
                 .map_or(false, |node_info_lock| {

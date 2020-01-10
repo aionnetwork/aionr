@@ -44,6 +44,7 @@ pub fn bcrypt(cost: u32, salt: &[u8], password: &[u8], output: &mut [u8]) {
 
 #[cfg(test)]
 mod test {
+    #[cfg(feature = "benches")]
     use std::time::Instant;
     use bcrypt::bcrypt;
 
@@ -280,6 +281,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_bcrypt_16_5() {
         let pass = [0u8; 16];
         let salt = [0u8; 16];

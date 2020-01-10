@@ -74,8 +74,8 @@ pub fn broad_new_transactions(p2p: Mgr, storage: Arc<SyncStorage>) {
 
         let mut node_count = 0;
         for node in active_nodes.iter() {
-            p2p.send(node.get_hash(), req.clone());
-            trace!(target: "sync", "Sync broadcast new transactions sent...");
+            p2p.send(node.hash, req.clone());
+            trace!(target: "sync_broadcast", "Sync broadcast new transactions sent...");
             node_count += 1;
             // TODO: To reconsider why only broadcast to 10 nodes at maximum
             if node_count > 10 {
@@ -84,7 +84,7 @@ pub fn broad_new_transactions(p2p: Mgr, storage: Arc<SyncStorage>) {
                 thread::sleep(Duration::from_millis(50));
             }
         }
-        debug!(target: "sync", "Sync broadcasted {} new transactions...", size);
+        debug!(target: "sync_broadcast", "Sync broadcasted {} new transactions...", size);
     }
 }
 
@@ -100,8 +100,8 @@ pub fn propagate_new_blocks(p2p: Mgr, block_hash: &H256, client: Arc<BlockChainC
             req.head.len = req.body.len() as u32;
 
             for node in active_nodes.iter() {
-                p2p.send(node.get_hash(), req.clone());
-                trace!(target: "sync", "Sync broadcast new block sent...");
+                p2p.send(node.hash, req.clone());
+                trace!(target: "sync_broadcast", "Sync broadcast new block sent...");
             }
         }
     }
@@ -117,13 +117,13 @@ pub fn handle_broadcast_block(
     network_best_block_number: Arc<RwLock<u64>>,
 )
 {
-    trace!(target: "sync", "BROADCASTBLOCK received.");
+    trace!(target: "sync_broadcast", "BROADCASTBLOCK received.");
     let network_best_number = *network_best_block_number.read();
     let best_block_number = client.chain_info().best_block_number;
 
     if best_block_number + 4 < network_best_number {
         // Ignore BROADCASTBLOCK message until full synced
-        trace!(target: "sync", "Syncing..., ignore BROADCASTBLOCK message.");
+        trace!(target: "sync_broadcast", "Syncing..., ignore BROADCASTBLOCK message.");
         return;
     }
     drop(network_best_block_number);
@@ -133,12 +133,11 @@ pub fn handle_broadcast_block(
         if let Ok(h) = header_rlp.as_val() {
             let header: Header = h;
             let hash = header.hash();
+            let number = header.number();
 
             // Only accept side chain blocks within MAX_NEW_BLOCK_AGE
-            if best_block_number > header.number()
-                && best_block_number - header.number() > MAX_NEW_BLOCK_AGE
-            {
-                trace!(target: "sync", "Ignored ancient new block {:?}", header.hash());
+            if best_block_number > number && best_block_number - number > MAX_NEW_BLOCK_AGE {
+                trace!(target: "sync_broadcast", "Ignored ancient new block {:?}", hash);
                 return;
             }
 
@@ -151,36 +150,66 @@ pub fn handle_broadcast_block(
                     let result = UnityEngine::validate_block_header(&header);
                     match result {
                         Ok(()) => {
-                            let result = client.import_block(block_rlp.as_raw().to_vec());
-
-                            match result {
-                                Ok(_) => {
-                                    trace!(target: "sync", "New broadcast block imported {:?} ({})", hash, header.number());
-                                    imported_blocks_hashes.insert(hash, 0);
-                                    let active_nodes = p2p.get_active_nodes();
-                                    for n in active_nodes.iter() {
-                                        // Re-broadcast this block
-                                        trace!(target: "sync", "Sync broadcast new block sent...");
-                                        p2p.send(n.get_hash(), req.clone());
+                            if let Ok(body_rlp) = block_rlp.at(1) {
+                                // parse body
+                                let mut transactions = Vec::new();
+                                if !body_rlp.is_empty() {
+                                    for transaction_rlp in body_rlp.iter() {
+                                        if !transaction_rlp.is_empty() {
+                                            if let Ok(transaction) = transaction_rlp.as_val() {
+                                                transactions.push(transaction);
+                                            }
+                                        }
                                     }
                                 }
-                                Err(BlockImportError::Import(ImportError::AlreadyInChain)) => {
-                                    trace!(target: "sync", "New block already in chain {:?}", hash);
+                                // Do block integrity validation before proceed
+                                let result =
+                                    UnityEngine::validate_block_body(&header, &transactions);
+                                match result {
+                                    Ok(_) => {
+                                        let result =
+                                            client.import_block(block_rlp.as_raw().to_vec());
+
+                                        match result {
+                                            Ok(_) => {
+                                                trace!(target: "sync_broadcast", "New broadcast block imported {:?} ({})", hash, number);
+                                                imported_blocks_hashes.insert(hash, 0);
+                                                let active_nodes = p2p.get_active_nodes();
+                                                for n in active_nodes.iter() {
+                                                    // Re-broadcast this block
+                                                    trace!(target: "sync_broadcast", "Sync broadcast new block sent...");
+                                                    p2p.send(n.hash, req.clone());
+                                                }
+                                            }
+                                            Err(BlockImportError::Import(
+                                                ImportError::AlreadyInChain,
+                                            )) => {
+                                                trace!(target: "sync_broadcast", "New block already in chain {:?}", hash);
+                                            }
+                                            Err(BlockImportError::Import(
+                                                ImportError::AlreadyQueued,
+                                            )) => {
+                                                trace!(target: "sync_broadcast", "New block already queued {:?}", hash);
+                                            }
+                                            Err(BlockImportError::Block(
+                                                BlockError::UnknownParent(p),
+                                            )) => {
+                                                info!(target: "sync_broadcast", "New block with unknown parent ({:?}) {:?}", p, hash);
+                                            }
+                                            Err(e) => {
+                                                error!(target: "sync_broadcast", "Bad new block {:?} : {:?}", hash, e);
+                                            }
+                                        };
+                                    }
+                                    Err(_e) => {
+                                        debug!(target: "sync_broadcast", "Incomplete block body #{} from node {}.", number, node_hash);
+                                    }
                                 }
-                                Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
-                                    trace!(target: "sync", "New block already queued {:?}", hash);
-                                }
-                                Err(BlockImportError::Block(BlockError::UnknownParent(p))) => {
-                                    info!(target: "sync", "New block with unknown parent ({:?}) {:?}", p, hash);
-                                }
-                                Err(e) => {
-                                    error!(target: "sync", "Bad new block {:?} : {:?}", hash, e);
-                                }
-                            };
+                            }
                         }
                         Err(e) => {
                             // ignore this batch if any invalidated header
-                            debug!(target: "sync", "Invalid header: {:?}, header: {}", e, to_hex(header_rlp.as_raw()));
+                            debug!(target: "sync_broadcast", "Invalid header: {:?}, header: {}", e, to_hex(header_rlp.as_raw()));
                         }
                     }
                 }
@@ -202,7 +231,7 @@ pub fn handle_broadcast_tx(
     network_best_block_number: Arc<RwLock<u64>>,
 )
 {
-    trace!(target: "sync", "BROADCASTTX received.");
+    trace!(target: "sync_broadcast", "BROADCASTTX received.");
 
     if let Some(node_info) = node_info.read().get(&node_hash) {
         if node_info
@@ -216,7 +245,7 @@ pub fn handle_broadcast_tx(
             return;
         }
     } else {
-        trace!(target: "sync", "Syncing..., ignore BROADCASTTX message.");
+        trace!(target: "sync_broadcast", "Syncing..., ignore BROADCASTTX message.");
         return;
     }
 
@@ -225,7 +254,7 @@ pub fn handle_broadcast_tx(
 
     if best_block_number + 4 < network_best_number {
         // Ignore BROADCASTTX message until full synced
-        trace!(target: "sync", "Syncing..., ignore BROADCASTTX message.");
+        trace!(target: "sync_broadcast", "Syncing..., ignore BROADCASTTX message.");
         return;
     }
     drop(network_best_block_number);

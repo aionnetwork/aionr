@@ -21,3 +21,6 @@ disable = true
 
 [ipc]
 disable = true
+
+[log]
+config = "log_config.yaml"

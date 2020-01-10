@@ -32,20 +32,29 @@ use bytes::BufMut;
 use sync::node_info::NodeInfo;
 use sync::action::Action;
 use p2p::{ChannelBuffer, Mgr};
+use std::time::Duration;
+use std::thread::sleep;
 
 use super::{channel_buffer_template_with_version,channel_buffer_template};
+use super::super::INTERVAL_STATUS;
 
 const HASH_LENGTH: usize = 32;
 
-pub fn send_random(p2p: Mgr, node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>) {
-    if let Some(hash) = p2p.get_random_active_node_hash() {
+pub fn send_req(p2p: Mgr, node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>) {
+    let nodes_hahses = p2p.get_active_nodes_hashes();
+    if nodes_hahses.len() == 0 {
+        return;
+    }
+    let interval = Duration::from_millis(INTERVAL_STATUS / nodes_hahses.len() as u64 / 2);
+    for hash in nodes_hahses {
         let mut node_info = node_info.write();
         if !node_info.contains_key(&hash) {
-            trace!(target: "sync", "new node info: hash:{}", hash);
+            trace!(target: "sync_send", "new node info: hash:{}", hash);
             node_info.insert(hash, RwLock::new(NodeInfo::new()));
         }
         drop(node_info);
-        send(p2p, hash)
+        send(p2p.clone(), hash);
+        sleep(interval);
     }
 }
 
@@ -55,7 +64,7 @@ pub fn send(p2p: Mgr, hash: u64) {
 }
 
 pub fn receive_req(p2p: Mgr, chain_info: &BlockChainInfo, hash: u64, version: u16) {
-    trace!(target: "sync", "status/receive_req");
+    trace!(target: "sync_req", "status/receive_req");
 
     let mut cb = channel_buffer_template_with_version(version, Action::STATUSRES.value());
 
@@ -80,7 +89,7 @@ pub fn receive_req(p2p: Mgr, chain_info: &BlockChainInfo, hash: u64, version: u1
 
     cb.body.put_slice(res_body.as_slice());
     cb.head.len = cb.body.len() as u32;
-    trace!(target:"sync", "status res bc body len: {}", cb.head.len);
+    trace!(target:"sync_req", "status res bc body len: {}", cb.head.len);
 
     p2p.update_node(&hash);
     p2p.send(hash, cb);
@@ -96,11 +105,11 @@ pub fn receive_res(
     local_genesis_hash: H256,
 )
 {
-    trace!(target: "sync", "status/receive_res");
+    trace!(target: "sync_res", "status/receive_res");
 
     // check channelbuffer len
     if (cb_in.head.len as usize) < mem::size_of::<u64>() + mem::size_of::<u8>() + 2 * HASH_LENGTH {
-        debug!(target: "sync", "status res channelbuffer length is too short" );
+        debug!(target: "sync_res", "status res channelbuffer length is too short" );
         return;
     }
 
@@ -111,7 +120,7 @@ pub fn receive_res(
 
     // check total_difficulty_len
     if req_body_rest.len() < total_difficulty_len + 2 * HASH_LENGTH {
-        debug!(target: "sync", "status res with wrong total_difficulty length " );
+        debug!(target: "sync_res", "status res with wrong total_difficulty length " );
         return;
     }
 
@@ -136,7 +145,7 @@ pub fn receive_res(
         {
             let mut node_info_write = node_info.write();
             if !node_info_write.contains_key(&hash) {
-                trace!(target: "sync", "new node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, best_hash, total_difficulty);
+                trace!(target: "sync_res", "new node info: hash:{}, bn:{}, bh:{}, td:{}", hash, best_block_num, best_hash, total_difficulty);
             }
             let info_lock = node_info_write
                 .entry(hash)
@@ -149,7 +158,7 @@ pub fn receive_res(
 
         p2p.update_node(&hash);
     } else {
-        error!(target: "sync", "Bad status res from node:{} invalid genesis, local genesis: {}, node genesis: {}",hash, local_genesis_hash, genesis_hash);
+        error!(target: "sync_res", "Bad status res from node:{} invalid genesis, local genesis: {}, node genesis: {}",hash, local_genesis_hash, genesis_hash);
         // TODO: move node to black list
     }
 }

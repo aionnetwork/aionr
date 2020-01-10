@@ -110,7 +110,9 @@ impl Ed25519KeyPair {
 mod tests {
     use std::str::FromStr;
     use {Ed25519KeyPair, Ed25519Secret};
+    #[cfg(feature = "benches")]
     use std::time::Instant;
+    #[cfg(feature = "benches")]
     use super::*;
 
     #[test]
@@ -131,6 +133,7 @@ address: a07bfd7baa8497fd43258a5442a26f277206f62a98668ae2212ab3f4c71a10c8".to_ow
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     pub fn benchtest_generate_keypair() {
         let mut keypair = generate_keypair();
         let count = 1000;

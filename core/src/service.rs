@@ -152,7 +152,6 @@ impl ClientService {
 
         let mut db_config = DatabaseConfig::default();
         db_config.wal = config.db_wal;
-        db_config.block_cache_size = config.db_cache_size.unwrap_or(1024) as u64;
         let mut db_configs = Vec::new();
         for db_name in db::DB_NAMES.to_vec() {
             let db_path = client_path.join(db_name);

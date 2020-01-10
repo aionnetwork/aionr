@@ -19,27 +19,30 @@
  *
  ******************************************************************************/
 
-extern crate cmake;
+use triehash::ordered_trie_root;
+use header::Header;
+use types::error::{BlockError, Error};
+use unexpected::Mismatch;
+use rlp::Encodable;
+use transaction::UnverifiedTransaction;
 
-#[cfg(target_os = "linux")]
-fn main() {
-    let mut config = cmake::Config::new("native/rust_evm_intf");
-
-    let dst = config.build_target("fastvm").build();
-    println!("cargo:rustc-link-search=native={}/build", dst.display());
-    println!("cargo:rustc-link-lib=static=fastvm");
-    println!("cargo:rustc-link-lib=LLVM-4.0");
+pub trait BlockIntegrityValidator {
+    fn validate(&self, txs: &Vec<UnverifiedTransaction>, header: &Header) -> Result<(), Error>;
 }
 
-#[cfg(target_os = "macos")]
-pub fn main() {
-    let mut config = cmake::Config::new("native/rust_evm_intf");
+pub struct TxRootValidator;
+impl BlockIntegrityValidator for TxRootValidator {
+    /// Verify block data against header: transactions root and uncles hash.
+    fn validate(&self, txs: &Vec<UnverifiedTransaction>, header: &Header) -> Result<(), Error> {
+        let expected_root = &ordered_trie_root(txs.iter().map(|tx| tx.rlp_bytes()));
+        let transactions_root = header.transactions_root();
 
-    let dst = config.build_target("fastvm").build();
-    println!("cargo:rustc-link-search=native={}/build", dst.display());
-    println!("cargo:rustc-link-lib=static=fastvm");
-    println!("cargo:rustc-link-lib=LLVM");
+        if expected_root != transactions_root {
+            return Err(From::from(BlockError::InvalidTransactionsRoot(Mismatch {
+                expected: expected_root.clone(),
+                found: transactions_root.clone(),
+            })));
+        }
+        Ok(())
+    }
 }
-
-#[cfg(target_os = "windows")]
-pub fn main() {}
