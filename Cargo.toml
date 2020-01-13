@@ -27,8 +27,6 @@ jsonrpc-core =      { git = "https://github.com/paritytech/jsonrpc.git", branch 
 acore =             { path = "core" }
 acore-bytes =       { path = "util/bytes" }
 acore-io =          { path = "util/io" }
-blake2b =           { path = "util/blake2b" }
-equihash =          { path = "util/equihash" }
 logger =            { path = "util/logger" }
 aion-types =        { path = "util/aion-types" }
 aion-version =      { path = "util/version" }
@@ -36,7 +34,6 @@ dir =               { path = "util/dir" }
 rlp =               { path = "util/rlp" }
 panic_hook =        { path = "util/panic_hook" }
 journaldb =         { path = "db/journaldb" }
-db =                { path = "db/core" }
 key =               { path = "keystore/key" }
 keychain =          { path = "keystore/keychain" }
 aion-rpc =          { path = "rpc" }
