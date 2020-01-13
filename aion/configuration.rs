@@ -33,7 +33,7 @@ use aion_rpc::dispatch::DynamicGasPrice;
 use cache::CacheConfig;
 use helpers::{
     to_block_id, to_u256, to_pending_set, aion_ipc_path, to_addresses,
-    to_address, to_queue_strategy,string_to_address
+    to_address, to_queue_strategy, string_to_address, check_node_string
 };
 use dir::helpers::{replace_home, replace_home_and_local, absolute};
 use params::{AccountsConfig, StakeConfig, MinerExtras, SpecType};
@@ -396,7 +396,11 @@ impl Configuration {
     fn net_config(&self) -> Result<Config, String> {
         let mut ret = Config::new();
         ret.max_peers = self.max_peers();
+        check_node_string(&self.args.arg_local_node)?;
         ret.local_node = self.args.arg_local_node.clone();
+        for node in self.args.arg_boot_nodes.iter() {
+            check_node_string(node)?;
+        }
         ret.boot_nodes = self.args.arg_boot_nodes.clone();
         ret.sync_from_boot_nodes_only = self.args.flag_sync_from_boot_nodes_only;
         ret.net_id = self.args.arg_net_id.clone();

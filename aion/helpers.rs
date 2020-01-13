@@ -19,8 +19,8 @@
  *
  ******************************************************************************/
 
- #![allow(deprecated)]
- #![allow(dead_code)]
+#![allow(deprecated)]
+#![allow(dead_code)]
 
 use std::io;
 use std::io::{Write, BufReader, BufRead};
@@ -32,6 +32,7 @@ use acore::miner::PendingSet;
 use acore::transaction::transaction_queue::PrioritizationStrategy;
 use cache::CacheConfig;
 use dir::helpers::replace_home;
+use regex::Regex;
 
 pub fn to_block_id(s: &str) -> Result<BlockId, String> {
     if s == "latest" {
@@ -245,6 +246,18 @@ pub fn parse_log_target(targets: Vec<String>) -> Option<String> {
     )
 }
 
+const RE: &str = "^p2p://[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}@\
+    (\\d|([1-9]\\d)|(1\\d\\d)|(2[0-4]\\d)|(25[0-5]))(\\.(\\d|([1-9]\\d)|(1\\d\\d)|(2[0-4]\\d)|(25[0-5]))){3}:(\\d|([1-9]\\d)|([1-9]\\d\\d)|([1-9]\\d\\d\\d)|([1-5]\\d\\d\\d\\d)|(6[0-4]\\d\\d\\d)|(65[0-4]\\d\\d)|(655[0-2]\\d)|(6553[0-5]))$";
+
+pub fn check_node_string(s: &String) -> Result<(), String> {
+    let re = Regex::new(RE).map_err(|e| format!("{:?}", e))?;
+    if re.is_match(s) {
+        Ok(())
+    } else {
+        Err("Invalid node string, please check your boot nodes and local node".to_string())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::fs::File;
@@ -255,7 +268,7 @@ mod tests {
     use acore::miner::PendingSet;
     use super::{
         to_block_id, to_u256, to_pending_set, to_address, to_addresses, password_from_file,
-        parse_log_target,
+        parse_log_target, check_node_string
 };
 
     #[test]
@@ -397,5 +410,57 @@ but the first password is trimmed
             &password_from_file(path.to_str().unwrap().into()).unwrap(),
             "password with trailing whitespace"
         );
+    }
+
+    #[test]
+    fn test_node_str_check() {
+        let good1 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:30303".to_string();
+        let good2 = "p2p://ffffffff-ffff-ffff-ffff-ffffffffffff@255.255.255.255:65535".to_string();
+        let good3 = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:0".to_string();
+
+        let bad1 = "a3p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:30303".to_string();
+        let bad2 = "p2p://c33d2207-729a-4584-e19ab97cf9ce@51.144.42.220:30303".to_string();
+        let bad3 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.220:30303".to_string();
+        let bad4 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.332.220:30303".to_string();
+        let bad5 = "p2p://c33d2207-729a-4584-86f1-e19ab97cfgce@51.144.42.220:30303".to_string();
+        let bad6 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:130303".to_string();
+        let bad7 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:65536".to_string();
+        let bad8 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:65545".to_string();
+        let bad9 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:65635".to_string();
+        let bad10 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:66535".to_string();
+        let bad11 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:75535".to_string();
+        let bad12 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.356:65535".to_string();
+        let bad13 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.265:65535".to_string();
+        let bad14 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.256:65535".to_string();
+        let bad15 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.042.220:65535".to_string();
+        let bad16 = "p2p://c33d2207-729a-4584-86f1-e19ab97cf9ce@51.144.42.220:0535".to_string();
+
+        let nodes = vec![
+            good1.clone(),
+            good2.clone(),
+            good3.clone(),
+            bad1,
+            bad2,
+            bad3,
+            bad4,
+            bad5,
+            bad6,
+            bad7,
+            bad8,
+            bad9,
+            bad10,
+            bad11,
+            bad12,
+            bad13,
+            bad14,
+            bad15,
+            bad16,
+        ];
+        let after_check: Vec<String> = nodes
+            .iter()
+            .filter(|node| check_node_string(node).is_ok())
+            .cloned()
+            .collect();
+        assert_eq!(after_check, vec![good1, good2, good3])
     }
 }

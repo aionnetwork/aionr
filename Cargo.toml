@@ -22,6 +22,7 @@ serde_json = "1.0"
 serde_derive = "1.0"
 fdlimit = "0.1"
 tokio = "0.1.13"
+regex = "0.2"
 ctrlc =             { git = "https://github.com/paritytech/rust-ctrlc.git" }
 jsonrpc-core =      { git = "https://github.com/paritytech/jsonrpc.git", branch = "parity-2.2" }
 acore =             { path = "core" }
@@ -45,7 +46,6 @@ p2p =               { path = "p2p" }
 [dev-dependencies]
 pretty_assertions = "0.1"
 tempdir = "0.3"
-regex = "0.2"
 
 [workspace]
 members = [

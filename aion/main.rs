@@ -53,6 +53,7 @@ extern crate tokio;
 extern crate p2p;
 #[macro_use]
 extern crate log as rlog;
+extern crate regex;
 
 #[cfg(test)]
 #[macro_use]
@@ -60,8 +61,6 @@ extern crate pretty_assertions;
 
 #[cfg(test)]
 extern crate tempdir;
-#[cfg(test)]
-extern crate regex;
 
 mod account;
 mod blockchain;
