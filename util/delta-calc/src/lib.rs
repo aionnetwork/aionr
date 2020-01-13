@@ -19,6 +19,7 @@
  *
  ******************************************************************************/
 
+#![warn(unused_extern_crates)]
 extern crate num_bigint;
 extern crate fixed_point;
 extern crate aion_types;

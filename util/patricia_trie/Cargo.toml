@@ -12,10 +12,10 @@ acore-bytes = { version = "0.1.0", path = "../bytes" }
 aion-types = { path = "../../util/aion-types"}
 blake2b = { path = "../blake2b" }
 rlp = { version = "0.2.1", path = "../rlp" }
-triehash = { version = "0.1.0", path = "../triehash" }
 db = {path = "../../db/core" }
 
 [dev-dependencies]
+triehash = { version = "0.1.0", path = "../triehash" }
 trie-standardmap = { path = "../trie-standardmap" }
 
 [features]
