@@ -60,13 +60,6 @@ pub const KEYS_PATH: &'static str = "$BASE/keys";
 
 /// Platform-specific zmq path - Windows only
 #[cfg(target_os = "windows")]
-pub const ZMQ_PATH: &'static str = "$LOCAL/zmq";
-/// Platform-specific cache path
-#[cfg(not(target_os = "windows"))]
-pub const ZMQ_PATH: &'static str = "$BASE/zmq";
-
-/// Platform-specific zmq path - Windows only
-#[cfg(target_os = "windows")]
 pub const CONFIG_PATH: &'static str = "$LOCAL/config.toml";
 /// Platform-specific cache path
 #[cfg(not(target_os = "windows"))]
@@ -83,8 +76,6 @@ pub struct Directories {
     pub cache: String,
     /// Dir to store keys
     pub keys: String,
-    /// zmq key dir
-    pub zmq: String,
     /// config dir
     pub config: Option<String>,
 }
@@ -98,7 +89,6 @@ impl Default for Directories {
             db: replace_home_and_local(&data_dir, &local_dir, CHAINS_PATH),
             cache: replace_home_and_local(&data_dir, &local_dir, CACHE_PATH),
             keys: replace_home_and_local(&data_dir, &local_dir, KEYS_PATH),
-            zmq: replace_home_and_local(&data_dir, &local_dir, ZMQ_PATH),
             config: Some(replace_home_and_local(&data_dir, &local_dir, CONFIG_PATH)),
         }
     }
@@ -111,22 +101,14 @@ impl Directories {
         fs::create_dir_all(&self.db).map_err(|e| e.to_string())?;
         fs::create_dir_all(&self.cache).map_err(|e| e.to_string())?;
         fs::create_dir_all(&self.keys).map_err(|e| e.to_string())?;
-        fs::create_dir_all(&self.zmq).map_err(|e| e.to_string())?;
         Ok(())
     }
 
     /// Database paths.
-    pub fn database(
-        &self,
-        genesis_hash: H256,
-        fork_name: Option<String>,
-        spec_name: String,
-    ) -> DatabaseDirectories
-    {
+    pub fn database(&self, genesis_hash: H256, spec_name: String) -> DatabaseDirectories {
         DatabaseDirectories {
             path: self.db.clone(),
             genesis_hash: genesis_hash,
-            fork_name: fork_name,
             spec_name: spec_name,
         }
     }
@@ -153,8 +135,6 @@ pub struct DatabaseDirectories {
     pub path: String,
     /// Genesis hash
     pub genesis_hash: H256,
-    /// Name of current fork
-    pub fork_name: Option<String>,
     /// Name of current spec
     pub spec_name: String,
 }
@@ -286,7 +266,6 @@ mod tests {
                 },
             ),
             keys: replace_home(&data_dir, "$BASE/keys"),
-            zmq: replace_home(&data_dir, "$BASE/zmq"),
             config: Some(replace_home(&data_dir, "$BASE/config.toml")),
         };
         assert_eq!(expected, Directories::default());

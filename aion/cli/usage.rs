@@ -327,7 +327,7 @@ macro_rules! usage {
                     process::exit(0);
                 }
 
-                let raw_args = RawArgs::parse(command)?;
+                let mut raw_args = RawArgs::parse(command)?;
 
                 // print default config
                 if raw_args.flag_default_config {
@@ -353,7 +353,14 @@ macro_rules! usage {
                         file.read_to_string(&mut config).map_err(|e| ArgsError::Config(config_file, e))?;
                         Ok(raw_args.into_args(Self::parse_config(&config)?))
                     },
-                    Err(_e) => Ok(raw_args.into_args(Config::default())),
+                    Err(_) if raw_args.arg_config.is_none() => {
+                        raw_args.flag_no_config = true;
+                        return Ok(raw_args.into_args(Config::default()));
+                    }
+                    Err(e) => {
+                        println_stderr!("Err:{:?} \nCannot open the config file {} \nPlease check your config path ",e ,&config_file);
+                        process::exit(0);
+                    },
                 }
             }
 
@@ -536,24 +543,18 @@ macro_rules! usage {
                         $(
                             let mut add_flag = &stringify!($flag)[5..];
                             add_flag = match (title,add_flag){
-                                ("http","no_http") | ("websockets","no_ws") | ("ipc","no_ipc") | ("stratum","no_stratum") | ("wallet", "enable_wallet") => "disable",
+                                ("http","no_http") | ("websockets","no_ws") | ("ipc","no_ipc") => "disable",
                                 (_,_) => add_flag,
                             };
-                            let add_default=match (title,add_flag) {
-                                ("wallet","disable") => true,
-                                _ => false
-                            };
+                            let add_default = false;
                             config.push_str(&format!("{} = {}\n",add_flag,add_default));
                         )*
                         $(
                             let mut add_arg = &stringify!($arg)[4..];
                             add_arg = match title{
-                                "stratum" => &add_arg[8..],
                                 "websockets" => &add_arg[3..],
-                                "rpc" | "ipc" => &add_arg[4..],
+                                "rpc" | "ipc" | "log" => &add_arg[4..],
                                 "http" => &add_arg[5..],
-                                "wallet" if add_arg != "zmq_key_path" => &add_arg[7..],
-                                "log" if add_arg != "log_file" => &add_arg[4..],
                                 _ => add_arg,
                             };
                             let add_default: $($arg_type_tt)+ = $arg_default.into();

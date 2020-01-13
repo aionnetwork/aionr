@@ -587,7 +587,6 @@ impl Miner {
                 .queue
                 .peek_last_ref()
                 .map(|pb| pb.block().header().hash());
-            let best_hash = chain_info.best_block_hash;
 
             let mut open_block = match seal_type {
                 Some(SealType::PoS) => {
@@ -622,31 +621,15 @@ impl Miner {
                     }
                 }
                 _ => {
-                    match sealing_work.queue.use_last_ref() {
-                        Some(ref old_block)
-                            if old_block.block().header().parent_hash() == &best_hash =>
-                        {
-                            trace!(target: "block", "prepare_block: Already have previous work; updating and returning");
-                            // Clone old block and add transactions into it
-                            let mut reopened_block = client.reopen_block((*old_block).clone());
-                            // Update block timestamp for AION 2.0 unity protocol
-                            reopened_block
-                                .set_timestamp_now_later_than(chain_info.best_block_timestamp);
-                            reopened_block
-                        }
-                        _ => {
-                            // block not found - create it.
-                            trace!(target: "block", "prepare_block: No existing work - making new block");
-                            let author: Address = self.author();
-                            client.prepare_open_block(
-                                author,
-                                (self.gas_floor_target(), self.gas_ceil_target()),
-                                self.extra_data(),
-                                seal_type.to_owned(),
-                                timestamp,
-                            )
-                        }
-                    }
+                    // Create new pow block template and rerun all transactions. No longer reopen previous block template (ARK-126)
+                    trace!(target: "block", "prepare_block: prepare new pow block template");
+                    client.prepare_open_block(
+                        self.author(),
+                        (self.gas_floor_target(), self.gas_ceil_target()),
+                        self.extra_data(),
+                        seal_type.to_owned(),
+                        timestamp,
+                    )
                 }
             };
 

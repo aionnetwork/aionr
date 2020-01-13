@@ -36,7 +36,6 @@ use transaction::UnverifiedTransaction;
 use aion_types::{H256,U256};
 use futures::Future;
 use futures::Stream;
-use lru_cache::LruCache;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use futures::sync::oneshot;
@@ -57,13 +56,11 @@ use sync::sync_provider::SyncStatus;
 pub use sync::sync_provider::SyncProvider;
 
 const INTERVAL_TRANSACTIONS_BROADCAST: u64 = 50;
-const INTERVAL_STATUS: u64 = 1000;
+const INTERVAL_STATUS: u64 = 5000;
 const INTERVAL_HEADERS: u64 = 100;
 const INTERVAL_BODIES: u64 = 100;
 const INTERVAL_IMPORT: u64 = 50;
 const INTERVAL_STATISICS: u64 = 10;
-const MAX_TX_CACHE: usize = 20480;
-const MAX_BLOCK_CACHE: usize = 32;
 
 pub struct Sync {
     /// Blockchain kernel interface
@@ -81,23 +78,11 @@ pub struct Sync {
     /// active nodes info
     node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
 
-    /// local best td
-    _local_best_td: Arc<RwLock<U256>>,
-
-    /// local best block number
-    _local_best_block_number: Arc<RwLock<u64>>,
-
     /// network best td
     network_best_td: Arc<RwLock<U256>>,
 
     /// network best block number
     network_best_block_number: Arc<RwLock<u64>>,
-
-    /// cache tx hash which has been stored and broadcasted
-    _cached_tx_hashes: Arc<Mutex<LruCache<H256, u8>>>,
-
-    /// cache block hash which has been committed and broadcasted
-    _cached_block_hashes: Arc<Mutex<LruCache<H256, u8>>>,
 }
 
 impl Sync {
@@ -129,10 +114,6 @@ impl Sync {
             node_info: Arc::new(RwLock::new(HashMap::new())),
             network_best_td: Arc::new(RwLock::new(local_best_td)),
             network_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
-            _local_best_td: Arc::new(RwLock::new(local_best_td)),
-            _local_best_block_number: Arc::new(RwLock::new(local_best_block_number)),
-            _cached_tx_hashes: Arc::new(Mutex::new(LruCache::new(MAX_TX_CACHE))),
-            _cached_block_hashes: Arc::new(Mutex::new(LruCache::new(MAX_BLOCK_CACHE))),
         }
     }
 
@@ -165,15 +146,15 @@ impl Sync {
                     let local_best_hash = client_statics.chain_info().best_block_hash;
                     let local_total_difficulty = client_statics.chain_info().total_difficulty;
                     let active_len = active_nodes.len();
-                    info!(target: "sync", "total/active {}/{}, local_best_num {}, hash {}, diff {}", total_len, active_len, local_best_number, local_best_hash, local_total_difficulty);
+                    info!(target: "sync_statics", "total/active {}/{}, local_best_num {}, hash {}, diff {}", total_len, active_len, local_best_number, local_best_hash, local_total_difficulty);
                     let (downloaded_blocks_size, downloaded_blocks_capacity) = storage_statics.downloaded_blocks_hashes_statics();
                     let (staged_blocks_size, staged_blocks_capacity) = storage_statics.staged_blocks_statics();
-                    debug!(target: "sync", "download record cache size/capacity {}/{}", downloaded_blocks_size, downloaded_blocks_capacity);
-                    debug!(target: "sync", "staged cache size/capacity {}/{}", staged_blocks_size, staged_blocks_capacity);
-                    debug!(target: "sync", "lightning syncing height: {}", storage_statics.lightning_base());
-                    info!(target: "sync", "{:-^127}", "");
-                    info!(target: "sync", "                              td         bn          bh                    addr                 rev      conn  seed       mode");
-                    info!(target: "sync", "{:-^127}", "");
+                    debug!(target: "sync_statics", "download record cache size/capacity {}/{}", downloaded_blocks_size, downloaded_blocks_capacity);
+                    debug!(target: "sync_statics", "staged cache size/capacity {}/{}", staged_blocks_size, staged_blocks_capacity);
+                    debug!(target: "sync_statics", "lightning syncing height: {}", storage_statics.lightning_base());
+                    info!(target: "sync_statics", "{:-^130}", "");
+                    info!(target: "sync_statics", "                                 td         bn          bh                    addr                 rev      conn  seed       mode");
+                    info!(target: "sync_statics", "{:-^130}", "");
 
                     if active_len > 0 {
                         let mut nodes_info = HashMap::new();
@@ -194,8 +175,8 @@ impl Sync {
                             .iter()
                             {
                                 if let Some((addr, revision, connection, seed)) = active_nodes.get(*hash) {
-                                    info!(target: "sync",
-                                          "{:>32}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}{:>11}",
+                                    info!(target: "sync_statics",
+                                          "{:>35}{:>11}{:>12}{:>24}{:>20}{:>10}{:>6}{:>11}",
                                           format!("{}", info.total_difficulty),
                                           format!("{}", info.best_block_number),
                                           format!("{}", info.best_block_hash),
@@ -209,11 +190,11 @@ impl Sync {
                             }
                     }
 
-                    info!(target: "sync", "{:-^127}", "");
+                    info!(target: "sync_statics", "{:-^130}", "");
                 }
                 Ok(())
             })
-            .map_err(|err| error!(target: "sync", "executor statics: {:?}", err))
+            .map_err(|err| error!(target: "sync_statics", "executor statics: {:?}", err))
             .select(rx.map_err(|_| {}))
             .map(|_| ())
             .map_err(|_| ())
@@ -227,10 +208,10 @@ impl Sync {
         executor.spawn(
             Interval::new(Instant::now(), Duration::from_millis(INTERVAL_STATUS))
                 .for_each(move |_| {
-                    status::send_random(p2p_status.clone(), node_info_status.clone());
+                    status::send_req(p2p_status.clone(), node_info_status.clone());
                     Ok(())
                 })
-                .map_err(|err| error!(target: "sync", "executor status: {:?}", err))
+                .map_err(|err| error!(target: "sync_status", "executor status: {:?}", err))
                 .select(rx.map_err(|_| {}))
                 .map(|_| ())
                 .map_err(|_| ()),
@@ -258,7 +239,7 @@ impl Sync {
                     );
                     Ok(())
                 })
-                .map_err(|err| error!(target: "sync", "executor header: {:?}", err))
+                .map_err(|err| error!(target: "sync_headers", "executor header: {:?}", err))
                 .select(rx.map_err(|_| {}))
                 .map(|_| ())
                 .map_err(|_| ()),
@@ -275,7 +256,7 @@ impl Sync {
                     bodies::sync_bodies(p2p_body.clone(), storage_body.clone());
                     Ok(())
                 })
-                .map_err(|err| error!(target: "sync", "executor body: {:?}", err))
+                .map_err(|err| error!(target: "sync_bodies", "executor body: {:?}", err))
                 .select(rx.map_err(|_| {}))
                 .map(|_| ())
                 .map_err(|_| ()),
@@ -297,7 +278,7 @@ impl Sync {
                     );
                     Ok(())
                 })
-                .map_err(|err| error!(target: "sync", "executor import: {:?}", err))
+                .map_err(|err| error!(target: "sync_import", "executor import: {:?}", err))
                 .select(rx.map_err(|_| {}))
                 .map(|_| ())
                 .map_err(|_| ()),
@@ -318,7 +299,7 @@ impl Sync {
 
                 Ok(())
             })
-            .map_err(|e| error!("interval errored; err={:?}", e))
+            .map_err(|e| error!(target: "sync_broadcast","interval errored; err={:?}", e))
             .select(rx.map_err(|_| {}))
             .map(|_| ())
             .map_err(|_| ()),
@@ -327,17 +308,17 @@ impl Sync {
     }
 
     pub fn shutdown(&self) {
-        info!(target:"sync", "sync shutdown start");
+        info!(target:"sync_shutdown", "sync shutdown start");
         // Shutdown runtime tasks
         let mut shutdown_hooks = self.shutdown_hooks.lock();
         while !shutdown_hooks.is_empty() {
             if let Some(shutdown_hook) = shutdown_hooks.pop() {
                 match shutdown_hook.send(()) {
                     Ok(_) => {
-                        info!(target: "sync", "shutdown signal sent");
+                        debug!(target: "sync_shutdown", "shutdown signal sent");
                     }
                     Err(err) => {
-                        info!(target: "sync", "shutdown err: {:?}", err);
+                        debug!(target: "sync_shutdown", "shutdown err: {:?}", err);
                     }
                 }
             }
@@ -345,7 +326,7 @@ impl Sync {
         // Shutdown p2p
         &self.p2p.shutdown();
         &self.p2p.clear_callback();
-        info!(target:"sync", "sync shutdown finished");
+        info!(target:"sync_shutdown", "sync shutdown finished");
     }
 
     pub fn get_local_node_info(&self) -> &String { self.p2p.get_local_node_info() }
@@ -383,7 +364,7 @@ impl ChainNotify for Sync {
                 let client = self.client.clone();
                 let block_id = BlockId::Hash(*hash);
                 if let Some(block_number) = client.block_number(block_id) {
-                    debug!(target: "sync", "New block #{}, hash: {}.", block_number, hash);
+                    debug!(target: "sync_notify", "New block #{}, hash: {}.", block_number, hash);
                 }
                 import::import_staged_blocks(hash, client, self.storage.clone());
             }
@@ -393,7 +374,7 @@ impl ChainNotify for Sync {
         // Reset mode of all connecting nodes to NORMAL.
         // TODO: need more thoughts whether this is a good idea
         if !retracted.is_empty() {
-            info!(target: "sync", "Chain reorg. Reset the syncing mode of all connecting nodes to NORMAL.");
+            debug!(target: "sync_notify", "Chain reorg. Reset the syncing mode of all connecting nodes to NORMAL.");
             for (_, node_info_lock) in &*self.node_info.read() {
                 let mut node_info = node_info_lock.write();
                 node_info.mode = Mode::Normal;
@@ -402,18 +383,18 @@ impl ChainNotify for Sync {
 
         // For locally sealed main-chain blocks, record them and broadcast them
         if !sealed.is_empty() && !enacted.is_empty() {
-            trace!(target: "sync", "Propagating blocks...");
+            trace!(target: "sync_notify", "Propagating blocks...");
             self.storage.insert_imported_blocks_hashes(sealed.clone());
             broadcast::propagate_new_blocks(self.p2p.clone(), &sealed[0], self.client.clone());
         }
     }
 
     fn start(&self) {
-        info!(target: "sync", "starting...");
+        info!(target: "sync_notify", "starting...");
     }
 
     fn stop(&self) {
-        info!(target: "sync", "stopping...");
+        info!(target: "sync_notify", "stopping...");
     }
 
     fn broadcast(&self, _message: Vec<u8>) {}
@@ -499,20 +480,20 @@ impl Callable for Sync {
     }
 
     fn disconnect(&self, hash: u64) {
-        info!(target: "sync", "stop syncing from disconnected node: {}", &hash);
+        debug!(target: "sync_disconnect", "stop syncing from disconnected node: {}", &hash);
         let mut node_info = self.node_info.write();
         node_info.remove(&hash);
         drop(node_info);
-        trace!(target: "sync", "finish dropping node_info");
+        trace!(target: "sync_disconnect", "finish dropping node_info");
 
         let mut headers = self.storage.headers_with_bodies_requested().lock();
         headers.remove(&hash);
         drop(headers);
-        trace!(target: "sync", "finish dropping headers_with_bodies_requested");
+        trace!(target: "sync_disconnect", "finish dropping headers_with_bodies_requested");
 
         let mut headers = self.storage.downloaded_headers().lock();
         headers.retain(|x| x.node_hash != hash);
 
-        trace!(target: "sync", "finish cleaning disconnected node: {}", &hash);
+        trace!(target: "sync_disconnect", "finish cleaning disconnected node: {}", &hash);
     }
 }

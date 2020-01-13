@@ -426,3 +426,17 @@ fn return_old_values() {
         assert!(t.remove(&key).unwrap().is_none());
     }
 }
+
+#[test]
+fn remove_none() {
+    let mut memdb = MemoryDB::new();
+    let mut root = H256::new();
+    let mut t = TrieDBMut::new(&mut memdb, &mut root);
+    assert!(t.is_empty());
+    assert_eq!(*t.root(), BLAKE2B_NULL_RLP);
+    t.insert(b"foo", b"bar").unwrap();
+    assert!(t.contains(b"foo").unwrap());
+    assert_eq!(t.get(b"foo").unwrap().unwrap(), DBValue::from_slice(b"bar"));
+    t.remove(b"foo").unwrap();
+    assert!(!t.contains(b"foo").unwrap());
+}

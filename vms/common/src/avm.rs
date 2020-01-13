@@ -266,7 +266,17 @@ pub enum AvmStatusCode {
     Success,
     Rejected,
     Failure,
-    Unsupprted,
+    Fatal,
+}
+
+impl AvmStatusCode {
+    pub fn is_fatal(&self) -> bool { *self == AvmStatusCode::Fatal }
+
+    pub fn is_success(&self) -> bool { *self == AvmStatusCode::Success }
+
+    pub fn is_reject(&self) -> bool { *self == AvmStatusCode::Rejected }
+
+    pub fn is_failure(&self) -> bool { *self == AvmStatusCode::Failure }
 }
 
 impl From<i32> for AvmStatusCode {
@@ -275,7 +285,7 @@ impl From<i32> for AvmStatusCode {
             0 => AvmStatusCode::Success,
             1 => AvmStatusCode::Rejected,
             2 => AvmStatusCode::Failure,
-            _ => AvmStatusCode::Unsupprted,
+            _ => AvmStatusCode::Fatal,
         }
     }
 }
@@ -286,7 +296,7 @@ impl Into<i32> for AvmStatusCode {
             AvmStatusCode::Success => 0,
             AvmStatusCode::Rejected => 1,
             AvmStatusCode::Failure => 2,
-            _ => -99,
+            AvmStatusCode::Fatal => -99,
         }
     }
 }
@@ -310,7 +320,7 @@ impl fmt::Display for AvmStatusCode {
             AvmStatusCode::Success => write!(f, "AvmSuccess"),
             AvmStatusCode::Rejected => write!(f, "AvmRejected"),
             AvmStatusCode::Failure => write!(f, "AvmFailure"),
-            AvmStatusCode::Unsupprted => write!(f, "AvmUnsupported"),
+            AvmStatusCode::Fatal => write!(f, "AvmFatal"),
         }
     }
 }

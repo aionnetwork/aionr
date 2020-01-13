@@ -338,7 +338,7 @@ impl<'x> OpenBlock<'x> {
         &mut self,
         txs: &[SignedTransaction],
         h: Option<H256>,
-        check_gas: bool,
+        is_building_block: bool,
     ) -> Vec<Result<Receipt, Error>>
     {
         //TODO: deal with AVM parallelism
@@ -357,7 +357,7 @@ impl<'x> OpenBlock<'x> {
         for apply_result in
             self.block
                 .state
-                .apply_batch(&env_info, self.engine.machine(), txs, check_gas)
+                .apply_batch(&env_info, self.engine.machine(), txs, is_building_block)
         {
             let result = match apply_result {
                 Ok(outcome) => {
@@ -369,13 +369,13 @@ impl<'x> OpenBlock<'x> {
                         .header
                         .add_transaction_fee(&outcome.receipt.transaction_fee);
                     self.block.receipts.push(outcome.receipt.clone());
-                    idx += 1;
                     Ok(outcome.receipt)
                 }
                 Err(x) => Err(From::from(x)),
             };
 
             receipts_results.push(result);
+            idx += 1;
         }
 
         receipts_results
@@ -392,7 +392,7 @@ impl<'x> OpenBlock<'x> {
         &mut self,
         t: SignedTransaction,
         h: Option<H256>,
-        check_gas: bool,
+        is_building_block: bool,
     ) -> Result<&Receipt, Error>
     {
         if self.block.transactions_set.contains(&t.hash()) {
@@ -415,22 +415,23 @@ impl<'x> OpenBlock<'x> {
                     &env_info,
                     self.engine.machine(),
                     &[t.clone()],
-                    check_gas,
+                    is_building_block,
                 ));
             } else {
                 result.push(self.block.state.apply(
                     &env_info,
                     self.engine.machine(),
                     &t,
-                    check_gas,
+                    is_building_block,
                 ));
             }
         } else {
-            result.push(
-                self.block
-                    .state
-                    .apply(&env_info, self.engine.machine(), &t, check_gas),
-            );
+            result.push(self.block.state.apply(
+                &env_info,
+                self.engine.machine(),
+                &t,
+                is_building_block,
+            ));
         }
 
         match result.pop().unwrap() {
@@ -787,7 +788,6 @@ fn is_for_avm(block: &mut OpenBlock, tx: &SignedTransaction) -> bool {
 }
 
 #[inline]
-#[cfg(not(feature = "slow-blocks"))]
 fn push_transactions(
     block: &mut OpenBlock,
     transactions: &[SignedTransaction],
@@ -828,37 +828,6 @@ fn push_transactions(
 
     trace!(target: "vm", "push transactions done");
 
-    Ok(())
-}
-
-#[cfg(feature = "slow-blocks")]
-fn push_transactions(
-    block: &mut OpenBlock,
-    transactions: &[SignedTransaction],
-) -> Result<(), Error>
-{
-    use std::time;
-
-    let slow_tx = option_env!("SLOW_TX_DURATION")
-        .and_then(|v| v.parse().ok())
-        .unwrap_or(100);
-    for t in transactions {
-        let hash = t.hash();
-        let start = time::Instant::now();
-        block.push_transaction(t.clone(), None)?;
-        let took = start.elapsed();
-        let took_ms = took.as_secs() * 1000 + took.subsec_nanos() as u64 / 1000000;
-        if took > time::Duration::from_millis(slow_tx) {
-            warn!(
-                target: "tx",
-                "Heavy ({} ms) transaction in block {:?}: {:?}",
-                took_ms,
-                block.header().number(),
-                hash
-            );
-        }
-        debug!(target: "tx", "Transaction {:?} took: {} ms", hash, took_ms);
-    }
     Ok(())
 }
 

@@ -12,3 +12,6 @@ aion-types = { path = "../../util/aion-types"}
 ethbloom = { path = "../../util/ethbloom"}
 rustc-hex = "1.0"
 byteorder = "1.0"
+
+[features]
+benches = []

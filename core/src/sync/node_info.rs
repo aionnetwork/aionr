@@ -77,7 +77,7 @@ impl NodeInfo {
 
     pub fn switch_mode(&mut self, mode: Mode, local_best: &u64, node_hash: &u64) {
         if self.mode != mode {
-            info!(target:"sync", "Node {}: switch to {} mode. local_best: {}, node best: {}", node_hash, &mode, local_best, &self.best_block_number);
+            debug!(target:"sync_mode", "Node {}: switch to {} mode. local_best: {}, node best: {}", node_hash, &mode, local_best, &self.best_block_number);
             self.mode = mode;
         }
     }

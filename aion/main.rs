@@ -79,7 +79,7 @@ use std::{process, env};
 use std::io::{self as stdio, Write};
 use cli::Args;
 use configuration::{Cmd, Execute, Configuration};
-use logger::setup_log;
+use logger::{setup_compression_log};
 
 enum PostExecutionAction {
     Print(String),
@@ -87,7 +87,7 @@ enum PostExecutionAction {
 }
 
 fn execute(command: Execute) -> Result<PostExecutionAction, String> {
-    let _ = setup_log(&command.logger).expect("Logger is initialized only once; qed");
+    let _ = setup_compression_log(command.logger.config)?;
 
     match command.cmd {
         Cmd::Run(run_cmd) => {

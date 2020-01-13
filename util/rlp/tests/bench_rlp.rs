@@ -19,6 +19,7 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
+#![cfg(feature = "benches")]
 
 extern crate aion_types;
 extern crate rlp;

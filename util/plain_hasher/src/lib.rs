@@ -69,9 +69,11 @@ impl hash::Hasher for PlainHasher {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "benches")]
     use std::time::Instant;
     use std::hash::Hasher;
     use super::PlainHasher;
+    #[cfg(feature = "benches")]
     use std::collections::hash_map::DefaultHasher;
 
     #[test]
@@ -84,6 +86,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     fn benchtest_write_plain_hasher() {
         let count = 1000;
         let time = Instant::now();
@@ -105,6 +108,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     fn benchtest_write_default_hasher() {
         let count = 1000;
         let time = Instant::now();

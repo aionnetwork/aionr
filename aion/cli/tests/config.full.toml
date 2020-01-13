@@ -9,7 +9,6 @@ unlock = ["0xdeadbeefcafe0000000000000000000000000000"]
 password = ["~/.safe/password.file"]
 keys_iterations = 10240
 refresh_time = 2
-fast_signing = true
 
 [network]
 max_peers = 50
@@ -48,13 +47,6 @@ disable = true
 path = "$HOME/.aion/jsonrpc.ipc"
 apis = ["api1","api2"]
 
-[wallet]
-disable = true
-interface = "local"
-port = 8547
-secure_connect = true
-zmq_key_path= "zmq"
-
 [mining]
 author = "0xdeadbeefcafe0000000000000000000000000001"
 force_sealing = true
@@ -82,18 +74,10 @@ tx_queue_mem_limit = 2
 staker_identity_address = "staker_identity_address"
 staker_signing_key = "staker_signing_key"
 
-
-[stratum]
-disable = true
-interface = "127.0.0.2"
-port = 8089
-secret = "secret"
-
 [db]
 pruning = "auto"
 pruning_history = 64
 pruning_memory = 500
-#cache_size_db = 64
 cache_size_blocks = 8
 cache_size_queue = 50
 cache_size_state = 25
@@ -105,8 +89,4 @@ scale_verifiers = true
 num_verifiers = 6
 
 [log]
-no_color = true
-level = "level"
-targets = ["target1","target2"]
-log_file = "log file"
-
+config = "log/config.yaml"

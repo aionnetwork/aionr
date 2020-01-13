@@ -162,10 +162,6 @@ usage! {
             "Specify a configuration. CONFIG may be a configuration file .",
 
         ["Account Options"]
-            FLAG flag_fast_signing: (bool) = false, or |c: &Config| c.account.as_ref()?.fast_signing.clone(),
-            "--fast-signing",
-            "Use drastically faster signing mode for permanently unlocked accounts. This setting causes raw secrets of these accounts to be stored unprotected in memory, so use with care.",
-
             ARG arg_keys_iterations: (u32) = 10240u32, or |c: &Config| c.account.as_ref()?.keys_iterations.clone(),
             "--keys-iterations=[NUM]",
             "Specify the number of iterations to use when deriving key from the password (bigger is more secure)",
@@ -182,8 +178,7 @@ usage! {
             "--password=[FILE]...",
             "Provide a list of files containing passwords for unlocking accounts. Leading and trailing whitespace is trimmed.",
 
-            // NOTE: for MS2 test
-            ARG arg_stake_contract: (Option<String>) = None, or |c: &Config| c.account.as_ref()?.stake_contract.clone(),
+            ARG arg_stake_contract: (String) = "0xa0733306c2ee0c60224b0e59efeae8eee558c0ca1b39e7e5a14a575124549416", or |c: &Config| c.account.as_ref()?.stake_contract.clone(),
             "--stake-contract=[ADDRESS]",
             "Specify the PoS staking contract address",
 
@@ -235,7 +230,7 @@ usage! {
             "--http-port=[PORT]",
             "Specify the port portion of the HTTP API server.",
 
-            ARG arg_http_interface: (String)  = "local", or |c: &Config| c.http.as_ref()?.interface.clone(),
+            ARG arg_http_interface: (String)  = "127.0.0.1", or |c: &Config| c.http.as_ref()?.interface.clone(),
             "--http-interface=[IP]",
             "Specify the hostname portion of the HTTP API server, IP should be an interface's IP address, or all (all interfaces) or local.",
 
@@ -264,7 +259,7 @@ usage! {
             "--ws-port=[PORT]",
             "Specify the port portion of the WebSockets server.",
 
-            ARG arg_ws_interface: (String)  = "local", or |c: &Config| c.websockets.as_ref()?.interface.clone(),
+            ARG arg_ws_interface: (String)  = "127.0.0.1", or |c: &Config| c.websockets.as_ref()?.interface.clone(),
             "--ws-interface=[IP]",
             "Specify the hostname portion of the WebSockets server, IP should be an interface's IP address, or all (all interfaces) or local.",
 
@@ -296,44 +291,6 @@ usage! {
             ARG arg_ipc_apis: (Vec<String>) = vec!["all".into()], or |c: &Config| c.ipc.as_ref()?.apis.clone(),
             "--ipc-apis=[APIS]...",
             "Specify custom API set available via JSON-RPC over IPC. Possible name are web3, eth, stratum, net, personal, rpc.",
-
-        ["Wallet Options"]
-            FLAG flag_enable_wallet: (bool) = false, or |c: &Config| c.wallet.as_ref()?.disable.clone().map(|a| !a),
-            "--enable-wallet",
-            "Enable Wallet API",
-
-            FLAG flag_secure_connect: (bool) = false, or |c: &Config| c.wallet.as_ref()?.secure_connect.clone(),
-            "--secure-connect",
-            "Run wallet server for secure connect",
-
-            ARG arg_wallet_interface: (String) = "local", or |c: &Config| c.wallet.as_ref()?.interface.clone(),
-            "--wallet-interface=[IP]",
-            "Specify the hostname portion of the Wallet API server, IP should be an interface's IP address, or all (all interfaces) or local.",
-
-            ARG arg_wallet_port: (u16) = 8547u16, or |c: &Config| c.wallet.as_ref()?.port.clone(),
-            "--wallet-port=[PORT]",
-            "Specify the port portion of the Wallet API server.",
-
-            ARG arg_zmq_key_path: (Option<String>) = None, or |c: &Config| c.wallet.as_ref()?.zmq_key_path.clone(),
-            "--zmq-key-path=[PATH]",
-            "Specify zmq key path for wallet server secure connect ",
-
-        ["Stratum Options"]
-            FLAG flag_no_stratum: (bool) = false, or |c: &Config| c.stratum.as_ref()?.disable.clone(),
-            "--no-stratum",
-            "Run Stratum server for miner push notification.",
-
-            ARG arg_stratum_interface: (String) = "local", or |c: &Config| c.stratum.as_ref()?.interface.clone(),
-            "--stratum-interface=[IP]",
-            "Interface address for Stratum server.",
-
-            ARG arg_stratum_port: (u16) = 8008u16, or |c: &Config| c.stratum.as_ref()?.port.clone(),
-            "--stratum-port=[PORT]",
-            "Port for Stratum server to listen on.",
-
-            ARG arg_stratum_secret: (Option<String>) = None, or |c: &Config| c.stratum.as_ref()?.secret.clone(),
-            "--stratum-secret=[STRING]",
-            "Secret for authorizing Stratum server for peers.",
 
         ["Sealing/Mining Options"]
             FLAG flag_force_sealing: (bool) = false, or |c: &Config| c.mining.as_ref()?.force_sealing.clone(),
@@ -458,10 +415,6 @@ usage! {
             ARG arg_pruning_memory: (usize) = 32usize, or |c: &Config| c.db.as_ref()?.pruning_memory.clone(),
             "--pruning-memory=[MB]",
             "The ideal amount of memory in megabytes to use to store recent states. As many states as possible will be kept within this limit, and at least --pruning-history states will always be kept.",
-//
-//            ARG arg_cache_size_db: (u32) = 128u32, or |c: &Config| c.db.as_ref()?.cache_size_db.clone(),
-//            "--cache-size-db=[MB]",
-//            "Override database cache size.",
 
             ARG arg_cache_size_blocks: (u32) = 8u32, or |c: &Config| c.db.as_ref()?.cache_size_blocks.clone(),
             "--cache-size-blocks=[MB]",
@@ -492,23 +445,9 @@ usage! {
             "Amount of verifier threads to use or to begin with, if verifier auto-scaling is enabled.",
 
         ["Log Options"]
-            FLAG flag_no_color: (bool) = false, or |c: &Config| c.log.as_ref()?.no_color.clone(),
-            "--no-color",
-            "Don't use terminal color codes in output.",
-
-            ARG arg_log_level: (String) = "info", or |c: &Config| c.log.as_ref()?.level.clone(),
-            "--log-level=[LEVEL]",
-            "Specify all modules' log level. LEVEL may be one of: off, error, warn, info, debug, trace.",
-
-            ARG arg_log_targets: (Vec<String>) = Vec::new(), or |c: &Config| c.log.as_ref()?.targets.clone(),
-            "--log-targets=[LOGGINGs]...",
-            "Specify the log target you want and specify it's log level. Must conform to the same format as RUST_LOG.eq 'own_tx=debug'.",
-
-            ARG arg_log_file: (Option<String>) = None, or |c: &Config| c.log.as_ref()?.log_file.clone(),
-            "--log-file=[FILENAME]",
-            "Specify a filename into which logging should be appended.",
-
-
+            ARG arg_log_config: (Option<String>) = None, or |c: &Config| c.log.as_ref()?.config.clone(),
+            "--log-config=[FILENAME]",
+            "Specify a yaml file path as log configuration",
     }
 }
 
@@ -522,10 +461,8 @@ struct Config {
     http: Option<Http>,
     websockets: Option<Ws>,
     ipc: Option<Ipc>,
-    wallet: Option<WalletApi>,
     mining: Option<Mining>,
     db: Option<Database>,
-    stratum: Option<Stratum>,
     log: Option<Log>,
 }
 
@@ -545,7 +482,6 @@ struct Account {
     password: Option<Vec<String>>,
     keys_iterations: Option<u32>,
     refresh_time: Option<u64>,
-    fast_signing: Option<bool>,
     stake_contract: Option<String>,
 }
 
@@ -600,16 +536,6 @@ struct Ipc {
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct WalletApi {
-    disable: Option<bool>,
-    interface: Option<String>,
-    port: Option<u16>,
-    secure_connect: Option<bool>,
-    zmq_key_path: Option<String>,
-}
-
-#[derive(Default, Debug, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct Mining {
     author: Option<String>,
     staker_identity_address: Option<String>,
@@ -640,15 +566,6 @@ struct Mining {
 
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
-struct Stratum {
-    disable: Option<bool>,
-    interface: Option<String>,
-    port: Option<u16>,
-    secret: Option<String>,
-}
-
-#[derive(Default, Debug, PartialEq, Deserialize)]
-#[serde(deny_unknown_fields)]
 struct Database {
     pruning: Option<String>,
     pruning_history: Option<u64>,
@@ -668,16 +585,13 @@ struct Database {
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Log {
-    no_color: Option<bool>,
-    level: Option<String>,
-    targets: Option<Vec<String>>,
-    log_file: Option<String>,
+    config: Option<String>,
 }
 
 #[cfg(test)]
 mod tests {
     use super::{
-        Args, ArgsError, Config, Operating, Account, Network, Ws, Ipc, WalletApi, Mining, Database,
+        Args, ArgsError, Config, Operating, Account, Network, Ws, Ipc, Mining, Database,
         Http,
 };
     use toml;
@@ -843,8 +757,8 @@ mod tests {
             arg_password: vec!["~/.safe/password.file".into()],
             arg_keys_iterations: 10240u32,
             arg_refresh_time: 2,
-            flag_fast_signing: true,
-            arg_stake_contract: None,
+            arg_stake_contract:
+                "0xa0733306c2ee0c60224b0e59efeae8eee558c0ca1b39e7e5a14a575124549416".into(),
 
             // -- Networking Options
             arg_max_peers: 50u32,
@@ -884,13 +798,6 @@ mod tests {
             arg_ipc_path: "$HOME/.aion/jsonrpc.ipc".into(),
             arg_ipc_apis: vec!["api1".into(), "api2".into()],
 
-            // Wallet
-            arg_wallet_interface: "local".into(),
-            arg_wallet_port: 8547u16,
-            flag_enable_wallet: false,
-            flag_secure_connect: true,
-            arg_zmq_key_path: Some("zmq".into()),
-
             // -- Sealing/Mining Options
             arg_author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
             flag_force_sealing: true,
@@ -915,20 +822,11 @@ mod tests {
             arg_blk_price_window: 20usize,
             flag_dynamic_gas_price: true,
             arg_local_max_gas_price: 100000000000u64,
-            arg_staker_identity_address: Some("staker_identity_address".into()),
-            arg_staker_signing_key: Some("staker_signing_key".into()),
-
-            // -- Stratum Options
-            flag_no_stratum: true,
-            arg_stratum_interface: "127.0.0.2".to_owned(),
-            arg_stratum_port: 8089u16,
-            arg_stratum_secret: Some("secret".into()),
-
+            arg_staker_private_key: Some("staker_private_key".into()),
             // -- Database Options
             arg_pruning: "auto".into(),
             arg_pruning_history: 64u64,
             arg_pruning_memory: 500usize,
-            //                arg_cache_size_db: 64u32,
             arg_cache_size_blocks: 8u32,
             arg_cache_size_queue: 50u32,
             arg_cache_size_state: 25u32,
@@ -947,10 +845,7 @@ mod tests {
             arg_config: "$HOME/.aion/config.toml".into(),
 
             // -- Log Options
-            flag_no_color: true,
-            arg_log_file: Some("log file".into()),
-            arg_log_level: "level".into(),
-            arg_log_targets: vec!["target1".into(), "target2".into()],
+            arg_log_config: Some("log/config.yaml".into()),
         };
 
         println!("{:?}", args);
@@ -1002,7 +897,6 @@ mod tests {
                     password: Some(vec!["passwdfile path".into()]),
                     keys_iterations: None,
                     refresh_time: None,
-                    fast_signing: None,
                     stake_contract: None,
                 }),
                 network: Some(Network {
@@ -1036,13 +930,6 @@ mod tests {
                     disable: None,
                     path: None,
                     apis: Some(vec!["rpc".into(), "eth".into()]),
-                }),
-                wallet: Some(WalletApi {
-                    disable: None,
-                    interface: None,
-                    port: Some(8181),
-                    secure_connect: None,
-                    zmq_key_path: None,
                 }),
                 mining: Some(Mining {
                     author: Some("0xdeadbeefcafe0000000000000000000000000001".into()),
@@ -1086,7 +973,6 @@ mod tests {
                     scale_verifiers: Some(false),
                     num_verifiers: None,
                 }),
-                stratum: None,
                 log: None,
             }
         );

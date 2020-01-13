@@ -19,79 +19,26 @@
  *
  ******************************************************************************/
 
-use std::env;
-use std::process::Command;
+extern crate cmake;
 
 #[cfg(target_os = "linux")]
 fn main() {
-    let outdir: String = env::var("OUT_DIR").unwrap();
-    // check llvm devel package
-    let llvm_installed = Command::new("dpkg")
-        .arg("-l")
-        .arg("llvm-4.0-dev")
-        .output()
-        .unwrap();
-    if llvm_installed.stdout.is_empty() {
-        panic!("No llvm found: pls install llvm-4.0-dev(sudo apt install llvm-4.0-dev .eg)");
-    }
-    let plat_info = Command::new("lsb_release")
-        .arg("-i")
-        .output()
-        .unwrap()
-        .stdout;
-    let (_, plat_name) = plat_info.split_at("Distributor ID:	".len());
+    let mut config = cmake::Config::new("native/rust_evm_intf");
 
-    match b"Ubuntu" == &plat_name[0..6] {
-        false => panic!("Unsupported on Non-Ubuntu platform"),
-        true => {
-            let sys_version = Command::new("lsb_release")
-                .arg("--release")
-                .output()
-                .unwrap();
-            let (_, version) = sys_version.stdout.split_at("Release:	".len());
-            match &version[0..5] {
-                b"18.04" => println!("found 18.04"),
-                b"16.04" => println!("found 16.04"),
-                _ => panic!("Unsupported version, needs 18.04/16.04"),
-            }
-        }
-    }
-
-    // rebuild fastvm library
-    let status = Command::new("make")
-        .arg("-C")
-        .arg("native/rust_evm_intf")
-        .arg(format!("{}={}", "OUTDIR", outdir))
-        .status()
-        .expect("failed to build fastvm");
-    if status.success() {
-        println!("cargo:rustc-link-search=native={}/dist", outdir);
-        println!("cargo:rustc-link-lib=static=fastvm");
-        println!("cargo:rustc-link-lib=LLVM-4.0");
-    } else {
-        panic!("build fastvm failed");
-    }
+    let dst = config.build_target("fastvm").build();
+    println!("cargo:rustc-link-search=native={}/build", dst.display());
+    println!("cargo:rustc-link-lib=static=fastvm");
+    println!("cargo:rustc-link-lib=LLVM-4.0");
 }
 
 #[cfg(target_os = "macos")]
 pub fn main() {
-    // TODO: check llvm installation
-    // TODO: check mac os version
-    // rebuild fastvm library
-    let outdir: String = env::var("OUT_DIR").unwrap();
-    let status = Command::new("make")
-        .arg("-C")
-        .arg("native/rust_evm_intf")
-        .arg(format!("{}={}", "OUTDIR", outdir))
-        .status()
-        .expect("failed to build fastvm");
-    if status.success() {
-        println!("cargo:rustc-link-search=native={}/dist", outdir);
-        println!("cargo:rustc-link-lib=static=fastvm");
-        println!("cargo:rustc-link-lib=LLVM");
-    } else {
-        panic!("build fastvm failed");
-    }
+    let mut config = cmake::Config::new("native/rust_evm_intf");
+
+    let dst = config.build_target("fastvm").build();
+    println!("cargo:rustc-link-search=native={}/build", dst.display());
+    println!("cargo:rustc-link-lib=static=fastvm");
+    println!("cargo:rustc-link-lib=LLVM");
 }
 
 #[cfg(target_os = "windows")]

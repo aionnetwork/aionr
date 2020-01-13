@@ -26,9 +26,7 @@ use byteorder::ByteOrder;
 use rand::random;
 use byteorder::ReadBytesExt;
 use ChannelBuffer;
-use node::NODE_ID_LENGTH;
-use node::IP_LENGTH;
-use node::Node;
+use node::{NODE_ID_LENGTH,IP_LENGTH,Node,IpAddr};
 use node::TempNode;
 use route::Action;
 use super::super::Mgr;
@@ -39,8 +37,8 @@ pub fn send(p2p: Mgr) {
     let len: usize = active.len();
     if len > 0 {
         let random = random::<usize>() % len;
-        let hash = active[random].get_hash();
-        debug!(target: "p2p", "active_nodes/send:  hash {}", &hash);
+        let hash = active[random].hash;
+        debug!(target: "p2p_send", "active_nodes/send:  hash {}", &hash);
         p2p.send(
             hash,
             channel_buffer_template(Action::ACTIVENODESREQ.value()),
@@ -49,7 +47,7 @@ pub fn send(p2p: Mgr) {
 }
 
 pub fn receive_req(p2p: Mgr, hash: u64, version: u16) {
-    debug!(target: "p2p", "active_nodes/receive_req");
+    debug!(target: "p2p_req", "active_nodes/receive_req");
     let mut cb_out = channel_buffer_template_with_version(version, Action::ACTIVENODESRES.value());
     let active_nodes = p2p.get_active_nodes();
     let mut res_body = Vec::new();
@@ -83,11 +81,11 @@ pub fn receive_req(p2p: Mgr, hash: u64, version: u16) {
 }
 
 pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
-    debug!(target: "p2p", "active_nodes/receive_res");
+    debug!(target: "p2p_res", "active_nodes/receive_res");
 
     // check channelbuffer len
     if cb_in.head.len < 1 {
-        debug!(target: "p2p", "active_nodes res channelbuffer length is too short" );
+        debug!(target: "p2p_res", "active_nodes res channelbuffer length is too short" );
         return;
     }
 
@@ -96,7 +94,7 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
 
     // check nodes length
     if nodes_count as usize * (NODE_ID_LENGTH + IP_LENGTH + mem::size_of::<u32>()) != rest.len() {
-        debug!(target: "p2p", "active_nodes res with wrong nodes length " );
+        debug!(target: "p2p_res", "active_nodes res with wrong nodes length " );
         return;
     }
 
@@ -121,14 +119,28 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer) {
             temp.addr.ip.copy_from_slice(ip);
             temp.addr.port = port.read_u32::<BigEndian>().unwrap_or(30303);
             temp.id.copy_from_slice(id);
-            trace!(target:"p2p", "get nodes {}: id: {} addr: {} ",_i,temp.get_id_string(),temp.addr.to_string());
+            trace!(target:"p2p_res", "get nodes {}: id: {} addr: {} ",_i,temp.get_id_string(),temp.addr.to_string());
 
             // TODO: complete if should add
             temp_list.push(temp);
         }
-        if let Ok(mut lock) = p2p.temp.try_lock() {
+
+        {
+            let nodes_id = p2p.nodes_id.lock();
+            temp_list = temp_list
+                .into_iter()
+                .filter(move |node| !nodes_id.contains(&node.get_id_string()))
+                .collect();
+        }
+
+        if !temp_list.is_empty() {
+            let mut lock = p2p.temp.lock();
+            let temp_addr: Vec<IpAddr> = lock.iter().map(|node| node.addr.clone()).collect();
             for t in temp_list.iter() {
-                lock.push_back(t.to_owned());
+                if !temp_addr.contains(&t.addr) {
+                    trace!(target:"p2p_res", "add to temp node id: {} addr: {} ",t.get_id_string(),t.addr.to_string());
+                    lock.push_back(t.to_owned());
+                }
             }
         }
     }
