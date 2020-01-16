@@ -176,7 +176,7 @@ impl MockDbRepository {
         self.close_all();
         let configs = self.configs.clone();
         for db_name in configs {
-            let mut db = mockkvdb::Mockkvdb::new_default();
+            let db = mockkvdb::Mockkvdb::new_default();
             self.dbs.insert(db_name, RwLock::new(db));
         }
     }

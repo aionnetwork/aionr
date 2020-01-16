@@ -410,6 +410,8 @@ impl<B: Backend> State<B> {
                         if let Some(value) = account.cached_storage_at(key) {
                             // println!("TT: 1");
                             return Ok(Some(value));
+                        } else if account.is_removed(key) {
+                            return Ok(None);
                         } else {
                             // storage not cached, will try local search later
                             local_account = Some(maybe_acc);
@@ -907,10 +909,18 @@ impl<B: Backend> State<B> {
                         }
                     }
                 }
+
                 if !account.is_empty() {
                     self.db.note_non_null_account(address);
                 }
             }
+
+            // TODO: I wonder whether we rely on this
+            // if let Some(ref mut account) = a.account {
+            //     if account.acc_type() == AccType::AVM {
+            //         self.db.force_update(address, account);
+            //     }
+            // }
         }
 
         {

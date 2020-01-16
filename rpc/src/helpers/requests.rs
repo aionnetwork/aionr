@@ -130,6 +130,8 @@ pub struct CallRequest {
     pub data: Option<Vec<u8>>,
     /// Nonce
     pub nonce: Option<U256>,
+    /// type
+    pub req_type: Option<U256>,
 }
 
 /// Confirmation object

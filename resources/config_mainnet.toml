@@ -29,5 +29,5 @@ disable = true
 [ipc]
 disable = true
 
-[mining]
-relay_set = "cheap"
+[log]
+config = "log_config.yaml"

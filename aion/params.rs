@@ -61,10 +61,7 @@ impl SpecType {
         let file;
         match *self {
             SpecType::Default => {
-                let filename = "resources/mainnet.json";
-                file = fs::File::open(filename).map_err(|e| {
-                    format!("Could not load specification file at {}: {}", filename, e)
-                })?;
+                return Ok(Spec::new_foundation());
             }
             SpecType::Custom(ref filename) => {
                 file = fs::File::open(filename).map_err(|e| {
@@ -135,7 +132,9 @@ pub struct StakeConfig {
 impl Default for StakeConfig {
     fn default() -> Self {
         StakeConfig {
-            contract: Address::default(),
+            contract: Address::from(
+                "a0733306c2ee0c60224b0e59efeae8eee558c0ca1b39e7e5a14a575124549416",
+            ),
         }
     }
 }

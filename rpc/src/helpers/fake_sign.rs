@@ -40,7 +40,7 @@ pub fn sign_call(request: CallRequest) -> Result<SignedTransaction, Error> {
         request.to.map_or(Action::Create, Action::Call),
         request.value.unwrap_or(0.into()),
         request.data.unwrap_or_default(),
-        DEFAULT_TRANSACTION_TYPE,
+        request.req_type.unwrap_or(DEFAULT_TRANSACTION_TYPE),
         None,
     )
     .fake_sign(from))

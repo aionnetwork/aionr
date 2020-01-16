@@ -20,7 +20,6 @@
  ******************************************************************************/
 use aion_types::{Address, H256, U256};
 use key::Ed25519Secret;
-use logger::init_log;
 use receipt::{SimpleReceipt,Receipt};
 use rustc_hex::FromHex;
 use std::str::FromStr;
@@ -49,8 +48,6 @@ fn make_frontier_machine() -> EthereumMachine {
 
 #[test]
 fn should_apply_create_transaction() {
-    init_log();
-
     let mut state = get_temp_state();
     let mut info = EnvInfo::default();
     info.gas_limit = 1_000_000.into();
@@ -94,8 +91,6 @@ fn should_apply_create_transaction() {
 
 #[test]
 fn should_work_when_cloned() {
-    init_log();
-
     let a = Address::zero();
 
     let mut state = {

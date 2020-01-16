@@ -56,7 +56,6 @@ use cache_manager::CacheManager;
 use encoded;
 // use engine::epoch::{PendingTransition as PendingEpochTransition};
 use rayon::prelude::*;
-use ansi_term::Colour;
 use kvdb::{DBTransaction, KeyValueDB};
 
 const LOG_BLOOMS_LEVELS: usize = 3;
@@ -969,10 +968,10 @@ impl BlockChain {
 
         if let BlockLocation::BranchBecomingCanonChain(ref d) = info.location {
             info!(target: "reorg", "Reorg to {} ({} {} {})",
-                Colour::Yellow.bold().paint(format!("#{} {}", info.number, info.hash)),
-                Colour::Red.paint(d.retracted.iter().join(" ")),
-                Colour::White.paint(format!("#{} {}", self.block_details(&d.ancestor).expect("`ancestor` is in the route; qed").number, d.ancestor)),
-                Colour::Green.paint(d.enacted.iter().join(" "))
+                format!("#{} {}", info.number, info.hash),
+                d.retracted.iter().join(" "),
+                format!("#{} {}", self.block_details(&d.ancestor).expect("`ancestor` is in the route; qed").number, d.ancestor),
+                d.enacted.iter().join(" ")
             );
         }
 

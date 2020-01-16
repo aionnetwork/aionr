@@ -30,11 +30,10 @@
 pub mod queue;
 
 use acore_bytes::Bytes;
-use aion_types::{H256, U256};
+use aion_types::U256;
 use heapsize::HeapSizeOf;
 use rlp::UntrustedRlp;
 use time::get_time;
-use triehash::ordered_trie_root;
 use unexpected::{Mismatch, OutOfBounds};
 
 use blockchain::*;
@@ -66,7 +65,6 @@ impl HeapSizeOf for PreverifiedBlock {
 /// Phase 1 quick block verification. Only does checks that are cheap. Operates on a single block
 pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &dyn Engine) -> Result<(), Error> {
     verify_header_params(&header, engine, true)?;
-    verify_block_integrity(bytes, &header.transactions_root())?;
     engine.verify_block_basic(&header)?;
 
     for t in UntrustedRlp::new(bytes)
@@ -304,7 +302,12 @@ pub fn verify_block_final(expected: &Header, got: &Header) -> Result<(), Error> 
 }
 
 /// Check basic header parameters.
-pub fn verify_header_params(header: &Header, engine: &dyn Engine, is_full: bool) -> Result<(), Error> {
+pub fn verify_header_params(
+    header: &Header,
+    engine: &dyn Engine,
+    is_full: bool,
+) -> Result<(), Error>
+{
     let expected_seal_fields = engine.seal_fields(header);
     if header.seal().len() != expected_seal_fields {
         return Err(From::from(BlockError::InvalidSealArity(Mismatch {
@@ -415,20 +418,6 @@ fn verify_parent(header: &Header, parent: &Header, gas_limit_divisor: U256) -> R
     Ok(())
 }
 
-/// Verify block data against header: transactions root and uncles hash.
-fn verify_block_integrity(block: &[u8], transactions_root: &H256) -> Result<(), Error> {
-    let block = UntrustedRlp::new(block);
-    let tx = block.at(1)?;
-    let expected_root = &ordered_trie_root(tx.iter().map(|r| r.as_raw()));
-    if expected_root != transactions_root {
-        return Err(From::from(BlockError::InvalidTransactionsRoot(Mismatch {
-            expected: expected_root.clone(),
-            found: transactions_root.clone(),
-        })));
-    }
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -440,6 +429,7 @@ mod tests {
     use encoded;
     use types::error::BlockError::*;
     use spec::Spec;
+    use triehash::ordered_trie_root;
     use helpers::{create_test_block_with_data, create_test_block};
     use transaction::{SignedTransaction, Transaction, UnverifiedTransaction, Action};
     use types::state::log_entry::{LogEntry, LocalizedLogEntry};
@@ -798,18 +788,6 @@ mod tests {
                 max: Some(engine.maximum_extra_data_size()),
                 min: None,
                 found: header.extra_data().len(),
-            }),
-        );
-
-        header = good.clone();
-        check_fail(
-            basic_test(
-                &create_test_block_with_data(&header, &good_transactions),
-                engine,
-            ),
-            InvalidTransactionsRoot(Mismatch {
-                expected: good_transactions_root.clone(),
-                found: header.transactions_root().clone(),
             }),
         );
 

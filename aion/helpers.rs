@@ -19,6 +19,9 @@
  *
  ******************************************************************************/
 
+#![allow(deprecated)]
+#![allow(dead_code)]
+
 use std::io;
 use std::io::{Write, BufReader, BufRead};
 use std::fs::File;
@@ -70,25 +73,21 @@ pub fn to_queue_strategy(s: &str) -> Result<PrioritizationStrategy, String> {
     }
 }
 
+pub fn string_to_address(s: &String) -> Result<Address, String> {
+    clean_0x(s)
+        .parse()
+        .map_err(|_| format!("Invalid address: {:?}", s))
+}
+
 pub fn to_address(s: Option<String>) -> Result<Address, String> {
     match s {
-        Some(ref a) => {
-            clean_0x(a)
-                .parse()
-                .map_err(|_| format!("Invalid address: {:?}", a))
-        }
+        Some(ref a) => string_to_address(a),
         None => Ok(Address::default()),
     }
 }
 
 pub fn to_addresses(s: &Vec<String>) -> Result<Vec<Address>, String> {
-    s.into_iter()
-        .map(|s1| {
-            clean_0x(s1)
-                .parse()
-                .map_err(|_| format!("Invalid address: {:?}", s1))
-        })
-        .collect()
+    s.into_iter().map(|s1| string_to_address(s1)).collect()
 }
 
 /// Flush output buffer.
@@ -119,14 +118,10 @@ pub fn to_client_config(
     client_config.blockchain.max_cache_size = cache_config.blockchain() as usize * mb;
     // in bytes
     client_config.blockchain.pref_cache_size = cache_config.blockchain() as usize * 3 / 4 * mb;
-    // db cache size, in megabytes
-    client_config.db_cache_size = Some(cache_config.db_cache_size() as usize);
     // db queue cache size, in bytes
     client_config.queue.max_mem_use = cache_config.queue() as usize * mb;
     // in bytes
     client_config.state_cache_size = cache_config.state() as usize * mb;
-    // in bytes
-    client_config.jump_table_size = cache_config.jump_tables() as usize * mb;
     // in bytes
     client_config.history_mem = pruning_memory * mb;
 
@@ -207,6 +202,7 @@ pub fn passwords_from_files(files: &[String]) -> Result<Vec<String>, String> {
     Ok(passwords?.into_iter().flat_map(|x| x).collect())
 }
 
+#[deprecated(since = "1.0.3", note = "Use log4rs instead")]
 pub fn validate_log_level(level: String, target: &str) -> String {
     match level.clone().to_lowercase().as_str() {
         "off" | "error" | "warn" | "info" | "debug" | "trace" => level,
@@ -221,6 +217,7 @@ pub fn validate_log_level(level: String, target: &str) -> String {
     }
 }
 
+#[deprecated(since = "1.0.3", note = "Use log4rs instead")]
 pub fn parse_log_target(targets: Vec<String>) -> Option<String> {
     if targets.is_empty() {
         return None;

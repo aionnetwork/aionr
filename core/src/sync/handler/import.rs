@@ -31,7 +31,12 @@ use sync::storage::SyncStorage;
 use sync::node_info::{NodeInfo, Mode};
 use aion_types::H256;
 
-pub fn import_staged_blocks(hash: &H256, client: Arc<dyn BlockChainClient>, storage: Arc<SyncStorage>) {
+pub fn import_staged_blocks(
+    hash: &H256,
+    client: Arc<dyn BlockChainClient>,
+    storage: Arc<SyncStorage>,
+)
+{
     let mut blocks_to_import = Vec::new();
     let mut staged_blocks = storage.staged_blocks().lock();
     if staged_blocks.contains_key(&hash) {
@@ -45,7 +50,7 @@ pub fn import_staged_blocks(hash: &H256, client: Arc<dyn BlockChainClient>, stor
         return;
     }
 
-    info!(target: "sync", "Importing {} staged blocks...", blocks_to_import.len());
+    debug!(target: "sync_import", "Importing {} staged blocks...", blocks_to_import.len());
 
     for block in &blocks_to_import {
         let block_number = BlockView::new(block).header_view().number();
@@ -54,10 +59,10 @@ pub fn import_staged_blocks(hash: &H256, client: Arc<dyn BlockChainClient>, stor
             Ok(_)
             | Err(BlockImportError::Import(ImportError::AlreadyInChain))
             | Err(BlockImportError::Import(ImportError::AlreadyQueued)) => {
-                trace!(target: "sync", "Staged block #{} imported...", block_number);
+                trace!(target: "sync_import", "Staged block #{} imported...", block_number);
             }
             Err(e) => {
-                warn!(target: "sync", "Failed to import staged block #{}, due to {:?}", block_number, e);
+                debug!(target: "sync_import", "Failed to import staged block #{}, due to {:?}", block_number, e);
                 // Remove records so that they can be downloaded again.
                 storage.remove_downloaded_blocks_hashes(
                     &blocks_to_import
@@ -96,7 +101,7 @@ pub fn import_blocks(
             } else if status == BlockStatus::Bad {
                 break;
             } else {
-                trace!(target: "sync", "ignore block #{}({}): {:?} ,from node {} ", block.header.number(), block.header.hash() , status, blocks_wrapper.node_hash);
+                trace!(target: "sync_import", "ignore block #{}({}): {:?} ,from node {} ", block.header.number(), block.header.hash() , status, blocks_wrapper.node_hash);
             }
         }
 
@@ -129,7 +134,7 @@ pub fn import_blocks(
                 }
                 Err(BlockImportError::Block(BlockError::UnknownParent(_))) => {
                     if first_imported_number != 0u64 {
-                        error!(target: "sync", "Can't import inconsistent blocks");
+                        error!(target: "sync_import", "Can't import inconsistent blocks");
                     }
                     unknown_number = block_number;
                     unknown_parent_hash = block_view.header_view().parent_hash();
@@ -176,7 +181,7 @@ pub fn import_blocks(
                 if info.mode == Mode::Lightning {
                     // Try to stage blocks if not staged yet
                     if storage.stage_blocks(unknown_parent_hash, unknown_blocks) {
-                        info!(target: "sync", "Node: {}, {} blocks staged for future import.", &node_hash, blocks_to_import.len());
+                        debug!(target: "sync_import", "Node: {}, {} blocks staged for future import.", &node_hash, blocks_to_import.len());
                         // Get last block number
                         let last_block = blocks_to_import.last().expect(
                             "checked collection is not empty. Should be able to get the last",
@@ -215,7 +220,7 @@ pub fn import_blocks(
             match info.mode {
                 // Fork point found, switch to forward mode
                 Mode::Backward => {
-                    info!(target: "sync", "Node: {}, found the fork point #{}", &node_hash, first_imported_number);
+                    debug!(target: "sync_import", "Node: {}, found the fork point #{}", &node_hash, first_imported_number);
                     info.switch_mode(Mode::Forward, &local_best_block, &node_hash);
                     info.sync_base_number = last_imported_number + 1;
                 }
@@ -243,8 +248,8 @@ pub fn import_blocks(
                     info.switch_mode(mode, &local_best_block, &node_hash);
                 }
             }
-            info!(target: "sync", "Node: {}, {} blocks imported", &node_hash, last_imported_number - first_imported_number + 1);
-            trace!(target: "sync", "Node: {}, NORMAL: {}, THUNDER: {}, LIGHTNING: {}", &node_hash, normal_nodes, thunder_nodes, lightning_nodes);
+            debug!(target: "sync_import", "Node: {}, {} blocks imported", &node_hash, last_imported_number - first_imported_number + 1);
+            trace!(target: "sync_import", "Node: {}, NORMAL: {}, THUNDER: {}, LIGHTNING: {}", &node_hash, normal_nodes, thunder_nodes, lightning_nodes);
         }
         drop(nodes_info);
         // TODO: maybe we should consider reset the header request cooldown here

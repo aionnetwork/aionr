@@ -2,7 +2,7 @@
 description = "aion network rust implementation"
 name = "aionr"
 # NOTE Make sure to update util/version/Cargo.toml as well
-version = "1.0.2"
+version = "1.1.0"
 license = "GPL-3.0"
 authors = ["aion foundation <admin@aion.network>"]
 

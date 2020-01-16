@@ -87,6 +87,7 @@ pub fn bcrypt_pbkdf(password: &[u8], salt: &[u8], rounds: u32, output: &mut [u8]
 #[cfg(test)]
 mod test {
     use std::iter::repeat;
+    #[cfg(feature = "benches")]
     use std::time::Instant;
 
     use bcrypt_pbkdf::{bcrypt_pbkdf, bcrypt_hash};
@@ -293,6 +294,7 @@ mod test {
     }
 
     #[test]
+    #[cfg(feature = "benches")]
     fn benchtest_bcrypt_pbkdf_5_32() {
         let pass = [0u8; 16];
         let salt = [0u8; 16];

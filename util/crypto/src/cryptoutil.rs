@@ -514,11 +514,9 @@ impl<T: FixedBuffer> StandardPadding for T {
 pub mod test {
     use std;
 
-    /*
     use std::iter::repeat;
     use rand::IsaacRng;
-    use rand::distributions::{ Distribution, IndependentSample, Range };
-    */
+    use rand::distributions::{ Range, Distribution  };
 
     use cryptoutil::{add_bytes_to_bits, add_bytes_to_bits_tuple};
     use digest::Digest;
@@ -526,38 +524,36 @@ pub mod test {
     /// Feed 1,000,000 'a's into the digest with varying input sizes and check that the result is
     /// correct.
     pub fn test_digest_1million_random<D: Digest>(
-        _digest: &mut D,
-        _blocksize: usize,
-        _expected: &str,
+        digest: &mut D,
+        blocksize: usize,
+        expected: &str,
     )
     {
-        /*
         let total_size = 1000000;
         let buffer: Vec<u8> = repeat('a' as u8).take(blocksize * 2).collect();
-        let mut rng = IsaacRng::new_unseeded();
+        let mut rng = IsaacRng::new_from_u64(0);
         let range = Range::new(0, 2 * blocksize + 1);
         let mut count = 0;
-        
+
         digest.reset();
-        
+
         while count < total_size {
-            let next = range.ind_sample(&mut rng);
+            let next = range.sample(&mut rng);
             let remaining = total_size - count;
             let size = if next > remaining { remaining } else { next };
             digest.input(&buffer[..size]);
             count += size;
         }
-        
+
         let result_str = digest.result_str();
-        
+
         assert!(expected == &result_str[..]);
-        */
     }
 
     // A normal addition - no overflow occurs
     #[test]
     fn test_add_bytes_to_bits_ok() {
-        assert!(add_bytes_to_bits(100, 10) == 180);
+        assert_eq!(add_bytes_to_bits(100, 10), 180);
     }
 
     // A simple failure case - adding 1 to the max value

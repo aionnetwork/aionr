@@ -1,14 +1,18 @@
 [aion]
 chain = "custom/custom.json"
+#base_path = "$HOME/.aion"
+#keys_path = "$BASE/keys"
+#db_path = "$BASE/chains"
 
 [account]
 keys_iterations = 10240
 refresh_time = 5
 unlock = []
 password = []
-stake_contract = "0xa056337bb14e818f3f53e13ab0d93b6539aa570cba91ce65c716058241989be9"
+#stake_contract = "0xa056337bb14e818f3f53e13ab0d93b6539aa570cba91ce65c716058241989be9"
 
 [network]
+sync_from_boot_nodes_only = false
 max_peers = 128
 net_id = 256
 local_node = "p2p://84112e91-b8d0-4691-a45d-240d7d85ffd6@0.0.0.0:30303"
@@ -58,7 +62,7 @@ local_max_gas_price = 100000000000
 blk_price_window = 20
 max_blk_traverse = 64
 gas_price_percentile = 60
-author = "0xa07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137"
+#author = "0xa07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137"
 #staker_private_key = None
 #tx_gas_limit = None
 #tx_time_limit = None
@@ -79,7 +83,4 @@ fat_db = "auto"
 #num_verifiers = None
 
 [log]
-no_color = false
-level = "info"
-targets = []
-#log_file = None
+config = "log_config.yaml"

@@ -71,6 +71,8 @@ pub trait Backend: Send {
     /// Check whether an account is known to be empty. Returns true if known to be
     /// empty, false otherwise.
     fn is_known_null(&self, address: &Address) -> bool;
+
+    fn force_update(&mut self, address: &Address, account: &AionVMAccount);
 }
 
 /// A raw backend used to check proofs of execution.
@@ -127,6 +129,7 @@ impl Backend for ProofCheck {
     fn get_cached_code(&self, _hash: &H256) -> Option<Arc<Vec<u8>>> { None }
     fn note_non_null_account(&self, _address: &Address) {}
     fn is_known_null(&self, _address: &Address) -> bool { false }
+    fn force_update(&mut self, _addr: &Address, _account: &AionVMAccount) {}
 }
 
 /// Proving state backend.
@@ -190,6 +193,7 @@ impl<H: AsHashStore + Send + Sync> Backend for Proving<H> {
     fn get_cached_code(&self, _: &H256) -> Option<Arc<Vec<u8>>> { None }
     fn note_non_null_account(&self, _: &Address) {}
     fn is_known_null(&self, _: &Address) -> bool { false }
+    fn force_update(&mut self, _addr: &Address, _account: &AionVMAccount) {}
 }
 
 impl<H: AsHashStore + Clone> Clone for Proving<H> {
@@ -225,4 +229,5 @@ impl<H: AsHashStore + Send + Sync> Backend for Basic<H> {
     fn get_cached_code(&self, _: &H256) -> Option<Arc<Vec<u8>>> { None }
     fn note_non_null_account(&self, _: &Address) {}
     fn is_known_null(&self, _: &Address) -> bool { false }
+    fn force_update(&mut self, _addr: &Address, _account: &AionVMAccount) {}
 }

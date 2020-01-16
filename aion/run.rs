@@ -90,7 +90,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // database paths
     let db_dirs = cmd
         .dirs
-        .database(genesis_hash.clone(), None, spec.data_dir.clone());
+        .database(genesis_hash.clone(), spec.data_dir.clone());
 
     // user defaults path
     let user_defaults_path = db_dirs.user_defaults_path();
