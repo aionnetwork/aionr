@@ -18,13 +18,50 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use std::cell::{Cell};
+use std::cell::{Cell, RefCell};
 use std::sync::Arc;
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 
 use aion_types::{H256, U256};
 use acore_bytes::{Bytes};
 use state::account::traits::AccType;
+
+use lru_cache::LruCache;
+
+#[derive(Clone, Debug, Hash, PartialEq)]
+pub enum KeyTag {
+    REMOVE,
+    DIRTY(Bytes),
+    CLEAN(Bytes),
+}
+
+impl KeyTag {
+    pub fn is_removed(&self) -> bool { return *self == KeyTag::REMOVE; }
+
+    // get the value from KeyTag
+    pub fn get(&self) -> Option<Bytes> {
+        match *self {
+            KeyTag::REMOVE => None,
+            KeyTag::DIRTY(ref v) | KeyTag::CLEAN(ref v) => Some(v.clone()),
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn is_dirty(&self) -> bool {
+        match *self {
+            KeyTag::DIRTY(_) => true,
+            _ => false,
+        }
+    }
+
+    #[cfg(test)]
+    pub(super) fn is_clean(&self) -> bool {
+        match *self {
+            KeyTag::CLEAN(_) => true,
+            _ => false,
+        }
+    }
+}
 
 /// Basic account type.
 #[derive(Debug, Clone, PartialEq, Eq, RlpEncodable, RlpDecodable)]
@@ -39,11 +76,14 @@ pub struct BasicAccount {
     pub code_hash: H256,
 }
 
+pub type VMCache = RefCell<LruCache<Bytes, Bytes>>;
+pub type VMStorageChange = HashMap<Bytes, KeyTag>;
+
 /// Single account in the system.
 /// Keeps track of changes to the code and storage.
 /// The changes are applied in `commit_storage` and `commit_code`
 #[derive(Clone)]
-pub struct Account<T, U> {
+pub struct Account {
     pub balance: U256,
 
     pub nonce: U256,
@@ -56,11 +96,11 @@ pub struct Account<T, U> {
 
     // LRU cache of the trie-backed storage.
     // limited to `STORAGE_CACHE_ITEMS` recent queries
-    pub storage_cache: T,
+    pub storage_cache: VMCache,
 
     // modified storage. Accumulates changes to storage made in `set_storage`
     // takes precedence over `storage_cache`.
-    pub storage_changes: U,
+    pub storage_changes: VMStorageChange,
 
     // aion: java kernel specific
     pub storage_removable: HashSet<Bytes>,

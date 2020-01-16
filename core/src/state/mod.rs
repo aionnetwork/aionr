@@ -388,81 +388,7 @@ impl<B: Backend> State<B> {
         })
     }
 
-    /// Mutate storage of account `address` so that it is `value` for `key`.
-    pub fn storage_at(&self, address: &Address, key: &Bytes) -> trie::Result<Option<Bytes>> {
-        // Storage key search and update works like this:
-        // 1. If there's an entry for the account in the local cache check for the key and return it if found.
-        // 2. If there's an entry for the account in the global cache check for the key or load it into that account.
-        // 3. If account is missing in the global cache load it into the local cache and cache the key there.
-
-        // Ok(None) for avm null
-        // Ok(vec![]) for fastvm empty
-        // Err() is error
-        // Ok(Some) for some
-        // check local cache first without updating
-        {
-            let local_cache = self.cache.borrow_mut();
-            let account = local_cache.get(address);
-            let mut local_account = None;
-            if let Some(maybe_acc) = account {
-                match maybe_acc.account {
-                    Some(ref account) => {
-                        if let Some(value) = account.cached_storage_at(key) {
-                            // println!("TT: 1");
-                            return Ok(Some(value));
-                        } else if account.is_removed(key) {
-                            return Ok(None);
-                        } else {
-                            // storage not cached, will try local search later
-                            local_account = Some(maybe_acc);
-                        }
-                    }
-                    // NOTE: No account found, is it possible in both fastvm and avm, maybe not
-                    _ => {
-                        return Ok(None);
-                    }
-                }
-            }
-            // check the global cache and and cache storage key there if found,
-            let trie_res = self.db.get_cached(address, |acc| {
-                match acc {
-                    // NOTE: the same question as above
-                    None => Ok(None),
-                    Some(a) => {
-                        let account_db = self
-                            .factories
-                            .accountdb
-                            .readonly(self.db.as_hashstore(), a.address_hash(address));
-                        a.storage_at(account_db.as_hashstore(), key)
-                    }
-                }
-            });
-
-            if let Some(res) = trie_res {
-                return res;
-            }
-
-            // otherwise cache the account localy and cache storage key there.
-            if let Some(ref mut acc) = local_account {
-                if let Some(ref account) = acc.account {
-                    let account_db = self
-                        .factories
-                        .accountdb
-                        .readonly(self.db.as_hashstore(), account.address_hash(address));
-                    return account.storage_at(account_db.as_hashstore(), key);
-                } else {
-                    return Ok(None);
-                }
-            }
-        }
-
-        // check if the account could exist before any requests to trie
-        if self.db.is_known_null(address) {
-            // println!("TT: 6");
-            return Ok(None);
-        }
-
-        // account is not found in the global cache, get from the DB and insert into local
+    fn invoke_state_trie(&self, address: &Address, key: &Bytes) -> trie::Result<Option<Bytes>> {
         let db = self
             .factories
             .trie
@@ -478,6 +404,34 @@ impl<B: Backend> State<B> {
         });
         self.insert_cache(address, AccountEntry::new_clean(maybe_acc));
         r
+    }
+
+    /// Mutate storage of account `address` so that it is `value` for `key`.
+    pub fn storage_at(&self, address: &Address, key: &Bytes) -> trie::Result<Option<Bytes>> {
+        {
+            let local_cache = self.cache.borrow_mut();
+            let account = local_cache.get(address);
+            if let Some(maybe_acc) = account {
+                match maybe_acc.account {
+                    Some(ref acc) => {
+                        let account_db = self
+                            .factories
+                            .accountdb
+                            .readonly(self.db.as_hashstore(), acc.address_hash(address));
+                        return acc.storage_at(account_db.as_hashstore(), key);
+                    }
+                    None => return Ok(None),
+                }
+            }
+        }
+
+        // check if the account could exist before any requests to trie
+        if self.db.is_known_null(address) {
+            return Ok(None);
+        }
+
+        // read the glocal state trie and update local block cache
+        self.invoke_state_trie(address, key)
     }
 
     /// Get accounts' code.

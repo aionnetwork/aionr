@@ -38,15 +38,13 @@ use trie::{Trie, SecTrieDB, TrieFactory, TrieError};
 // use db::Writable;
 use kvdb::{KeyValueDB, DBTransaction, DBValue, HashStore};
 
-use super::generic::Account;
+use super::generic::{Account, VMCache, VMStorageChange, KeyTag};
 use super::traits::{VMAccount, AccType};
 use state::Backend;
 
 const STORAGE_CACHE_ITEMS: usize = 8192;
 
-type VMCache = RefCell<LruCache<Bytes, Bytes>>;
-type VMStorageChange = HashMap<Bytes, Bytes>;
-pub type AionVMAccount = Account<VMCache, VMStorageChange>;
+pub type AionVMAccount = Account;
 
 #[derive(Copy, Clone)]
 pub enum RequireCache {
@@ -89,6 +87,11 @@ impl From<BasicAccount> for AionVMAccount {
 }
 
 impl AionVMAccount {
+    #[cfg(test)]
+    fn mark_as_avm(&mut self) { self.account_type = AccType::AVM; }
+
+    #[cfg(test)]
+    fn mark_as_fvm(&mut self) { self.account_type = AccType::FVM; }
     pub fn new_contract(balance: U256, nonce: U256) -> Self {
         Self {
             balance,
@@ -142,7 +145,7 @@ impl AionVMAccount {
     pub fn from_pod(pod: PodAccount) -> Self {
         let mut storage_changes = HashMap::new();
         for item in pod.storage.into_iter() {
-            storage_changes.insert(item.0[..].to_vec(), item.1[..].to_vec());
+            storage_changes.insert(item.0[..].to_vec(), KeyTag::DIRTY(item.1[..].to_vec()));
         }
         AionVMAccount {
             balance: pod.balance,
@@ -183,42 +186,18 @@ impl AionVMAccount {
         db: &mut HashStore,
     ) -> trie::Result<()>
     {
-        let account_type = self.acc_type().clone();
-        // println!("StorageROOT before commit = {:?}", self.storage_root);
         let mut t = trie_factory.from_existing(db, &mut self.storage_root)?;
         for (k, v) in self.storage_changes.drain() {
-            // cast key and value to trait type,
-            // so we can call overloaded `to_bytes` method
-            let mut is_zero = true;
-            for item in v.clone() {
-                if item != 0x00 {
-                    is_zero = false;
-                    break;
+            match v.is_removed() {
+                true => {
+                    t.remove(&k)?;
+                    self.storage_cache.borrow_mut().remove(&k);
                 }
-            }
-            if account_type == AccType::AVM {
-                // avm always commits storage in storage_changes
-                // and removes storage in storage_removable
-                debug!(target: "vm", "insert avm key: {:?}", k);
-                is_zero = false;
-            }
-            debug!(target: "vm", "CommitStorage: key = {:?}, value = {:?}, is_zero = {:?}", k, v, is_zero);
-            // account just commit storage key/value pairs,
-            // the real length of value should be dealed by caller
-            match is_zero {
-                true => t.remove(&k)?,
-                false => t.insert(&k, &encode(&v))?,
+                false => {
+                    t.insert(&k, &encode(&v.get().unwrap()))?;
+                    self.storage_cache.borrow_mut().insert(k, v.get().unwrap());
+                }
             };
-
-            self.storage_cache.borrow_mut().insert(k, v);
-        }
-
-        if account_type == AccType::AVM {
-            for k in self.storage_removable.clone() {
-                debug!(target: "vm", "remove avm key: {:?}", k);
-                t.remove(&k)?;
-                self.storage_cache.borrow_mut().remove(&k);
-            }
         }
 
         Ok(())
@@ -794,19 +773,26 @@ impl VMAccount for AionVMAccount {
 }
 
 impl AionVMAccount {
-    /// storage search priority:
-    /// 1. 'removable' which means it needs to be removed from database when commit.
-    /// 2. 'storage_changes' which means latest write access.
-    /// 3. 'storage_cache' latest read access and previous commit results
     pub fn storage_at(&self, db: &HashStore, key: &Bytes) -> trie::Result<Option<Bytes>> {
-        if self.storage_removable.contains(key) {
-            return Ok(None);
-        }
-
         if let Some(value) = self.cached_storage_at(key) {
-            return Ok(Some(value));
+            return Ok(value.get());
         }
 
+        let db = SecTrieDB::new(db, &self.storage_root)?;
+
+        let trie_value: Option<Bytes> = db.get_with(key, ::rlp::decode)?;
+        match trie_value {
+            Some(v) => {
+                self.storage_cache
+                    .borrow_mut()
+                    .insert(key.to_vec(), v.clone());
+                Ok(Some(v))
+            }
+            _ => Ok(None),
+        }
+    }
+
+    pub fn storage_trie_at(&self, db: &HashStore, key: &Bytes) -> trie::Result<Option<Bytes>> {
         let db = SecTrieDB::new(db, &self.storage_root)?;
 
         if self.acc_type() == AccType::AVM && !db.contains(key)? {
@@ -820,39 +806,41 @@ impl AionVMAccount {
         Ok(Some(item))
     }
 
-    pub fn cached_storage_at(&self, key: &Bytes) -> Option<Bytes> {
-        if let Some(value) = self.storage_changes.get(key) {
-            return Some(value.clone());
+    pub(self) fn cached_storage_at(&self, key: &Bytes) -> Option<KeyTag> {
+        match self.storage_changes.get(key) {
+            Some(v) => Some(v.clone()),
+            _ => {
+                if let Some(v) = self.storage_cache.borrow_mut().get_mut(key) {
+                    Some(KeyTag::CLEAN(v.clone()))
+                } else {
+                    None
+                }
+            }
         }
-
-        if let Some(value) = self.storage_cache.borrow_mut().get_mut(key) {
-            return Some(value.clone());
-        }
-
-        None
     }
 
-    pub fn is_removed(&self, key: &Bytes) -> bool { return self.storage_removable.contains(key); }
-
     pub fn set_storage(&mut self, key: Bytes, value: Bytes) {
-        // update removable set
-        if self.storage_removable.contains(&key) {
-            self.storage_removable.remove(&key);
-        }
+        // fn is_zero(v: &Bytes) -> bool {
+        //     let mut zero = true;
+        //     for b in v {
+        //         if b != &0x00u8 {
+        //             zero = false;
+        //             break;
+        //         }
+        //     }
+        //     zero
+        // }
 
-        self.storage_changes.insert(key, value);
+        // if is_zero(&value) && self.acc_type() == AccType::FVM {
+        //     self.storage_changes.insert(key, KeyTag::REMOVE);
+        // } else {
+        //     self.storage_changes.insert(key, KeyTag::DIRTY(value));
+        // }
+        self.storage_changes.insert(key, KeyTag::DIRTY(value));
     }
 
     pub fn remove_storage(&mut self, key: Bytes) {
-        // update storage changes
-        if self.storage_changes.contains_key(&key) {
-            let old = self.storage_changes.remove(&key);
-            debug!(target: "vm", "removed avm value {:?}", old);
-        }
-
-        self.storage_cache.borrow_mut().remove(&key);
-
-        self.storage_removable.insert(key.clone());
+        self.storage_changes.insert(key, KeyTag::REMOVE);
     }
 
     pub fn update_root(&mut self, graph_db: Arc<KeyValueDB>) {
@@ -922,3 +910,72 @@ impl fmt::Debug for AionVMAccount {
 
 // account will not actually be shared between threads
 unsafe impl Sync for AionVMAccount {}
+
+#[cfg(test)]
+mod tests {
+    use kvdb::MemoryDB;
+    use db::AccountDBMut;
+    use aion_types::Address;
+    use super::AionVMAccount;
+    #[test]
+    fn cached_storage_at() {
+        let mut db = MemoryDB::new();
+        let mut db = AccountDBMut::new(&mut db, &Address::new());
+        let mut a = AionVMAccount::new_contract(69.into(), 0.into());
+
+        // key tag converts from DIRTY to CLEAN
+        a.set_storage(vec![0x12, 0x34], vec![0x67, 0x78]);
+        assert!(a.cached_storage_at(&vec![0x12, 0x34]).unwrap().is_dirty());
+        assert_eq!(
+            a.cached_storage_at(&vec![0x12, 0x34]).unwrap().get(),
+            Some(vec![0x67, 0x78])
+        );
+        a.commit_storage(&Default::default(), &mut db).unwrap();
+
+        assert!(a.cached_storage_at(&vec![0x12, 0x34]).unwrap().is_clean());
+        assert_eq!(
+            a.cached_storage_at(&vec![0x12, 0x34]).unwrap().get(),
+            Some(vec![0x67, 0x78])
+        );
+
+        // data read from disk to cache is CLEAN
+        a.storage_cache.borrow_mut().clear();
+        assert!(a.cached_storage_at(&vec![0x12, 0x34]).is_none());
+        a.storage_at(&db, &vec![0x12, 0x34]).unwrap();
+        assert!(a.cached_storage_at(&vec![0x12, 0x34]).unwrap().is_clean());
+
+        // from CLEAN to DIRTY in cache
+        a.set_storage(vec![0x12, 0x34], vec![0x56, 0x78]);
+        assert!(a.cached_storage_at(&vec![0x12, 0x34]).unwrap().is_dirty());
+        assert_eq!(
+            a.cached_storage_at(&vec![0x12, 0x34]).unwrap().get(),
+            Some(vec![0x56, 0x78])
+        );
+
+        // set empty value
+        a.set_storage(vec![0x12, 0x34], vec![]);
+        assert_eq!(
+            a.cached_storage_at(&vec![0x12, 0x34]).unwrap().get(),
+            Some(vec![])
+        );
+        assert_eq!(a.storage_at(&db, &vec![0x12, 0x34]).unwrap(), Some(vec![]));
+        // remove key
+        a.remove_storage(vec![0x12, 0x34]);
+        assert!(
+            a.cached_storage_at(&vec![0x12, 0x34])
+                .unwrap()
+                .get()
+                .is_none()
+        );
+        assert!(a.storage_at(&db, &vec![0x12, 0x34]).unwrap().is_none());
+
+        // commit
+        a.commit_storage(&Default::default(), &mut db).unwrap();
+
+        // the key vec![0x12, 0x34] is removed from Account MPT, so storage_at will return Default value
+        a.mark_as_fvm();
+        assert!(a.storage_at(&db, &vec![0x12, 0x34]).unwrap().is_none());
+        a.mark_as_avm();
+        assert!(a.storage_at(&db, &vec![0x12, 0x34]).unwrap().is_none());
+    }
+}
