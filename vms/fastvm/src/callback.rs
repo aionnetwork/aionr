@@ -64,7 +64,7 @@ impl Deref for EvmAddress {
 #[no_mangle]
 // 1 - get block hash
 pub extern fn get_blockhash(obj: *mut libc::c_void, number: u64) -> HashValue {
-    debug!(target: "vm", "get_blockhash");
+    debug!(target: "vm", "FastVM CB: get_blockhash");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
     debug!(target: "vm", "blockhash = {:?}, number = {:?}", ext.blockhash(&(number.into())), number);
     println!("blockhash = {:?}", ext.blockhash(&(number.into())));
@@ -76,7 +76,7 @@ pub extern fn get_blockhash(obj: *mut libc::c_void, number: u64) -> HashValue {
 #[no_mangle]
 // 2 - get contract code
 pub extern fn get_code(obj: *mut libc::c_void, code_info: *mut u8, address: EvmAddress) {
-    debug!(target: "vm", "get_code");
+    debug!(target: "vm", "FastVM CB: get_code, address: {:?}", address);
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
 
     #[repr(C)]
@@ -100,7 +100,7 @@ pub extern fn get_code(obj: *mut libc::c_void, code_info: *mut u8, address: EvmA
 #[no_mangle]
 // 3 - get account balance
 pub extern fn get_balance(obj: *mut libc::c_void, address: EvmAddress) -> EvmWord {
-    debug!(target: "vm", "get_balance");
+    debug!(target: "vm", "FastVM CB: get_balance");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
     let balance = ext.balance(&(address.bytes.into()));
     let evm_strg: [u8; 16] = U128::from(U256::from(balance)).into();
@@ -112,7 +112,7 @@ pub extern fn get_balance(obj: *mut libc::c_void, address: EvmAddress) -> EvmWor
 #[no_mangle]
 // 4 - check account exists
 pub extern fn exists(obj: *mut libc::c_void, address: EvmAddress) -> i32 {
-    debug!(target: "vm", "check exists");
+    debug!(target: "vm", "FastVM CB: check exists");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
     match ext.exists(&((*address).into())) {
         true => 1,
@@ -124,15 +124,13 @@ pub extern fn exists(obj: *mut libc::c_void, address: EvmAddress) -> i32 {
 // 5 - get storage
 pub extern fn get_storage(obj: *mut libc::c_void, _address: EvmAddress, key: EvmWord) -> EvmWord {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
-    debug!(target: "vm", "ext<get_storage>: key = {:?}, raw_env = {:?}", key, obj);
     let storage = ext.storage_at(&(key.bytes).into());
     debug!(target: "vm",
-        "FastVM CB: get_storage() key = {:?}, value = {:?}",
+        "FastVM CB: get_storage(),  key: {:?}, value: {:?}",
         key,
-        storage
+        &storage[..]
     );
     let evm_strg: [u8; 16] = storage.into();
-    debug!(target: "vm", "callback.rs get_storage() storage: {:?}", evm_strg);
     EvmWord {
         bytes: evm_strg,
     }
@@ -143,18 +141,14 @@ pub extern fn get_storage(obj: *mut libc::c_void, _address: EvmAddress, key: Evm
 pub extern fn put_storage(obj: *mut libc::c_void, _addr: EvmAddress, key: EvmWord, value: EvmWord) {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
 
-    debug!(target: "vm",
-        "callback.rs put_storage() key: {:?}",
-        U256::from(U128::from(key.bytes.clone()))
-    );
-    debug!(target: "vm", "callback.rs put_storage() value: {:?}", value);
+    debug!(target: "vm", "FastVM CB: put_storage(), key: {:?}, value: {:?}", key, value);
     ext.set_storage(U128::from(*key).into(), U128::from(*value).into());
 }
 
 #[no_mangle]
 // 7 - self destroy
 pub extern fn selfdestruct(obj: *mut libc::c_void, _owner: EvmAddress, beneficiary: EvmAddress) {
-    debug!(target: "vm", "selfdestruct");
+    debug!(target: "vm", "FastVM CB: selfdestruct");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
     ext.suicide(&((*beneficiary).into()));
 }
@@ -179,14 +173,14 @@ pub extern fn vm_log(
         let topic: &[u8; 32] = unsafe { mem::transmute(topics as usize + idx * 32) };
         new_topics.push((*topic).into());
     }
-    debug!(target: "vm", "vm topics = {:?}, data = {:?}", new_topics, data);
+    debug!(target: "vm", "FastVM CB: log, topics: {:?}, data: {:?}", new_topics, data);
     ext.log(new_topics, data);
 }
 
 #[no_mangle]
 // 9 - call
 pub extern fn call(obj: *mut libc::c_void, info: *mut u8, msg: *const u8) -> *const u8 {
-    debug!(target: "vm", "enter vm call");
+    debug!(target: "vm", "FastVM CB: enter vm call");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
     let result_info: &mut EvmResult = unsafe { mem::transmute(info) };
     let evm_msg: &EvmMessage = unsafe { mem::transmute(msg) };
@@ -208,9 +202,9 @@ pub extern fn call(obj: *mut libc::c_void, info: *mut u8, msg: *const u8) -> *co
     let receive_address: Address = U256::from(&evm_msg.recv_addr).into();
     let code_address: Address = U256::from(&evm_msg.address).into();
 
-    debug!(target: "vm", "sender address = {:?}", evm_msg.caller);
-    debug!(target: "vm", "receive address = {:?}", evm_msg.recv_addr);
-    debug!(target: "vm", "code address = {:?}", evm_msg.address);
+    debug!(target: "vm", 
+    "FastVM CB: call, sender: {:?}, receiver: {:?}, code address: {:?}", 
+    evm_msg.caller, evm_msg.recv_addr, evm_msg.address);
 
     // Failure if exceed maximum call depth
     if evm_msg.depth >= constants::MAX_CALL_DEPTH {

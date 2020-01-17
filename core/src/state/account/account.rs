@@ -820,23 +820,20 @@ impl AionVMAccount {
     }
 
     pub fn set_storage(&mut self, key: Bytes, value: Bytes) {
-        // fn is_zero(v: &Bytes) -> bool {
-        //     let mut zero = true;
-        //     for b in v {
-        //         if b != &0x00u8 {
-        //             zero = false;
-        //             break;
-        //         }
-        //     }
-        //     zero
-        // }
-
-        // if is_zero(&value) && self.acc_type() == AccType::FVM {
-        //     self.storage_changes.insert(key, KeyTag::REMOVE);
-        // } else {
-        //     self.storage_changes.insert(key, KeyTag::DIRTY(value));
-        // }
-        self.storage_changes.insert(key, KeyTag::DIRTY(value));
+        fn gen_tag(value: &Bytes, vm_id: &AccType) -> KeyTag {
+            if *vm_id == AccType::AVM {
+                KeyTag::DIRTY(value.clone())
+            } else {
+                for b in value {
+                    if *b != 0x00u8 {
+                        return KeyTag::DIRTY(value.clone());
+                    }
+                }
+                KeyTag::REMOVE
+            }
+        }
+        let acc_type = self.acc_type();
+        self.storage_changes.insert(key, gen_tag(&value, &acc_type));
     }
 
     pub fn remove_storage(&mut self, key: Bytes) {
