@@ -732,7 +732,7 @@ mod tests {
             engine,
         ));
 
-        header.set_gas_limit(min_gas_limit - From::from(1));
+        header.set_gas_limit(min_gas_limit - 1);
         check_fail(
             basic_test(&create_test_block(&header), engine),
             InvalidGasLimit(OutOfBounds {
@@ -754,7 +754,7 @@ mod tests {
         );
 
         header = good.clone();
-        let gas_used = header.gas_limit().clone() + 1.into();
+        let gas_used = header.gas_limit().clone() + 1;
         header.set_gas_used(gas_used);
         check_fail(
             basic_test(&create_test_block(&header), engine),
@@ -1061,12 +1061,12 @@ mod tests {
 
         // make branch1
         let mut parent8b = parent8.clone();
-        parent8b.set_difficulty(parent8.difficulty().clone() + 1u64.into());
+        parent8b.set_difficulty(parent8.difficulty().clone() + 1u64);
         let mut parentb = parent.clone();
-        parentb.set_difficulty(parent.difficulty().clone() + 2u64.into());
+        parentb.set_difficulty(parent.difficulty().clone() + 2u64);
         parentb.set_parent_hash(parent8b.hash());
         let mut goodb = good.clone();
-        goodb.set_difficulty(good.difficulty().clone() + 3u64.into());
+        goodb.set_difficulty(good.difficulty().clone() + 3u64);
         goodb.set_parent_hash(parentb.hash());
 
         bc.insert(create_test_block(&goodb));
@@ -1184,15 +1184,15 @@ mod tests {
 
         // make branch2
         let mut parent7c = parent7.clone();
-        parent7c.set_difficulty(parent7.difficulty().clone() + 2u64.into());
+        parent7c.set_difficulty(parent7.difficulty().clone() + 2u64);
         let mut parent8c = parent8.clone();
-        parent8c.set_difficulty(parent8.difficulty().clone() + 4u64.into());
+        parent8c.set_difficulty(parent8.difficulty().clone() + 4u64);
         parent8c.set_parent_hash(parent7c.hash());
         let mut parentc = parent.clone();
-        parentc.set_difficulty(parent.difficulty().clone() + 6u64.into());
+        parentc.set_difficulty(parent.difficulty().clone() + 6u64);
         parentc.set_parent_hash(parent8c.hash());
         let mut goodc = good.clone();
-        goodc.set_difficulty(good.difficulty().clone() + 8u64.into());
+        goodc.set_difficulty(good.difficulty().clone() + 8u64);
         goodc.set_parent_hash(parentc.hash());
 
         bc.insert(create_test_block(&goodc));

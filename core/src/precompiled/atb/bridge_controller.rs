@@ -116,7 +116,9 @@ impl BridgeController {
         Ok(())
     }
 
-    fn is_ring_locked(&self, ext: &mut dyn BuiltinExt) -> bool { self.connector.get_ring_locked(ext) }
+    fn is_ring_locked(&self, ext: &mut dyn BuiltinExt) -> bool {
+        self.connector.get_ring_locked(ext)
+    }
 
     fn is_ring_member(&self, ext: &mut dyn BuiltinExt, address: H256) -> bool {
         self.connector.get_active_member(ext, address)
@@ -361,7 +363,12 @@ impl BridgeController {
         self.add_log(ext, topics);
     }
 
-    fn emit_successful_transaction_hash(&self, ext: &mut dyn BuiltinExt, aion_transaction_hash: H256) {
+    fn emit_successful_transaction_hash(
+        &self,
+        ext: &mut dyn BuiltinExt,
+        aion_transaction_hash: H256,
+    )
+    {
         let topics: Vec<H256> = vec![
             BridgeEventSig::SuccessfulTxHash.hash().into(),
             aion_transaction_hash,

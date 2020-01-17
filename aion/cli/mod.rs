@@ -842,9 +842,6 @@ mod tests {
             arg_log_config: Some("log/config.yaml".into()),
         };
 
-        println!("{:?}", args);
-        println!("{:?}", args_target);
-
         // then
         assert_eq!(args, args_target);
     }

@@ -371,7 +371,7 @@ fn evm_storage() {
         log_topics: Vec::new(),
         log_data: Vec::new(),
     };
-    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &Ext)) };
+    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &dyn Ext)) };
     instance.init(raw_env);
     println!("raw_ext = {:?}", raw_env);
 
@@ -397,7 +397,7 @@ fn evm_mstore() {
         log_topics: Vec::new(),
         log_data: Vec::new(),
     };
-    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &Ext)) };
+    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &dyn Ext)) };
     instance.init(raw_env);
 
     // first mstore, then mload
@@ -425,7 +425,7 @@ fn evm_log() {
         log_topics: Vec::new(),
         log_data: Vec::new(),
     };
-    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &Ext)) };
+    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &dyn Ext)) };
     instance.init(raw_env);
 
     // LOG0
@@ -471,7 +471,7 @@ fn blockhash() {
         log_topics: Vec::new(),
         log_data: Vec::new(),
     };
-    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &Ext)) };
+    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &dyn Ext)) };
     instance.init(raw_env);
 
     // 0x40
@@ -501,7 +501,7 @@ fn sha3() {
         log_topics: Vec::new(),
         log_data: Vec::new(),
     };
-    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &Ext)) };
+    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &dyn Ext)) };
     instance.init(raw_env);
 
     // 0x20: compute sha3(0xff)
@@ -535,7 +535,7 @@ fn invalid_gas() {
         log_topics: Vec::new(),
         log_data: Vec::new(),
     };
-    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &Ext)) };
+    let raw_env: *mut ::libc::c_void = unsafe { ::std::mem::transmute(Box::new(&ext as &dyn Ext)) };
     instance.init(raw_env);
     //let code = "d0d1188a00000000000000000000000000000032".from_hex().unwrap();
     // let code = vec![0x60, 0x50];

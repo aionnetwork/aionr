@@ -27,6 +27,7 @@ use std::str::FromStr;
 use serde::{Deserialize, Deserializer};
 use serde::de::{Error, Visitor, Unexpected};
 use aion_types::{U128, U256};
+use std::convert::TryInto;
 
 /// Lenient uint json deserialization for test json files.
 #[derive(
@@ -51,21 +52,21 @@ impl Into<U128> for Uint {
 }
 
 impl Into<u64> for Uint {
-    fn into(self) -> u64 { u64::from(self.0) }
+    fn into(self) -> u64 { self.0.as_u64() }
 }
 
 impl Into<u32> for Uint {
-    fn into(self) -> u32 { u64::from(self.0) as u32 }
+    fn into(self) -> u32 { self.0.as_u32() }
 }
 
 impl Into<usize> for Uint {
     fn into(self) -> usize {
         // TODO: clean it after util conversions refactored.
-        u64::from(self.0) as usize
+        self.0.as_usize()
     }
 }
 impl Into<u8> for Uint {
-    fn into(self) -> u8 { u64::from(self.0) as u8 }
+    fn into(self) -> u8 { self.0.try_into().unwrap_or_default() }
 }
 
 impl<'a> Deserialize<'a> for Uint {

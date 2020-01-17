@@ -260,7 +260,7 @@ impl DifficultyCalc {
                 .to_big_uint()
                 .into();
             if temp == parent_difficulty {
-                temp + 1u64.into()
+                temp + 1u64
             } else {
                 temp
             }

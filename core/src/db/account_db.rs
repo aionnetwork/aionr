@@ -62,7 +62,12 @@ impl Default for Factory {
 impl Factory {
     /// Create a read-only accountdb.
     /// This will panic when write operations are called.
-    pub fn readonly<'db>(&self, db: &'db dyn HashStore, address_hash: H256) -> Box<dyn HashStore + 'db> {
+    pub fn readonly<'db>(
+        &self,
+        db: &'db dyn HashStore,
+        address_hash: H256,
+    ) -> Box<dyn HashStore + 'db>
+    {
         match *self {
             Factory::Mangled => Box::new(AccountDB::from_hash(db, address_hash)),
             Factory::Plain => Box::new(Wrapping(db)),
@@ -70,7 +75,12 @@ impl Factory {
     }
 
     /// Create a new mutable hashdb.
-    pub fn create<'db>(&self, db: &'db mut dyn HashStore, address_hash: H256) -> Box<dyn HashStore + 'db> {
+    pub fn create<'db>(
+        &self,
+        db: &'db mut dyn HashStore,
+        address_hash: H256,
+    ) -> Box<dyn HashStore + 'db>
+    {
         match *self {
             Factory::Mangled => Box::new(AccountDBMut::from_hash(db, address_hash)),
             Factory::Plain => Box::new(WrappingMut(db)),

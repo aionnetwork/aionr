@@ -380,7 +380,7 @@ impl From<BlockImportError> for Error {
         match err {
             BlockImportError::Block(e) => Error::Block(e),
             BlockImportError::Import(e) => Error::Import(e),
-            BlockImportError::Other(s) => Error::Util(UtilError::from(s)),
+            BlockImportError::Other(s) => Error::Other(s),
         }
     }
 }

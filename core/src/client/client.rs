@@ -1228,7 +1228,7 @@ impl BlockChainClient for Client {
         fn binary_chop<F, E>(mut lower: U256, mut upper: U256, mut cond: F) -> Result<U256, E>
         where F: FnMut(U256) -> Result<bool, E> {
             while upper - lower > 1.into() {
-                let mid = (lower + upper) / 2.into();
+                let mid = (lower + upper) / 2;
                 trace!(target: "estimate_gas", "{} .. {} .. {}", lower, mid, upper);
                 let c = cond(mid)?;
                 match c {
@@ -1917,7 +1917,7 @@ fn transaction_receipt(
 
     let sender = tx.sender();
     let receipt = receipts.pop().expect("Current receipt is provided; qed");
-    let prior_gas_used = receipts.iter().fold(0.into(), |b, r| b + r.gas_used);
+    let prior_gas_used = receipts.iter().fold(U256::zero(), |b, r| b + r.gas_used);
     let no_of_logs = receipts
         .into_iter()
         .map(|receipt| receipt.logs().len())

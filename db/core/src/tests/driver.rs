@@ -21,8 +21,6 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate db;
-
 use db::{DBTransaction, DbRepository, KeyValueDB, RepositoryConfig, DatabaseConfig};
 use rand;
 use std::fs;

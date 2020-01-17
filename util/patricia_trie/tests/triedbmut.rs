@@ -16,7 +16,7 @@ use trie_standardmap::*;
 use aion_types::H256;
 
 fn populate_trie<'db>(
-    db: &'db mut HashStore,
+    db: &'db mut dyn HashStore,
     root: &'db mut H256,
     v: &[(Vec<u8>, Vec<u8>)],
 ) -> TrieDBMut<'db>

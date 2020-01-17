@@ -70,7 +70,12 @@ impl TotalCurrencyContract {
         }
     }
 
-    fn execute_update_total_balance(&self, ext: &mut dyn BuiltinExt, input: &[u8]) -> ExecutionResult {
+    fn execute_update_total_balance(
+        &self,
+        ext: &mut dyn BuiltinExt,
+        input: &[u8],
+    ) -> ExecutionResult
+    {
         if input.len() < 114 {
             return self.fail(String::from("internal error: input length < 114."));
         }

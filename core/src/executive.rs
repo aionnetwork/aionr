@@ -297,7 +297,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 match signal {
                     0 => debug!(target: "vm", "AVMExec: commit state"),
                     1 => debug!(target: "vm", "AVMExec: get state"),
-                    _ => println!("unknown signal"),
+                    _ => debug!(target: "vm", "AVMExec: unknown signal"),
                 }
                 signal = rx.recv().expect("Unable to receive from channel");
             }

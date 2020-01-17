@@ -118,8 +118,8 @@ fn main() {
     }
 }
 
-fn key_dir(location: &str) -> Result<Box<KeyDirectory>, Error> {
-    let dir: Box<KeyDirectory> = match location {
+fn key_dir(location: &str) -> Result<Box<dyn KeyDirectory>, Error> {
+    let dir: Box<dyn KeyDirectory> = match location {
         path if path.starts_with("aion") => {
             let chain = path.split('-').nth(1).unwrap_or("aion");
             let path = dir::aion(chain);

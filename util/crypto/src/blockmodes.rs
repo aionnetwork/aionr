@@ -1188,7 +1188,6 @@ mod test {
         NewEncFunc: FnMut() -> E,
         NewDecFunc: FnMut() -> D,
     {
-        use rand;
         use rand::Rng;
 
         //let tmp: &[_] = &[1, 2, 3, 4];

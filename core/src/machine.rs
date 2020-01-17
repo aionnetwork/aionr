@@ -168,7 +168,12 @@ impl EthereumMachine {
     /// Only returns references to activated built-ins.
     // TODO: builtin contract routing - to do this properly, it will require removing the built-in configuration-reading logic
     // from Spec into here and removing the Spec::builtins field.
-    pub fn builtin(&self, a: &Address, block_number: BlockNumber) -> Option<&Box<dyn BuiltinContract>> {
+    pub fn builtin(
+        &self,
+        a: &Address,
+        block_number: BlockNumber,
+    ) -> Option<&Box<dyn BuiltinContract>>
+    {
         self.builtins().get(a).and_then(|b| {
             if b.is_active(block_number) {
                 Some(b)

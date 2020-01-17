@@ -22,8 +22,6 @@
 
 #![warn(unused_extern_crates)]
 
-#[macro_use]
-extern crate error_chain;
 extern crate aion_types;
 extern crate rlp;
 extern crate rustc_hex;
@@ -64,16 +62,24 @@ impl std::error::Error for BaseDataError {
     fn description(&self) -> &str { "Error in database subsystem" }
 }
 
-error_chain! {
-    types {
-        UtilError, ErrorKind, ResultExt, Result;
-    }
+/// Util Error
+#[derive(Debug, derive_more::Display, derive_more::From)]
+pub enum UtilError {
+    Io(::std::io::Error),
+    FromHex(FromHexError),
+    Decoder(DecoderError),
+    BaseData(BaseDataError),
+    Db(db::Error),
+}
 
-    foreign_links {
-        Io(::std::io::Error);
-        FromHex(FromHexError);
-        Decoder(DecoderError);
-        BaseData(BaseDataError);
-        Db(db::Error);
+impl std::error::Error for UtilError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            UtilError::Io(err) => Some(err),
+            UtilError::FromHex(err) => Some(err),
+            UtilError::Decoder(err) => Some(err),
+            UtilError::BaseData(err) => Some(err),
+            UtilError::Db(err) => Some(err),
+        }
     }
 }

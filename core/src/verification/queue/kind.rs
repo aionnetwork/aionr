@@ -196,7 +196,11 @@ pub mod headers {
             verify_header_params(&input, engine, true).map(|_| input)
         }
 
-        fn verify(unverified: Self::Unverified, engine: &dyn Engine) -> Result<Self::Verified, Error> {
+        fn verify(
+            unverified: Self::Unverified,
+            engine: &dyn Engine,
+        ) -> Result<Self::Verified, Error>
+        {
             engine
                 .verify_block_unordered(&unverified)
                 .map(|_| unverified)

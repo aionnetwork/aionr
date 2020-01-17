@@ -28,10 +28,10 @@ use ethereum_types_serialize;
 
 use num_bigint::BigUint;
 
-construct_uint!(U64, 1);
-construct_uint!(U128, 2);
-construct_uint!(U256, 4);
-construct_uint!(U512, 8);
+construct_uint!(pub struct U64(1););
+construct_uint!(pub struct U128(2););
+construct_uint!(pub struct U256(4););
+construct_uint!(pub struct U512(8););
 
 impl U256 {
     /// Multiplies two 256-bit integers to produce full 512-bit integer
@@ -297,78 +297,6 @@ impl From<U128> for U256 {
         ret[0] = arr[0];
         ret[1] = arr[1];
         U256(ret)
-    }
-}
-
-impl From<U256> for u64 {
-    fn from(value: U256) -> u64 { value.as_u64() }
-}
-
-impl From<U256> for u32 {
-    fn from(value: U256) -> u32 { value.as_u32() }
-}
-
-impl<'a> From<&'a [u8; 32]> for U256 {
-    fn from(bytes: &[u8; 32]) -> Self { bytes[..].into() }
-}
-
-impl From<[u8; 32]> for U256 {
-    fn from(bytes: [u8; 32]) -> Self { bytes[..].as_ref().into() }
-}
-
-impl From<U256> for [u8; 32] {
-    fn from(number: U256) -> Self {
-        let mut arr = [0u8; 32];
-        number.to_big_endian(&mut arr);
-        arr
-    }
-}
-
-impl<'a> From<&'a [u8; 8]> for U64 {
-    fn from(bytes: &[u8; 8]) -> Self { bytes[..].into() }
-}
-
-impl From<[u8; 8]> for U64 {
-    fn from(bytes: [u8; 8]) -> Self { bytes[..].as_ref().into() }
-}
-
-impl From<U64> for [u8; 8] {
-    fn from(number: U64) -> Self {
-        let mut arr = [0u8; 8];
-        number.to_big_endian(&mut arr);
-        arr
-    }
-}
-
-impl<'a> From<&'a [u8; 16]> for U128 {
-    fn from(bytes: &[u8; 16]) -> Self { bytes[..].into() }
-}
-
-impl From<[u8; 16]> for U128 {
-    fn from(bytes: [u8; 16]) -> Self { bytes[..].as_ref().into() }
-}
-
-impl From<U128> for [u8; 16] {
-    fn from(number: U128) -> Self {
-        let mut arr = [0u8; 16];
-        number.to_big_endian(&mut arr);
-        arr
-    }
-}
-
-impl<'a> From<&'a [u8; 64]> for U512 {
-    fn from(bytes: &[u8; 64]) -> Self { bytes[..].into() }
-}
-
-impl From<[u8; 64]> for U512 {
-    fn from(bytes: [u8; 64]) -> Self { bytes[..].as_ref().into() }
-}
-
-impl From<U512> for [u8; 64] {
-    fn from(number: U512) -> Self {
-        let mut arr = [0u8; 64];
-        number.to_big_endian(&mut arr);
-        arr
     }
 }
 

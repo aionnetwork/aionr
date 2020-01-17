@@ -33,6 +33,8 @@ extern crate parking_lot;
 extern crate interleaved_ordered;
 extern crate heapsize;
 extern crate plain_hasher;
+#[cfg(test)]
+extern crate rand;
 
 mod mockkvdb;
 mod traits;

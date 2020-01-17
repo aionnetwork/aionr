@@ -7,5 +7,5 @@ authors = ["Aion Foundation <admin@aion.network>"]
 rlp = { path = "../rlp" }
 db = { path = "../../db/core" }
 aion-types = { path = "../../util/aion-types"}
-error-chain = { version = "0.12", default-features = false }
 rustc-hex = "1.0"
+derive_more = "0.14.0"

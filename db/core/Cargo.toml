@@ -11,7 +11,6 @@ log = "0.3"
 num_cpus = "1.0"
 parity-rocksdb = "0.5.0"
 multimap = "0.4.0"
-error-chain = { version = "0.12", default-features = false }
 regex = "0.2"
 blake2b = {path = "../../util/blake2b" }
 rlp = { version = "0.2.1", path = "../../util/rlp" }
@@ -19,6 +18,8 @@ parking_lot = "0.5"
 interleaved-ordered = "0.1.0"
 heapsize = "0.4"
 plain_hasher = { path = "../../util/plain_hasher" }
+
 [dev-dependencies]
 pretty_assertions = "0.1"
+rand = "0.4"
 macros = { path = "../../util/macros" }

@@ -1648,8 +1648,7 @@ pub mod test {
     {
         let gas_price = default_gas_price() + gas_price_increment;
         let unsigned_tx1 = new_unsigned_tx(default_nonce(), default_gas_val(), gas_price);
-        let unsigned_tx2 =
-            new_unsigned_tx(default_nonce() + 1.into(), default_gas_val(), gas_price);
+        let unsigned_tx2 = new_unsigned_tx(default_nonce() + 1, default_gas_val(), gas_price);
 
         let keypair = generate_keypair();
         let secret = &keypair.secret();
@@ -1736,7 +1735,7 @@ pub mod test {
         txq.add(tx1, &fetch_account).unwrap();
         txq.add(tx2, &fetch_account).unwrap();
         assert_eq!(txq.status().pending, 2);
-        assert_eq!(txq.last_nonce(&sender), Some(nonce + 1.into()));
+        assert_eq!(txq.last_nonce(&sender), Some(nonce + 1));
 
         // when
         let tx = new_tx(123.into(), 1.into(), TransactionOrigin::External);
@@ -2796,9 +2795,9 @@ pub mod test {
             let nonce = 123.into();
             let gas = default_gas_val();
             let tx = new_unsigned_tx(nonce, gas, 1.into());
-            let tx2 = new_unsigned_tx(nonce + 1.into(), gas, 1.into());
-            let tx2_2 = new_unsigned_tx(nonce + 1.into(), gas, 5.into());
-            let tx3 = new_unsigned_tx(nonce + 2.into(), gas, 1.into());
+            let tx2 = new_unsigned_tx(nonce + 1, gas, 1.into());
+            let tx2_2 = new_unsigned_tx(nonce + 1, gas, 5.into());
+            let tx3 = new_unsigned_tx(nonce + 2, gas, 1.into());
 
             (
                 tx.sign(secret),

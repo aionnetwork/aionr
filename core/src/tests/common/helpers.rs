@@ -45,6 +45,29 @@ use std::collections::BTreeMap;
 use db;
 use tests::common::TestBlockChainClient;
 
+#[allow(unused)]
+pub fn tests_logger_init() {
+    use log::{SetLoggerError,LogLevelFilter,LogMetadata,LogLevel,LogRecord};
+    struct SimpleLogger;
+
+    impl log::Log for SimpleLogger {
+        fn enabled(&self, metadata: &LogMetadata) -> bool { metadata.level() <= LogLevel::Trace }
+
+        fn log(&self, record: &LogRecord) {
+            if self.enabled(record.metadata()) {
+                println!("{} - {}", record.level(), record.args());
+            }
+        }
+    }
+    pub fn init() -> Result<(), SetLoggerError> {
+        ::log::set_logger(|max_log_level| {
+            max_log_level.set(LogLevelFilter::Trace);
+            Box::new(SimpleLogger)
+        })
+    }
+    init().unwrap()
+}
+
 pub fn make_aion_machine() -> EthereumMachine {
     EthereumMachine::regular(Default::default(), BTreeMap::new(), U256::zero())
 }
