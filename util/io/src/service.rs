@@ -566,7 +566,11 @@ where Message: Send + Sync + Clone + 'static
     }
 
     /// Regiter an IO handler with the event loop.
-    pub fn register_handler(&self, handler: Arc<dyn IoHandler<Message> + Send>) -> Result<(), IoError> {
+    pub fn register_handler(
+        &self,
+        handler: Arc<dyn IoHandler<Message> + Send>,
+    ) -> Result<(), IoError>
+    {
         self.host_channel.lock().send(IoMessage::AddHandler {
             handler: handler,
         })?;

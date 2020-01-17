@@ -1719,7 +1719,7 @@ pub mod test {
         // given
         let mut txq = TransactionQueue::with_limits(
             PrioritizationStrategy::GasPriceOnly,
-            16,
+            48,
             Mutex::new(IoService::<TxIoMessage>::start().unwrap().channel()),
         );
         let (tx1, tx2) = new_tx_pair(
@@ -1753,7 +1753,7 @@ pub mod test {
             by_priority: BTreeSet::new(),
             by_address: Table::new(),
             by_gas_price: Default::default(),
-            memory_limit: 8,
+            memory_limit: 24,
             memory_usage: 0,
         };
         let (tx1, tx2) = new_tx_pair_default(1.into(), 0.into(), TransactionOrigin::External);
@@ -2395,7 +2395,7 @@ pub mod test {
         // given
         let mut txq = TransactionQueue::with_limits(
             PrioritizationStrategy::GasPriceOnly,
-            8,
+            24,
             Mutex::new(IoService::<TxIoMessage>::start().unwrap().channel()),
         );
         let tx = new_tx(default_nonce(), 0.into(), TransactionOrigin::External);
@@ -2420,7 +2420,7 @@ pub mod test {
     fn should_limit_transactions() {
         let mut txq = TransactionQueue::with_limits(
             PrioritizationStrategy::GasPriceOnly,
-            8,
+            24,
             Mutex::new(IoService::<TxIoMessage>::start().unwrap().channel()),
         );
         let (tx1, tx2) = new_tx_pair_default(4.into(), 1.into(), TransactionOrigin::External);

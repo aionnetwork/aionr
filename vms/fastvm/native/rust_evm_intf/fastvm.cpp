@@ -210,6 +210,7 @@ extern "C" {
 
     uint8_t *buf = (uint8_t *)malloc(info.output_size);
     memcpy(buf, output_ptr, info.output_size);;
+    free(output_ptr);
 
     result->output_data = buf;
 
@@ -307,6 +308,10 @@ extern "C" {
     return 0;
   }
 
+  uint8_t *vm_alloc_data(int32_t size) {
+    return (uint8_t *)malloc(size);
+  }
+
   void parse_context(char *b, struct evm_message *msg, struct evm_tx_context *ctx)
   {
     unsigned address_len = 32;
@@ -351,8 +356,6 @@ extern "C" {
   int fastvm_run(struct evm_instance *inst, const unsigned char code[], const unsigned len, char context[], int rev, struct rust_vm_result *result)
   {
     uint32_t idx = 0;
-
-    //DBG_DUMP_CODE_INFO
     
     struct evm_message msg;
     parse_context(context, &msg, &ctx);
@@ -368,13 +371,11 @@ extern "C" {
     do_keccak((const uint8_t*) code, len, msg.code_hash.bytes);
     struct evm_result evm_result = inst->execute(inst, &vm_context, (enum evm_revision)rev, &msg,
                                                  (uint8_t *)code, len);
-    //DBG_DUMP_RESULT
 
     result->status_code = evm_result.status_code;
     result->gas_left = evm_result.gas_left;
     result->output_size = evm_result.output_size;
     debug("evm execution result's gas left = %d\n", result->gas_left);
-    //memcpy(result->output_data, evm_result.output_data, result->output_size * sizeof(uint8_t));
     for (idx = 0; idx < result->output_size; idx++) {
       result->output_data[idx] = evm_result.output_data[idx];
     }
@@ -385,21 +386,15 @@ extern "C" {
     if (recv_idx == -1)
       curr_recv_addr.filled = 0;
 
-    // release
-#if 1
     if (evm_result.release) {
       evm_result.release(&evm_result);
     }
-#endif
-    //inst->destroy(inst);
     return 0;
   }
 
 #if __cplusplus
 }
 #endif
-
-
 
 
 /**

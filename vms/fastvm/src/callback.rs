@@ -245,8 +245,12 @@ pub extern fn call(obj: *mut libc::c_void, info: *mut u8, msg: *const u8) -> *co
     result_info.status_code = result.status_code.into();
     result_info.output_size = result.return_data.len();
     debug!(target: "vm", "output_data: {:?}", result.return_data);
-    if result_info.output_size > 0 {
-        result_info.output_data = unsafe { ::std::mem::transmute(&result.return_data[0]) };
+
+    result_info.output_data = unsafe { vm_alloc_data(result_info.output_size as i32) };
+    for idx in 0..result_info.output_size {
+        unsafe {
+            *result_info.output_data.add(idx) = result.return_data[idx];
+        }
     }
     result_info.output_data
 }
@@ -264,6 +268,7 @@ pub extern fn test_fn() {
 
 #[link(name = "fastvm")]
 extern {
+    pub fn vm_alloc_data(size: i32) -> *mut u8;
     // below two are reserved for `cargo rum --example callback`
     pub fn register_callback(func: extern fn());
     // use single resiter func, since each func type differs

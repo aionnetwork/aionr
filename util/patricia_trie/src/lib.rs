@@ -278,7 +278,12 @@ impl TrieFactory {
     }
 
     /// Create new mutable instance of Trie.
-    pub fn create<'db>(&self, db: &'db mut dyn HashStore, root: &'db mut H256) -> Box<dyn TrieMut + 'db> {
+    pub fn create<'db>(
+        &self,
+        db: &'db mut dyn HashStore,
+        root: &'db mut H256,
+    ) -> Box<dyn TrieMut + 'db>
+    {
         match self.spec {
             TrieSpec::Generic => Box::new(TrieDBMut::new(db, root)),
             TrieSpec::Secure => Box::new(SecTrieDBMut::new(db, root)),

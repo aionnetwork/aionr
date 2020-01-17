@@ -48,7 +48,11 @@ pub fn import_account(path: &Path, dst: &dyn KeyDirectory) -> Result<Address, Er
 }
 
 /// Import all accounts from one directory to the other.
-pub fn import_accounts(src: &dyn KeyDirectory, dst: &dyn KeyDirectory) -> Result<Vec<Address>, Error> {
+pub fn import_accounts(
+    src: &dyn KeyDirectory,
+    dst: &dyn KeyDirectory,
+) -> Result<Vec<Address>, Error>
+{
     let accounts = src.load()?;
     let existing_accounts = dst
         .load()?

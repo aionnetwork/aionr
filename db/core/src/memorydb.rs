@@ -59,7 +59,11 @@ impl MemoryDB {
 
     pub fn get_by_prefix(&self, _prefix: &[u8]) -> Option<Box<[u8]>> { unimplemented!() }
 
-    pub fn iter_from_prefix(&self, _prefix: &[u8]) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)>> {
+    pub fn iter_from_prefix(
+        &self,
+        _prefix: &[u8],
+    ) -> Box<dyn Iterator<Item = (Box<[u8]>, Box<[u8]>)>>
+    {
         unimplemented!()
     }
 
