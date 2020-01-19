@@ -21,7 +21,6 @@
  ******************************************************************************/
 
 #![warn(unused_extern_crates)]
-extern crate siphasher;
 
 use std::cmp;
 use std::mem;

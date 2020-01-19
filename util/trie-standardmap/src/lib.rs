@@ -24,9 +24,6 @@
 //! Key-value datastore with a modified Merkle tree.
 
 extern crate acore_bytes as bytes;
-extern crate aion_types;
-extern crate blake2b;
-extern crate rlp;
 
 use bytes::Bytes;
 use aion_types::H256;

@@ -6,6 +6,7 @@ name = "aion-version"
 version = "1.1.0"
 authors = ["Aion Foundation <admin@aion.network>"]
 build = "build.rs"
+edition = "2018"
 
 [dependencies]
 target_info = "0.1"

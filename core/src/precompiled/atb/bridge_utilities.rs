@@ -27,8 +27,8 @@ use bytebuffer::ByteBuffer;
 use blake2b::blake2b;
 use aion_types::H256;
 
-use precompiled::atb::bridge_transfer::{BridgeTransfer, TRANSFER_SIZE};
-use precompiled::precompiled_utilities::{WORD_LENGTH, HALF_WORD_LENGTH, pad};
+use crate::precompiled::atb::bridge_transfer::{BridgeTransfer, TRANSFER_SIZE};
+use crate::precompiled::precompiled_utilities::{WORD_LENGTH, HALF_WORD_LENGTH, pad};
 
 pub fn to_signature(func_signature: &str) -> [u8; 4] {
     let mut sig_chopped: [u8; 4] = [0u8; 4];
@@ -104,9 +104,9 @@ mod tests {
         to_signature, to_event_signature, get_signature, or_default_word, or_default_d_word,
         boolean_to_result_bytes, int_to_result_bytes, compute_bundle_hash,
 };
-    use precompiled::precompiled_utilities::{WORD_LENGTH, HALF_WORD_LENGTH};
+    use crate::precompiled::precompiled_utilities::{WORD_LENGTH, HALF_WORD_LENGTH};
     use num_bigint::ToBigInt;
-    use precompiled::atb::bridge_transfer::{BridgeTransfer, get_instance};
+    use crate::precompiled::atb::bridge_transfer::{BridgeTransfer, get_instance};
 
     #[test]
     fn test_to_signature() {

@@ -22,7 +22,7 @@
 
 //! Misc deserialization.
 
-use hash;
+use crate::hash;
 
 /// Collected account metadata
 #[derive(Default, Clone, Debug, PartialEq, Serialize, Deserialize)]

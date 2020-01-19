@@ -19,7 +19,7 @@
  *
  ******************************************************************************/
 
-use msg::ChannelBuffer;
+use crate::msg::ChannelBuffer;
 
 pub trait Callable: Sync + Send {
     fn handle(&self, hash: u64, cb: ChannelBuffer);

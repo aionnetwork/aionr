@@ -26,19 +26,19 @@ use std::collections::{HashMap, VecDeque};
 
 use parking_lot::{Mutex, RwLock};
 
-use engine::unity_engine::UnityEngine;
-use header::Header;
+use crate::engine::unity_engine::UnityEngine;
+use crate::header::Header;
 use acore_bytes::to_hex;
 use aion_types::U256;
-use client::{BlockChainClient, BlockId};
+use crate::client::{BlockChainClient, BlockId};
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use p2p::{ChannelBuffer, Mgr, Node};
-use sync::action::Action;
-use sync::wrappers::{HeadersWrapper};
-use sync::node_info::{NodeInfo, Mode};
-use sync::storage::SyncStorage;
+use crate::sync::action::Action;
+use crate::sync::wrappers::{HeadersWrapper};
+use crate::sync::node_info::{NodeInfo, Mode};
+use crate::sync::storage::SyncStorage;
 use rand::{thread_rng, Rng};
 
 use super::{channel_buffer_template,channel_buffer_template_with_version};

@@ -21,29 +21,28 @@
  ******************************************************************************/
 
 use aion_types::{H256, U256};
-use account_provider::AccountProvider;
-use block::{OpenBlock, Drain};
-use blockchain::{BlockChain};
-use types::blockchain::config::Config as BlockChainConfig;
+use crate::account_provider::AccountProvider;
+use crate::block::{OpenBlock, Drain};
+use crate::blockchain::{BlockChain};
+use crate::types::blockchain::config::Config as BlockChainConfig;
 use acore_bytes::Bytes;
-use client::{BlockChainClient, ChainNotify, Client, ClientConfig};
+use crate::client::{BlockChainClient, ChainNotify, Client, ClientConfig};
 use key::{Ed25519Secret, Ed25519KeyPair};
-use header::{Header, SealType};
-use transaction::{Action, Transaction, SignedTransaction};
-use views::BlockView;
+use crate::header::{Header, SealType};
+use crate::transaction::{Action, Transaction, SignedTransaction, DEFAULT_TRANSACTION_TYPE};
+use crate::views::BlockView;
 use io::*;
-use miner::{Miner, MinerService};
+use crate::miner::{Miner, MinerService};
 use parking_lot::RwLock;
 use rlp::{self, RlpStream};
-use spec::*;
-use db::StateDB;
-use state::*;
+use crate::spec::*;
+use crate::db::{self,StateDB};
+use crate::state::*;
 use std::sync::Arc;
 use kvdb::{MockDbRepository, DBTransaction, KeyValueDB};
-use machine::EthereumMachine;
+use crate::machine::EthereumMachine;
 use std::collections::BTreeMap;
-use db;
-use tests::common::TestBlockChainClient;
+use crate::tests::common::TestBlockChainClient;
 
 #[allow(unused)]
 pub fn tests_logger_init() {
@@ -264,7 +263,7 @@ where
                     action: Action::Create,
                     data: vec![],
                     value: U256::zero(),
-                    transaction_type: ::transaction::DEFAULT_TRANSACTION_TYPE,
+                    transaction_type: DEFAULT_TRANSACTION_TYPE,
                     nonce_bytes: Vec::new(),
                     gas_price_bytes: Vec::new(),
                     gas_bytes: Vec::new(),
@@ -464,19 +463,19 @@ pub fn generate_dummy_empty_blockchain() -> BlockChain {
     bc
 }
 
-pub fn get_temp_state() -> State<::db::StateDB> {
+pub fn get_temp_state() -> State<StateDB> {
     let journal_db = get_temp_state_db();
     State::new(
         journal_db,
         U256::from(0),
         Default::default(),
         Arc::new(MockDbRepository::init(vec![String::from(
-            ::db::COL_AVM_GRAPH,
+            db::COL_AVM_GRAPH,
         )])),
     )
 }
 
-pub fn get_temp_state_with_nonce() -> State<::db::StateDB> {
+pub fn get_temp_state_with_nonce() -> State<StateDB> {
     let journal_db = get_temp_state_db();
     State::new(
         journal_db,
@@ -488,7 +487,7 @@ pub fn get_temp_state_with_nonce() -> State<::db::StateDB> {
 
 pub fn get_temp_state_db() -> StateDB {
     let db = new_db();
-    let journal_db = ::journaldb::new(db, ::journaldb::Algorithm::OverlayRecent, ::db::COL_STATE);
+    let journal_db = ::journaldb::new(db, ::journaldb::Algorithm::OverlayRecent, db::COL_STATE);
     StateDB::new(journal_db, 5 * 1024 * 1024)
 }
 

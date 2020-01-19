@@ -32,18 +32,18 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
 use std::sync::Arc;
 
-use types::error::Error;
-use types::executed::{Executed, ExecutionError};
-use executive::Executive;
-use factory::Factories;
-use factory::VmFactory;
-use machine::EthereumMachine as Machine;
-use pod_account::*;
-use pod_state::{self, PodState};
-use receipt::Receipt;
-use db::StateDB;
-use transaction::{SignedTransaction, Action};
-use types::state::state_diff::StateDiff;
+use crate::types::error::Error;
+use crate::types::executed::{Executed, ExecutionError};
+use crate::executive::Executive;
+use crate::factory::Factories;
+use crate::factory::VmFactory;
+use crate::machine::EthereumMachine as Machine;
+use crate::pod_account::*;
+use crate::pod_state::{self, PodState};
+use crate::receipt::Receipt;
+use crate::db::StateDB;
+use crate::transaction::{SignedTransaction, Action};
+use crate::types::state::state_diff::StateDiff;
 use vms::EnvInfo;
 use vms::AvmStatusCode;
 
@@ -64,7 +64,7 @@ pub mod backend;
 #[cfg(test)]
 mod tests;
 
-pub use state::account::{
+pub use crate::state::account::{
     AionVMAccount,
     VMAccount,
     AccType,

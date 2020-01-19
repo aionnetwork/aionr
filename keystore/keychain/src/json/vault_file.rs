@@ -48,7 +48,7 @@ impl VaultFile {
 #[cfg(test)]
 mod test {
     use serde_json;
-    use json::{VaultFile, Crypto, Cipher, Aes128Ctr, Kdf, Pbkdf2, Prf};
+    use crate::json::{VaultFile, Crypto, Cipher, Aes128Ctr, Kdf, Pbkdf2, Prf};
 
     #[test]
     fn to_and_from_json() {

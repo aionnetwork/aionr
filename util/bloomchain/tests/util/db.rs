@@ -21,8 +21,8 @@
  ******************************************************************************/
 
 use std::collections::HashMap;
-use bloomchain::{Position, Bloom, BloomDatabase};
-use bloomchain::group::{GroupPosition, BloomGroup, BloomGroupDatabase};
+use crate::bloomchain::{Position, Bloom, BloomDatabase};
+use crate::bloomchain::group::{GroupPosition, BloomGroup, BloomGroupDatabase};
 
 #[derive(Default)]
 pub struct BloomMemoryDatabase {

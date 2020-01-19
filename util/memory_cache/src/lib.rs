@@ -25,9 +25,6 @@
 //! crate.
 // TODO: push changes upstream in a clean way.
 
-extern crate heapsize;
-extern crate lru_cache;
-
 use heapsize::HeapSizeOf;
 use lru_cache::LruCache;
 

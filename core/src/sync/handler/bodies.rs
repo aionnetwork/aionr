@@ -22,17 +22,17 @@
 use std::sync::Arc;
 use std::time::SystemTime;
 
-use block::Block;
-use client::{BlockId, BlockChainClient};
+use crate::block::Block;
+use crate::client::{BlockId, BlockChainClient};
 use aion_types::H256;
 use bytes::BufMut;
 use rlp::{RlpStream, UntrustedRlp};
 use p2p::{ChannelBuffer, Mgr};
-use sync::action::Action;
-use sync::storage::SyncStorage;
-use sync::wrappers::{HeadersWrapper, BlocksWrapper};
-use header::Header;
-use engine::UnityEngine;
+use crate::sync::action::Action;
+use crate::sync::storage::SyncStorage;
+use crate::sync::wrappers::{HeadersWrapper, BlocksWrapper};
+use crate::header::Header;
+use crate::engine::UnityEngine;
 
 use super::{channel_buffer_template,channel_buffer_template_with_version};
 

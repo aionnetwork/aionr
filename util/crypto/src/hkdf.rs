@@ -8,11 +8,11 @@
 //! Derivation Function as specified by  https://tools.ietf.org/html/rfc5869.
 
 use std::iter::repeat;
-use cryptoutil::copy_memory;
+use crate::cryptoutil::copy_memory;
 
-use digest::Digest;
-use hmac::Hmac;
-use mac::Mac;
+use crate::digest::Digest;
+use crate::hmac::Hmac;
+use crate::mac::Mac;
 
 /// Execute the HKDF-Extract function.  Applications MUST NOT use this for
 /// password hashing.
@@ -70,10 +70,10 @@ pub fn hkdf_expand<D: Digest>(mut digest: D, prk: &[u8], info: &[u8], okm: &mut 
 mod test {
     use std::iter::repeat;
 
-    use digest::Digest;
-    use sha1::Sha1;
-    use sha2::Sha256;
-    use hkdf::{hkdf_extract, hkdf_expand};
+    use crate::digest::Digest;
+    use crate::sha1::Sha1;
+    use crate::sha2::Sha256;
+    use crate::hkdf::{hkdf_extract, hkdf_expand};
 
     struct TestVector<D: Digest> {
         digest: D,

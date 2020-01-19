@@ -5,6 +5,7 @@ license = "GPL-3.0"
 name = "acore"
 version = "0.1.0"
 authors = ["Aion Foundation <admin@aion.network>"]
+edition = "2018"
 
 [dependencies]
 ansi_term = "0.10"

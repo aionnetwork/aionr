@@ -1,5 +1,5 @@
 use std::{u16, u32, u64, u8};
-use avm::{NativeEncoder, NativeDecoder};
+use crate::avm::{NativeEncoder, NativeDecoder};
 
 use super::EnvInfo;
 

@@ -19,8 +19,8 @@
  *
  ******************************************************************************/
 
-use header::Header;
-use types::error::{BlockError, Error};
+use crate::header::Header;
+use crate::types::error::{BlockError, Error};
 use unexpected::{Mismatch, OutOfBounds};
 
 pub trait DependentHeaderValidator {

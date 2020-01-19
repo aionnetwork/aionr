@@ -23,7 +23,7 @@
 use std::sync::Arc;
 use acore::account_provider::AccountProvider;
 use jsonrpc_core::Error;
-use helpers::errors;
+use crate::helpers::errors;
 
 pub fn unwrap_provider(
     provider: &Option<Arc<AccountProvider>>,

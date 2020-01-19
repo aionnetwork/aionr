@@ -25,13 +25,12 @@
 
 #[cfg(feature = "std")]
 extern crate core;
-extern crate blake2b;
+
 #[macro_use]
 extern crate fixed_hash;
 #[cfg(feature = "serialize")]
 extern crate ethereum_types_serialize;
-#[cfg(feature = "serialize")]
-extern crate serde;
+
 #[macro_use]
 extern crate crunchy;
 #[cfg(feature = "serialize")]

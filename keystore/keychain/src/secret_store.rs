@@ -24,10 +24,10 @@ use std::hash::{Hash, Hasher};
 use std::path::PathBuf;
 use std::cmp::Ordering;
 use key::{Address, Ed25519Signature, Ed25519Secret, Message, sign_ed25519};
-use Error;
-use json::{Uuid, OpaqueKeyFile};
+use crate::Error;
+use crate::json::{Uuid, OpaqueKeyFile};
 use aion_types::H256;
-use OpaqueSecretEd25519;
+use crate::OpaqueSecretEd25519;
 
 /// Stored account reference
 #[derive(Debug, Clone, PartialEq, Eq, Ord)]

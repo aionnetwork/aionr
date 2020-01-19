@@ -21,7 +21,7 @@
 
 use aion_types::{Address, H256, U256};
 use vms::{ExecStatus, ReturnData, ExecutionResult};
-use precompiled::builtin::{BuiltinContract, BuiltinExt, BuiltinParams};
+use crate::precompiled::builtin::{BuiltinContract, BuiltinExt, BuiltinParams};
 use super::bridge_controller::BridgeController;
 use super::bridge_deserializer::{
     parse_address_from_call, parse_address_list, parse_bundle_request, parse_double_word_from_call,
@@ -345,21 +345,22 @@ mod test {
     use blake2b::{Blake2b, blake2b};
     use aion_types::{Address, H256, U256};
     use vms::ExecStatus;
-    use executive::contract_address;
+    use crate::executive::contract_address;
     use fastvm::basetypes::DataWord;
     use key::{Ed25519KeyPair, generate_keypair, public_to_address_ed25519};
     use num_bigint::{BigInt, Sign, ToBigInt};
-    use precompiled::atb::{bridge_event_sig, bridge_func_sig, bridge_transfer, bridge_utilities};
-    use precompiled::atb::bridge_event_sig::BridgeEventSig;
-    use precompiled::atb::bridge_transfer::{get_instance, BridgeTransfer};
-    use precompiled::atb::bridge_utilities::compute_bundle_hash;
-    use precompiled::builtin::{
+    use crate::precompiled::atb::{bridge_event_sig, bridge_func_sig, bridge_transfer, bridge_utilities};
+    use crate::precompiled::atb::bridge_event_sig::BridgeEventSig;
+    use crate::precompiled::atb::bridge_transfer::{get_instance, BridgeTransfer};
+    use crate::precompiled::atb::bridge_utilities::compute_bundle_hash;
+    use crate::precompiled::builtin::{
         BuiltinContext, BuiltinContract, BuiltinExt, BuiltinExtImpl, BuiltinParams,
 };
     use rustc_hex::FromHex;
-    use state::{State, Substate};
+    use crate::state::{State, Substate};
     use super::{*};
-    use helpers::get_temp_state;
+    use crate::helpers::get_temp_state;
+    use crate::db::StateDB;
 
     lazy_static! {
         static ref OWNER_ADDRESS: Address =
@@ -396,9 +397,9 @@ mod test {
     fn get_contract() -> TokenBridgeContract { TokenBridgeContract::new(builtin_params()) }
 
     fn get_ext<'a>(
-        state: &'a mut State<::db::StateDB>,
+        state: &'a mut State<StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::db::StateDB>
+    ) -> BuiltinExtImpl<'a, StateDB>
     {
         let ext = BuiltinExtImpl::new(
             state,
@@ -459,9 +460,9 @@ mod test {
     }
 
     fn get_ext_zero_sender<'a>(
-        state: &'a mut State<::db::StateDB>,
+        state: &'a mut State<StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::db::StateDB>
+    ) -> BuiltinExtImpl<'a, StateDB>
     {
         let ext = BuiltinExtImpl::new(
             state,
@@ -477,9 +478,9 @@ mod test {
     }
 
     fn get_ext_default<'a>(
-        state: &'a mut State<::db::StateDB>,
+        state: &'a mut State<StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::db::StateDB>
+    ) -> BuiltinExtImpl<'a, StateDB>
     {
         let ext = BuiltinExtImpl::new(
             state,

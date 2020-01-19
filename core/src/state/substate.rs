@@ -23,7 +23,7 @@
 //! Execution environment substate.
 use std::collections::HashSet;
 use aion_types::{U256, Address};
-use log_entry::LogEntry;
+use crate::log_entry::LogEntry;
 use super::CleanupMode;
 
 /// State changes which should be applied in finalize,

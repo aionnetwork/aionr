@@ -23,11 +23,11 @@
 use std::collections::HashMap;
 use std::ops::Range;
 use bloom::Bloom;
-use chain::BloomChain;
-use config::Config;
-use number::Number;
-use filter::Filter;
-use position::Position as BloomPosition;
+use crate::chain::BloomChain;
+use crate::config::Config;
+use crate::number::Number;
+use crate::filter::Filter;
+use crate::position::Position as BloomPosition;
 use super::{GroupDatabaseBridge, BloomGroupDatabase, BloomGroup, GroupPosition};
 use super::position::Manager as PositionManager;
 

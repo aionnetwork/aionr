@@ -22,29 +22,29 @@
 
 use std::time::Duration;
 
-use state::BasicAccount;
-use block::{OpenBlock, SealedBlock, ClosedBlock};
-use blockchain::TreeRoute;
-use encoded;
-use types::error::{ImportResult, CallError, BlockImportError};
-use factory::VmFactory;
-use executive::Executed;
-use filter::Filter;
-use header::{BlockNumber, SealType, Header};
-use log_entry::LocalizedLogEntry;
-use receipt::LocalizedReceipt;
-use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction};
-use verification::queue::QueueInfo as BlockQueueInfo;
+use crate::state::BasicAccount;
+use crate::block::{OpenBlock, SealedBlock, ClosedBlock};
+use crate::blockchain::TreeRoute;
+use crate::encoded;
+use crate::types::error::{ImportResult, CallError, BlockImportError};
+use crate::factory::VmFactory;
+use crate::executive::Executed;
+use crate::filter::Filter;
+use crate::header::{BlockNumber, SealType, Header};
+use crate::log_entry::LocalizedLogEntry;
+use crate::receipt::LocalizedReceipt;
+use crate::transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction};
+use crate::verification::queue::QueueInfo as BlockQueueInfo;
 use aion_types::{H256, H128, U256, Address};
 use vms::LastHashes;
 use acore_bytes::Bytes;
 use num_bigint::BigUint;
 
-use types::ids::*;
-use types::call_analytics::CallAnalytics;
-use types::blockchain::info::BlockChainInfo;
-use types::block::status::BlockStatus;
-use types::pruning_info::PruningInfo;
+use crate::types::ids::*;
+use crate::types::call_analytics::CallAnalytics;
+use crate::types::blockchain::info::BlockChainInfo;
+use crate::types::block::status::BlockStatus;
+use crate::types::pruning_info::PruningInfo;
 
 use super::super::transaction::UnverifiedTransaction;
 
@@ -54,7 +54,7 @@ pub trait BlockChainClient: Sync + Send {
     fn block_header(&self, id: BlockId) -> Option<encoded::Header>;
 
     /// Get raw block header data by block hash.
-    fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header>;
+    fn block_header_data(&self, hash: &H256) -> Option<encoded::Header>;
 
     /// Look up the block number for the given block ID.
     fn block_number(&self, id: BlockId) -> Option<BlockNumber>;

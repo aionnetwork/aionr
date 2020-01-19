@@ -218,11 +218,11 @@ mod tests {
     use aion_types::{H128, U128, H256, U256, Address};
     use vms::ExecStatus;
     use super::TotalCurrencyContract;
-    use precompiled::builtin::{BuiltinParams, BuiltinContract, BuiltinExt, BuiltinContext};
+    use crate::precompiled::builtin::{BuiltinParams, BuiltinContract, BuiltinExt, BuiltinContext};
     use key::{sign_ed25519, Ed25519Secret, Ed25519KeyPair};
     use std::str::FromStr;
     use acore_bytes::to_hex;
-    use log_entry::LogEntry;
+    use crate::log_entry::LogEntry;
 
     struct TestBuiltinExt {
         map: BTreeMap<H128, H128>,

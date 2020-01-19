@@ -47,8 +47,8 @@ assert_eq!(hex, "3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe2451143153
 
 use std::cmp;
 
-use digest::Digest;
-use cryptoutil::{write_u64v_le, read_u64v_le, zero};
+use crate::digest::Digest;
+use crate::cryptoutil::{write_u64v_le, read_u64v_le, zero};
 
 const B: usize = 200;
 const NROUNDS: usize = 24;
@@ -420,8 +420,8 @@ impl Clone for Sha3 {
 
 #[cfg(test)]
 mod tests {
-    use digest::Digest;
-    use sha3::{Sha3, Sha3Mode};
+    use crate::digest::Digest;
+    use crate::sha3::{Sha3, Sha3Mode};
     use serialize::hex::{FromHex, ToHex};
 
     struct Test {

@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use std::collections::HashMap;
-use precompiled::atb::bridge_utilities::to_signature;
+use crate::precompiled::atb::bridge_utilities::to_signature;
 
 pub enum BridgeFuncSig {
     ChangeOwner,

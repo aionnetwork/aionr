@@ -4,8 +4,8 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use buffer::{BufferResult, RefReadBuffer, RefWriteBuffer};
-use cryptoutil::symm_enc_or_dec;
+use crate::buffer::{BufferResult, RefReadBuffer, RefWriteBuffer};
+use crate::cryptoutil::symm_enc_or_dec;
 
 pub trait BlockEncryptor {
     fn block_size(&self) -> usize;

@@ -205,7 +205,7 @@ impl KeyFile {
 mod tests {
     use std::str::FromStr;
     use serde_json;
-    use json::{KeyFile, Uuid, Version, Crypto, Cipher, Aes128Ctr, Kdf, Pbkdf2, Prf};
+    use crate::json::{KeyFile, Uuid, Version, Crypto, Cipher, Aes128Ctr, Kdf, Pbkdf2, Prf};
 
     #[test]
     fn basic_keyfile() {

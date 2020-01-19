@@ -27,12 +27,12 @@ use parking_lot::{Mutex, RwLock};
 use std::time::{Instant, Duration};
 
 use crypto::KEY_ITERATIONS;
-use random::Random;
-use ethkey::{Ed25519KeyPair, Ed25519Secret, Ed25519Signature, Address, Message};
-use accounts_dir::{KeyDirectory, VaultKeyDirectory, VaultKey, SetKeyError};
-use account::SafeAccount;
-use json::{Uuid, OpaqueKeyFile};
-use {Error, SimpleSecretStore, SecretStore, StoreAccountRef, OpaqueSecretEd25519};
+use crate::random::Random;
+use crate::ethkey::{Ed25519KeyPair, Ed25519Secret, Ed25519Signature, Address, Message};
+use crate::accounts_dir::{KeyDirectory, VaultKeyDirectory, VaultKey, SetKeyError};
+use crate::account::SafeAccount;
+use crate::json::{Uuid, OpaqueKeyFile};
+use crate::{Error, SimpleSecretStore, SecretStore, StoreAccountRef, OpaqueSecretEd25519};
 
 /// Accounts store.
 pub struct EthStore {

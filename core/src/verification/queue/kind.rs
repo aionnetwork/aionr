@@ -21,9 +21,9 @@
  ******************************************************************************/
 
 //! Definition of valid items for the verification queue.
-use engine::Engine;
-use types::error::Error;
-use header::SealType;
+use crate::engine::Engine;
+use crate::types::error::Error;
+use crate::header::SealType;
 
 use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
@@ -77,10 +77,10 @@ pub trait Kind: 'static + Sized + Send + Sync {
 pub mod blocks {
     use super::{Kind, BlockLike};
 
-    use engine::Engine;
-    use types::error::{Error, BlockError};
-    use header::{Header,SealType};
-    use verification::{PreverifiedBlock, verify_block_basic, verify_block_unordered};
+    use crate::engine::Engine;
+    use crate::types::error::{Error, BlockError};
+    use crate::header::{Header,SealType};
+    use crate::verification::{PreverifiedBlock, verify_block_basic, verify_block_unordered};
 
     use heapsize::HeapSizeOf;
     use aion_types::{H256, U256};
@@ -129,7 +129,7 @@ pub mod blocks {
     impl Unverified {
         /// Create an `Unverified` from raw bytes.
         pub fn new(bytes: Bytes) -> Self {
-            use views::BlockView;
+            use crate::views::BlockView;
 
             let header = BlockView::new(&bytes).header();
             Unverified {
@@ -170,10 +170,10 @@ pub mod blocks {
 pub mod headers {
     use super::{Kind, BlockLike};
 
-    use engine::Engine;
-    use types::error::Error;
-    use header::{Header,SealType};
-    use verification::verify_header_params;
+    use crate::engine::Engine;
+    use crate::types::error::Error;
+    use crate::header::{Header,SealType};
+    use crate::verification::verify_header_params;
 
     use aion_types::{H256, U256};
 

@@ -28,8 +28,8 @@ use heapsize::HeapSizeOf;
 use rlp::*;
 use acore_bytes::Bytes;
 
-use types::BlockNumber;
-use log_entry::{LogEntry, LocalizedLogEntry};
+use crate::types::BlockNumber;
+use crate::log_entry::{LogEntry, LocalizedLogEntry};
 
 /// Simple information describing execution of a transaction for syncing
 /// use.

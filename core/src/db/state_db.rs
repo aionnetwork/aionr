@@ -29,13 +29,13 @@ use memory_cache::MemoryLruCache;
 use journaldb::JournalDB;
 use kvdb::{KeyValueDB, DBTransaction, HashStore};
 use aion_types::{H256, Address};
-use state::{self, AionVMAccount};
-use header::BlockNumber;
+use crate::state::{self, AionVMAccount};
+use crate::header::BlockNumber;
 use blake2b::blake2b;
 use parking_lot::Mutex;
 use util_error::UtilError;
 use bloom_journal::{Bloom, BloomJournal};
-use db::COL_ACCOUNT_BLOOM;
+use crate::db::COL_ACCOUNT_BLOOM;
 use byteorder::{LittleEndian, ByteOrder};
 
 /// Number of bytes allocated in the memory for accounts bloom.
@@ -519,7 +519,7 @@ impl state::Backend for StateDB {
 
 /// Sync wrapper for the account.
 struct SyncAccount(Option<AionVMAccount>);
-/// That implementation is safe because account is never modified or accessed in any way.
+/// That implementation is safe because crate::account is never modified or accessed in any way.
 /// We only need `Sync` here to allow `StateDb` to be kept in a `RwLock`.
 /// `AionVNAccount` is `!Sync` by default because of `RefCell`s inside it.
 unsafe impl Sync for SyncAccount {}
@@ -528,8 +528,8 @@ unsafe impl Sync for SyncAccount {}
 mod tests {
     use aion_types::{H256, U256, Address};
     use kvdb::DBTransaction;
-    use helpers::*;
-    use state::{VMAccount, Backend, AionVMAccount};
+    use crate::helpers::*;
+    use crate::state::{VMAccount, Backend, AionVMAccount};
 
     #[test]
     fn state_db_smoke() {

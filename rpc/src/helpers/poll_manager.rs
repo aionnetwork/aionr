@@ -88,7 +88,7 @@ where T: Timer
 mod tests {
     use std::cell::Cell;
     use transient_hashmap::Timer;
-    use helpers::PollManager;
+    use crate::helpers::PollManager;
 
     struct TestTimer<'a> {
         time: &'a Cell<i64>,

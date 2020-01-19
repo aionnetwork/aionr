@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 use rustc_hex::FromHex as RustcFromHex;
-use bloomchain::Bloom;
+use crate::bloomchain::Bloom;
 
 pub trait FromHex {
     fn from_hex(s: &str) -> Self

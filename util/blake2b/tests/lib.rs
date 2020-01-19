@@ -22,8 +22,6 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate blake2b;
-
 mod kat;
 
 use blake2b::{Blake2b, KEY_BYTES, OUT_BYTES};

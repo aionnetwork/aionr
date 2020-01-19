@@ -24,11 +24,11 @@
 
 use std::io::Read;
 use std::collections::BTreeMap;
-use uint::Uint;
-use bytes::Bytes;
-use hash::{Address, H256};
-use state::{Env, AccountState, Transaction};
-use maybe::MaybeEmpty;
+use crate::uint::Uint;
+use crate::bytes::Bytes;
+use crate::hash::{Address, H256};
+use crate::state::{Env, AccountState, Transaction};
+use crate::maybe::MaybeEmpty;
 use serde_json::{self, Error};
 
 /// State test deserializer.

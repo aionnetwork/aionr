@@ -22,8 +22,6 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate aion_types;
-
 use std::io;
 use aion_types::H256;
 

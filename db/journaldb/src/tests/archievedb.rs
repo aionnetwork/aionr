@@ -1,7 +1,7 @@
 use blake2b::blake2b;
-use kvdb::{HashStore, DBValue};
+use crate::kvdb::{HashStore, DBValue};
 use super::*;
-use kvdb::{MockDbRepository};
+use crate::kvdb::{MockDbRepository};
 
 use aion_types::H256;
 

@@ -3,6 +3,7 @@ name = "trie-standardmap"
 version = "0.1.0"
 authors = ["debris <marek.kotewicz@gmail.com>"]
 description = "Standard test map for profiling tries"
+edition = "2018"
 
 [dependencies]
 acore-bytes = { path = "../bytes" }

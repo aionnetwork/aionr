@@ -29,17 +29,18 @@ use std::collections::{HashSet, HashMap};
 use blake2b::{blake2b};
 use aion_types::{H256, U256, U512, Address};
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ExecutionResult, ExecStatus, ReturnData, ParamsType};
-use state::{Backend as StateBackend, State, Substate, CleanupMode};
-use machine::EthereumMachine as Machine;
-use types::error::ExecutionError;
+use crate::state::{Backend as StateBackend, State, Substate, CleanupMode};
+use crate::machine::EthereumMachine as Machine;
+use crate::types::error::ExecutionError;
 use vms::VMType;
 use vms::constants::{MAX_CALL_DEPTH, GAS_CALL_MAX, GAS_CREATE_MAX};
 
-use externalities::*;
-use transaction::{Action, SignedTransaction};
+use crate::externalities::*;
+use crate::transaction::{Action, SignedTransaction};
 use crossbeam;
-pub use types::executed::Executed;
-use precompiled::builtin::{BuiltinExtImpl, BuiltinContext};
+pub use crate::types::executed::Executed;
+use crate::precompiled::builtin::{BuiltinExtImpl, BuiltinContext};
+use crate::db;
 
 use kvdb::{DBTransaction};
 
@@ -890,7 +891,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     match self
                         .state
                         .export_kvdb()
-                        .get(::db::COL_EXTRA, &alias[..])
+                        .get(db::COL_EXTRA, &alias[..])
                         .unwrap()
                     {
                         Some(invoked_set) => {
@@ -919,7 +920,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
             // Step 2: write into database
             let mut batch = DBTransaction::new();
-            batch.put(::db::COL_EXTRA, &k, alias_data.as_slice());
+            batch.put(db::COL_EXTRA, &k, alias_data.as_slice());
             self.state
                 .export_kvdb()
                 .write(batch)

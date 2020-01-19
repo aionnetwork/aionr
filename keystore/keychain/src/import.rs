@@ -25,8 +25,8 @@ use std::path::Path;
 use std::fs;
 
 use key::Address;
-use accounts_dir::{KeyDirectory, DiskKeyFileManager, KeyFileManager};
-use Error;
+use crate::accounts_dir::{KeyDirectory, DiskKeyFileManager, KeyFileManager};
+use crate::Error;
 
 /// Import an account from a file.
 pub fn import_account(path: &Path, dst: &dyn KeyDirectory) -> Result<Address, Error> {

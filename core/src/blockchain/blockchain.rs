@@ -34,27 +34,27 @@ use parking_lot::{Mutex, RwLock};
 use acore_bytes::Bytes;
 use rlp::*;
 use rlp_compress::{compress, decompress, blocks_swapper};
-use header::*;
-use transaction::*;
-use views::*;
-use log_entry::{LogEntry, LocalizedLogEntry};
-use receipt::Receipt;
-use types::blooms::{BloomGroup, GroupPosition};
-use types::blockchain::best_block::{BestBlock, BestAncientBlock};
-use types::block::info::{BlockInfo, BlockLocation, BranchBecomingCanonChainData};
-use types::blockchain::extra::{
+use crate::header::*;
+use crate::transaction::*;
+use crate::views::*;
+use crate::log_entry::{LogEntry, LocalizedLogEntry};
+use crate::receipt::Receipt;
+use crate::types::blooms::{BloomGroup, GroupPosition};
+use crate::types::blockchain::best_block::{BestBlock, BestAncientBlock};
+use crate::types::block::info::{BlockInfo, BlockLocation, BranchBecomingCanonChainData};
+use crate::types::blockchain::extra::{
     BlockReceipts, BlockDetails, TransactionAddress,
 };
-use types::blockchain::info::BlockChainInfo;
-use types::blockchain::tree_route::TreeRoute;
-use types::block::extra_update::ExtrasUpdate;
-use types::blockchain::config::Config;
-use types::blockchain::cache::CacheSize;
-use types::blockchain::import_route::ImportRoute;
-use db::{self, Writable, Readable, CacheUpdatePolicy};
-use cache_manager::CacheManager;
-use encoded;
-// use engine::epoch::{PendingTransition as PendingEpochTransition};
+use crate::types::blockchain::info::BlockChainInfo;
+use crate::types::blockchain::tree_route::TreeRoute;
+use crate::types::block::extra_update::ExtrasUpdate;
+use crate::types::blockchain::config::Config;
+use crate::types::blockchain::cache::CacheSize;
+use crate::types::blockchain::import_route::ImportRoute;
+use crate::db::{self, Writable, Readable, CacheUpdatePolicy};
+use crate::cache_manager::CacheManager;
+use crate::encoded;
+// use crate::engine::epoch::{PendingTransition as PendingEpochTransition};
 use rayon::prelude::*;
 use kvdb::{DBTransaction, KeyValueDB};
 
@@ -410,7 +410,7 @@ impl BlockProvider for BlockChain {
     /// Get the address of transaction with given hash.
     fn transaction_address(&self, hash: &H256) -> Option<TransactionAddress> {
         // check whether this tx is meta transaction
-        let tx_hash = match self.db.get(::db::COL_EXTRA, &hash).unwrap() {
+        let tx_hash = match self.db.get(db::COL_EXTRA, &hash).unwrap() {
             Some(ref tx_data) if tx_data[..].starts_with(b"alias") => {
                 let mut data = [0u8; 32];
                 data.copy_from_slice(&tx_data[5..37]);

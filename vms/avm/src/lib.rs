@@ -21,19 +21,11 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate core;
-extern crate rustc_hex;
-extern crate libc;
-extern crate num_bigint;
-extern crate rjni;
 extern crate vm_common as types;
-extern crate aion_types;
+
 extern crate blake2b as hash;
 #[macro_use]
 extern crate log;
-extern crate rlp;
-extern crate crypto;
-extern crate tiny_keccak;
 
 pub mod avm;
 pub mod callback;

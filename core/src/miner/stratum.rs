@@ -26,14 +26,14 @@ use std::sync::{Arc, Weak};
 use std::net::{SocketAddr, AddrParseError};
 use std::fmt;
 
-use block::IsBlock;
-use client::Client;
+use crate::block::IsBlock;
+use crate::client::Client;
 use aion_types::{H256, clean_0x};
 // definitions of stratum spec, used as StratumService
 use acore_stratum::{
     JobDispatcher, PushWorkHandler, Stratum as StratumService, Error as StratumServiceError,
 };
-use miner::{Miner, MinerService};
+use crate::miner::{Miner, MinerService};
 use dir::helpers::replace_home_and_local;
 use dir::{default_data_path, default_local_path, CHAINS_PATH};
 

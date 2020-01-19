@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use aion_types::{U256, U128, U512};
-use ffi::EvmStatusCode;
+use crate::ffi::EvmStatusCode;
 use std::{fmt, ops, cmp};
 use types::ReturnData;
 

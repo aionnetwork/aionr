@@ -25,8 +25,8 @@
 use aion_types::{H256, U256, U512, Address};
 use acore_bytes::Bytes;
 use trie;
-use log_entry::LogEntry;
-use state_diff::StateDiff;
+use crate::log_entry::LogEntry;
+use crate::state_diff::StateDiff;
 
 use std::fmt;
 use std::collections::HashSet;

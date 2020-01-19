@@ -23,7 +23,7 @@
 //! Accounts Directory
 
 use std::path::{PathBuf};
-use {SafeAccount, Error};
+use crate::{SafeAccount, Error};
 
 mod disk;
 mod memory;

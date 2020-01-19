@@ -19,7 +19,7 @@
  *
  ******************************************************************************/
 
-use uint::Uint;
+use crate::uint::Uint;
 
 #[derive(Clone, Debug, PartialEq, Deserialize)]
 pub struct UnityEngineParams {

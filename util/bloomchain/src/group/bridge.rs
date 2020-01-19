@@ -21,10 +21,10 @@
  ******************************************************************************/
 
 use bloom::Bloom;
-use config::Config;
-use database::BloomDatabase;
-use position::Position;
-use group::position::Manager as PositionManager;
+use crate::config::Config;
+use crate::database::BloomDatabase;
+use crate::position::Position;
+use crate::group::position::Manager as PositionManager;
 use super::BloomGroupDatabase;
 
 /// Bridge between `BloomDatabase` and `BloomGroupDatabase`.

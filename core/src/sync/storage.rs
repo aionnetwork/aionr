@@ -24,7 +24,7 @@ use lru_cache::LruCache;
 use parking_lot::{Mutex, RwLock};
 
 use aion_types::H256;
-use sync::wrappers::{HeadersWrapper, BlocksWrapper};
+use crate::sync::wrappers::{HeadersWrapper, BlocksWrapper};
 
 // const MAX_DOWNLOADED_HEADERS_COUNT: usize = 4096;
 const MAX_CACHED_BLOCK_HASHES: usize = 32;

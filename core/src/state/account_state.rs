@@ -22,7 +22,7 @@
 
 use aion_types::U256;
 
-use state::{AionVMAccount, VMAccount};
+use crate::state::{AionVMAccount, VMAccount};
 
 #[derive(Eq, PartialEq, Clone, Copy, Debug)]
 /// Account modification state. Used to check if the account was

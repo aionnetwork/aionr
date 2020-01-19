@@ -27,12 +27,12 @@ use std::collections::HashMap;
 use parking_lot::RwLock;
 
 use aion_types::{Address, H256, U256};
-use transaction::banning_queue::BanningTransactionQueue;
-use transaction::transaction_queue::{AccountDetails, RemovalReason, VerifiedTransaction,
+use crate::transaction::banning_queue::BanningTransactionQueue;
+use crate::transaction::transaction_queue::{AccountDetails, RemovalReason, VerifiedTransaction,
 TransactionOrigin, TransactionQueueStatus};
-use transaction::transaction::{Condition, SignedTransaction, PendingTransaction};
-use transaction::local_transactions::Status as LocalTransactionStatus;
-use transaction::error::Error;
+use crate::transaction::transaction::{Condition, SignedTransaction, PendingTransaction};
+use crate::transaction::local_transactions::Status as LocalTransactionStatus;
+use crate::transaction::error::Error;
 
 /// Transaction pool
 pub struct TransactionPool {

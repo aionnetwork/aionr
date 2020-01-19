@@ -27,8 +27,8 @@ use std::collections::BTreeMap;
 use itertools::Itertools;
 use aion_types::{H256, Address};
 use triehash::sec_trie_root;
-use pod_account::{self, PodAccount};
-use types::state::state_diff::StateDiff;
+use crate::pod_account::{self, PodAccount};
+use crate::types::state::state_diff::StateDiff;
 use ajson;
 
 /// State of all accounts in the system expressed in Plain Old Data.

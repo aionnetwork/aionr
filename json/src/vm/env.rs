@@ -21,8 +21,8 @@
  ******************************************************************************/
 
 //! Vm environment.
-use hash::Address;
-use uint::Uint;
+use crate::hash::Address;
+use crate::uint::Uint;
 
 /// Vm environment.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -47,7 +47,7 @@ pub struct Env {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use vm::Env;
+    use crate::vm::Env;
 
     #[test]
     fn env_deserialization() {

@@ -28,8 +28,8 @@ use super::blake2b_hash_contract::Blake2bHashContract;
 use super::tx_hash_contract::TxHashContract;
 use super::atb::token_bridge_contract::TokenBridgeContract;
 use std::fmt;
-use state::{State, Substate, Backend as StateBackend, CleanupMode};
-use log_entry::LogEntry;
+use crate::state::{State, Substate, Backend as StateBackend, CleanupMode};
+use crate::log_entry::LogEntry;
 
 pub trait BuiltinContract: Send + Sync {
     /// gas cost.

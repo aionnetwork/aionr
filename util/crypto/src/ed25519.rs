@@ -4,10 +4,10 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use digest::Digest;
-use sha2::{Sha512};
-use curve25519::{GeP2, GeP3, ge_scalarmult_base, sc_reduce, sc_muladd, curve25519, Fe};
-use util::{fixed_time_eq};
+use crate::digest::Digest;
+use crate::sha2::{Sha512};
+use crate::curve25519::{GeP2, GeP3, ge_scalarmult_base, sc_reduce, sc_muladd, curve25519, Fe};
+use crate::util::{fixed_time_eq};
 use std::ops::{Add, Sub, Mul};
 
 static L: [u8; 32] = [
@@ -174,10 +174,10 @@ fn edwards_to_montgomery_x(ed_y: Fe) -> Fe {
 
 #[cfg(test)]
 mod tests {
-    use ed25519::{keypair, signature, verify, exchange};
-    use curve25519::{curve25519_base, curve25519};
-    use digest::Digest;
-    use sha2::{Sha512};
+    use crate::ed25519::{keypair, signature, verify, exchange};
+    use crate::curve25519::{curve25519_base, curve25519};
+    use crate::digest::Digest;
+    use crate::sha2::{Sha512};
 
     fn do_keypair_case(seed: [u8; 32], expected_secret: [u8; 64], expected_public: [u8; 32]) {
         let (actual_secret, actual_public) = keypair(seed.as_ref());

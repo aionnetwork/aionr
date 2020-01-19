@@ -23,7 +23,7 @@
 //! Trie lookup via HashStore.
 
 use db::HashStore;
-use nibbleslice::NibbleSlice;
+use crate::nibbleslice::NibbleSlice;
 use rlp::Rlp;
 use aion_types::H256;
 

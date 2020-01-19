@@ -22,8 +22,8 @@
 
 //! Logger for Aion executables
 #![warn(unused_extern_crates)]
-extern crate log;
-extern crate log4rs;
+
+use log4rs;
 
 use log::LogLevelFilter;
 use log4rs::append::console::ConsoleAppender;

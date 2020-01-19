@@ -31,13 +31,13 @@ use vms::{
     ExecStatus,
     ReturnData
 };
-use state::{Substate, CleanupMode};
-use transaction::{Action, Transaction, SignedTransaction, DEFAULT_TRANSACTION_TYPE, AVM_TRANSACTION_TYPE};
-use types::error::{ExecutionError};
-use executive::{Executive, contract_address};
+use crate::state::{Substate, CleanupMode};
+use crate::transaction::{Action, Transaction, SignedTransaction, DEFAULT_TRANSACTION_TYPE, AVM_TRANSACTION_TYPE};
+use crate::types::error::{ExecutionError};
+use crate::executive::{Executive, contract_address};
 use avm_abi::{AVMEncoder, AbiToken, ToBytes};
 
-use helpers::{get_temp_state,make_aion_machine};
+use crate::helpers::{get_temp_state,make_aion_machine};
 
 #[test]
 fn test_contract_address() {

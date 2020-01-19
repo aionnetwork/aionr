@@ -24,8 +24,8 @@ use jsonrpc_core;
 use http;
 use hyper;
 use tokio::runtime::TaskExecutor;
-use Metadata;
-use types::Origin;
+use crate::Metadata;
+use crate::types::Origin;
 use std::net::SocketAddr;
 
 /// Common HTTP & IPC & WebSocket metadata extractor.

@@ -11,17 +11,17 @@
 use std::cmp;
 use std::iter::repeat;
 
-use buffer::{
+use crate::buffer::{
     ReadBuffer, WriteBuffer, OwnedReadBuffer, OwnedWriteBuffer, BufferResult, RefReadBuffer,
     RefWriteBuffer,
 };
-use buffer::BufferResult::{BufferUnderflow, BufferOverflow};
-use cryptoutil::{self, symm_enc_or_dec};
-use symmetriccipher::{
+use crate::buffer::BufferResult::{BufferUnderflow, BufferOverflow};
+use crate::cryptoutil::{self, symm_enc_or_dec};
+use crate::symmetriccipher::{
     BlockEncryptor, BlockEncryptorX8, Encryptor, BlockDecryptor, Decryptor,
     SynchronousStreamCipher, SymmetricCipherError,
 };
-use symmetriccipher::SymmetricCipherError::{InvalidPadding, InvalidLength};
+use crate::symmetriccipher::SymmetricCipherError::{InvalidPadding, InvalidLength};
 
 /// The BlockProcessor trait is used to implement modes that require processing complete blocks of
 /// data. The methods of this trait are called by the BlockEngine which is in charge of properly
@@ -857,15 +857,15 @@ mod test {
     #[cfg(feature = "benches")]
     use std::time::Instant;
 
-    use aessafe;
-    use blockmodes::{
+    use crate::aessafe;
+    use crate::blockmodes::{
         EcbEncryptor, EcbDecryptor, CbcEncryptor, CbcDecryptor, CtrMode, CtrModeX8, NoPadding,
         PkcsPadding,
 };
-    use buffer::{ReadBuffer, WriteBuffer, RefReadBuffer, RefWriteBuffer, BufferResult};
-    use buffer::BufferResult::{BufferUnderflow, BufferOverflow};
-    use symmetriccipher::{Encryptor, Decryptor};
-    use symmetriccipher::SymmetricCipherError::{self, InvalidLength, InvalidPadding};
+    use crate::buffer::{ReadBuffer, WriteBuffer, RefReadBuffer, RefWriteBuffer, BufferResult};
+    use crate::buffer::BufferResult::{BufferUnderflow, BufferOverflow};
+    use crate::symmetriccipher::{Encryptor, Decryptor};
+    use crate::symmetriccipher::SymmetricCipherError::{self, InvalidLength, InvalidPadding};
 
     use std::cmp;
 

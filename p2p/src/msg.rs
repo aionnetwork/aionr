@@ -19,8 +19,8 @@
  *
  ******************************************************************************/
 
-use route::Version;
-use route::Module;
+use crate::route::Version;
+use crate::route::Module;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Head {
@@ -86,10 +86,10 @@ impl ChannelBuffer {
 #[cfg(test)]
 mod tests {
 
-    use msg::Head;
-    use route::Version;
-    use route::Module;
-    use route::Action;
+    use crate::msg::Head;
+    use crate::route::Version;
+    use crate::route::Module;
+    use crate::route::Action;
 
     #[test]
     pub fn test_head() {

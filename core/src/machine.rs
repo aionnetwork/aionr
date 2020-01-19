@@ -26,14 +26,16 @@ use std::collections::BTreeMap;
 use std::cmp;
 use std::sync::Arc;
 
-use block::{ExecutedBlock, IsBlock};
-use precompiled::builtin::BuiltinContract;
-use types::error::Error;
-use executive::{Executive};
-use header::{BlockNumber, Header};
-use spec::CommonParams;
-use state::{CleanupMode, Substate};
-use transaction::{SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
+use crate::block::{ExecutedBlock, IsBlock};
+use crate::precompiled::builtin::BuiltinContract;
+use crate::types::error::Error;
+use crate::executive::{Executive};
+use crate::header::{BlockNumber, Header};
+use crate::spec::CommonParams;
+use crate::state::{CleanupMode, Substate};
+use crate::transaction::{SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
+use crate::client;
+use crate::receipt::Receipt;
 use aion_types::{U256, H256, Address};
 use vms::{ActionParams, ActionValue, CallType, ParamsType};
 
@@ -225,7 +227,7 @@ pub struct AuxiliaryData<'a> {
     /// The full block bytes, including the header.
     pub bytes: Option<&'a [u8]>,
     /// The block receipts.
-    pub receipts: Option<&'a [::receipt::Receipt]>,
+    pub receipts: Option<&'a [Receipt]>,
 }
 
 /// Type alias for a function we can make calls through synchronously.
@@ -247,7 +249,7 @@ impl ::aion_machine::Machine for EthereumMachine {
     type Header = Header;
 
     type LiveBlock = ExecutedBlock;
-    type EngineClient = dyn (::client::EngineClient);
+    type EngineClient = dyn (client::EngineClient);
     type AuxiliaryRequest = AuxiliaryRequest;
 
     type Error = Error;

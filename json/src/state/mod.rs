@@ -31,5 +31,5 @@ pub use self::log::Log;
 pub use self::state::State;
 pub use self::test::Test;
 pub use self::transaction::Transaction;
-pub use blockchain::State as AccountState;
-pub use vm::Env;
+pub use crate::blockchain::State as AccountState;
+pub use crate::vm::Env;

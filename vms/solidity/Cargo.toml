@@ -3,6 +3,7 @@ name = "solidity"
 version = "0.2.0"
 authors = ["Admin <admin@aion.network>"]
 build = "build.rs"
+edition = "2018"
 
 [dependencies]
 libc = "0.2.0"

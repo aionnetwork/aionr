@@ -21,12 +21,14 @@
 
 //! Ping rpc interface.
 use jsonrpc_core::Result;
+use jsonrpc_derive::rpc;
 
-build_rpc_trait! {
-    /// Ping rpc interface.
-    pub trait Ping {
-        /// Returns ping response.
-        #[rpc(name = "ping")]
-        fn ping(&self) -> Result<String>;
-    }
+/// Ping rpc interface.
+#[rpc(server)]
+pub trait Ping {
+    type Metadata;
+
+    /// Returns ping response.
+    #[rpc(name = "ping")]
+    fn ping(&self) -> Result<String>;
 }

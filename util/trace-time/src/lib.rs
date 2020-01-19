@@ -23,7 +23,7 @@
 #![warn(unused_extern_crates)]
 //! Performance timer with logging
 
-extern crate time;
+use time;
 #[macro_use]
 extern crate log;
 

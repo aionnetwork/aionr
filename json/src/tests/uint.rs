@@ -1,6 +1,6 @@
 use serde_json;
 use aion_types::U256;
-use uint::Uint;
+use crate::uint::Uint;
 
 #[test]
 fn uint_deserialization() {

@@ -25,9 +25,7 @@
 //!
 //! This module should be used to generate trie root hash.
 
-extern crate aion_types;
-extern crate blake2b;
-extern crate rlp;
+use rlp;
 
 use std::collections::BTreeMap;
 use std::cmp;

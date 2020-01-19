@@ -22,7 +22,7 @@
 use std::io::Error;
 use std::{fs, ptr, thread, env, path::Path, path::PathBuf};
 use std::sync::atomic::{AtomicPtr, Ordering};
-use callback::register_callbacks;
+use crate::callback::register_callbacks;
 use types::avm::{NativeDecoder, NativeEncoder};
 use rjni::{Classpath, JavaVM, Options, Type, Value, Version};
 use rjni::ffi;

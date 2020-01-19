@@ -26,7 +26,7 @@ use std::fmt;
 
 use aion_types::{U256, H256};
 // use security_level::SecurityLevel;
-use {types::BlockNumber};
+use crate::{types::BlockNumber};
 
 /// Information about the blockchain gathered together.
 #[derive(Clone, Debug)]

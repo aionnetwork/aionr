@@ -20,11 +20,11 @@
  ******************************************************************************/
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use header::Header;
+use crate::header::Header;
 use equihash::EquihashValidator;
 use blake2b::Blake2b;
 use aion_types::U256;
-use types::error::{BlockError, Error};
+use crate::types::error::{BlockError, Error};
 use unexpected::{Mismatch, OutOfBounds};
 use acore_bytes::to_hex;
 

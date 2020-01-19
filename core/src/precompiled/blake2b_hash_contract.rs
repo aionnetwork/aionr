@@ -91,17 +91,18 @@ impl BuiltinContract for Blake2bHashContract {
 #[cfg(test)]
 mod tests {
     use super::Blake2bHashContract;
-    use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
-    use state::{State, Substate};
-    use helpers::get_temp_state;
+    use crate::precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
+    use crate::state::{State, Substate};
+    use crate::helpers::get_temp_state;
+    use crate::db::StateDB;
     use acore_bytes::to_hex;
     use aion_types::{Address, H256};
     use vms::ExecStatus;
 
     fn get_ext_default<'a>(
-        state: &'a mut State<::db::StateDB>,
+        state: &'a mut State<StateDB>,
         substate: &'a mut Substate,
-    ) -> BuiltinExtImpl<'a, ::db::StateDB>
+    ) -> BuiltinExtImpl<'a, StateDB>
     {
         BuiltinExtImpl::new(
             state,

@@ -24,10 +24,10 @@
 
 use aion_types::H256;
 use blake2b::blake2b;
-use header::Header;
+use crate::header::Header;
 use rlp::Rlp;
-use transaction::{UnverifiedTransaction, LocalizedTransaction};
-use views::{TransactionView, HeaderView};
+use crate::transaction::{UnverifiedTransaction, LocalizedTransaction};
+use crate::views::{TransactionView, HeaderView};
 
 /// View onto block rlp.
 pub struct BlockView<'a> {

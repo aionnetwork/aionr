@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 use std::io::{BufReader, Read, BufRead};
-use bloomchain::Bloom;
+use crate::bloomchain::Bloom;
 use super::FromHex;
 
 pub fn for_each_bloom<F>(bytes: &[u8], mut f: F)

@@ -23,12 +23,12 @@ use std::collections::HashMap;
 
 use parking_lot::RwLock;
 
-use client::{BlockId, BlockChainClient, BlockStatus, BlockImportError};
-use types::error::{BlockError, ImportError};
-use header::Seal;
-use views::BlockView;
-use sync::storage::SyncStorage;
-use sync::node_info::{NodeInfo, Mode};
+use crate::client::{BlockId, BlockChainClient, BlockStatus, BlockImportError};
+use crate::types::error::{BlockError, ImportError};
+use crate::header::Seal;
+use crate::views::BlockView;
+use crate::sync::storage::SyncStorage;
+use crate::sync::node_info::{NodeInfo, Mode};
 use aion_types::H256;
 
 pub fn import_staged_blocks(

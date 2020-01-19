@@ -22,7 +22,7 @@
 
 use aion_types::{H256, U256};
 use acore_bytes::Bytes;
-use header::BlockNumber;
+use crate::header::BlockNumber;
 
 /// Best block info.
 #[derive(Default)]

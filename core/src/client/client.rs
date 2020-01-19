@@ -36,33 +36,34 @@ use trie::{Trie, TrieFactory, TrieSpec};
 
 // other
 use aion_types::{Address, H128, H256, H264, U256};
-use state::BasicAccount;
-use block::*;
-use blockchain::{BlockChain, BlockProvider, TreeRoute};
-use types::blockchain::import_route::ImportRoute;
-use types::blockchain::extra::TransactionAddress;
-use client::Error as ClientError;
-use client::{
+use crate::state::BasicAccount;
+use crate::block::*;
+use crate::blockchain::{BlockChain, BlockProvider, TreeRoute};
+use crate::types::blockchain::import_route::ImportRoute;
+use crate::types::blockchain::extra::TransactionAddress;
+use crate::client::Error as ClientError;
+use crate::client::{
     BlockChainClient, BlockId, BlockImportError, CallAnalytics, ChainNotify, ClientConfig,
     MiningBlockChainClient, ProvingBlockChainClient, PruningInfo, TransactionId,
 };
-use encoded;
-use engine::Engine;
-use types::error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
-use executive::{contract_address, Executed, Executive};
-use factory::{Factories, VmFactory};
-use header::{BlockNumber, Header, Seal, SealType};
+use crate::encoded;
+use crate::engine::Engine;
+use crate::machine::EthereumMachine;
+use crate::types::error::{Error,BlockError, CallError, ExecutionError, ImportError, ImportResult};
+use crate::executive::{contract_address, Executed, Executive};
+use crate::factory::{Factories, VmFactory};
+use crate::header::{BlockNumber, Header, Seal, SealType};
 use io::*;
-use log_entry::LocalizedLogEntry;
-use miner::{Miner, MinerService};
+use crate::log_entry::LocalizedLogEntry;
+use crate::miner::{Miner, MinerService};
 use parking_lot::{Mutex, RwLock, Condvar};
-use receipt::{LocalizedReceipt, Receipt};
+use crate::receipt::{LocalizedReceipt, Receipt};
 use rlp::*;
-use service::ClientIoMessage;
-use spec::Spec;
-use state::{State};
-use db::StateDB;
-use transaction::{
+use crate::service::ClientIoMessage;
+use crate::spec::Spec;
+use crate::state::{State};
+use crate::db::{self,StateDB};
+use crate::transaction::{
     Transaction,
     Action,
     LocalizedTransaction,
@@ -71,15 +72,15 @@ use transaction::{
     AVM_TRANSACTION_TYPE,
     DEFAULT_TRANSACTION_TYPE
 };
-use types::filter::Filter;
+use crate::types::filter::Filter;
 use vms::{EnvInfo, LastHashes};
-use verification::queue::BlockQueue;
-use verification::{
+use crate::verification::queue::BlockQueue;
+use crate::verification::{
     PreverifiedBlock,
     verify_block_family,
     verify_block_final
 };
-use views::BlockView;
+use crate::views::BlockView;
 use avm_abi::{AbiToken, AVMEncoder, AVMDecoder};
 use key::public_to_address_ed25519;
 
@@ -89,10 +90,10 @@ use num_bigint::{BigUint};
 
 // re-export
 #[cfg(test)]
-use types::blockchain::cache::CacheSize as BlockChainCacheSize;
-pub use types::block::status::BlockStatus;
-pub use types::blockchain::info::BlockChainInfo;
-pub use verification::queue::QueueInfo as BlockQueueInfo;
+use crate::types::blockchain::cache::CacheSize as BlockChainCacheSize;
+pub use crate::types::block::status::BlockStatus;
+pub use crate::types::blockchain::info::BlockChainInfo;
+pub use crate::verification::queue::QueueInfo as BlockQueueInfo;
 
 const MIN_HISTORY_SIZE: u64 = 8;
 
@@ -167,7 +168,7 @@ impl Client {
         db: Arc<dyn KeyValueDB>,
         miner: Arc<Miner>,
         message_channel: IoChannel<ClientIoMessage>,
-    ) -> Result<Arc<Client>, ::types::error::Error>
+    ) -> Result<Arc<Client>, Error>
     {
         let trie_spec = match config.fat_db {
             true => TrieSpec::Fat,
@@ -181,7 +182,7 @@ impl Client {
             accountdb: Default::default(),
         };
 
-        let journal_db = journaldb::new(db.clone(), config.pruning, ::db::COL_STATE);
+        let journal_db = journaldb::new(db.clone(), config.pruning, db::COL_STATE);
         let mut state_db = StateDB::new(journal_db, config.state_cache_size);
         if state_db.journal_db().is_empty() {
             // Sets the correct state root.
@@ -834,7 +835,7 @@ impl Client {
     }
 
     fn do_virtual_call(
-        machine: &::machine::EthereumMachine,
+        machine: &EthereumMachine,
         env_info: &EnvInfo,
         state: &mut State<StateDB>,
         t: &SignedTransaction,
@@ -844,7 +845,7 @@ impl Client {
         fn call(
             state: &mut State<StateDB>,
             env_info: &EnvInfo,
-            machine: &::machine::EthereumMachine,
+            machine: &EthereumMachine,
             state_diff: bool,
             transaction: &SignedTransaction,
         ) -> Result<Executed, CallError>
@@ -952,8 +953,8 @@ impl Client {
             let hash = self
                 .block_hash(BlockId::Number(blk))
                 .expect("can not found block , db may crashed");
-            batch.delete(::db::COL_HEADERS, &hash);
-            batch.delete(::db::COL_BODIES, &hash);
+            batch.delete(db::COL_HEADERS, &hash);
+            batch.delete(db::COL_BODIES, &hash);
 
             // delete col_extra
 
@@ -961,7 +962,7 @@ impl Client {
             let mut key_blk_detail = H264::default();
             key_blk_detail[0] = 0u8;
             (*key_blk_detail)[1..].clone_from_slice(&hash);
-            batch.delete(::db::COL_EXTRA, &key_blk_detail);
+            batch.delete(db::COL_EXTRA, &key_blk_detail);
 
             // block hashes
             let mut blk_number = [0u8; 5];
@@ -970,7 +971,7 @@ impl Client {
             blk_number[2] = (blk >> 16) as u8;
             blk_number[3] = (blk >> 8) as u8;
             blk_number[4] = blk as u8;
-            batch.delete(::db::COL_EXTRA, &blk_number);
+            batch.delete(db::COL_EXTRA, &blk_number);
 
             // transaction address
             let mut key_tx_addr = H264::default();
@@ -982,14 +983,14 @@ impl Client {
                 .expect("can not found body , db may crashed");
             for tx in body.transactions() {
                 (*key_tx_addr)[1..].clone_from_slice(tx.hash());
-                batch.delete(::db::COL_EXTRA, &key_tx_addr);
+                batch.delete(db::COL_EXTRA, &key_tx_addr);
             }
 
             // block receipts
             let mut key_blk_receipts = H264::default();
             key_blk_receipts[0] = 4u8;
             (*key_blk_receipts)[1..].clone_from_slice(&hash);
-            batch.delete(::db::COL_EXTRA, &key_blk_receipts);
+            batch.delete(db::COL_EXTRA, &key_blk_receipts);
 
             let header = self
                 .chain
@@ -997,7 +998,7 @@ impl Client {
                 .block_header(&hash)
                 .expect("can not found block , db may crashed");
             let state_root = header.state_root();
-            batch.delete(::db::COL_STATE, &state_root);
+            batch.delete(db::COL_STATE, &state_root);
             // flush dbtransaction
             if blk % 1000 == 0 {
                 info!(target: "revert", "#{}", blk);
@@ -1034,17 +1035,17 @@ impl Client {
         // revert last block detail
         {
             let details = target_block_details;
-            use db::Writable;
-            batch.write(::db::COL_EXTRA, &new_best_hash, &details);
+            use crate::db::Writable;
+            batch.write(db::COL_EXTRA, &new_best_hash, &details);
         }
         // update new best hash
         let new_best_hash = self
             .block_hash(BlockId::Number(new_block))
             .expect("can not found block , db may crashed");
-        batch.put(::db::COL_EXTRA, b"best", &new_best_hash);
+        batch.put(db::COL_EXTRA, b"best", &new_best_hash);
         // reset state
         let latest_era_key = [b'l', b'a', b's', b't', 0, 0, 0, 0, 0, 0, 0, 0];
-        batch.put(::db::COL_STATE, &latest_era_key, &encode(&new_block));
+        batch.put(db::COL_STATE, &latest_era_key, &encode(&new_block));
         self.db
             .write()
             .write(batch)
@@ -1312,7 +1313,7 @@ impl BlockChainClient for Client {
         )
     }
 
-    fn block_header(&self, id: BlockId) -> Option<::encoded::Header> {
+    fn block_header(&self, id: BlockId) -> Option<encoded::Header> {
         let chain = self.chain.read();
 
         if let BlockId::Pending = id {
@@ -1326,7 +1327,7 @@ impl BlockChainClient for Client {
         Self::block_hash(&chain, &self.miner, id).and_then(|hash| chain.block_header_data(&hash))
     }
 
-    fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header> {
+    fn block_header_data(&self, hash: &H256) -> Option<encoded::Header> {
         let chain = self.chain.read();
         chain.block_header_data(hash)
     }
@@ -1633,8 +1634,8 @@ impl BlockChainClient for Client {
     }
 
     fn import_block(&self, bytes: Bytes) -> Result<H256, BlockImportError> {
-        use verification::queue::kind::blocks::Unverified;
-        use verification::queue::kind::BlockLike;
+        use crate::verification::queue::kind::blocks::Unverified;
+        use crate::verification::queue::kind::BlockLike;
 
         // create unverified block here so the `blake2b` calculation can be cached.
         let unverified = Unverified::new(bytes);
@@ -1973,8 +1974,8 @@ mod tests {
 
     #[test]
     fn should_not_cache_details_before_commit() {
-        use client::BlockChainClient;
-        use helpers::{generate_dummy_client, get_good_dummy_block_hash};
+        use crate::client::BlockChainClient;
+        use crate::helpers::{generate_dummy_client, get_good_dummy_block_hash};
 
         use std::thread;
         use std::time::Duration;

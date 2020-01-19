@@ -22,8 +22,8 @@
 
 //! Spec builtin deserialization.
 
-use hash::Address;
-use uint::Uint;
+use crate::hash::Address;
+use crate::uint::Uint;
 
 /// Spec builtin.
 #[derive(Debug, PartialEq, Deserialize, Clone)]
@@ -47,8 +47,8 @@ impl Builtin {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use spec::builtin::Builtin;
-    use uint::Uint;
+    use crate::spec::builtin::Builtin;
+    use crate::uint::Uint;
 
     #[test]
     fn builtin_deserialization() {

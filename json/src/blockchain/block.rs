@@ -22,9 +22,9 @@
 
 //! Blockchain test block deserializer.
 
-use bytes::Bytes;
-use blockchain::header::Header;
-use blockchain::transaction::Transaction;
+use crate::bytes::Bytes;
+use crate::blockchain::header::Header;
+use crate::blockchain::transaction::Transaction;
 
 /// Blockchain test block deserializer.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -43,7 +43,7 @@ impl Block {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use blockchain::block::Block;
+    use crate::blockchain::block::Block;
 
     #[test]
     fn block_deserialization() {

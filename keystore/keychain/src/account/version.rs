@@ -20,7 +20,7 @@
  *
  ******************************************************************************/
 
-use json;
+use crate::json;
 use rlp::{self, RlpStream, UntrustedRlp, DecoderError};
 
 #[derive(Debug, PartialEq, Clone)]

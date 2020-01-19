@@ -26,8 +26,8 @@ use std::str::FromStr;
 use std::hash::{Hash, Hasher};
 use rustc_hex::{ToHex, FromHex};
 use aion_types::{H256, H768};
-use {Error, Message};
-use Ed25519Secret;
+use crate::{Error, Message};
+use crate::Ed25519Secret;
 use aion_types::Ed25519Public;
 use rcrypto::ed25519::{signature, verify};
 
@@ -140,9 +140,9 @@ mod tests {
     use std::str::FromStr;
     #[cfg(feature = "benches")]
     use std::time::Instant;
-    use Message;
+    use crate::Message;
     use rcrypto::ed25519::verify;
-    use generate_keypair;
+    use crate::generate_keypair;
     use super::{sign_ed25519, Ed25519Signature};
 
     #[test]

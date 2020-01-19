@@ -23,11 +23,11 @@ use std::fmt;
 use std::ptr;
 use rand::{Rng, OsRng};
 use rustc_hex::ToHex;
-use blake2b::Blake2b;
+use crate::blake2b::Blake2b;
 use aion_types::{H256, Ed25519Public};
-use Ed25519Secret;
-use Address;
-use Error;
+use crate::Ed25519Secret;
+use crate::Address;
+use crate::Error;
 use rcrypto::ed25519::keypair;
 
 pub fn public_to_address_ed25519(public: &Ed25519Public) -> Address {
@@ -109,7 +109,7 @@ impl Ed25519KeyPair {
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
-    use {Ed25519KeyPair, Ed25519Secret};
+    use crate::{Ed25519KeyPair, Ed25519Secret};
     #[cfg(feature = "benches")]
     use std::time::Instant;
     #[cfg(feature = "benches")]

@@ -4,6 +4,7 @@ version = "0.1.0"
 authors = ["Aion Foundation <admin@aion.network>"]
 description = "An LRU-cache which operates on memory used"
 license = "GPL3"
+edition = "2018"
 
 [dependencies]
 heapsize = "0.4"

@@ -34,23 +34,23 @@ use ethbloom::Bloom;
 use kvdb::{MemoryDB, MockDbRepository};
 use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
-use types::BlockNumber;
+use crate::types::BlockNumber;
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
-use engine::{Engine, UnityEngine};
-use types::error::Error;
-use executive::Executive;
-use factory::Factories;
-use header::{Header, SealType};
-use machine::EthereumMachine;
-use pod_state::PodState;
-use precompiled::builtin::{builtin_contract, BuiltinContract};
-use spec::seal::Generic as GenericSeal;
-use spec::Genesis;
-use state::backend::Basic as BasicBackend;
-use state::{Backend, State, Substate};
+use crate::engine::{Engine, UnityEngine};
+use crate::types::error::Error;
+use crate::executive::Executive;
+use crate::factory::Factories;
+use crate::header::{Header, SealType};
+use crate::machine::EthereumMachine;
+use crate::pod_state::PodState;
+use crate::precompiled::builtin::{builtin_contract, BuiltinContract};
+use crate::spec::seal::Generic as GenericSeal;
+use crate::spec::Genesis;
+use crate::state::backend::Basic as BasicBackend;
+use crate::state::{Backend, State, Substate};
 
 #[cfg(test)]
-use tests::common::null_engine::NullEngine;
+use crate::tests::common::null_engine::NullEngine;
 
 // helper for formatting errors.
 fn fmt_err<F: ::std::fmt::Display>(f: F) -> String { format!("Spec json is invalid: {}", f) }
@@ -518,7 +518,7 @@ impl Spec {
 #[cfg(test)]
 mod tests {
     use super::Spec;
-    use views::BlockView;
+    use crate::views::BlockView;
     #[test]
     fn test_load_empty() {
         assert!(Spec::load(&[] as &[u8]).is_err());

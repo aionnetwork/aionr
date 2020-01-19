@@ -26,7 +26,7 @@ use aion_types::{H256, U256};
 use bytes::u64_to_bytes;
 use serde::ser::{Serialize, Serializer, SerializeStruct};
 
-use types::{Bytes, TransactionCondition};
+use crate::types::{Bytes, TransactionCondition};
 
 /// Transaction
 #[derive(Debug, Default, Clone, PartialEq)]

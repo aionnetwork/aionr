@@ -5,7 +5,7 @@
 // except according to those terms.
 
 use std::fmt;
-use {UntrustedRlp, PayloadInfo, Prototype, Decodable};
+use crate::{UntrustedRlp, PayloadInfo, Prototype, Decodable};
 
 impl<'a> From<UntrustedRlp<'a>> for Rlp<'a> {
     fn from(rlp: UntrustedRlp<'a>) -> Rlp<'a> {

@@ -22,12 +22,7 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate aion_types;
-extern crate blake2b;
-extern crate rlp;
 extern crate acore_bytes as bytes;
-extern crate elastic_array;
-extern crate db;
 
 #[macro_use]
 extern crate log;
@@ -106,10 +101,10 @@ pub trait Query {
     type Item;
 
     /// Decode a byte-slice into the desired item.
-    fn decode(self, &[u8]) -> Self::Item;
+    fn decode(self, value: &[u8]) -> Self::Item;
 
     /// Record that a node has been passed through.
-    fn record(&mut self, &H256, &[u8], u32) {}
+    fn record(&mut self, _hash: &H256, _data: &[u8], _depth: u32) {}
 }
 
 impl<'a> Query for &'a mut Recorder {

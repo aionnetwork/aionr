@@ -27,9 +27,9 @@ use std::time::Duration;
 use std::ops::{Deref, DerefMut};
 use aion_types::{H256, U256, Address};
 use blake2b::blake2b;
-use transaction::{self, Action};
+use crate::transaction::{self, Action};
 use transient_hashmap::TransientHashMap;
-use transaction::transaction_queue::{TransactionQueue, AccountDetails, VerifiedTransaction};
+use crate::transaction::transaction_queue::{TransactionQueue, AccountDetails, VerifiedTransaction};
 
 type Count = u16;
 
@@ -223,9 +223,9 @@ mod tests {
     use super::*;
     use key::generate_keypair;
     use rustc_hex::FromHex;
-    use transaction::transaction_queue::TransactionOrigin;
-    use transaction::transaction_queue::test::default_account_details;
-    use transaction::DEFAULT_TRANSACTION_TYPE;
+    use crate::transaction::transaction_queue::TransactionOrigin;
+    use crate::transaction::transaction_queue::test::default_account_details;
+    use crate::transaction::DEFAULT_TRANSACTION_TYPE;
     use aion_types::{U256, Address};
 
     fn queue() -> BanningTransactionQueue {

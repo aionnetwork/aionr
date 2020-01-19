@@ -22,10 +22,7 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate aion_types;
-extern crate rlp;
-extern crate rustc_hex;
-extern crate db;
+use db;
 
 use std::fmt;
 use rustc_hex::FromHexError;

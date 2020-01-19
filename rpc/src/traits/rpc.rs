@@ -25,18 +25,20 @@
 use std::collections::BTreeMap;
 
 use jsonrpc_core::Result;
+use jsonrpc_derive::rpc;
 
-build_rpc_trait! {
-    /// RPC Interface.
-    pub trait Rpc {
-        /// Returns supported modules for Geth 1.3.6
-        /// @ignore
-        #[rpc(name = "modules")]
-        fn modules(&self) -> Result<BTreeMap<String, String>>;
+/// RPC Interface.
+#[rpc(server)]
+pub trait Rpc {
+    type Metadata;
 
-        /// Returns supported modules for Geth 1.4.0
-        /// @ignore
-        #[rpc(name = "rpc_modules")]
-        fn rpc_modules(&self) -> Result<BTreeMap<String, String>>;
-    }
+    /// Returns supported modules for Geth 1.3.6
+    /// @ignore
+    #[rpc(name = "modules")]
+    fn modules(&self) -> Result<BTreeMap<String, String>>;
+
+    /// Returns supported modules for Geth 1.4.0
+    /// @ignore
+    #[rpc(name = "rpc_modules")]
+    fn rpc_modules(&self) -> Result<BTreeMap<String, String>>;
 }

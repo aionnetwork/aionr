@@ -29,9 +29,9 @@ use kvdb::HashStore;
 use triehash::sec_trie_root;
 use acore_bytes::Bytes;
 use trie::TrieFactory;
-use state::{VMAccount, AionVMAccount};
+use crate::state::{VMAccount, AionVMAccount};
 use ajson;
-use types::account::account_diff::*;
+use crate::types::account::account_diff::*;
 use rlp::{self, RlpStream};
 
 #[derive(Debug, Clone, PartialEq, Eq)]

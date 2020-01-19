@@ -5,6 +5,7 @@ name = "aionr"
 version = "1.1.0"
 license = "GPL-3.0"
 authors = ["aion foundation <admin@aion.network>"]
+edition = "2018"
 
 [dependencies]
 log = "0.3"
@@ -23,7 +24,7 @@ serde_derive = "1.0"
 fdlimit = "0.1"
 tokio = "0.1.13"
 ctrlc =             { git = "https://github.com/paritytech/rust-ctrlc.git" }
-jsonrpc-core =      { git = "https://github.com/paritytech/jsonrpc.git", branch = "parity-2.2" }
+jsonrpc-core = "14.0.5"
 acore =             { path = "core" }
 acore-bytes =       { path = "util/bytes" }
 acore-io =          { path = "util/io" }

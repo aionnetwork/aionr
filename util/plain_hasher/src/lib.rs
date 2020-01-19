@@ -23,7 +23,6 @@
 #![warn(unused_extern_crates)]
 #[macro_use]
 extern crate crunchy;
-extern crate aion_types;
 
 use std::{hash, mem};
 use std::collections::{HashMap, HashSet};

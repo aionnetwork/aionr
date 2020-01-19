@@ -22,7 +22,7 @@
 
 use std::ops::Range;
 use bloom::Bloom;
-use number::Number;
+use crate::number::Number;
 
 /// Should be used to filter blocks from `BloomChain`.
 pub trait Filter {

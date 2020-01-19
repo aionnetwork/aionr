@@ -22,10 +22,10 @@
 
 //! Spec genesis deserialization.
 
-use uint::Uint;
-use hash::{Address, H256};
-use bytes::Bytes;
-use spec::Seal;
+use crate::uint::Uint;
+use crate::hash::{Address, H256};
+use crate::bytes::Bytes;
+use crate::spec::Seal;
 
 /// Spec genesis.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -64,12 +64,12 @@ pub struct Genesis {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use bytes::Bytes;
-    use uint::Uint;
+    use crate::bytes::Bytes;
+    use crate::uint::Uint;
     use aion_types::{U256, H256 as Eth256};
-    use hash::{H256, Address};
-    use spec::genesis::Genesis;
-    use spec::{POWEquihash, Seal};
+    use crate::hash::{H256, Address};
+    use crate::spec::genesis::Genesis;
+    use crate::spec::{POWEquihash, Seal};
     use std::str::FromStr;
 
     #[test]

@@ -22,10 +22,6 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate keychain;
-extern crate key;
-extern crate rustc_hex;
-
 use rustc_hex::ToHex;
 use key::generate_keypair;
 use keychain::{Crypto, Error};

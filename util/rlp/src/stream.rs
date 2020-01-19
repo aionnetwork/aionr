@@ -7,7 +7,7 @@
 use std::borrow::Borrow;
 use byteorder::{ByteOrder, BigEndian};
 use elastic_array::{ElasticArray16, ElasticArray1024};
-use traits::Encodable;
+use crate::traits::Encodable;
 
 #[derive(Debug, Copy, Clone)]
 struct ListInfo {

@@ -1,4 +1,3 @@
-extern crate patricia_trie;
 extern crate triehash;
 extern crate db;
 extern crate trie_standardmap;

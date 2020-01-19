@@ -21,7 +21,6 @@
  ******************************************************************************/
 
 #![warn(unused_extern_crates)]
-extern crate aion_types;
 
 use aion_types::{H256, U256, Address};
 

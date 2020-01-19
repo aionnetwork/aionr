@@ -24,7 +24,7 @@
 
 use std::collections::HashSet;
 use aion_types::H256;
-use types::{Filter, Log};
+use crate::types::{Filter, Log};
 
 pub type BlockNumber = u64;
 

@@ -21,8 +21,8 @@
  ******************************************************************************/
 
 use elastic_array::ElasticArray36;
-use nibbleslice::NibbleSlice;
-use nibblevec::NibbleVec;
+use crate::nibbleslice::NibbleSlice;
+use crate::nibblevec::NibbleVec;
 use bytes::*;
 use rlp::*;
 use db::DBValue;

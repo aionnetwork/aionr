@@ -31,7 +31,7 @@ use rlp::UntrustedRlp;
 use aion_types::{H64, H128, U128, H256, U256, Address};
 use serde_json::{self, Value};
 use serde_json::map::Map;
-use dispatch::DynamicGasPrice;
+use crate::dispatch::DynamicGasPrice;
 
 use acore::sync::SyncProvider;
 use acore::account_provider::AccountProvider;
@@ -47,13 +47,13 @@ use solidity::compile;
 
 use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_core::futures::future;
-use jsonrpc_macros::Trailing;
 
-use helpers::{errors, limit_logs, fake_sign};
-use helpers::dispatch::{FullDispatcher, default_gas_price};
-use helpers::accounts::unwrap_provider;
-use traits::Eth;
-use types::{
+use crate::helpers::{errors, limit_logs, fake_sign};
+use crate::helpers::dispatch::{FullDispatcher, default_gas_price};
+use crate::helpers::accounts::unwrap_provider;
+use crate::traits::Eth;
+use crate::Metadata;
+use crate::types::{
     Block, BlockTransactions, BlockNumber, Bytes, SyncStatus, Transaction, CallRequest, Index,
 Filter, Log, Receipt, Work, Contract, ContractInfo, Abi, AbiIO , SyncInfo, /*AcitvePeerInfo, PbSyncInfo,
                                                                            SimpleReceipt, SimpleReceiptLog,*/
@@ -251,6 +251,8 @@ where
     M: MinerService + 'static,
     EM: ExternalMinerService + 'static,
 {
+    type Metadata = Metadata;
+
     fn protocol_version(&self) -> Result<String> {
         let version = self.sync.status().protocol_version.to_owned();
         Ok(format!("{}", version))
@@ -302,7 +304,7 @@ where
 
     fn block_number(&self) -> Result<u64> { Ok(self.client.chain_info().best_block_number) }
 
-    fn balance(&self, address: H256, num: Trailing<BlockNumber>) -> BoxFuture<U256> {
+    fn balance(&self, address: H256, num: Option<BlockNumber>) -> BoxFuture<U256> {
         let address = address.into();
 
         let id = num.unwrap_or_default();
@@ -316,13 +318,7 @@ where
         Box::new(future::done(res))
     }
 
-    fn storage_at(
-        &self,
-        address: Address,
-        pos: U128,
-        num: Trailing<BlockNumber>,
-    ) -> BoxFuture<H128>
-    {
+    fn storage_at(&self, address: Address, pos: U128, num: Option<BlockNumber>) -> BoxFuture<H128> {
         let id = num.unwrap_or_default();
 
         try_bf!(check_known(&*self.client, id.clone()));
@@ -337,7 +333,7 @@ where
         Box::new(future::done(res))
     }
 
-    fn transaction_count(&self, address: Address, num: Trailing<BlockNumber>) -> BoxFuture<U256> {
+    fn transaction_count(&self, address: Address, num: Option<BlockNumber>) -> BoxFuture<U256> {
         let res = match num.unwrap_or_default() {
             BlockNumber::Pending => {
                 let nonce = self
@@ -381,7 +377,7 @@ where
         }))
     }
 
-    fn code_at(&self, address: Address, num: Trailing<BlockNumber>) -> BoxFuture<Bytes> {
+    fn code_at(&self, address: Address, num: Option<BlockNumber>) -> BoxFuture<Bytes> {
         let id = num.unwrap_or_default();
         try_bf!(check_known(&*self.client, id.clone()));
 
@@ -463,7 +459,7 @@ where
         Box::new(future::ok(logs))
     }
 
-    fn work(&self, _no_new_work_timeout: Trailing<u64>) -> Result<Work> {
+    fn work(&self, _no_new_work_timeout: Option<u64>) -> Result<Work> {
         Err(errors::deprecated(
             "eth_getWork is deprecated, use stratum api getblocktemplate instead".to_string(),
         ))
@@ -497,7 +493,7 @@ where
 
     fn submit_transaction(&self, raw: Bytes) -> Result<H256> { self.send_raw_transaction(raw) }
 
-    fn call(&self, request: CallRequest, num: Trailing<BlockNumber>) -> BoxFuture<Bytes> {
+    fn call(&self, request: CallRequest, num: Option<BlockNumber>) -> BoxFuture<Bytes> {
         let request = CallRequest::into(request);
         let signed = try_bf!(fake_sign::sign_call(request));
 
@@ -509,7 +505,7 @@ where
         ))
     }
 
-    fn estimate_gas(&self, request: CallRequest, num: Trailing<BlockNumber>) -> BoxFuture<U256> {
+    fn estimate_gas(&self, request: CallRequest, num: Option<BlockNumber>) -> BoxFuture<U256> {
         let request = CallRequest::into(request);
         let signed = try_bf!(fake_sign::sign_call(request));
         Box::new(future::done(

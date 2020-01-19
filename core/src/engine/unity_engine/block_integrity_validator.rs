@@ -20,11 +20,11 @@
  ******************************************************************************/
 
 use triehash::ordered_trie_root;
-use header::Header;
-use types::error::{BlockError, Error};
+use crate::header::Header;
+use crate::types::error::{BlockError, Error};
 use unexpected::Mismatch;
 use rlp::Encodable;
-use transaction::UnverifiedTransaction;
+use crate::transaction::UnverifiedTransaction;
 
 pub trait BlockIntegrityValidator {
     fn validate(&self, txs: &Vec<UnverifiedTransaction>, header: &Header) -> Result<(), Error>;

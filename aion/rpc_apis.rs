@@ -31,7 +31,7 @@ use acore::miner::Miner;
 use acore::sync::SyncProvider;
 use aion_rpc::dispatch::{DynamicGasPrice, FullDispatcher};
 use aion_rpc::informant::{ActivityNotifier, ClientNotifier};
-use aion_rpc::Metadata;
+use aion_rpc::metadata::*;
 use jsonrpc_core::{self as core, MetaIoHandler};
 use parking_lot::Mutex;
 use tokio::runtime::TaskExecutor;

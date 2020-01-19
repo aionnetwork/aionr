@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 use super::{Position, GroupPosition};
-use position::Position as BloomPosition;
+use crate::position::Position as BloomPosition;
 
 pub struct Manager {
     index_size: usize,

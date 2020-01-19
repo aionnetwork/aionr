@@ -25,8 +25,8 @@ extern crate rustc_hex;
 
 mod util;
 
-use bloomchain::{Bloom, Config};
-use bloomchain::group::BloomGroupChain;
+use crate::bloomchain::{Bloom, Config};
+use crate::bloomchain::group::BloomGroupChain;
 use util::{BloomGroupMemoryDatabase, FromHex, for_each_bloom, generate_n_random_blooms};
 
 #[test]

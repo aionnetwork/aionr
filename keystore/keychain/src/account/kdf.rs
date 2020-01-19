@@ -20,7 +20,7 @@
  *
  ******************************************************************************/
 
-use json;
+use crate::json;
 use rustc_hex::{FromHex, ToHex};
 use rlp::{self, RlpStream, UntrustedRlp, DecoderError};
 

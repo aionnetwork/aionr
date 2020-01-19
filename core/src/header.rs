@@ -33,7 +33,8 @@ use std::cmp;
 use time::get_time;
 use serde::{Serialize, Serializer};
 
-pub use types::BlockNumber;
+pub use crate::types::BlockNumber;
+use crate::encoded;
 
 // TODO: better location?
 pub fn u256_to_u128(value: U256) -> U128 {
@@ -524,7 +525,7 @@ impl Header {
     pub fn rlp_blake2b(&self, with_seal: Seal) -> H256 { blake2b(self.rlp(with_seal)) }
 
     /// Encode the header, getting a type-safe wrapper around the RLP.
-    pub fn encoded(&self) -> ::encoded::Header { ::encoded::Header::new(self.rlp(Seal::With)) }
+    pub fn encoded(&self) -> encoded::Header { encoded::Header::new(self.rlp(Seal::With)) }
 }
 
 impl Decodable for Header {

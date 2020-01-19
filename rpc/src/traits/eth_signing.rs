@@ -23,27 +23,29 @@
 //! Eth rpc interface.
 
 use jsonrpc_core::BoxFuture;
-use aion_types::{H256, H768};
+use aion_types::{H256, H768, Address};
+use jsonrpc_derive::rpc;
 
-use types::{Bytes, TransactionRequest, RichRawTransaction};
+use crate::types::{Bytes as RpcBytes, TransactionRequest, RichRawTransaction};
 
-build_rpc_trait! {
-    /// Signing methods implementation relying on unlocked accounts.
-    pub trait EthSigning {
-        /// Signs the hash of data with given address signature.
-        #[rpc(name = "eth_sign")]
-        fn sign(&self, H256, Bytes) -> BoxFuture<H768>;
+/// Signing methods implementation relying on unlocked accounts.
+#[rpc(server)]
+pub trait EthSigning {
+    type Metadata;
 
-        /// Sends transaction; will block waiting for signer to return the
-        /// transaction hash.
-        /// If Signer is disable it will require the account to be unlocked.
-        #[rpc(name = "eth_sendTransaction")]
-        fn send_transaction(&self, TransactionRequest) -> BoxFuture<H256>;
+    /// Signs the hash of data with given address signature.
+    #[rpc(name = "eth_sign")]
+    fn sign(&self, address: Address, pass: RpcBytes) -> BoxFuture<H768>;
 
-        /// Signs transactions without dispatching it to the network.
-        /// Returns signed transaction RLP representation and the transaction itself.
-        /// It can be later submitted using `eth_sendRawTransaction/eth_submitTransaction`.
-        #[rpc(name = "eth_signTransaction")]
-        fn sign_transaction(&self, TransactionRequest) -> BoxFuture<RichRawTransaction>;
-    }
+    /// Sends transaction; will block waiting for signer to return the
+    /// transaction hash.
+    /// If Signer is disable it will require the account to be unlocked.
+    #[rpc(name = "eth_sendTransaction")]
+    fn send_transaction(&self, request: TransactionRequest) -> BoxFuture<H256>;
+
+    /// Signs transactions without dispatching it to the network.
+    /// Returns signed transaction RLP representation and the transaction itself.
+    /// It can be later submitted using `eth_sendRawTransaction/eth_submitTransaction`.
+    #[rpc(name = "eth_signTransaction")]
+    fn sign_transaction(&self, request: TransactionRequest) -> BoxFuture<RichRawTransaction>;
 }

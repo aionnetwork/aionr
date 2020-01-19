@@ -20,10 +20,10 @@
  *
  ******************************************************************************/
 
-use helpers::CallRequest as Request;
+use crate::helpers::CallRequest as Request;
 use aion_types::{U256, Address};
 
-use types::Bytes;
+use crate::types::Bytes;
 
 /// Call request
 #[derive(Debug, Default, PartialEq, Deserialize)]

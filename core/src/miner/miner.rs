@@ -28,33 +28,34 @@ use std::ops::Deref;
 use std::hash::{Hash, Hasher};
 
 use rustc_hex::FromHex;
-use account_provider::AccountProvider;
+use crate::account_provider::AccountProvider;
 use acore_bytes::Bytes;
 use aion_types::{Address, H256, U256};
-use block::{Block, ClosedBlock, IsBlock, SealedBlock};
-use client::{BlockId, MiningBlockChainClient, TransactionId};
-use engine::Engine;
-use header::{BlockNumber, Header, SealType};
-use types::error::*;
+use crate::block::{Block, ClosedBlock, IsBlock, SealedBlock};
+use crate::client::{BlockId, MiningBlockChainClient, TransactionId};
+use crate::engine::Engine;
+use crate::header::{BlockNumber, Header, SealType};
+use crate::types::error::*;
 use io::IoChannel;
-use miner::{MinerService, MinerStatus};
+use crate::miner::{MinerService, MinerStatus};
 use parking_lot::{Mutex, RwLock};
-use receipt::Receipt;
-use spec::Spec;
-use state::State;
-use transaction::{
+use crate::receipt::Receipt;
+use crate::spec::Spec;
+use crate::state::State;
+use crate::transaction::{
     Condition as TransactionCondition,
     Error as TransactionError,
     PendingTransaction,
     SignedTransaction,
     UnverifiedTransaction,
 };
-use transaction::banning_queue::{BanningTransactionQueue, Threshold};
-use transaction::local_transactions::TxIoMessage;
-use transaction::transaction_pool::TransactionPool;
-use transaction::transaction_queue::{
+use crate::transaction::banning_queue::{BanningTransactionQueue, Threshold};
+use crate::transaction::local_transactions::TxIoMessage;
+use crate::transaction::transaction_pool::TransactionPool;
+use crate::transaction::transaction_queue::{
     AccountDetails, PrioritizationStrategy, RemovalReason, TransactionOrigin, TransactionQueue,
 };
+use crate::db::{StateDB};
 use using_queue::{GetAction, UsingQueue};
 use rcrypto::ed25519;
 use key::Ed25519KeyPair;
@@ -243,7 +244,7 @@ impl Miner {
     pub fn clear(&self) { self.sealing_work.lock().queue.reset(); }
 
     /// Get `Some` `clone()` of the current pending block's state or `None` if we're not sealing.
-    pub fn pending_state(&self, latest_block_number: BlockNumber) -> Option<State<::db::StateDB>> {
+    pub fn pending_state(&self, latest_block_number: BlockNumber) -> Option<State<StateDB>> {
         self.map_pending_block(|b| b.state().clone(), latest_block_number)
     }
 
@@ -1754,22 +1755,19 @@ fn parse_staker(key: String) -> Result<Ed25519KeyPair, String> {
 #[cfg(test)]
 mod tests {
     use aion_types::U256;
-    use block::IsBlock;
+    use crate::block::IsBlock;
     use io::IoChannel;
     use keychain;
-    use miner::{Miner, MinerService};
+    use crate::miner::{Miner, MinerService};
     use rustc_hex::FromHex;
-    use spec::Spec;
+    use crate::spec::Spec;
     use std::sync::Arc;
     use std::time::Duration;
     use super::{Banning, MinerOptions, PendingSet, SealType};
-    use types::error::*;
-    use client::{BlockChainClient, BlockId};
-    use tests::common::{EachBlockWith, TestBlockChainClient};
-    use transaction::{PendingTransaction, SignedTransaction, Error as TransactionError};
-    use transaction::Action;
-    use transaction::Transaction;
-    use transaction::transaction_queue::PrioritizationStrategy;
+    use crate::types::error::*;
+    use crate::client::{BlockChainClient, BlockId};
+    use crate::tests::common::{EachBlockWith, TestBlockChainClient};
+    use crate::transaction::{PendingTransaction, SignedTransaction, Error as TransactionError, Action, Transaction, transaction_queue::PrioritizationStrategy, DEFAULT_TRANSACTION_TYPE};
 
     #[test]
     fn should_prepare_block_to_seal() {
@@ -1866,7 +1864,7 @@ mod tests {
             gas: U256::from(300_000),
             gas_price: default_gas_price(),
             nonce: U256::zero(),
-            transaction_type: ::transaction::DEFAULT_TRANSACTION_TYPE,
+            transaction_type: DEFAULT_TRANSACTION_TYPE,
             nonce_bytes: Vec::new(),
             gas_price_bytes: Vec::new(),
             gas_bytes: Vec::new(),
@@ -1885,7 +1883,7 @@ mod tests {
             gas: U256::from(300_000),
             gas_price: default_gas_price(),
             nonce: U256::zero(),
-            transaction_type: ::transaction::DEFAULT_TRANSACTION_TYPE,
+            transaction_type: DEFAULT_TRANSACTION_TYPE,
             nonce_bytes: Vec::new(),
             gas_price_bytes: Vec::new(),
             gas_bytes: Vec::new(),

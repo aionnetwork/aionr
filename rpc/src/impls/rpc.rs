@@ -23,7 +23,8 @@
 //! RPC generic methods implementation.
 use std::collections::BTreeMap;
 use jsonrpc_core::Result;
-use traits::Rpc;
+use crate::traits::Rpc;
+use crate::Metadata;
 
 /// RPC generic methods implementation.
 pub struct RpcClient {
@@ -45,6 +46,8 @@ impl RpcClient {
 }
 
 impl Rpc for RpcClient {
+    type Metadata = Metadata;
+
     fn rpc_modules(&self) -> Result<BTreeMap<String, String>> {
         let modules = self
             .modules

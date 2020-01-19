@@ -11,18 +11,18 @@
 
 use std::iter::repeat;
 use std::io;
-use cryptoutil::copy_memory;
+use crate::cryptoutil::copy_memory;
 
 use rand::{OsRng, Rng};
 use rand::distributions::Standard;
 use serialize::base64;
 use serialize::base64::{FromBase64, ToBase64};
 
-use cryptoutil::{read_u32_be, write_u32_be};
-use hmac::Hmac;
-use mac::Mac;
-use sha2::Sha256;
-use util::fixed_time_eq;
+use crate::cryptoutil::{read_u32_be, write_u32_be};
+use crate::hmac::Hmac;
+use crate::mac::Mac;
+use crate::sha2::Sha256;
+use crate::util::fixed_time_eq;
 
 // Calculate a block of the output of size equal to the output_bytes of the underlying Mac function
 // mac - The Mac function to use
@@ -274,9 +274,9 @@ pub fn pbkdf2_check(password: &str, hashed_value: &str) -> Result<bool, &'static
 mod test {
     use std::iter::repeat;
 
-    use pbkdf2::{pbkdf2, pbkdf2_simple, pbkdf2_check};
-    use hmac::Hmac;
-    use sha1::Sha1;
+    use crate::pbkdf2::{pbkdf2, pbkdf2_simple, pbkdf2_check};
+    use crate::hmac::Hmac;
+    use crate::sha1::Sha1;
 
     struct Test {
         password: Vec<u8>,

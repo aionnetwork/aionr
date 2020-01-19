@@ -3,6 +3,7 @@ description = "Log implementation for Aion"
 name = "logger"
 version = "1.0.0"
 authors = ["Aion Foundation <admin@aion.network>"]
+edition = "2018"
 
 [dependencies]
 log = "0.3"

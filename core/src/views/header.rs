@@ -26,7 +26,7 @@ use acore_bytes::Bytes;
 use aion_types::{H256, U256, Address, to_u256};
 use ethbloom::Bloom;
 use blake2b::blake2b;
-use header::{BlockNumber, SealType};
+use crate::header::{BlockNumber, SealType};
 use rlp::Rlp;
 
 /// View onto block header rlp.

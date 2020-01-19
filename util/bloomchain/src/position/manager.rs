@@ -97,7 +97,7 @@ impl Manager {
 
 #[cfg(test)]
 mod tests {
-    use position::Position;
+    use crate::position::Position;
     use super::*;
     #[test]
     fn test_level_size() {

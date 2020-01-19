@@ -21,9 +21,9 @@
  ******************************************************************************/
 
 use std::{env, fs};
-use accounts_dir::{KeyDirectory, RootDiskDirectory, VaultKey};
-use account::SafeAccount;
-use ethkey::generate_keypair;
+use crate::accounts_dir::{KeyDirectory, RootDiskDirectory, VaultKey};
+use crate::account::SafeAccount;
+use crate::ethkey::generate_keypair;
 use tempdir::TempDir;
 
 #[test]

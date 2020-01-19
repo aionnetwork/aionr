@@ -40,5 +40,5 @@ pub use self::blockchain::{BlockProvider, BlockChain};
 // pub use self::extras::{BlockReceipts, BlockDetails, TransactionAddress};
 // pub use self::import_route::ImportRoute;
 // re-export
-pub use types::blockchain::tree_route::TreeRoute;
-pub use types::blockchain::extra::BlockReceipts;
+pub use crate::types::blockchain::tree_route::TreeRoute;
+pub use crate::types::blockchain::extra::BlockReceipts;

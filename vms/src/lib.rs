@@ -22,10 +22,7 @@
 #![warn(unused_extern_crates)]
 
 extern crate vm_common as types;
-extern crate aion_types;
-extern crate fastvm;
-extern crate avm;
-extern crate libc;
+
 #[macro_use]
 extern crate log;
 

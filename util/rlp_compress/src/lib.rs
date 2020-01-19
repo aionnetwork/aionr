@@ -1,9 +1,7 @@
 #![warn(unused_extern_crates)]
 
-extern crate elastic_array;
 #[macro_use]
 extern crate lazy_static;
-extern crate rlp;
 
 mod common;
 

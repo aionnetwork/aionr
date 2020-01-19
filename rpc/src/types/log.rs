@@ -22,7 +22,7 @@
 
 use acore::log_entry::{LocalizedLogEntry, LogEntry};
 use aion_types::{H256, U256, Address};
-use types::{Bytes};
+use crate::types::{Bytes};
 use serde::ser::{Serialize, Serializer, SerializeStruct};
 
 /// Log
@@ -111,7 +111,7 @@ mod tests {
     use serde_json;
     use std::str::FromStr;
     use aion_types::{H256, U256};
-    use types::{Log};
+    use crate::types::{Log};
 
     #[test]
     fn log_serialization() {

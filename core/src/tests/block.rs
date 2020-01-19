@@ -22,22 +22,22 @@
 
 use log;
 use std::sync::Arc;
-use block::{OpenBlock, LockedBlock, SealedBlock, Drain};
-use engine::Engine;
-use types::error::Error;
-use header::Header;
-use factory::Factories;
-use db::StateDB;
-use state::State;
-use views::BlockView;
-use transaction::SignedTransaction;
+use crate::block::{OpenBlock, LockedBlock, SealedBlock, Drain};
+use crate::engine::Engine;
+use crate::types::error::Error;
+use crate::header::Header;
+use crate::factory::Factories;
+use crate::db::StateDB;
+use crate::state::State;
+use crate::views::BlockView;
+use crate::transaction::SignedTransaction;
 use kvdb::MockDbRepository;
 use aion_types::Address;
 use vms::LastHashes;
-use tests::common::helpers::get_temp_state_db;
-use tests::common::TestBlockChainClient;
-use spec::Spec;
-use client::BlockChainClient;
+use crate::tests::common::helpers::get_temp_state_db;
+use crate::tests::common::TestBlockChainClient;
+use crate::spec::Spec;
+use crate::client::BlockChainClient;
 
 /// Enact the block given by `block_bytes` using `engine` on the database `db` with given `parent` block header
 fn enact_bytes(
@@ -161,7 +161,7 @@ fn open_block() {
 
 #[test]
 fn enact_block() {
-    use spec::*;
+    use crate::spec::*;
     let spec = Spec::new_test();
     let engine = &*spec.engine;
     let genesis_header = spec.genesis_header();

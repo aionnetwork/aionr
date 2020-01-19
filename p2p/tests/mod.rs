@@ -19,9 +19,6 @@
  *
  ******************************************************************************/
 
-extern crate p2p;
-extern crate tokio;
-
 use std::time::Duration;
 use std::thread;
 use p2p::Mgr;

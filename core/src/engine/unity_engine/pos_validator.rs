@@ -19,8 +19,8 @@
  *
  ******************************************************************************/
 
-use header::{Header, SealType};
-use types::error::{BlockError, Error};
+use crate::header::{Header, SealType};
+use crate::types::error::{BlockError, Error};
 use unexpected::Mismatch;
 use rcrypto::ed25519::verify;
 use num::Zero;
@@ -110,8 +110,8 @@ impl PoSValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use header::{Header, SealType};
-    use types::error::{Error, BlockError};
+    use crate::header::{Header, SealType};
+    use crate::types::error::{Error, BlockError};
     use unexpected::Mismatch;
     use aion_types::{U256, Address};
 

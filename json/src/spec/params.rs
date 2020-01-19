@@ -22,8 +22,8 @@
 
 //! Spec params deserialization.
 
-use uint::{self, Uint};
-use hash::Address;
+use crate::uint::{self, Uint};
+use crate::hash::Address;
 
 /// Spec params.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -54,9 +54,9 @@ pub struct Params {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use uint::Uint;
+    use crate::uint::Uint;
     use aion_types::U256;
-    use spec::params::Params;
+    use crate::spec::params::Params;
 
     #[test]
     fn params_deserialization() {

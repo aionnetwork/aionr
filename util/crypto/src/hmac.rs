@@ -10,9 +10,9 @@
 
 use std::iter::repeat;
 
-use cryptoutil;
-use digest::Digest;
-use mac::{Mac, MacResult};
+use crate::cryptoutil;
+use crate::digest::Digest;
+use crate::mac::{Mac, MacResult};
 
 /**
  * The Hmac struct represents an Hmac function - a Message Authentication Code using a Digest.
@@ -121,10 +121,10 @@ impl<D: Digest> Mac for Hmac<D> {
 mod test {
     use std::iter::repeat;
 
-    use mac::{Mac, MacResult};
-    use hmac::Hmac;
-    //use digest::Digest;
-    use md5::Md5;
+    use crate::mac::{Mac, MacResult};
+    use crate::hmac::Hmac;
+    //use crate::digest::Digest;
+    use crate::md5::Md5;
 
     struct Test {
         key: Vec<u8>,

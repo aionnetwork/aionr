@@ -22,8 +22,6 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate triehash;
-
 use triehash::{trie_root, shared_prefix_len, hex_prefix_encode};
 
 #[test]

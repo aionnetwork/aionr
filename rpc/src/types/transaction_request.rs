@@ -24,10 +24,10 @@
 use std::fmt;
 
 use ansi_term::Colour;
-use helpers;
+use crate::helpers;
 use aion_types::{U256, Address, H256};
 
-use types::{Bytes, TransactionCondition};
+use crate::types::{Bytes, TransactionCondition};
 
 /// Transaction request coming from RPC
 #[derive(
@@ -164,7 +164,7 @@ mod tests {
     use serde_json;
     use std::str::FromStr;
     use aion_types::{H256, U256};
-    use types::TransactionCondition;
+    use crate::types::TransactionCondition;
 
     #[test]
     fn transaction_request_deserialize() {

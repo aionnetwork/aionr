@@ -311,7 +311,7 @@ impl fmt::Display for Connection {
 #[cfg(test)]
 mod node_tests {
 
-    use TempNode;
+    use crate::TempNode;
 
     #[test]
     fn test_parse_seed() {

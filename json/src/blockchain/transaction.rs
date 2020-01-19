@@ -22,8 +22,8 @@
 
 //! Blockchain test transaction deserialization.
 
-use uint::Uint;
-use bytes::Bytes;
+use crate::uint::Uint;
+use crate::bytes::Bytes;
 
 /// Blockchain test transaction deserialization.
 #[derive(Debug, PartialEq, Deserialize)]

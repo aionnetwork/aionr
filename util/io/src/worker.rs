@@ -24,8 +24,8 @@ use std::sync::Arc;
 use std::thread::{JoinHandle, self};
 use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 use crossbeam::sync::chase_lev;
-use service::{HandlerId, IoChannel, IoContext};
-use IoHandler;
+use crate::service::{HandlerId, IoChannel, IoContext};
+use crate::IoHandler;
 use std::cell::Cell;
 
 use std::sync::{Condvar as SCondvar, Mutex as SMutex};

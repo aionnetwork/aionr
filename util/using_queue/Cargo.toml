@@ -2,5 +2,6 @@
 name = "using_queue"
 version = "0.1.0"
 authors = ["Aion Foundation <admin@aion.network>"]
+edition = "2018"
 
 [dependencies]

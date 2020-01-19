@@ -1,8 +1,6 @@
 #![warn(unused_extern_crates)]
 
-extern crate rand;
 extern crate rustc_serialize as serialize;
-extern crate libc;
 
 pub mod aessafe;
 pub mod bcrypt;
@@ -29,10 +27,10 @@ pub mod symmetriccipher;
 pub mod util;
 
 use std::fmt;
-use pbkdf2::pbkdf2;
-use scrypt::{scrypt, ScryptParams};
-use sha2::Sha256;
-use hmac::Hmac;
+use crate::pbkdf2::pbkdf2;
+use crate::scrypt::{scrypt, ScryptParams};
+use crate::sha2::Sha256;
+use crate::hmac::Hmac;
 
 pub const KEY_LENGTH: usize = 32;
 pub const KEY_ITERATIONS: usize = 10240;
@@ -129,10 +127,10 @@ pub fn derive_mac(derived_left_bits: &[u8], cipher_text: &[u8]) -> Vec<u8> {
 
 /// AES encryption
 pub mod aes {
-    use blockmodes::{CtrMode, CbcDecryptor, PkcsPadding};
-    use aessafe::{AesSafe128Encryptor, AesSafe128Decryptor};
-    use symmetriccipher::{Encryptor, Decryptor, SymmetricCipherError};
-    use buffer::{RefReadBuffer, RefWriteBuffer, WriteBuffer};
+    use crate::blockmodes::{CtrMode, CbcDecryptor, PkcsPadding};
+    use crate::aessafe::{AesSafe128Encryptor, AesSafe128Decryptor};
+    use crate::symmetriccipher::{Encryptor, Decryptor, SymmetricCipherError};
+    use crate::buffer::{RefReadBuffer, RefWriteBuffer, WriteBuffer};
 
     /// Encrypt a message (CTR mode)
     pub fn encrypt(k: &[u8], iv: &[u8], plain: &[u8], dest: &mut [u8]) {

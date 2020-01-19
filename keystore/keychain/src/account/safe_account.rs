@@ -23,9 +23,9 @@
 use std::str::FromStr;
 use rustc_hex::ToHex;
 use uuid::Uuid;
-use ethkey::{Ed25519KeyPair, Ed25519Signature, Address, Message, sign_ed25519};
-use {json, Error};
-use account::Version;
+use crate::ethkey::{Ed25519KeyPair, Ed25519Signature, Address, Message, sign_ed25519};
+use crate::{json, Error};
+use crate::account::Version;
 use aion_types::H256;
 use rlp::{self, RlpStream, UntrustedRlp, DecoderError};
 use super::crypto::Crypto;

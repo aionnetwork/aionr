@@ -22,10 +22,7 @@
 #![warn(unused_extern_crates)]
 
 //! methods for FastVM implemented by Rust
-extern crate bincode;
-extern crate libc;
-extern crate num_bigint;
-extern crate aion_types;
+
 #[macro_use]
 extern crate log;
 extern crate patricia_trie as trie;

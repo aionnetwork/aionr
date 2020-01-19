@@ -23,7 +23,7 @@
 //! Local Transactions List.
 use std::collections::HashMap;
 use aion_types::{H256, U256};
-use transaction::error::Error;
+use crate::transaction::error::Error;
 use parking_lot::Mutex;
 use io::IoChannel;
 
@@ -229,10 +229,10 @@ pub enum TxIoMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use transaction::transaction::{Transaction, Action, SignedTransaction};
+    use crate::transaction::transaction::{Transaction, Action, SignedTransaction};
     use key::generate_keypair;
     use io::IoService;
-    use transaction::DEFAULT_TRANSACTION_TYPE;
+    use crate::transaction::DEFAULT_TRANSACTION_TYPE;
 
     #[test]
     fn should_add_transaction_as_pending() {

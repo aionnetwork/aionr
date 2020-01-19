@@ -25,18 +25,8 @@
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
-extern crate futures;
-extern crate bincode;
-extern crate rand;
-extern crate tokio;
-extern crate tokio_codec;
-extern crate tokio_reactor;
-extern crate acore_bytes;
-extern crate uuid;
+
 extern crate aion_version as version;
-extern crate bytes;
-extern crate byteorder;
-extern crate parking_lot;
 
 #[cfg(test)]
 mod test;
@@ -72,16 +62,16 @@ use tokio::timer::Interval;
 use tokio_reactor::Handle;
 use tokio_codec::{Decoder,Framed};
 use codec::Codec;
-use route::Version;
-use route::Action;
-use state::STATE;
+use crate::route::Version;
+use crate::route::Action;
+use crate::state::STATE;
 use handler::handshake;
 use handler::active_nodes;
-use node::TempNode;
+use crate::node::TempNode;
 use parking_lot::{Mutex,RwLock};
 
-pub use msg::ChannelBuffer;
-pub use node::Node;
+pub use crate::msg::ChannelBuffer;
+pub use crate::node::Node;
 pub use config::Config;
 pub use callable::Callable;
 
@@ -92,7 +82,7 @@ const TIMEOUT_MAX: u64 = 30;
 const TEMP_MAX: usize = 64;
 
 pub const PROTOCAL_VERSION: u16 = Version::V0 as u16;
-pub use route::Module;
+pub use crate::route::Module;
 
 #[derive(Clone)]
 pub struct Mgr {
@@ -854,9 +844,9 @@ mod tests {
     use futures::Future;
     use tokio::net::TcpStream;
     use futures::sync::{mpsc,oneshot};
-    use Mgr;
-    use node::Node;
-    use config::Config;
+    use crate::Mgr;
+    use crate::node::Node;
+    use crate::config::Config;
     use super::PROTOCAL_VERSION;
     use parking_lot::RwLock as RwLock;
 

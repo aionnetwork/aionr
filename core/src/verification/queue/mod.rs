@@ -32,13 +32,14 @@ use heapsize::HeapSizeOf;
 use aion_types::{H256, U256};
 use parking_lot::{Condvar, Mutex, RwLock};
 use io::*;
-use engine::Engine;
-use types::error::*;
-use service::*;
+use crate::engine::Engine;
+use crate::types::error::*;
+use crate::service::*;
+use crate::block_status::BlockStatus;
 
 use self::kind::{BlockLike, Kind};
 
-pub use types::verification_queue_info::VerificationQueueInfo as QueueInfo;
+pub use crate::types::verification_queue_info::VerificationQueueInfo as QueueInfo;
 
 pub mod kind;
 
@@ -123,9 +124,8 @@ pub enum Status {
     Unknown,
 }
 
-impl Into<::block_status::BlockStatus> for Status {
-    fn into(self) -> ::block_status::BlockStatus {
-        use block_status::BlockStatus;
+impl Into<BlockStatus> for Status {
+    fn into(self) -> BlockStatus {
         match self {
             Status::Queued => BlockStatus::Queued,
             Status::Bad => BlockStatus::Bad,
@@ -798,12 +798,12 @@ impl<K: Kind> Drop for VerificationQueue<K> {
 #[cfg(test)]
 mod tests {
     use io::*;
-    use spec::*;
+    use crate::spec::*;
     use super::{BlockQueue,State, Config};
     use super::kind::blocks::Unverified;
-    use helpers::*;
-    use types::error::{Error,ImportError};
-    use views::BlockView;
+    use crate::helpers::*;
+    use crate::types::error::{Error,ImportError};
+    use crate::views::BlockView;
 
     // create a test block queue.
     // auto_scaling enables verifier adjustment.

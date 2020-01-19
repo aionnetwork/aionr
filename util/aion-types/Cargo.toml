@@ -17,6 +17,7 @@ authors = ["Aion Foundation <admin@aion.network>"]
 build = "build.rs"
 description = "Aion types"
 license = "MIT"
+edition = "2018"
 
 [dependencies.num-bigint]
 version = "0.2"

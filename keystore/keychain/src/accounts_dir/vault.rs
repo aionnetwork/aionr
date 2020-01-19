@@ -23,7 +23,7 @@
 use std::{fs, io};
 use std::path::{PathBuf, Path};
 use parking_lot::Mutex;
-use {json, SafeAccount, Error};
+use crate::{json, SafeAccount, Error};
 use blake2b::blake2b;
 use super::super::account::Crypto;
 use super::{KeyDirectory, VaultKeyDirectory, VaultKey, SetKeyError};

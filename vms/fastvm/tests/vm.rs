@@ -21,11 +21,6 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate fastvm;
-extern crate aion_types;
-extern crate rlp;
-extern crate vm_common;
-
 use std::convert::Into;
 use aion_types::U256;
 use vm_common::CallType;

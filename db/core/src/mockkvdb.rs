@@ -19,7 +19,7 @@
  *
  ******************************************************************************/
 
-use traits::KeyValueDAO;
+use crate::traits::KeyValueDAO;
 use std::collections::BTreeMap;
 use super::{Key, DBValue};
 

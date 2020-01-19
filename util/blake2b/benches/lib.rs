@@ -22,9 +22,6 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate tiny_keccak;
-extern crate blake2b;
-
 use std::iter::repeat;
 use std::time::Instant;
 use tiny_keccak::keccak256;

@@ -20,10 +20,10 @@
  ******************************************************************************/
 
 use super::DifficultyCalc;
-use types::error::{Error, BlockError};
-use header::Header;
+use crate::types::error::{Error, BlockError};
+use crate::header::Header;
 use unexpected::{Mismatch};
-use client::BlockChainClient;
+use crate::client::BlockChainClient;
 
 pub trait GrandParentHeaderValidator {
     fn validate(

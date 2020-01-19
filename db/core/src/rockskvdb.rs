@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use std::cmp;
-use traits::KeyValueDAO;
+use crate::traits::KeyValueDAO;
 use parity_rocksdb::{
     DB, Options, BlockBasedOptions, Cache, ReadOptions, IteratorMode, Direction, WriteOptions,
     WriteBatch, DBIterator, Writable, DBCompactionStyle,
@@ -29,7 +29,7 @@ use super::{Key, DBValue};
 use std::collections::HashMap;
 use interleaved_ordered::{interleave_ordered, InterleaveOrdered};
 use std::marker::PhantomData;
-use dbconfigs::DatabaseConfig;
+use crate::dbconfigs::DatabaseConfig;
 
 enum KeyState {
     Insert(DBValue),

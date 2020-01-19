@@ -21,8 +21,8 @@
 use std::convert::Into;
 use rustc_hex::FromHex;
 use rlp::{ encode, decode };
-use receipt::Receipt;
-use log_entry::LogEntry;
+use crate::receipt::Receipt;
+use crate::log_entry::LogEntry;
 use aion_types::{ H256, U256 };
 
 #[test]

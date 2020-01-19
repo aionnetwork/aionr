@@ -22,9 +22,9 @@
 
 use std::fmt;
 use std::io::Error as IoError;
-use ethkey::Error as EthKeyError;
+use crate::ethkey::Error as EthKeyError;
 use crypto::Error as EthCryptoError;
-//use ethkey::DerivationError;
+//use crate::ethkey::DerivationError;
 
 /// Account-related errors.
 #[derive(Debug)]

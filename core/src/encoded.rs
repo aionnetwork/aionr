@@ -29,11 +29,11 @@
 //! When the entirety of the object is needed, it's better to upgrade it to a fully
 //! decoded object where parts like the hash can be saved.
 
-use block::Block as FullBlock;
+use crate::block::Block as FullBlock;
 
-use header::{BlockNumber, SealType, Header as FullHeader};
-use transaction::UnverifiedTransaction;
-use views;
+use crate::header::{BlockNumber, SealType, Header as FullHeader};
+use crate::transaction::UnverifiedTransaction;
+use crate::views;
 
 use blake2b::blake2b;
 use heapsize::HeapSizeOf;

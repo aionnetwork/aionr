@@ -26,7 +26,7 @@ use std::collections::BTreeMap;
 use std::io::Read;
 use serde_json;
 use serde_json::Error;
-use vm::Vm;
+use crate::vm::Vm;
 
 /// Vm test deserializer.
 #[derive(Debug, PartialEq, Deserialize)]

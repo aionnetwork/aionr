@@ -36,10 +36,10 @@ use bytes::Bytes;
 use key::Ed25519Signature;
 use parking_lot::Mutex;
 
-use helpers::{errors, nonce, ConfirmationPayload, FilledTransactionRequest, TransactionRequest};
+use crate::helpers::{errors, nonce, ConfirmationPayload, FilledTransactionRequest, TransactionRequest};
 use jsonrpc_core::futures::{future, Async, Future, Poll};
 use jsonrpc_core::{BoxFuture, Error, Result};
-use types::{
+use crate::types::{
     ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse,
     RichRawTransaction as RpcRichRawTransaction, SignRequest as RpcSignRequest,
 };
@@ -73,7 +73,7 @@ pub trait Dispatcher: Send + Sync + Clone {
     ) -> BoxFuture<SignResult>;
 
     /// Converts a `SignedTransaction` into `RichRawTransaction`
-    fn enrich(&self, SignedTransaction) -> RpcRichRawTransaction;
+    fn enrich(&self, signed_transaction: SignedTransaction) -> RpcRichRawTransaction;
 
     /// "Dispatch" a local transaction.
     fn dispatch_transaction(&self, signed_transaction: PendingTransaction) -> Result<H256>;

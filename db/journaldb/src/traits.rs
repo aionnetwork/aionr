@@ -23,7 +23,7 @@
 //! Disk-backed `HashStore` implementation.
 
 use std::sync::Arc;
-use kvdb::{self, DBTransaction, HashStore};
+use crate::kvdb::{self, DBTransaction, HashStore};
 use aion_types::H256;
 use error::UtilError;
 use bytes::Bytes;

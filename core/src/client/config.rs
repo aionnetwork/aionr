@@ -23,13 +23,13 @@
 use std::str::FromStr;
 use std::path::Path;
 
-use verification::queue::Config as QueueConfig;
+use crate::verification::queue::Config as QueueConfig;
 use journaldb;
 use kvdb::CompactionProfile;
 use aion_types::Address;
 
 pub use std::time::Duration;
-pub use types::blockchain::config::Config as BlockChainConfig;
+pub use crate::types::blockchain::config::Config as BlockChainConfig;
 pub use vms::VMType;
 
 /// Client state db compaction profile

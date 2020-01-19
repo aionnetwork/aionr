@@ -34,10 +34,11 @@ use parking_lot::Mutex;
 use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_core::futures::{future, Future};
 use jsonrpc_core::futures::future::Either;
-use traits::EthFilter;
-use types::{BlockNumber, Index, Filter, FilterChanges, Log};
-use helpers::{errors, PollFilter, PollManager, limit_logs};
-use impls::eth::pending_logs;
+use crate::traits::EthFilter;
+use crate::types::{BlockNumber, Index, Filter, FilterChanges, Log};
+use crate::helpers::{errors, PollFilter, PollManager, limit_logs};
+use crate::impls::eth::pending_logs;
+use crate::Metadata;
 
 /// Something which provides data that can be filtered over.
 pub trait Filterable {
@@ -122,6 +123,8 @@ where
 }
 
 impl<T: Filterable + Send + Sync + 'static> EthFilter for T {
+    type Metadata = Metadata;
+
     fn new_filter(&self, filter: Filter) -> Result<U256> {
         let mut polls = self.polls().lock();
         match self.block_number(

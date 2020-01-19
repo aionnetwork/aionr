@@ -64,12 +64,8 @@
 //TODO: use Poll from mio
 #![allow(deprecated)]
 
-extern crate mio;
 #[macro_use]
 extern crate log as rlog;
-extern crate slab;
-extern crate crossbeam;
-extern crate parking_lot;
 
 mod service;
 mod worker;

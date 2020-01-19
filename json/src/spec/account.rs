@@ -23,9 +23,9 @@
 //! Spec account deserialization.
 
 use std::collections::BTreeMap;
-use uint::Uint;
-use bytes::Bytes;
-use spec::builtin::Builtin;
+use crate::uint::Uint;
+use crate::bytes::Bytes;
+use crate::spec::builtin::Builtin;
 
 /// Spec account.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -58,10 +58,10 @@ impl Account {
 mod tests {
     use std::collections::BTreeMap;
     use serde_json;
-    use spec::account::Account;
+    use crate::spec::account::Account;
     use aion_types::U256;
-    use uint::Uint;
-    use bytes::Bytes;
+    use crate::uint::Uint;
+    use crate::bytes::Bytes;
 
     #[test]
     fn account_balance_missing_not_empty() {

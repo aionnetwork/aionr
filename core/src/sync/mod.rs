@@ -31,8 +31,8 @@ use std::time::Duration;
 use std::time::Instant;
 use itertools::Itertools;
 use std::collections::{HashMap};
-use client::{BlockId, BlockChainClient, ChainNotify};
-use transaction::UnverifiedTransaction;
+use crate::client::{BlockId, BlockChainClient, ChainNotify};
+use crate::transaction::UnverifiedTransaction;
 use aion_types::{H256,U256};
 use futures::Future;
 use futures::Stream;
@@ -43,17 +43,17 @@ use futures::sync::oneshot::Sender;
 use parking_lot::{Mutex, RwLock};
 
 use p2p::{ ChannelBuffer, Config, Mgr, Callable, PROTOCAL_VERSION, Module};
-use sync::action::Action;
-use sync::handler::status;
-use sync::handler::bodies;
-use sync::handler::headers;
-use sync::handler::broadcast;
-use sync::handler::import;
-use sync::node_info::{NodeInfo, Mode};
-use sync::storage::SyncStorage;
-use sync::sync_provider::SyncStatus;
+use crate::sync::action::Action;
+use crate::sync::handler::status;
+use crate::sync::handler::bodies;
+use crate::sync::handler::headers;
+use crate::sync::handler::broadcast;
+use crate::sync::handler::import;
+use crate::sync::node_info::{NodeInfo, Mode};
+use crate::sync::storage::SyncStorage;
+use crate::sync::sync_provider::SyncStatus;
 
-pub use sync::sync_provider::SyncProvider;
+pub use crate::sync::sync_provider::SyncProvider;
 
 const INTERVAL_TRANSACTIONS_BROADCAST: u64 = 50;
 const INTERVAL_STATUS: u64 = 5000;

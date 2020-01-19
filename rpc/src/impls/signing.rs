@@ -28,13 +28,14 @@ use acore::account_provider::AccountProvider;
 
 use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_core::futures::Future;
-use helpers::errors;
-use helpers::dispatch::{self, Dispatcher};
-use helpers::accounts::unwrap_provider;
-use traits::{EthSigning};
+use crate::helpers::errors;
+use crate::helpers::dispatch::{self, Dispatcher};
+use crate::helpers::accounts::unwrap_provider;
+use crate::traits::{EthSigning};
+use crate::Metadata;
 use aion_types::{H256, H768, Address};
 
-use types::{
+use crate::types::{
     Bytes as RpcBytes,
     RichRawTransaction as RpcRichRawTransaction, TransactionRequest as RpcTransactionRequest,
     ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse as RpcConfirmationResponse,
@@ -71,6 +72,8 @@ impl<D: Dispatcher + 'static> SigningClient<D> {
 }
 
 impl<D: Dispatcher + 'static> EthSigning for SigningClient<D> {
+    type Metadata = Metadata;
+
     fn sign(&self, address: Address, data: RpcBytes) -> BoxFuture<H768> {
         Box::new(
             self.handle(RpcConfirmationPayload::EthSignMessage(

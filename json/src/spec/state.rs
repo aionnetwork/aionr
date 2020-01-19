@@ -23,11 +23,11 @@
 //! Blockchain test state deserializer.
 
 use std::collections::BTreeMap;
-use hash::Address;
-use bytes::Bytes;
-use spec::{Account, Builtin};
+use crate::hash::Address;
+use crate::bytes::Bytes;
+use crate::spec::{Account, Builtin};
 use aion_types::U256;
-use uint::Uint;
+use crate::uint::Uint;
 
 /// Blockchain test state deserializer.
 #[derive(Debug, PartialEq, Deserialize)]

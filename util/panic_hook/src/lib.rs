@@ -22,8 +22,6 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate backtrace;
-
 use std::io::{self, Write};
 use std::panic::{self, PanicInfo};
 use std::thread;

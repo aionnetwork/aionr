@@ -22,8 +22,8 @@
 
 //! Spec seal deserialization.
 
-use hash::*;
-use bytes::Bytes;
+use crate::hash::*;
+use crate::bytes::Bytes;
 
 #[derive(Debug, PartialEq, Deserialize)]
 pub struct POWEquihash {

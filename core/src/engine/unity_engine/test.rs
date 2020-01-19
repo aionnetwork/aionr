@@ -24,8 +24,8 @@ use super::RewardsCalculator;
 use super::UnityEngineParams;
 use super::DifficultyCalc;
 use super::SealType;
-use spec::Spec;
-use tests::common::TestBlockChainClient;
+use crate::spec::Spec;
+use crate::tests::common::TestBlockChainClient;
 
 #[test]
 fn test_calculate_rewards_number1() {

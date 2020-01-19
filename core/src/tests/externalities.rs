@@ -23,10 +23,12 @@
 use std::sync::Arc;
 use aion_types::{U256, H256, Address};
 use vms::{EnvInfo, traits::Ext,  CallType};
-use state::{State, Substate};
-use helpers::{get_temp_state,make_aion_machine};
+use crate::state::{State, Substate};
+use crate::helpers::{get_temp_state,make_aion_machine};
 use kvdb::MockDbRepository;
-use externalities::{OriginInfo,Externalities};
+use crate::externalities::{OriginInfo,Externalities};
+use crate::db::StateDB;
+use crate::machine::EthereumMachine;
 
 fn get_test_env_info() -> EnvInfo {
     EnvInfo {
@@ -41,8 +43,8 @@ fn get_test_env_info() -> EnvInfo {
 }
 
 struct TestSetup {
-    state: State<::db::StateDB>,
-    machine: ::machine::EthereumMachine,
+    state: State<StateDB>,
+    machine: EthereumMachine,
     sub_state: Substate,
     env_info: EnvInfo,
 }

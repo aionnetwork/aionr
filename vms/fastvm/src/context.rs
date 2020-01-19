@@ -21,7 +21,7 @@
 
 use std::collections::HashSet;
 
-use basetypes::{DataWord, EvmAddress};
+use crate::basetypes::{DataWord, EvmAddress};
 use num_bigint::{BigInt};
 use aion_types::{Address};
 

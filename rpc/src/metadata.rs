@@ -23,10 +23,10 @@
 //! Aion RPC requests Metadata.
 use std::sync::Arc;
 
-use jsonrpc_core;
+use jsonrpc_core::Metadata as MD;
 use jsonrpc_pubsub::{Session, PubSubMetadata};
 
-use types::Origin;
+use crate::types::Origin;
 
 /// RPC methods metadata.
 #[derive(Clone, Default, Debug)]
@@ -37,7 +37,7 @@ pub struct Metadata {
     pub session: Option<Arc<Session>>,
 }
 
-impl jsonrpc_core::Metadata for Metadata {}
+impl MD for Metadata {}
 impl PubSubMetadata for Metadata {
     fn session(&self) -> Option<Arc<Session>> { self.session.clone() }
 }

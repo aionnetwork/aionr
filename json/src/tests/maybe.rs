@@ -1,8 +1,8 @@
 use std::str::FromStr;
 use serde_json;
 use aion_types;
-use hash::H256;
-use maybe::MaybeEmpty;
+use crate::hash::H256;
+use crate::maybe::MaybeEmpty;
 
 #[test]
 fn maybe_deserialization() {

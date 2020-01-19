@@ -28,10 +28,10 @@ use ansi_term::Colour;
 use bytes::ToPretty;
 use aion_types::{U256, H256, H520, H768, Address};
 
-use types::{
+use crate::types::{
     TransactionRequest, RichRawTransaction, Bytes, TransactionCondition, Origin,
 };
-use helpers;
+use crate::helpers;
 
 /// Confirmation waiting in a queue
 #[derive(Debug, Clone, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -237,8 +237,8 @@ mod tests {
     use std::str::FromStr;
     use serde_json;
     use aion_types::{U256, H256};
-    use types::TransactionCondition;
-    use helpers;
+    use crate::types::TransactionCondition;
+    use crate::helpers;
     use super::*;
 
     #[test]

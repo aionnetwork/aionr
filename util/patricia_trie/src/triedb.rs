@@ -22,7 +22,7 @@
 
 use std::fmt;
 use db::{HashStore, DBValue};
-use nibbleslice::NibbleSlice;
+use crate::nibbleslice::NibbleSlice;
 use rlp::*;
 use super::node::{Node, OwnedNode};
 use super::lookup::Lookup;

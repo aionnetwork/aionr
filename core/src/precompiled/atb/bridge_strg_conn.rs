@@ -22,7 +22,7 @@
 #![allow(unused)]
 
 use aion_types::{H256, Address};
-use precompiled::builtin::BuiltinExt;
+use crate::precompiled::builtin::BuiltinExt;
 use blake2b::blake2b;
 
 type BridgeStrgKey = [u8; 16];

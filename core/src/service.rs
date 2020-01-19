@@ -32,14 +32,14 @@ use tokio::timer::Interval;
 use tokio::prelude::{Future, Stream};
 use ansi_term::Colour;
 use acore_bytes::Bytes;
-use client::{ChainNotify, Client, ClientConfig};
-use db;
-use types::error::*;
+use crate::client::{ChainNotify, Client, ClientConfig};
+use crate::db;
+use crate::types::error::*;
 use io::*;
 use kvdb::KeyValueDB;
 use kvdb::{DatabaseConfig, RepositoryConfig, DbRepository, DBTransaction, Error as DbError};
-use miner::Miner;
-use spec::Spec;
+use crate::miner::Miner;
+use crate::spec::Spec;
 use stop_guard::StopGuard;
 use aion_types::{H256};
 use rlp::*;
@@ -213,8 +213,8 @@ impl ClientService {
         best_block_hash: H256,
     ) -> Result<Option<H256>, String>
     {
-        use db::Readable;
-        use types::blockchain::extra::BlockDetails;
+        use crate::db::Readable;
+        use crate::types::blockchain::extra::BlockDetails;
 
         let mut loop_end = 0u64;
         let mut cur_blk_hash = best_block_hash;
@@ -252,9 +252,10 @@ impl ClientService {
 
     /// check db if correct
     fn correct_db(dbs: Arc<dyn KeyValueDB>) -> Result<(), String> {
-        use db::Readable;
+        use crate::db::Readable;
         use rlp_compress::{decompress,blocks_swapper};
-        use types::blockchain::extra::BlockDetails;
+        use crate::types::blockchain::extra::BlockDetails;
+        use crate::encoded::Header;
         // get best block hash
         let best_block_hash = dbs.get(db::COL_EXTRA, b"best").expect("EXTRA db not found");
         match best_block_hash {
@@ -284,7 +285,7 @@ impl ClientService {
                         .expect("HEADERS db not found");
                     let parent_header_bytes =
                         decompress(&parent_header_bytes, blocks_swapper()).into_vec();
-                    let parent_header = ::encoded::Header::new(parent_header_bytes).decode();
+                    let parent_header = Header::new(parent_header_bytes).decode();
                     let parent_number = parent_header.number();
                     batch.put(db::COL_EXTRA, b"best", &parent);
 
@@ -297,7 +298,7 @@ impl ClientService {
                     warn!(target: "run", "Db is incorrect, reset to {}", parent_number);
                     let latest_era_key = [b'l', b'a', b's', b't', 0, 0, 0, 0, 0, 0, 0, 0];
                     batch.put(db::COL_STATE, &latest_era_key, &encode(&parent_number));
-                    use db::Writable;
+                    use crate::db::Writable;
                     batch.write(db::COL_EXTRA, &parent, &parent_detail);
                     let _ = dbs.write(batch);
                 }
@@ -348,8 +349,8 @@ impl IoHandler<ClientIoMessage> for ClientIoHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockchain::{BlockChain,BlockProvider};
-    use helpers::{new_db,generate_dummy_blockchain_with_db};
+    use crate::blockchain::{BlockChain,BlockProvider};
+    use crate::helpers::{new_db,generate_dummy_blockchain_with_db};
     #[test]
     fn test_correct_db() {
         let db = new_db();

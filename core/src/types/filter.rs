@@ -24,8 +24,8 @@
 
 use aion_types::{H256, Address};
 use ethbloom::{Bloom, Input as BloomInput};
-use types::ids::BlockId;
-use log_entry::LogEntry;
+use crate::types::ids::BlockId;
+use crate::log_entry::LogEntry;
 
 /// Blockchain Filter.
 #[derive(Debug, PartialEq)]
@@ -129,9 +129,9 @@ impl Filter {
 #[cfg(test)]
 mod tests {
     use ethbloom::Bloom;
-    use filter::Filter;
-    use types::ids::BlockId;
-    use log_entry::LogEntry;
+    use crate::filter::Filter;
+    use crate::types::ids::BlockId;
+    use crate::log_entry::LogEntry;
 
     #[test]
     fn test_bloom_possibilities_none() {

@@ -25,7 +25,7 @@
 use std::io::Read;
 use serde_json;
 use serde_json::Error;
-use spec::{Params, Genesis, Engine, State};
+use crate::spec::{Params, Genesis, Engine, State};
 
 /// Spec deserialization.
 #[derive(Debug, PartialEq, Deserialize)]

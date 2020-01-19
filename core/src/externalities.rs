@@ -28,11 +28,11 @@ use aion_types::{H256, U256, H128, Address};
 use vms::{ActionParams, ActionValue, EnvInfo, CallType, ExecutionResult, ExecStatus, ReturnData, ParamsType};
 use vms::traits::Ext;
 use acore_bytes::Bytes;
-use state::{Backend as StateBackend, State, Substate, CleanupMode};
-use machine::EthereumMachine as Machine;
-use executive::*;
+use crate::state::{Backend as StateBackend, State, Substate, CleanupMode};
+use crate::machine::EthereumMachine as Machine;
+use crate::executive::*;
 use kvdb::KeyValueDB;
-use db::{self, Readable};
+use crate::db::{self, Readable};
 
 /// Transaction properties that externalities need to know about.
 pub struct OriginInfo {
@@ -448,7 +448,7 @@ where B: StateBackend
     }
 
     fn log(&mut self, topics: Vec<H256>, data: &[u8]) {
-        use log_entry::LogEntry;
+        use crate::log_entry::LogEntry;
 
         // origin_info.address is always contract address for fastvm
         let address = self.origin_info[0].address.clone();
@@ -820,7 +820,7 @@ where B: StateBackend
     fn root(&self) -> H256 { self.state.lock().unwrap().root().clone() }
 
     fn avm_log(&mut self, address: &Address, topics: Vec<H256>, data: Vec<u8>, index: i32) {
-        use log_entry::LogEntry;
+        use crate::log_entry::LogEntry;
         self.substates[index as usize].logs.push(LogEntry {
             address: address.clone(),
             topics,

@@ -4,9 +4,9 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use blowfish::Blowfish;
-use cryptoutil::{write_u32_be};
-use step_by::RangeExt;
+use crate::blowfish::Blowfish;
+use crate::cryptoutil::{write_u32_be};
+use crate::step_by::RangeExt;
 
 fn setup(cost: u32, salt: &[u8], key: &[u8]) -> Blowfish {
     assert!(cost < 32);
@@ -46,7 +46,7 @@ pub fn bcrypt(cost: u32, salt: &[u8], password: &[u8], output: &mut [u8]) {
 mod test {
     #[cfg(feature = "benches")]
     use std::time::Instant;
-    use bcrypt::bcrypt;
+    use crate::bcrypt::bcrypt;
 
     struct Test {
         cost: u32,

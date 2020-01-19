@@ -25,10 +25,10 @@ use byteorder::BigEndian;
 use byteorder::ByteOrder;
 use rand::random;
 use byteorder::ReadBytesExt;
-use ChannelBuffer;
-use node::{NODE_ID_LENGTH,IP_LENGTH,Node,IpAddr};
-use node::TempNode;
-use route::Action;
+use crate::ChannelBuffer;
+use crate::node::{NODE_ID_LENGTH,IP_LENGTH,Node,IpAddr};
+use crate::node::TempNode;
+use crate::route::Action;
 use super::super::Mgr;
 use super::{channel_buffer_template,channel_buffer_template_with_version};
 

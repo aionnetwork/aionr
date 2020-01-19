@@ -23,9 +23,9 @@
 use std::collections::HashMap;
 use parking_lot::RwLock;
 use itertools::Itertools;
-use ethkey::Address;
+use crate::ethkey::Address;
 
-use {SafeAccount, Error};
+use crate::{SafeAccount, Error};
 use super::KeyDirectory;
 
 /// Accounts in-memory storage.

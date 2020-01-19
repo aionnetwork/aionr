@@ -22,10 +22,10 @@
 
 //! State test transaction deserialization.
 
-use uint::Uint;
-use bytes::Bytes;
-use hash::{Address, H256};
-use maybe::MaybeEmpty;
+use crate::uint::Uint;
+use crate::bytes::Bytes;
+use crate::hash::{Address, H256};
+use crate::maybe::MaybeEmpty;
 
 /// State test transaction deserialization.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -56,7 +56,7 @@ pub struct Transaction {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use state::Transaction;
+    use crate::state::Transaction;
 
     #[test]
     fn transaction_deserialization() {

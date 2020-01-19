@@ -23,8 +23,7 @@
 #![warn(unused_extern_crates)]
 
 //! Dir utilities for platform-specific operations
-extern crate aion_types;
-extern crate journaldb;
+
 #[macro_use]
 extern crate log;
 
@@ -33,7 +32,7 @@ use std::{env, fs};
 use std::path::{PathBuf, Path};
 use aion_types::{H64, H256};
 use journaldb::Algorithm;
-use helpers::{replace_home, replace_home_and_local};
+use crate::helpers::{replace_home, replace_home_and_local};
 // re-export platform-specific functions
 use platform::*;
 
@@ -239,7 +238,7 @@ mod platform {
 #[cfg(test)]
 mod tests {
     use super::Directories;
-    use helpers::{replace_home, replace_home_and_local};
+    use crate::helpers::{replace_home, replace_home_and_local};
 
     #[test]
     fn test_default_directories() {

@@ -24,7 +24,7 @@ use std::ops::Deref;
 use std::str::FromStr;
 use rustc_hex::ToHex;
 use aion_types::H512;
-use {Error};
+use crate::{Error};
 
 #[derive(Clone, PartialEq, Eq)]
 pub struct Ed25519Secret {

@@ -28,7 +28,6 @@ use std::collections::{HashMap, LinkedList};
 use rustc_hex::FromHex;
 use rustc_hex::ToHex;
 
-use jsonrpc_macros::Trailing;
 use aion_types::{H256, H512, U256};
 use acore::block::IsBlock;
 use acore::sync::SyncProvider;
@@ -38,10 +37,11 @@ use acore::account_provider::AccountProvider;
 use acore::header::SealType;
 use jsonrpc_core::{Error, Result};
 
-use helpers::errors;
-use helpers::accounts::unwrap_provider;
-use traits::Stratum;
-use types::{
+use crate::helpers::errors;
+use crate::helpers::accounts::unwrap_provider;
+use crate::traits::Stratum;
+use crate::Metadata;
+use crate::types::{
     Work, Info, AddressValidation, MiningInfo, MinerStats, TemplateParam, Bytes, StratumHeader,
     SimpleHeader, BlockNumber
 };
@@ -124,8 +124,10 @@ where
     S: SyncProvider + 'static,
     M: MinerService + 'static,
 {
+    type Metadata = Metadata;
+
     /// Returns the work of current block
-    fn work(&self, _tpl_param: Trailing<TemplateParam>) -> Result<Work> {
+    fn work(&self, _tpl_param: Option<TemplateParam>) -> Result<Work> {
         // check if we're still syncing and return empty strings in that case
         self.check_syncing()?;
 

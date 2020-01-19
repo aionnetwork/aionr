@@ -52,13 +52,13 @@ pub use dbrepository::{DbRepository, MockDbRepository};
 pub use dbtransaction::{DBOp, DBTransaction};
 pub use mockkvdb::Mockkvdb;
 pub use rockskvdb::Rockskvdb;
-pub use traits::{ HashStore, AsHashStore, KeyValueDB };
+pub use crate::traits::{ HashStore, AsHashStore, KeyValueDB };
 #[cfg(test)]
 #[allow(unused)]
-use traits::KeyValueDAO;
+use crate::traits::KeyValueDAO;
 pub use memorydb::MemoryDB;
-pub use error::Error;
-pub use dbconfigs::{DatabaseConfig, CompactionProfile, RepositoryConfig};
+pub use crate::error::Error;
+pub use crate::dbconfigs::{DatabaseConfig, CompactionProfile, RepositoryConfig};
 
 pub type Key = ElasticArray32<u8>;
 pub type DBValue = ElasticArray128<u8>;

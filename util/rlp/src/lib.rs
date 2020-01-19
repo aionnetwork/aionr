@@ -32,11 +32,7 @@
 //! * You want to get view onto rlp-slice.
 //! * You don't want to decode whole rlp at once.
 
-extern crate byteorder;
 extern crate aion_types as bigint;
-extern crate ethbloom;
-extern crate elastic_array;
-extern crate rustc_hex;
 
 mod traits;
 mod error;

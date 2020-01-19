@@ -8,9 +8,9 @@ use std::{cmp, mem, str};
 use byteorder::{ByteOrder, BigEndian};
 use bigint::{U64, U128, U256, H64, H128, H160, H256, H512, H520, H768};
 use ethbloom::Bloom;
-use traits::{Encodable, Decodable};
-use stream::RlpStream;
-use {UntrustedRlp, DecoderError};
+use crate::traits::{Encodable, Decodable};
+use crate::stream::RlpStream;
+use crate::{UntrustedRlp, DecoderError};
 
 pub fn decode_usize(bytes: &[u8]) -> Result<usize, DecoderError> {
     match bytes.len() {

@@ -31,16 +31,17 @@ use acore_bytes::{Bytes, ToPretty};
 use super::generic::{Filth, BasicAccount};
 use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP, blake2b};
 use rlp::*;
-use pod_account::*;
+use crate::pod_account::*;
 use trie;
 use trie::{Trie, SecTrieDB, TrieFactory, TrieError};
 
-// use db::Writable;
+// use crate::db::Writable;
 use kvdb::{KeyValueDB, DBTransaction, DBValue, HashStore};
 
 use super::generic::Account;
 use super::traits::{VMAccount, AccType};
-use state::Backend;
+use crate::state::Backend;
+use crate::db;
 
 const STORAGE_CACHE_ITEMS: usize = 8192;
 
@@ -677,7 +678,7 @@ impl VMAccount for AionVMAccount {
     {
         if self.object_graph_hash == BLAKE2B_EMPTY {
             if let Some(root) = graph_db
-                .get(::db::COL_AVM_GRAPH, &self.delta_root)
+                .get(db::COL_AVM_GRAPH, &self.delta_root)
                 .unwrap_or(None)
             {
                 debug!(target: "vm", "{:?}: update root from {:?} to {:?}", a, self.storage_root, root);
@@ -690,7 +691,7 @@ impl VMAccount for AionVMAccount {
                 // always cache object graph and key/value storage root
                 debug!(target: "vm", "try to get object graph from: {:?}", self.delta_root);
                 let graph_hash = concatenated.get(1).unwrap();
-                match graph_db.get(::db::COL_AVM_GRAPH, &graph_hash).unwrap() {
+                match graph_db.get(db::COL_AVM_GRAPH, &graph_hash).unwrap() {
                     Some(data) => {
                         self.object_graph_size = Some(data.len());
                         self.object_graph_hash = concatenated.get(1).unwrap().clone(); //blake2b(&data);
@@ -874,13 +875,9 @@ impl AionVMAccount {
             let content = stream.out();
 
             let mut batch = DBTransaction::new();
+            batch.put(db::COL_AVM_GRAPH, &self.delta_root[..], content.as_slice());
             batch.put(
-                ::db::COL_AVM_GRAPH,
-                &self.delta_root[..],
-                content.as_slice(),
-            );
-            batch.put(
-                ::db::COL_AVM_GRAPH,
+                db::COL_AVM_GRAPH,
                 &self.object_graph_hash[..],
                 self.object_graph_cache.as_slice(),
             );

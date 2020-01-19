@@ -29,7 +29,7 @@ use super::node::NodeKey;
 
 use db::{HashStore, DBValue};
 use bytes::ToPretty;
-use nibbleslice::NibbleSlice;
+use crate::nibbleslice::NibbleSlice;
 use rlp::{Rlp, RlpStream};
 
 use std::collections::{HashSet, VecDeque};

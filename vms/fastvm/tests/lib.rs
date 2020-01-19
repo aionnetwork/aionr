@@ -21,13 +21,9 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate time;
-extern crate rand;
-extern crate libc;
-extern crate fastvm;
-extern crate aion_types;
-extern crate rustc_hex;
-extern crate vm_common;
+use time;
+use rand;
+
 #[macro_use]
 extern crate log;
 

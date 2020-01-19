@@ -60,11 +60,11 @@ Some of these functions are commonly found in all hash digest
 algorithms, but some, like "parity" is only found in SHA-1.
  */
 
-use digest::Digest;
-use cryptoutil::{
+use crate::digest::Digest;
+use crate::cryptoutil::{
     write_u32_be, read_u32v_be, add_bytes_to_bits, FixedBuffer, FixedBuffer64, StandardPadding,
 };
-use simd::u32x4;
+use crate::simd::u32x4;
 
 const STATE_LEN: usize = 5;
 const BLOCK_LEN: usize = 16;
@@ -451,11 +451,11 @@ impl Digest for Sha1 {
 mod tests {
     #[cfg(feature = "benches")]
     use std::time::Instant;
-    use cryptoutil::test::test_digest_1million_random;
-    use digest::Digest;
+    use crate::cryptoutil::test::test_digest_1million_random;
+    use crate::digest::Digest;
     #[cfg(feature = "benches")]
-    use sha1::{STATE_LEN, BLOCK_LEN, sha1_digest_block_u32};
-    use sha1::Sha1;
+    use crate::sha1::{STATE_LEN, BLOCK_LEN, sha1_digest_block_u32};
+    use crate::sha1::Sha1;
 
     #[derive(Clone)]
     struct Test {

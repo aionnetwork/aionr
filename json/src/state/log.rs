@@ -21,8 +21,8 @@
  ******************************************************************************/
 
 //! State test log deserialization.
-use hash::{Address, H256, Bloom};
-use bytes::Bytes;
+use crate::hash::{Address, H256, Bloom};
+use crate::bytes::Bytes;
 
 /// State test log deserialization.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -40,7 +40,7 @@ pub struct Log {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use state::Log;
+    use crate::state::Log;
 
     #[test]
     fn log_deserialization() {

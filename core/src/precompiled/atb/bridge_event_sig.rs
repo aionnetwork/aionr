@@ -19,7 +19,7 @@
  *
  ******************************************************************************/
 
-use precompiled::atb::bridge_utilities::to_event_signature;
+use crate::precompiled::atb::bridge_utilities::to_event_signature;
 
 pub enum BridgeEventSig {
     ChangedOwner,

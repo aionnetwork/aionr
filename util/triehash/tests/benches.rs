@@ -22,12 +22,6 @@
 #![warn(unused_extern_crates)]
 #![cfg(feature = "benches")]
 
-extern crate trie_standardmap;
-extern crate aion_types;
-extern crate blake2b;
-
-extern crate triehash;
-
 use triehash::trie_root;
 use std::time::Instant;
 use aion_types::H256;

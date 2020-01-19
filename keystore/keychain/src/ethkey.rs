@@ -22,7 +22,7 @@
 
 //! key reexport to make documentation look pretty.
 pub use key::*;
-use json;
+use crate::json;
 
 impl Into<json::H256> for Address {
     fn into(self) -> json::H256 {

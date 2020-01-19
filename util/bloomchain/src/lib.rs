@@ -32,8 +32,8 @@ mod filter;
 
 pub use bloom::{Bloom, BloomRef, Input};
 pub use chain::BloomChain;
-pub use config::Config;
-pub use database::BloomDatabase;
-pub use number::Number;
-pub use position::Position;
-pub use filter::Filter;
+pub use crate::config::Config;
+pub use crate::database::BloomDatabase;
+pub use crate::number::Number;
+pub use crate::position::Position;
+pub use crate::filter::Filter;

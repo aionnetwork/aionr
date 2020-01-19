@@ -23,8 +23,6 @@
 #![warn(unused_extern_crates)]
 //! Aion version specific information.
 
-extern crate target_info;
-
 use target_info::Target;
 
 mod vergen {

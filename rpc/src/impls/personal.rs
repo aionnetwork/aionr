@@ -28,16 +28,17 @@ use acore::transaction::PendingTransaction;
 use aion_types::{H256, H768, Address};
 use jsonrpc_core::{BoxFuture, Result};
 use jsonrpc_core::futures::Future;
-use helpers::errors;
-use helpers::dispatch::{self, Dispatcher, SignWith};
-use helpers::accounts::unwrap_provider;
-use traits::Personal;
-use types::{
+use crate::helpers::errors;
+use crate::helpers::dispatch::{self, Dispatcher, SignWith};
+use crate::helpers::accounts::unwrap_provider;
+use crate::traits::Personal;
+use crate::types::{
     Bytes as RpcBytes,
     ConfirmationPayload as RpcConfirmationPayload, ConfirmationResponse as RpcConfirmationResponse,
     TransactionRequest, RichRawTransaction as RpcRichRawTransaction,
 };
-use helpers::nonce::Ready as NonceReady;
+use crate::helpers::nonce::Ready as NonceReady;
+use crate::Metadata;
 /// Account management (personal) rpc implementation.
 pub struct PersonalClient<D: Dispatcher> {
     accounts: Option<Arc<AccountProvider>>,
@@ -88,6 +89,8 @@ impl<D: Dispatcher + 'static> PersonalClient<D> {
 }
 
 impl<D: Dispatcher + 'static> Personal for PersonalClient<D> {
+    type Metadata = Metadata;
+
     fn accounts(&self) -> Result<Vec<Address>> {
         let store = self.account_provider()?;
         let accounts = store

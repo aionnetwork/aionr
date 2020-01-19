@@ -18,9 +18,9 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use state::account::{AionVMAccount,AccType,VMAccount};
+use crate::state::account::{AionVMAccount,AccType,VMAccount};
 use kvdb::MemoryDB;
-use db::AccountDBMut;
+use crate::db::AccountDBMut;
 use aion_types::Address;
 
 use std::sync::Arc;

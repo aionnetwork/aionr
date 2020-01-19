@@ -23,7 +23,7 @@
 //! Import route.
 
 use aion_types::H256;
-use types::block::info::{BlockInfo, BlockLocation};
+use crate::types::block::info::{BlockInfo, BlockLocation};
 
 /// Import route for newly inserted block.
 #[derive(Debug, PartialEq)]
@@ -78,8 +78,8 @@ impl From<BlockInfo> for ImportRoute {
 #[cfg(test)]
 mod tests {
     use aion_types::{H256, U256};
-    use types::block::info::{BlockInfo, BlockLocation, BranchBecomingCanonChainData};
-    use types::blockchain::import_route::ImportRoute;
+    use crate::types::block::info::{BlockInfo, BlockLocation, BranchBecomingCanonChainData};
+    use crate::types::blockchain::import_route::ImportRoute;
 
     #[test]
     fn import_route_none() {

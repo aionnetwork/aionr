@@ -2,6 +2,7 @@
 name = "keychain"
 version = "0.2.0"
 authors = ["Aion Foundation <admin@aion.network>"]
+edition = "2018"
 
 [dependencies]
 key =        { path = "../key" }

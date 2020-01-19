@@ -22,12 +22,12 @@
 
 use std::collections::{HashMap, HashSet};
 use std::ops::Range;
-use number::Number;
-use position::{Position, Manager as PositionManager};
+use crate::number::Number;
+use crate::position::{Position, Manager as PositionManager};
 use bloom::Bloom;
-use filter::Filter;
-use config::Config;
-use database::BloomDatabase;
+use crate::filter::Filter;
+use crate::config::Config;
+use crate::database::BloomDatabase;
 
 /// Prepares all bloom database operations.
 pub struct BloomChain<'a> {

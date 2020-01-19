@@ -20,7 +20,7 @@
  *
  ******************************************************************************/
 
-use position::Position;
+use crate::position::Position;
 use bloom::Bloom;
 
 /// Readonly `Bloom` database.

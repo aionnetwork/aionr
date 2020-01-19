@@ -20,17 +20,17 @@
  ******************************************************************************/
 use aion_types::{Address, H256, U256};
 use key::Ed25519Secret;
-use receipt::{SimpleReceipt,Receipt};
+use crate::receipt::{SimpleReceipt,Receipt};
 use rustc_hex::FromHex;
 use std::str::FromStr;
 use std::sync::Arc;
 use vms::EnvInfo;
-use state::{State,CleanupMode};
+use crate::state::{State,CleanupMode};
 use super::common::helpers::{get_temp_state,get_temp_state_db};
 use kvdb::MockDbRepository;
-use transaction::{Transaction,Action};
-use machine::EthereumMachine;
-use spec::spec::Spec;
+use crate::transaction::{Transaction,Action};
+use crate::machine::EthereumMachine;
+use crate::spec::spec::Spec;
 
 fn secret() -> Ed25519Secret {
     Ed25519Secret::from_str("7ea8af7d0982509cd815096d35bc3a295f57b2a078e4e25731e3ea977b9544626702b86f33072a55f46003b1e3e242eb18556be54c5ab12044c3c20829e0abb5").unwrap()

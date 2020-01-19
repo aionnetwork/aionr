@@ -3,6 +3,7 @@ name = "aion-machine"
 version = "0.1.0"
 description = "Generalization of a state machine for consensus engines"
 authors = ["Aion Foundation <admin@aion.network>"]
+edition = "2018"
 
 [dependencies]
 aion-types = { path = "../util/aion-types"}

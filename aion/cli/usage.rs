@@ -158,8 +158,8 @@ macro_rules! usage {
         use std::collections::HashMap;
         use crate::cli::group::Group;
 
-        extern crate textwrap;
-        extern crate term_size;
+        use textwrap;
+        use term_size;
         use self::textwrap::{Wrapper};
 
         const MAX_TERM_WIDTH: usize = 120;

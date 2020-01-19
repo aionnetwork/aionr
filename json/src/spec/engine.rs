@@ -35,7 +35,7 @@ pub enum Engine {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use spec::Engine;
+    use crate::spec::Engine;
 
     #[test]
     fn engine_deserialization() {

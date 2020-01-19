@@ -23,7 +23,7 @@ use std::sync::Arc;
 use aion_types::{Address, H256, U256};
 use acore_bytes::Bytes;
 use kvdb::{KeyValueDB, HashStore};
-use state::{Backend, RequireCache};
+use crate::state::{Backend, RequireCache};
 use trie::TrieError;
 
 #[derive(Debug, Clone, PartialEq, Copy)]

@@ -23,7 +23,7 @@
 use aion_types::{H256, U256, Address};
 use ajson;
 use blake2b::BLAKE2B_NULL_RLP;
-use spec::seal::Seal;
+use crate::spec::seal::Seal;
 
 pub struct Genesis {
     pub seal: Seal,

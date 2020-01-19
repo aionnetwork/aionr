@@ -6,7 +6,7 @@
 
 use std::cmp;
 
-use cryptoutil;
+use crate::cryptoutil;
 
 #[derive(Clone, Copy)]
 pub enum BufferResult {

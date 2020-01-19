@@ -20,8 +20,8 @@
  ******************************************************************************/
 
 use std::time::SystemTime;
-use header::Header;
-use block::Block;
+use crate::header::Header;
+use crate::block::Block;
 
 #[derive(Clone, PartialEq)]
 pub struct HeadersWrapper {

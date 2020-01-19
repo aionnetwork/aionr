@@ -22,7 +22,7 @@
 
 //! Null engine params deserialization.
 
-use uint::Uint;
+use crate::uint::Uint;
 
 /// Authority params deserialization.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -42,7 +42,7 @@ pub struct NullEngine {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use uint::Uint;
+    use crate::uint::Uint;
     use aion_types::U256;
     use super::*;
 

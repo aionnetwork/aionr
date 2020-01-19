@@ -23,21 +23,22 @@
 use std::str::FromStr;
 use std::sync::Arc;
 use io::IoChannel;
-use client::{BlockChainClient, MiningBlockChainClient, Client, ClientConfig, BlockId};
-use state::{CleanupMode};
-use block::IsBlock;
-use types::filter::Filter;
+use crate::client::{BlockChainClient, MiningBlockChainClient, Client, ClientConfig, BlockId};
+use crate::state::{CleanupMode};
+use crate::block::IsBlock;
+use crate::types::filter::Filter;
 use aion_types::{Address, U256};
 use kvdb::{DatabaseConfig, DbRepository, RepositoryConfig};
-use miner::Miner;
-use spec::Spec;
-use views::BlockView;
+use crate::miner::Miner;
+use crate::spec::Spec;
+use crate::views::BlockView;
 use key::Ed25519Secret;
-use transaction::{PendingTransaction, Transaction, Action, Condition};
-use miner::MinerService;
+use crate::transaction::{PendingTransaction, Transaction, Action, Condition};
+use crate::miner::MinerService;
 use tempdir::TempDir;
-use helpers::*;
+use crate::helpers::*;
 use aion_types::H256;
+use crate::db::DB_NAMES;
 
 #[test]
 fn imports_from_empty() {
@@ -45,7 +46,7 @@ fn imports_from_empty() {
     let spec = get_test_spec();
     let db_config = DatabaseConfig::default();
     let mut db_configs = Vec::new();
-    for db_name in ::db::DB_NAMES.to_vec() {
+    for db_name in DB_NAMES.to_vec() {
         db_configs.push(RepositoryConfig {
             db_name: db_name.into(),
             db_config: db_config.clone(),
@@ -72,7 +73,7 @@ fn client_check_vote() {
     let spec = get_test_spec();
     let db_config = DatabaseConfig::default();
     let mut db_configs = Vec::new();
-    for db_name in ::db::DB_NAMES.to_vec() {
+    for db_name in DB_NAMES.to_vec() {
         db_configs.push(RepositoryConfig {
             db_name: db_name.into(),
             db_config: db_config.clone(),
@@ -113,7 +114,7 @@ fn imports_good_block() {
     let spec = get_test_spec();
     let db_config = DatabaseConfig::default();
     let mut db_configs = Vec::new();
-    for db_name in ::db::DB_NAMES.to_vec() {
+    for db_name in DB_NAMES.to_vec() {
         db_configs.push(RepositoryConfig {
             db_name: db_name.into(),
             db_config: db_config.clone(),
@@ -147,7 +148,7 @@ fn query_none_block() {
     let spec = get_test_spec();
     let db_config = DatabaseConfig::default();
     let mut db_configs = Vec::new();
-    for db_name in ::db::DB_NAMES.to_vec() {
+    for db_name in DB_NAMES.to_vec() {
         db_configs.push(RepositoryConfig {
             db_name: db_name.into(),
             db_config: db_config.clone(),
@@ -306,7 +307,7 @@ fn change_history_size() {
     db_config.memory_budget = 1024;
     db_config.block_size = 64;
     let mut db_configs = Vec::new();
-    for db_name in ::db::DB_NAMES.to_vec() {
+    for db_name in DB_NAMES.to_vec() {
         db_configs.push(RepositoryConfig {
             db_name: db_name.into(),
             db_config: db_config.clone(),
@@ -423,7 +424,7 @@ fn test_total_difficulty() {
     let spec = get_test_spec();
     let db_config = DatabaseConfig::default();
     let mut db_configs = Vec::new();
-    for db_name in ::db::DB_NAMES.to_vec() {
+    for db_name in DB_NAMES.to_vec() {
         db_configs.push(RepositoryConfig {
             db_name: db_name.into(),
             db_config: db_config.clone(),

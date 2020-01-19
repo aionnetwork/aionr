@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use super::{DBValue, Result};
-use dbtransaction::DBTransaction;
+use crate::dbtransaction::DBTransaction;
 /// basic kvdb operation.
 pub trait KeyValueDAO: Sync + Send {
     /// Get value by key

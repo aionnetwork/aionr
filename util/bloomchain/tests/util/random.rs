@@ -23,7 +23,7 @@
 extern crate rand;
 
 use self::rand::random;
-use bloomchain::Bloom;
+use crate::bloomchain::Bloom;
 
 pub fn generate_random_bloom() -> Bloom {
     let mut res = [0u8; 256];

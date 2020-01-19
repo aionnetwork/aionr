@@ -2,6 +2,7 @@
 name = "vm_common"
 version = "0.1.0"
 authors = ["Camus Qiu <camus@aion.network>"]
+edition = "2018"
 
 [dependencies]
 aion-types = {path = "../../util/aion-types"}

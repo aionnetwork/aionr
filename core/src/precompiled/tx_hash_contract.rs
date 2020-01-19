@@ -62,9 +62,9 @@ impl BuiltinContract for TxHashContract {
 #[cfg(test)]
 mod tests {
     use super::TxHashContract;
-    use precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
-    use helpers::get_temp_state;
-    use state::Substate;
+    use crate::precompiled::builtin::{BuiltinParams, BuiltinExtImpl, BuiltinContext, BuiltinContract};
+    use crate::helpers::get_temp_state;
+    use crate::state::Substate;
     use aion_types::{H256, Address};
     use vms::ExecStatus;
     use rustc_hex::ToHex;

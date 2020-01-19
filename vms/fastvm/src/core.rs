@@ -19,12 +19,12 @@
  *
  ******************************************************************************/
 
-use context::ExecutionContext;
-use callback::register_cbs;
+use crate::context::ExecutionContext;
+use crate::callback::register_cbs;
 use std::mem;
 use std::ptr;
 use bincode::{serialize};
-use ffi::*;
+use crate::ffi::*;
 
 const REVISION_AION_V1: i32 = 7;
 

@@ -12,9 +12,9 @@ use std;
 use std::{io, mem};
 use std::ptr;
 
-use buffer::{ReadBuffer, WriteBuffer, BufferResult};
-use buffer::BufferResult::{BufferUnderflow, BufferOverflow};
-use symmetriccipher::{SynchronousStreamCipher, SymmetricCipherError};
+use crate::buffer::{ReadBuffer, WriteBuffer, BufferResult};
+use crate::buffer::BufferResult::{BufferUnderflow, BufferOverflow};
+use crate::symmetriccipher::{SynchronousStreamCipher, SymmetricCipherError};
 
 /// Write a u64 into a vector, which must be 8 bytes long. The value is written in big-endian
 /// format.
@@ -518,8 +518,8 @@ pub mod test {
     use rand::IsaacRng;
     use rand::distributions::{ Range, Distribution  };
 
-    use cryptoutil::{add_bytes_to_bits, add_bytes_to_bits_tuple};
-    use digest::Digest;
+    use crate::cryptoutil::{add_bytes_to_bits, add_bytes_to_bits_tuple};
+    use crate::digest::Digest;
 
     /// Feed 1,000,000 'a's into the digest with varying input sizes and check that the result is
     /// correct.

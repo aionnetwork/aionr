@@ -24,7 +24,8 @@
 use std::sync::Arc;
 use jsonrpc_core::Result;
 use acore::sync::SyncProvider;
-use traits::Net;
+use crate::traits::Net;
+use crate::Metadata;
 
 /// Net rpc implementation.
 pub struct NetClient<S: ?Sized> {
@@ -45,6 +46,8 @@ where S: SyncProvider
 impl<S: ?Sized> Net for NetClient<S>
 where S: SyncProvider + 'static
 {
+    type Metadata = Metadata;
+
     fn version(&self) -> Result<String> {
         Ok(format!("{}", self.sync.status().network_id).to_owned())
     }

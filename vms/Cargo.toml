@@ -2,6 +2,7 @@
 name = "vms"
 version = "0.1.0"
 authors = ["aion-camus <camus@aion.network>"]
+edition = "2018"
 
 [dependencies]
 byteorder = "1.0"

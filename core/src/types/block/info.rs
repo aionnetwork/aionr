@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 use aion_types::{H256, U256};
-use header::BlockNumber;
+use crate::header::BlockNumber;
 
 /// Brief info about inserted block.
 #[derive(Clone)]

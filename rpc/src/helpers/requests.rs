@@ -23,7 +23,7 @@
 use aion_types::{Address, U256, H256};
 use bytes::Bytes;
 
-use types::{Origin, TransactionCondition};
+use crate::types::{Origin, TransactionCondition};
 
 /// Transaction request coming from RPC
 #[derive(Debug, Clone, Default, Eq, PartialEq, Hash)]

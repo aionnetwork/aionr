@@ -26,11 +26,11 @@ use std::collections::HashMap;
 use parking_lot::RwLock;
 
 use aion_types::{H256, U256};
-use types::blockchain::info::BlockChainInfo;
+use crate::types::blockchain::info::BlockChainInfo;
 use byteorder::{BigEndian, ByteOrder, ReadBytesExt};
 use bytes::BufMut;
-use sync::node_info::NodeInfo;
-use sync::action::Action;
+use crate::sync::node_info::NodeInfo;
+use crate::sync::action::Action;
 use p2p::{ChannelBuffer, Mgr};
 use std::time::Duration;
 use std::thread::sleep;

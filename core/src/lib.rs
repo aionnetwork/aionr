@@ -21,76 +21,25 @@
  ******************************************************************************/
 
 #![warn(unused_extern_crates)]
-extern crate bloomchain;
-extern crate byteorder;
-extern crate crossbeam;
+
 extern crate acore_bloom_journal as bloom_journal;
 extern crate acore_io as io;
-extern crate acore_bytes;
-extern crate bytes;
-extern crate aion_types;
-extern crate ethbloom;
-extern crate ajson;
-extern crate key;
 extern crate crypto as rcrypto;
-extern crate itertools;
-extern crate lru_cache;
-extern crate num_cpus;
-extern crate num;
-extern crate aion_machine;
-extern crate parking_lot;
-extern crate rayon;
-extern crate rlp;
-extern crate rlp_compress;
-extern crate blake2b;
-extern crate heapsize;
 extern crate patricia_trie as trie;
-extern crate triehash;
-extern crate ansi_term;
-extern crate unexpected;
-extern crate util_error;
 extern crate db as kvdb;
-extern crate transient_hashmap;
 #[macro_use]
 extern crate lazy_static;
 #[macro_use]
 extern crate rlp_derive;
-extern crate rustc_hex;
-extern crate stats;
-extern crate stop_guard;
-extern crate time;
-extern crate using_queue;
-extern crate table;
-extern crate memory_cache;
-extern crate journaldb;
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate trace_time;
-extern crate keychain;
-extern crate equihash;
-extern crate vms;
-extern crate futures;
-extern crate tokio;
 // extern crate state as crate_state;
-extern crate tiny_keccak;
-extern crate num_bigint;
-extern crate bytebuffer;
-extern crate avm_abi;
-extern crate fixed_point;
-extern crate delta_calc;
 
-#[cfg(test)]
-extern crate fastvm;
-#[cfg(test)]
-extern crate tempdir;
 #[cfg(test)]
 #[macro_use]
 extern crate macros;
-extern crate p2p;
-extern crate rand;
-extern crate ctrlc;
-extern crate serde;
 
 /// pub mod is used here to avoid name collision when used in other module
 pub mod account_provider;
@@ -131,7 +80,7 @@ mod types;
 #[cfg(test)]
 mod tests;
 
-pub use types::{
+pub use crate::types::{
     filter,
     state::log_entry,
     state::receipt,
@@ -143,7 +92,7 @@ pub use types::{
     error::BlockError
 };
 
-pub use executive::contract_address;
+pub use crate::executive::contract_address;
 
 #[cfg(test)]
-use tests::common::helpers;
+use crate::tests::common::helpers;

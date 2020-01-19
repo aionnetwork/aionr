@@ -26,7 +26,7 @@ use aion_types::{H256, U256};
 use ethbloom::Bloom;
 
 use serde::ser::{Serialize, Serializer, SerializeStruct};
-use types::{Bytes, Transaction};
+use crate::types::{Bytes, Transaction};
 
 /// Block Transactions
 #[derive(Debug)]
@@ -230,7 +230,7 @@ mod tests {
     use serde_json;
     use ethbloom::Bloom;
     use aion_types::{H256, U256};
-    use types::{Transaction, Bytes};
+    use crate::types::{Transaction, Bytes};
     use super::{Block, BlockTransactions, Header, SealType};
 
     #[test]

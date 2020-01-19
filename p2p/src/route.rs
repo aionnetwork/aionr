@@ -132,9 +132,9 @@ impl Action {
 #[cfg(test)]
 mod tests {
 
-    use route::Version;
-    use route::Module;
-    use route::Action;
+    use crate::route::Version;
+    use crate::route::Module;
+    use crate::route::Action;
 
     /// p2p route util methods
     ///

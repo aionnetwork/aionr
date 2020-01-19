@@ -21,8 +21,8 @@
  ******************************************************************************/
 
 use std::collections::BTreeMap;
-use types::account::account_diff::{ AccountDiff, Diff };
-use pod_account::{PodAccount, diff_pod};
+use crate::types::account::account_diff::{ AccountDiff, Diff };
+use crate::pod_account::{PodAccount, diff_pod};
 
 #[test]
 fn existence() {

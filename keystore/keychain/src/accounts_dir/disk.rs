@@ -25,7 +25,7 @@ use std::io::Write;
 use std::path::{PathBuf, Path};
 use std::collections::HashMap;
 use time;
-use {json, SafeAccount, Error};
+use crate::{json, SafeAccount, Error};
 use rlp::{self};
 use super::{KeyDirectory, VaultKeyDirectory, VaultKeyDirectoryProvider, VaultKey};
 use super::vault::{VAULT_FILE_NAME, VaultDiskDirectory};
@@ -184,7 +184,7 @@ where T: KeyFileManager
 
         // check for duplicate filename and append random suffix
         if dedup && keyfile_path.exists() {
-            let suffix = ::random::random_string(4);
+            let suffix = crate::random::random_string(4);
             filename.push_str(&format!("-{}", suffix));
             keyfile_path.set_file_name(&filename);
         }

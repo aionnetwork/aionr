@@ -3,6 +3,7 @@ name = "fastvm"
 version = "0.2.0"
 authors = ["Camus Qiu <camus@aion.network>"]
 build = "build.rs"
+edition = "2018"
 
 [dependencies]
 libc = "0.2.0"

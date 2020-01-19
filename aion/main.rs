@@ -21,36 +21,12 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate ansi_term;
-extern crate ctrlc;
 #[macro_use]
 extern crate clap;
-extern crate dir;
-extern crate fdlimit;
-extern crate jsonrpc_core;
-extern crate num_cpus;
-extern crate parking_lot;
-extern crate rlp;
-extern crate rpassword;
-extern crate rustc_hex;
-extern crate serde;
-extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
-extern crate toml;
-extern crate acore;
 extern crate acore_bytes as bytes;
 extern crate acore_io as io;
-extern crate logger;
-extern crate aion_types;
-extern crate key;
-extern crate keychain;
-extern crate panic_hook;
-extern crate aion_rpc;
-extern crate aion_version;
-extern crate journaldb;
-extern crate tokio;
-extern crate p2p;
 #[macro_use]
 extern crate log as rlog;
 
@@ -58,11 +34,7 @@ extern crate log as rlog;
 #[macro_use]
 extern crate pretty_assertions;
 
-#[cfg(test)]
-extern crate tempdir;
-#[cfg(test)]
-extern crate regex;
-
+use panic_hook;
 mod account;
 mod blockchain;
 mod cache;

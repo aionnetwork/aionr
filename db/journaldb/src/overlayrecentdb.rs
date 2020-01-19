@@ -29,7 +29,7 @@ use parking_lot::RwLock;
 use heapsize::HeapSizeOf;
 use rlp::*;
 use super::{DB_PREFIX_LEN, LATEST_ERA_KEY};
-use kvdb::{KeyValueDB, DBTransaction, HashStore, DBValue, MemoryDB};
+use crate::kvdb::{KeyValueDB, DBTransaction, HashStore, DBValue, MemoryDB};
 use super::JournalDB;
 use aion_types::H256;
 use plain_hasher::H256FastMap;

@@ -21,10 +21,10 @@
  ******************************************************************************/
 
 use std::collections::BTreeMap;
-use types::state::state_diff::StateDiff;
-use types::account::account_diff::{ AccountDiff, Diff };
-use pod_account::{ PodAccount };
-use pod_state::{ PodState, diff_pod };
+use crate::types::state::state_diff::StateDiff;
+use crate::types::account::account_diff::{ AccountDiff, Diff };
+use crate::pod_account::{ PodAccount };
+use crate::pod_state::{ PodState, diff_pod };
 
 #[test]
 fn create_delete() {

@@ -21,7 +21,8 @@
 
 //! Ping rpc implementation.
 use jsonrpc_core::Result;
-use traits::Ping;
+use crate::traits::Ping;
+use crate::Metadata;
 
 /// Ping rpc implementation.
 pub struct PingClient;
@@ -32,5 +33,7 @@ impl PingClient {
 }
 
 impl Ping for PingClient {
+    type Metadata = Metadata;
+
     fn ping(&self) -> Result<String> { Ok("pong".into()) }
 }

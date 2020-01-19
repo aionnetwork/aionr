@@ -24,18 +24,18 @@ mod miner;
 pub mod external;
 
 pub use self::miner::{Miner, MinerOptions, Banning, PendingSet};
-pub use transaction::local_transactions::Status as LocalTransactionStatus;
+pub use crate::transaction::local_transactions::Status as LocalTransactionStatus;
 
 use std::collections::BTreeMap;
 
 use aion_types::{H256, U256, Address};
 use acore_bytes::Bytes;
-use block::ClosedBlock;
-use client::{MiningBlockChainClient};
-use types::error::{Error};
-use header::{BlockNumber, SealType};
-use receipt::Receipt;
-use transaction::{UnverifiedTransaction, PendingTransaction};
+use crate::block::ClosedBlock;
+use crate::client::{MiningBlockChainClient};
+use crate::types::error::{Error};
+use crate::header::{BlockNumber, SealType};
+use crate::receipt::Receipt;
+use crate::transaction::{UnverifiedTransaction, PendingTransaction};
 use key::Ed25519KeyPair;
 
 /// Miner client API, this trait is somewhat related to multiple kinds of miner

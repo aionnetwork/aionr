@@ -21,11 +21,8 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate fastvm;
-extern crate libc;
 #[macro_use]
 extern crate log;
-extern crate rustc_hex;
 
 use fastvm::core::FastVM;
 use rustc_hex::FromHex;

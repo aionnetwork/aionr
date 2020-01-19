@@ -26,7 +26,7 @@ use rustc_hex::ToHex;
 use aion_types::{H256, U256, Address};
 use ethbloom::Bloom;
 
-use types::{Log, Bytes};
+use crate::types::{Log, Bytes};
 
 #[derive(Debug, Clone)]
 pub struct SimpleReceiptLog {
@@ -216,7 +216,7 @@ impl From<EthReceipt> for Receipt {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use types::{Log, Receipt, Bytes};
+    use crate::types::{Log, Receipt, Bytes};
 
     #[test]
     fn receipt_serialization() {

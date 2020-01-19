@@ -30,7 +30,7 @@
 use std::collections::{HashSet, HashMap};
 use std::sync::Arc;
 
-use state::{AionVMAccount};
+use crate::state::{AionVMAccount};
 use parking_lot::Mutex;
 use aion_types::{Address, H256};
 use kvdb::{AsHashStore, HashStore, DBValue, MemoryDB};

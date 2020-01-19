@@ -21,7 +21,7 @@
 
 #![warn(unused_extern_crates)]
 extern crate acore_bytes as bytes;
-extern crate blake2b;
+
 #[macro_use]
 extern crate log;
 

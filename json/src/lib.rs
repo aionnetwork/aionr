@@ -20,11 +20,7 @@
  *
  ******************************************************************************/
 #![warn(unused_extern_crates)]
-extern crate rustc_hex;
-extern crate serde;
-extern crate serde_json;
-extern crate aion_types;
-extern crate ethbloom;
+
 #[macro_use]
 extern crate serde_derive;
 
@@ -41,4 +37,4 @@ pub mod misc;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
-use bytes::Bytes;
+use crate::bytes::Bytes;

@@ -22,9 +22,6 @@
 #![warn(unused_extern_crates)]
 
 extern crate crypto as rcrypto;
-extern crate aion_types;
-extern crate rand;
-extern crate rustc_hex;
 extern crate blake2b as blake2b_util;
 
 mod error;

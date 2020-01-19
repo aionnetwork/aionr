@@ -36,13 +36,13 @@ use rlp::UntrustedRlp;
 use time::get_time;
 use unexpected::{Mismatch, OutOfBounds};
 
-use blockchain::*;
-use client::BlockChainClient;
-use engine::Engine;
-use types::error::{BlockError, Error};
-use header::{BlockNumber, Header};
-use transaction::{SignedTransaction, UnverifiedTransaction};
-use views::BlockView;
+use crate::blockchain::*;
+use crate::client::BlockChainClient;
+use crate::engine::Engine;
+use crate::types::error::{BlockError, Error};
+use crate::header::{BlockNumber, Header};
+use crate::transaction::{SignedTransaction, UnverifiedTransaction};
+use crate::views::BlockView;
 
 /// Preprocessed block data gathered in `verify_block_unordered` call
 pub struct PreverifiedBlock {
@@ -425,14 +425,15 @@ mod tests {
     use std::collections::HashMap;
     use aion_types::H256;
     use ethbloom::Bloom;
-    use types::blockchain::extra::{BlockDetails, TransactionAddress, BlockReceipts};
-    use encoded;
-    use types::error::BlockError::*;
-    use spec::Spec;
+    use crate::types::blockchain::extra::{BlockDetails, TransactionAddress, BlockReceipts};
+    use crate::encoded;
+    use crate::types::error::BlockError::*;
+    use crate::spec::Spec;
     use triehash::ordered_trie_root;
-    use helpers::{create_test_block_with_data, create_test_block};
-    use transaction::{SignedTransaction, Transaction, UnverifiedTransaction, Action};
-    use types::state::log_entry::{LogEntry, LocalizedLogEntry};
+    use crate::tests::common::TestBlockChainClient;
+    use crate::helpers::{create_test_block_with_data, create_test_block};
+    use crate::transaction::{SignedTransaction, Transaction, UnverifiedTransaction, Action};
+    use crate::types::state::log_entry::{LogEntry, LocalizedLogEntry};
     use rlp;
     use keychain;
 
@@ -600,7 +601,7 @@ mod tests {
         // additions that need access to state (tx filter in specific)
         // no existing tests need access to test, so having this not function
         // is fine.
-        let client = ::tests::common::TestBlockChainClient::default();
+        let client = TestBlockChainClient::default();
 
         let parent = bc
             .block_header(header.parent_hash())
@@ -610,7 +611,7 @@ mod tests {
             bytes,
             &transactions[..],
             bc as &dyn BlockProvider,
-            &client as &dyn (::client::BlockChainClient),
+            &client as &dyn BlockChainClient,
         );
         verify_block_family(&header, &parent, None, None, engine, Some(full_params))?;
         Ok(())

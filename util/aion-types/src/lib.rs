@@ -30,18 +30,15 @@ extern crate core;
 extern crate uint as uint_crate;
 #[macro_use]
 extern crate fixed_hash;
-extern crate num_bigint;
 
 #[cfg(feature = "serialize")]
 extern crate ethereum_types_serialize;
-#[cfg(feature = "serialize")]
-extern crate serde;
 
 mod hash;
 mod uint;
 
-pub use uint::{U64, U128, U256, U512};
-pub use hash::{H32, H64, H128, H160, H256, H264, H512, H520, H768, H1024};
+pub use crate::uint::{U64, U128, U256, U512};
+pub use crate::hash::{H32, H64, H128, H160, H256, H264, H512, H520, H768, H1024};
 pub use fixed_hash::clean_0x;
 
 pub type Address = H256;

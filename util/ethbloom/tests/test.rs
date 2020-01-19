@@ -22,7 +22,6 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate ethbloom;
 #[macro_use]
 extern crate hex_literal;
 

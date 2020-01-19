@@ -35,8 +35,8 @@
 //!
 //! use aion_types::{U256, Address};
 //! use key::{Random, Generator};
-//!    use transaction::transaction_queue::{TransactionQueue, TransactionDetailsProvider, AccountDetails, TransactionOrigin, RemovalReason};
-//!    use transaction::*;
+//!    use crate::transaction::transaction_queue::{TransactionQueue, TransactionDetailsProvider, AccountDetails, TransactionOrigin, RemovalReason};
+//!    use crate::transaction::*;
 //!    use rustc_hex::FromHex;
 //!
 //!    #[derive(Default)]
@@ -115,11 +115,11 @@ use io::IoChannel;
 use parking_lot::Mutex;
 use aion_types::{H256, U256, Address};
 use heapsize::HeapSizeOf;
-use transaction::local_transactions::{
+use crate::transaction::local_transactions::{
     LocalTransactionsList, Status as LocalTransactionStatus, TxIoMessage,
 };
 use table::Table;
-use transaction::{self, SignedTransaction, PendingTransaction};
+use crate::transaction::{self, SignedTransaction, PendingTransaction};
 
 type BlockNumber = u64;
 
@@ -1506,7 +1506,7 @@ pub mod test {
     use super::*;
     use key::{generate_keypair};
     use rustc_hex::FromHex;
-    use transaction::{Transaction, DEFAULT_TRANSACTION_TYPE};
+    use crate::transaction::{Transaction, DEFAULT_TRANSACTION_TYPE};
     use io::IoService;
 
     pub struct DummyTransactionDetailsProvider {

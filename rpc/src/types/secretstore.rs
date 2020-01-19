@@ -22,7 +22,7 @@
 
 use aion_types::H512;
 
-use types::Bytes;
+use crate::types::Bytes;
 
 /// Encrypted document key.
 #[derive(Default, Debug, Serialize, PartialEq)]

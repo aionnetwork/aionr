@@ -20,8 +20,8 @@
  *
  ******************************************************************************/
 
-use U256;
-use U128;
+use crate::U256;
+use crate::U128;
 use num_bigint::BigUint;
 
 #[cfg(feature = "serialize")]

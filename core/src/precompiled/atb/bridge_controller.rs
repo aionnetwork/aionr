@@ -27,13 +27,13 @@ use num_bigint::BigInt;
 use num_bigint::ToBigInt;
 
 use key::{Ed25519Signature, public_to_address_ed25519, verify_signature_ed25519};
-use precompiled::precompiled_utilities::{WORD_LENGTH, pad};
-use precompiled::atb::err_code::ErrCode;
-use precompiled::builtin::BuiltinExt;
-use precompiled::atb::bridge_event_sig::BridgeEventSig;
-use precompiled::atb::bridge_strg_conn::BridgeStorageConnector;
-use precompiled::atb::bridge_transfer::BridgeTransfer;
-use precompiled::atb::bridge_utilities::compute_bundle_hash;
+use crate::precompiled::precompiled_utilities::{WORD_LENGTH, pad};
+use crate::precompiled::atb::err_code::ErrCode;
+use crate::precompiled::builtin::BuiltinExt;
+use crate::precompiled::atb::bridge_event_sig::BridgeEventSig;
+use crate::precompiled::atb::bridge_strg_conn::BridgeStorageConnector;
+use crate::precompiled::atb::bridge_transfer::BridgeTransfer;
+use crate::precompiled::atb::bridge_utilities::compute_bundle_hash;
 
 pub struct BridgeController {
     connector: BridgeStorageConnector,

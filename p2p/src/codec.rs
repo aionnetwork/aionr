@@ -25,9 +25,9 @@ use tokio_codec::Encoder;
 use acore_bytes::to_hex;
 use bincode::config;
 use bytes::BytesMut;
-use node::HEADER_LENGTH;
-use msg::ChannelBuffer;
-use route::Version;
+use crate::node::HEADER_LENGTH;
+use crate::msg::ChannelBuffer;
+use crate::route::Version;
 
 pub struct Codec;
 

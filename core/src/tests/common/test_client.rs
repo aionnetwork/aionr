@@ -25,47 +25,47 @@
 use acore_bytes::Bytes;
 use aion_types::{Address, H128, H256, U256};
 use blake2b::blake2b;
-use block::{ClosedBlock, OpenBlock, SealedBlock};
-use blockchain::{BlockReceipts, TreeRoute};
-use client::{
+use crate::block::{ClosedBlock, OpenBlock, SealedBlock};
+use crate::blockchain::{BlockReceipts, TreeRoute};
+use crate::client::{
     BlockChainClient, BlockChainInfo, BlockId, BlockImportError, BlockStatus,
     CallAnalytics, LastHashes, MiningBlockChainClient, ProvingBlockChainClient,
-    TransactionId,
+    TransactionId, EngineClient
 };
-use db::{COL_STATE, DB_NAMES};
-use db::StateDB;
-use encoded;
-use executive::Executed;
-use factory::VmFactory;
-use filter::Filter;
-use header::{BlockNumber, Header as BlockHeader, SealType};
+use crate::db::{COL_STATE, DB_NAMES};
+use crate::db::StateDB;
+use crate::encoded;
+use crate::executive::Executed;
+use crate::factory::VmFactory;
+use crate::filter::Filter;
+use crate::header::{BlockNumber, Header as BlockHeader, SealType};
 use itertools::Itertools;
 use journaldb;
 use key::{generate_keypair, public_to_address_ed25519};
 use kvdb::{DatabaseConfig, DbRepository, RepositoryConfig};
 use kvdb::{KeyValueDB, MockDbRepository};
-use log_entry::LocalizedLogEntry;
-use miner::{Miner, MinerService};
+use crate::log_entry::LocalizedLogEntry;
+use crate::miner::{Miner, MinerService};
 use parking_lot::RwLock;
-use receipt::{LocalizedReceipt, Receipt};
+use crate::receipt::{LocalizedReceipt, Receipt};
 use rlp::*;
 use rustc_hex::FromHex;
-use spec::Spec;
-use state::BasicAccount;
+use crate::spec::Spec;
+use crate::state::BasicAccount;
 use std::collections::HashMap;
 use std::mem;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrder};
 use std::time::Duration;
 use tempdir::TempDir;
-use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction,
+use crate::transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction,
 Transaction, Action, DEFAULT_TRANSACTION_TYPE
 };
-use transaction::UnverifiedTransaction;
-use types::error::{CallError, ImportResult};
-use types::pruning_info::PruningInfo;
-use verification::queue::QueueInfo;
-use views::BlockView;
+use crate::transaction::UnverifiedTransaction;
+use crate::types::error::{CallError, ImportResult};
+use crate::types::pruning_info::PruningInfo;
+use crate::verification::queue::QueueInfo;
+use crate::views::BlockView;
 use num_bigint::BigUint;
 
 /// Test client.
@@ -654,8 +654,11 @@ impl BlockChainClient for TestBlockChainClient {
     }
 
     fn best_block_header(&self) -> encoded::Header {
-        self.block_header(BlockId::Hash(self.chain_info().best_block_hash))
-            .expect("Best block always has header.")
+        BlockChainClient::block_header(
+            self,
+            BlockId::Hash(BlockChainClient::chain_info(self).best_block_hash),
+        )
+        .expect("Best block always has header.")
     }
 
     fn calculate_difficulty(
@@ -685,7 +688,7 @@ impl BlockChainClient for TestBlockChainClient {
             .map(encoded::Header::new)
     }
 
-    fn block_header_data(&self, hash: &H256) -> Option<::encoded::Header> {
+    fn block_header_data(&self, hash: &H256) -> Option<encoded::Header> {
         self.blocks
             .read()
             .get(&hash)
@@ -932,7 +935,7 @@ impl BlockChainClient for TestBlockChainClient {
     fn new_block_chained(&self) {}
 
     fn ready_transactions(&self) -> Vec<PendingTransaction> {
-        let info = self.chain_info();
+        let info = BlockChainClient::chain_info(self);
         self.miner
             .ready_transactions(info.best_block_number, info.best_block_timestamp)
     }
@@ -944,7 +947,7 @@ impl BlockChainClient for TestBlockChainClient {
     }
 
     fn pruning_info(&self) -> PruningInfo {
-        let best_num = self.chain_info().best_block_number;
+        let best_num = BlockChainClient::chain_info(self).best_block_number;
         PruningInfo {
             earliest_chain: 1,
             earliest_state: self
@@ -981,7 +984,7 @@ impl ProvingBlockChainClient for TestBlockChainClient {
     // }
 }
 
-impl ::client::EngineClient for TestBlockChainClient {
+impl EngineClient for TestBlockChainClient {
     fn submit_seal(&self, block_hash: H256, seal: Vec<Bytes>) {
         if self.miner.submit_seal(self, block_hash, seal).is_err() {
             warn!(target: "poa", "Wrong internal seal submission!")
@@ -998,7 +1001,7 @@ impl ::client::EngineClient for TestBlockChainClient {
         BlockChainClient::block_number(self, id)
     }
 
-    fn block_header(&self, id: BlockId) -> Option<::encoded::Header> {
+    fn block_header(&self, id: BlockId) -> Option<encoded::Header> {
         BlockChainClient::block_header(self, id)
     }
 }

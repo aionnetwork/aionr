@@ -24,10 +24,11 @@
 use tiny_keccak::keccak256;
 use jsonrpc_core::Result;
 use version::version;
-use traits::Web3;
+use crate::traits::Web3;
+use crate::Metadata;
 use aion_types::H256;
 
-use types::Bytes;
+use crate::types::Bytes;
 
 /// Web3 rpc implementation.
 pub struct Web3Client;
@@ -38,6 +39,8 @@ impl Web3Client {
 }
 
 impl Web3 for Web3Client {
+    type Metadata = Metadata;
+
     fn client_version(&self) -> Result<String> { Ok(version().to_owned()) }
 
     fn sha3(&self, data: Bytes) -> Result<H256> { Ok(keccak256(&data.0).into()) }

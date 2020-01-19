@@ -21,11 +21,11 @@
  ******************************************************************************/
 use std::collections::HashMap;
 use aion_types::H256;
-use header::BlockNumber;
-use types::blooms::{BloomGroup, GroupPosition};
+use crate::header::BlockNumber;
+use crate::types::blooms::{BloomGroup, GroupPosition};
 
-use types::block::info::BlockInfo;
-use types::blockchain::extra::{BlockDetails, BlockReceipts, TransactionAddress};
+use crate::types::block::info::BlockInfo;
+use crate::types::blockchain::extra::{BlockDetails, BlockReceipts, TransactionAddress};
 
 /// Block extras update info.
 pub struct ExtrasUpdate<'a> {

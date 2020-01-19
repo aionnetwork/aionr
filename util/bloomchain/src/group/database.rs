@@ -20,7 +20,7 @@
  *
  ******************************************************************************/
 
-use group::{GroupPosition, BloomGroup};
+use crate::group::{GroupPosition, BloomGroup};
 
 /// Readonly `BloomGroup` database.
 pub trait BloomGroupDatabase {

@@ -22,10 +22,10 @@
 
 //! Vm call deserialization.
 
-use bytes::Bytes;
-use hash::Address;
-use uint::Uint;
-use maybe::MaybeEmpty;
+use crate::bytes::Bytes;
+use crate::hash::Address;
+use crate::uint::Uint;
+use crate::maybe::MaybeEmpty;
 
 /// Vm call deserialization.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -44,11 +44,11 @@ pub struct Call {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use vm::Call;
+    use crate::vm::Call;
     use aion_types::{U256, H256};
-    use uint::Uint;
-    use hash::Address;
-    use maybe::MaybeEmpty;
+    use crate::uint::Uint;
+    use crate::hash::Address;
+    use crate::maybe::MaybeEmpty;
     use std::str::FromStr;
 
     #[test]

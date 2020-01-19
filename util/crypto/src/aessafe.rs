@@ -126,10 +126,10 @@ finite field which allows for efficient computation of the AES S-Boxes. See [7] 
 use std::ops::{BitAnd, BitXor, Not};
 use std::default::Default;
 
-use cryptoutil::{read_u32v_le, write_u32_le};
-use simd::u32x4;
-use step_by::RangeExt;
-use symmetriccipher::{BlockEncryptor, BlockEncryptorX8, BlockDecryptor, BlockDecryptorX8};
+use crate::cryptoutil::{read_u32v_le, write_u32_le};
+use crate::simd::u32x4;
+use crate::step_by::RangeExt;
+use crate::symmetriccipher::{BlockEncryptor, BlockEncryptorX8, BlockDecryptor, BlockDecryptorX8};
 
 const U32X4_0: u32x4 = u32x4(0, 0, 0, 0);
 const U32X4_1: u32x4 = u32x4(0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff);

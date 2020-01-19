@@ -6,7 +6,7 @@
 
 //! Common RLP traits
 use elastic_array::ElasticArray1024;
-use {DecoderError, UntrustedRlp, RlpStream};
+use crate::{DecoderError, UntrustedRlp, RlpStream};
 
 /// RLP decodable trait
 pub trait Decodable: Sized {

@@ -45,7 +45,7 @@ impl STATE {
 #[cfg(test)]
 mod tests {
 
-    use state::STATE;
+    use crate::state::STATE;
 
     #[test]
     fn equal() {

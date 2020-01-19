@@ -23,10 +23,8 @@
 #![warn(unused_extern_crates)]
 #![cfg(feature = "benches")]
 
-extern crate ethbloom;
-extern crate rand;
-extern crate fixed_hash;
-extern crate blake2b;
+use rand;
+
 #[macro_use]
 extern crate crunchy;
 

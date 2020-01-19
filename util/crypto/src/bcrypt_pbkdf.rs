@@ -4,11 +4,11 @@
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
 
-use blowfish::Blowfish;
-use cryptoutil::{read_u32v_be, write_u32_be, write_u32_le};
-use sha2::Sha512;
-use digest::Digest;
-use step_by::RangeExt;
+use crate::blowfish::Blowfish;
+use crate::cryptoutil::{read_u32v_be, write_u32_be, write_u32_le};
+use crate::sha2::Sha512;
+use crate::digest::Digest;
+use crate::step_by::RangeExt;
 
 fn bcrypt_hash(hpass: &[u8], hsalt: &[u8], output: &mut [u8; 32]) {
     let mut bf = Blowfish::init_state();
@@ -90,7 +90,7 @@ mod test {
     #[cfg(feature = "benches")]
     use std::time::Instant;
 
-    use bcrypt_pbkdf::{bcrypt_pbkdf, bcrypt_hash};
+    use crate::bcrypt_pbkdf::{bcrypt_pbkdf, bcrypt_hash};
 
     #[test]
     fn test_bcrypt_hash() {

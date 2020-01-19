@@ -6,8 +6,8 @@
 
 use std::ops::{Add, Sub, Mul};
 use std::cmp::{Eq, PartialEq, min};
-use util::{fixed_time_eq};
-use step_by::RangeExt;
+use crate::util::{fixed_time_eq};
+use crate::step_by::RangeExt;
 
 /*
 fe means field element.
@@ -2656,7 +2656,7 @@ pub fn curve25519_base(x: &[u8]) -> [u8; 32] {
 
 #[cfg(test)]
 mod tests {
-    use curve25519::{Fe, curve25519_base};
+    use crate::curve25519::{Fe, curve25519_base};
 
     #[test]
     fn from_to_bytes_preserves() {

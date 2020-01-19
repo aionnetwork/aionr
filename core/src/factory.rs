@@ -21,7 +21,7 @@
  ******************************************************************************/
 
 use trie::TrieFactory;
-use db::Factory as AccountFactory;
+use crate::db::Factory as AccountFactory;
 use vms::{VMType, Factory, FastVMFactory, AVMFactory};
 
 /// Virtual machine factory

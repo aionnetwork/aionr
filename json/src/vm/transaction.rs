@@ -21,9 +21,9 @@
  ******************************************************************************/
 
 //! Executed transaction.
-use hash::Address;
-use uint::Uint;
-use bytes::Bytes;
+use crate::hash::Address;
+use crate::uint::Uint;
+use crate::bytes::Bytes;
 
 /// Executed transaction.
 #[derive(Debug, PartialEq, Deserialize)]
@@ -51,7 +51,7 @@ pub struct Transaction {
 #[cfg(test)]
 mod tests {
     use serde_json;
-    use vm::Transaction;
+    use crate::vm::Transaction;
 
     #[test]
     fn transaction_deserialization() {

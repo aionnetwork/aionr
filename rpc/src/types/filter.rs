@@ -27,7 +27,7 @@ use acore::filter::Filter as EthFilter;
 use acore::client::BlockId;
 use aion_types::{H256, Address};
 
-use types::{BlockNumber, Log};
+use crate::types::{BlockNumber, Log};
 
 /// Variadic value
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -155,7 +155,7 @@ mod tests {
     use std::str::FromStr;
     use aion_types::H256;
     use super::{VariadicValue, Topic, Filter};
-    use types::BlockNumber;
+    use crate::types::BlockNumber;
     use acore::filter::Filter as EthFilter;
     use acore::client::BlockId;
 

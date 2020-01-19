@@ -19,16 +19,16 @@
  *
  ******************************************************************************/
 
-use rockskvdb;
-use mockkvdb;
+use crate::rockskvdb;
+use crate::mockkvdb;
 use std::collections::{HashMap, BTreeMap};
 use parking_lot::RwLock;
 
 use super::{Result, DBValue};
-use traits::{KeyValueDAO, KeyValueDB};
-use dbconfigs::RepositoryConfig;
-use dbtransaction::{DBTransaction, DBOp};
-use error::Error;
+use crate::traits::{KeyValueDAO, KeyValueDB};
+use crate::dbconfigs::RepositoryConfig;
+use crate::dbtransaction::{DBTransaction, DBOp};
+use crate::error::Error;
 
 type DB = rockskvdb::Rockskvdb;
 type DbName = String;

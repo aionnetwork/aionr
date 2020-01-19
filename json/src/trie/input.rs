@@ -25,7 +25,7 @@
 use std::fmt;
 use std::collections::BTreeMap;
 use std::str::FromStr;
-use bytes::Bytes;
+use crate::bytes::Bytes;
 use serde::{Deserialize, Deserializer};
 use serde::de::{Error as ErrorTrait, Visitor, MapAccess, SeqAccess};
 
@@ -134,7 +134,7 @@ impl<'a> Visitor<'a> for InputVisitor {
 mod tests {
     use std::collections::BTreeMap;
     use serde_json;
-    use bytes::Bytes;
+    use crate::bytes::Bytes;
     use super::Input;
 
     #[test]

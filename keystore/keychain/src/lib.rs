@@ -22,32 +22,16 @@
 
 #![warn(unused_extern_crates)]
 
-extern crate blake2b;
-extern crate crypto;
-extern crate itertools;
-extern crate parking_lot;
-extern crate rand;
-extern crate rustc_hex;
-extern crate serde;
-extern crate serde_json;
-extern crate smallvec;
-extern crate subtle;
-extern crate time;
-extern crate aion_types;
-extern crate key;
-extern crate rlp;
-extern crate uuid;
 #[macro_use]
 extern crate log;
 #[macro_use]
 extern crate serde_derive;
-#[cfg(test)]
-extern crate tempdir;
 
 pub mod accounts_dir;
 pub mod ethkey;
 pub mod secret_store;
 
+use crypto;
 mod account;
 mod json;
 
@@ -70,4 +54,4 @@ pub use self::secret_store::{
 pub use self::random::random_string;
 
 /// An opaque wrapper for secret.
-pub struct OpaqueSecretEd25519(::ethkey::Ed25519Secret);
+pub struct OpaqueSecretEd25519(ethkey::Ed25519Secret);

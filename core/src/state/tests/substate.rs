@@ -18,8 +18,8 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-use state::substate::Substate;
-use log_entry::LogEntry;
+use crate::state::substate::Substate;
+use crate::log_entry::LogEntry;
 
 #[test]
 fn created() {

@@ -34,10 +34,10 @@ pub use self::chain_notify::ChainNotify;
 pub use self::traits::{BlockChainClient, MiningBlockChainClient, EngineClient};
 pub use self::traits::ProvingBlockChainClient;
 
-pub use types::ids::*;
-pub use types::pruning_info::PruningInfo;
-pub use types::call_analytics::CallAnalytics;
-pub use executive::{Executed, Executive};
+pub use crate::types::ids::*;
+pub use crate::types::pruning_info::PruningInfo;
+pub use crate::types::call_analytics::CallAnalytics;
+pub use crate::executive::{Executed, Executive};
 pub use vms::{EnvInfo, LastHashes};
 
-pub use types::error::{BlockImportError, TransactionImportError};
+pub use crate::types::error::{BlockImportError, TransactionImportError};

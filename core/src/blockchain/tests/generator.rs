@@ -27,10 +27,10 @@ use aion_types::{U256, H256};
 use ethbloom::Bloom;
 
 use acore_bytes::Bytes;
-use header::{Header,SealType};
+use crate::header::{Header,SealType};
 use rlp::encode;
-use transaction::SignedTransaction;
-use views::BlockView;
+use crate::transaction::SignedTransaction;
+use crate::views::BlockView;
 
 /// Helper structure, used for encoding blocks.
 #[derive(Default, Clone, RlpEncodable)]

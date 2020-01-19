@@ -3,6 +3,7 @@ name = "avm"
 version = "0.2.1"
 authors = ["Yulong Wu <yulong@aion.network>", "Camus Qiu <camus@aion.network>"]
 build = "build.rs"
+edition = "2018"
 
 [dependencies]
 rjni = { path = "rjni" }
