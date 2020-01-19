@@ -216,7 +216,7 @@ pub extern fn call(obj: *mut libc::c_void, info: *mut u8, msg: *const u8) -> *co
     if evm_msg.depth >= constants::MAX_CALL_DEPTH {
         result_info.status_code = EvmStatusCode::Failure;
         result_info.gas_left = 0;
-        return unsafe { mem::transmute(&vec![0u8][0]) };
+        return ::std::ptr::null();
     }
 
     let result = match call_type {
