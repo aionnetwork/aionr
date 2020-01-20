@@ -20,7 +20,7 @@ extern {
         rhsp: *const u8,
         count: libc::size_t,
     ) -> u32;
-    pub fn rust_crypto_util_secure_memset(dst: *mut u8, val: libc::uint8_t, count: libc::size_t);
+    pub fn rust_crypto_util_secure_memset(dst: *mut u8, val: u8, count: libc::size_t);
 }
 
 pub fn secure_memset(dst: &mut [u8], val: u8) {
