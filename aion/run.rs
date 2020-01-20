@@ -80,7 +80,7 @@ pub struct RunCmd {
     pub verifier_settings: VerifierSettings,
 }
 
-pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
+pub fn execute_impl(cmd: RunCmd) -> Result<Weak<Client>, String> {
     // load spec
     let spec = cmd.spec.spec()?;
 

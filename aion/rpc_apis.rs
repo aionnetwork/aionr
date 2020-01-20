@@ -280,7 +280,7 @@ impl ApiSet {
             Api::Personal,
             Api::Ping,
         ]
-            .into_iter()
+            .iter()
             .cloned()
             .collect();
 
@@ -293,7 +293,7 @@ impl ApiSet {
             Api::Personal,
             Api::Ping,
         ]
-            .into_iter()
+            .iter()
             .cloned()
             .collect();
 
