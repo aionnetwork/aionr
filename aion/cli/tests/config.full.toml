@@ -1,0 +1,91 @@
+[aion]
+chain = "homestead"
+base_path = "base"
+db_path = "db"
+keys_path = "keys"
+
+[account]
+unlock = ["0xdeadbeefcafe0000000000000000000000000000"]
+password = ["~/.safe/password.file"]
+keys_iterations = 10240
+refresh_time = 2
+
+[network]
+max_peers = 50
+net_id = 128
+local_node = "p2p://12345678-9abc-def0-1234-56789abcdef0@2.3.3.3:3333"
+boot_nodes = [
+    "p2p://22345678-9abc-def0-1234-56789abcdef0@3.4.4.4:4444",
+    "p2p://32345678-9abc-def0-1234-56789abcdef0@4.5.5.5:5555"
+]
+sync_from_boot_nodes_only = true
+ip_black_list = ["ip1","ip2"]
+
+[rpc]
+processing_threads = 3
+
+[http]
+disable = true
+port = 8545
+interface = "local"
+cors = ["cor1","cor2"]
+apis = ["api1","api2"]
+hosts = ["host1","host2"]
+server_threads = 5
+
+[websockets]
+disable = true
+port = 8546
+interface = "local"
+origins = ["origin1","origin2"]
+apis = ["api1","api2"]
+hosts = ["host1","host2"]
+max_connections = 12
+
+[ipc]
+disable = true
+path = "$HOME/.aion/jsonrpc.ipc"
+apis = ["api1","api2"]
+
+[mining]
+author = "0xdeadbeefcafe0000000000000000000000000001"
+force_sealing = true
+reseal_min_period = 4000
+work_queue_size = 100
+relay_set = "cheap"
+min_gas_price = 10000000000
+max_gas_price = 9000000000000000000
+gas_floor_target = "4700000"
+gas_cap = "6283184"
+tx_queue_strategy = "gas_factor"
+tx_queue_ban_count = 1
+tx_queue_ban_time = 180 #s
+tx_gas_limit = "6283184"
+tx_time_limit = 100 #ms
+extra_data = "Aion"
+remove_solved = true
+infinite_pending_block = true
+dynamic_gas_price = true
+local_max_gas_price = 100000000000
+blk_price_window = 20
+max_blk_traverse = 64
+gas_price_percentile = 60
+tx_queue_mem_limit = 2
+staker_private_key = "staker_private_key"
+
+[db]
+pruning = "auto"
+pruning_history = 64
+pruning_memory = 500
+cache_size_blocks = 8
+cache_size_queue = 50
+cache_size_state = 25
+cache_size = 128 # Overrides above caches with total size
+disable_wal = true
+db_compaction = "ssd"
+fat_db = "auto"
+scale_verifiers = true
+num_verifiers = 6
+
+[log]
+config = "log/config.yaml"

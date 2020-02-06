@@ -1,0 +1,21 @@
+[package]
+name = "journaldb"
+version = "0.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+description = "A `HashDB` which can manage a short-term journal potentially containing many forks of mutually exclusive actions"
+license = "GPL3"
+
+[dependencies]
+acore-bytes = { path = "../../util/bytes" }
+aion-types = { path = "../../util/aion-types"}
+heapsize = "0.4"
+db = { path = "../core" }
+log = "0.3"
+parking_lot = "0.5"
+plain_hasher = { path = "../../util/plain_hasher" }
+rlp = { path = "../../util/rlp" }
+util-error = { path = "../../util/error" }
+
+[dev-dependencies]
+logger = { path = "../../util/logger" }
+blake2b = { path = "../../util/blake2b" }

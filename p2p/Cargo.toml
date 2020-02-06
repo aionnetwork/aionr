@@ -1,0 +1,28 @@
+[package]
+name = "p2p"
+version = "0.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+
+[dependencies]
+log = "0.3"
+bincode = "1.0.1"
+bytes = "0.4"
+byteorder = "1.2.7"
+lazy_static = "1.3.0"
+rand = "0.5.5"
+lru-cache = "0.1"
+uuid = { version = "0.6.5", features = ["v4"] }
+serde = "1.0.80"
+serde_derive = "1.0.92"
+state = "0.4.1"
+futures = "0.1.26"
+tokio = "0.1.11"
+tokio-codec = "0.1.1"
+tokio-current-thread = "0.1.3"
+tokio-executor = "0.1.5"
+tokio-io = "0.1.10"
+tokio-reactor = "0.1.6"
+tokio-tcp = "0.1.2"
+parking_lot = "0.5"
+acore-bytes =  { path = "../util/bytes" }
+aion-version = { path = "../util/version" }

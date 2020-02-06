@@ -1,0 +1,14 @@
+[package]
+name = "key"
+version = "0.3.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+
+[dependencies]
+blake2b = { path = "../../util/blake2b"}
+crypto = { path = "../../util/crypto" }
+aion-types = { path = "../../util/aion-types"}
+rand = "0.4"
+rustc-hex = "1.0"
+
+[features]
+benches = []

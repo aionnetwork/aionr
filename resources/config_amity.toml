@@ -1,0 +1,32 @@
+[aion]
+chain = "amity/amity.json"
+
+[account]
+stake_contract = "0xa056337bb14e818f3f53e13ab0d93b6539aa570cba91ce65c716058241989be9"
+
+[network]
+max_peers = 32
+net_id = 27
+local_node = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"
+boot_nodes = [
+"p2p://a8011211-8c7e-496c-9c4e-c89318280274@13.82.30.156:30303",
+"p2p://a8021211-729a-4584-86f1-e19ab97cf9ce@13.69.15.78:30303",
+"p2p://a8031211-729a-4584-86f1-e19ab97cf9cq@34.68.147.170:30303",
+"p2p://a8041211-8c7e-496c-9c4e-c89318280275@35.228.234.246:30303"
+]
+
+[http]
+disable = false
+port = 8545
+
+[websockets]
+disable = true
+
+[ipc]
+disable = true
+
+[mining]
+author = "0xa07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137"
+
+[log]
+config = "log_config.yaml"

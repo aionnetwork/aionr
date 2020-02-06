@@ -1,0 +1,26 @@
+[package]
+name = "fastvm"
+version = "0.2.0"
+authors = ["Camus Qiu <camus@aion.network>"]
+build = "build.rs"
+
+[dependencies]
+libc = "0.2.0"
+time = "0.1"
+num = "*"
+serde_derive = "1.0.0"
+serde_json = "*"
+bincode = "1.0.0"
+num-bigint = "0.2"
+vm_common = {path = "../common"}
+aion-types = { path = "../../util/aion-types"}
+patricia-trie = { path = "../../util/patricia_trie" }
+log = "0.3"
+
+[dev-dependencies]
+rand = "0.4.3"
+rustc-hex = "2.0.1"
+rlp = { path = "../../util/rlp" }
+
+[build-dependencies]
+cmake = "0.1"

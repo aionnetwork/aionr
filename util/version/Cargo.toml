@@ -1,0 +1,19 @@
+# NOTE This file is used by the auto-updater service.
+# Make sure to update the service if it's moved or the structure is changed.
+[package]
+name = "aion-version"
+# NOTE: this value is used for Aion version string (via env CARGO_PKG_VERSION)
+version = "1.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+build = "build.rs"
+
+[dependencies]
+target_info = "0.1"
+
+[build-dependencies]
+vergen = "0.1"
+rustc_version = "0.2.0"
+toml = "0.4"
+
+[features]
+final = []

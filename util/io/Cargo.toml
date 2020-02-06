@@ -1,0 +1,15 @@
+[package]
+description = "core IO library"
+homepage = "https://aion.network"
+license = "GPL-3.0"
+name = "acore-io"
+version = "0.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+
+[dependencies]
+mio = "0.6.8"
+crossbeam = "0.3"
+parking_lot = "0.5"
+log = "0.3"
+slab = "0.2"
+

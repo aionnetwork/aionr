@@ -1,0 +1,79 @@
+[package]
+description = "Core library"
+homepage = "https://aion.network"
+license = "GPL-3.0"
+name = "acore"
+version = "0.1.0"
+authors = ["Aion Foundation <admin@aion.network>"]
+
+[dependencies]
+ansi_term = "0.10"
+bloomchain = { path = "../util/bloomchain" }
+byteorder = "1.0"
+bytes = "0.4"
+state = "0.4.1"
+crossbeam = "0.3"
+acore-bloom-journal = { path = "../util/bloom" }
+acore-bytes = { path = "../util/bytes" }
+patricia-trie = { path = "../util/patricia_trie" }
+acore-io = { path = "../util/io" }
+aion-types = { path = "../util/aion-types"}
+ethbloom = { path = "../util/ethbloom"}
+memory-cache = { path = "../util/memory_cache" }
+ajson = { path = "../json" }
+key = { path = "../keystore/key" }
+crypto = { path = "../util/crypto" }
+keychain = { path = "../keystore/keychain" }
+vms = { path =  "../vms" }
+heapsize = "0.4"
+itertools = "0.5"
+lazy_static = "1.0"
+log = "0.3"
+lru-cache = "0.1"
+num = "0.1"
+num_cpus = "1.2"
+aion-machine = { path = "../machine" }
+parking_lot = "0.5"
+rayon = "0.8"
+rlp = { path = "../util/rlp" }
+rlp_compress = { path = "../util/rlp_compress" }
+rlp_derive = { path = "../util/rlp_derive" }
+util-error = { path = "../util/error" }
+stop-guard = { path = "../util/stop-guard" }
+fixed-point = { path = "../util/fixed_point" }
+rustc-hex = "1.0"
+stats = { path = "../util/stats" }
+time = "0.1"
+trace-time = { path = "../util/trace-time" }
+using_queue = { path = "../util/using_queue" }
+table = { path = "../util/table" }
+triehash = { path = "../util/triehash" }
+unexpected = { path = "../util/unexpected" }
+journaldb = { path = "../db/journaldb" }
+db = { path = "../db/core" }
+equihash = { path = "../util/equihash" }
+blake2b = { path = "../util/blake2b" }
+avm_abi =   { path = "../util/avm_abi" }
+p2p = { path = "../p2p" }
+tiny-keccak = "1.4.2"
+num-bigint = "0.2"
+bytebuffer = "0.2.1"
+transient-hashmap = "0.4"
+macros = { path = "../util/macros" }
+futures = "0.1.6"
+tokio = "0.1.11"
+rand = "0.5.5"
+ctrlc = { git = "https://github.com/paritytech/rust-ctrlc.git" }
+delta-calc = { path = "../util/delta-calc" }
+serde = "1.0"
+
+[dev-dependencies]
+tempdir = "*"
+log = "0.3"
+macros =           { path = "../util/macros" }
+trie-standardmap = { path = "../util/trie-standardmap" }
+fastvm =           { path = "../vms/fastvm" }
+vms =              { path = "../vms" }
+logger =           { path = "../util/logger" }
+aion-types =       { path = "../util/aion-types" }
+db =               { path = "../db/core" }
