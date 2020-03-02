@@ -140,10 +140,16 @@ pub struct DifficultyCalc {
     minimum_pow_difficulty: U256,
     minimum_pos_difficulty: U256,
     unity_update: Option<BlockNumber>,
+    unity_hybrid_seed_update: Option<BlockNumber>,
 }
 
 impl DifficultyCalc {
-    pub fn new(params: &UnityEngineParams, unity_update: Option<BlockNumber>) -> DifficultyCalc {
+    pub fn new(
+        params: &UnityEngineParams,
+        unity_update: Option<BlockNumber>,
+        unity_hybrid_seed_update: Option<BlockNumber>,
+    ) -> DifficultyCalc
+    {
         DifficultyCalc {
             difficulty_bound_divisor: params.difficulty_bound_divisor,
             // difficulty_bound_divisor_unity: params.difficulty_bound_divisor_unity,
@@ -153,6 +159,7 @@ impl DifficultyCalc {
             minimum_pos_difficulty: params.minimum_pos_difficulty,
             // block_time_unity: params.block_time_unity,
             unity_update: unity_update,
+            unity_hybrid_seed_update: unity_hybrid_seed_update,
         }
     }
 
@@ -169,12 +176,14 @@ impl DifficultyCalc {
             Some(fork_number) if parent.number() >= fork_number => {
                 // 1. First PoS block
                 if parent.number() == fork_number {
-                    // Dynamic initial pos difficulty: ARK-71
-                    let initial_pos_difficulty = client
-                        .get_total_stake(BlockId::Hash(parent.hash()))
-                        .map(|total_stake| total_stake * U256::from(10u64))
-                        .unwrap_or(self.minimum_pos_difficulty);
-                    return cmp::max(self.minimum_pos_difficulty, initial_pos_difficulty);
+                    return self.initial_pos_difficulty(parent, client);
+                }
+
+                // 1.1 If first block after the unity hybrid seed update, reset pos difficulty
+                if let Some(fork_number) = self.unity_hybrid_seed_update {
+                    if parent.number() == fork_number {
+                        return self.initial_pos_difficulty(parent, client);
+                    }
                 }
 
                 let grand_parent = grand_parent.expect(
@@ -204,6 +213,15 @@ impl DifficultyCalc {
                 self.calculate_difficulty_v1(parent, grand_parent)
             }
         }
+    }
+
+    // Dynamic initial pos difficulty: ARK-71
+    fn initial_pos_difficulty(&self, parent: &Header, client: &BlockChainClient) -> U256 {
+        let initial_pos_difficulty = client
+            .get_total_stake(BlockId::Hash(parent.hash()))
+            .map(|total_stake| total_stake * U256::from(10u64))
+            .unwrap_or(self.minimum_pos_difficulty);
+        return cmp::max(self.minimum_pos_difficulty, initial_pos_difficulty);
     }
 
     // Aion 1.0 difficulty adjustment algorithm (pure PoW)
@@ -432,7 +450,11 @@ impl UnityEngine {
             machine.params().unity_update,
             machine.premine(),
         );
-        let difficulty_calc = DifficultyCalc::new(&params, machine.params().unity_update);
+        let difficulty_calc = DifficultyCalc::new(
+            &params,
+            machine.params().unity_update,
+            machine.params().unity_hybrid_seed_update,
+        );
         Arc::new(UnityEngine {
             machine,
             rewards_calculator,
@@ -543,7 +565,19 @@ impl Engine for Arc<UnityEngine> {
         {
             Err(BlockError::InvalidPoSBlockNumber.into())
         } else {
-            PoSValidator::validate(header, parent, grand_parent, stake)?;
+            // U30-22: unity hybrid seed update
+            let unity_hybrid_seed_update = self
+                .machine
+                .params()
+                .unity_hybrid_seed_update
+                .map_or(false, |fork_number| header.number() > fork_number);
+            PoSValidator::validate(
+                header,
+                parent,
+                grand_parent,
+                stake,
+                unity_hybrid_seed_update,
+            )?;
             Ok(())
         }
     }

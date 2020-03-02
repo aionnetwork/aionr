@@ -61,6 +61,8 @@ use key::Ed25519KeyPair;
 use num::Zero;
 use num_bigint::BigUint;
 use delta_calc::calculate_delta;
+use key::public_to_address_ed25519;
+use blake2b::blake2b;
 
 const POW_UPDATE_COOLDOWN: Duration = Duration::from_secs(1);
 
@@ -375,7 +377,14 @@ impl Miner {
         );
 
         // 5. Calcualte timestamp for the new PoS block
-        let new_seed = ed25519::signature(&seed, &sk);
+        // U30-22 New hybrid seed
+        let new_seed = if self.unity_hybrid_seed_update(client) {
+            Self::generate_hybrid_seed(&seed, &pk, &best_block_header.decode())
+        }
+        // Normal unity seed
+        else {
+            ed25519::signature(&seed, &sk)
+        };
 
         let delta_uint = calculate_delta(difficulty, &new_seed, stake.clone());
 
@@ -1041,6 +1050,46 @@ impl Miner {
         )
     }
 
+    // U30-22
+    // Generate hybrid seed for pos block
+    fn generate_hybrid_seed(
+        grand_parent_seed: &[u8],
+        pk: &[u8],
+        parent_header: &Header,
+    ) -> [u8; 64]
+    {
+        let mut hybrid_seed: Vec<u8> = Vec::new();
+        let signing_address: Address = public_to_address_ed25519(&H256::from(pk));
+        let parent_mine_hash: H256 = parent_header.mine_hash();
+        let parent_nonce: &[u8] = &parent_header.seal()[0];
+        // X = PoS-seed_n-1 || Signing-addr || Pow-HeaderHashForMiners_n-1 || Pow-nonce_n-1
+        hybrid_seed.extend(grand_parent_seed);
+        hybrid_seed.extend(&signing_address.to_vec());
+        hybrid_seed.extend(&parent_mine_hash.to_vec());
+        hybrid_seed.extend(parent_nonce);
+        // left = X || 0
+        let mut hybrid_left: Vec<u8> = Vec::new();
+        hybrid_left.extend(&hybrid_seed);
+        hybrid_left.extend(&[0u8]);
+        // right = X || 1
+        let mut hybrid_right: Vec<u8> = Vec::new();
+        hybrid_right.extend(&hybrid_seed);
+        hybrid_right.extend(&[1u8]);
+        // PoS-seed_n = Blake2b(X || 0) || Blake2b(X || 1)
+        let seed_left: H256 = blake2b(&hybrid_left);
+        let seed_right: H256 = blake2b(&hybrid_right);
+        let mut new_seed: Vec<u8> = Vec::new();
+        new_seed.extend(&seed_left.to_vec());
+        new_seed.extend(&seed_right.to_vec());
+        debug!(target: "miner", "block {:?}, hybrid_left {:?}, hybrid_right {:?}, seed_left {:?}, 
+            seed_right {:?}, new_seed {:?}", 
+            parent_header.number() + 1, hybrid_left, hybrid_right, seed_left,
+            seed_right, new_seed);
+        let mut seed: [u8; 64] = [0u8; 64];
+        seed.copy_from_slice(&new_seed.as_slice()[..64]);
+        seed
+    }
+
     #[cfg(test)]
     /// Replace tx message channel. Useful for testing.
     pub fn set_tx_message_channel(&self, tx_message: IoChannel<TxIoMessage>) {
@@ -1447,9 +1496,20 @@ impl MinerService for Miner {
 
         let timestamp = best_block_header.timestamp();
         let grand_parent = client.block_header_data(&best_block_header.parent_hash());
-        let great_grand_parent = match &grand_parent {
-            Some(header) => client.block_header_data(&header.parent_hash()),
-            None => None,
+        let (great_grand_parent, parent_seed) = match &grand_parent {
+            Some(header) => {
+                let seed = if header.seal_type() == Some(SealType::PoS) {
+                    header
+                        .seal()
+                        .get(0)
+                        .expect("A pos block has to contain a seed")
+                        .to_owned()
+                } else {
+                    vec![0u8; 64]
+                };
+                (client.block_header_data(&header.parent_hash()), seed)
+            }
+            None => (None, vec![0u8; 64]),
         };
         let difficulty = client.calculate_difficulty(
             &best_block_header.decode(),
@@ -1458,6 +1518,13 @@ impl MinerService for Miner {
         );
 
         debug!(target: "miner", "new block difficulty = {:?}", difficulty);
+
+        // U30-22
+        let seed = if self.unity_hybrid_seed_update(client) {
+            Self::generate_hybrid_seed(&parent_seed, &pk.to_vec(), &best_block_header.decode())
+        } else {
+            seed
+        };
 
         let delta_uint = calculate_delta(difficulty, &seed, stake.clone());
 
@@ -1701,6 +1768,18 @@ impl MinerService for Miner {
             .machine()
             .params()
             .unity_update
+            .map_or(false, |fork_number| {
+                client.chain_info().best_block_number >= fork_number
+            })
+    }
+
+    // AION Unity hybrid seed update
+    // Check if the next block is on the unity hybrid seed hard fork
+    fn unity_hybrid_seed_update(&self, client: &MiningBlockChainClient) -> bool {
+        self.engine
+            .machine()
+            .params()
+            .unity_hybrid_seed_update
             .map_or(false, |fork_number| {
                 client.chain_info().best_block_number >= fork_number
             })
