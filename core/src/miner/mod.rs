@@ -170,6 +170,10 @@ pub trait MinerService: Send + Sync {
     // Check if next block is on the unity hard fork
     fn unity_update(&self, client: &MiningBlockChainClient) -> bool;
 
+    // AION Unity hybrid seed update
+    // Check if the next block is on the unity hybrid seed hard fork
+    fn unity_hybrid_seed_update(&self, client: &MiningBlockChainClient) -> bool;
+
     // AION 2.0
     // Check if it's allowed to produce a new block with given seal type.
     // A block's seal type must be different than its parent's seal type.
