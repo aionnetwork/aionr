@@ -19,7 +19,9 @@
  *
  ******************************************************************************/
 
+//! P2p Module
 //!
+//! Network Manager, manage node interaction, messaging, and task assignment in the network.
 
 #![warn(unused_extern_crates)]
 
@@ -93,9 +95,11 @@ const INTERVAL_ACTIVE_NODES: u64 = 3;
 const TIMEOUT_MAX: u64 = 30;
 const TEMP_MAX: usize = 64;
 
+/// Protocal version for p2p/sync
 pub const PROTOCAL_VERSION: u16 = Version::V0 as u16;
 pub use route::Module;
 
+/// P2p Manager
 #[derive(Clone)]
 pub struct Mgr {
     /// shutdown hook
@@ -160,10 +164,12 @@ impl Mgr {
         }
     }
 
+    /// bind sync module callback
     pub fn register_callback(&self, callback: Weak<Callable>) {
         *self.callback.write() = Some(callback);
     }
 
+    /// clear sync module callback
     pub fn clear_callback(&self) {
         while Arc::strong_count(&self.callback) > 2 {
             ::std::thread::sleep(Duration::from_secs(2));
@@ -584,6 +590,7 @@ impl Mgr {
         }
     }
 
+    /// disconnect node
     fn disconnect(&self, hash: u64, id: String) {
         {
             let mut id_set = self.nodes_id.lock();
@@ -644,6 +651,7 @@ impl Mgr {
         info!(target: "p2p_shutdown" , "p2p shutdown finished");
     }
 
+    /// get network id
     pub fn get_net_id(&self) -> u32 { self.config.net_id }
 
     /// rechieve a random node with td >= target_td
@@ -766,6 +774,7 @@ impl Mgr {
         }
     }
 
+    /// get local node info to fill back to config file
     pub fn get_local_node_info(&self) -> &String { &self.config.local_node }
 
     /// messages with module code other than p2p module

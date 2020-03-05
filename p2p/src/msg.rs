@@ -56,20 +56,25 @@ impl Head {
     }
 }
 
+/// Channel buffer. The message shape in Aion Sync/P2p protocal.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ChannelBuffer {
+    /// channel buffer header
     pub head: Head,
+    /// channel buffer body
     pub body: Vec<u8>,
 }
 
 impl ChannelBuffer {
+    /// initialization with default value
     pub fn new() -> ChannelBuffer {
         ChannelBuffer {
             head: Head::new(),
             body: Vec::new(),
         }
     }
-    // temporiy name it for it now
+
+    /// initailization with given value
     pub fn new1(ver: u16, ctrl: u8, action: u8, len: u32) -> ChannelBuffer {
         ChannelBuffer {
             head: Head::new1(ver, ctrl, action, len),
@@ -77,6 +82,7 @@ impl ChannelBuffer {
         }
     }
 
+    /// convert task type to u32
     pub fn to_route(ver: u16, ctrl: u8, action: u8) -> u32 {
         ((ver as u32) << 16) + ((ctrl as u32) << 8) + (action as u32)
     }
