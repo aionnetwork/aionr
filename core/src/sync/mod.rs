@@ -19,6 +19,15 @@
  *
  ******************************************************************************/
 
+//! Sync module. Handle transmitting and recieving nodes status, transactions, blocks
+//!
+//! # Tasks
+//! * node_status: to get/send status from/to other nodes
+//! * headers: to get/send a number of continuous block headers from/to other nodes
+//! * bodies: to get/send a number of continuous block bodies from/to other nodes
+//! * import: to import downloaded to verification queue
+//! * broadcast: to get/send the newest transactions and block from/to other nodes
+
 mod handler;
 mod action;
 mod wrappers;
@@ -62,6 +71,7 @@ const INTERVAL_BODIES: u64 = 100;
 const INTERVAL_IMPORT: u64 = 50;
 const INTERVAL_STATISICS: u64 = 10;
 
+/// Sync manager
 pub struct Sync {
     /// Blockchain kernel interface
     client: Arc<BlockChainClient>,
@@ -86,6 +96,7 @@ pub struct Sync {
 }
 
 impl Sync {
+    /// constructor
     pub fn new(config: Config, client: Arc<BlockChainClient>) -> Sync {
         let local_best_td: U256 = client.chain_info().total_difficulty;
         let local_best_block_number: u64 = client.chain_info().best_block_number;
@@ -117,10 +128,12 @@ impl Sync {
         }
     }
 
+    /// register callback
     pub fn register_callback(&self, callback: Weak<Callable>) {
         self.p2p.register_callback(callback);
     }
 
+    /// run sync instance
     pub fn run(&self, executor: TaskExecutor) {
         // init p2p
         let p2p = &self.p2p.clone();
@@ -307,6 +320,7 @@ impl Sync {
         shutdown_hooks.push(tx);
     }
 
+    /// shutdown routine
     pub fn shutdown(&self) {
         info!(target:"sync_shutdown", "sync shutdown start");
         // Shutdown runtime tasks
@@ -329,11 +343,12 @@ impl Sync {
         info!(target:"sync_shutdown", "sync shutdown finished");
     }
 
+    /// get local node info to fill back to config file
     pub fn get_local_node_info(&self) -> &String { self.p2p.get_local_node_info() }
 }
 
 impl SyncProvider for Sync {
-    /// Get sync status
+    /// Get sync status for rpc request
     fn status(&self) -> SyncStatus {
         // TODO:  only set start_block_number/highest_block_number.
         SyncStatus {
