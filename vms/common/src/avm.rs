@@ -296,7 +296,7 @@ impl Into<i32> for AvmStatusCode {
             AvmStatusCode::Success => 0,
             AvmStatusCode::Rejected => 1,
             AvmStatusCode::Failure => 2,
-            AvmStatusCode::Fatal => -99,
+            AvmStatusCode::Fatal => -1,
         }
     }
 }

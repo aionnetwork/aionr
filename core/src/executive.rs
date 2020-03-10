@@ -274,7 +274,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             self.machine.params().unity_update,
         );
 
-        self.avm_finalize(txs, substates.as_slice(), results)
+        self.finalize_avm(txs, substates.as_slice(), results)
     }
 
     fn exec_avm(
@@ -823,7 +823,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         res
     }
 
-    fn avm_finalize(
+    fn finalize_avm(
         &mut self,
         txs: &[SignedTransaction],
         substates: &[Substate],
@@ -862,6 +862,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     gas_used: self.info.gas_used + total_gas_used,
                     gas: t.gas,
                 }));
+            } else if result.status_code == ExecStatus::Rejected {
+                final_results.push(Err(ExecutionError::Internal("AVM rejected".to_string())));
             } else {
                 total_gas_used = total_gas_used + gas_used;
                 final_results.push(Ok(Executed {
@@ -881,6 +883,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             }
 
             // store Meta transaction hashes
+            // only succeeded transactions have meta transaction hashes to store
             // encode as: b"alias" + hash + hash + ...
             for (alias, tx_hash) in result.invokable_hashes {
                 let mut set = if let Some(ref mut set) = multiple_sets.get_mut(&alias) {

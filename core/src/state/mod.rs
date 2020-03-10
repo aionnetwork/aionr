@@ -42,10 +42,9 @@ use pod_account::*;
 use pod_state::{self, PodState};
 use receipt::Receipt;
 use db::StateDB;
-use transaction::{SignedTransaction, Action};
+use transaction::SignedTransaction;
 use types::state::state_diff::StateDiff;
 use vms::EnvInfo;
-use vms::AvmStatusCode;
 
 use aion_types::{Address, H256, U256};
 use acore_bytes::Bytes;
@@ -678,7 +677,7 @@ impl<B: Backend> State<B> {
         // Only fvm transactions (including precompiled) and balance transfers are executed in this function
         let result = self.execute(env_info, machine, t, true, false, is_building_block);
         match result {
-            // Include the transaction into block if the execution result if ok
+            // Transaction accepted
             Ok(e) => {
                 self.commit()?;
                 let state_root = self.root().clone();
@@ -695,55 +694,8 @@ impl<B: Backend> State<B> {
                     receipt,
                 })
             }
-            // For rejected transactions...
-            Err(x) => {
-                // If building local block, reject it
-                if is_building_block {
-                    Err(From::from(x))
-                }
-                // If importing external block, accept it but do not commit state
-                else {
-                    let state_root = self.root().clone();
-                    let gas_used = match x {
-                        ExecutionError::InvalidNonce {
-                            expected: _,
-                            got: _,
-                        }
-                        | ExecutionError::NotEnoughCash {
-                            required: _,
-                            got: _,
-                        } => t.gas,
-                        ExecutionError::BlockGasLimitReached {
-                            gas_used: _,
-                            gas_limit: _,
-                            gas: _,
-                        } => {
-                            if let Action::Call(address) = t.action {
-                                match self.code(&address) {
-                                    Ok(Some(_)) => U256::from(0u64),
-                                    _ => t.gas,
-                                }
-                            } else {
-                                U256::from(0u64)
-                            }
-                        }
-                        _ => U256::from(0u64),
-                    };
-
-                    let receipt = Receipt::new(
-                        state_root,
-                        gas_used,
-                        gas_used * t.gas_price,
-                        vec![],
-                        vec![],
-                        x.to_string(),
-                    );
-                    trace!(target: "state", "Transaction receipt: {:?}", receipt);
-                    Ok(ApplyOutcome {
-                        receipt,
-                    })
-                }
-            }
+            // Transaction rejected
+            Err(x) => Err(From::from(x)),
         }
     }
 
@@ -763,37 +715,24 @@ impl<B: Backend> State<B> {
         let mut index = 0;
         for result in exec_results {
             let outcome = match result {
+                // Transaction accepted
                 Ok(e) => {
-                    // For avm rejected transactions, reject if building local blocks, or accept if importing external blocks
-                    if e.exception == AvmStatusCode::Rejected.to_string() && is_building_block {
-                        Err(From::from(ExecutionError::Internal(
-                            "AVM rejected".to_string(),
-                        )))
-                    } else {
-                        if e.exception == AvmStatusCode::Rejected.to_string() {
-                            println!("rejected avm transaction: {:?}", txs[index].hash());
-                        }
-                        let state_root = e.state_root.clone();
-                        let receipt = Receipt::new(
-                            state_root,
-                            e.gas_used,
-                            e.transaction_fee,
-                            e.logs,
-                            e.output,
-                            e.exception,
-                        );
-                        Ok(ApplyOutcome {
-                            receipt,
-                        })
-                    }
+                    let state_root = e.state_root.clone();
+                    let receipt = Receipt::new(
+                        state_root,
+                        e.gas_used,
+                        e.transaction_fee,
+                        e.logs,
+                        e.output,
+                        e.exception,
+                    );
+                    Ok(ApplyOutcome {
+                        receipt,
+                    })
                 }
+                // Transaction rejected
                 Err(x) => {
-                    // If building local block, reject it
-                    if is_building_block {
-                        Err(From::from(x))
-                    }
-                    // If importing external block, accept it but do not commit state
-                    else {
+                    if Self::accept_transaction_exception_001(env_info, &txs[index]) {
                         let state_root = self.root().clone();
                         let receipt = Receipt::new(
                             state_root,
@@ -803,10 +742,11 @@ impl<B: Backend> State<B> {
                             vec![],
                             x.to_string(),
                         );
-                        trace!(target: "state", "Transaction receipt: {:?}", receipt);
                         Ok(ApplyOutcome {
                             receipt,
                         })
+                    } else {
+                        Err(From::from(x))
                     }
                 }
             };
@@ -1196,6 +1136,15 @@ impl<B: Backend> State<B> {
                 _ => panic!("Required account must always exist; qed"),
             }
         }))
+    }
+
+    // Cover the historical transaction exception for AKI-569
+    fn accept_transaction_exception_001(env_info: &EnvInfo, tx: &SignedTransaction) -> bool {
+        let block_number = env_info.number;
+        let hash = tx.hash();
+        (block_number == 4735401 || block_number == 4735403 || block_number == 4735405)
+            && hash
+                == &H256::from("bc7422952fb73d0cab9ca96bb1489857674342e9e2bdec989651a6f691814061")
     }
 }
 
