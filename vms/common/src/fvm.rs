@@ -43,6 +43,7 @@ impl ReturnData {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+/// fastvm uses ExecStatus directly
 pub enum ExecStatus {
     Success,
     OutOfGas,
