@@ -32,6 +32,23 @@ use transaction::{Transaction,Action};
 use machine::EthereumMachine;
 use spec::spec::Spec;
 
+use std::io::Error;
+use std::fs::File;
+use std::io::Read;
+use std::path::PathBuf;
+use std::path::Path;
+
+use avm_abi::{AVMEncoder, AbiToken, ToBytes};
+
+fn read_file(path: &str) -> Result<Vec<u8>, Error> {
+    let path = Path::new(path);
+    println!("path = {:?}", path);
+    let mut file = File::open(path)?;
+    let mut buf = Vec::<u8>::new();
+    file.read_to_end(&mut buf)?;
+    Ok(buf)
+}
+
 fn secret() -> Ed25519Secret {
     Ed25519Secret::from_str("7ea8af7d0982509cd815096d35bc3a295f57b2a078e4e25731e3ea977b9544626702b86f33072a55f46003b1e3e242eb18556be54c5ab12044c3c20829e0abb5").unwrap()
 }
@@ -44,6 +61,101 @@ fn new_frontier_test_machine() -> EthereumMachine {
 fn make_frontier_machine() -> EthereumMachine {
     let machine = new_frontier_test_machine();
     machine
+}
+
+#[test]
+fn no_log_on_failure() {
+    let mut state = get_temp_state();
+    let mut info = EnvInfo::default();
+    info.gas_limit = 10_000_000.into();
+    let machine = make_frontier_machine();
+
+    let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    file.push("src/tests/avmjars/APITest-1.0-SNAPSHOT.jar");
+    let file_str = file.to_str().expect("Failed to locate the APITest.jar");
+    let mut code = read_file(file_str).expect("unable to open avm dapp");
+    let mut avm_code: Vec<u8> = (code.len() as u32).to_vm_bytes();
+    println!("code of hello_avm: {:?}", code.len());
+    avm_code.append(&mut code);
+
+    let t = Transaction {
+        nonce: 0.into(),
+        nonce_bytes: Vec::new(),
+        gas_price: 1.into(),
+        gas_price_bytes: Vec::new(),
+        gas: 5_000_000.into(),
+        gas_bytes: (5_000_000 as u32).to_vm_bytes(),
+        action: Action::Create,
+        value: 0.into(),
+        value_bytes: Vec::new(),
+        transaction_type: 2.into(),
+        data: avm_code,
+        beacon: None,
+    }
+    .sign(&secret());
+
+    state
+        .add_balance(&t.sender(), &(200_000_000.into()), CleanupMode::NoEmpty)
+        .unwrap();
+    let outcome = state.apply_batch(&info, &machine, &[t], true);
+    for res in outcome {
+        let receipt = res.unwrap().receipt.clone();
+        assert_eq!(
+            receipt,
+            Receipt {
+                simple_receipt: SimpleReceipt {
+                    log_bloom: "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".into(),
+                    logs: vec![],
+                    state_root: H256::from("0x0291b9a76731d9a3dd46e9e278d71bd631abba9ea332da7c92293cb826705c32")
+                },
+                output: vec![160, 200, 30, 216, 168, 193, 192, 177, 233, 149, 176, 45, 136, 179, 60, 129, 75, 104, 122, 126, 153, 49, 53, 107, 191, 83, 242, 85, 210, 185, 25, 80],
+                gas_used: U256::from(767347),
+                error_message: String::new(),
+                transaction_fee: U256::from(767347)
+            }
+        );
+    }
+
+    let call_data = AbiToken::STRING(String::from("log_on_failure")).encode();
+    let target_addr = vec![
+        160u8, 200, 30, 216, 168, 193, 192, 177, 233, 149, 176, 45, 136, 179, 60, 129, 75, 104,
+        122, 126, 153, 49, 53, 107, 191, 83, 242, 85, 210, 185, 25, 80,
+    ];
+    let t = Transaction {
+        nonce: 1.into(),
+        nonce_bytes: vec![0x1u8],
+        gas_price: 1.into(),
+        gas_price_bytes: Vec::new(),
+        gas: 1_000_000.into(),
+        gas_bytes: Vec::new(),
+        action: Action::Call(target_addr.as_slice().into()),
+        value: 0.into(),
+        value_bytes: Vec::new(),
+        transaction_type: 1.into(),
+        data: call_data,
+        beacon: None,
+    }
+    .sign(&secret());
+
+    state
+        .add_balance(&t.sender(), &(5_000_000.into()), CleanupMode::NoEmpty)
+        .unwrap();
+    let outcome = state.apply_batch(&info, &machine, &[t], true);
+
+    for res in outcome {
+        let expected_receipt = Receipt {
+            simple_receipt: SimpleReceipt{log_bloom: "0x00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000".into(),
+            logs: vec![], state_root: H256::from(
+                    "0x69087be2ec1fef65c9cfbdc143d9a669bd250b5ab1a0f44ee3a15686e1081aef"
+                ), },
+            output: vec![],
+            gas_used: U256::from(1000000),
+            error_message:  String::from("AvmFailure"),
+            transaction_fee: U256::from(1000000),
+        };
+
+        assert_eq!(res.unwrap().receipt, expected_receipt);
+    }
 }
 
 #[test]
