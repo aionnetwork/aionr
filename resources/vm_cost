@@ -1,0 +1,15 @@
+#!/usr/bin/perl
+
+use v5.14;
+
+my ($total_time, $count, $aver) = (0, 0, 0);
+while(<>) {
+    if (/exec duration: Ok\((\d+)\)ms/) {
+        $total_time += $1;
+        $count++;
+    }
+}
+
+$aver = $total_time/$count;
+
+print "$total_time, $count, $aver\n";

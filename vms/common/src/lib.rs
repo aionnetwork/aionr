@@ -32,6 +32,17 @@ pub mod avm;
 mod test;
 
 mod fvm;
+mod types;
 
-pub use fvm::*;
-pub use avm::*;
+pub use fvm::{
+    ExecutionResult as FvmExecutionResult,
+    EnvInfo,
+    CallType,
+    ExecStatus,
+    ActionParams,
+    ActionValue,
+    LastHashes,
+    ParamsType
+};
+pub use avm::{ExecutionResult as AvmExecutionResult};
+pub use types::*;

@@ -28,20 +28,10 @@ use fastvm::ffi::EvmStatusCode;
 use fastvm::core::FastVM;
 use fastvm::basetypes::{constants::GAS_CODE_DEPOSIT, DataWord};
 use fastvm::context::{execution_kind, ExecutionContext, TransactionResult};
-use types::{ExecutionResult, ExecStatus, CallType, ReturnData, ActionParams, ActionValue};
+use types::{AvmExecutionResult, FvmExecutionResult, ExecStatus, CallType, ReturnData, ActionParams, ActionValue};
 use types::traits::Ext;
 use types::avm::{TransactionContext as AVMTxContext, AvmStatusCode};
 use aion_types::{U128, U256, H256};
-
-pub trait Factory {
-    fn exec(
-        &mut self,
-        params: Vec<ActionParams>,
-        ext: &mut Ext,
-        is_local: bool,
-        unity_update: Option<u64>,
-    ) -> Vec<ExecutionResult>;
-}
 
 #[derive(Clone)]
 pub struct FastVMFactory {
@@ -56,19 +46,9 @@ impl FastVMFactory {
             instance: FastVM::new(),
         }
     }
-}
 
-impl Factory for FastVMFactory {
-    fn exec(
-        &mut self,
-        params: Vec<ActionParams>,
-        ext: &mut Ext,
-        _is_local: bool,
-        _unity_update: Option<u64>,
-    ) -> Vec<ExecutionResult>
-    {
-        assert!(params.len() == 1);
-        let params = params[0].clone();
+    pub fn exec(&mut self, params: ActionParams, ext: &mut Ext) -> FvmExecutionResult {
+        let params = params.clone();
         assert!(
             params.gas <= U256::from(i64::max_value() as u64),
             "evmjit max gas is 2 ^ 63"
@@ -86,14 +66,14 @@ impl Factory for FastVMFactory {
         // AIP: needs fix that in java kernel
         if code.is_empty() {
             ext.set_special_empty_flag();
-            return vec![ExecutionResult {
+            return FvmExecutionResult {
                 gas_left: params.gas,
                 status_code: ExecStatus::Success,
                 return_data: ReturnData::empty(),
                 exception: String::default(),
                 state_root: H256::default(),
                 invokable_hashes: Default::default(),
-            }];
+            };
         }
 
         let gas = params.gas.low_u64();
@@ -179,7 +159,7 @@ impl Factory for FastVMFactory {
             }
         }
 
-        vec![ExecutionResult {
+        FvmExecutionResult {
             gas_left,
             status_code: status_code.into(),
             return_data: ReturnData::new(return_data, 0, return_data_length),
@@ -189,7 +169,7 @@ impl Factory for FastVMFactory {
             },
             state_root: H256::default(),
             invokable_hashes: Default::default(),
-        }]
+        }
     }
 }
 
@@ -208,16 +188,14 @@ impl AVMFactory {
             instance: AVM::new(),
         }
     }
-}
 
-impl Factory for AVMFactory {
-    fn exec(
+    pub fn exec(
         &mut self,
         params: Vec<ActionParams>,
         ext: &mut Ext,
         is_local: bool,
         unity_update: Option<u64>,
-    ) -> Vec<ExecutionResult>
+    ) -> Vec<AvmExecutionResult>
     {
         let mut avm_tx_contexts = Vec::new();
 
@@ -326,7 +304,7 @@ impl Factory for AVMFactory {
                     U256::from(avm_tx_contexts[index].energy_limit - result.energy_used);
                 let return_data = result.return_data;
                 debug!(target: "vm", "tx: {:?}, avm status code = {:?}, gas left = {:?}", index, status_code, gas_left);
-                exec_results.push(ExecutionResult {
+                exec_results.push(AvmExecutionResult {
                     gas_left: gas_left.into(),
                     status_code: status_code.clone().into(),
                     return_data: ReturnData::new(return_data.clone(), 0, return_data.len()),
@@ -351,16 +329,4 @@ impl Factory for AVMFactory {
 
         return exec_results;
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::AVMFactory;
-    use super::FastVMFactory;
-
-    #[test]
-    fn test_create_fastvm() { let _vm = FastVMFactory::new(); }
-
-    #[test]
-    fn test_create_avm() { let _vm = AVMFactory::new(); }
 }

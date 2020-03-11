@@ -29,7 +29,7 @@ use std::sync::Arc;
 use block::{ExecutedBlock, IsBlock};
 use precompiled::builtin::BuiltinContract;
 use types::error::Error;
-use executive::{Executive};
+use executor::fvm_exec::{Executive};
 use header::{BlockNumber, Header};
 use spec::CommonParams;
 use state::{CleanupMode, Substate};

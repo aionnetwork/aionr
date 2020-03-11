@@ -22,7 +22,7 @@
 use std::sync::Arc;
 use bytes::Bytes;
 use aion_types::{ H128, U256, H256, Address };
-use super::{ EnvInfo, ExecutionResult, CallType };
+use super::{ EnvInfo, FvmExecutionResult, CallType };
 
 /// Externalities interface for EVMs
 pub trait Ext {
@@ -56,7 +56,7 @@ pub trait Ext {
     /// Creates new contract.
     ///
     /// Returns gas_left and contract address if contract creation was succesfull.
-    fn create(&mut self, gas: &U256, value: &U256, code: &[u8]) -> ExecutionResult;
+    fn create(&mut self, gas: &U256, value: &U256, code: &[u8]) -> FvmExecutionResult;
 
     /// Message call.
     ///
@@ -73,7 +73,7 @@ pub trait Ext {
         code_address: &Address,
         call_type: CallType,
         static_flag: bool,
-    ) -> ExecutionResult;
+    ) -> FvmExecutionResult;
 
     /// Returns code at given address
     fn extcode(&self, address: &Address) -> Arc<Bytes>;

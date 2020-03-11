@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use aion_types::{Address, H256, U256};
-use vms::{ExecStatus, ReturnData, ExecutionResult};
+use vms::{ExecStatus, ReturnData, FvmExecutionResult as ExecutionResult};
 use precompiled::builtin::{BuiltinContract, BuiltinExt, BuiltinParams};
 use super::bridge_controller::BridgeController;
 use super::bridge_deserializer::{

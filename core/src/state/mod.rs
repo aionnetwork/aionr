@@ -34,7 +34,8 @@ use std::sync::Arc;
 
 use types::error::Error;
 use types::executed::{Executed, ExecutionError};
-use executive::Executive;
+use executor::fvm_exec::{Executive as FvmExecutor};
+use executor::avm_exec::{Executive as AvmExecutor};
 use factory::Factories;
 use factory::VmFactory;
 use machine::EthereumMachine as Machine;
@@ -76,7 +77,7 @@ pub use self::substate::Substate;
 use self::account_state::{AccountEntry, AccountState};
 
 /// Used to return information about an `State::apply` operation.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ApplyOutcome {
     /// The receipt for the applied transaction.
     pub receipt: Receipt,
@@ -769,11 +770,11 @@ impl<B: Backend> State<B> {
         is_building_block: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
-        let mut e = Executive::new(self, env_info, machine);
+        let mut e = AvmExecutor::new(self, env_info, machine);
 
         match virt {
-            true => e.transact_virtual_bulk(txs, check_nonce),
-            false => e.transact_bulk(txs, false, is_building_block),
+            true => e.transact_virtual(txs, check_nonce),
+            false => e.transact(txs, false, is_building_block),
         }
     }
 
@@ -791,7 +792,7 @@ impl<B: Backend> State<B> {
         is_building_block: bool,
     ) -> Result<Executed, ExecutionError>
     {
-        let mut e = Executive::new(self, env_info, machine);
+        let mut e = FvmExecutor::new(self, env_info, machine);
 
         match virt {
             true => e.transact_virtual(t, check_nonce),

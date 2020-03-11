@@ -118,14 +118,11 @@ mod machine;
 mod pod_state;
 mod pod_account;
 mod state;
-// mod state_db;
 mod db;
 mod factory;
 mod cache_manager;
-// mod account_db;
 mod precompiled;
-mod executive;
-mod externalities;
+mod executor;
 mod types;
 
 #[cfg(test)]
@@ -143,7 +140,7 @@ pub use types::{
     error::BlockError
 };
 
-pub use executive::contract_address;
+pub use executor::fvm_exec::contract_address;
 
 #[cfg(test)]
 use tests::common::helpers;
