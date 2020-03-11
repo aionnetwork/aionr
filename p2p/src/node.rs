@@ -23,10 +23,7 @@ use std::fmt;
 use std::time::SystemTime;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use std::collections::hash_map::DefaultHasher;
 use std::collections::hash_set::HashSet;
-use std::hash::Hash;
-use std::hash::Hasher;
 use uuid::Uuid;
 use futures::sync::mpsc;
 use tokio::net::TcpStream;
@@ -34,6 +31,7 @@ use super::msg::*;
 use super::state::STATE;
 use futures::sync::oneshot::Sender;
 use parking_lot::Mutex;
+use super::util::{calculate_hash,convert_ip_string};
 
 const EMPTY_ID: &str = "00000000-0000-0000-0000-000000000000";
 
@@ -43,12 +41,6 @@ pub const PROTOCOL_LENGTH: usize = 6;
 pub const MAX_REVISION_LENGTH: usize = 24;
 pub const REVISION_PREFIX: &str = "r-";
 pub const IP_LENGTH: usize = 8;
-
-fn calculate_hash<T: Hash>(t: &T) -> u64 {
-    let mut s = DefaultHasher::new();
-    t.hash(&mut s);
-    s.finish()
-}
 
 #[derive(Clone)]
 pub struct Node {
@@ -166,18 +158,6 @@ impl Node {
         }
         result
     }
-}
-
-pub fn convert_ip_string(ip_str: String) -> [u8; 8] {
-    let mut ip: [u8; 8] = [0u8; 8];
-    let ip_vec: Vec<&str> = ip_str.split(".").collect();
-    if ip_vec.len() == 4 {
-        ip[1] = ip_vec[0].parse::<u8>().unwrap_or(0);
-        ip[3] = ip_vec[1].parse::<u8>().unwrap_or(0);
-        ip[5] = ip_vec[2].parse::<u8>().unwrap_or(0);
-        ip[7] = ip_vec[3].parse::<u8>().unwrap_or(0);
-    }
-    ip
 }
 
 #[derive(Clone, Copy, Eq, Hash, PartialEq)]
