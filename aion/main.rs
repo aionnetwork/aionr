@@ -22,7 +22,7 @@
 //!
 //! # core
 //! * [acore](../acore/index.html) : Aionr core, the dispatch center of each module manages the
-//! entire life process of blocks and tx.
+//! entire life process of blocks and txs.
 //!
 //! # db
 //! * [db](../db/index.html) : Blockchain key value database implementation.
@@ -36,13 +36,15 @@
 //! * [keychain](../keychain/index.html) : Account secret store.
 //!
 //! # machine
-//! * [aion_machine](../aion_machine/index.html) : Generalization of types surrounding blockchain-suitable state machines..
+//! * [aion_machine](../aion_machine/index.html) : Generalization of types surrounding
+//! blockchain-suitable state machines.
 //!
 //! # p2p
 //! * [p2p](../p2p/index.html) : peer to peer library support aion wire protocol.
 //!
 //! # rpc
-//! * [aion_rpc](../aion_rpc/index.html) : Aionr core api daemon for aion binary api protocol and web3 protocol client.
+//! * [aion_rpc](../aion_rpc/index.html) : Aionr core api daemon for aion binary api protocol and
+//! web3 protocol client.
 //!
 //! # vms
 //! Contract VM module for interacting with FastVM and AVM.

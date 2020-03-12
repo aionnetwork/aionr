@@ -21,14 +21,14 @@
 
 //! P2p Module
 //!
-//! Network Manager, manage node interaction, messaging, and task assignment in the network.
+//! Network Manager, manage node interaction, sending/receiving messages, and task assignment in
+//! the network.
 //!
 //! # Tasks
 //! * timeout: to cleanup inactive nodes
 //! * active_nodes: to get/send active nodes list from/to other nodes
 //! * inbound: to accept inbound connection from other nodes
 //! * outbound: to establish outbound connection to other nodes
-//! * broadcast: to get/send the newest transactions and block from/to other nodes
 
 #![warn(unused_extern_crates)]
 

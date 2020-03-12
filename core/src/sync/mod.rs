@@ -22,10 +22,11 @@
 //! Sync module. Handle transmitting and recieving nodes status, transactions, blocks
 //!
 //! # Tasks
+//! * sync_statics: to print nodes info at regular intervals
 //! * node_status: to get/send status from/to other nodes
 //! * headers: to get/send a number of continuous block headers from/to other nodes
 //! * bodies: to get/send a number of continuous block bodies from/to other nodes
-//! * import: to import downloaded to verification queue
+//! * import: to import downloaded blocks to verification queue
 //! * broadcast: to get/send the newest transactions and block from/to other nodes
 
 mod handler;
