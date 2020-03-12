@@ -357,7 +357,7 @@ impl<'x> OpenBlock<'x> {
         for apply_result in
             self.block
                 .state
-                .apply_batch(&env_info, self.engine.machine(), txs, is_building_block)
+                .apply_avm(&env_info, self.engine.machine(), txs, is_building_block)
         {
             let result = match apply_result {
                 Ok(outcome) => {
@@ -411,14 +411,14 @@ impl<'x> OpenBlock<'x> {
             .map_or(false, |v| self.block.header().number() >= v);
         if aion040fork {
             if t.tx_type() == AVM_TRANSACTION_TYPE || is_normal_or_avm_call(self, &t) {
-                result.append(&mut self.block.state.apply_batch(
+                result.append(&mut self.block.state.apply_avm(
                     &env_info,
                     self.engine.machine(),
                     &[t.clone()],
                     is_building_block,
                 ));
             } else {
-                result.push(self.block.state.apply(
+                result.push(self.block.state.apply_fvm(
                     &env_info,
                     self.engine.machine(),
                     &t,
@@ -426,7 +426,7 @@ impl<'x> OpenBlock<'x> {
                 ));
             }
         } else {
-            result.push(self.block.state.apply(
+            result.push(self.block.state.apply_fvm(
                 &env_info,
                 self.engine.machine(),
                 &t,

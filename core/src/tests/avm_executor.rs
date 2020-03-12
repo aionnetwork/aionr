@@ -50,7 +50,7 @@ fn read_file(path: &str) -> Result<Vec<u8>, Error> {
     file.read_to_end(&mut buf)?;
     Ok(buf)
 }
- 
+
 #[test]
 fn avm_recursive() {
     let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -138,7 +138,7 @@ fn avm_recursive() {
         assert_eq!(status_code, AvmStatusCode::Success);
     }
 }
- 
+
 #[test]
 fn get_vote() {
     let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -279,7 +279,7 @@ fn get_vote() {
         assert_eq!(return_data.to_vec(), vec![3, 231]);
     }
 }
- 
+
 #[test]
 /// HelloWorld with extra storage test
 fn hello_avm() {
@@ -388,7 +388,7 @@ fn avm_storage() {
     assert_eq!(value, None);
     // println!("state = {:?}", state);
 }
- 
+
 #[test]
 fn avm_balance_transfer() {
     let mut state = get_temp_state();
@@ -425,7 +425,7 @@ fn avm_balance_transfer() {
     assert_eq!(state.balance(&address), Ok(100.into()));
     assert_eq!(state.balance(&params2.address), Ok(99.into()));
 }
- 
+
 #[test]
 fn avm_status_rejected() {
     let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -459,12 +459,12 @@ fn avm_status_rejected() {
         None,
     );
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
-    let errors = {
+    let results = {
         let mut ex = AvmExecutive::new(&mut state, &info, &machine);
         ex.transact(&[signed_transaction.clone()], false, true)
     };
     assert_eq!(
-        errors[0].clone().unwrap_err(),
+        results[0].clone().unwrap_err(),
         ExecutionError::BlockGasLimitReached {
             gas_limit: U256::from(3_000_000),
             gas_used: U256::from(0),
@@ -484,9 +484,9 @@ fn avm_status_rejected() {
     );
 
     let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
-    let errors = {
+    let results = {
         let mut ex = AvmExecutive::new(&mut state, &info, &machine);
         ex.transact(&[signed_transaction], false, true)
     };
-    assert!(errors[0].is_ok());
+    assert!(results[0].is_err());
 }

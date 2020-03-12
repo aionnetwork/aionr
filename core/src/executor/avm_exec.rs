@@ -28,7 +28,7 @@ use std::collections::{HashSet, HashMap};
 use std::time::SystemTime;
 
 use aion_types::{H256, U256, Address};
-use vms::{ActionParams, ActionValue, CallType, EnvInfo, AvmExecutionResult as ExecutionResult, ParamsType};
+use vms::{ActionParams, ActionValue, CallType, EnvInfo, AvmExecutionResult as ExecutionResult, ParamsType, AvmStatusCode};
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use types::error::ExecutionError;
@@ -302,7 +302,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 touched.insert(account);
             }
 
-            if gas_used + total_gas_used + self.info.gas_used > self.info.gas_limit {
+            // Return error if the transaction is rejected by avm
+            if result.status_code == AvmStatusCode::Rejected {
+                final_results.push(Err(ExecutionError::Internal("AVM rejected".to_string())));
+            }
+            // Return error if the transaction's consumed gas is bigger than the remainning gas limit of the block
+            else if gas_used + total_gas_used + self.info.gas_used > self.info.gas_limit {
                 final_results.push(Err(ExecutionError::BlockGasLimitReached {
                     gas_limit: self.info.gas_limit,
                     gas_used: self.info.gas_used + total_gas_used,

@@ -667,7 +667,7 @@ impl<B: Backend> State<B> {
 
     /// Execute a given transaction, producing a receipt.
     /// This will change the state accordingly.
-    pub fn apply(
+    pub fn apply_fvm(
         &mut self,
         env_info: &EnvInfo,
         machine: &Machine,
@@ -676,7 +676,7 @@ impl<B: Backend> State<B> {
     ) -> ApplyResult
     {
         // Only fvm transactions (including precompiled) and balance transfers are executed in this function
-        let result = self.execute(env_info, machine, t, true, false, is_building_block);
+        let result = self.execute_fvm(env_info, machine, t, true, false, is_building_block);
         match result {
             // Transaction accepted
             Ok(e) => {
@@ -700,7 +700,7 @@ impl<B: Backend> State<B> {
         }
     }
 
-    pub fn apply_batch(
+    pub fn apply_avm(
         &mut self,
         env_info: &EnvInfo,
         machine: &Machine,
@@ -710,7 +710,7 @@ impl<B: Backend> State<B> {
     {
         // Only avm transactions will go here
         let exec_results =
-            self.execute_bulk(env_info, machine, txs, false, false, is_building_block);
+            self.execute_avm(env_info, machine, txs, false, false, is_building_block);
 
         let mut receipts = Vec::new();
         let mut index = 0;
@@ -760,7 +760,7 @@ impl<B: Backend> State<B> {
         return receipts;
     }
 
-    fn execute_bulk(
+    fn execute_avm(
         &mut self,
         env_info: &EnvInfo,
         machine: &Machine,
@@ -782,7 +782,7 @@ impl<B: Backend> State<B> {
     //
     // `virt` signals that we are executing outside of a block set and restrictions like
     // gas limits and gas costs should be lifted.
-    fn execute(
+    fn execute_fvm(
         &mut self,
         env_info: &EnvInfo,
         machine: &Machine,
