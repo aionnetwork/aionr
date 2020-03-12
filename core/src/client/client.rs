@@ -49,7 +49,8 @@ use client::{
 use encoded;
 use engine::Engine;
 use types::error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
-use executor::fvm_exec::{contract_address, Executed, Executive as FvmExecutor};
+use types::executed::Executed;
+use executor::fvm_exec::{contract_address, Executive as FvmExecutor};
 use executor::avm_exec::{Executive as AvmExecutor};
 use factory::{Factories, VmFactory};
 use header::{BlockNumber, Header, Seal, SealType};

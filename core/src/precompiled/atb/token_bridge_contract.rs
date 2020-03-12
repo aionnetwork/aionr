@@ -345,7 +345,7 @@ mod test {
     use blake2b::{Blake2b, blake2b};
     use aion_types::{Address, H256, U256};
     use vms::ExecStatus;
-    use executive::contract_address;
+    use executor::fvm_exec::contract_address;
     use fastvm::basetypes::DataWord;
     use key::{Ed25519KeyPair, generate_keypair, public_to_address_ed25519};
     use num_bigint::{BigInt, Sign, ToBigInt};

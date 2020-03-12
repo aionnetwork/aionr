@@ -26,7 +26,7 @@ use vms::{EnvInfo, traits::Ext,  CallType};
 use state::{State, Substate};
 use helpers::{get_temp_state,make_aion_machine};
 use kvdb::MockDbRepository;
-use externalities::{OriginInfo,Externalities};
+use executor::fvm_externality::{OriginInfo, FvmExternalities as Externalities};
 
 fn get_test_env_info() -> EnvInfo {
     EnvInfo {

@@ -28,7 +28,7 @@ use blockchain::TreeRoute;
 use encoded;
 use types::error::{ImportResult, CallError, BlockImportError};
 use factory::VmFactory;
-use executor::fvm_exec::Executed;
+use types::executed::Executed;
 use filter::Filter;
 use header::{BlockNumber, SealType, Header};
 use log_entry::LocalizedLogEntry;

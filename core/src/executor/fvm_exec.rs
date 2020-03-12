@@ -21,9 +21,9 @@
  ******************************************************************************/
 
 //! Transaction Execution environment.
-use std::clone::Clone;
 use std::sync::{Arc, Mutex};
 use std::collections::HashSet;
+
 use blake2b::{blake2b};
 use aion_types::{H256, U256, U512, Address};
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, FvmExecutionResult as ExecutionResult, ExecStatus, ReturnData, ParamsType};
@@ -31,28 +31,12 @@ use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use types::error::ExecutionError;
 use vms::constants::{MAX_CALL_DEPTH, GAS_CALL_MAX, GAS_CREATE_MAX};
-
 use executor::fvm_externality::*;
 use transaction::{Action, SignedTransaction};
 use crossbeam;
-pub use types::executed::Executed;
+use types::executed::Executed;
 use precompiled::builtin::{BuiltinExtImpl, BuiltinContext};
-
-#[cfg(debug_assertions)]
-/// Roughly estimate what stack size each level of evm depth will use. (Debug build)
-const STACK_SIZE_PER_DEPTH: usize = 128 * 1024;
-
-#[cfg(not(debug_assertions))]
-/// Roughly estimate what stack size each level of evm depth will use.
-const STACK_SIZE_PER_DEPTH: usize = 128 * 1024;
-
-#[cfg(debug_assertions)]
-// /// Entry stack overhead prior to execution. (Debug build)
-const STACK_SIZE_ENTRY_OVERHEAD: usize = 100 * 1024;
-
-#[cfg(not(debug_assertions))]
-/// Entry stack overhead prior to execution.
-const STACK_SIZE_ENTRY_OVERHEAD: usize = 20 * 1024;
+use super::params::*;
 
 /// VM lock
 lazy_static! {

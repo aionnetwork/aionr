@@ -44,5 +44,5 @@ pub use fvm::{
     LastHashes,
     ParamsType
 };
-pub use avm::{ExecutionResult as AvmExecutionResult};
+pub use avm::{ExecutionResult as AvmExecutionResult, AvmStatusCode};
 pub use types::*;

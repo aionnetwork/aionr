@@ -23,39 +23,22 @@
 //! Transaction Execution environment.
 use std::thread;
 use std::sync::mpsc::{channel, Sender};
-use std::clone::Clone;
 use std::sync::{Arc, Mutex};
 use std::collections::{HashSet, HashMap};
 use std::time::SystemTime;
+
 use aion_types::{H256, U256, Address};
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, AvmExecutionResult as ExecutionResult, ParamsType};
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use types::error::ExecutionError;
 use vms::constants::{MAX_CALL_DEPTH};
-
 use executor::avm_externality::*;
 use transaction::{Action, SignedTransaction};
 use crossbeam;
-pub use types::executed::Executed;
-
+use types::executed::Executed;
 use kvdb::{DBTransaction};
-
-#[cfg(debug_assertions)]
-/// Roughly estimate what stack size each level of evm depth will use. (Debug build)
-const STACK_SIZE_PER_DEPTH: usize = 128 * 1024;
-
-#[cfg(not(debug_assertions))]
-/// Roughly estimate what stack size each level of evm depth will use.
-const STACK_SIZE_PER_DEPTH: usize = 128 * 1024;
-
-#[cfg(debug_assertions)]
-// /// Entry stack overhead prior to execution. (Debug build)
-const STACK_SIZE_ENTRY_OVERHEAD: usize = 100 * 1024;
-
-#[cfg(not(debug_assertions))]
-/// Entry stack overhead prior to execution.
-const STACK_SIZE_ENTRY_OVERHEAD: usize = 20 * 1024;
+use super::params::*;
 
 /// VM lock
 lazy_static! {
@@ -266,22 +249,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 .expect("Sub-thread creation cannot fail; the host might run out of resources; qed")
         })
         .join()
-    }
-
-    #[cfg(test)]
-    pub fn create_vm(
-        &mut self,
-        params: Vec<ActionParams>,
-        _substates: &mut [Substate],
-    ) -> Vec<ExecutionResult>
-    {
-        self.state.checkpoint();
-
-        let mut unconfirmed_substates = vec![Substate::new(); params.len()];
-
-        let res = self.exec_vm(params, unconfirmed_substates.as_mut_slice(), false, None);
-
-        res
     }
 
     #[cfg(test)]

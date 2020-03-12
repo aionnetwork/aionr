@@ -37,7 +37,5 @@ pub use self::traits::ProvingBlockChainClient;
 pub use types::ids::*;
 pub use types::pruning_info::PruningInfo;
 pub use types::call_analytics::CallAnalytics;
-pub use executor::fvm_exec::{Executed, Executive};
-pub use vms::{EnvInfo, LastHashes};
 
 pub use types::error::{BlockImportError, TransactionImportError};
