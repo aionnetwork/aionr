@@ -18,6 +18,7 @@ pub enum ExecStatus {
     Revert,
     Failure,
     Rejected,
+    Fatal,
 }
 
 /// Finalization result. Gas Left: either it is a known value, or it needs to be computed by processing

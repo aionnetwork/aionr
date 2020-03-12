@@ -52,6 +52,7 @@ pub struct Executive<'a, B: 'a + StateBackend> {
     depth: usize,
 }
 
+/// avm executive
 impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     /// Basic constructor.
     pub fn new(state: &'a mut State<B>, info: &'a EnvInfo, machine: &'a Machine) -> Self {
@@ -63,6 +64,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         }
     }
 
+    /// generate an avm externality with substates
+    /// what is externality?
+    /// AVMExternalities acts as bridge between kernel and avm, and
+    /// used in avm callbacks
     pub(crate) fn as_externalities<'any>(
         &'any mut self,
         substates: &'any mut [Substate],
@@ -79,6 +84,7 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         )
     }
 
+    /// execute transactions virtually, which means no state affect
     pub fn transact_virtual(
         &'a mut self,
         txs: &[SignedTransaction],
@@ -88,9 +94,10 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         self.transact(txs, true, false)
     }
 
-    /*
-     * send transactions to avm
-     */
+    /// transact to avm
+    /// * txs: transactions to be executed
+    /// * is_local_call: if true, no state update
+    /// * is_building_block: whether it is from sync or miner
     pub fn transact(
         &'a mut self,
         txs: &[SignedTransaction],
@@ -192,6 +199,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         self.finalize(txs, substates.as_slice(), results)
     }
 
+    /// internal exec function that runs vm
+    /// * params: runtime parameters
+    /// * unconfirmed_substate: temp state that will be finalized on success
+    /// * is_local_call: whether it's local or not
+    /// * unity_update: fork point for unity and avm 2.0
     fn exec_vm(
         &mut self,
         params: Vec<ActionParams>,
