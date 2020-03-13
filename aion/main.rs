@@ -116,11 +116,13 @@ use cli::Args;
 use configuration::{Cmd, Execute, Configuration};
 use logger::{setup_compression_log};
 
+/// execution result to post
 enum PostExecutionAction {
     Print(String),
     Quit,
 }
 
+/// setup logger and excute command
 fn execute(command: Execute) -> Result<PostExecutionAction, String> {
     let _ = setup_compression_log(command.logger.config)?;
 
@@ -139,6 +141,7 @@ fn execute(command: Execute) -> Result<PostExecutionAction, String> {
     }
 }
 
+/// Read command line arguments and execute the command
 fn start() -> Result<PostExecutionAction, String> {
     let args: Vec<String> = env::args().collect();
     let conf = Configuration::parse(&args).unwrap_or_else(|e| e.exit());
@@ -146,6 +149,7 @@ fn start() -> Result<PostExecutionAction, String> {
     execute(cmd)
 }
 
+/// run kernel
 fn main() {
     panic_hook::set();
     let res = match start() {
