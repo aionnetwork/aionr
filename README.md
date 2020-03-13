@@ -50,23 +50,27 @@ Follow this guide to install the Aion Rust kernel on your system.
     > cargo 1.28.0 (96a2c7d16 2018-07-13)
     ```
 
-4. Install Boost `v1.65.1`
+4. Install Boost `v1.65.1` dependencies
 
     - Ubuntu `16.04`:
 
         ```bash
-        wget https://dl.bintray.com/boostorg/release/1.65.1/source/boost_1_65_1.tar.bz2
-        tar xf boost_1_65_1.tar.bz2
-        cd boost_1_65_1
-        ./bootstrap.sh --libdir=/usr/lib/x86_64-linux-gnu/
-        ./b2
-        ./b2 install
+        wget http://launchpadlibrarian.net/359703399/libboost-system1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
+        wget http://launchpadlibrarian.net/359703377/libboost-filesystem1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
+        wget http://launchpadlibrarian.net/359703390/libboost-program-options1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
+        wget http://launchpadlibrarian.net/361669149/libicu60_60.2-3ubuntu3_amd64.deb
+        wget http://launchpadlibrarian.net/359703394/libboost-regex1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
+        sudo dpkg -i libboost-system1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
+        sudo dpkg -i libboost-filesystem1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
+        sudo dpkg -i libboost-program-options1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
+        sudo dpkg -i libicu60_60.2-3ubuntu3_amd64.deb
+        sudo dpkg -i libboost-regex1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
         ```
 
     - Ubuntu `18.04`:
 
         ```bash
-        sudo apt-get install libboost-all-dev -y
+        sudo apt-get install libboost-filesystem1.65.1 libboost-program-options1.65.1 libboost-regex1.65.1  -y
         ```
 
 5. Install JAVA JDK:
