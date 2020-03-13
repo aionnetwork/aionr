@@ -14,7 +14,8 @@
     "maximumExtraDataSize": "0x20",
     "minGasLimit": "0x100590",
     "monetaryPolicyUpdate": "0",
-    "unityUpdate": "10"
+    "unityUpdate": "10",
+    "unityHybridSeedUpdate": "20"
   },
   "genesis": {
     "seal": {
@@ -24,7 +25,7 @@
       }
     },
     "difficulty": "0x0010",
-    "author": "0xa02df9004be3c4a20aeb50c459212412b1d0a58da3e1ac70ba74dde6b4accf4b",
+    "author": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "timestamp": "1525924800",
     "parentHash": "0x0000000000000000000000000000000000000000000000000000000000000000",
     "extraData": "0x0000000000000000000000000000000000000000000000000000000000000000",
@@ -67,6 +68,6 @@
       }
     },
     "a02df9004be3c4a20aeb50c459212412b1d0a58da3e1ac70ba74dde6b4accf4b": { "balance": "1000000000000000000000000" },
-    "a027e3441b6283222e3ce56d4c08b95f9cc2146dfe43ca697833ebdf413cd24a": { "balance": "3140000000000000000000000000000000" }
+    "a0445ccda5276bf807fa97f3dae1b7bb826afaa6ed19e31de0898ba9cb96f9e8": { "balance": "1000000000000000000000000" }
   }
 }
