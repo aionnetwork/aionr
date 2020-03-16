@@ -70,7 +70,7 @@ use transaction::{
     LocalizedTransaction,
     PendingTransaction,
     SignedTransaction,
-    AVM_TRANSACTION_TYPE,
+    AVM_CREATION_TYPE,
     DEFAULT_TRANSACTION_TYPE
 };
 use types::filter::Filter;
@@ -1075,7 +1075,7 @@ impl Client {
 
 // helper function to tell is this transaction is for avm
 fn for_local_avm(state: &mut State<StateDB>, transaction: &SignedTransaction) -> bool {
-    if transaction.tx_type() == AVM_TRANSACTION_TYPE {
+    if transaction.tx_type() == AVM_CREATION_TYPE {
         return true;
     } else if let Action::Call(a) = transaction.action {
         let code = state.code(&a).unwrap_or(None);

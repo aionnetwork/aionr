@@ -35,7 +35,7 @@ use vms::{
     AvmStatusCode,
 };
 use state::{Substate, CleanupMode};
-use transaction::{Action, Transaction, SignedTransaction, DEFAULT_TRANSACTION_TYPE, AVM_TRANSACTION_TYPE};
+use transaction::{Action, Transaction, SignedTransaction, DEFAULT_TRANSACTION_TYPE, AVM_CREATION_TYPE};
 use types::error::{ExecutionError};
 use executor::fvm_exec::{contract_address};
 use executor::avm_exec::{Executive as AvmExecutive};
@@ -479,7 +479,7 @@ fn avm_status_rejected() {
         Action::Create,
         0.into(),
         avm_code.clone(),
-        AVM_TRANSACTION_TYPE,
+        AVM_CREATION_TYPE,
         None,
     );
 

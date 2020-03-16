@@ -39,10 +39,10 @@ use types::error::{Error, BlockError};
 use factory::Factories;
 use header::{Header, Seal, SealType};
 use receipt::Receipt;
-use state::State;
+use state::{State, ApplyResult};
 use db::StateDB;
 use transaction::{
-    UnverifiedTransaction, SignedTransaction, Error as TransactionError, AVM_TRANSACTION_TYPE,
+    UnverifiedTransaction, SignedTransaction, Error as TransactionError, AVM_CREATION_TYPE,
     Action,
 };
 use verification::PreverifiedBlock;
@@ -333,61 +333,9 @@ impl<'x> OpenBlock<'x> {
     /// Get the environment info concerning this block.
     pub fn env_info(&self) -> EnvInfo { self.block.env_info() }
 
-    // apply avm transactions
-    pub fn apply_batch_txs(
-        &mut self,
-        txs: &[SignedTransaction],
-        h: Option<H256>,
-        is_building_block: bool,
-    ) -> Vec<Result<Receipt, Error>>
-    {
-        //TODO: deal with AVM parallelism
-        if !txs
-            .iter()
-            .filter(|t| self.block.transactions_set.contains(&t.hash()))
-            .collect::<Vec<_>>()
-            .is_empty()
-        {
-            return vec![Err(From::from(TransactionError::AlreadyImported))];
-        }
-        let env_info = self.env_info();
-        let mut idx = 0;
-        let mut receipts_results = Vec::new();
-        // avm should deal with exceptions correctly
-        for apply_result in
-            self.block
-                .state
-                .apply_avm(&env_info, self.engine.machine(), txs, is_building_block)
-        {
-            let result = match apply_result {
-                Ok(outcome) => {
-                    self.block
-                        .transactions_set
-                        .insert(h.unwrap_or_else(|| txs[idx].hash().clone()));
-                    self.block.transactions.push(txs[idx].clone().into());
-                    self.block
-                        .header
-                        .add_transaction_fee(&outcome.receipt.transaction_fee);
-                    self.block.receipts.push(outcome.receipt.clone());
-                    Ok(outcome.receipt)
-                }
-                Err(x) => Err(From::from(x)),
-            };
-
-            receipts_results.push(result);
-            idx += 1;
-        }
-
-        receipts_results
-    }
-
     /// Push a transaction into the block.
-    ///
-    /// If valid, it will be executed, and archived together with the receipt.
-    /// This method is triggered both by sync and miner:
-    /// sync module really call push_transactions, and we do bulk pushes during sync;
-    /// however miner do not use push_transactions due to some special logic:
-    /// transaction penalisation .etc
+    /// The transaction will be verified and executed.
+    /// The execution result is returned.
     pub fn push_transaction(
         &mut self,
         t: SignedTransaction,
@@ -395,46 +343,33 @@ impl<'x> OpenBlock<'x> {
         is_building_block: bool,
     ) -> Result<&Receipt, Error>
     {
+        // Check duplication
         if self.block.transactions_set.contains(&t.hash()) {
             return Err(From::from(TransactionError::AlreadyImported));
         }
 
-        let mut result = Vec::new();
         let env_info = self.env_info();
         debug!(target: "vm", "tx type = {:?}", t.tx_type());
 
-        let aion040fork = self
-            .engine
-            .machine()
-            .params()
-            .monetary_policy_update
-            .map_or(false, |v| self.block.header().number() >= v);
-        if aion040fork {
-            if t.tx_type() == AVM_TRANSACTION_TYPE || is_normal_or_avm_call(self, &t) {
-                result.append(&mut self.block.state.apply_avm(
+        // Execute the transaction according to its type (fvm or avm; balance transfers and pre-compiled contracts go to fvm).
+        let result: ApplyResult = if self.is_avm_hardfork() && is_avm_transaction(&self.block, &t) {
+            self.block
+                .state
+                .apply_avm(
                     &env_info,
                     self.engine.machine(),
                     &[t.clone()],
                     is_building_block,
-                ));
-            } else {
-                result.push(self.block.state.apply_fvm(
-                    &env_info,
-                    self.engine.machine(),
-                    &t,
-                    is_building_block,
-                ));
-            }
+                )
+                .pop()
+                .expect("AVM batch execution must return at least one result")
         } else {
-            result.push(self.block.state.apply_fvm(
-                &env_info,
-                self.engine.machine(),
-                &t,
-                is_building_block,
-            ));
-        }
+            self.block
+                .state
+                .apply_fvm(&env_info, self.engine.machine(), &t, is_building_block)
+        };
 
-        match result.pop().unwrap() {
+        match result {
             Ok(outcome) => {
                 self.block
                     .transactions_set
@@ -454,9 +389,104 @@ impl<'x> OpenBlock<'x> {
         }
     }
 
-    /// Push transactions onto the block.
+    /// Push multiple transactions into the block.
+    /// The transactions are verified and executed.
+    /// Multiple consecutive avm transactions can be executed in parallel. Other transactions are
+    /// executed sequentially.
+    /// This method can only be used when validating a block. When building a local block template,
+    /// we must only call push_transaction() to execute transactions one by one (pararrel execution
+    /// is not supported).
+    /// Returns Error if any one of the transactions is invalid (rejected when being executed).
     pub fn push_transactions(&mut self, transactions: &[SignedTransaction]) -> Result<(), Error> {
-        push_transactions(self, transactions)
+        // Try to execute consecutive avm transactions in parallel after the avm hard fork.
+        if self.is_avm_hardfork() {
+            let mut tx_batch = Vec::new();
+            debug!(target: "vm", "transactions = {:?}, len = {:?}", transactions, transactions.len());
+            for tx in transactions {
+                // Fill in the batch with avm transactions.
+                if is_avm_transaction(&self.block, tx) {
+                    trace!(target: "vm", "found avm transaction");
+                    tx_batch.push(tx.clone())
+                }
+                // Execute and clear the batch when a non-avm transaction is met.
+                else {
+                    if tx_batch.len() >= 1 {
+                        self.apply_avm_batch_transactions(tx_batch.as_slice(), None)?;
+                        tx_batch.clear();
+                    }
+                    // Execute this non-avm transaction individually after the batch
+                    self.push_transaction(tx.clone(), None, false)?;
+                }
+            }
+
+            // Execute and clear the batch at the end
+            if !tx_batch.is_empty() {
+                self.apply_avm_batch_transactions(tx_batch.as_slice(), None)?;
+                tx_batch.clear();
+            }
+        }
+        // Execute transactions one by one before the avm hard fork.
+        else {
+            for t in transactions {
+                self.push_transaction(t.clone(), None, false)?;
+            }
+        }
+
+        trace!(target: "vm", "push transactions done");
+
+        Ok(())
+    }
+
+    /// Execute a batch of AVM transactions.
+    /// This method can only be used when validating a block. When building a local block template,
+    /// we must only call push_transaction() to execute transactions one by one (pararrel execution
+    /// is not supported).
+    /// Returns Error if any one of the transactions is invalid (rejected when being executed).
+    pub fn apply_avm_batch_transactions(
+        &mut self,
+        txs: &[SignedTransaction],
+        h: Option<H256>,
+    ) -> Result<(), Error>
+    {
+        // Check duplication
+        if !txs
+            .iter()
+            .filter(|t| self.block.transactions_set.contains(&t.hash()))
+            .collect::<Vec<_>>()
+            .is_empty()
+        {
+            return Err(From::from(TransactionError::AlreadyImported));
+        }
+
+        let env_info = self.env_info();
+        let mut idx = 0;
+        // Execute the batch of transactions
+        for apply_result in self
+            .block
+            .state
+            .apply_avm(&env_info, self.engine.machine(), txs, false)
+        {
+            match apply_result {
+                // update block status for each transaction executed
+                Ok(outcome) => {
+                    self.block
+                        .transactions_set
+                        .insert(h.unwrap_or_else(|| txs[idx].hash().clone()));
+                    self.block.transactions.push(txs[idx].clone().into());
+                    self.block
+                        .header
+                        .add_transaction_fee(&outcome.receipt.transaction_fee);
+                    self.block.receipts.push(outcome.receipt.clone());
+                }
+                // Return error if any one of the transactions is invalid
+                Err(x) => {
+                    return Err(From::from(x));
+                }
+            };
+            idx += 1;
+        }
+
+        Ok(())
     }
 
     /// Populate self from a header.
@@ -560,6 +590,14 @@ impl<'x> OpenBlock<'x> {
         LockedBlock {
             block: s.block,
         }
+    }
+
+    fn is_avm_hardfork(&self) -> bool {
+        self.engine
+            .machine()
+            .params()
+            .monetary_policy_update
+            .map_or(false, |v| self.block.header().number() >= v)
     }
 
     #[cfg(test)]
@@ -753,82 +791,36 @@ fn enact(
     Ok(b.close_and_lock())
 }
 
-#[inline]
-fn is_normal_or_avm_call(block: &mut OpenBlock, tx: &SignedTransaction) -> bool {
+/// Identify if a transaction is an AVM transaction, based on the current block state.
+fn is_avm_transaction(block: &ExecutedBlock, tx: &SignedTransaction) -> bool {
+    // Check if it is an AVM creation transaction
+    if tx.tx_type() == AVM_CREATION_TYPE {
+        return true;
+    }
+
+    // Check if it is an AVM call transaction
     if let Action::Call(a) = tx.action {
-        // since fastvm is executed one transaction after another,
-        // code() gets the real code of contract
-        // for avm: when creation and call are in one block
-        // code() will return None. However avm solves the dependency,
-        // call will be executed after creation, and code is retrieved by avm callback
-        let code = block.block.state.code(&a).unwrap_or(None);
+        // Filter out builtin contracts
         if a == H256::from("0000000000000000000000000000000000000000000000000000000000000100")
             || a == H256::from("0000000000000000000000000000000000000000000000000000000000000200")
         {
             return false;
-        } else {
-            // not builtin call
-            if let Some(c) = code {
-                debug!(target: "vm", "pre bytes = {:?}", &c[0..2]);
-                // fastvm contract in database must have header 0x60,0x50
-                return c[0..2] != [0x60u8, 0x50];
-            }
+        }
+
+        // Get code from the destination address.
+        let code = block.state.code(&a).unwrap_or(None);
+        // 1. If there is some code in the address, check that it does not start with 6050
+        // 2. If there is no code in the address, either it is not a contract call, or the called contract
+        // is being created in this block. In the later case, even though the transaction will be a valid avm
+        // call, we return false here so it won't get into the same batch as the contract creation transaction.
+        if let Some(c) = code {
+            debug!(target: "vm", "pre bytes = {:?}", &c[0..2]);
+            // fastvm contract in database must have header 0x60,0x50
+            return c[0..2] != [0x60u8, 0x50];
         }
     }
-
-    // fastvm creation and call a contract with empty code
 
     return false;
-}
-
-#[inline]
-fn is_for_avm(block: &mut OpenBlock, tx: &SignedTransaction) -> bool {
-    // AVM creation = 0x02; normal call = 0x01
-    return tx.tx_type() == AVM_TRANSACTION_TYPE || is_normal_or_avm_call(block, tx);
-}
-
-#[inline]
-fn push_transactions(
-    block: &mut OpenBlock,
-    transactions: &[SignedTransaction],
-) -> Result<(), Error>
-{
-    let aion040fork = block
-        .engine
-        .machine()
-        .params()
-        .monetary_policy_update
-        .map_or(false, |v| block.block.header().number() >= v);
-
-    if aion040fork {
-        let mut tx_batch = Vec::new();
-        debug!(target: "vm", "transactions = {:?}, len = {:?}", transactions, transactions.len());
-        for tx in transactions {
-            if !is_for_avm(block, tx) {
-                if tx_batch.len() >= 1 {
-                    block.apply_batch_txs(tx_batch.as_slice(), None, false);
-                    tx_batch.clear();
-                }
-                block.push_transaction(tx.clone(), None, false)?;
-            } else {
-                trace!(target: "vm", "found avm transaction");
-                tx_batch.push(tx.clone())
-            }
-        }
-
-        if !tx_batch.is_empty() {
-            block.apply_batch_txs(tx_batch.as_slice(), None, false);
-            tx_batch.clear();
-        }
-    } else {
-        for t in transactions {
-            block.push_transaction(t.clone(), None, false)?;
-        }
-    }
-
-    trace!(target: "vm", "push transactions done");
-
-    Ok(())
 }
 
 // TODO [ToDr] Pass `PreverifiedBlock` by move, this will avoid unecessary allocation
