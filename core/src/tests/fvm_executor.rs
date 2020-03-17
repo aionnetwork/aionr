@@ -1564,9 +1564,16 @@ fn contract_create2() {
     // machine before aion040_fork returns failure on creation at existed account
     assert_eq!(status_code, ExecStatus::Revert);
 
+    // create contract on account with storage and balance after avm fork
     let mut machine = make_aion_machine();
     machine.set_monetary(0);
     let mut substate = Substate::new();
+    state
+        .set_storage(&address, vec![0x1u8, 0, 0, 0], vec![0x2u8, 0, 0, 0])
+        .unwrap();
+    state
+        .add_balance(&address, &U256::from(100), CleanupMode::NoEmpty)
+        .unwrap();
 
     let ExecutionResult {
         gas_left: _,
@@ -1580,30 +1587,6 @@ fn contract_create2() {
         ex.create(params.clone(), &mut substate)
     };
 
-    // machine after aion040_fork returns success on creation at exsited account which has no code
-    assert_eq!(status_code, ExecStatus::Success);
-
-    println!(
-        "code = {:?}",
-        state.code(&inner_contract_address[..].into())
-    );
-
-    let mut machine = make_aion_machine();
-    machine.set_monetary(0);
-    let mut substate = Substate::new();
-
-    let ExecutionResult {
-        gas_left: _,
-        status_code,
-        return_data: _,
-        exception: _,
-        state_root: _,
-        invokable_hashes: _,
-    } = {
-        let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.create(params.clone(), &mut substate)
-    };
-
-    // normal creation of contract on account which already exists
+    // creation on account with storage will succeed
     assert_eq!(status_code, ExecStatus::Success);
 }

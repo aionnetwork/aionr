@@ -314,6 +314,26 @@ fn hello_avm() {
         ex.call_vm(vec![params.clone()], &mut [substate])
     };
 
+    let created_account = vec![
+        160u8, 127, 35, 48, 74, 9, 148, 226, 236, 6, 141, 109, 146, 22, 155, 26, 166, 190, 73, 6,
+        28, 157, 124, 19, 6, 179, 250, 190, 204, 216, 155, 211,
+    ];
+
+    // check avm creation on account with balance and storage
+    state
+        .add_balance(
+            &created_account.as_slice().into(),
+            &U256::from(199),
+            CleanupMode::NoEmpty,
+        )
+        .unwrap();
+    state
+        .set_storage(
+            &created_account.as_slice().into(),
+            vec![0x1u8, 0, 0, 0],
+            vec![0x2u8, 0, 0, 0],
+        )
+        .unwrap();
     for r in execution_results {
         let AvmExecutionResult {
             status_code,
@@ -327,7 +347,6 @@ fn hello_avm() {
         assert_eq!(status_code, AvmStatusCode::Success);
 
         params.address = (*return_data).into();
-        println!("return data = {:?}", return_data);
     }
 
     // Hello avm is deployed
