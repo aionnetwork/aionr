@@ -369,7 +369,7 @@ impl ChainNotify for Sync {
         _invalid: Vec<H256>,
         enacted: Vec<H256>,
         retracted: Vec<H256>,
-        _sealed: Vec<H256>,
+        sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
         _duration: u64,
     )
@@ -396,10 +396,14 @@ impl ChainNotify for Sync {
             }
         }
 
+        // Add sealed blocks into imported blocks cache
+        if !sealed.is_empty() {
+            self.storage.insert_imported_blocks_hashes(sealed.clone());
+        }
+
         // Broadcast the new main-chain blocks unless the node is syncing
         if !self.is_syncing() && !enacted.is_empty() {
             trace!(target: "sync_notify", "Propagating blocks...");
-            self.storage.insert_imported_blocks_hashes(enacted.clone());
             broadcast::propagate_new_blocks(self.p2p.clone(), enacted, self.client.clone());
         }
     }
