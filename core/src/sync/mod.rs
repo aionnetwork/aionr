@@ -330,6 +330,21 @@ impl Sync {
     }
 
     pub fn get_local_node_info(&self) -> &String { self.p2p.get_local_node_info() }
+
+    /// Determine if the node is doing a major sync
+    fn is_syncing(&self) -> bool {
+        let local_best_block_number = self.client.chain_info().best_block_number;
+        let network_best_block_number = *self.network_best_block_number.read();
+        let local_total_difficulty = self.client.chain_info().total_difficulty;
+        let network_total_difficulty = *self.network_best_td.read();
+        if local_best_block_number + 4 < network_best_block_number
+            && local_total_difficulty <= network_total_difficulty
+        {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl SyncProvider for Sync {
@@ -354,7 +369,7 @@ impl ChainNotify for Sync {
         _invalid: Vec<H256>,
         enacted: Vec<H256>,
         retracted: Vec<H256>,
-        sealed: Vec<H256>,
+        _sealed: Vec<H256>,
         _proposed: Vec<Vec<u8>>,
         _duration: u64,
     )
@@ -381,11 +396,11 @@ impl ChainNotify for Sync {
             }
         }
 
-        // For locally sealed main-chain blocks, record them and broadcast them
-        if !sealed.is_empty() && !enacted.is_empty() {
+        // Broadcast the new main-chain blocks unless the node is syncing
+        if !self.is_syncing() && !enacted.is_empty() {
             trace!(target: "sync_notify", "Propagating blocks...");
-            self.storage.insert_imported_blocks_hashes(sealed.clone());
-            broadcast::propagate_new_blocks(self.p2p.clone(), &sealed[0], self.client.clone());
+            self.storage.insert_imported_blocks_hashes(enacted.clone());
+            broadcast::propagate_new_blocks(self.p2p.clone(), enacted, self.client.clone());
         }
     }
 
