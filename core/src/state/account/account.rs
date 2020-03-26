@@ -22,7 +22,7 @@
 
 use lru_cache::LruCache;
 use std::cell::{Cell, RefCell};
-use std::collections::{HashMap, BTreeMap, HashSet};
+use std::collections::{HashMap, BTreeMap};
 use std::sync::Arc;
 use std::fmt;
 
@@ -81,7 +81,6 @@ impl From<BasicAccount> for AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
-            storage_removable: HashSet::new(),
         }
     }
 }
@@ -113,7 +112,6 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
-            storage_removable: HashSet::new(),
         }
     }
 
@@ -138,7 +136,6 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,
-            storage_removable: HashSet::new(),
         }
     }
 
@@ -172,9 +169,7 @@ impl AionVMAccount {
             object_graph_cache: Arc::new(vec![]),
             address_hash: Cell::new(None),
             empty_but_commit: false,
-            account_type: AccType::FVM,
-            storage_removable: HashSet::new()
-        }
+            account_type: AccType::FVM,        }
     }
 
     fn storage_is_clean(&self) -> bool { self.storage_changes.is_empty() }
@@ -232,7 +227,6 @@ impl AionVMAccount {
             address_hash: self.address_hash.clone(),
             empty_but_commit: self.empty_but_commit.clone(),
             account_type: self.account_type.clone(),
-            storage_removable: HashSet::new(),
         }
     }
 
@@ -250,21 +244,12 @@ impl AionVMAccount {
         self.transformed_code_size = other.transformed_code_size;
         self.transformed_code_cache = other.transformed_code_cache;
         self.object_graph_size = other.object_graph_size;
-        self.object_graph_hash = other.object_graph_hash;
+        self.object_graph_hash = BLAKE2B_EMPTY; //other.object_graph_hash;
         self.object_graph_cache = other.object_graph_cache;
         self.empty_but_commit = other.empty_but_commit;
         self.account_type = other.account_type;
 
-        let mut cache = self.storage_cache.borrow_mut();
-        for (k, v) in other.storage_cache.into_inner() {
-            cache.insert(k.clone(), v.clone()); //TODO: cloning should not be required here
-        }
-        self.storage_changes = other.storage_changes;
-        self.storage_removable = other.storage_removable;
-
-        for k in self.storage_removable.drain() {
-            cache.remove(&k);
-        }
+        self.storage_cache = other.storage_cache;
     }
 
     pub fn set_empty_but_commit(&mut self) { self.empty_but_commit = true; }
@@ -405,29 +390,30 @@ impl VMAccount for AionVMAccount {
 
     // objectgraph uses delta_root as key,
     // it is cached during updating account cache
-    fn cache_objectgraph(&mut self, a: &Address, db: &HashStore) -> Option<Arc<Bytes>> {
-        if let Some(root) = db.get(a) {
-            self.storage_root = root[..].into();
-            // if storage_root has been stored, it should be avm created account
-            self.account_type = AccType::AVM;
-            // always cache object graph and key/value storage root
-            println!("try to get object graph from: {:?}", self.delta_root);
-            match db.get(&self.delta_root) {
-                Some(data) => {
-                    self.object_graph_size = Some(data.len());
-                    self.object_graph_hash = blake2b(&data);
-                    self.object_graph_cache = Arc::new(data[..].to_vec());
-                    Some(self.object_graph_cache.clone())
-                }
-                None => {
-                    self.object_graph_size = None;
-                    self.object_graph_hash = BLAKE2B_EMPTY;
-                    None
-                }
-            }
-        } else {
-            None
-        }
+    fn cache_objectgraph(&mut self, _a: &Address, _db: &HashStore) -> Option<Arc<Bytes>> {
+        // if let Some(root) = db.get(a) {
+        //     self.storage_root = root[..].into();
+        //     // if storage_root has been stored, it should be avm created account
+        //     self.account_type = AccType::AVM;
+        //     // always cache object graph and key/value storage root
+        //     println!("try to get object graph from: {:?}", self.delta_root);
+        //     match db.get(&self.delta_root) {
+        //         Some(data) => {
+        //             self.object_graph_size = Some(data.len());
+        //             self.object_graph_hash = blake2b(&data);
+        //             self.object_graph_cache = Arc::new(data[..].to_vec());
+        //             Some(self.object_graph_cache.clone())
+        //         }
+        //         None => {
+        //             self.object_graph_size = None;
+        //             self.object_graph_hash = BLAKE2B_EMPTY;
+        //             None
+        //         }
+        //     }
+        // } else {
+        //     None
+        // }
+        None
     }
 
     fn cache_given_code(&mut self, code: Arc<Bytes>) {
@@ -829,6 +815,7 @@ impl AionVMAccount {
                         return KeyTag::DIRTY(value.clone());
                     }
                 }
+                // zeros means REMOVE in fastvm
                 KeyTag::REMOVE
             }
         }

@@ -394,12 +394,20 @@ impl<B: Backend> State<B> {
             .trie
             .readonly(self.db.as_hashstore(), &self.root)
             .expect(SEC_TRIE_DB_UNWRAP_STR);
-        let maybe_acc = db.get_with(address, AionVMAccount::from_rlp)?;
-        let r = maybe_acc.as_ref().map_or(Ok(None), |a| {
+        let mut maybe_acc = db.get_with(address, AionVMAccount::from_rlp)?;
+        let r = maybe_acc.as_mut().map_or(Ok(None), |a| {
             let account_db = self
                 .factories
                 .accountdb
                 .readonly(self.db.as_hashstore(), a.address_hash(address));
+            // ensure the storage root is correct
+            a.update_account_cache(
+                address,
+                RequireCache::None,
+                &self.db,
+                account_db.as_hashstore(),
+                self.kvdb.clone(),
+            );
             a.storage_at(account_db.as_hashstore(), key)
         });
         self.insert_cache(address, AccountEntry::new_clean(maybe_acc));

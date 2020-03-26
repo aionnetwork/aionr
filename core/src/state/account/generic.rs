@@ -20,7 +20,7 @@
  ******************************************************************************/
 use std::cell::{Cell, RefCell};
 use std::sync::Arc;
-use std::collections::{HashSet, HashMap};
+use std::collections::HashMap;
 
 use aion_types::{H256, U256};
 use acore_bytes::{Bytes};
@@ -101,9 +101,6 @@ pub struct Account {
     // modified storage. Accumulates changes to storage made in `set_storage`
     // takes precedence over `storage_cache`.
     pub storage_changes: VMStorageChange,
-
-    // aion: java kernel specific
-    pub storage_removable: HashSet<Bytes>,
 
     // code hash of the account.
     pub code_hash: H256,
