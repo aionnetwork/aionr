@@ -14,7 +14,7 @@ password = []
 [network]
 sync_from_boot_nodes_only = false
 max_peers = 128
-net_id = 256
+net_id = 0
 local_node = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"
 boot_nodes = []
 

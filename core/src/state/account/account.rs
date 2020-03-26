@@ -892,7 +892,6 @@ impl fmt::Debug for AionVMAccount {
         f.debug_struct("AionVMAccount")
             .field("balance", &self.balance)
             .field("nonce", &self.nonce)
-            .field("code", &self.code())
             .field("code_hash", &self.code_hash())
             .field(
                 "storage",

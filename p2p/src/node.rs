@@ -29,7 +29,6 @@ use std::hash::Hash;
 use std::hash::Hasher;
 use uuid::Uuid;
 use futures::sync::mpsc;
-use aion_types::H256;
 use tokio::net::TcpStream;
 use super::msg::*;
 use super::state::STATE;
@@ -58,9 +57,7 @@ pub struct Node {
     pub net_id: u32,
     pub addr: IpAddr,
     pub real_addr: IpAddr,
-    pub genesis_hash: H256,
 
-    pub if_boot: bool,
     pub revision: [u8; MAX_REVISION_LENGTH],
     pub ts: Arc<TcpStream>,
     pub tx: mpsc::Sender<ChannelBuffer>,
@@ -98,9 +95,7 @@ impl Node {
             net_id: 0,
             real_addr: addr.clone(),
             addr,
-            genesis_hash: H256::default(),
 
-            if_boot: false,
             revision: [b' '; MAX_REVISION_LENGTH],
             ts: Arc::new(ts),
             tx,
@@ -138,9 +133,7 @@ impl Node {
                 ip: [0u8; 8],
                 port: 0,
             },
-            genesis_hash: H256::default(),
 
-            if_boot: false,
             revision: [b' '; MAX_REVISION_LENGTH],
             ts: Arc::new(ts),
             tx,
