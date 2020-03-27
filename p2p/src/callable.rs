@@ -21,8 +21,10 @@
 
 use msg::ChannelBuffer;
 
+/// Callable trait for Sync callback functions.
 pub trait Callable: Sync + Send {
+    /// signal to external (sync) for handling sync tasks
     fn handle(&self, hash: u64, cb: ChannelBuffer);
-    // signal to external (sync) for disconnect event
+    /// signal to external (sync) for disconnect event
     fn disconnect(&self, hash: u64);
 }

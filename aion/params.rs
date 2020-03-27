@@ -25,6 +25,7 @@ use journaldb::Algorithm;
 use acore::spec::{Spec};
 use user_defaults::UserDefaults;
 
+/// genesis spec type
 #[derive(Debug, PartialEq)]
 pub enum SpecType {
     Default,
@@ -57,6 +58,7 @@ impl fmt::Display for SpecType {
 }
 
 impl SpecType {
+    /// get genesis spec
     pub fn spec<'a>(&self) -> Result<Spec, String> {
         let file;
         match *self {
@@ -73,9 +75,12 @@ impl SpecType {
     }
 }
 
+/// enum to specify pruning algrithm
 #[derive(Debug, PartialEq)]
 pub enum Pruning {
+    /// specific pruning algorithm
     Specific(Algorithm),
+    /// follow user default algorithm
     Auto,
 }
 
@@ -95,6 +100,7 @@ impl str::FromStr for Pruning {
 }
 
 impl Pruning {
+    /// convert to Algorithm enum
     pub fn to_algorithm(&self, user_defaults: &UserDefaults) -> Algorithm {
         match *self {
             Pruning::Specific(algo) => algo,
@@ -103,6 +109,7 @@ impl Pruning {
     }
 }
 
+/// accounts
 #[derive(Debug, PartialEq)]
 pub struct AccountsConfig {
     pub iterations: u32,

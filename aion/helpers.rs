@@ -19,8 +19,8 @@
  *
  ******************************************************************************/
 
- #![allow(deprecated)]
- #![allow(dead_code)]
+#![allow(deprecated)]
+#![allow(dead_code)]
 
 use std::io;
 use std::io::{Write, BufReader, BufRead};
@@ -33,6 +33,7 @@ use acore::transaction::transaction_queue::PrioritizationStrategy;
 use cache::CacheConfig;
 use dir::helpers::replace_home;
 
+/// parse BlockId from string
 pub fn to_block_id(s: &str) -> Result<BlockId, String> {
     if s == "latest" {
         Ok(BlockId::Latest)
@@ -45,6 +46,7 @@ pub fn to_block_id(s: &str) -> Result<BlockId, String> {
     }
 }
 
+/// parse U256 from string
 pub fn to_u256(s: &str) -> Result<U256, String> {
     if let Ok(decimal) = U256::from_dec_str(s) {
         Ok(decimal)
@@ -55,6 +57,7 @@ pub fn to_u256(s: &str) -> Result<U256, String> {
     }
 }
 
+/// parse pending set from string
 pub fn to_pending_set(s: &str) -> Result<PendingSet, String> {
     match s {
         "cheap" => Ok(PendingSet::AlwaysQueue),
@@ -64,6 +67,7 @@ pub fn to_pending_set(s: &str) -> Result<PendingSet, String> {
     }
 }
 
+/// parse queue strategy from string
 pub fn to_queue_strategy(s: &str) -> Result<PrioritizationStrategy, String> {
     match s {
         "gas" => Ok(PrioritizationStrategy::GasAndGasPrice),
@@ -73,12 +77,14 @@ pub fn to_queue_strategy(s: &str) -> Result<PrioritizationStrategy, String> {
     }
 }
 
+/// parse address from string
 pub fn string_to_address(s: &String) -> Result<Address, String> {
     clean_0x(s)
         .parse()
         .map_err(|_| format!("Invalid address: {:?}", s))
 }
 
+/// parse addresses from string
 pub fn to_address(s: Option<String>) -> Result<Address, String> {
     match s {
         Some(ref a) => string_to_address(a),
@@ -99,6 +105,7 @@ pub fn aion_ipc_path(base: &str, path: &str) -> String {
     replace_home(base, &path)
 }
 
+/// build client configuration
 pub fn to_client_config(
     cache_config: &CacheConfig,
     spec_name: String,
@@ -203,6 +210,7 @@ pub fn passwords_from_files(files: &[String]) -> Result<Vec<String>, String> {
 }
 
 #[deprecated(since = "1.0.3", note = "Use log4rs instead")]
+/// parse log lavel
 pub fn validate_log_level(level: String, target: &str) -> String {
     match level.clone().to_lowercase().as_str() {
         "off" | "error" | "warn" | "info" | "debug" | "trace" => level,
@@ -218,6 +226,7 @@ pub fn validate_log_level(level: String, target: &str) -> String {
 }
 
 #[deprecated(since = "1.0.3", note = "Use log4rs instead")]
+/// parse log targets with level
 pub fn parse_log_target(targets: Vec<String>) -> Option<String> {
     if targets.is_empty() {
         return None;

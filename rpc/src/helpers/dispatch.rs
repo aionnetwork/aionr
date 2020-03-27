@@ -440,6 +440,7 @@ impl<T: Debug> From<(T, Option<AccountToken>)> for WithToken<T> {
     }
 }
 
+/// auto-adjusted gas price params
 #[derive(Debug, Clone, PartialEq)]
 pub struct DynamicGasPrice {
     pub blk_price_window: usize,

@@ -19,6 +19,8 @@
  *
  ******************************************************************************/
 
+//! delta calculation. Used to calculate PoS block timestamp.
+
 extern crate num_bigint;
 extern crate fixed_point;
 extern crate aion_types;
@@ -45,13 +47,23 @@ lazy_static! {
     );
 }
 
+/// Calculate delta with given parameters
+///
+/// # parameter
+/// * difficulty: difficulty of current PoS block
+/// * seed: seed of current PoS block
+/// * stake: total stake of current PoS block author
+///
+/// ```
+/// delta = difficulty * ( ln(2^256) - ln(hash(seed)) ) / stake
+/// ```
 pub fn calculate_delta(difficulty: U256, seed: &[u8], stake: BigUint) -> u64 {
     let hash_of_seed = blake2b(&seed[..]);
     trace!(target: "delta_calc", "difficulty: {:?}, hash: {}, stake: {}",
            difficulty, hash_of_seed, stake);
 
     let u = LN_BOUNDARY
-        .subtruct(&FixedPoint::ln(&hash_of_seed.into()))
+        .subtract(&FixedPoint::ln(&hash_of_seed.into()))
         .expect("H256 should smaller than 2^256");
     let delta: BigUint = u.multiply_uint(difficulty.into()).to_big_uint() / stake;
     trace!(target: "delta_calc", "delta: {}", delta);

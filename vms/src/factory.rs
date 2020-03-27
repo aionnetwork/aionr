@@ -33,6 +33,11 @@ use types::traits::Ext;
 use types::avm::{TransactionContext as AVMTxContext, AvmStatusCode};
 use aion_types::{U128, U256, H256};
 
+/// Factory for multiple vm execution, exec() is implemented individually by avm and fastvm
+/// * params: parameter from kernel, will be tranformed to vm context
+/// * ext: will be transformed into raw handler in vm, and recovered in each callback
+/// * is_local: flag that shows it is a local call that does not affect state
+/// * unity fork point, used to identify avm version
 pub trait Factory {
     fn exec(
         &mut self,

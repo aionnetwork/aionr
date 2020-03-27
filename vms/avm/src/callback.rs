@@ -631,6 +631,7 @@ pub extern fn avm_remove_storage(
     ext.remove_storage(addr, key);
 }
 
+/// assign all these callback functions to outer callback struct (see avmloader.so)
 pub fn register_callbacks() {
     unsafe {
         callbacks.create_account = avm_create_account;
