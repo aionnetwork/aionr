@@ -56,6 +56,7 @@ use user_defaults::UserDefaults;
 const VERIFY_PASSWORD_HINT: &'static str = "Make sure valid password is present in files passed \
                                             using `--password` or in the configuration file.";
 
+/// CMD parameters to run kernel.
 #[derive(Debug, PartialEq)]
 pub struct RunCmd {
     pub cache_config: CacheConfig,
@@ -80,6 +81,7 @@ pub struct RunCmd {
     pub verifier_settings: VerifierSettings,
 }
 
+/// run kernel
 pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     // load spec
     let spec = cmd.spec.spec()?;
@@ -374,6 +376,7 @@ pub fn execute_impl(cmd: RunCmd) -> Result<(Weak<Client>), String> {
     Ok(weak_client)
 }
 
+/// run execute implementation
 pub fn execute(cmd: RunCmd) -> Result<(), String> {
     // increase max number of open files
     raise_fd_limit();
@@ -386,6 +389,7 @@ pub fn execute(cmd: RunCmd) -> Result<(), String> {
     wait(execute_impl(cmd))
 }
 
+/// env printer
 fn print_running_environment(
     spec: &SpecType,
     spec_data_dir: &String,
@@ -426,6 +430,7 @@ fn print_running_environment(
     );
 }
 
+/// logo printer
 fn print_logo() {
     info!(
         target: "run",
@@ -440,6 +445,7 @@ fn print_logo() {
     info!(target: "run","       build: {}", version());
 }
 
+/// to init account provider instance
 fn prepare_account_provider(
     spec: &SpecType,
     dirs: &Directories,
@@ -505,7 +511,7 @@ fn prepare_account_provider(
     Ok(account_provider)
 }
 
-// Construct an error `String` with an adaptive hint on how to create an account.
+/// Construct an error `String` with an adaptive hint on how to create an account.
 fn build_create_account_hint(spec: &SpecType, keys: &str) -> String {
     format!(
         "You can create an account via RPC, UI or `aion account new --chain {} --keys-path {}`.",
@@ -513,6 +519,7 @@ fn build_create_account_hint(spec: &SpecType, keys: &str) -> String {
     )
 }
 
+/// Fill back local node if local node id is empty
 fn fill_back_local_node(path: String, local_node_info: &String) {
     use std::fs;
     use std::io::BufRead;
@@ -554,6 +561,7 @@ fn fill_back_local_node(path: String, local_node_info: &String) {
     info!(target: "run","Local node fill back!");
 }
 
+/// Wait for Ctrl_C signal to shutdown the kernel
 fn wait_for_exit() {
     let exit = Arc::new((Mutex::new(false), Condvar::new()));
 
@@ -569,6 +577,7 @@ fn wait_for_exit() {
     let _ = exit.1.wait(&mut l);
 }
 
+/// Wait for the remaining tasks to finish
 fn wait_for_drop<T>(w: Weak<T>) {
     let sleep_duration = Duration::from_secs(1);
     let warn_timeout = Duration::from_secs(60);

@@ -32,6 +32,7 @@ use serde_json::de::from_reader;
 use serde_json::ser::to_string;
 use journaldb::Algorithm;
 
+/// Default value of some config params
 pub struct UserDefaults {
     pub is_first_launch: bool,
     pub pruning: Algorithm,
@@ -108,6 +109,7 @@ impl Default for UserDefaults {
 }
 
 impl UserDefaults {
+    /// load default config value from the given path
     pub fn load<P>(path: P) -> Result<Self, String>
     where P: AsRef<Path> {
         match File::open(path) {
@@ -124,6 +126,7 @@ impl UserDefaults {
         }
     }
 
+    /// save default config value to the given path
     pub fn save<P>(&self, path: P) -> Result<(), String>
     where P: AsRef<Path> {
         let mut file: File =

@@ -32,6 +32,7 @@ use rpc_apis::{self, ApiSet};
 use tokio::runtime::TaskExecutor;
 pub use aion_rpc::{IpcServer, HttpServer, WsServer, RequestMiddleware, WsError, WsErrorKind};
 
+/// Config params for rpc http apis
 #[derive(Debug, Clone, PartialEq)]
 pub struct HttpConfiguration {
     pub enabled: bool,
@@ -59,6 +60,7 @@ impl Default for HttpConfiguration {
     }
 }
 
+/// Config for rpc ipc apis
 #[derive(Debug, Clone, PartialEq)]
 pub struct IpcConfiguration {
     pub enabled: bool,
@@ -81,6 +83,7 @@ impl Default for IpcConfiguration {
     }
 }
 
+/// config for rpc websocket apis
 #[derive(Debug, Clone, PartialEq)]
 pub struct WsConfiguration {
     pub enabled: bool,
@@ -106,7 +109,9 @@ impl Default for WsConfiguration {
     }
 }
 
+/// dependencies for rpc apis
 pub struct Dependencies<D: rpc_apis::Dependencies> {
+    /// rpc dependencies
     pub apis: Arc<D>,
     pub stats: Arc<RpcStats>,
 }
