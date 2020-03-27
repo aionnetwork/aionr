@@ -401,9 +401,7 @@ fn print_running_environment(
         info!(
             target: "run",
             " config path: {}",
-            Colour::White
-                .bold()
-                .paint(config)
+            config
         );
     } else {
         info!(target: "run", "Start without config.");
@@ -416,25 +414,19 @@ fn print_running_environment(
             info!(
                 target: "run",
                 "genesis path: {}",
-            Colour::White
-                .bold()
-                .paint(absolute(filename.to_string()))
+                absolute(filename.to_string())
             );
         }
     }
     info!(
         target: "run",
         "   keys path: {}",
-        Colour::White
-            .bold()
-            .paint(dirs.keys_path(spec_data_dir).to_string_lossy().into_owned())
+        dirs.keys_path(spec_data_dir).to_string_lossy().into_owned()
     );
     info!(
         target: "run",
         "     db path: {}",
-        Colour::White
-            .bold()
-            .paint(db_dirs.db_root_path().to_string_lossy().into_owned())
+        db_dirs.db_root_path().to_string_lossy().into_owned()
     );
 }
 
@@ -450,7 +442,7 @@ fn print_logo() {
         Colour::Blue.bold().paint("| |__| |   / ____ \\   | |\\  |\n"),
         Colour::Blue.bold().paint(" \\____/   /_/    \\_\\  |_| \\_|\n\n")
     );
-    info!(target: "run","       build: {}", Colour::White.bold().paint(version()));
+    info!(target: "run","       build: {}", version());
 }
 
 /// to init account provider instance

@@ -50,10 +50,10 @@ Follow this guide to install the Aion Rust kernel on your system.
     > cargo 1.28.0 (96a2c7d16 2018-07-13)
     ```
 
-4. Install Boost `v1.65.1`
+4. Install Boost `v1.65.1` 
 
     - Ubuntu `16.04`:
-
+    
         ```bash
         wget https://dl.bintray.com/boostorg/release/1.65.1/source/boost_1_65_1.tar.bz2
         tar xf boost_1_65_1.tar.bz2
@@ -66,7 +66,7 @@ Follow this guide to install the Aion Rust kernel on your system.
     - Ubuntu `18.04`:
 
         ```bash
-        sudo apt-get install libboost-all-dev -y
+        sudo apt-get install libboost-filesystem1.65-dev libboost-program-options1.65-dev libboost-regex1.65-dev  -y
         ```
 
 5. Install JAVA JDK:

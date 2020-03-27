@@ -21,6 +21,8 @@
 
 //! delta calculation. Used to calculate PoS block timestamp.
 
+#![warn(unused_extern_crates)]
+
 extern crate num_bigint;
 extern crate fixed_point;
 extern crate aion_types;

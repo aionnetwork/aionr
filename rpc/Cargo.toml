@@ -6,7 +6,6 @@ license = "GPL-3.0"
 authors = ["Aion Foundation <admin@aion.network>"]
 
 [dependencies]
-ansi_term = "0.10"
 futures = "0.1.6"
 log = "0.3"
 order-stat = "0.1"

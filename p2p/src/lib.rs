@@ -41,7 +41,6 @@ extern crate bincode;
 extern crate rand;
 extern crate tokio;
 extern crate tokio_codec;
-extern crate tokio_reactor;
 extern crate acore_bytes;
 extern crate uuid;
 extern crate aion_version as version;
@@ -80,7 +79,6 @@ use tokio::net::TcpStream;
 use tokio::prelude::*;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
-use tokio_reactor::Handle;
 use tokio_codec::{Decoder,Framed};
 use codec::Codec;
 use route::Version;
@@ -387,7 +385,7 @@ impl Mgr {
 
                         match StdTcpStream::connect_timeout(&addr, Duration::from_millis(1000)) {
                             Ok(stdts)=>{
-                                if let Ok(ts) = TcpStream::from_std(stdts, &Handle::default()) {
+                                if let Ok(ts) = TcpStream::from_std(stdts, &Default::default()) {
                                     debug!(target: "p2p_outbound", "connected to: {}", &temp_node.addr.to_string());
 
                                     let p2p_outbound_1 = p2p_outbound_0.clone();
