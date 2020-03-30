@@ -743,6 +743,7 @@ mod tests {
                 fat_db: Default::default(),
                 vm_type: Default::default(),
                 verifier_settings: Default::default(),
+                stake_conf: Default::default()
             }))
         );
     }

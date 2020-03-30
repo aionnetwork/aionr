@@ -56,9 +56,7 @@ lazy_static! {
 /// * seed: seed of current PoS block
 /// * stake: total stake of current PoS block author
 ///
-/// ```
-/// delta = difficulty * ( ln(2^256) - ln(hash(seed)) ) / stake
-/// ```
+/// `delta = difficulty * ( ln(2^256) - ln(hash(seed)) ) / stake`
 pub fn calculate_delta(difficulty: U256, seed: &[u8], stake: BigUint) -> u64 {
     let hash_of_seed = blake2b(&seed[..]);
     trace!(target: "delta_calc", "difficulty: {:?}, hash: {}, stake: {}",
