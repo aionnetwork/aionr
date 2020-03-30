@@ -161,9 +161,9 @@ impl Sync {
                     let local_total_difficulty = client_statics.chain_info().total_difficulty;
                     let active_len = active_nodes.len();
                     info!(target: "sync_statics", "total/active {}/{}, local_best_num {}, hash {}, diff {}", total_len, active_len, local_best_number, local_best_hash, local_total_difficulty);
-                    let (downloaded_blocks_size, downloaded_blocks_capacity) = storage_statics.downloaded_blocks_hashes_statics();
+                    let (recorded_blocks_size, recorded_blocks_capacity) = storage_statics.recorded_blocks_hashes_statics();
                     let (staged_blocks_size, staged_blocks_capacity) = storage_statics.staged_blocks_statics();
-                    debug!(target: "sync_statics", "download record cache size/capacity {}/{}", downloaded_blocks_size, downloaded_blocks_capacity);
+                    debug!(target: "sync_statics", "recorded cache size/capacity {}/{}", recorded_blocks_size, recorded_blocks_capacity);
                     debug!(target: "sync_statics", "staged cache size/capacity {}/{}", staged_blocks_size, staged_blocks_capacity);
                     debug!(target: "sync_statics", "lightning syncing height: {}", storage_statics.lightning_base());
                     info!(target: "sync_statics", "{:-^130}", "");
@@ -414,7 +414,7 @@ impl ChainNotify for Sync {
 
         // Add sealed blocks into imported blocks cache
         if !sealed.is_empty() {
-            self.storage.insert_imported_blocks_hashes(sealed.clone());
+            self.storage.insert_recorded_blocks_hashes(sealed.clone());
         }
 
         // Broadcast the new main-chain blocks unless the node is syncing

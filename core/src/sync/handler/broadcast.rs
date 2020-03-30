@@ -143,8 +143,8 @@ pub fn handle_broadcast_block(
             let parent_hash = header.parent_hash();
             // Proceed only when the parent block is in chain
             if client.block_header(BlockId::Hash(*parent_hash)).is_some() {
-                let mut imported_blocks_hashes = storage.imported_blocks_hashes().lock();
-                if !imported_blocks_hashes.contains_key(&hash) {
+                let mut recorded_blocks_hashes = storage.recorded_blocks_hashes().lock();
+                if !recorded_blocks_hashes.contains_key(&hash) {
                     // Do basic header validation before proceed
                     let result = UnityEngine::validate_block_header(&header);
                     match result {
@@ -172,7 +172,7 @@ pub fn handle_broadcast_block(
                                         match result {
                                             Ok(_) => {
                                                 trace!(target: "sync_broadcast", "New broadcast block imported {:?} ({})", hash, number);
-                                                imported_blocks_hashes.insert(hash, 0);
+                                                recorded_blocks_hashes.insert(hash, 0);
                                                 let active_nodes = p2p.get_active_nodes();
                                                 for n in active_nodes.iter() {
                                                     // Re-broadcast this block
