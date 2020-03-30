@@ -34,7 +34,7 @@ use acore::ImportError;
 use acore::miner::Miner;
 use acore::verification::queue::VerifierSettings;
 use cache::CacheConfig;
-use params::{SpecType, Pruning, Switch, fatdb_switch_to_bool};
+use params::{SpecType, Pruning, Switch, fatdb_switch_to_bool, StakeConfig};
 use helpers::{to_client_config};
 use dir::Directories;
 use user_defaults::UserDefaults;
@@ -114,6 +114,7 @@ pub struct ImportBlockchain {
     pub fat_db: Switch,
     pub vm_type: VMType,
     pub verifier_settings: VerifierSettings,
+    pub stake_conf: StakeConfig,
 }
 
 /// Config for sub-command `export`
@@ -205,6 +206,7 @@ fn execute_import(cmd: ImportBlockchain) -> Result<(), String> {
     );
 
     client_config.queue.verifier_settings = cmd.verifier_settings;
+    client_config.stake_contract = cmd.stake_conf.contract;
 
     // build client
     let service = ClientService::start(

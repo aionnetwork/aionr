@@ -172,6 +172,7 @@ impl Configuration {
                 vm_type,
                 // with_color: logger_config.color,
                 verifier_settings: self.verifier_settings(),
+                stake_conf: self.stake_config()?,
             };
             Cmd::Blockchain(BlockchainCmd::Import(import_cmd))
         } else if self.args.cmd_export {
