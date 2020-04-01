@@ -169,6 +169,8 @@ impl<'a> Ext for TestEnv<'a> {
 
     fn remove_storage(&mut self, _a: &Address, _key: Vec<u8>) {}
 
+    fn has_storage(&mut self, _a: &Address) -> bool { unimplemented!() }
+
     /// Determine whether an account exists.
     fn exists(&self, address: &Address) -> bool { return *self.accounts.get(address).unwrap(); }
 
