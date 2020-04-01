@@ -1858,8 +1858,6 @@ impl MiningBlockChainClient for Client {
             );
         });
         self.db.read().flush().expect("DB flush failed.");
-        // clear pending PoS blocks
-        self.miner.clear_pos_pending();
 
         let (_, _, _, hour, minute, second) = utc_from_secs(timestamp as i64);
         // Print log

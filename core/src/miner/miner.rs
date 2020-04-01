@@ -199,7 +199,8 @@ impl Deref for ReadyPoSWork {
 pub struct Miner {
     // NOTE [ToDr]  When locking always lock in this order!
     transaction_pool: TransactionPool,
-    sealing_work: Mutex<SealingWork>,
+    // Cache of best block pow block templates
+    sealing_work_pow: Mutex<SealingWork>,
     // PoS block queue
     maybe_work: Mutex<HashMap<H256, ReadyPoSWork>>,
     // a seed/block_hash map for resealing
@@ -242,7 +243,7 @@ impl Miner {
     }
 
     /// Clear all pending block states
-    pub fn clear(&self) { self.sealing_work.lock().queue.reset(); }
+    pub fn clear(&self) { self.sealing_work_pow.lock().queue.reset(); }
 
     /// Get `Some` `clone()` of the current pending block's state or `None` if we're not sealing.
     pub fn pending_state(&self, latest_block_number: BlockNumber) -> Option<State<::db::StateDB>> {
@@ -542,7 +543,7 @@ impl Miner {
             transaction_pool,
             next_allowed_reseal: Mutex::new(Instant::now()),
             sealing_block_last_request: Mutex::new(0),
-            sealing_work: Mutex::new(SealingWork {
+            sealing_work_pow: Mutex::new(SealingWork {
                 queue: UsingQueue::new(options.work_queue_size),
                 enabled: false,
             }),
@@ -588,8 +589,8 @@ impl Miner {
                 )
             };
 
-            let mut sealing_work = self.sealing_work.lock();
-            let last_work_hash = sealing_work
+            let mut sealing_work_pow = self.sealing_work_pow.lock();
+            let last_work_hash = sealing_work_pow
                 .queue
                 .peek_last_ref()
                 .map(|pb| pb.block().header().hash());
@@ -788,8 +789,8 @@ impl Miner {
     /// Check if reseal is allowed and necessary.
     fn requires_reseal(&self, best_block: BlockNumber) -> bool {
         let has_local_transactions = self.transaction_pool.has_local_pending_transactions();
-        let mut sealing_work = self.sealing_work.lock();
-        if sealing_work.enabled {
+        let mut sealing_work_pow = self.sealing_work_pow.lock();
+        if sealing_work_pow.enabled {
             trace!(target: "block", "requires_reseal: sealing enabled");
             let last_request = *self.sealing_block_last_request.lock();
             // Reseal when:
@@ -807,8 +808,8 @@ impl Miner {
 
             if should_disable_sealing {
                 trace!(target: "block", "Miner sleeping (current {}, last {})", best_block, last_request);
-                sealing_work.enabled = false;
-                sealing_work.queue.reset();
+                sealing_work_pow.enabled = false;
+                sealing_work_pow.queue.reset();
                 false
             } else {
                 true
@@ -821,8 +822,8 @@ impl Miner {
 
     /// Prepares work which has to be done to seal.
     fn prepare_work(&self, block: ClosedBlock, original_work_hash: Option<H256>) {
-        let mut sealing_work = self.sealing_work.lock();
-        let last_work_hash = sealing_work
+        let mut sealing_work_pow = self.sealing_work_pow.lock();
+        let last_work_hash = sealing_work_pow
             .queue
             .peek_last_ref()
             .map(|pb| pb.block().header().mine_hash());
@@ -834,24 +835,24 @@ impl Miner {
             let _target = block.block().header().boundary();
             let is_new =
                 original_work_hash.map_or(true, |h| block.block().header().mine_hash() != h);
-            sealing_work.queue.push(block);
+            sealing_work_pow.queue.push(block);
             // If push notifications are enabled we assume all work items are used.
             if is_new {
-                sealing_work.queue.use_last_ref();
+                sealing_work_pow.queue.use_last_ref();
             }
         };
-        trace!(target: "block", "prepare_work: leaving (last={:?})", sealing_work.queue.peek_last_ref().map(|b| b.block().header().mine_hash()));
+        trace!(target: "block", "prepare_work: leaving (last={:?})", sealing_work_pow.queue.peek_last_ref().map(|b| b.block().header().mine_hash()));
     }
 
     /// Returns true if we had to prepare new pending block.
     fn prepare_work_sealing(&self, client: &MiningBlockChainClient) -> bool {
         trace!(target: "block", "prepare_work_sealing: entering");
         let prepare_new = {
-            let mut sealing_work = self.sealing_work.lock();
-            let have_work = sealing_work.queue.peek_last_ref().is_some();
+            let mut sealing_work_pow = self.sealing_work_pow.lock();
+            let have_work = sealing_work_pow.queue.peek_last_ref().is_some();
             trace!(target: "block", "prepare_work_sealing: have_work={}", have_work);
             if !have_work {
-                sealing_work.enabled = true;
+                sealing_work_pow.enabled = true;
                 true
             } else {
                 false
@@ -1037,8 +1038,8 @@ impl Miner {
         F: Fn() -> H,
         G: FnOnce(&ClosedBlock) -> H,
     {
-        let sealing_work = self.sealing_work.lock();
-        sealing_work.queue.peek_last_ref().map_or_else(
+        let sealing_work_pow = self.sealing_work_pow.lock();
+        sealing_work_pow.queue.peek_last_ref().map_or_else(
             || from_chain(),
             |b| {
                 if b.block().header().number() > latest_block_number {
@@ -1048,6 +1049,18 @@ impl Miner {
                 }
             },
         )
+    }
+
+    /// Clear pending blocks and block templates
+    fn clear_pending_blocks(&self) {
+        // Clear pending PoS blocks and block templates
+        let mut queue = self.maybe_work.lock();
+        let mut best_pos = self.best_pos.lock();
+        self.sealing_work_pos.lock().clear();
+        queue.clear();
+        *best_pos = None;
+        // Clear pening PoW block templates
+        self.sealing_work_pow.lock().queue.reset();
     }
 
     // U30-22
@@ -1121,11 +1134,11 @@ impl MinerService for Miner {
     ///                 -   transaction number in pending block
     fn status(&self) -> MinerStatus {
         let status = self.transaction_pool.status();
-        let sealing_work = self.sealing_work.lock();
+        let sealing_work_pow = self.sealing_work_pow.lock();
         MinerStatus {
             transactions_in_pending_queue: status.pending,
             transactions_in_future_queue: status.future,
-            transactions_in_pending_block: sealing_work
+            transactions_in_pending_block: sealing_work_pow
                 .queue
                 .peek_last_ref()
                 .map_or(0, |b| b.transactions().len()),
@@ -1463,14 +1476,6 @@ impl MinerService for Miner {
         }
     }
 
-    fn clear_pos_pending(&self) {
-        let mut queue = self.maybe_work.lock();
-        let mut best_pos = self.best_pos.lock();
-        self.sealing_work_pos.lock().clear();
-        queue.clear();
-        *best_pos = None;
-    }
-
     /// Generate PoS block template
     fn get_pos_template(
         &self,
@@ -1639,7 +1644,7 @@ impl MinerService for Miner {
     }
 
     /// RPC
-    fn is_currently_sealing(&self) -> bool { self.sealing_work.lock().queue.is_in_use() }
+    fn is_currently_sealing(&self) -> bool { self.sealing_work_pow.lock().queue.is_in_use() }
 
     // Stratum server receives a finished job, and updates sealing work
     fn map_sealing_work<F, T>(&self, client: &MiningBlockChainClient, f: F) -> Option<T>
@@ -1654,8 +1659,8 @@ impl MinerService for Miner {
         trace!(target: "miner", "map_sealing_work: entering");
         self.prepare_work_sealing(client);
         trace!(target: "miner", "map_sealing_work: sealing prepared");
-        let mut sealing_work = self.sealing_work.lock();
-        let ret = sealing_work.queue.use_last_ref();
+        let mut sealing_work_pow = self.sealing_work_pow.lock();
+        let ret = sealing_work_pow.queue.use_last_ref();
         trace!(target: "miner", "map_sealing_work: leaving use_last_ref={:?}", ret.as_ref().map(|b| b.block().header().hash()));
         ret.map(f)
     }
@@ -1668,7 +1673,7 @@ impl MinerService for Miner {
         seal: Vec<Bytes>,
     ) -> Result<(), Error>
     {
-        let result = if let Some(b) = self.sealing_work.lock().queue.get_used_if(
+        let result = if let Some(b) = self.sealing_work_pow.lock().queue.get_used_if(
             if self.options.enable_resubmission {
                 GetAction::Clone
             } else {
@@ -1690,8 +1695,6 @@ impl MinerService for Miner {
         };
         result.and_then(|sealed| {
             client.import_sealed_block(sealed)?;
-            // Clear the sealing_work queue after a PoW block is successfully imported
-            self.sealing_work.lock().queue.reset();
             Ok(())
         })
     }
@@ -1756,7 +1759,7 @@ impl MinerService for Miner {
         // Actions to do when new block imported in the main chain
         if !enacted.is_empty() {
             self.transaction_pool.record_transaction_sealed();
-            self.clear_pos_pending();
+            self.clear_pending_blocks();
             client.new_block_chained();
         }
     }

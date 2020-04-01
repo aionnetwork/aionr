@@ -1,8 +1,6 @@
 #!/bin/bash
 
 PWD=`pwd`
-BOOST_TAR="boost_1_65_1.tar.bz2"
-BOOST_SHA1SUM=4a5b0c3c1b1b9a4d6cb6a6cc395e903e76f76720
 JDK_TAR="openjdk-11.0.1_linux-x64_bin.tar.gz"
 JDK_SHA1SUM=2737d3c1c67d5629383d6da4c4c33b1e3427c3d6
 WHEREJAVAC=`javac --version | awk '{print$2}' | awk 'BEGIN{FS="."}{print$1}'`
@@ -48,9 +46,7 @@ function resolve_u1804 {
 
     ## Step 2: install dependencies
     echo -e "\033[33minstalling local dependencies\033[0m"
-    install libboost-filesystem1.65-dev
-    install libboost-program-options1.65-dev
-    install llvm-4.0-dev
+    install libboost-filesystem1.65.1 libboost-program-options1.65.1 libllvm4.0
 }
 
 function resolve_u1604 {
@@ -75,13 +71,12 @@ function resolve_u1604 {
     fi
 
     ## install libboost dependencies
-    install libstdc++ libc6 libgcc1
-    wget http://launchpadlibrarian.net/359703399/libboost-system1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
-    wget http://launchpadlibrarian.net/359703377/libboost-filesystem1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
-    wget http://launchpadlibrarian.net/359703390/libboost-program-options1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
-    install2 libboost-system1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
-    install2 libboost-filesystem1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
-    install2 libboost-program-options1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
+    wget https://launchpad.net/ubuntu/+archive/primary/+files/libboost-system1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb \
+      https://launchpad.net/ubuntu/+archive/primary/+files/libboost-filesystem1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb \
+      https://launchpad.net/ubuntu/+archive/primary/+files/libboost-program-options1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
+    install2 libboost-system1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb \
+      libboost-filesystem1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb \
+      libboost-program-options1.65.1_1.65.1+dfsg-0ubuntu5_amd64.deb
 
     ## install llvm-4.0
     install libllvm4.0

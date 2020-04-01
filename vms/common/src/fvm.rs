@@ -12,6 +12,7 @@ use types::ReturnData;
 type BlockNumber = u64;
 
 #[derive(Debug, PartialEq, Clone)]
+/// fastvm uses ExecStatus directly
 pub enum ExecStatus {
     Success,
     OutOfGas,

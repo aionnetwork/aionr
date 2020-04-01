@@ -19,8 +19,9 @@
  *
  ******************************************************************************/
 
+/// to provide sync info to rpc module
 pub trait SyncProvider: Send + Sync {
-    /// Get sync status
+    /// Get sync status for rpc request
     fn status(&self) -> SyncStatus;
 }
 

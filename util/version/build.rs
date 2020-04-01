@@ -21,7 +21,6 @@
  ******************************************************************************/
 
 extern crate rustc_version;
-extern crate toml;
 extern crate vergen;
 
 use std::env;

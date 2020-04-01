@@ -640,6 +640,7 @@ pub extern fn avm_has_storage(handle: *const c_void, address: *const avm_address
     ext.has_storage(addr)
 }
 
+/// assign all these callback functions to outer callback struct (see avmloader.so)
 pub fn register_callbacks() {
     unsafe {
         callbacks.create_account = avm_create_account;

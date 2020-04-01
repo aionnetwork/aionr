@@ -34,8 +34,6 @@ extern crate rlp;
 extern crate util_error as error;
 extern crate db;
 #[cfg(test)]
-extern crate logger;
-#[cfg(test)]
 extern crate blake2b;
 
 use std::{fmt, str};

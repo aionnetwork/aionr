@@ -149,8 +149,6 @@ pub trait MinerService: Send + Sync {
 
     fn get_ready_pos(&self, h: &H256) -> Option<(ClosedBlock, Vec<Bytes>)>;
 
-    fn clear_pos_pending(&self);
-
     fn get_pos_template(
         &self,
         client: &MiningBlockChainClient,

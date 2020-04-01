@@ -4,30 +4,52 @@ use types::ReturnData;
 use super::ExecStatus;
 
 #[derive(Debug)]
+/// Transaction info for avm execution
 pub struct TransactionContext {
-    /// 2 - CREATE; 3 - CALL; 4 - BALANCE_TRANSFER; 5 - GC
+    /// 1: CALL(Default), means call an avm contract
+    /// 2: CREATE, means create an avm contract
+    /// otherwise: unsupported
     pub transaction_type: u8,
+    // target address of this transaction
     pub address: Vec<u8>,
+    // sender of this transaction
     pub caller: Vec<u8>,
+    // the external sender who firstly call the avm
     pub origin: Vec<u8>,
+    // nonce of sender
     pub nonce: u64,
+    // value in *wei (10^-18 aion)*, should cover energy_limit*energy_price
     pub value: Vec<u8>,
+    // call data: it is encoded with *avm abi* spec
     pub data: Vec<u8>,
+    // gas limit of this transaction
     pub energy_limit: u64,
+    // gas price of this transaction
     pub energy_price: u64,
+    // hash of this transaction
     pub transaction_hash: Vec<u8>,
+    // deprecated(calculated inside avm now)
     pub basic_cost: u32,
+    // timestamp of this transaction
     pub transaction_timestamp: u64,
+    // timestamp of this block when it is sealed
     pub block_timestamp: u64,
+    // number of this block
     pub block_number: u64,
+    // energy limit of this block
     pub block_energy_limit: u64,
+    // coinbase of this block, who receives the block reward
     pub block_coinbase: Vec<u8>,
+    // deprecated
     pub block_previous_hash: Vec<u8>,
+    // difficulty of this block
     pub block_difficulty: Vec<u8>,
+    // call depth: maximum is 9 for avm
     pub internal_call_depth: u32,
 }
 
 impl TransactionContext {
+    /// construct a new transaction context, will be serialized, then used inside avm
     pub fn new(
         tx_hash: Vec<u8>,
         address: Address,
@@ -70,6 +92,7 @@ impl TransactionContext {
         }
     }
 
+    /// serialize transaction context
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut enc = NativeEncoder::new();
         enc.encode_byte(self.transaction_type);
@@ -99,6 +122,13 @@ impl TransactionContext {
 }
 
 #[derive(Debug, Clone)]
+/// result of transaction execution
+/// * status: refer *AvmStatusCode* below
+/// * return_data: the return value of contract call
+/// * energy_used: gas used by the vm
+/// * state_root: avm has concurrent execution ability, it will return state root on finalization.
+/// * invokable_hashes: hashes of meta transactions
+///
 pub struct TransactionResult {
     pub status: u32,
     pub return_data: Vec<u8>,
@@ -130,6 +160,7 @@ impl TransactionResult {
     }
 }
 
+/// a helper that encode data into avm
 pub struct NativeEncoder {
     buffer: Vec<u8>,
 }
@@ -176,6 +207,7 @@ impl NativeEncoder {
     pub fn to_bytes(&self) -> Vec<u8> { self.buffer.clone() }
 }
 
+/// a helper that decode data from avm
 pub struct NativeDecoder {
     bytes: Vec<u8>,
     index: usize,
@@ -263,13 +295,16 @@ impl NativeDecoder {
 #[derive(Debug, PartialEq, Clone)]
 #[repr(C)]
 pub enum AvmStatusCode {
-    //Camus: Revert status should be dealed within avm.
     Success,
+    // this transaction is rejected, will not be included in block.
     Rejected,
+    // this transaction fails to execute, will be included in block.
     Failure,
+    // avm internal error, we can not recover unless *REBOOT*.
     Fatal,
 }
 
+/// define user interfaces to get the execution status
 impl AvmStatusCode {
     pub fn is_fatal(&self) -> bool { *self == AvmStatusCode::Fatal }
 
@@ -302,6 +337,8 @@ impl Into<i32> for AvmStatusCode {
     }
 }
 
+/// ExecStatus is a common status used in vms module
+/// all kinds of vm status are mapped to ExecStatus.
 impl From<AvmStatusCode> for ExecStatus {
     fn from(status: AvmStatusCode) -> ExecStatus {
         match status {
