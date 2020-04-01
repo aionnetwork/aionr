@@ -1,5 +1,6 @@
 use std::fmt;
-use aion_types::{Address,H256};
+use aion_types::{Address,H256, U256};
+use types::ReturnData;
 use super::ExecStatus;
 
 #[derive(Debug)]
@@ -331,7 +332,7 @@ impl Into<i32> for AvmStatusCode {
             AvmStatusCode::Success => 0,
             AvmStatusCode::Rejected => 1,
             AvmStatusCode::Failure => 2,
-            AvmStatusCode::Fatal => -99,
+            AvmStatusCode::Fatal => -1,
         }
     }
 }
@@ -360,4 +361,20 @@ impl fmt::Display for AvmStatusCode {
             AvmStatusCode::Fatal => write!(f, "AvmFatal"),
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub struct ExecutionResult {
+    /// Final amount of gas left.
+    pub gas_left: U256,
+    /// Status code returned from VM
+    pub status_code: AvmStatusCode,
+    /// Return data buffer.
+    pub return_data: ReturnData,
+    /// exception / error message (empty if success)
+    pub exception: String,
+    /// state root from avm
+    pub state_root: H256,
+    /// invokable transaction hashes from avm
+    pub invokable_hashes: Vec<(H256, H256)>,
 }

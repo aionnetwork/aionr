@@ -34,7 +34,8 @@ use std::sync::Arc;
 
 use types::error::Error;
 use types::executed::{Executed, ExecutionError};
-use executive::Executive;
+use executor::fvm_exec::{Executive as FvmExecutor};
+use executor::avm_exec::{Executive as AvmExecutor};
 use factory::Factories;
 use factory::VmFactory;
 use machine::EthereumMachine as Machine;
@@ -42,10 +43,9 @@ use pod_account::*;
 use pod_state::{self, PodState};
 use receipt::Receipt;
 use db::StateDB;
-use transaction::{SignedTransaction, Action};
+use transaction::SignedTransaction;
 use types::state::state_diff::StateDiff;
 use vms::EnvInfo;
-use vms::AvmStatusCode;
 
 use aion_types::{Address, H256, U256};
 use acore_bytes::Bytes;
@@ -77,7 +77,7 @@ pub use self::substate::Substate;
 use self::account_state::{AccountEntry, AccountState};
 
 /// Used to return information about an `State::apply` operation.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ApplyOutcome {
     /// The receipt for the applied transaction.
     pub receipt: Receipt,
@@ -343,11 +343,19 @@ impl<B: Backend> State<B> {
         self.ensure_cached(a, RequireCache::None, false, |a| a.is_some())
     }
 
-    /// Determine whether an account exists and if not empty.
+    /// Determine whether an account exists and if not null.
     pub fn exists_and_not_null(&self, a: &Address) -> trie::Result<bool> {
         debug!(target: "vm", "exist and not null");
         self.ensure_cached(a, RequireCache::None, false, |a| {
             a.map_or(false, |a| !a.is_null())
+        })
+    }
+
+    /// Determine whether an account exists and if not empty.
+    pub fn exists_and_not_empty(&self, a: &Address) -> trie::Result<bool> {
+        debug!(target: "vm", "exist and not null");
+        self.ensure_cached(a, RequireCache::None, false, |a| {
+            a.map_or(false, |a| !a.is_empty())
         })
     }
 
@@ -386,6 +394,17 @@ impl<B: Backend> State<B> {
             a.as_ref()
                 .and_then(|account| account.storage_root().cloned())
         })
+    }
+
+    /// Check if an account has storage
+    pub fn has_storage(&self, a: &Address) -> bool {
+        debug!(target: "vm", "check storage empty of: {:?}", a);
+        self.ensure_cached(a, RequireCache::None, true, |a| {
+            a.as_ref()
+                .and_then(|account| account.storage_root().cloned())
+                .map_or(false, |root| root != BLAKE2B_NULL_RLP)
+        })
+        .unwrap_or(false)
     }
 
     /// Mutate storage of account `address` so that it is `value` for `key`.
@@ -667,7 +686,7 @@ impl<B: Backend> State<B> {
 
     /// Execute a given transaction, producing a receipt.
     /// This will change the state accordingly.
-    pub fn apply(
+    pub fn apply_fvm(
         &mut self,
         env_info: &EnvInfo,
         machine: &Machine,
@@ -676,9 +695,9 @@ impl<B: Backend> State<B> {
     ) -> ApplyResult
     {
         // Only fvm transactions (including precompiled) and balance transfers are executed in this function
-        let result = self.execute(env_info, machine, t, true, false, is_building_block);
+        let result = self.execute_fvm(env_info, machine, t, true, false, is_building_block);
         match result {
-            // Include the transaction into block if the execution result if ok
+            // Transaction accepted
             Ok(e) => {
                 self.commit()?;
                 let state_root = self.root().clone();
@@ -695,59 +714,12 @@ impl<B: Backend> State<B> {
                     receipt,
                 })
             }
-            // For rejected transactions...
-            Err(x) => {
-                // If building local block, reject it
-                if is_building_block {
-                    Err(From::from(x))
-                }
-                // If importing external block, accept it but do not commit state
-                else {
-                    let state_root = self.root().clone();
-                    let gas_used = match x {
-                        ExecutionError::InvalidNonce {
-                            expected: _,
-                            got: _,
-                        }
-                        | ExecutionError::NotEnoughCash {
-                            required: _,
-                            got: _,
-                        } => t.gas,
-                        ExecutionError::BlockGasLimitReached {
-                            gas_used: _,
-                            gas_limit: _,
-                            gas: _,
-                        } => {
-                            if let Action::Call(address) = t.action {
-                                match self.code(&address) {
-                                    Ok(Some(_)) => U256::from(0u64),
-                                    _ => t.gas,
-                                }
-                            } else {
-                                U256::from(0u64)
-                            }
-                        }
-                        _ => U256::from(0u64),
-                    };
-
-                    let receipt = Receipt::new(
-                        state_root,
-                        gas_used,
-                        gas_used * t.gas_price,
-                        vec![],
-                        vec![],
-                        x.to_string(),
-                    );
-                    trace!(target: "state", "Transaction receipt: {:?}", receipt);
-                    Ok(ApplyOutcome {
-                        receipt,
-                    })
-                }
-            }
+            // Transaction rejected
+            Err(x) => Err(From::from(x)),
         }
     }
 
-    pub fn apply_batch(
+    pub fn apply_avm(
         &mut self,
         env_info: &EnvInfo,
         machine: &Machine,
@@ -757,43 +729,30 @@ impl<B: Backend> State<B> {
     {
         // Only avm transactions will go here
         let exec_results =
-            self.execute_bulk(env_info, machine, txs, false, false, is_building_block);
+            self.execute_avm(env_info, machine, txs, false, false, is_building_block);
 
         let mut receipts = Vec::new();
         let mut index = 0;
         for result in exec_results {
             let outcome = match result {
+                // Transaction accepted
                 Ok(e) => {
-                    // For avm rejected transactions, reject if building local blocks, or accept if importing external blocks
-                    if e.exception == AvmStatusCode::Rejected.to_string() && is_building_block {
-                        Err(From::from(ExecutionError::Internal(
-                            "AVM rejected".to_string(),
-                        )))
-                    } else {
-                        if e.exception == AvmStatusCode::Rejected.to_string() {
-                            println!("rejected avm transaction: {:?}", txs[index].hash());
-                        }
-                        let state_root = e.state_root.clone();
-                        let receipt = Receipt::new(
-                            state_root,
-                            e.gas_used,
-                            e.transaction_fee,
-                            e.logs,
-                            e.output,
-                            e.exception,
-                        );
-                        Ok(ApplyOutcome {
-                            receipt,
-                        })
-                    }
+                    let state_root = e.state_root.clone();
+                    let receipt = Receipt::new(
+                        state_root,
+                        e.gas_used,
+                        e.transaction_fee,
+                        e.logs,
+                        e.output,
+                        e.exception,
+                    );
+                    Ok(ApplyOutcome {
+                        receipt,
+                    })
                 }
+                // Transaction rejected
                 Err(x) => {
-                    // If building local block, reject it
-                    if is_building_block {
-                        Err(From::from(x))
-                    }
-                    // If importing external block, accept it but do not commit state
-                    else {
+                    if Self::accept_transaction_exception_001(env_info, &txs[index]) {
                         let state_root = self.root().clone();
                         let receipt = Receipt::new(
                             state_root,
@@ -803,10 +762,11 @@ impl<B: Backend> State<B> {
                             vec![],
                             x.to_string(),
                         );
-                        trace!(target: "state", "Transaction receipt: {:?}", receipt);
                         Ok(ApplyOutcome {
                             receipt,
                         })
+                    } else {
+                        Err(From::from(x))
                     }
                 }
             };
@@ -819,7 +779,7 @@ impl<B: Backend> State<B> {
         return receipts;
     }
 
-    fn execute_bulk(
+    fn execute_avm(
         &mut self,
         env_info: &EnvInfo,
         machine: &Machine,
@@ -829,11 +789,11 @@ impl<B: Backend> State<B> {
         is_building_block: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
-        let mut e = Executive::new(self, env_info, machine);
+        let mut e = AvmExecutor::new(self, env_info, machine);
 
         match virt {
-            true => e.transact_virtual_bulk(txs, check_nonce),
-            false => e.transact_bulk(txs, false, is_building_block),
+            true => e.transact_virtual(txs, check_nonce),
+            false => e.transact(txs, false, is_building_block),
         }
     }
 
@@ -841,7 +801,7 @@ impl<B: Backend> State<B> {
     //
     // `virt` signals that we are executing outside of a block set and restrictions like
     // gas limits and gas costs should be lifted.
-    fn execute(
+    fn execute_fvm(
         &mut self,
         env_info: &EnvInfo,
         machine: &Machine,
@@ -851,7 +811,7 @@ impl<B: Backend> State<B> {
         is_building_block: bool,
     ) -> Result<Executed, ExecutionError>
     {
-        let mut e = Executive::new(self, env_info, machine);
+        let mut e = FvmExecutor::new(self, env_info, machine);
 
         match virt {
             true => e.transact_virtual(t, check_nonce),
@@ -1196,6 +1156,15 @@ impl<B: Backend> State<B> {
                 _ => panic!("Required account must always exist; qed"),
             }
         }))
+    }
+
+    // Cover the historical transaction exception for AKI-569
+    fn accept_transaction_exception_001(env_info: &EnvInfo, tx: &SignedTransaction) -> bool {
+        let block_number = env_info.number;
+        let hash = tx.hash();
+        (block_number == 4735401 || block_number == 4735403 || block_number == 4735405)
+            && hash
+                == &H256::from("bc7422952fb73d0cab9ca96bb1489857674342e9e2bdec989651a6f691814061")
     }
 }
 

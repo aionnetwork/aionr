@@ -1,5 +1,5 @@
 [aion]
-chain = "amity/amity.json"
+chain = "resources/amity.json"
 
 [account]
 stake_contract = "0xa056337bb14e818f3f53e13ab0d93b6539aa570cba91ce65c716058241989be9"
@@ -7,7 +7,7 @@ stake_contract = "0xa056337bb14e818f3f53e13ab0d93b6539aa570cba91ce65c71605824198
 [network]
 max_peers = 32
 net_id = 27
-local_node = "p2p://00000000-0000-0000-0000-000000000000@0.0.0.0:30303"
+local_node = "p2p://53e4d87b-2dd9-4338-82e7-2b3e308dc46d@0.0.0.0:30303"
 boot_nodes = [
 "p2p://a8011211-8c7e-496c-9c4e-c89318280274@13.82.30.156:30303",
 "p2p://a8021211-729a-4584-86f1-e19ab97cf9ce@13.69.15.78:30303",
@@ -29,4 +29,4 @@ disable = true
 author = "0xa07e185919beef1e0a79fea78fcfabc24927c5067d758e514ad74b905a2bf137"
 
 [log]
-config = "log_config.yaml"
+config = "resources/log_config.yaml"

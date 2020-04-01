@@ -21,48 +21,26 @@
  ******************************************************************************/
 
 //! Transaction Execution environment.
-use std::thread;
-use std::sync::mpsc::{channel, Sender};
-use std::clone::Clone;
 use std::sync::{Arc, Mutex};
-use std::collections::{HashSet, HashMap};
+use std::collections::HashSet;
+
 use blake2b::{blake2b};
 use aion_types::{H256, U256, U512, Address};
-use vms::{ActionParams, ActionValue, CallType, EnvInfo, ExecutionResult, ExecStatus, ReturnData, ParamsType};
+use vms::{ActionParams, ActionValue, CallType, EnvInfo, FvmExecutionResult as ExecutionResult, ExecStatus, ReturnData, ParamsType};
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use types::error::ExecutionError;
-use vms::VMType;
 use vms::constants::{MAX_CALL_DEPTH, GAS_CALL_MAX, GAS_CREATE_MAX};
-
-use externalities::*;
+use executor::fvm_externality::*;
 use transaction::{Action, SignedTransaction};
 use crossbeam;
-pub use types::executed::Executed;
+use types::executed::Executed;
 use precompiled::builtin::{BuiltinExtImpl, BuiltinContext};
-
-use kvdb::{DBTransaction};
-
-#[cfg(debug_assertions)]
-/// Roughly estimate what stack size each level of evm depth will use. (Debug build)
-const STACK_SIZE_PER_DEPTH: usize = 128 * 1024;
-
-#[cfg(not(debug_assertions))]
-/// Roughly estimate what stack size each level of evm depth will use.
-const STACK_SIZE_PER_DEPTH: usize = 128 * 1024;
-
-#[cfg(debug_assertions)]
-// /// Entry stack overhead prior to execution. (Debug build)
-const STACK_SIZE_ENTRY_OVERHEAD: usize = 100 * 1024;
-
-#[cfg(not(debug_assertions))]
-/// Entry stack overhead prior to execution.
-const STACK_SIZE_ENTRY_OVERHEAD: usize = 20 * 1024;
+use super::params::*;
 
 /// VM lock
 lazy_static! {
     static ref VM_LOCK: Mutex<bool> = Mutex::new(false);
-    static ref AVM_LOCK: Mutex<bool> = Mutex::new(false);
 }
 
 /// Returns new address created from address, nonce
@@ -113,14 +91,14 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
     }
 
     /// Creates `Externalities` from `Executive`.
-    pub fn as_externalities<'any>(
+    pub(crate) fn as_externalities<'any>(
         &'any mut self,
         origin_info: Vec<OriginInfo>,
         substate: &'any mut Substate,
-    ) -> Externalities<'any, B>
+    ) -> FvmExternalities<'any, B>
     {
         let kvdb = self.state.export_kvdb().clone();
-        Externalities::new(
+        FvmExternalities::new(
             self.state,
             self.info,
             self.machine,
@@ -128,22 +106,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             origin_info,
             substate,
             kvdb,
-        )
-    }
-
-    pub fn as_avm_externalities<'any>(
-        &'any mut self,
-        substates: &'any mut [Substate],
-        tx_chnnl: Sender<i32>,
-    ) -> AVMExternalities<'any, B>
-    {
-        AVMExternalities::new(
-            self.state,
-            self.info,
-            self.machine,
-            self.depth,
-            substates,
-            tx_chnnl,
         )
     }
 
@@ -166,176 +128,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         }
 
         self.transact(t, check_nonce, true, false)
-    }
-
-    pub fn transact_virtual_bulk(
-        &'a mut self,
-        txs: &[SignedTransaction],
-        _check_nonce: bool,
-    ) -> Vec<Result<Executed, ExecutionError>>
-    {
-        self.transact_bulk(txs, true, false)
-    }
-
-    // TIPS: carefully deal with errors in parallelism
-    pub fn transact_bulk(
-        &'a mut self,
-        txs: &[SignedTransaction],
-        is_local_call: bool,
-        is_building_block: bool,
-    ) -> Vec<Result<Executed, ExecutionError>>
-    {
-        let _vm_lock = AVM_LOCK.lock().unwrap();
-        let mut vm_params = Vec::new();
-
-        for t in txs {
-            let sender = t.sender();
-            let nonce = t.nonce;
-
-            let init_gas = t.gas;
-
-            if is_local_call {
-                let sender = t.sender();
-                let balance = self.state.balance(&sender).unwrap_or(0.into());
-                let needed_balance = t.value.saturating_add(t.gas.saturating_mul(t.gas_price));
-                if balance < needed_balance {
-                    // give the sender a sufficient balance
-                    let _ =
-                        self.state
-                            .add_balance(&sender, &(needed_balance), CleanupMode::NoEmpty);
-                }
-                debug!(target: "vm", "sender: {:?}, balance: {:?}", sender, self.state.balance(&sender).unwrap_or(0.into()));
-            } else if is_building_block && self.info.gas_used + t.gas > self.info.gas_limit {
-                // check gas limit
-                return vec![Err(From::from(ExecutionError::BlockGasLimitReached {
-                    gas_limit: self.info.gas_limit,
-                    gas_used: self.info.gas_used,
-                    gas: t.gas,
-                }))];
-            }
-
-            // Transactions are now handled in different ways depending on whether it's
-            // action type is Create or Call.
-            let params = match t.action {
-                Action::Create => {
-                    ActionParams {
-                        code_address: Address::default(),
-                        code_hash: None,
-                        address: Address::default(),
-                        sender: sender.clone(),
-                        origin: sender.clone(),
-                        gas: init_gas,
-                        gas_price: t.gas_price,
-                        value: ActionValue::Transfer(t.value),
-                        code: Some(Arc::new(t.data.clone())),
-                        data: None,
-                        call_type: CallType::None,
-                        transaction_hash: t.hash().to_owned(),
-                        original_transaction_hash: t.hash().to_owned(),
-                        nonce: nonce.low_u64(),
-                        static_flag: false,
-                        params_type: ParamsType::Embedded,
-                    }
-                }
-                Action::Call(ref address) => {
-                    let call_type = match self.state.code(&address).unwrap().is_some() {
-                        true => CallType::Call,
-                        false => CallType::BulkBalance,
-                    };
-
-                    ActionParams {
-                        code_address: address.clone(),
-                        address: address.clone(),
-                        sender: sender.clone(),
-                        origin: sender.clone(),
-                        gas: init_gas,
-                        gas_price: t.gas_price,
-                        value: ActionValue::Transfer(t.value),
-                        code: self.state.code(address).unwrap(),
-                        code_hash: Some(self.state.code_hash(address).unwrap()),
-                        data: Some(t.data.clone()),
-                        call_type,
-                        transaction_hash: t.hash().to_owned(),
-                        original_transaction_hash: t.hash().to_owned(),
-                        nonce: nonce.low_u64(),
-                        params_type: ParamsType::Embedded,
-                        static_flag: false,
-                    }
-                }
-            };
-            vm_params.push(params);
-        }
-
-        let mut substates = vec![Substate::new(); vm_params.len()];
-        let results = self.exec_avm(
-            vm_params,
-            &mut substates.as_mut_slice(),
-            is_local_call,
-            self.machine.params().unity_update,
-        );
-
-        self.avm_finalize(txs, substates.as_slice(), results)
-    }
-
-    fn exec_avm(
-        &mut self,
-        params: Vec<ActionParams>,
-        unconfirmed_substate: &mut [Substate],
-        is_local_call: bool,
-        unity_update: Option<u64>,
-    ) -> Vec<ExecutionResult>
-    {
-        let local_stack_size = ::io::LOCAL_STACK_SIZE.with(|sz| sz.get());
-        let depth_threshold =
-            local_stack_size.saturating_sub(STACK_SIZE_ENTRY_OVERHEAD) / STACK_SIZE_PER_DEPTH;
-
-        // start a new thread to listen avm signal
-        let (tx, rx) = channel();
-        thread::spawn(move || {
-            let mut signal = rx.recv().expect("Unable to receive from channel");
-            while signal >= 0 {
-                match signal {
-                    0 => debug!(target: "vm", "AVMExec: commit state"),
-                    1 => debug!(target: "vm", "AVMExec: get state"),
-                    _ => println!("unknown signal"),
-                }
-                signal = rx.recv().expect("Unable to receive from channel");
-            }
-
-            trace!(target: "vm", "received {:?}, kill channel", signal);
-        });
-
-        // Ordinary execution - keep VM in same thread
-        debug!(target: "vm", "depth threshold = {:?}", depth_threshold);
-        if self.depth != depth_threshold {
-            let mut vm_factory = self.state.vm_factory();
-            // consider put global callback in ext
-            let mut ext = self.as_avm_externalities(unconfirmed_substate, tx.clone());
-            //TODO: make create/exec compatible with fastvm
-            let vm = vm_factory.create(VMType::AVM);
-            return vm.exec(params, &mut ext, is_local_call, unity_update);
-        }
-
-        //Start in new thread with stack size needed up to max depth
-        crossbeam::scope(|scope| {
-            let mut vm_factory = self.state.vm_factory();
-
-            let mut ext = self.as_avm_externalities(unconfirmed_substate, tx.clone());
-
-            scope
-                .builder()
-                .stack_size(::std::cmp::max(
-                    (MAX_CALL_DEPTH as usize).saturating_sub(depth_threshold)
-                        * STACK_SIZE_PER_DEPTH,
-                    local_stack_size,
-                ))
-                .spawn(move || {
-                    let vm = vm_factory.create(VMType::AVM);
-                    vm.exec(params, &mut ext, is_local_call, unity_update)
-                })
-                .expect("Sub-thread creation cannot fail; the host might run out of resources; qed")
-        })
-        .join()
     }
 
     /// This function should be used to execute transaction.
@@ -506,13 +298,9 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
             // consider put global callback in ext
             let mut ext = self.as_externalities(OriginInfo::from(&[&params]), unconfirmed_substate);
             //TODO: make create/exec compatible with fastvm
-            let vm = vm_factory.create(VMType::FastVM);
+            let mut vm = vm_factory.create_fvm();
             // fastvm local call flag is unused
-            return vm
-                .exec(vec![params], &mut ext, false, None)
-                .first()
-                .unwrap()
-                .clone();
+            return vm.exec(params, &mut ext).clone();
         }
 
         //Start in new thread with stack size needed up to max depth
@@ -532,11 +320,8 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     local_stack_size,
                 ))
                 .spawn(move || {
-                    let vm = vm_factory.create(VMType::FastVM);
-                    vm.exec(vec![params], &mut ext, false, None)
-                        .first()
-                        .unwrap()
-                        .clone()
+                    let mut vm = vm_factory.create_fvm();
+                    vm.exec(params, &mut ext).clone()
                 })
                 .expect("Sub-thread creation cannot fail; the host might run out of resources; qed")
         })
@@ -703,40 +488,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         return res;
     }
 
-    #[cfg(test)]
-    pub fn create_avm(
-        &mut self,
-        params: Vec<ActionParams>,
-        _substates: &mut [Substate],
-    ) -> Vec<ExecutionResult>
-    {
-        self.state.checkpoint();
-
-        let mut unconfirmed_substates = vec![Substate::new(); params.len()];
-
-        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice(), false, None);
-
-        res
-    }
-
-    #[cfg(test)]
-    pub fn call_avm(
-        &mut self,
-        params: Vec<ActionParams>,
-        _substates: &mut [Substate],
-    ) -> Vec<ExecutionResult>
-    {
-        self.state.checkpoint();
-
-        let mut unconfirmed_substates = vec![Substate::new(); params.len()];
-
-        let res = self.exec_avm(params, unconfirmed_substates.as_mut_slice(), false, None);
-
-        println!("{:?}", unconfirmed_substates);
-
-        res
-    }
-
     /// Creates contract with given contract params.
     /// NOTE. It does not finalize the transaction (doesn't do refunds, nor suicides).
     /// Modifies the substate.
@@ -749,18 +500,19 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         if self
             .state
-            .exists_and_not_null(&params.address)
+            .exists_and_not_empty(&params.address)
             .unwrap_or(true)
         {
             // AKI-83: allow internal creation of contract which has balance and no code.
             let code = self.state.code(&params.address).unwrap_or(None);
+            let nonce = self.state.nonce(&params.address).unwrap_or(0.into());
+            let has_storage = self.state.has_storage(&params.address);
             let aion040_fork = self
                 .machine
                 .params()
                 .monetary_policy_update
                 .map_or(false, |v| self.info.number >= v);
-            if !aion040_fork || code.is_some() {
-                //(self.depth >= 1 && code.is_some()) || self.depth == 0 {
+            if !aion040_fork || code.is_some() || nonce != U256::from(0) || has_storage {
                 return ExecutionResult {
                     gas_left: 0.into(),
                     status_code: ExecStatus::Failure,
@@ -821,121 +573,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         self.enact_result(&res, substate, unconfirmed_substate);
         debug!(target: "vm", "create res = {:?}", res);
         res
-    }
-
-    fn avm_finalize(
-        &mut self,
-        txs: &[SignedTransaction],
-        substates: &[Substate],
-        results: Vec<ExecutionResult>,
-    ) -> Vec<Result<Executed, ExecutionError>>
-    {
-        assert_eq!(txs.len(), results.len());
-
-        let mut final_results = Vec::new();
-
-        let mut total_gas_used: U256 = U256::from(0);
-        let mut multiple_sets: HashMap<H256, HashSet<H256>> = HashMap::new();
-        for idx in 0..txs.len() {
-            let result = results.get(idx).unwrap().clone();
-            let t = txs[idx].clone();
-            let substate = substates[idx].clone();
-            // perform suicides
-            for address in &substate.suicides {
-                self.state.kill_account(address);
-            }
-
-            let gas_used = t.gas - result.gas_left;
-
-            //TODO: check whether avm has already refunded
-            //let refund_value = gas_left * t.gas_price;
-            let fees_value = gas_used * t.gas_price;
-
-            let mut touched = HashSet::new();
-            for account in substate.touched {
-                touched.insert(account);
-            }
-
-            if gas_used + total_gas_used + self.info.gas_used > self.info.gas_limit {
-                final_results.push(Err(ExecutionError::BlockGasLimitReached {
-                    gas_limit: self.info.gas_limit,
-                    gas_used: self.info.gas_used + total_gas_used,
-                    gas: t.gas,
-                }));
-            } else {
-                total_gas_used = total_gas_used + gas_used;
-                final_results.push(Ok(Executed {
-                    exception: result.exception,
-                    gas: t.gas,
-                    gas_used: gas_used,
-                    refunded: result.gas_left,
-                    cumulative_gas_used: self.info.gas_used + gas_used,
-                    logs: substate.logs,
-                    contracts_created: substate.contracts_created,
-                    output: result.return_data.to_vec(),
-                    state_diff: None,
-                    transaction_fee: fees_value,
-                    touched: touched,
-                    state_root: result.state_root,
-                }))
-            }
-
-            // store Meta transaction hashes
-            // encode as: b"alias" + hash + hash + ...
-            for (alias, tx_hash) in result.invokable_hashes {
-                let mut set = if let Some(ref mut set) = multiple_sets.get_mut(&alias) {
-                    set.clone()
-                } else {
-                    let mut set = HashSet::new();
-                    match self
-                        .state
-                        .export_kvdb()
-                        .get(::db::COL_EXTRA, &alias[..])
-                        .unwrap()
-                    {
-                        Some(invoked_set) => {
-                            Self::decode_alias_and_set(&invoked_set[..], &mut set);
-                        }
-                        None => {}
-                    }
-                    set
-                };
-
-                set.insert(tx_hash);
-                multiple_sets.insert(alias, set);
-            }
-        }
-
-        debug!(target: "vm", "meta alias sets: {:?}", multiple_sets);
-
-        // store alias sets
-        for (k, set) in multiple_sets.drain() {
-            // Step 1: encode alias set
-            let mut alias_data = Vec::new();
-            alias_data.append(&mut b"alias".to_vec());
-            for mut hash in set {
-                alias_data.append(&mut hash[..].to_vec());
-            }
-
-            // Step 2: write into database
-            let mut batch = DBTransaction::new();
-            batch.put(::db::COL_EXTRA, &k, alias_data.as_slice());
-            self.state
-                .export_kvdb()
-                .write(batch)
-                .expect("EXTRA DB write failed");
-        }
-
-        return final_results;
-    }
-
-    fn decode_alias_and_set(raw_set: &[u8], set: &mut HashSet<H256>) {
-        assert!(raw_set.len() >= 5);
-        let mut index = 5;
-        while index <= raw_set.len() - 32 {
-            set.insert(raw_set[index..(index + 32)].into());
-            index += 32;
-        }
     }
 
     /// Finalizes the transaction (does refunds and suicides).

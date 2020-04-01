@@ -118,8 +118,7 @@ mod db;
 mod factory;
 mod cache_manager;
 mod precompiled;
-mod executive;
-mod externalities;
+mod executor;
 mod types;
 
 #[cfg(test)]
@@ -137,7 +136,7 @@ pub use types::{
     error::BlockError
 };
 
-pub use executive::contract_address;
+pub use executor::fvm_exec::contract_address;
 
 #[cfg(test)]
 use tests::common::helpers;

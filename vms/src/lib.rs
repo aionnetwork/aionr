@@ -33,7 +33,7 @@ extern crate log;
 mod factory;
 mod vmtype;
 
-pub use factory::{Factory, FastVMFactory, AVMFactory};
+pub use factory::{FastVMFactory, AVMFactory};
 pub use vmtype::VMType;
 pub use fastvm::vm::{self, Error};
 pub use fastvm::basetypes::constants;
