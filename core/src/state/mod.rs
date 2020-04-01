@@ -343,11 +343,19 @@ impl<B: Backend> State<B> {
         self.ensure_cached(a, RequireCache::None, false, |a| a.is_some())
     }
 
-    /// Determine whether an account exists and if not empty.
+    /// Determine whether an account exists and if not null.
     pub fn exists_and_not_null(&self, a: &Address) -> trie::Result<bool> {
         debug!(target: "vm", "exist and not null");
         self.ensure_cached(a, RequireCache::None, false, |a| {
             a.map_or(false, |a| !a.is_null())
+        })
+    }
+
+    /// Determine whether an account exists and if not empty.
+    pub fn exists_and_not_empty(&self, a: &Address) -> trie::Result<bool> {
+        debug!(target: "vm", "exist and not null");
+        self.ensure_cached(a, RequireCache::None, false, |a| {
+            a.map_or(false, |a| !a.is_empty())
         })
     }
 
@@ -386,6 +394,17 @@ impl<B: Backend> State<B> {
             a.as_ref()
                 .and_then(|account| account.storage_root().cloned())
         })
+    }
+
+    /// Check if an account has storage
+    pub fn has_storage(&self, a: &Address) -> bool {
+        debug!(target: "vm", "check storage empty of: {:?}", a);
+        self.ensure_cached(a, RequireCache::None, true, |a| {
+            a.as_ref()
+                .and_then(|account| account.storage_root().cloned())
+                .map_or(false, |root| root != BLAKE2B_NULL_RLP)
+        })
+        .unwrap_or(false)
     }
 
     /// Mutate storage of account `address` so that it is `value` for `key`.

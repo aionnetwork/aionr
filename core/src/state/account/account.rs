@@ -542,13 +542,7 @@ impl VMAccount for AionVMAccount {
         }
     }
 
-    fn is_empty(&self) -> bool {
-        assert!(
-            self.storage_is_clean(),
-            "Account::is_empty() may only legally be called when storage is clean."
-        );
-        self.is_null() && self.storage_root == BLAKE2B_NULL_RLP
-    }
+    fn is_empty(&self) -> bool { self.is_null() && self.storage_root == BLAKE2B_NULL_RLP }
 
     fn is_null(&self) -> bool {
         debug!(target: "vm", "check null: balance = {:?}, nonce = {:?}, code_hash = {:?}",

@@ -214,6 +214,12 @@ public class NativeKernelInterface implements IExternalState {
 
     @Override
     public byte[] getTransformedCode(AionAddress address) {
-        return Loader.getTransformedCode(handle, address.toByteArray(), (byte)0x2);
+        return Loader.getTransformedCode(handle, address.toByteArray(), (byte)0x02);
     }
+
+    @Override
+    public boolean hasStorage(AionAddress address) {
+        return Loader.hasStorage(handle, address.toByteArray());
+    }
+
 }

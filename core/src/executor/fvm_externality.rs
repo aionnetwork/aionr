@@ -547,4 +547,6 @@ where B: StateBackend
     fn set_objectgraph(&mut self, _address: &Address, _data: Bytes) { unimplemented!() }
 
     fn remove_storage(&mut self, _address: &Address, _data: Bytes) { unimplemented!() }
+
+    fn has_storage(&mut self, address: &Address) -> bool { self.state.has_storage(address) }
 }

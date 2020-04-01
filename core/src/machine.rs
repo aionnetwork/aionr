@@ -154,9 +154,16 @@ impl EthereumMachine {
     /// Get the general parameters of the chain.
     pub fn params(&self) -> &CommonParams { &self.params }
 
+    #[cfg(test)]
     /// set monetary policy
     pub fn set_monetary(&mut self, block_number: u64) {
         self.params.monetary_policy_update = Some(block_number);
+    }
+
+    #[cfg(test)]
+    /// set unity hard fork
+    pub fn set_unity(&mut self, block_number: u64) {
+        self.params.unity_update = Some(block_number);
     }
 
     /// Builtin-contracts for the chain..

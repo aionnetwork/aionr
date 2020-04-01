@@ -255,6 +255,8 @@ where B: StateBackend
             .expect("Fatal error during removing storage");
     }
 
+    fn has_storage(&mut self, a: &Address) -> bool { self.state.lock().unwrap().has_storage(a) }
+
     fn kill_account(&mut self, a: &Address) { self.state.lock().unwrap().kill_account(a) }
 
     fn inc_balance(&mut self, a: &Address, value: &U256) {

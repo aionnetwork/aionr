@@ -40,6 +40,9 @@ use types::executed::Executed;
 use kvdb::{DBTransaction};
 use super::params::*;
 
+#[cfg(test)]
+use header::BlockNumber;
+
 /// VM lock
 lazy_static! {
     static ref AVM_LOCK: Mutex<bool> = Mutex::new(false);
@@ -268,13 +271,14 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         &mut self,
         params: Vec<ActionParams>,
         _substates: &mut [Substate],
+        unity: Option<BlockNumber>,
     ) -> Vec<ExecutionResult>
     {
         self.state.checkpoint();
 
         let mut unconfirmed_substates = vec![Substate::new(); params.len()];
 
-        let res = self.exec_vm(params, unconfirmed_substates.as_mut_slice(), false, None);
+        let res = self.exec_vm(params, unconfirmed_substates.as_mut_slice(), false, unity);
 
         println!("{:?}", unconfirmed_substates);
 

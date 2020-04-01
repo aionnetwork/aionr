@@ -62,4 +62,6 @@ public class Loader {
     public static native boolean edverify(byte[] data, byte[] data1, byte[] data2);
 
     public static native void removeStorage(long handle, byte[] address, byte[] key);
+
+    public static native boolean hasStorage(long handle, byte[] address);
 }

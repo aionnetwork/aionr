@@ -137,6 +137,9 @@ pub trait Ext {
     // avm remove storage
     fn remove_storage(&mut self, a: &Address, key: Vec<u8>);
 
+    // check if an address has non-empty storage
+    fn has_storage(&mut self, a: &Address) -> bool;
+
     /// avm create account
     fn create_account(&mut self, address: &Address);
 

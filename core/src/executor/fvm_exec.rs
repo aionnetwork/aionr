@@ -500,18 +500,19 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         if self
             .state
-            .exists_and_not_null(&params.address)
+            .exists_and_not_empty(&params.address)
             .unwrap_or(true)
         {
             // AKI-83: allow internal creation of contract which has balance and no code.
             let code = self.state.code(&params.address).unwrap_or(None);
+            let nonce = self.state.nonce(&params.address).unwrap_or(0.into());
+            let has_storage = self.state.has_storage(&params.address);
             let aion040_fork = self
                 .machine
                 .params()
                 .monetary_policy_update
                 .map_or(false, |v| self.info.number >= v);
-            if !aion040_fork || code.is_some() {
-                //(self.depth >= 1 && code.is_some()) || self.depth == 0 {
+            if !aion040_fork || code.is_some() || nonce != U256::from(0) || has_storage {
                 return ExecutionResult {
                     gas_left: 0.into(),
                     status_code: ExecStatus::Failure,
