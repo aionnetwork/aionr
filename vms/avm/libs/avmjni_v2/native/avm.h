@@ -168,6 +168,8 @@ typedef bool (*avm_edveryfy_fn)(const struct avm_bytes *data, const struct avm_b
 
 typedef void (*avm_remove_storage_fn)(const void *handle, const struct avm_address *address, const struct avm_bytes *data);
 
+typedef bool (*avm_has_storage_fn)(const void *handle, const struct avm_address *address);
+
 /**
  * A data structure holds all the callback function pointers.
  */
@@ -198,6 +200,7 @@ struct avm_callbacks {
     avm_keccak256_fn            keccak256;
     avm_edveryfy_fn             verify_ed25519;
     avm_remove_storage_fn       remove_storage;
+    avm_has_storage_fn          has_storage;
 };
 
 typedef struct avm_bytes (*create_contract_fn)(const struct avm_address *address, const uint64_t nonce);

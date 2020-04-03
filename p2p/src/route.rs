@@ -60,17 +60,21 @@ impl Version {
     }
 }
 
-/// p2p routing module code, u8
+/// p2p routing module code
 ///
-/// routing modules defined here only for p2p layer which is 0u8
+/// routing modules enum for task distribution
 #[derive(Debug, PartialEq)]
 pub enum Module {
+    /// P2p module
     P2P,
+    /// Sync module
     SYNC,
+    /// Unknown module
     UNKNOWN,
 }
 
 impl Module {
+    /// convert to u8, 0u8 for P2P, 1u8 for SYNC
     pub fn value(&self) -> u8 {
         match self {
             Module::P2P => 0u8,
@@ -78,6 +82,7 @@ impl Module {
             Module::UNKNOWN => 0xffu8,
         }
     }
+    /// convert from u8, 0u8 for P2P, 1u8 for SYNC
     pub fn from(value: u8) -> Module {
         match value {
             0 => Module::P2P,
@@ -87,7 +92,7 @@ impl Module {
     }
 }
 
-/// p2p routing action code, u8
+/// p2p routing action code
 ///
 /// routing actions defined here only for p2p layer
 #[derive(Debug, PartialEq)]

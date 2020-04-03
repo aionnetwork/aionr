@@ -18,6 +18,41 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
+//! Aionr client application.
+//!
+//! # core
+//! * [acore](../acore/index.html) : Aionr core, the dispatch center of each module manages the
+//! entire life process of blocks and txs.
+//!
+//! # db
+//! * [db](../db/index.html) : Blockchain key value database implementation.
+//! * [journaldb](../journaldb/index.html) JournalDB interface and implementation.
+//!
+//! # json
+//! * [ajson](../ajson/index.html) : Json converter, for loading genesis spec.
+//!
+//! # keystore
+//! * [key](../key/index.html) : Keys generator and validator.
+//! * [keychain](../keychain/index.html) : Account secret store.
+//!
+//! # machine
+//! * [aion_machine](../aion_machine/index.html) : Generalization of types surrounding
+//! blockchain-suitable state machines.
+//!
+//! # p2p
+//! * [p2p](../p2p/index.html) : peer to peer library support aion wire protocol.
+//!
+//! # rpc
+//! * [aion_rpc](../aion_rpc/index.html) : Aionr core api daemon for aion binary api protocol and
+//! web3 protocol client.
+//!
+//! # vms
+//! Contract VM module for interacting with FastVM and AVM.
+//! * [avm](../avm/index.html) : Aion Virtual Machine for java contract
+//! * [fastvm](../fastvm/index.html) : Fast Virtual Machine for solidity contract
+//!
+//! # util
+//! Aionr core common library.
 
 #![warn(unused_extern_crates)]
 
@@ -81,11 +116,13 @@ use cli::Args;
 use configuration::{Cmd, Execute, Configuration};
 use logger::{setup_compression_log};
 
+/// execution result to post
 enum PostExecutionAction {
     Print(String),
     Quit,
 }
 
+/// setup logger and excute command
 fn execute(command: Execute) -> Result<PostExecutionAction, String> {
     let _ = setup_compression_log(command.logger.config)?;
 
@@ -104,6 +141,7 @@ fn execute(command: Execute) -> Result<PostExecutionAction, String> {
     }
 }
 
+/// Read command line arguments and execute the command
 fn start() -> Result<PostExecutionAction, String> {
     let args: Vec<String> = env::args().collect();
     let conf = Configuration::parse(&args).unwrap_or_else(|e| e.exit());
@@ -111,6 +149,7 @@ fn start() -> Result<PostExecutionAction, String> {
     execute(cmd)
 }
 
+/// run kernel
 fn main() {
     panic_hook::set();
     let res = match start() {

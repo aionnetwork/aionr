@@ -24,7 +24,6 @@
 
 use std::fmt;
 use serde::{Serialize, Serializer};
-use ansi_term::Colour;
 use bytes::ToPretty;
 use aion_types::{U256, H256, H520, H768, Address};
 
@@ -103,7 +102,7 @@ impl fmt::Display for SignRequest {
             f,
             "sign 0x{} with {}",
             self.data.0.pretty(),
-            Colour::White.bold().paint(format!("0x{:?}", self.address)),
+            format!("0x{:?}", self.address),
         )
     }
 }
@@ -129,11 +128,7 @@ impl From<(Address, Bytes)> for DecryptRequest {
 
 impl fmt::Display for DecryptRequest {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(
-            f,
-            "decrypt data with {}",
-            Colour::White.bold().paint(format!("0x{:?}", self.address)),
-        )
+        write!(f, "decrypt data with {}", format!("0x{:?}", self.address),)
     }
 }
 

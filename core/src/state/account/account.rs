@@ -86,11 +86,6 @@ impl From<BasicAccount> for AionVMAccount {
 }
 
 impl AionVMAccount {
-    #[cfg(test)]
-    fn mark_as_avm(&mut self) { self.account_type = AccType::AVM; }
-
-    #[cfg(test)]
-    fn mark_as_fvm(&mut self) { self.account_type = AccType::FVM; }
     pub fn new_contract(balance: U256, nonce: U256) -> Self {
         Self {
             balance,
@@ -184,6 +179,7 @@ impl AionVMAccount {
         match trie_db.get_with(address, Self::from_rlp) {
             Ok(account) => {
                 account.map(|mut account| {
+                    // Initialize account code, transformed code (avm only) and object graph (avm only)
                     account.update_account_cache(
                         address,
                         require_cache,
@@ -191,6 +187,8 @@ impl AionVMAccount {
                         account_db_hashstore,
                         kvdb,
                     );
+                    // Initialize address hash
+                    account.address_hash(address);
                     account
                 })
             }
@@ -279,6 +277,12 @@ impl AionVMAccount {
     }
 
     pub fn set_empty_but_commit(&mut self) { self.empty_but_commit = true; }
+
+    #[cfg(test)]
+    pub fn mark_as_avm(&mut self) { self.account_type = AccType::AVM; }
+
+    #[cfg(test)]
+    pub fn mark_as_fvm(&mut self) { self.account_type = AccType::FVM; }
 }
 
 impl VMAccount for AionVMAccount {
@@ -533,13 +537,7 @@ impl VMAccount for AionVMAccount {
         }
     }
 
-    fn is_empty(&self) -> bool {
-        assert!(
-            self.storage_is_clean(),
-            "Account::is_empty() may only legally be called when storage is clean."
-        );
-        self.is_null() && self.storage_root == BLAKE2B_NULL_RLP
-    }
+    fn is_empty(&self) -> bool { self.is_null() && self.storage_root == BLAKE2B_NULL_RLP }
 
     fn is_null(&self) -> bool {
         debug!(target: "vm", "check null: balance = {:?}, nonce = {:?}, code_hash = {:?}",
@@ -730,10 +728,9 @@ impl VMAccount for AionVMAccount {
                 }
             }
         }
-
         if self.account_type == AccType::AVM && !self.is_transformed_cached() {
             // update transformed code cache
-            let hash = blake2b(self.address_hash.get().unwrap());
+            let hash = blake2b(self.address_hash(a));
             match state_db.get_cached_code(&hash) {
                 Some(code) => self.cache_given_transformed_code(code),
                 None => {

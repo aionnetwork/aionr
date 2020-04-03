@@ -533,3 +533,15 @@ JNIEXPORT void JNICALL Java_org_aion_avm_loader_Loader_removeStorage
   struct avm_bytes input = load_bytes(env, data);
   callbacks.remove_storage((void *)handle, &a, &input);
 }
+
+/*
+ * Class:     org_aion_avm_loader_Loader
+ * Method:    hasStorage
+ * Signature: (J[B[B)Z
+ */
+JNIEXPORT jboolean JNICALL Java_org_aion_avm_loader_Loader_hasStorage
+  (JNIEnv *env, jclass clazz, jlong handle, jbyteArray address)
+{
+  struct avm_address a = load_address(env, address);
+  return callbacks.has_storage((void*)handle, &a);
+}

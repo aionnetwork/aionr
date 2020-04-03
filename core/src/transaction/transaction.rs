@@ -56,7 +56,7 @@ pub const SYSTEM_ADDRESS: Address = H256([
 ]);
 
 pub const DEFAULT_TRANSACTION_TYPE: U256 = U256([1, 0, 0, 0]);
-pub const AVM_TRANSACTION_TYPE: U256 = U256([2, 0, 0, 0]);
+pub const AVM_CREATION_TYPE: U256 = U256([2, 0, 0, 0]);
 
 pub const BEACON_HASH_EXTENSION: u8 = 1;
 
@@ -462,7 +462,7 @@ impl UnverifiedTransaction {
     {
         match has_fork {
             Some(ref fork)
-                if *fork < current_blk && !(self.transaction_type == AVM_TRANSACTION_TYPE
+                if *fork < current_blk && !(self.transaction_type == AVM_CREATION_TYPE
                     || self.transaction_type == DEFAULT_TRANSACTION_TYPE) =>
             {
                 Err(error::Error::InvalidTransactionType)

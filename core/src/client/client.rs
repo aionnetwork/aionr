@@ -49,7 +49,9 @@ use client::{
 use encoded;
 use engine::Engine;
 use types::error::{BlockError, CallError, ExecutionError, ImportError, ImportResult};
-use executive::{contract_address, Executed, Executive};
+use types::executed::Executed;
+use executor::fvm_exec::{contract_address, Executive as FvmExecutor};
+use executor::avm_exec::{Executive as AvmExecutor};
 use factory::{Factories, VmFactory};
 use header::{BlockNumber, Header, Seal, SealType};
 use io::*;
@@ -68,7 +70,7 @@ use transaction::{
     LocalizedTransaction,
     PendingTransaction,
     SignedTransaction,
-    AVM_TRANSACTION_TYPE,
+    AVM_CREATION_TYPE,
     DEFAULT_TRANSACTION_TYPE
 };
 use types::filter::Filter;
@@ -204,8 +206,8 @@ impl Client {
 
         let history = if config.history < MIN_HISTORY_SIZE {
             info!(target: "client", "Ignoring pruning history parameter of {}\
-                , falling back to minimum of {}",
-                config.history, MIN_HISTORY_SIZE);
+                                     , falling back to minimum of {}",
+                  config.history, MIN_HISTORY_SIZE);
             MIN_HISTORY_SIZE
         } else {
             config.history
@@ -566,19 +568,19 @@ impl Client {
             (Some(ref first), Some(ref last)) if first == last => {
                 let (_, _, _, hour, minute, second) = utc_from_secs(first.timestamp() as i64);
                 info!(target: "miner", "External {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}",
-                    first.seal_type().clone().unwrap_or_default(),
-                    format!("{}", first.number()),
-                    format!("{:x}", first.hash()),
-                    format!("{:x}", first.difficulty()),
-                    format!("{:x}", first.timestamp()),
-                    format!("{}", hour),
-                    format!("{}", minute),
-                    format!("{}", second));
+                      first.seal_type().clone().unwrap_or_default(),
+                      format!("{}", first.number()),
+                      format!("{:x}", first.hash()),
+                      format!("{:x}", first.difficulty()),
+                      format!("{:x}", first.timestamp()),
+                      format!("{}", hour),
+                      format!("{}", minute),
+                      format!("{}", second));
             }
             (Some(first), Some(last)) => {
                 info!(target: "miner", "External blocks added from #{} to #{}",
-                    format!("{}", first.number()),
-                    format!("{}", last.number()));
+                      format!("{}", first.number()),
+                      format!("{}", last.number()));
             }
             (_, _) => {}
         }
@@ -861,14 +863,14 @@ impl Client {
                 .monetary_policy_update
                 .map_or(false, |v| env_info.number >= v);
             if aion040fork && for_local_avm(state, transaction) {
-                let avm_result = Executive::new(state, env_info, machine)
-                    .transact_virtual_bulk(&[transaction.clone()], false);
+                let avm_result = AvmExecutor::new(state, env_info, machine)
+                    .transact_virtual(&[transaction.clone()], false);
                 match avm_result[0].clone() {
                     Err(x) => return Err(x.into()),
                     Ok(_) => ret = avm_result[0].clone().unwrap(),
                 }
             } else {
-                ret = Executive::new(state, env_info, machine)
+                ret = FvmExecutor::new(state, env_info, machine)
                     .transact_virtual(transaction, false)?;
             }
 
@@ -1073,7 +1075,7 @@ impl Client {
 
 // helper function to tell is this transaction is for avm
 fn for_local_avm(state: &mut State<StateDB>, transaction: &SignedTransaction) -> bool {
-    if transaction.tx_type() == AVM_TRANSACTION_TYPE {
+    if transaction.tx_type() == AVM_CREATION_TYPE {
         return true;
     } else if let Action::Call(a) = transaction.action {
         let code = state.code(&a).unwrap_or(None);
@@ -1192,16 +1194,20 @@ impl BlockChainClient for Client {
             let mut state = original_state.clone();
 
             if for_local_avm(&mut state, &tx) {
-                Ok(Executive::new(&mut state, &env_info, self.engine.machine())
-                    .transact_virtual_bulk(&[tx.clone()], false)[0]
-                    .clone()
-                    .map(|r| r.exception.as_str() == "")
-                    .unwrap_or(false))
+                Ok(
+                    AvmExecutor::new(&mut state, &env_info, self.engine.machine())
+                        .transact_virtual(&[tx.clone()], false)[0]
+                        .clone()
+                        .map(|r| r.exception.as_str() == "")
+                        .unwrap_or(false),
+                )
             } else {
-                Ok(Executive::new(&mut state, &env_info, self.engine.machine())
-                    .transact_virtual(&tx, false)
-                    .map(|r| r.exception.as_str() == "")
-                    .unwrap_or(false))
+                Ok(
+                    FvmExecutor::new(&mut state, &env_info, self.engine.machine())
+                        .transact_virtual(&tx, false)
+                        .map(|r| r.exception.as_str() == "")
+                        .unwrap_or(false),
+                )
             }
         };
 
@@ -1852,20 +1858,18 @@ impl MiningBlockChainClient for Client {
             );
         });
         self.db.read().flush().expect("DB flush failed.");
-        // clear pending PoS blocks
-        self.miner.clear_pos_pending();
 
         let (_, _, _, hour, minute, second) = utc_from_secs(timestamp as i64);
         // Print log
         info!(target: "miner", "Local {} block added. #{}, hash: {}, diff: {}, timestamp: {}, time: {}:{}:{}",
-            seal_type.unwrap_or_default(),
-            format!("{}", number),
-            format!("{:x}", hash),
-            format!("{:x}", difficulty),
-            format!("{:x}", timestamp),
-            format!("{}", hour),
-            format!("{}", minute),
-            format!("{}", second));
+              seal_type.unwrap_or_default(),
+              format!("{}", number),
+              format!("{:x}", hash),
+              format!("{:x}", difficulty),
+              format!("{:x}", timestamp),
+              format!("{}", hour),
+              format!("{}", minute),
+              format!("{}", second));
         Ok(hash)
     }
 

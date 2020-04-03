@@ -7,11 +7,9 @@ version = "0.1.0"
 authors = ["Aion Foundation <admin@aion.network>"]
 
 [dependencies]
-ansi_term = "0.10"
 bloomchain = { path = "../util/bloomchain" }
 byteorder = "1.0"
 bytes = "0.4"
-state = "0.4.1"
 crossbeam = "0.3"
 acore-bloom-journal = { path = "../util/bloom" }
 acore-bytes = { path = "../util/bytes" }
@@ -39,7 +37,6 @@ rlp = { path = "../util/rlp" }
 rlp_compress = { path = "../util/rlp_compress" }
 rlp_derive = { path = "../util/rlp_derive" }
 util-error = { path = "../util/error" }
-stop-guard = { path = "../util/stop-guard" }
 fixed-point = { path = "../util/fixed_point" }
 rustc-hex = "1.0"
 stats = { path = "../util/stats" }
@@ -59,7 +56,6 @@ tiny-keccak = "1.4.2"
 num-bigint = "0.2"
 bytebuffer = "0.2.1"
 transient-hashmap = "0.4"
-macros = { path = "../util/macros" }
 futures = "0.1.6"
 tokio = "0.1.11"
 rand = "0.5.5"
@@ -69,11 +65,6 @@ serde = "1.0"
 
 [dev-dependencies]
 tempdir = "*"
-log = "0.3"
 macros =           { path = "../util/macros" }
 trie-standardmap = { path = "../util/trie-standardmap" }
 fastvm =           { path = "../vms/fastvm" }
-vms =              { path = "../vms" }
-logger =           { path = "../util/logger" }
-aion-types =       { path = "../util/aion-types" }
-db =               { path = "../db/core" }

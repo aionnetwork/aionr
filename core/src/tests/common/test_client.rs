@@ -22,6 +22,12 @@
 
 //! Test client.
 
+use std::mem;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrder};
+use std::time::Duration;
+use std::collections::HashMap;
+
 use acore_bytes::Bytes;
 use aion_types::{Address, H128, H256, U256};
 use blake2b::blake2b;
@@ -29,21 +35,20 @@ use block::{ClosedBlock, OpenBlock, SealedBlock};
 use blockchain::{BlockReceipts, TreeRoute};
 use client::{
     BlockChainClient, BlockChainInfo, BlockId, BlockImportError, BlockStatus,
-    CallAnalytics, LastHashes, MiningBlockChainClient, ProvingBlockChainClient,
+    CallAnalytics, MiningBlockChainClient, ProvingBlockChainClient,
     TransactionId,
 };
-use db::{COL_STATE, DB_NAMES};
-use db::StateDB;
+use vms::LastHashes;
+use db::{COL_STATE, DB_NAMES, StateDB};
 use encoded;
-use executive::Executed;
+use types::executed::Executed;
 use factory::VmFactory;
 use filter::Filter;
 use header::{BlockNumber, Header as BlockHeader, SealType};
 use itertools::Itertools;
 use journaldb;
 use key::{generate_keypair, public_to_address_ed25519};
-use kvdb::{DatabaseConfig, DbRepository, RepositoryConfig};
-use kvdb::{KeyValueDB, MockDbRepository};
+use kvdb::{DatabaseConfig, DbRepository, RepositoryConfig, KeyValueDB, MockDbRepository};
 use log_entry::LocalizedLogEntry;
 use miner::{Miner, MinerService};
 use parking_lot::RwLock;
@@ -52,11 +57,7 @@ use rlp::*;
 use rustc_hex::FromHex;
 use spec::Spec;
 use state::BasicAccount;
-use std::collections::HashMap;
-use std::mem;
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering as AtomicOrder};
-use std::time::Duration;
+
 use tempdir::TempDir;
 use transaction::{LocalizedTransaction, PendingTransaction, SignedTransaction,
 Transaction, Action, DEFAULT_TRANSACTION_TYPE

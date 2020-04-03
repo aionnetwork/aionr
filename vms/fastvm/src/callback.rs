@@ -60,9 +60,9 @@ impl Deref for EvmAddress {
     fn deref(&self) -> &Self::Target { &self.bytes }
 }
 
-// definitions of callbacks used by fastvm.so; obj : &Callback
+/// definitions of callbacks used by fastvm.so; obj : &Callback
 #[no_mangle]
-// 1 - get block hash
+/// 1 - get block hash by number
 pub extern fn get_blockhash(obj: *mut libc::c_void, number: u64) -> HashValue {
     debug!(target: "vm", "FastVM CB: get_blockhash");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
@@ -74,7 +74,7 @@ pub extern fn get_blockhash(obj: *mut libc::c_void, number: u64) -> HashValue {
 }
 
 #[no_mangle]
-// 2 - get contract code
+/// 2 - get contract code
 pub extern fn get_code(obj: *mut libc::c_void, code_info: *mut u8, address: EvmAddress) {
     debug!(target: "vm", "FastVM CB: get_code, address: {:?}", address);
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
@@ -98,7 +98,7 @@ pub extern fn get_code(obj: *mut libc::c_void, code_info: *mut u8, address: EvmA
 }
 
 #[no_mangle]
-// 3 - get account balance
+/// 3 - get account balance
 pub extern fn get_balance(obj: *mut libc::c_void, address: EvmAddress) -> EvmWord {
     debug!(target: "vm", "FastVM CB: get_balance");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
@@ -110,7 +110,7 @@ pub extern fn get_balance(obj: *mut libc::c_void, address: EvmAddress) -> EvmWor
 }
 
 #[no_mangle]
-// 4 - check account exists
+/// 4 - check whether account exists
 pub extern fn exists(obj: *mut libc::c_void, address: EvmAddress) -> i32 {
     debug!(target: "vm", "FastVM CB: check exists");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
@@ -121,7 +121,7 @@ pub extern fn exists(obj: *mut libc::c_void, address: EvmAddress) -> i32 {
 }
 
 #[no_mangle]
-// 5 - get storage
+/// 5 - get storage
 pub extern fn get_storage(obj: *mut libc::c_void, _address: EvmAddress, key: EvmWord) -> EvmWord {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
     let storage = ext.storage_at(&(key.bytes).into());
@@ -137,7 +137,7 @@ pub extern fn get_storage(obj: *mut libc::c_void, _address: EvmAddress, key: Evm
 }
 
 #[no_mangle]
-// 6 - put storage
+/// 6 - put storage
 pub extern fn put_storage(obj: *mut libc::c_void, _addr: EvmAddress, key: EvmWord, value: EvmWord) {
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
 
@@ -146,7 +146,7 @@ pub extern fn put_storage(obj: *mut libc::c_void, _addr: EvmAddress, key: EvmWor
 }
 
 #[no_mangle]
-// 7 - self destroy
+/// 7 - self destroy
 pub extern fn selfdestruct(obj: *mut libc::c_void, _owner: EvmAddress, beneficiary: EvmAddress) {
     debug!(target: "vm", "FastVM CB: selfdestruct");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
@@ -154,7 +154,7 @@ pub extern fn selfdestruct(obj: *mut libc::c_void, _owner: EvmAddress, beneficia
 }
 
 #[no_mangle]
-// 8 - log
+/// 8 - log
 pub extern fn vm_log(
     obj: *mut libc::c_void,
     _addr: EvmAddress,
@@ -178,7 +178,7 @@ pub extern fn vm_log(
 }
 
 #[no_mangle]
-// 9 - call
+/// 9 - call
 pub extern fn call(obj: *mut libc::c_void, info: *mut u8, msg: *const u8) -> *const u8 {
     debug!(target: "vm", "FastVM CB: enter vm call");
     let ext: &mut Box<Ext> = unsafe { mem::transmute(obj) };
@@ -246,7 +246,7 @@ pub extern fn call(obj: *mut libc::c_void, info: *mut u8, msg: *const u8) -> *co
 }
 
 #[no_mangle]
-// 10 - get tx context
+/// 10 - get tx context
 pub extern fn get_tx_context(_obj: *mut libc::c_void, _result: *mut u8) {
     debug!(target: "vm", "I'm get_tx_context foo");
 }
@@ -258,9 +258,9 @@ pub extern fn test_fn() {
 
 #[link(name = "fastvm")]
 extern {
-    // below two are reserved for `cargo rum --example callback`
+    /// below two are reserved for `cargo rum --example callback`
     pub fn register_callback(func: extern fn());
-    // use single resiter func, since each func type differs
+    /// use single resiter func, since each func type differs
     // it is ugly!!!
     pub fn register_call_fn(
         func: extern fn(obj: *mut libc::c_void, result: *mut u8, msg: *const u8) -> *const u8,

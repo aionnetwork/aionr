@@ -17,5 +17,4 @@ rlp = { path = "../../util/rlp" }
 util-error = { path = "../../util/error" }
 
 [dev-dependencies]
-logger = { path = "../../util/logger" }
 blake2b = { path = "../../util/blake2b" }

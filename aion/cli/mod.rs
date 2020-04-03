@@ -19,6 +19,8 @@
  *
  ******************************************************************************/
 
+//! Configuration parameters definitions ( CMD and config file )
+
 #[macro_use]
 mod usage;
 mod group;
@@ -446,6 +448,7 @@ usage! {
     }
 }
 
+/// config shape for config file
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Config {
@@ -461,6 +464,7 @@ struct Config {
     log: Option<Log>,
 }
 
+/// Operating options shape for config file
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Operating {
@@ -470,6 +474,7 @@ struct Operating {
     keys_path: Option<String>,
 }
 
+/// Account options shape for config file
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Account {
@@ -480,6 +485,7 @@ struct Account {
     stake_contract: Option<String>,
 }
 
+/// Network options shape for config file
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Network {
@@ -491,12 +497,14 @@ struct Network {
     ip_black_list: Option<Vec<String>>,
 }
 
+/// Rpc options shape for config file
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Rpc {
     processing_threads: Option<usize>,
 }
 
+/// Http options shape for config file
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Http {
@@ -509,6 +517,7 @@ struct Http {
     server_threads: Option<usize>,
 }
 
+/// Websocket options shape for config file
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Ws {
@@ -521,6 +530,7 @@ struct Ws {
     max_connections: Option<usize>,
 }
 
+/// Ipc options shape for config file
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Ipc {
@@ -529,6 +539,7 @@ struct Ipc {
     apis: Option<Vec<String>>,
 }
 
+/// Mining options shape for config file
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Mining {
@@ -558,6 +569,7 @@ struct Mining {
     local_max_gas_price: Option<u64>,
 }
 
+/// Database options shape for config file
 #[derive(Default, Debug, PartialEq, Deserialize)]
 #[serde(deny_unknown_fields)]
 struct Database {

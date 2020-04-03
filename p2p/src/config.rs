@@ -18,18 +18,25 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
-
+/// P2p Config
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Config {
+    /// boot nodes
     pub boot_nodes: Vec<String>,
+    /// max peers
     pub max_peers: u32,
+    /// net id
     pub net_id: u32,
+    /// local node
     pub local_node: String,
+    /// sync from boot nodes only
     pub sync_from_boot_nodes_only: bool,
+    /// ip black list
     pub ip_black_list: Vec<String>,
 }
 
 impl Config {
+    /// initialization
     pub fn new() -> Self {
         Config {
             boot_nodes: Vec::new(),

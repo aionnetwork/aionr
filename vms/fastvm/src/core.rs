@@ -58,9 +58,13 @@ impl EvmResult {
  *
  */
 #[derive(Debug, Clone)]
+/// fastvm object which lives in one fastvm transaction
 pub struct FastVM {
+    /// revision: current is 7
     revision: i32,
+    /// whether statical call or not
     flag_static: i32,
+    /// raw instance used in callback
     vm_instance: i64,
 }
 

@@ -89,19 +89,18 @@ pub fn broad_new_transactions(p2p: Mgr, storage: Arc<SyncStorage>) {
 }
 
 /// Broadcast new blocks
-pub fn propagate_new_blocks(p2p: Mgr, block_hash: &H256, client: Arc<BlockChainClient>) {
+pub fn propagate_new_blocks(p2p: Mgr, block_hashes: Vec<H256>, client: Arc<BlockChainClient>) {
     let active_nodes = p2p.get_active_nodes();
     if active_nodes.len() > 0 {
-        let mut req = channel_buffer_template(Action::BROADCASTBLOCK.value());
-
-        if let Some(block_rlp) = client.block(BlockId::Hash(block_hash.clone())) {
-            req.body.put_slice(&block_rlp.into_inner());
-
-            req.head.len = req.body.len() as u32;
-
-            for node in active_nodes.iter() {
-                p2p.send(node.hash, req.clone());
-                trace!(target: "sync_broadcast", "Sync broadcast new block sent...");
+        for block_hash in block_hashes {
+            if let Some(block_rlp) = client.block(BlockId::Hash(block_hash)) {
+                let mut req = channel_buffer_template(Action::BROADCASTBLOCK.value());
+                req.body.put_slice(&block_rlp.into_inner());
+                req.head.len = req.body.len() as u32;
+                for node in active_nodes.iter() {
+                    p2p.send(node.hash, req.clone());
+                    trace!(target: "sync_broadcast", "Sync broadcast new block sent...");
+                }
             }
         }
     }
@@ -144,8 +143,8 @@ pub fn handle_broadcast_block(
             let parent_hash = header.parent_hash();
             // Proceed only when the parent block is in chain
             if client.block_header(BlockId::Hash(*parent_hash)).is_some() {
-                let mut imported_blocks_hashes = storage.imported_blocks_hashes().lock();
-                if !imported_blocks_hashes.contains_key(&hash) {
+                let mut recorded_blocks_hashes = storage.recorded_blocks_hashes().lock();
+                if !recorded_blocks_hashes.contains_key(&hash) {
                     // Do basic header validation before proceed
                     let result = UnityEngine::validate_block_header(&header);
                     match result {
@@ -173,7 +172,7 @@ pub fn handle_broadcast_block(
                                         match result {
                                             Ok(_) => {
                                                 trace!(target: "sync_broadcast", "New broadcast block imported {:?} ({})", hash, number);
-                                                imported_blocks_hashes.insert(hash, 0);
+                                                recorded_blocks_hashes.insert(hash, 0);
                                                 let active_nodes = p2p.get_active_nodes();
                                                 for n in active_nodes.iter() {
                                                     // Re-broadcast this block
