@@ -33,7 +33,7 @@ use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP, blake2b};
 use rlp::*;
 use pod_account::*;
 use trie;
-use trie::{Trie, SecTrieDB, TrieFactory, TrieError};
+use trie::{Trie, SecTrieDB, TrieFactory, TrieError, TrieKinds};
 
 // use db::Writable;
 use kvdb::{KeyValueDB, DBTransaction, DBValue, HashStore};
@@ -170,6 +170,32 @@ impl AionVMAccount {
             address_hash: Cell::new(None),
             empty_but_commit: false,
             account_type: AccType::FVM,        }
+    }
+
+    pub fn invoke_account_from_db<B: Backend>(
+        address: &Address,
+        trie_db: TrieKinds,
+        account_db_hashstore: &HashStore,
+        require_cache: RequireCache,
+        global_cache: &B,
+        kvdb: Arc<KeyValueDB>,
+    ) -> Option<Self>
+    {
+        match trie_db.get_with(address, Self::from_rlp) {
+            Ok(account) => {
+                account.map(|mut account| {
+                    account.update_account_cache(
+                        address,
+                        require_cache,
+                        global_cache,
+                        account_db_hashstore,
+                        kvdb,
+                    );
+                    account
+                })
+            }
+            Err(_) => None,
+        }
     }
 
     fn storage_is_clean(&self) -> bool { self.storage_changes.is_empty() }
@@ -905,6 +931,7 @@ mod tests {
         let mut db = MemoryDB::new();
         let mut db = AccountDBMut::new(&mut db, &Address::new());
         let mut a = AionVMAccount::new_contract(69.into(), 0.into());
+        a.mark_as_avm();
 
         // key tag converts from DIRTY to CLEAN
         a.set_storage(vec![0x12, 0x34], vec![0x67, 0x78]);

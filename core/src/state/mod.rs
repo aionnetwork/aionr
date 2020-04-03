@@ -25,7 +25,7 @@
 //! Unconfirmed sub-states are managed with `checkpoint`s which may be canonicalized
 //! or rolled back.
 
-use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP};
+use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP, blake2b};
 use std::cell::{RefMut, RefCell};
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -389,27 +389,26 @@ impl<B: Backend> State<B> {
     }
 
     fn invoke_state_trie(&self, address: &Address, key: &Bytes) -> trie::Result<Option<Bytes>> {
-        let db = self
+        let trie_db = self
             .factories
             .trie
             .readonly(self.db.as_hashstore(), &self.root)
             .expect(SEC_TRIE_DB_UNWRAP_STR);
-        let mut maybe_acc = db.get_with(address, AionVMAccount::from_rlp)?;
-        let r = maybe_acc.as_mut().map_or(Ok(None), |a| {
-            let account_db = self
-                .factories
-                .accountdb
-                .readonly(self.db.as_hashstore(), a.address_hash(address));
-            // ensure the storage root is correct
-            a.update_account_cache(
-                address,
-                RequireCache::None,
-                &self.db,
-                account_db.as_hashstore(),
-                self.kvdb.clone(),
-            );
-            a.storage_at(account_db.as_hashstore(), key)
-        });
+        let account_db = self
+            .factories
+            .accountdb
+            .readonly(self.db.as_hashstore(), blake2b(address));
+        let maybe_acc: Option<AionVMAccount> = AionVMAccount::invoke_account_from_db(
+            address,
+            trie_db,
+            account_db.as_hashstore(),
+            RequireCache::None,
+            &self.db,
+            self.kvdb.clone(),
+        );
+        let r = maybe_acc
+            .as_ref()
+            .map_or(Ok(None), |a| a.storage_at(account_db.as_hashstore(), key));
         self.insert_cache(address, AccountEntry::new_clean(maybe_acc));
         r
     }
@@ -1051,24 +1050,22 @@ impl<B: Backend> State<B> {
 
                 trace!(target: "vm", "search local database");
                 // not found in the global cache, get from the DB and insert into local
-                let db = self
+                let trie_db = self
                     .factories
                     .trie
                     .readonly(self.db.as_hashstore(), &self.root)?;
-                let mut maybe_acc = db.get_with(a, AionVMAccount::from_rlp)?;
-                if let Some(ref mut account) = maybe_acc.as_mut() {
-                    let accountdb = self
-                        .factories
-                        .accountdb
-                        .readonly(self.db.as_hashstore(), account.address_hash(a));
-                    account.update_account_cache(
-                        a,
-                        require,
-                        &self.db,
-                        accountdb.as_hashstore(),
-                        self.kvdb.clone(),
-                    );
-                }
+                let account_db = self
+                    .factories
+                    .accountdb
+                    .readonly(self.db.as_hashstore(), blake2b(a));
+                let maybe_acc: Option<AionVMAccount> = AionVMAccount::invoke_account_from_db(
+                    a,
+                    trie_db,
+                    account_db.as_hashstore(),
+                    require,
+                    &self.db,
+                    self.kvdb.clone(),
+                );
                 let r = f(maybe_acc.as_ref());
                 self.insert_cache(a, AccountEntry::new_clean(maybe_acc));
                 Ok(r)
@@ -1096,7 +1093,7 @@ impl<B: Backend> State<B> {
     fn require_or_from<'a, F, G>(
         &'a self,
         a: &Address,
-        require_code: bool,
+        _require_code: bool,
         default: F,
         not_default: G,
     ) -> trie::Result<RefMut<'a, AionVMAccount>>
@@ -1110,11 +1107,23 @@ impl<B: Backend> State<B> {
                 Some(acc) => self.insert_cache(a, AccountEntry::new_clean_cached(acc)),
                 None => {
                     let maybe_acc = if !self.db.is_known_null(a) {
-                        let db = self
+                        let trie_db = self
                             .factories
                             .trie
                             .readonly(self.db.as_hashstore(), &self.root)?;
-                        AccountEntry::new_clean(db.get_with(a, AionVMAccount::from_rlp)?)
+                        let account_db = self
+                            .factories
+                            .accountdb
+                            .readonly(self.db.as_hashstore(), blake2b(a));
+                        let account = AionVMAccount::invoke_account_from_db(
+                            a,
+                            trie_db,
+                            account_db.as_hashstore(),
+                            RequireCache::Code,
+                            &self.db,
+                            self.kvdb.clone(),
+                        );
+                        AccountEntry::new_clean(account)
                     } else {
                         AccountEntry::new_clean(None)
                     };
@@ -1138,23 +1147,7 @@ impl<B: Backend> State<B> {
             // set the dirty flag after changing account data.
             entry.state = AccountState::Dirty;
             match entry.account {
-                Some(ref mut account) => {
-                    if require_code {
-                        let addr_hash = account.address_hash(a);
-                        let accountdb = self
-                            .factories
-                            .accountdb
-                            .readonly(self.db.as_hashstore(), addr_hash);
-                        account.update_account_cache(
-                            a,
-                            RequireCache::Code,
-                            &self.db,
-                            accountdb.as_hashstore(),
-                            self.kvdb.clone(),
-                        );
-                    }
-                    account
-                }
+                Some(ref mut account) => account,
                 _ => panic!("Required account must always exist; qed"),
             }
         }))
