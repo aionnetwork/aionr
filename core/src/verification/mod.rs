@@ -428,25 +428,6 @@ mod tests {
         }
     }
 
-    fn check_fail_timestamp(result: Result<(), Error>, temp: bool) {
-        let name = if temp {
-            "TemporarilyInvalid"
-        } else {
-            "InvalidTimestamp"
-        };
-        match result {
-            Err(Error::Block(BlockError::InvalidTimestamp(_))) if !temp => (),
-            Err(Error::Block(BlockError::TemporarilyInvalid(_))) if temp => (),
-            Err(other) => {
-                panic!(
-                    "Block verification failed.\nExpected: {}\nGot: {:?}",
-                    name, other
-                )
-            }
-            Ok(_) => panic!("Block verification failed.\nExpected: {}\nGot: Ok", name),
-        }
-    }
-
     struct TestBlockChain {
         blocks: HashMap<H256, Bytes>,
         numbers: HashMap<BlockNumber, H256>,
@@ -797,26 +778,6 @@ mod tests {
                 min: Some(parent.timestamp() + 1),
                 found: header.timestamp(),
             }),
-        );
-
-        header = good.clone();
-        header.set_timestamp(2450000000);
-        check_fail_timestamp(
-            basic_test(
-                &create_test_block_with_data(&header, &good_transactions),
-                engine,
-            ),
-            false,
-        );
-
-        header = good.clone();
-        header.set_timestamp(get_time().sec as u64 + 20);
-        check_fail_timestamp(
-            basic_test(
-                &create_test_block_with_data(&header, &good_transactions),
-                engine,
-            ),
-            true,
         );
 
         header = good.clone();
