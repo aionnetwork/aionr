@@ -25,7 +25,7 @@
 //! Unconfirmed sub-states are managed with `checkpoint`s which may be canonicalized
 //! or rolled back.
 
-use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP};
+use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP, blake2b};
 use std::cell::{RefMut, RefCell};
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -407,96 +407,57 @@ impl<B: Backend> State<B> {
         .unwrap_or(false)
     }
 
+    fn invoke_state_trie(&self, address: &Address, key: &Bytes) -> trie::Result<Option<Bytes>> {
+        let trie_db = self
+            .factories
+            .trie
+            .readonly(self.db.as_hashstore(), &self.root)
+            .expect(SEC_TRIE_DB_UNWRAP_STR);
+        let account_db = self
+            .factories
+            .accountdb
+            .readonly(self.db.as_hashstore(), blake2b(address));
+        let maybe_acc: Option<AionVMAccount> = AionVMAccount::invoke_account_from_db(
+            address,
+            trie_db,
+            account_db.as_hashstore(),
+            RequireCache::None,
+            &self.db,
+            self.kvdb.clone(),
+        );
+        let r = maybe_acc
+            .as_ref()
+            .map_or(Ok(None), |a| a.storage_at(account_db.as_hashstore(), key));
+        self.insert_cache(address, AccountEntry::new_clean(maybe_acc));
+        r
+    }
+
     /// Mutate storage of account `address` so that it is `value` for `key`.
     pub fn storage_at(&self, address: &Address, key: &Bytes) -> trie::Result<Option<Bytes>> {
-        // Storage key search and update works like this:
-        // 1. If there's an entry for the account in the local cache check for the key and return it if found.
-        // 2. If there's an entry for the account in the global cache check for the key or load it into that account.
-        // 3. If account is missing in the global cache load it into the local cache and cache the key there.
-
-        // Ok(None) for avm null
-        // Ok(vec![]) for fastvm empty
-        // Err() is error
-        // Ok(Some) for some
-        // check local cache first without updating
         {
             let local_cache = self.cache.borrow_mut();
             let account = local_cache.get(address);
-            let mut local_account = None;
             if let Some(maybe_acc) = account {
                 match maybe_acc.account {
-                    Some(ref account) => {
-                        if let Some(value) = account.cached_storage_at(key) {
-                            // println!("TT: 1");
-                            return Ok(Some(value));
-                        } else if account.is_removed(key) {
-                            return Ok(None);
-                        } else {
-                            // storage not cached, will try local search later
-                            local_account = Some(maybe_acc);
-                        }
-                    }
-                    // NOTE: No account found, is it possible in both fastvm and avm, maybe not
-                    _ => {
-                        return Ok(None);
-                    }
-                }
-            }
-            // check the global cache and and cache storage key there if found,
-            let trie_res = self.db.get_cached(address, |acc| {
-                match acc {
-                    // NOTE: the same question as above
-                    None => Ok(None),
-                    Some(a) => {
+                    Some(ref acc) => {
                         let account_db = self
                             .factories
                             .accountdb
-                            .readonly(self.db.as_hashstore(), a.address_hash(address));
-                        a.storage_at(account_db.as_hashstore(), key)
+                            .readonly(self.db.as_hashstore(), acc.address_hash(address));
+                        return acc.storage_at(account_db.as_hashstore(), key);
                     }
-                }
-            });
-
-            if let Some(res) = trie_res {
-                return res;
-            }
-
-            // otherwise cache the account localy and cache storage key there.
-            if let Some(ref mut acc) = local_account {
-                if let Some(ref account) = acc.account {
-                    let account_db = self
-                        .factories
-                        .accountdb
-                        .readonly(self.db.as_hashstore(), account.address_hash(address));
-                    return account.storage_at(account_db.as_hashstore(), key);
-                } else {
-                    return Ok(None);
+                    None => return Ok(None),
                 }
             }
         }
 
         // check if the account could exist before any requests to trie
         if self.db.is_known_null(address) {
-            // println!("TT: 6");
             return Ok(None);
         }
 
-        // account is not found in the global cache, get from the DB and insert into local
-        let db = self
-            .factories
-            .trie
-            .readonly(self.db.as_hashstore(), &self.root)
-            .expect(SEC_TRIE_DB_UNWRAP_STR);
-        let maybe_acc = db.get_with(address, AionVMAccount::from_rlp)?;
-        let r = maybe_acc.as_ref().map_or(Ok(None), |a| {
-            let account_db = self
-                .factories
-                .accountdb
-                .readonly(self.db.as_hashstore(), a.address_hash(address));
-            a.storage_at(account_db.as_hashstore(), key)
-        });
-        self.insert_cache(address, AccountEntry::new_clean(maybe_acc));
-        r
+        // read the glocal state trie and update local block cache
+        self.invoke_state_trie(address, key)
     }
 
     /// Get accounts' code.
@@ -1049,24 +1010,22 @@ impl<B: Backend> State<B> {
 
                 trace!(target: "vm", "search local database");
                 // not found in the global cache, get from the DB and insert into local
-                let db = self
+                let trie_db = self
                     .factories
                     .trie
                     .readonly(self.db.as_hashstore(), &self.root)?;
-                let mut maybe_acc = db.get_with(a, AionVMAccount::from_rlp)?;
-                if let Some(ref mut account) = maybe_acc.as_mut() {
-                    let accountdb = self
-                        .factories
-                        .accountdb
-                        .readonly(self.db.as_hashstore(), account.address_hash(a));
-                    account.update_account_cache(
-                        a,
-                        require,
-                        &self.db,
-                        accountdb.as_hashstore(),
-                        self.kvdb.clone(),
-                    );
-                }
+                let account_db = self
+                    .factories
+                    .accountdb
+                    .readonly(self.db.as_hashstore(), blake2b(a));
+                let maybe_acc: Option<AionVMAccount> = AionVMAccount::invoke_account_from_db(
+                    a,
+                    trie_db,
+                    account_db.as_hashstore(),
+                    require,
+                    &self.db,
+                    self.kvdb.clone(),
+                );
                 let r = f(maybe_acc.as_ref());
                 self.insert_cache(a, AccountEntry::new_clean(maybe_acc));
                 Ok(r)
@@ -1094,7 +1053,7 @@ impl<B: Backend> State<B> {
     fn require_or_from<'a, F, G>(
         &'a self,
         a: &Address,
-        require_code: bool,
+        _require_code: bool,
         default: F,
         not_default: G,
     ) -> trie::Result<RefMut<'a, AionVMAccount>>
@@ -1108,11 +1067,23 @@ impl<B: Backend> State<B> {
                 Some(acc) => self.insert_cache(a, AccountEntry::new_clean_cached(acc)),
                 None => {
                     let maybe_acc = if !self.db.is_known_null(a) {
-                        let db = self
+                        let trie_db = self
                             .factories
                             .trie
                             .readonly(self.db.as_hashstore(), &self.root)?;
-                        AccountEntry::new_clean(db.get_with(a, AionVMAccount::from_rlp)?)
+                        let account_db = self
+                            .factories
+                            .accountdb
+                            .readonly(self.db.as_hashstore(), blake2b(a));
+                        let account = AionVMAccount::invoke_account_from_db(
+                            a,
+                            trie_db,
+                            account_db.as_hashstore(),
+                            RequireCache::Code,
+                            &self.db,
+                            self.kvdb.clone(),
+                        );
+                        AccountEntry::new_clean(account)
                     } else {
                         AccountEntry::new_clean(None)
                     };
@@ -1136,23 +1107,7 @@ impl<B: Backend> State<B> {
             // set the dirty flag after changing account data.
             entry.state = AccountState::Dirty;
             match entry.account {
-                Some(ref mut account) => {
-                    if require_code {
-                        let addr_hash = account.address_hash(a);
-                        let accountdb = self
-                            .factories
-                            .accountdb
-                            .readonly(self.db.as_hashstore(), addr_hash);
-                        account.update_account_cache(
-                            a,
-                            RequireCache::Code,
-                            &self.db,
-                            accountdb.as_hashstore(),
-                            self.kvdb.clone(),
-                        );
-                    }
-                    account
-                }
+                Some(ref mut account) => account,
                 _ => panic!("Required account must always exist; qed"),
             }
         }))
@@ -1165,6 +1120,20 @@ impl<B: Backend> State<B> {
         (block_number == 4735401 || block_number == 4735403 || block_number == 4735405)
             && hash
                 == &H256::from("bc7422952fb73d0cab9ca96bb1489857674342e9e2bdec989651a6f691814061")
+    }
+
+    #[cfg(test)]
+    /// Mark an account as AVM
+    pub fn mark_as_avm(&mut self, a: &Address) -> trie::Result<()> {
+        self.require(a, true)?.mark_as_avm();
+        Ok(())
+    }
+
+    #[cfg(test)]
+    /// Mark an account as AVM
+    pub fn mark_as_fvm(&mut self, a: &Address) -> trie::Result<()> {
+        self.require(a, true)?.mark_as_fvm();
+        Ok(())
     }
 }
 

@@ -2914,6 +2914,9 @@ fn avm_storage() {
     let mut state = get_temp_state();
     let address = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
     state
+        .mark_as_avm(&address)
+        .expect("account mark as avm failed");
+    state
         .set_storage(&address, vec![0, 0, 0, 1], vec![0])
         .expect("avm set storage failed");
     let value = state
