@@ -272,7 +272,7 @@ impl AionVMAccount {
         self.object_graph_cache = other.object_graph_cache;
         self.empty_but_commit = other.empty_but_commit;
         self.account_type = other.account_type;
-
+        self.storage_changes = other.storage_changes;
         self.storage_cache = other.storage_cache;
     }
 
