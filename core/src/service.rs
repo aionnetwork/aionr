@@ -30,7 +30,6 @@ use futures::sync::oneshot;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use tokio::prelude::{Future, Stream};
-use ansi_term::Colour;
 use acore_bytes::Bytes;
 use client::{ChainNotify, Client, ClientConfig};
 use db;
@@ -40,7 +39,6 @@ use kvdb::KeyValueDB;
 use kvdb::{DatabaseConfig, RepositoryConfig, DbRepository, DBTransaction, Error as DbError};
 use miner::Miner;
 use spec::Spec;
-use stop_guard::StopGuard;
 use aion_types::{H256};
 use rlp::*;
 
@@ -129,7 +127,6 @@ pub struct ClientService {
     io_service: Arc<IoService<ClientIoMessage>>,
     client: Arc<Client>,
     database: Arc<DbRepository>,
-    _stop_guard: StopGuard,
 }
 
 impl ClientService {
@@ -147,7 +144,7 @@ impl ClientService {
         info!(
             target:"run",
             "     network: {}",
-            Colour::White.bold().paint(spec.name.clone()),
+            spec.name,
         );
 
         let mut db_config = DatabaseConfig::default();
@@ -176,13 +173,10 @@ impl ClientService {
         });
         io_service.register_handler(client_io)?;
 
-        let stop_guard = StopGuard::new();
-
         Ok(ClientService {
             io_service: Arc::new(io_service),
             client,
             database: dbs,
-            _stop_guard: stop_guard,
         })
     }
 

@@ -19,6 +19,16 @@
  *
  ******************************************************************************/
 
+//! Sync module. Handle transmitting and recieving nodes status, transactions, blocks
+//!
+//! # Tasks
+//! * sync_statics: to print nodes info at regular intervals
+//! * node_status: to get/send status from/to other nodes
+//! * headers: to get/send a number of continuous block headers from/to other nodes
+//! * bodies: to get/send a number of continuous block bodies from/to other nodes
+//! * import: to import downloaded blocks to verification queue
+//! * broadcast: to get/send the newest transactions and block from/to other nodes
+
 mod handler;
 mod action;
 mod wrappers;
@@ -62,6 +72,7 @@ const INTERVAL_BODIES: u64 = 100;
 const INTERVAL_IMPORT: u64 = 50;
 const INTERVAL_STATISICS: u64 = 10;
 
+/// Sync manager
 pub struct Sync {
     /// Blockchain kernel interface
     client: Arc<BlockChainClient>,
@@ -86,6 +97,7 @@ pub struct Sync {
 }
 
 impl Sync {
+    /// constructor
     pub fn new(config: Config, client: Arc<BlockChainClient>) -> Sync {
         let local_best_td: U256 = client.chain_info().total_difficulty;
         let local_best_block_number: u64 = client.chain_info().best_block_number;
@@ -117,10 +129,12 @@ impl Sync {
         }
     }
 
+    /// register callback
     pub fn register_callback(&self, callback: Weak<Callable>) {
         self.p2p.register_callback(callback);
     }
 
+    /// run sync instance
     pub fn run(&self, executor: TaskExecutor) {
         // init p2p
         let p2p = &self.p2p.clone();
@@ -147,9 +161,9 @@ impl Sync {
                     let local_total_difficulty = client_statics.chain_info().total_difficulty;
                     let active_len = active_nodes.len();
                     info!(target: "sync_statics", "total/active {}/{}, local_best_num {}, hash {}, diff {}", total_len, active_len, local_best_number, local_best_hash, local_total_difficulty);
-                    let (downloaded_blocks_size, downloaded_blocks_capacity) = storage_statics.downloaded_blocks_hashes_statics();
+                    let (recorded_blocks_size, recorded_blocks_capacity) = storage_statics.recorded_blocks_hashes_statics();
                     let (staged_blocks_size, staged_blocks_capacity) = storage_statics.staged_blocks_statics();
-                    debug!(target: "sync_statics", "download record cache size/capacity {}/{}", downloaded_blocks_size, downloaded_blocks_capacity);
+                    debug!(target: "sync_statics", "recorded cache size/capacity {}/{}", recorded_blocks_size, recorded_blocks_capacity);
                     debug!(target: "sync_statics", "staged cache size/capacity {}/{}", staged_blocks_size, staged_blocks_capacity);
                     debug!(target: "sync_statics", "lightning syncing height: {}", storage_statics.lightning_base());
                     info!(target: "sync_statics", "{:-^130}", "");
@@ -307,6 +321,7 @@ impl Sync {
         shutdown_hooks.push(tx);
     }
 
+    /// shutdown routine
     pub fn shutdown(&self) {
         info!(target:"sync_shutdown", "sync shutdown start");
         // Shutdown runtime tasks
@@ -329,11 +344,27 @@ impl Sync {
         info!(target:"sync_shutdown", "sync shutdown finished");
     }
 
+    /// get local node info to fill back to config file
     pub fn get_local_node_info(&self) -> &String { self.p2p.get_local_node_info() }
+
+    /// Determine if the node is doing a major sync
+    fn is_syncing(&self) -> bool {
+        let local_best_block_number = self.client.chain_info().best_block_number;
+        let network_best_block_number = *self.network_best_block_number.read();
+        let local_total_difficulty = self.client.chain_info().total_difficulty;
+        let network_total_difficulty = *self.network_best_td.read();
+        if local_best_block_number + 4 < network_best_block_number
+            && local_total_difficulty <= network_total_difficulty
+        {
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl SyncProvider for Sync {
-    /// Get sync status
+    /// Get sync status for rpc request
     fn status(&self) -> SyncStatus {
         // TODO:  only set start_block_number/highest_block_number.
         SyncStatus {
@@ -381,11 +412,15 @@ impl ChainNotify for Sync {
             }
         }
 
-        // For locally sealed main-chain blocks, record them and broadcast them
-        if !sealed.is_empty() && !enacted.is_empty() {
+        // Add sealed blocks into imported blocks cache
+        if !sealed.is_empty() {
+            self.storage.insert_recorded_blocks_hashes(sealed.clone());
+        }
+
+        // Broadcast the new main-chain blocks unless the node is syncing
+        if !self.is_syncing() && !enacted.is_empty() {
             trace!(target: "sync_notify", "Propagating blocks...");
-            self.storage.insert_imported_blocks_hashes(sealed.clone());
-            broadcast::propagate_new_blocks(self.p2p.clone(), &sealed[0], self.client.clone());
+            broadcast::propagate_new_blocks(self.p2p.clone(), enacted, self.client.clone());
         }
     }
 

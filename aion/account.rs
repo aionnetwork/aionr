@@ -28,21 +28,30 @@ use helpers::{password_prompt, password_from_file, password_once};
 use params::SpecType;
 use aion_types::clean_0x;
 use rustc_hex::ToHex;
+
+/// Config params for account sub-command
 #[derive(Debug, PartialEq)]
 pub enum AccountCmd {
+    /// sub-command `account new`
     New(NewAccount),
+    /// sub-command `account list`
     List(ListAccounts),
+    /// sub-command `account import`
     Import(ImportAccounts),
+    /// sub-command `account import-by-key`
     ImportByPrivkey(ImportAccount),
+    /// sub-command `account export-to-key`
     ExportToProvkey(ExportAccount),
 }
 
+/// Config for sub-command `account list`
 #[derive(Debug, PartialEq)]
 pub struct ListAccounts {
     pub path: String,
     pub spec: SpecType,
 }
 
+/// Config for sub-command `account new`
 #[derive(Debug, PartialEq)]
 pub struct NewAccount {
     pub iterations: u32,
@@ -51,6 +60,7 @@ pub struct NewAccount {
     pub password_file: Option<String>,
 }
 
+/// Config for sub-command `account import`
 #[derive(Debug, PartialEq)]
 pub struct ImportAccounts {
     pub from: Vec<String>,
@@ -58,6 +68,7 @@ pub struct ImportAccounts {
     pub spec: SpecType,
 }
 
+/// Config for sub-command `account import-by-key`
 #[derive(Debug, PartialEq)]
 pub struct ImportAccount {
     pub path: String,
@@ -65,6 +76,8 @@ pub struct ImportAccount {
     pub iterations: u32,
     pub pri_keys: Option<String>,
 }
+
+/// Config for sub-command `account export-to-key`
 #[derive(Debug, PartialEq)]
 pub struct ExportAccount {
     pub path: String,
@@ -73,6 +86,7 @@ pub struct ExportAccount {
     pub address: Option<String>,
 }
 
+/// Execute the account subcommand related code
 pub fn execute(cmd: AccountCmd) -> Result<String, String> {
     match cmd {
         AccountCmd::New(new_cmd) => new(new_cmd),
@@ -83,6 +97,7 @@ pub fn execute(cmd: AccountCmd) -> Result<String, String> {
     }
 }
 
+/// to create keys dir if it does not exist
 fn keys_dir(path: String, spec: SpecType) -> Result<RootDiskDirectory, String> {
     let spec = spec.spec()?;
     let mut path = PathBuf::from(&path);
@@ -90,6 +105,7 @@ fn keys_dir(path: String, spec: SpecType) -> Result<RootDiskDirectory, String> {
     RootDiskDirectory::create(path).map_err(|e| format!("Could not open keys directory: {}", e))
 }
 
+/// Get secret store
 fn secret_store(dir: Box<RootDiskDirectory>, iterations: Option<u32>) -> Result<EthStore, String> {
     match iterations {
         Some(i) => EthStore::open_with_iterations(dir, i),
@@ -98,6 +114,7 @@ fn secret_store(dir: Box<RootDiskDirectory>, iterations: Option<u32>) -> Result<
     .map_err(|e| format!("Could not open keys store: {}", e))
 }
 
+/// Create new account
 fn new(n: NewAccount) -> Result<String, String> {
     let password: String = match n.password_file {
         Some(file) => password_from_file(file)?,
@@ -112,6 +129,7 @@ fn new(n: NewAccount) -> Result<String, String> {
     Ok(format!("0x{:?}", new_account))
 }
 
+/// List accounts
 fn list(list_cmd: ListAccounts) -> Result<String, String> {
     let dir = Box::new(keys_dir(list_cmd.path, list_cmd.spec)?);
     let secret_store = Box::new(secret_store(dir, None)?);
@@ -126,6 +144,7 @@ fn list(list_cmd: ListAccounts) -> Result<String, String> {
     Ok(result)
 }
 
+/// Import safe account files
 fn import(i: ImportAccounts) -> Result<String, String> {
     let to = keys_dir(i.to, i.spec)?;
     let mut imported = 0;

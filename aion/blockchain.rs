@@ -34,7 +34,7 @@ use acore::ImportError;
 use acore::miner::Miner;
 use acore::verification::queue::VerifierSettings;
 use cache::CacheConfig;
-use params::{SpecType, Pruning, Switch, fatdb_switch_to_bool};
+use params::{SpecType, Pruning, Switch, fatdb_switch_to_bool, StakeConfig};
 use helpers::{to_client_config};
 use dir::Directories;
 use user_defaults::UserDefaults;
@@ -52,9 +52,12 @@ impl MillisecondDuration for Duration {
     }
 }
 
+/// blockchain data format
 #[derive(Debug, PartialEq)]
 pub enum DataFormat {
+    /// Hex format
     Hex,
+    /// Binary format
     Binary,
 }
 
@@ -74,14 +77,20 @@ impl FromStr for DataFormat {
     }
 }
 
+/// Config params for blockchain sub-command
 #[derive(Debug, PartialEq)]
 pub enum BlockchainCmd {
+    /// sub-command `db kill`
     Kill(KillBlockchain),
+    /// sub-command `import`
     Import(ImportBlockchain),
+    /// sub-command `export`
     Export(ExportBlockchain),
+    /// sub-command `revert`
     Revert(RevertBlockchain),
 }
 
+/// Config for sub-command `db kill`
 #[derive(Debug, PartialEq)]
 pub struct KillBlockchain {
     pub spec: SpecType,
@@ -89,6 +98,7 @@ pub struct KillBlockchain {
     pub pruning: Pruning,
 }
 
+/// Config for sub-command `import`
 #[derive(Debug, PartialEq)]
 pub struct ImportBlockchain {
     pub spec: SpecType,
@@ -104,8 +114,10 @@ pub struct ImportBlockchain {
     pub fat_db: Switch,
     pub vm_type: VMType,
     pub verifier_settings: VerifierSettings,
+    pub stake_conf: StakeConfig,
 }
 
+/// Config for sub-command `export`
 #[derive(Debug, PartialEq)]
 pub struct ExportBlockchain {
     pub spec: SpecType,
@@ -123,6 +135,7 @@ pub struct ExportBlockchain {
     pub to_block: BlockId,
 }
 
+/// Config for sub-command `revert`
 #[derive(Debug, PartialEq)]
 pub struct RevertBlockchain {
     pub spec: SpecType,
@@ -137,6 +150,7 @@ pub struct RevertBlockchain {
     pub to_block: BlockId,
 }
 
+/// Execute the blockchain subcommand related code
 pub fn execute(cmd: BlockchainCmd) -> Result<(), String> {
     match cmd {
         BlockchainCmd::Kill(kill_cmd) => kill_db(kill_cmd),
@@ -146,6 +160,7 @@ pub fn execute(cmd: BlockchainCmd) -> Result<(), String> {
     }
 }
 
+/// import blocks from data file
 fn execute_import(cmd: ImportBlockchain) -> Result<(), String> {
     let timer = Instant::now();
     // load spec file
@@ -191,6 +206,7 @@ fn execute_import(cmd: ImportBlockchain) -> Result<(), String> {
     );
 
     client_config.queue.verifier_settings = cmd.verifier_settings;
+    client_config.stake_contract = cmd.stake_conf.contract;
 
     // build client
     let service = ClientService::start(
@@ -317,6 +333,7 @@ fn execute_import(cmd: ImportBlockchain) -> Result<(), String> {
     Ok(())
 }
 
+/// run client
 fn start_client(
     dirs: Directories,
     spec: SpecType,
@@ -388,6 +405,7 @@ fn start_client(
     Ok(service)
 }
 
+/// export block chain to a data file
 fn execute_export(cmd: ExportBlockchain) -> Result<(), String> {
     let timer = Instant::now();
     let service = start_client(
@@ -455,6 +473,7 @@ fn execute_export(cmd: ExportBlockchain) -> Result<(), String> {
     Ok(())
 }
 
+/// remove specified db
 pub fn kill_db(cmd: KillBlockchain) -> Result<(), String> {
     let spec = cmd.spec.spec()?;
     let genesis_hash = spec.genesis_header().hash();
@@ -469,6 +488,8 @@ pub fn kill_db(cmd: KillBlockchain) -> Result<(), String> {
     info!(target: "db_kill", "Database {:?} deleted.", &dir);
     Ok(())
 }
+
+/// revert db to specified block number
 fn execute_revert(cmd: RevertBlockchain) -> Result<(), String> {
     let timer = Instant::now();
     let service = start_client(
@@ -518,6 +539,7 @@ fn execute_revert(cmd: RevertBlockchain) -> Result<(), String> {
 
     Ok(())
 }
+
 #[cfg(test)]
 mod test {
     use super::DataFormat;

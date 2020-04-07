@@ -25,7 +25,6 @@ extern crate key;
 extern crate panic_hook;
 extern crate rustc_hex;
 extern crate serde;
-extern crate threadpool;
 
 #[macro_use]
 extern crate serde_derive;

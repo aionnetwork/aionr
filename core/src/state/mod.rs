@@ -25,7 +25,7 @@
 //! Unconfirmed sub-states are managed with `checkpoint`s which may be canonicalized
 //! or rolled back.
 
-use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP};
+use blake2b::{BLAKE2B_EMPTY, BLAKE2B_NULL_RLP, blake2b};
 use std::cell::{RefMut, RefCell};
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
@@ -34,7 +34,8 @@ use std::sync::Arc;
 
 use types::error::Error;
 use types::executed::{Executed, ExecutionError};
-use executive::Executive;
+use executor::fvm_exec::{Executive as FvmExecutor};
+use executor::avm_exec::{Executive as AvmExecutor};
 use factory::Factories;
 use factory::VmFactory;
 use machine::EthereumMachine as Machine;
@@ -42,10 +43,9 @@ use pod_account::*;
 use pod_state::{self, PodState};
 use receipt::Receipt;
 use db::StateDB;
-use transaction::{SignedTransaction, Action};
+use transaction::SignedTransaction;
 use types::state::state_diff::StateDiff;
 use vms::EnvInfo;
-use vms::AvmStatusCode;
 
 use aion_types::{Address, H256, U256};
 use acore_bytes::Bytes;
@@ -77,7 +77,7 @@ pub use self::substate::Substate;
 use self::account_state::{AccountEntry, AccountState};
 
 /// Used to return information about an `State::apply` operation.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ApplyOutcome {
     /// The receipt for the applied transaction.
     pub receipt: Receipt,
@@ -343,11 +343,19 @@ impl<B: Backend> State<B> {
         self.ensure_cached(a, RequireCache::None, false, |a| a.is_some())
     }
 
-    /// Determine whether an account exists and if not empty.
+    /// Determine whether an account exists and if not null.
     pub fn exists_and_not_null(&self, a: &Address) -> trie::Result<bool> {
         debug!(target: "vm", "exist and not null");
         self.ensure_cached(a, RequireCache::None, false, |a| {
             a.map_or(false, |a| !a.is_null())
+        })
+    }
+
+    /// Determine whether an account exists and if not empty.
+    pub fn exists_and_not_empty(&self, a: &Address) -> trie::Result<bool> {
+        debug!(target: "vm", "exist and not null");
+        self.ensure_cached(a, RequireCache::None, false, |a| {
+            a.map_or(false, |a| !a.is_empty())
         })
     }
 
@@ -388,96 +396,68 @@ impl<B: Backend> State<B> {
         })
     }
 
+    /// Check if an account has storage
+    pub fn has_storage(&self, a: &Address) -> bool {
+        debug!(target: "vm", "check storage empty of: {:?}", a);
+        self.ensure_cached(a, RequireCache::None, true, |a| {
+            a.as_ref()
+                .and_then(|account| account.storage_root().cloned())
+                .map_or(false, |root| root != BLAKE2B_NULL_RLP)
+        })
+        .unwrap_or(false)
+    }
+
+    fn invoke_state_trie(&self, address: &Address, key: &Bytes) -> trie::Result<Option<Bytes>> {
+        let trie_db = self
+            .factories
+            .trie
+            .readonly(self.db.as_hashstore(), &self.root)
+            .expect(SEC_TRIE_DB_UNWRAP_STR);
+        let account_db = self
+            .factories
+            .accountdb
+            .readonly(self.db.as_hashstore(), blake2b(address));
+        let maybe_acc: Option<AionVMAccount> = AionVMAccount::invoke_account_from_db(
+            address,
+            trie_db,
+            account_db.as_hashstore(),
+            RequireCache::None,
+            &self.db,
+            self.kvdb.clone(),
+        );
+        let r = maybe_acc
+            .as_ref()
+            .map_or(Ok(None), |a| a.storage_at(account_db.as_hashstore(), key));
+        self.insert_cache(address, AccountEntry::new_clean(maybe_acc));
+        r
+    }
+
     /// Mutate storage of account `address` so that it is `value` for `key`.
     pub fn storage_at(&self, address: &Address, key: &Bytes) -> trie::Result<Option<Bytes>> {
-        // Storage key search and update works like this:
-        // 1. If there's an entry for the account in the local cache check for the key and return it if found.
-        // 2. If there's an entry for the account in the global cache check for the key or load it into that account.
-        // 3. If account is missing in the global cache load it into the local cache and cache the key there.
-
-        // Ok(None) for avm null
-        // Ok(vec![]) for fastvm empty
-        // Err() is error
-        // Ok(Some) for some
-        // check local cache first without updating
         {
             let local_cache = self.cache.borrow_mut();
             let account = local_cache.get(address);
-            let mut local_account = None;
             if let Some(maybe_acc) = account {
                 match maybe_acc.account {
-                    Some(ref account) => {
-                        if let Some(value) = account.cached_storage_at(key) {
-                            // println!("TT: 1");
-                            return Ok(Some(value));
-                        } else if account.is_removed(key) {
-                            return Ok(None);
-                        } else {
-                            // storage not cached, will try local search later
-                            local_account = Some(maybe_acc);
-                        }
-                    }
-                    // NOTE: No account found, is it possible in both fastvm and avm, maybe not
-                    _ => {
-                        return Ok(None);
-                    }
-                }
-            }
-            // check the global cache and and cache storage key there if found,
-            let trie_res = self.db.get_cached(address, |acc| {
-                match acc {
-                    // NOTE: the same question as above
-                    None => Ok(None),
-                    Some(a) => {
+                    Some(ref acc) => {
                         let account_db = self
                             .factories
                             .accountdb
-                            .readonly(self.db.as_hashstore(), a.address_hash(address));
-                        a.storage_at(account_db.as_hashstore(), key)
+                            .readonly(self.db.as_hashstore(), acc.address_hash(address));
+                        return acc.storage_at(account_db.as_hashstore(), key);
                     }
-                }
-            });
-
-            if let Some(res) = trie_res {
-                return res;
-            }
-
-            // otherwise cache the account localy and cache storage key there.
-            if let Some(ref mut acc) = local_account {
-                if let Some(ref account) = acc.account {
-                    let account_db = self
-                        .factories
-                        .accountdb
-                        .readonly(self.db.as_hashstore(), account.address_hash(address));
-                    return account.storage_at(account_db.as_hashstore(), key);
-                } else {
-                    return Ok(None);
+                    None => return Ok(None),
                 }
             }
         }
 
         // check if the account could exist before any requests to trie
         if self.db.is_known_null(address) {
-            // println!("TT: 6");
             return Ok(None);
         }
 
-        // account is not found in the global cache, get from the DB and insert into local
-        let db = self
-            .factories
-            .trie
-            .readonly(self.db.as_hashstore(), &self.root)
-            .expect(SEC_TRIE_DB_UNWRAP_STR);
-        let maybe_acc = db.get_with(address, AionVMAccount::from_rlp)?;
-        let r = maybe_acc.as_ref().map_or(Ok(None), |a| {
-            let account_db = self
-                .factories
-                .accountdb
-                .readonly(self.db.as_hashstore(), a.address_hash(address));
-            a.storage_at(account_db.as_hashstore(), key)
-        });
-        self.insert_cache(address, AccountEntry::new_clean(maybe_acc));
-        r
+        // read the glocal state trie and update local block cache
+        self.invoke_state_trie(address, key)
     }
 
     /// Get accounts' code.
@@ -667,7 +647,7 @@ impl<B: Backend> State<B> {
 
     /// Execute a given transaction, producing a receipt.
     /// This will change the state accordingly.
-    pub fn apply(
+    pub fn apply_fvm(
         &mut self,
         env_info: &EnvInfo,
         machine: &Machine,
@@ -676,9 +656,9 @@ impl<B: Backend> State<B> {
     ) -> ApplyResult
     {
         // Only fvm transactions (including precompiled) and balance transfers are executed in this function
-        let result = self.execute(env_info, machine, t, true, false, is_building_block);
+        let result = self.execute_fvm(env_info, machine, t, true, false, is_building_block);
         match result {
-            // Include the transaction into block if the execution result if ok
+            // Transaction accepted
             Ok(e) => {
                 self.commit()?;
                 let state_root = self.root().clone();
@@ -695,59 +675,12 @@ impl<B: Backend> State<B> {
                     receipt,
                 })
             }
-            // For rejected transactions...
-            Err(x) => {
-                // If building local block, reject it
-                if is_building_block {
-                    Err(From::from(x))
-                }
-                // If importing external block, accept it but do not commit state
-                else {
-                    let state_root = self.root().clone();
-                    let gas_used = match x {
-                        ExecutionError::InvalidNonce {
-                            expected: _,
-                            got: _,
-                        }
-                        | ExecutionError::NotEnoughCash {
-                            required: _,
-                            got: _,
-                        } => t.gas,
-                        ExecutionError::BlockGasLimitReached {
-                            gas_used: _,
-                            gas_limit: _,
-                            gas: _,
-                        } => {
-                            if let Action::Call(address) = t.action {
-                                match self.code(&address) {
-                                    Ok(Some(_)) => U256::from(0u64),
-                                    _ => t.gas,
-                                }
-                            } else {
-                                U256::from(0u64)
-                            }
-                        }
-                        _ => U256::from(0u64),
-                    };
-
-                    let receipt = Receipt::new(
-                        state_root,
-                        gas_used,
-                        gas_used * t.gas_price,
-                        vec![],
-                        vec![],
-                        x.to_string(),
-                    );
-                    trace!(target: "state", "Transaction receipt: {:?}", receipt);
-                    Ok(ApplyOutcome {
-                        receipt,
-                    })
-                }
-            }
+            // Transaction rejected
+            Err(x) => Err(From::from(x)),
         }
     }
 
-    pub fn apply_batch(
+    pub fn apply_avm(
         &mut self,
         env_info: &EnvInfo,
         machine: &Machine,
@@ -757,43 +690,30 @@ impl<B: Backend> State<B> {
     {
         // Only avm transactions will go here
         let exec_results =
-            self.execute_bulk(env_info, machine, txs, false, false, is_building_block);
+            self.execute_avm(env_info, machine, txs, false, false, is_building_block);
 
         let mut receipts = Vec::new();
         let mut index = 0;
         for result in exec_results {
             let outcome = match result {
+                // Transaction accepted
                 Ok(e) => {
-                    // For avm rejected transactions, reject if building local blocks, or accept if importing external blocks
-                    if e.exception == AvmStatusCode::Rejected.to_string() && is_building_block {
-                        Err(From::from(ExecutionError::Internal(
-                            "AVM rejected".to_string(),
-                        )))
-                    } else {
-                        if e.exception == AvmStatusCode::Rejected.to_string() {
-                            println!("rejected avm transaction: {:?}", txs[index].hash());
-                        }
-                        let state_root = e.state_root.clone();
-                        let receipt = Receipt::new(
-                            state_root,
-                            e.gas_used,
-                            e.transaction_fee,
-                            e.logs,
-                            e.output,
-                            e.exception,
-                        );
-                        Ok(ApplyOutcome {
-                            receipt,
-                        })
-                    }
+                    let state_root = e.state_root.clone();
+                    let receipt = Receipt::new(
+                        state_root,
+                        e.gas_used,
+                        e.transaction_fee,
+                        e.logs,
+                        e.output,
+                        e.exception,
+                    );
+                    Ok(ApplyOutcome {
+                        receipt,
+                    })
                 }
+                // Transaction rejected
                 Err(x) => {
-                    // If building local block, reject it
-                    if is_building_block {
-                        Err(From::from(x))
-                    }
-                    // If importing external block, accept it but do not commit state
-                    else {
+                    if Self::accept_transaction_exception_001(env_info, &txs[index]) {
                         let state_root = self.root().clone();
                         let receipt = Receipt::new(
                             state_root,
@@ -803,10 +723,11 @@ impl<B: Backend> State<B> {
                             vec![],
                             x.to_string(),
                         );
-                        trace!(target: "state", "Transaction receipt: {:?}", receipt);
                         Ok(ApplyOutcome {
                             receipt,
                         })
+                    } else {
+                        Err(From::from(x))
                     }
                 }
             };
@@ -819,7 +740,7 @@ impl<B: Backend> State<B> {
         return receipts;
     }
 
-    fn execute_bulk(
+    fn execute_avm(
         &mut self,
         env_info: &EnvInfo,
         machine: &Machine,
@@ -829,11 +750,11 @@ impl<B: Backend> State<B> {
         is_building_block: bool,
     ) -> Vec<Result<Executed, ExecutionError>>
     {
-        let mut e = Executive::new(self, env_info, machine);
+        let mut e = AvmExecutor::new(self, env_info, machine);
 
         match virt {
-            true => e.transact_virtual_bulk(txs, check_nonce),
-            false => e.transact_bulk(txs, false, is_building_block),
+            true => e.transact_virtual(txs, check_nonce),
+            false => e.transact(txs, false, is_building_block),
         }
     }
 
@@ -841,7 +762,7 @@ impl<B: Backend> State<B> {
     //
     // `virt` signals that we are executing outside of a block set and restrictions like
     // gas limits and gas costs should be lifted.
-    fn execute(
+    fn execute_fvm(
         &mut self,
         env_info: &EnvInfo,
         machine: &Machine,
@@ -851,7 +772,7 @@ impl<B: Backend> State<B> {
         is_building_block: bool,
     ) -> Result<Executed, ExecutionError>
     {
-        let mut e = Executive::new(self, env_info, machine);
+        let mut e = FvmExecutor::new(self, env_info, machine);
 
         match virt {
             true => e.transact_virtual(t, check_nonce),
@@ -1089,24 +1010,22 @@ impl<B: Backend> State<B> {
 
                 trace!(target: "vm", "search local database");
                 // not found in the global cache, get from the DB and insert into local
-                let db = self
+                let trie_db = self
                     .factories
                     .trie
                     .readonly(self.db.as_hashstore(), &self.root)?;
-                let mut maybe_acc = db.get_with(a, AionVMAccount::from_rlp)?;
-                if let Some(ref mut account) = maybe_acc.as_mut() {
-                    let accountdb = self
-                        .factories
-                        .accountdb
-                        .readonly(self.db.as_hashstore(), account.address_hash(a));
-                    account.update_account_cache(
-                        a,
-                        require,
-                        &self.db,
-                        accountdb.as_hashstore(),
-                        self.kvdb.clone(),
-                    );
-                }
+                let account_db = self
+                    .factories
+                    .accountdb
+                    .readonly(self.db.as_hashstore(), blake2b(a));
+                let maybe_acc: Option<AionVMAccount> = AionVMAccount::invoke_account_from_db(
+                    a,
+                    trie_db,
+                    account_db.as_hashstore(),
+                    require,
+                    &self.db,
+                    self.kvdb.clone(),
+                );
                 let r = f(maybe_acc.as_ref());
                 self.insert_cache(a, AccountEntry::new_clean(maybe_acc));
                 Ok(r)
@@ -1134,7 +1053,7 @@ impl<B: Backend> State<B> {
     fn require_or_from<'a, F, G>(
         &'a self,
         a: &Address,
-        require_code: bool,
+        _require_code: bool,
         default: F,
         not_default: G,
     ) -> trie::Result<RefMut<'a, AionVMAccount>>
@@ -1148,11 +1067,23 @@ impl<B: Backend> State<B> {
                 Some(acc) => self.insert_cache(a, AccountEntry::new_clean_cached(acc)),
                 None => {
                     let maybe_acc = if !self.db.is_known_null(a) {
-                        let db = self
+                        let trie_db = self
                             .factories
                             .trie
                             .readonly(self.db.as_hashstore(), &self.root)?;
-                        AccountEntry::new_clean(db.get_with(a, AionVMAccount::from_rlp)?)
+                        let account_db = self
+                            .factories
+                            .accountdb
+                            .readonly(self.db.as_hashstore(), blake2b(a));
+                        let account = AionVMAccount::invoke_account_from_db(
+                            a,
+                            trie_db,
+                            account_db.as_hashstore(),
+                            RequireCache::Code,
+                            &self.db,
+                            self.kvdb.clone(),
+                        );
+                        AccountEntry::new_clean(account)
                     } else {
                         AccountEntry::new_clean(None)
                     };
@@ -1176,26 +1107,33 @@ impl<B: Backend> State<B> {
             // set the dirty flag after changing account data.
             entry.state = AccountState::Dirty;
             match entry.account {
-                Some(ref mut account) => {
-                    if require_code {
-                        let addr_hash = account.address_hash(a);
-                        let accountdb = self
-                            .factories
-                            .accountdb
-                            .readonly(self.db.as_hashstore(), addr_hash);
-                        account.update_account_cache(
-                            a,
-                            RequireCache::Code,
-                            &self.db,
-                            accountdb.as_hashstore(),
-                            self.kvdb.clone(),
-                        );
-                    }
-                    account
-                }
+                Some(ref mut account) => account,
                 _ => panic!("Required account must always exist; qed"),
             }
         }))
+    }
+
+    // Cover the historical transaction exception for AKI-569
+    fn accept_transaction_exception_001(env_info: &EnvInfo, tx: &SignedTransaction) -> bool {
+        let block_number = env_info.number;
+        let hash = tx.hash();
+        (block_number == 4735401 || block_number == 4735403 || block_number == 4735405)
+            && hash
+                == &H256::from("bc7422952fb73d0cab9ca96bb1489857674342e9e2bdec989651a6f691814061")
+    }
+
+    #[cfg(test)]
+    /// Mark an account as AVM
+    pub fn mark_as_avm(&mut self, a: &Address) -> trie::Result<()> {
+        self.require(a, true)?.mark_as_avm();
+        Ok(())
+    }
+
+    #[cfg(test)]
+    /// Mark an account as AVM
+    pub fn mark_as_fvm(&mut self, a: &Address) -> trie::Result<()> {
+        self.require(a, true)?.mark_as_fvm();
+        Ok(())
     }
 }
 

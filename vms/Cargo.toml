@@ -4,11 +4,9 @@ version = "0.1.0"
 authors = ["aion-camus <camus@aion.network>"]
 
 [dependencies]
-byteorder = "1.0"
 log = "0.3"
 libc = "0.2.0"
 vm_common = { path = "common"}
 aion-types = { path = "../util/aion-types"}
-patricia-trie = { path = "../util/patricia_trie" }
 fastvm = { path = "fastvm" }
 avm = { path = "avm" }

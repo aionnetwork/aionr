@@ -27,15 +27,14 @@ use vms::{
     ActionValue,
     CallType,
     EnvInfo,
-    ExecutionResult,
+    FvmExecutionResult as ExecutionResult,
     ExecStatus,
     ReturnData
 };
 use state::{Substate, CleanupMode};
-use transaction::{Action, Transaction, SignedTransaction, DEFAULT_TRANSACTION_TYPE, AVM_TRANSACTION_TYPE};
+use transaction::{Action, Transaction, SignedTransaction, DEFAULT_TRANSACTION_TYPE};
 use types::error::{ExecutionError};
-use executive::{Executive, contract_address};
-use avm_abi::{AVMEncoder, AbiToken, ToBytes};
+use executor::fvm_exec::{contract_address, Executive};
 
 use helpers::{get_temp_state,make_aion_machine};
 
@@ -1512,532 +1511,7 @@ fn static_call() {
 }
 
 #[test]
-fn avm_recursive() {
-    let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // NOTE: tested with avm v1.3
-    file.push("src/tests/avmjars/demo-0.3.0.jar");
-    let file_str = file.to_str().expect("Failed to locate the demo.jar");
-    let mut code = read_file(file_str).expect("unable to open avm dapp");
-    let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-    let address = contract_address(&sender, &U256::zero()).0;
-    let mut params = ActionParams::default();
-    params.address = address.clone();
-    params.sender = sender.clone();
-    params.origin = sender.clone();
-    params.gas = U256::from(5_000_000);
-    let mut avm_code: Vec<u8> = (code.len() as u32).to_vm_bytes();
-    println!("code of hello_avm = {:?}", code.len());
-    avm_code.append(&mut code);
-    params.code = Some(Arc::new(avm_code.clone()));
-    params.value = ActionValue::Transfer(0.into());
-    params.call_type = CallType::None;
-    params.gas_price = 1.into();
-    let mut state = get_temp_state();
-    state
-        .add_balance(&sender, &U256::from(200_000_000), CleanupMode::NoEmpty)
-        .unwrap();
-    let info = EnvInfo::default();
-    let machine = make_aion_machine();
-    let substate = Substate::new();
-    let execution_results = {
-        let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.call_avm(vec![params.clone()], &mut [substate])
-    };
-
-    for r in execution_results {
-        let ExecutionResult {
-            status_code,
-            gas_left: _,
-            return_data,
-            exception: _,
-            state_root: _,
-            invokable_hashes: _,
-        } = r;
-
-        assert_eq!(status_code, ExecStatus::Success);
-
-        params.address = (*return_data).into();
-        println!("return data = {:?}", return_data);
-    }
-
-    // Hello avm is deployed
-
-    assert!(state.code(&params.address).unwrap().is_some());
-
-    params.call_type = CallType::Call;
-    // let call_data = AbiToken::STRING(String::from("callExt")).encode();
-    let mut call_data = AbiToken::STRING(String::from("recursive")).encode();
-    // for QA recursive
-    let mut target = [0u8; 32];
-    target.copy_from_slice(&params.address[..]);
-    call_data.append(&mut AbiToken::ADDRESS(target).encode());
-    call_data.append(&mut AbiToken::INT32(10).encode());
-    // call_data.append(&mut AbiToken::INT32(1).encode());
-    // temp QA ends
-    params.data = Some(call_data);
-    params.nonce += 1;
-    params.gas = U256::from(2_000_000);
-    println!("call data = {:?}", params.data);
-    let substate = Substate::new();
-    let execution_results = {
-        let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.call_avm(vec![params.clone()], &mut [substate.clone()])
-    };
-
-    for r in execution_results {
-        let ExecutionResult {
-            status_code,
-            gas_left,
-            return_data: _,
-            exception: _,
-            state_root: _,
-            invokable_hashes: _,
-        } = r;
-
-        println!("gas left = {:?}", gas_left);
-        assert_eq!(status_code, ExecStatus::Success);
-    }
-}
-
-#[test]
-fn get_vote() {
-    let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // NOTE: tested with avm v1.3
-    file.push("src/tests/avmjars/unity-staking.jar");
-    let file_str = file
-        .to_str()
-        .expect("Failed to locate the unity-staking.jar");
-    let mut code = read_file(file_str).expect("unable to open avm dapp");
-    let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-    let address = contract_address(&sender, &U256::zero()).0;
-    let mut params = ActionParams::default();
-    params.address = address.clone();
-    params.sender = sender.clone();
-    params.origin = sender.clone();
-    params.gas = U256::from(5_000_000);
-    let mut avm_code: Vec<u8> = (code.len() as u32).to_vm_bytes();
-    println!("code of hello_avm = {:?}", code.len());
-    avm_code.append(&mut code);
-    params.code = Some(Arc::new(avm_code.clone()));
-    params.value = ActionValue::Transfer(0.into());
-    params.call_type = CallType::None;
-    params.gas_price = 1.into();
-    let mut state = get_temp_state();
-    state
-        .add_balance(&sender, &U256::from(200_000_000), CleanupMode::NoEmpty)
-        .unwrap();
-    let info = EnvInfo::default();
-    let machine = make_aion_machine();
-    let substate = Substate::new();
-    let execution_results = {
-        let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.call_avm(vec![params.clone()], &mut [substate])
-    };
-
-    for r in execution_results {
-        let ExecutionResult {
-            status_code,
-            gas_left: _,
-            return_data,
-            exception: _,
-            state_root: _,
-            invokable_hashes: _,
-        } = r;
-
-        assert_eq!(status_code, ExecStatus::Success);
-
-        params.address = (*return_data).into();
-        println!("return data = {:?}", return_data);
-    }
-
-    assert!(state.code(&params.address).unwrap().is_some());
-
-    // register
-    params.call_type = CallType::Call;
-    let mut call_data = AbiToken::STRING(String::from("register")).encode();
-    call_data.append(&mut AbiToken::ADDRESS(params.sender.into()).encode());
-    params.data = Some(call_data);
-    params.nonce += 1;
-    params.gas = U256::from(2_000_000);
-    params.value = ActionValue::Transfer(0.into());
-    println!("call data = {:?}", params.data);
-    let substate = Substate::new();
-    let execution_results = {
-        let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.call_avm(vec![params.clone()], &mut [substate.clone()])
-    };
-
-    for r in execution_results {
-        let ExecutionResult {
-            status_code,
-            gas_left,
-            return_data,
-            exception: _,
-            state_root: _,
-            invokable_hashes: _,
-        } = r;
-
-        println!("gas left = {:?}, output = {:?}", gas_left, return_data);
-        assert_eq!(status_code, ExecStatus::Success);
-    }
-
-    // Vote
-    params.call_type = CallType::Call;
-    let mut call_data = AbiToken::STRING(String::from("vote")).encode();
-    call_data.append(&mut AbiToken::ADDRESS(params.sender.into()).encode());
-    params.data = Some(call_data);
-    params.nonce += 1;
-    params.gas = U256::from(2_000_000);
-    params.value = ActionValue::Transfer(999.into());
-    println!("call data = {:?}", params.data);
-    let substate = Substate::new();
-    let execution_results = {
-        let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.call_avm(vec![params.clone()], &mut [substate.clone()])
-    };
-
-    for r in execution_results {
-        let ExecutionResult {
-            status_code,
-            gas_left,
-            return_data,
-            exception: _,
-            state_root: _,
-            invokable_hashes: _,
-        } = r;
-
-        println!("gas left = {:?}, output = {:?}", gas_left, return_data);
-        assert_eq!(status_code, ExecStatus::Success);
-    }
-
-    params.call_type = CallType::Call;
-    let mut call_data = AbiToken::STRING(String::from("getVote")).encode();
-    call_data.append(&mut AbiToken::ADDRESS(params.sender.into()).encode());
-    params.data = Some(call_data);
-    params.nonce += 1;
-    params.gas = U256::from(2_000_000);
-    params.value = ActionValue::Transfer(0.into());
-    println!("call data = {:?}", params.data);
-    let substate = Substate::new();
-    let execution_results = {
-        let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.call_avm(vec![params.clone()], &mut [substate.clone()])
-    };
-
-    for r in execution_results {
-        let ExecutionResult {
-            status_code,
-            gas_left,
-            return_data,
-            exception: _,
-            state_root: _,
-            invokable_hashes: _,
-        } = r;
-
-        println!("gas left = {:?}, output = {:?}", gas_left, return_data);
-        assert_eq!(status_code, ExecStatus::Success);
-        assert_eq!(return_data.to_vec(), vec![3, 231]);
-    }
-}
-
-#[test]
-/// HelloWorld with extra storage test
-fn hello_avm() {
-    let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // NOTE: tested with avm v1.3
-    file.push("src/tests/avmjars/demo-0.2.0.jar");
-    let file_str = file.to_str().expect("Failed to locate the demo.jar");
-    let mut code = read_file(file_str).expect("unable to open avm dapp");
-    let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-    let address = contract_address(&sender, &U256::zero()).0;
-    let mut params = ActionParams::default();
-    params.address = address.clone();
-    params.sender = sender.clone();
-    params.origin = sender.clone();
-    params.gas = U256::from(5_000_000);
-    let mut avm_code: Vec<u8> = (code.len() as u32).to_vm_bytes();
-    println!("code of hello_avm = {:?}", code.len());
-    avm_code.append(&mut code);
-    params.code = Some(Arc::new(avm_code.clone()));
-    params.value = ActionValue::Transfer(0.into());
-    params.call_type = CallType::None;
-    params.gas_price = 1.into();
-    let mut state = get_temp_state();
-    state
-        .add_balance(&sender, &U256::from(200_000_000), CleanupMode::NoEmpty)
-        .unwrap();
-    let info = EnvInfo::default();
-    let machine = make_aion_machine();
-    let substate = Substate::new();
-    let execution_results = {
-        let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.call_avm(vec![params.clone()], &mut [substate])
-    };
-
-    for r in execution_results {
-        let ExecutionResult {
-            status_code,
-            gas_left: _,
-            return_data,
-            exception: _,
-            state_root: _,
-            invokable_hashes: _,
-        } = r;
-
-        assert_eq!(status_code, ExecStatus::Success);
-
-        params.address = (*return_data).into();
-        println!("return data = {:?}", return_data);
-    }
-
-    // Hello avm is deployed
-
-    assert!(state.code(&params.address).unwrap().is_some());
-
-    params.call_type = CallType::Call;
-    let call_data = AbiToken::STRING(String::from("callExt")).encode();
-    params.data = Some(call_data);
-    params.nonce += 1;
-    params.gas = U256::from(2_000_000);
-    println!("call data = {:?}", params.data);
-    let substate = Substate::new();
-    let execution_results = {
-        let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.call_avm(vec![params.clone()], &mut [substate.clone()])
-    };
-
-    for r in execution_results {
-        let ExecutionResult {
-            status_code,
-            gas_left,
-            return_data: _,
-            exception: _,
-            state_root: _,
-            invokable_hashes: _,
-        } = r;
-
-        println!("gas left = {:?}", gas_left);
-        assert_eq!(status_code, ExecStatus::Success);
-    }
-
-    // params.call_type = CallType::Call;
-    // let mut call_data = AbiToken::STRING(String::from("recursive")).encode();
-    // call_data.append(&mut AbiToken::ADDRESS(params.address.into()).encode());
-    // call_data.append(&mut AbiToken::INT32(10).encode());
-
-    // params.data = Some(call_data);
-    // params.nonce += 1;
-    // params.gas = U256::from(2_000_000);
-    // println!("call data = {:?}", params.data);
-    // let substate = Substate::new();
-    // let execution_results = {
-    //     let mut ex = Executive::new(&mut state, &info, &machine);
-    //     ex.call_avm(vec![params.clone()], &mut [substate.clone()])
-    // };
-
-    // for r in execution_results {
-    //     let ExecutionResult {
-    //         status_code,
-    //         gas_left: _,
-    //         return_data,
-    //         exception: _,
-    //         state_root,
-    //     } = r;
-
-    //     assert_eq!(status_code, ExecStatus::Success);
-    // }
-
-    // test key/value storage
-    // params.call_type = CallType::Call;
-    // let call_data = AbiToken::STRING(String::from("storageTest")).encode();
-    // params.data = Some(call_data);
-    // params.nonce += 1;
-    // params.gas = U256::from(2_000_000);
-    // println!("call data = {:?}", params.data);
-    // let substate = Substate::new();
-    // let execution_results = {
-    //     let mut ex = Executive::new(&mut state, &info, &machine);
-    //     ex.call_avm(vec![params.clone()], &mut [substate.clone()])
-    // };
-
-    // for r in execution_results {
-    //     let ExecutionResult {
-    //         status_code,
-    //         gas_left: _,
-    //         return_data,
-    //         exception: _,
-    //         state_root,
-    //     } = r;
-
-    //     assert_eq!(status_code, ExecStatus::Success);
-    //     println!(
-    //         "result state root = {:?}, return_data = {:?}",
-    //         state_root, return_data
-    //     );
-    //     assert_eq!(return_data.to_vec(), vec![0u8, 2, 3, 4]);
-    // }
-
-    // assert_eq!(
-    //     state
-    //         .storage_at(
-    //             &params.address,
-    //             &vec![
-    //                 1u8, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1, 2, 3, 4,
-    //                 5, 6, 7, 8, 9, 10, 1, 2,
-    //             ]
-    //         )
-    //         .unwrap(),
-    //     vec![0u8, 2, 3, 4]
-    // );
-}
-
-use std::io::Error;
-use std::fs::File;
-use std::io::Read;
-use std::path::PathBuf;
-use std::path::Path;
-
-fn read_file(path: &str) -> Result<Vec<u8>, Error> {
-    let path = Path::new(path);
-    println!("path = {:?}", path);
-    let mut file = File::open(path)?;
-    let mut buf = Vec::<u8>::new();
-    file.read_to_end(&mut buf)?;
-    Ok(buf)
-}
-
-#[test]
-fn avm_storage() {
-    let mut state = get_temp_state();
-    let address = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-    state
-        .set_storage(&address, vec![0, 0, 0, 1], vec![0])
-        .expect("avm set storage failed");
-    let value = state
-        .storage_at(&address, &vec![0, 0, 0, 1])
-        .expect("avm get storage failed");
-    assert_eq!(value, Some(vec![0]));
-    state
-        .set_storage(
-            &address,
-            vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 0],
-            vec![1, 2, 3, 4, 5, 0, 0, 0, 2],
-        )
-        .expect("avm set storage failed");
-    state
-        .remove_storage(&address, vec![0, 0, 0, 1])
-        .expect("remove failed");
-    let value = state
-        .storage_at(&address, &vec![0, 0, 0, 1])
-        .expect("set storage failed");
-    assert_eq!(value, None);
-    // println!("state = {:?}", state);
-}
-
-#[test]
-fn avm_balance_transfer() {
-    let mut state = get_temp_state();
-    let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-    let mut params = ActionParams::default();
-    let address = contract_address(&sender, &U256::zero()).0;
-    params.address = address.clone();
-    params.sender = sender.clone();
-    params.origin = sender.clone();
-    params.gas = U256::from(1_000_000);
-    params.code = Some(Arc::new(vec![]));
-    params.value = ActionValue::Transfer(100.into());
-    params.call_type = CallType::BulkBalance;
-    params.gas_price = 1.into();
-    state
-        .add_balance(&sender, &U256::from(50_000_000), CleanupMode::NoEmpty)
-        .unwrap();
-    let info = EnvInfo::default();
-    let machine = make_aion_machine();
-    let substate = Substate::new();
-    let mut params2 = params.clone();
-    params2.address = contract_address(&sender, &U256::one()).0;
-    params2.value = ActionValue::Transfer(99.into());
-    params2.nonce = params.nonce + 1;
-    let results = {
-        let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.call_avm(
-            vec![params.clone(), params2.clone()],
-            &mut [substate.clone(), substate.clone()],
-        )
-    };
-
-    assert_eq!(results.len(), 2);
-    assert_eq!(state.balance(&address), Ok(100.into()));
-    assert_eq!(state.balance(&params2.address), Ok(99.into()));
-}
-
-#[test]
-fn avm_status_rejected() {
-    let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    // NOTE: tested with avm v1.3
-    file.push("src/tests/avmjars/demo-0.2.0.jar");
-    let file_str = file.to_str().expect("Failed to locate the demo.jar");
-    let mut code = read_file(file_str).expect("unable to open avm dapp");
-    let mut avm_code: Vec<u8> = (code.len() as u32).to_vm_bytes();
-    println!("code of hello_avm = {:?}", code.len());
-    avm_code.append(&mut code);
-
-    let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-    let machine = make_aion_machine();
-    let mut info = EnvInfo::default();
-    info.gas_limit = U256::from(3_000_000);
-    let mut state = get_temp_state();
-    state
-        .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
-        .unwrap();
-
-    // 1. Invalid gas limit
-    // 1.1 Transaction gas limit exceeds block gas limit
-    let transaction: Transaction = Transaction::new(
-        U256::one(),
-        U256::zero(),
-        U256::from(4_000_000),
-        Action::Create,
-        0.into(),
-        avm_code.clone(),
-        DEFAULT_TRANSACTION_TYPE,
-        None,
-    );
-    let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
-    let errors = {
-        let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact_bulk(&[signed_transaction.clone()], false, true)
-    };
-    assert_eq!(
-        errors[0].clone().unwrap_err(),
-        ExecutionError::BlockGasLimitReached {
-            gas_limit: U256::from(3_000_000),
-            gas_used: U256::from(0),
-            gas: U256::from(4_000_000),
-        }
-    );
-
-    let transaction: Transaction = Transaction::new(
-        U256::zero(),
-        U256::zero(),
-        U256::from(2_000_000),
-        Action::Create,
-        0.into(),
-        avm_code.clone(),
-        AVM_TRANSACTION_TYPE,
-        None,
-    );
-
-    let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
-    let errors = {
-        let mut ex = Executive::new(&mut state, &info, &machine);
-        ex.transact_bulk(&[signed_transaction], false, true)
-    };
-    assert!(errors[0].is_ok());
-}
-
-#[test]
-fn contract_create2() {
+fn contract_create_non_empty_internal() {
     // test internal creation to address with balance
     let code = "605060405234156100105760006000fd5b5b6000600061001d610043565b604051809103906000f08015821516156100375760006000fd5b915091505b5050610052565b60405160648061009a83390190565b603a806100606000396000f30060506040526008565b60006000fd00a165627a7a72305820fd53915fee1b05fe9bfd2e5c002fbc0a06e4b569cdf9cee967125a1bad38bbae0029605060405260006000600050909055341560195760006000fd5b601d565b603a80602a6000396000f30060506040526008565b60006000fd00a165627a7a7230582067ea917dd1ec8e15669ee107500f563855e03f1941e0a857e305c3f1754c16a40029".from_hex().unwrap();
     let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
@@ -2072,6 +1546,7 @@ fn contract_create2() {
     info.gas_limit = U256::from(1000000);
     info.author = Address::from(1);
 
+    // Case 1
     let machine = make_aion_machine();
     let mut substate = Substate::new();
 
@@ -2090,6 +1565,19 @@ fn contract_create2() {
     // machine before aion040_fork returns failure on creation at existed account
     assert_eq!(status_code, ExecStatus::Revert);
 
+    // Case 2
+    // create contract on account with storage and balance after avm fork
+    let mut state = get_temp_state();
+    state
+        .add_balance(&sender, &U256::from(10000000), CleanupMode::NoEmpty)
+        .unwrap();
+    state
+        .add_balance(
+            &inner_contract_address[..].into(),
+            &U256::from(100),
+            CleanupMode::NoEmpty,
+        )
+        .unwrap();
     let mut machine = make_aion_machine();
     machine.set_monetary(0);
     let mut substate = Substate::new();
@@ -2106,14 +1594,154 @@ fn contract_create2() {
         ex.create(params.clone(), &mut substate)
     };
 
-    // machine after aion040_fork returns success on creation at exsited account which has no code
+    // creation on account with storage will succeed
     assert_eq!(status_code, ExecStatus::Success);
 
-    println!(
-        "code = {:?}",
-        state.code(&inner_contract_address[..].into())
-    );
+    // Case 3 code
+    let mut state = get_temp_state();
+    let mut substate = Substate::new();
+    state
+        .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
+        .unwrap();
+    state
+        .init_code(&inner_contract_address[..].into(), vec![0x1u8, 0, 0, 0])
+        .unwrap();
 
+    let ExecutionResult {
+        gas_left: _,
+        status_code,
+        return_data: _,
+        exception: _,
+        state_root: _,
+        invokable_hashes: _,
+    } = {
+        let mut ex = Executive::new(&mut state, &info, &machine);
+        ex.create(params.clone(), &mut substate)
+    };
+
+    // creation on account with storage will succeed
+    assert_eq!(status_code, ExecStatus::Revert);
+
+    // Case 4 storage
+    let mut state = get_temp_state();
+    state
+        .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
+        .unwrap();
+    state
+        .add_balance(
+            &inner_contract_address[..].into(),
+            &U256::from(100),
+            CleanupMode::NoEmpty,
+        )
+        .unwrap();
+    state
+        .set_storage(
+            &inner_contract_address[..].into(),
+            vec![0x1u8, 0, 0, 0],
+            vec![0x2u8, 0, 0, 0],
+        )
+        .unwrap();
+    state.commit().unwrap();
+    let mut substate = Substate::new();
+
+    let ExecutionResult {
+        gas_left: _,
+        status_code,
+        return_data: _,
+        exception: _,
+        state_root: _,
+        invokable_hashes: _,
+    } = {
+        let mut ex = Executive::new(&mut state, &info, &machine);
+        ex.create(params.clone(), &mut substate)
+    };
+
+    // creation on account with storage will succeed
+    assert_eq!(status_code, ExecStatus::Revert);
+
+    // Case 5 nonce
+    let mut state = get_temp_state();
+    state
+        .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
+        .unwrap();
+    state.inc_nonce(&inner_contract_address[..].into()).unwrap();
+    let mut substate = Substate::new();
+
+    let ExecutionResult {
+        gas_left: _,
+        status_code,
+        return_data: _,
+        exception: _,
+        state_root: _,
+        invokable_hashes: _,
+    } = {
+        let mut ex = Executive::new(&mut state, &info, &machine);
+        ex.create(params.clone(), &mut substate)
+    };
+
+    // creation on account with storage will succeed
+    assert_eq!(status_code, ExecStatus::Revert);
+}
+
+#[test]
+fn contract_create_non_empty() {
+    let code = "60506040526000356c01000000000000000000000000900463ffffffff16806326121ff01461004957806375ed12351461005f578063e2179b8e146100fd57610043565b60006000fd5b34156100555760006000fd5b61005d61018d565b005b341561006b5760006000fd5b6100816004808035906010019091905050610275565b6040518080601001828103825283818151815260100191508051906010019080838360005b838110156100c25780820151818401525b6010810190506100a6565b50505050905090810190600f1680156100ef5780820380516001836010036101000a031916815260100191505b509250505060405180910390f35b34156101095760006000fd5b61011161032c565b6040518080601001828103825283818151815260100191508051906010019080838360005b838110156101525780820151818401525b601081019050610136565b50505050905090810190600f16801561017f5780820380516001836010036101000a031916815260100191505b509250505060405180910390f35b6101956103f5565b6104006040518059106101a55750595b9080825280601002601001820160405280156101bc575b5090506f610000000000000000000000000000008160008151811015156101df57fe5b9060100101906effffffffffffffffffffffffffffff1916908160001a9053506f62000000000000000000000000000000816103ff81518110151561022057fe5b9060100101906effffffffffffffffffffffffffffff1916908160001a9053508060006000506000602081526010019081526010016000209050600050908051906010019061027092919061040c565b505b50565b600060005060105280600052602060002090506000915090508054600181600116156101000203166002900480600f0160108091040260100160405190810160405280929190818152601001828054600181600116156101000203166002900480156103245780600f106102f757610100808354040283529160100191610324565b8201919060005260106000209050905b81548152906001019060100180831161030757829003600f168201915b505050505081565b6103346103f5565b600060005060006020815260100190815260100160002090506000508054600181600116156101000203166002900480600f0160108091040260100160405190810160405280929190818152601001828054600181600116156101000203166002900480156103e65780600f106103b9576101008083540402835291601001916103e6565b8201919060005260106000209050905b8154815290600101906010018083116103c957829003600f168201915b505050505090506103f2565b90565b601060405190810160405280600081526010015090565b8280546001816001161561010002031660029004906000526010600020905090600f016010900481019282600f1061044f57805160ff1916838001178555610482565b82800160010185558215610482579182015b828111156104815782518260005090905591601001919060010190610461565b5b50905061048f9190610493565b5090565b6104bb919061049d565b808211156104b7576000818150600090555060010161049d565b5090565b905600a165627a7a72305820a9b457c98ced88e9dda94a6ec2b32e69b1dc8ed693342b427da048636174f4c60029".from_hex().unwrap();
+
+    let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
+    let address = contract_address(&sender, &U256::zero()).0;
+    println!("test address = {:?}", address);
+    // TODO: add tests for 'callcreate'
+    let mut params = ActionParams::default();
+    params.address = address.clone();
+    params.code_address = address.clone();
+    params.sender = sender.clone();
+    params.origin = sender.clone();
+    params.gas = U256::from(1000_000);
+    params.code = Some(Arc::new(code.clone()));
+    params.value = ActionValue::Transfer(U256::from(0));
+    params.call_type = CallType::Call;
+    params.gas_price = U256::from(0);
+    params.data = Some("26121ff0".from_hex().unwrap());
+    let mut state = get_temp_state();
+    state
+        .add_balance(&sender, &U256::from(10000000), CleanupMode::NoEmpty)
+        .unwrap();
+    state
+        .add_balance(&address, &U256::from(100), CleanupMode::NoEmpty)
+        .unwrap();
+    let mut info = EnvInfo::default();
+    info.number = 1;
+    info.gas_limit = U256::from(1000000);
+    info.author = Address::from(1);
+
+    // Case 1
+    let machine = make_aion_machine();
+    let mut substate = Substate::new();
+
+    let ExecutionResult {
+        gas_left: _,
+        status_code,
+        return_data: _,
+        exception: _,
+        state_root: _,
+        invokable_hashes: _,
+    } = {
+        let mut ex = Executive::new(&mut state, &info, &machine);
+        ex.create(params.clone(), &mut substate)
+    };
+
+    // machine before aion040_fork returns failure on creation at existed account
+    assert_eq!(status_code, ExecStatus::Failure);
+
+    // Case 2
+    // create contract on account with storage and balance after avm fork
+    let mut state = get_temp_state();
+    state
+        .add_balance(&sender, &U256::from(10000000), CleanupMode::NoEmpty)
+        .unwrap();
+    state
+        .add_balance(&address, &U256::from(100), CleanupMode::NoEmpty)
+        .unwrap();
     let mut machine = make_aion_machine();
     machine.set_monetary(0);
     let mut substate = Substate::new();
@@ -2130,6 +1758,81 @@ fn contract_create2() {
         ex.create(params.clone(), &mut substate)
     };
 
-    // normal creation of contract on account which already exists
+    // creation on account with storage will succeed
     assert_eq!(status_code, ExecStatus::Success);
+
+    // Case 3 code
+    let mut state = get_temp_state();
+    let mut substate = Substate::new();
+    state
+        .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
+        .unwrap();
+    state.init_code(&address, vec![0x1u8, 0, 0, 0]).unwrap();
+
+    let ExecutionResult {
+        gas_left: _,
+        status_code,
+        return_data: _,
+        exception: _,
+        state_root: _,
+        invokable_hashes: _,
+    } = {
+        let mut ex = Executive::new(&mut state, &info, &machine);
+        ex.create(params.clone(), &mut substate)
+    };
+
+    // creation on account with storage will succeed
+    assert_eq!(status_code, ExecStatus::Failure);
+
+    // Case 4 storage
+    let mut state = get_temp_state();
+    state
+        .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
+        .unwrap();
+    state
+        .add_balance(&address, &U256::from(100), CleanupMode::NoEmpty)
+        .unwrap();
+    state
+        .set_storage(&address, vec![0x1u8, 0, 0, 0], vec![0x2u8, 0, 0, 0])
+        .unwrap();
+    state.commit().unwrap();
+    let mut substate = Substate::new();
+
+    let ExecutionResult {
+        gas_left: _,
+        status_code,
+        return_data: _,
+        exception: _,
+        state_root: _,
+        invokable_hashes: _,
+    } = {
+        let mut ex = Executive::new(&mut state, &info, &machine);
+        ex.create(params.clone(), &mut substate)
+    };
+
+    // creation on account with storage will succeed
+    assert_eq!(status_code, ExecStatus::Failure);
+
+    // Case 5 nonce
+    let mut state = get_temp_state();
+    state
+        .add_balance(&sender, &U256::from(100), CleanupMode::NoEmpty)
+        .unwrap();
+    state.inc_nonce(&address).unwrap();
+    let mut substate = Substate::new();
+
+    let ExecutionResult {
+        gas_left: _,
+        status_code,
+        return_data: _,
+        exception: _,
+        state_root: _,
+        invokable_hashes: _,
+    } = {
+        let mut ex = Executive::new(&mut state, &info, &machine);
+        ex.create(params.clone(), &mut substate)
+    };
+
+    // creation on account with storage will succeed
+    assert_eq!(status_code, ExecStatus::Failure);
 }

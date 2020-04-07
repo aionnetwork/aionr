@@ -18,6 +18,9 @@
  *     If not, see <https://www.gnu.org/licenses/>.
  *
  ******************************************************************************/
+
+//! LogApproximator trait and implement for FixedPoint
+
 use super::{FixedPoint,MAX_PRECISION};
 use num_bigint::BigUint;
 use bigdecimal::BigDecimal;
@@ -74,12 +77,14 @@ lazy_static! {
     .unwrap();
 }
 
+/// Logarithm Approximator
 pub trait LogApproximator {
+    /// Calculate natural logarithm
     fn ln(input: &BigUint) -> FixedPoint;
-    fn ln2() -> FixedPoint { LN2.clone() }
 }
 
 impl LogApproximator for FixedPoint {
+    /// Calculate natural logarithm
     fn ln(input: &BigUint) -> FixedPoint {
         // put input in the range [0.1, 1)
         let bit_len = input.bits();
@@ -109,11 +114,11 @@ impl LogApproximator for FixedPoint {
             if x_prime < *MAX_PRECISION {
                 x = x_prime;
                 y = y
-                    .subtruct(&(*LN_TABLE)[left_shift])
+                    .subtract(&(*LN_TABLE)[left_shift])
                     .expect("FixedPoint sub ln failed");
             } else if x_prime == *MAX_PRECISION {
                 y = y
-                    .subtruct(&(*LN_TABLE)[left_shift])
+                    .subtract(&(*LN_TABLE)[left_shift])
                     .expect("FixedPoint sub ln failed");
                 return y;
             }
@@ -122,7 +127,7 @@ impl LogApproximator for FixedPoint {
 
         y = y
             .add(&x)
-            .subtruct(&*MAX_PRECISION)
+            .subtract(&*MAX_PRECISION)
             .expect("FixedPoint sub one failed");
 
         y

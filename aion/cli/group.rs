@@ -21,6 +21,7 @@
 
 use std::str;
 
+/// groups of options
 pub enum Group {
     Operating,
     Misc,

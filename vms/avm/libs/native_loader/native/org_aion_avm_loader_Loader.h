@@ -215,6 +215,14 @@ JNIEXPORT jboolean JNICALL Java_org_aion_avm_loader_Loader_edverify
 JNIEXPORT void JNICALL Java_org_aion_avm_loader_Loader_removeStorage
   (JNIEnv *, jclass, jlong, jbyteArray, jbyteArray);
 
+/*
+ * Class:     org_aion_avm_loader_Loader
+ * Method:    hasStorage
+ * Signature: (J[B)Z
+ */
+JNIEXPORT jboolean JNICALL Java_org_aion_avm_loader_Loader_hasStorage
+  (JNIEnv *, jclass, jlong, jbyteArray);
+
 #ifdef __cplusplus
 }
 #endif
