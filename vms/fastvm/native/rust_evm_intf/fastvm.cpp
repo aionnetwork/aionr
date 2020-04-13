@@ -382,9 +382,12 @@ extern "C" {
     pop_gbl_obj();
     gbl_cb_obj = gbl_cb_objs[cur_obj];
     recv_idx -= 1;
-    if (recv_idx == -1)
+    if (recv_idx == -1) {
       curr_recv_addr.filled = 0;
-
+    }
+    else {
+      memcpy(&curr_recv_addr.addr, &recv_addr_repo[recv_idx], sizeof(evm_address));
+    }
     // release
 #if 1
     if (evm_result.release) {
