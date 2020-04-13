@@ -37,6 +37,7 @@ pub struct Log {
 }
 
 #[derive(Debug, Clone)]
+/// internal transaction during contract execution
 pub struct AionInternalTx {
     parent_hash: Vec<u8>,
     deep: usize,
@@ -115,27 +116,39 @@ impl TransactionResult {
 
 #[derive(Debug, Clone)]
 pub struct ExecutionContext {
+    /// transaction hash
     pub tx_hash: Vec<u8>,
-
+    /// destination address
     pub address: Address,
+    /// caller with 0 depth call
     pub origin: Address,
+    /// sender of current transaction
     pub caller: Address,
-
+    /// gas price in *wei*
     pub nrg_price: DataWord,
+    /// gas limit
     pub nrg_limit: u64,
+    /// value with this transaction
     pub call_value: DataWord,
+    /// call data with this transaction
     pub call_data: Vec<u8>,
-
+    /// call depth
     pub depth: i32,
+    /// kind of this transaction: see *execution_kind* below
     pub kind: i32,
+    /// call or create flags: static or not
     pub flags: i32,
-
+    /// account who receives the block rewards
     pub block_coinbase: Address,
+    /// block number with which current execution is
     pub block_number: u64,
+    /// block timestamp
     pub block_timestamp: i64,
+    /// block gas limit
     pub block_nrglimit: u64,
+    /// block difficulty
     pub block_difficulty: DataWord,
-
+    /// transaction result
     pub result: TransactionResult,
 }
 

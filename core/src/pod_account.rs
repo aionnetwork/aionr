@@ -59,7 +59,10 @@ impl PodAccount {
                 .storage_changes()
                 .iter()
                 .fold(BTreeMap::new(), |mut m, (k, v)| {
-                    m.insert(k.clone().as_slice().into(), v.clone().as_slice().into());
+                    m.insert(
+                        k.clone().as_slice().into(),
+                        v.clone().get().unwrap_or(vec![]).as_slice().into(),
+                    );
                     m
                 }),
             code: acc.code().map(|x| x.to_vec()),

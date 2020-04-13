@@ -255,10 +255,8 @@ pub fn receive_res(p2p: Mgr, hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncS
                     } else {
                         let block_hash = header.hash();
 
-                        // ignore the block if its body is already downloaded or imported
-                        if !storage.is_block_hash_downloaded(&block_hash)
-                            && !storage.is_block_hash_imported(&block_hash)
-                        {
+                        // ignore the block if it is already downloaded or imported
+                        if !storage.is_block_hash_recorded(&block_hash) {
                             headers.push(header.clone());
                         } else if !headers.is_empty() {
                             // Keep blocks in a batch consecutive

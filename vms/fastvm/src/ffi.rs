@@ -145,6 +145,7 @@ impl Into<EvmStatusCode> for ExecStatus {
             ExecStatus::OutOfGas => EvmStatusCode::OutOfGas,
             ExecStatus::Revert => EvmStatusCode::Revert,
             ExecStatus::Rejected => EvmStatusCode::Rejected,
+            ExecStatus::Fatal => EvmStatusCode::InternalError,
             _ => EvmStatusCode::Failure,
         }
     }
@@ -157,6 +158,7 @@ impl From<EvmStatusCode> for ExecStatus {
             EvmStatusCode::OutOfGas => ExecStatus::OutOfGas,
             EvmStatusCode::Revert => ExecStatus::Revert,
             EvmStatusCode::Rejected => ExecStatus::Rejected,
+            EvmStatusCode::InternalError => ExecStatus::Fatal,
             _ => ExecStatus::Failure,
         }
     }

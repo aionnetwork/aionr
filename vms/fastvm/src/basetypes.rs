@@ -25,10 +25,11 @@ use std::mem::transmute;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 
+/// 32 bytes long hash
 pub type EvmHash = [u8; 32];
-/// Aion address is now the public key which takes 32 bytes
+/// 32 bytes array starting with 0xa0
 pub type EvmAddress = [u8; 32];
-/// Big-endian 128-bit word
+/// Big-endian 128-bit word, it is the base data type of evm
 pub type EvmWord = [u8; 16];
 
 #[derive(Debug, Clone)]
@@ -58,6 +59,7 @@ impl ByteBuffer {
     }
 }
 
+/// DataWord type should be deprecated in the future
 impl DataWord {
     pub fn new() -> DataWord {
         DataWord {
@@ -112,6 +114,7 @@ impl DataWord {
     pub fn zero() -> DataWord { DataWord::new_with_int(0) }
 }
 
+/// deprecated
 struct EvmContext {}
 
 use libc;
@@ -148,12 +151,18 @@ pub struct EvmMessage {
 pub mod constants {
     use aion_types::U256;
 
+    /// the minimum gas left of internal creation
     pub const GAS_CODE_DEPOSIT: U256 = U256([1000, 0, 0, 0]);
+    /// Gas Limit of contract creation is between *GAS_CREATE_MIN* and *GAS_CREATE_MAX*
     pub const GAS_CREATE_MIN: U256 = U256([200000, 0, 0, 0]);
     pub const GAS_CREATE_MAX: U256 = U256([5000000, 0, 0, 0]);
+    /// gas cost of zero value byte
     pub const GAS_TX_DATA_ZERO: U256 = U256([4, 0, 0, 0]);
+    /// gas cost of non-zero value byte
     pub const GAS_TX_DATA_NONZERO: U256 = U256([64, 0, 0, 0]);
+    /// gas limit of contract call is between *GAS_CALL_MIN* and *GAS_CALL_MAX*
     pub const GAS_CALL_MIN: U256 = U256([21000, 0, 0, 0]);
     pub const GAS_CALL_MAX: U256 = U256([2000000, 0, 0, 0]);
+    /// max call depth of fastvm is 128
     pub const MAX_CALL_DEPTH: i32 = 128;
 }

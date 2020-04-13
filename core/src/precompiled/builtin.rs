@@ -20,7 +20,7 @@
  ******************************************************************************/
 
 use aion_types::{U256, Address, H128, H256};
-use vms::ExecutionResult;
+use vms::{FvmExecutionResult as ExecutionResult};
 use ajson;
 use super::total_currency_contract::TotalCurrencyContract;
 use super::edverify_contract::EDVerifyContract;

@@ -21,7 +21,8 @@
  ******************************************************************************/
 
 mod client;
-mod executive;
+mod fvm_executor;
+mod avm_executor;
 mod block;
 mod pod_account;
 mod pod_state;

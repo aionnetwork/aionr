@@ -21,7 +21,7 @@
 
 use super::builtin::{BuiltinExt, BuiltinContract, BuiltinParams};
 use aion_types::{U256, H128, U128, H256, Address};
-use vms::{ExecutionResult, ExecStatus, ReturnData};
+use vms::{FvmExecutionResult as ExecutionResult, ExecStatus, ReturnData};
 use key::{Ed25519Signature, public_to_address_ed25519, verify_signature_ed25519};
 
 /// A pre-compiled contract for retrieving and updating the total amount of currency.

@@ -50,30 +50,45 @@ fn calculate_hash<T: Hash>(t: &T) -> u64 {
     s.finish()
 }
 
+/// p2p node, basic connected node information
 #[derive(Clone)]
 pub struct Node {
+    /// node hash
     pub hash: u64,
+    /// node id
     pub id: [u8; NODE_ID_LENGTH],
+    /// net id
     pub net_id: u32,
+    /// address, include ip and port,
+    /// inbound node port will be allocated by tcp stream
     pub addr: IpAddr,
+    /// real address, include ip and port,
+    /// the address which we can connect to.
     pub real_addr: IpAddr,
-
+    /// revision
     pub revision: [u8; MAX_REVISION_LENGTH],
+    /// tcp stream
     pub ts: Arc<TcpStream>,
+    /// message channel transporter
     pub tx: mpsc::Sender<ChannelBuffer>,
+    /// node state
     pub state: STATE,
+    /// connection type (inbound/outbound)
     pub connection: Connection,
+    /// seed node flag
     pub if_seed: bool,
+    /// node update timestamp, use to keep node alive
     pub update: SystemTime,
 
     /// storage for msg out routes as flag tokens
     /// clear on incoming paired clear_token received
     pub tokens: HashSet<u32>,
+    /// tcp stream shutdown signal sender
     pub tx_thread: Arc<Mutex<Vec<Sender<()>>>>,
 }
 
 impl Node {
-    // construct inbound node
+    /// construct inbound node
     pub fn new_outbound(
         ts: TcpStream,
         tx: mpsc::Sender<ChannelBuffer>,
@@ -109,7 +124,7 @@ impl Node {
         })
     }
 
-    // construct outbound node
+    /// construct outbound node
     pub fn new_inbound(
         ts: TcpStream,
         tx: mpsc::Sender<ChannelBuffer>,
@@ -147,15 +162,19 @@ impl Node {
         })
     }
 
+    /// get nodes id
     pub fn get_id_string(&self) -> String { String::from_utf8_lossy(&self.id).into() }
 
+    /// update nodes
     pub fn update(&mut self) {
         trace!(target: "p2p_node", "node timestamp updated");
         self.update = SystemTime::now();
     }
 
+    /// return true if node is active
     pub fn is_active(&self) -> bool { self.state == STATE::ACTIVE }
 
+    /// shutdown tcp thread
     pub fn shutdown_tcp_thread(&self) -> Result<(), ()> {
         let mut tx_thread_vec = self.tx_thread.lock();
         let mut result = Ok(());

@@ -1,0 +1,23 @@
+#!/bin/sh
+
+echo "pre-commit hook is running..."
+
+# Iterate over rust files whose commit is: add, copy, modify, rename.
+for file in $(git diff --name-only --cached --diff-filter=ACMR | grep ".*\.rs$")
+do
+    # is this condition neccessary? removed files are filtered in --diff-filter?
+
+    # If file was removed but still in commit list, ignore it.
+    if [ -f $file ]
+    then
+        echo "formatting ${file}..."
+        rustfmt +nightly $file 2>/dev/null
+        rustfmt +nightly $file --check 2>/dev/null
+        git add $file
+    fi
+done
+exit_code=$?
+if [ "$exit_code" -ne "0" ]; then
+    echo "failed to format some rust files automatically, please format manually."
+    exit $exit_code
+fi

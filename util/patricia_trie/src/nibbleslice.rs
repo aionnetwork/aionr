@@ -124,6 +124,9 @@ where 'a: 'view
     }
 
     /// Create a new nibble slice from the given HPE encoded data (e.g. output of `encoded()`).
+    /// Hex-Prefix Encoding to ensure even encoded data
+    /// 16th bit: 1 -> odd, 0 -> even
+    /// only leaf's first byte is 0x20
     pub fn from_encoded(data: &'a [u8]) -> (NibbleSlice, bool) {
         (
             Self::new_offset(data, if data[0] & 16 == 16 { 1 } else { 2 }),

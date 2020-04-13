@@ -47,7 +47,7 @@ fn storage_at() {
     let value = a.storage_at(&db.immutable(), &vec![0x00; 16]).unwrap();
     assert_eq!(value, Some(vec![0x12, 0x34]));
     let value = a.storage_at(&db.immutable(), &vec![0x01]).unwrap();
-    assert_eq!(value, Some(Vec::<u8>::new()));
+    assert_eq!(value, None);
 }
 
 #[test]
@@ -107,42 +107,4 @@ fn cache_transformed_code() {
         Some(Arc::new(vec![0x55, 0x44, 0xffu8]))
     );
     assert_eq!(a.account_type, AccType::AVM);
-}
-
-// #[test]
-// fn cache_objectgraph() {
-//     let address = Address::new();
-//     let mut db = MemoryDB::new();
-//     let mut db = AccountDBMut::new(&mut db, &address);
-//     let mut a = AionVMAccount::new_contract(69.into(), 0.into());
-//     let kvdb = Mockkvdb::new_default();
-
-//     let rlp = {
-//         a.init_objectgraph(vec![0x55, 0x44, 0xffu8]);
-//         a.commit_storage(&Default::default(), &mut db).unwrap();
-//         // calculate delta_root and save it in accountDB
-//         a.update_root(&address, Arc::new(kvdb));
-//         a.rlp()
-//     };
-
-//     let mut a = AionVMAccount::from_rlp(&rlp);
-//     assert_eq!(
-//         a.cache_objectgraph(&address, &db.immutable()),
-//         Some(Arc::new(vec![0x55, 0x44, 0xffu8]))
-//     );
-// }
-
-#[test]
-fn cached_storage_at() {
-    let mut db = MemoryDB::new();
-    let mut db = AccountDBMut::new(&mut db, &Address::new());
-    let mut a = AionVMAccount::new_contract(69.into(), 0.into());
-
-    a.set_storage(vec![0x12, 0x34], vec![0x67, 0x78]);
-    a.commit_storage(&Default::default(), &mut db).unwrap();
-
-    assert!(a.cached_storage_at(&vec![0x12, 0x34]).is_some());
-
-    a.storage_cache.borrow_mut().clear();
-    assert!(a.cached_storage_at(&vec![0x12, 0x34]).is_none());
 }

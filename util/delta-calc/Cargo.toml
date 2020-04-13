@@ -11,6 +11,3 @@ log = "0.3"
 blake2b = { path = "../blake2b" }
 fixed-point = { path = "../fixed_point" }
 aion-types = { path = "../aion-types" }
-
-[dev-dependencies]
-rand = "0.4"

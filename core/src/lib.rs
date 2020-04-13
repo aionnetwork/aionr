@@ -46,7 +46,6 @@ extern crate blake2b;
 extern crate heapsize;
 extern crate patricia_trie as trie;
 extern crate triehash;
-extern crate ansi_term;
 extern crate unexpected;
 extern crate util_error;
 extern crate db as kvdb;
@@ -57,7 +56,6 @@ extern crate lazy_static;
 extern crate rlp_derive;
 extern crate rustc_hex;
 extern crate stats;
-extern crate stop_guard;
 extern crate time;
 extern crate using_queue;
 extern crate table;
@@ -72,7 +70,6 @@ extern crate equihash;
 extern crate vms;
 extern crate futures;
 extern crate tokio;
-// extern crate state as crate_state;
 extern crate tiny_keccak;
 extern crate num_bigint;
 extern crate bytebuffer;
@@ -104,7 +101,6 @@ pub mod client;
 pub mod transaction;
 // PoW Engine
 pub mod engine;
-//pub mod error;
 pub mod header;
 pub mod views;
 pub mod sync;
@@ -118,14 +114,11 @@ mod machine;
 mod pod_state;
 mod pod_account;
 mod state;
-// mod state_db;
 mod db;
 mod factory;
 mod cache_manager;
-// mod account_db;
 mod precompiled;
-mod executive;
-mod externalities;
+mod executor;
 mod types;
 
 #[cfg(test)]
@@ -143,7 +136,7 @@ pub use types::{
     error::BlockError
 };
 
-pub use executive::contract_address;
+pub use executor::fvm_exec::contract_address;
 
 #[cfg(test)]
 use tests::common::helpers;

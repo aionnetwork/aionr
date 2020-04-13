@@ -23,7 +23,6 @@
 //! `TransactionRequest` type
 use std::fmt;
 
-use ansi_term::Colour;
 use helpers;
 use aion_types::{U256, Address, H256};
 
@@ -89,8 +88,8 @@ impl fmt::Display for TransactionRequest {
                 write!(
                     f,
                     "{} ETH from {} to 0x{:?}",
-                    Colour::White.bold().paint(format_ether(eth)),
-                    Colour::White.bold().paint(format!("0x{:?}", self.from)),
+                    format_ether(eth),
+                    format!("0x{:?}", self.from),
                     to
                 )
             }
@@ -98,8 +97,8 @@ impl fmt::Display for TransactionRequest {
                 write!(
                     f,
                     "{} ETH from {} for contract creation",
-                    Colour::White.bold().paint(format_ether(eth)),
-                    Colour::White.bold().paint(format!("0x{:?}", self.from)),
+                    format_ether(eth),
+                    format!("0x{:?}", self.from),
                 )
             }
         }

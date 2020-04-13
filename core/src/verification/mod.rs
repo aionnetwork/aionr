@@ -33,7 +33,6 @@ use acore_bytes::Bytes;
 use aion_types::U256;
 use heapsize::HeapSizeOf;
 use rlp::UntrustedRlp;
-use time::get_time;
 use unexpected::{Mismatch, OutOfBounds};
 
 use blockchain::*;
@@ -64,7 +63,7 @@ impl HeapSizeOf for PreverifiedBlock {
 
 /// Phase 1 quick block verification. Only does checks that are cheap. Operates on a single block
 pub fn verify_block_basic(header: &Header, bytes: &[u8], engine: &Engine) -> Result<(), Error> {
-    verify_header_params(&header, engine, true)?;
+    verify_header_params(&header, engine)?;
     engine.verify_block_basic(&header)?;
 
     for t in UntrustedRlp::new(bytes)
@@ -302,7 +301,7 @@ pub fn verify_block_final(expected: &Header, got: &Header) -> Result<(), Error> 
 }
 
 /// Check basic header parameters.
-pub fn verify_header_params(header: &Header, engine: &Engine, is_full: bool) -> Result<(), Error> {
+pub fn verify_header_params(header: &Header, engine: &Engine) -> Result<(), Error> {
     let expected_seal_fields = engine.seal_fields(header);
     if header.seal().len() != expected_seal_fields {
         return Err(From::from(BlockError::InvalidSealArity(Mismatch {
@@ -318,6 +317,7 @@ pub fn verify_header_params(header: &Header, engine: &Engine, is_full: bool) -> 
             found: header.number(),
         })));
     }
+
     if header.gas_used() > header.gas_limit() {
         return Err(From::from(BlockError::TooMuchGasUsed(OutOfBounds {
             max: Some(header.gas_limit().clone()),
@@ -325,6 +325,7 @@ pub fn verify_header_params(header: &Header, engine: &Engine, is_full: bool) -> 
             found: header.gas_used().clone(),
         })));
     }
+
     let min_gas_limit = engine.params().min_gas_limit;
     if header.gas_limit() < &min_gas_limit {
         return Err(From::from(BlockError::InvalidGasLimit(OutOfBounds {
@@ -333,6 +334,7 @@ pub fn verify_header_params(header: &Header, engine: &Engine, is_full: bool) -> 
             found: header.gas_limit().clone(),
         })));
     }
+
     let maximum_extra_data_size = engine.maximum_extra_data_size();
     if header.number() != 0 && header.extra_data().len() > maximum_extra_data_size {
         return Err(From::from(BlockError::ExtraDataOutOfBounds(OutOfBounds {
@@ -340,29 +342,6 @@ pub fn verify_header_params(header: &Header, engine: &Engine, is_full: bool) -> 
             max: Some(maximum_extra_data_size),
             found: header.extra_data().len(),
         })));
-    }
-
-    if is_full {
-        const ACCEPTABLE_DRIFT_SECS: u64 = 15;
-        let max_time = get_time().sec as u64 + ACCEPTABLE_DRIFT_SECS;
-        let invalid_threshold = max_time + ACCEPTABLE_DRIFT_SECS * 9;
-        let timestamp = header.timestamp();
-
-        if timestamp > invalid_threshold {
-            return Err(From::from(BlockError::InvalidTimestamp(OutOfBounds {
-                max: Some(max_time),
-                min: None,
-                found: timestamp,
-            })));
-        }
-
-        if timestamp > max_time {
-            return Err(From::from(BlockError::TemporarilyInvalid(OutOfBounds {
-                max: Some(max_time),
-                min: None,
-                found: timestamp,
-            })));
-        }
     }
 
     Ok(())
@@ -430,6 +409,7 @@ mod tests {
     use types::state::log_entry::{LogEntry, LocalizedLogEntry};
     use rlp;
     use keychain;
+    use time::get_time;
 
     fn check_ok(result: Result<(), Error>) {
         result.unwrap_or_else(|e| panic!("Block verification failed: {:?}", e));
@@ -445,25 +425,6 @@ mod tests {
                 )
             }
             Ok(_) => panic!("Block verification failed.\nExpected: {:?}\nGot: Ok", e),
-        }
-    }
-
-    fn check_fail_timestamp(result: Result<(), Error>, temp: bool) {
-        let name = if temp {
-            "TemporarilyInvalid"
-        } else {
-            "InvalidTimestamp"
-        };
-        match result {
-            Err(Error::Block(BlockError::InvalidTimestamp(_))) if !temp => (),
-            Err(Error::Block(BlockError::TemporarilyInvalid(_))) if temp => (),
-            Err(other) => {
-                panic!(
-                    "Block verification failed.\nExpected: {}\nGot: {:?}",
-                    name, other
-                )
-            }
-            Ok(_) => panic!("Block verification failed.\nExpected: {}\nGot: Ok", name),
         }
     }
 
@@ -817,26 +778,6 @@ mod tests {
                 min: Some(parent.timestamp() + 1),
                 found: header.timestamp(),
             }),
-        );
-
-        header = good.clone();
-        header.set_timestamp(2450000000);
-        check_fail_timestamp(
-            basic_test(
-                &create_test_block_with_data(&header, &good_transactions),
-                engine,
-            ),
-            false,
-        );
-
-        header = good.clone();
-        header.set_timestamp(get_time().sec as u64 + 20);
-        check_fail_timestamp(
-            basic_test(
-                &create_test_block_with_data(&header, &good_transactions),
-                engine,
-            ),
-            true,
         );
 
         header = good.clone();
