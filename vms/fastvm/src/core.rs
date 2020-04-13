@@ -26,6 +26,7 @@ use std::ptr;
 use bincode::{serialize};
 use ffi::*;
 
+const REVISION_AION_V0: i32 = 5;
 const REVISION_AION_V1: i32 = 7;
 
 impl EvmJit<u8> for EvmResult {
@@ -133,7 +134,12 @@ impl FastVM {
         //let vm_ctx: *mut ::libc::wchar_t = unsafe { mem::transmute(&ctx_buffer[0]) };
         let vm_ctx = get_libc_pointer_of_bytes(&ctx_buffer);
 
-        let vm_rev: i32 = self.revision.clone() as i32;
+        // let vm_rev: i32 = self.revision.clone() as i32;
+        let vm_rev: i32 = if ctx.depth == 0 {
+            REVISION_AION_V1
+        } else {
+            REVISION_AION_V0
+        };
         let mut result = EvmResult::new();
 
         match result.output_data.is_null() {
