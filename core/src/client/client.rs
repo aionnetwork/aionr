@@ -1838,9 +1838,9 @@ impl MiningBlockChainClient for Client {
 
             let route = self.commit_block(block, &header, &block_data);
             trace!(target: "client", "Imported sealed block #{} ({})", number, hash);
-            self.state_db
-                .write()
-                .sync_cache(&route.enacted, &route.retracted, false);
+            // self.state_db
+            //     .write()
+            //     .sync_cache(&route.enacted, &route.retracted, false);
             route
         };
         let (enacted, retracted) = self.calculate_enacted_retracted(&[route]);
