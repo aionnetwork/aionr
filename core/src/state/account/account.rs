@@ -268,7 +268,7 @@ impl AionVMAccount {
         self.transformed_code_size = other.transformed_code_size;
         self.transformed_code_cache = other.transformed_code_cache;
         self.object_graph_size = other.object_graph_size;
-        self.object_graph_hash = BLAKE2B_EMPTY; //other.object_graph_hash;
+        self.object_graph_hash = other.object_graph_hash;
         self.object_graph_cache = other.object_graph_cache;
         self.empty_but_commit = other.empty_but_commit;
         self.account_type = other.account_type;
