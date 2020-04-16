@@ -363,8 +363,10 @@ impl VMAccount for AionVMAccount {
     fn transformed_code_size(&self) -> Option<usize> { self.transformed_code_size.clone() }
 
     fn is_cached(&self) -> bool {
-        !self.code_cache.is_empty()
-            || (self.code_cache.is_empty() && self.code_hash == BLAKE2B_EMPTY)
+        !self.code_cache.is_empty() || self.code_hash == BLAKE2B_EMPTY
+        // equivalent to
+        // !self.code_cache.is_empty()
+        //     || (self.code_cache.is_empty() && self.code_hash == BLAKE2B_EMPTY)
     }
 
     fn is_transformed_cached(&self) -> bool { !self.transformed_code_cache.is_empty() }
