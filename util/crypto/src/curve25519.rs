@@ -43,6 +43,7 @@ static FE_D2: Fe = Fe([
     -21827239, -5839606, -30745221, 13898782, 229458, 15978800, -12551817, -6495438, 29715968,
     9444199,
 ]);
+static CURVE25519_A: Fe = Fe([486662, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
 fn load_4u(s: &[u8]) -> u64 {
     (s[0] as u64) | ((s[1] as u64) << 8) | ((s[2] as u64) << 16) | ((s[3] as u64) << 24)
@@ -1311,7 +1312,7 @@ impl GeP1P1 {
         }
     }
 
-    fn to_p3(&self) -> GeP3 {
+    pub fn to_p3(&self) -> GeP3 {
         GeP3 {
             x: self.x * self.t,
             y: self.y * self.z,
@@ -1454,6 +1455,43 @@ impl GeP2 {
 }
 
 impl GeP3 {
+    pub fn from_bytes(s: &[u8]) -> Option<GeP3> {
+        let y = Fe::from_bytes(s);
+        let z = FE_ONE;
+        let y_squared = y.square();
+        let u = y_squared - FE_ONE;
+        let v = (y_squared * FE_D) + FE_ONE;
+        let v_raise_3 = v.square() * v;
+        let v_raise_7 = v_raise_3.square() * v;
+        let uv7 = v_raise_7 * u; // Is this commutative? u comes second in the code, but not in the notation...
+
+        let mut x = uv7.pow25523() * v_raise_3 * u;
+
+        let vxx = x.square() * v;
+        let check = vxx - u;
+
+        if check.is_nonzero() {
+            let check2 = vxx + u;
+            if check2.is_nonzero() {
+                return None;
+            }
+            x = x * FE_SQRTM1;
+        }
+
+        if x.is_negative() != ((s[31] >> 7) != 0) {
+            x = x.neg();
+        }
+
+        let t = x * y;
+
+        Some(GeP3 {
+            x: x,
+            y: y,
+            z: z,
+            t: t,
+        })
+    }
+
     pub fn from_bytes_negate_vartime(s: &[u8]) -> Option<GeP3> {
         let y = Fe::from_bytes(s);
         let z = FE_ONE;
@@ -1498,7 +1536,7 @@ impl GeP3 {
         }
     }
 
-    fn to_cached(&self) -> GeCached {
+    pub fn to_cached(&self) -> GeCached {
         GeCached {
             y_plus_x: self.y + self.x,
             y_minus_x: self.y - self.x,
@@ -1525,6 +1563,20 @@ impl GeP3 {
         let mut bs = y.to_bytes();
         bs[31] ^= (if x.is_negative() { 1 } else { 0 }) << 7;
         bs
+    }
+
+    pub fn multiply_by_cofactor(&self) -> GeP3 {
+        let mut point = self.clone();
+        let mut tmp_point: GeCached = point.to_cached();
+        let mut tmp2_point = point + tmp_point;
+        point = tmp2_point.to_p3();
+        tmp_point = point.to_cached();
+        tmp2_point = point + tmp_point;
+        point = tmp2_point.to_p3();
+        tmp_point = point.to_cached();
+        tmp2_point = point + tmp_point;
+        point = tmp2_point.to_p3();
+        point
     }
 }
 
@@ -1669,6 +1721,137 @@ impl GePrecomp {
         t.maybe_set(&minus_t, bnegative as i32);
         t
     }
+}
+
+impl GeCached {
+    fn zero() -> GeCached {
+        GeCached {
+            y_plus_x: FE_ONE,
+            y_minus_x: FE_ONE,
+            z: FE_ONE,
+            t2d: FE_ZERO,
+        }
+    }
+
+    pub fn maybe_set(&mut self, other: &GeCached, do_swap: i32) {
+        self.y_plus_x.maybe_set(&other.y_plus_x, do_swap);
+        self.y_minus_x.maybe_set(&other.y_minus_x, do_swap);
+        self.z.maybe_set(&other.z, do_swap);
+        self.t2d.maybe_set(&other.t2d, do_swap);
+    }
+
+    pub fn select(cached: [GeCached; 8], b: i8) -> GeCached {
+        let bnegative = (b as u8) >> 7;
+        let babs: u8 = (b - (((-(bnegative as i8)) & b) << 1)) as u8;
+        let mut t = GeCached::zero();
+        t.maybe_set(&cached[0], equal(babs, 1));
+        t.maybe_set(&cached[1], equal(babs, 2));
+        t.maybe_set(&cached[2], equal(babs, 3));
+        t.maybe_set(&cached[3], equal(babs, 4));
+        t.maybe_set(&cached[4], equal(babs, 5));
+        t.maybe_set(&cached[5], equal(babs, 6));
+        t.maybe_set(&cached[6], equal(babs, 7));
+        t.maybe_set(&cached[7], equal(babs, 8));
+        let minus_t = GeCached {
+            y_plus_x: t.y_minus_x,
+            y_minus_x: t.y_plus_x,
+            z: t.z,
+            t2d: t.t2d.neg(),
+        };
+        t.maybe_set(&minus_t, bnegative as i32);
+        t
+    }
+}
+
+/*
+h = a * p
+where a = a[0]+256*a[1]+...+256^31 a[31]
+
+Preconditions:
+a[31] <= 127
+*/
+pub fn ge_scalarmult(a: &[u8], p: GeP3) -> GeP3 {
+    let mut es: [i8; 64] = [0; 64];
+    let mut r: GeP1P1;
+    let mut s: GeP2;
+    let mut t: GeCached;
+
+    let mut pi = [GeCached {
+        y_plus_x: FE_ZERO,
+        y_minus_x: FE_ZERO,
+        z: FE_ZERO,
+        t2d: FE_ZERO,
+    }; 8];
+
+    pi[0] = p.to_cached(); /* p */
+
+    let t2: GeP1P1 = p.dbl();
+    let p2: GeP3 = t2.to_p3();
+    pi[1] = p2.to_cached(); /* 2p = 2*p */
+
+    let t3: GeP1P1 = p + pi[1];
+    let p3: GeP3 = t3.to_p3();
+    pi[2] = p3.to_cached(); /* 3p = 3p = 2p+p */
+
+    let t4: GeP1P1 = p2.dbl();
+    let p4: GeP3 = t4.to_p3();
+    pi[3] = p4.to_cached(); /* 4p = 2*2p */
+
+    let t5: GeP1P1 = p + pi[3];
+    let p5: GeP3 = t5.to_p3();
+    pi[4] = p5.to_cached(); /* 5p = 4p+p */
+
+    let t6: GeP1P1 = p3.dbl();
+    let p6: GeP3 = t6.to_p3();
+    pi[5] = p6.to_cached(); /* 6p = 2*3p */
+
+    let t7: GeP1P1 = p + pi[5];
+    let p7: GeP3 = t7.to_p3();
+    pi[6] = p7.to_cached(); /* 7p = 6p+p */
+
+    let t8: GeP1P1 = p4.dbl();
+    let p8: GeP3 = t8.to_p3();
+    pi[7] = p8.to_cached(); /* 8p = 2*4p */
+
+    for i in 0..32 {
+        es[2 * i + 0] = ((a[i] >> 0) & 15) as i8;
+        es[2 * i + 1] = ((a[i] >> 4) & 15) as i8;
+    }
+    /* each es[i] is between 0 and 15 */
+    /* es[63] is between 0 and 7 */
+
+    let mut carry: i8 = 0;
+    for i in 0..63 {
+        es[i] += carry;
+        carry = es[i] + 8;
+        carry >>= 4;
+        es[i] -= carry << 4;
+    }
+    es[63] += carry;
+    /* each es[i] is between -8 and 8 */
+
+    let mut h = GeP3::zero();
+
+    for i in (1..64).rev() {
+        t = GeCached::select(pi, es[i]);
+        r = h + t;
+
+        s = r.to_p2();
+        r = s.dbl();
+        s = r.to_p2();
+        r = s.dbl();
+        s = r.to_p2();
+        r = s.dbl();
+        s = r.to_p2();
+        r = s.dbl();
+
+        h = r.to_p3();
+    }
+    t = GeCached::select(pi, es[0]);
+    r = h + t;
+    h = r.to_p3();
+
+    h
 }
 
 /*
@@ -2652,6 +2835,111 @@ pub fn curve25519_base(x: &[u8]) -> [u8; 32] {
     let mut base: [u8; 32] = [0; 32];
     base[0] = 9;
     curve25519(x, base.as_ref())
+}
+
+fn chi25519(z: Fe) -> Fe {
+    let mut t0 = z.square();
+    let mut t1 = t0 * z;
+    t0 = t1.square();
+    let mut t2 = t0.square();
+    t2 = t2.square();
+    t2 = t2 * t0;
+    t1 = t2 * z;
+    t2 = t1.square();
+    for _i in 1..5 {
+        t2 = t2.square();
+    }
+    t1 = t2 * t1;
+    t2 = t1.square();
+    for _i in 1..10 {
+        t2 = t2.square();
+    }
+    t2 = t2 * t1;
+    let mut t3 = t2.square();
+    for _i in 1..20 {
+        t3 = t3.square();
+    }
+    t2 = t3 * t2;
+    t2 = t2.square();
+    for _i in 1..10 {
+        t2 = t2.square()
+    }
+    t1 = t2 * t1;
+    t2 = t1.square();
+    for _i in 1..50 {
+        t2 = t2.square();
+    }
+    t2 = t2 * t1;
+    t3 = t2.square();
+    for _i in 1..100 {
+        t3 = t3.square();
+    }
+    t2 = t3 * t2;
+    t2 = t2.square();
+    for _i in 1..50 {
+        t2 = t2.square();
+    }
+    t1 = t2 * t1;
+    t1 = t1.square();
+    for _i in 1..4 {
+        t1 = t1.square();
+    }
+    let output = t1 * t0;
+    output
+}
+
+pub fn ge25519_from_uniform(r: [u8; 32]) -> [u8; 32] {
+    let mut s: [u8; 32] = r.clone();
+    let x_sign = s[31] & 0x80;
+    s[31] &= 0x7f;
+
+    let mut rr2 = Fe::from_bytes(&s);
+
+    /* elligator */
+    rr2 = rr2.square_and_double();
+    rr2.0[0] = rr2.0[0] + 1;
+    rr2 = rr2.invert();
+    let mut x = CURVE25519_A * rr2;
+    x = x.neg();
+
+    let mut x2 = x.square();
+    let x3 = x * x2;
+    let mut e = x3 + x;
+    x2 = x2 * CURVE25519_A;
+    e = x2 + e;
+
+    e = chi25519(e);
+
+    s = e.to_bytes();
+    let e_is_minus_1 = s[1] & 1;
+    if e_is_minus_1 == 1 {
+        x = x.neg();
+    }
+    x2 = FE_ZERO;
+    if e_is_minus_1  == 1 {
+        x2 = CURVE25519_A;
+    }
+    x = x - x2;
+
+    /* yed = (x-1)/(x+1) */
+    let x_plus_one = x + FE_ONE;
+    let x_minus_one = x - FE_ONE;
+    let x_plus_one_inv = x_plus_one.invert();
+    let yed = x_minus_one * x_plus_one_inv;
+    s = yed.to_bytes();
+
+    /* recover x */
+    s[31] |= x_sign;
+    let mut p3 = GeP3::from_bytes(&s).unwrap(); // TODO: handle unwrap
+
+    let mut p1 = p3.dbl();
+    let mut p2 = p1.to_p2();
+    p1 = p2.dbl();
+    p2 = p1.to_p2();
+    p1 = p2.dbl();
+    p3 = p1.to_p3();
+
+    p3.to_bytes()
 }
 
 #[cfg(test)]
