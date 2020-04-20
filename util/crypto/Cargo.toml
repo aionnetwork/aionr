@@ -12,6 +12,7 @@ rustc-serialize = "^0.3"
 rand = "*"
 libc = "*"
 rustc-hex = "1.0"
+log = "0.3"
 
 [features]
 benches = []

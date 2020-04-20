@@ -4,6 +4,8 @@ extern crate rand;
 extern crate rustc_serialize as serialize;
 extern crate libc;
 extern crate rustc_hex;
+#[macro_use]
+extern crate log;
 
 pub mod aessafe;
 pub mod bcrypt;

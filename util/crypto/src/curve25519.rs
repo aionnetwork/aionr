@@ -2888,7 +2888,7 @@ fn chi25519(z: Fe) -> Fe {
     output
 }
 
-pub fn ge25519_from_uniform(r: [u8; 32]) -> [u8; 32] {
+pub fn ge25519_from_uniform(r: [u8; 32]) -> Result<[u8; 32], ()> {
     let mut s: [u8; 32] = r.clone();
     let x_sign = s[31] & 0x80;
     s[31] &= 0x7f;
@@ -2916,7 +2916,7 @@ pub fn ge25519_from_uniform(r: [u8; 32]) -> [u8; 32] {
         x = x.neg();
     }
     x2 = FE_ZERO;
-    if e_is_minus_1  == 1 {
+    if e_is_minus_1 == 1 {
         x2 = CURVE25519_A;
     }
     x = x - x2;
@@ -2930,7 +2930,10 @@ pub fn ge25519_from_uniform(r: [u8; 32]) -> [u8; 32] {
 
     /* recover x */
     s[31] |= x_sign;
-    let mut p3 = GeP3::from_bytes(&s).unwrap(); // TODO: handle unwrap
+    let mut p3 = match GeP3::from_bytes(&s) {
+        Some(point) => point,
+        None => return Err(()),
+    };
 
     let mut p1 = p3.dbl();
     let mut p2 = p1.to_p2();
@@ -2939,7 +2942,7 @@ pub fn ge25519_from_uniform(r: [u8; 32]) -> [u8; 32] {
     p1 = p2.dbl();
     p3 = p1.to_p3();
 
-    p3.to_bytes()
+    Ok(p3.to_bytes())
 }
 
 #[cfg(test)]
