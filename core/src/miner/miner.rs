@@ -1094,8 +1094,8 @@ impl Miner {
         let mut new_seed: Vec<u8> = Vec::new();
         new_seed.extend(&seed_left.to_vec());
         new_seed.extend(&seed_right.to_vec());
-        debug!(target: "miner", "block {:?}, hybrid_left {:?}, hybrid_right {:?}, seed_left {:?}, 
-            seed_right {:?}, new_seed {:?}", 
+        debug!(target: "miner", "block {:?}, hybrid_left {:?}, hybrid_right {:?}, seed_left {:?},
+            seed_right {:?}, new_seed {:?}",
             parent_header.number() + 1, hybrid_left, hybrid_right, seed_left,
             seed_right, new_seed);
         let mut seed: [u8; 64] = [0u8; 64];
@@ -1197,7 +1197,6 @@ impl MinerService for Miner {
     ) -> Vec<Result<(), Error>>
     {
         trace!(target: "client", "Importing external transactions");
-        let mut is_imported: bool = false;
 
         let results = transactions
             .into_iter()
@@ -1210,9 +1209,6 @@ impl MinerService for Miner {
                             TransactionOrigin::External,
                             None,
                         );
-                        if !is_imported && import_result.is_ok() {
-                            is_imported = true;
-                        }
                         import_result
                     })
             })
