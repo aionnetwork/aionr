@@ -73,6 +73,9 @@ dependencies = [
 [[package]]
 name = "acore-bytes"
 version = "0.1.0"
+dependencies = [
+ "rustc-hex 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
+]
 
 [[package]]
 name = "acore-io"

@@ -52,6 +52,9 @@ pub struct Params {
     /// Unity hybrid seed update block number.
     #[serde(rename = "unityHybridSeedUpdate")]
     pub unity_hybrid_seed_update: Option<Uint>,
+    /// Unity ecvrf seed update block number.
+    #[serde(rename = "unityECVRFSeedUpdate")]
+    pub unity_ecvrf_seed_update: Option<Uint>,
 }
 
 #[cfg(test)]

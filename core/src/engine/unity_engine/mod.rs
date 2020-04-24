@@ -571,12 +571,20 @@ impl Engine for Arc<UnityEngine> {
                 .params()
                 .unity_hybrid_seed_update
                 .map_or(false, |fork_number| header.number() > fork_number);
+            // U30-32: unity ecvrf seed update
+            let unity_ecvrf_seed_update = self
+                .machine
+                .params()
+                .unity_ecvrf_seed_update
+                .map_or(false, |fork_number| header.number() > fork_number);
+
             PoSValidator::validate(
                 header,
                 parent,
                 grand_parent,
                 stake,
                 unity_hybrid_seed_update,
+                unity_ecvrf_seed_update,
             )?;
             Ok(())
         }

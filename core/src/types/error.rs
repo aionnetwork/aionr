@@ -106,6 +106,8 @@ pub enum BlockError {
     InvalidPoSSeed,
     /// Invalid PoS block signature
     InvalidPoSSignature,
+    /// Invalid PoS block public key
+    InvalidPoSPublicKey,
     /// Invalid PoS block author
     InvalidPoSAuthor,
     /// Invalid future time stamp
@@ -168,6 +170,7 @@ impl fmt::Display for BlockError {
             InvalidPoSSealType => "PoS block's seal type is not pos.".into(),
             InvalidPoSSeed => "PoS block's seed verification failed.".into(),
             InvalidPoSSignature => "PoS block's signature verification failed.".into(),
+            InvalidPoSPublicKey => "PoS block's public key verification failed.".into(),
             InvalidPoSAuthor => {
                 "PoS block's author does not match the public key provided in the seal.".into()
             }

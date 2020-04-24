@@ -49,3 +49,8 @@ loggers:
     appenders:
       - stdout
     additive: false
+  sync_statics:
+    level: off
+    appenders:
+      - stdout
+    additive: false

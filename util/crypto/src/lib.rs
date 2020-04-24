@@ -30,7 +30,7 @@ mod simd;
 mod step_by;
 pub mod symmetriccipher;
 pub mod util;
-pub mod vrf;
+pub mod ecvrf;
 
 use std::fmt;
 use pbkdf2::pbkdf2;

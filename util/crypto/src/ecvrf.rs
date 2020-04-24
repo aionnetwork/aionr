@@ -31,14 +31,14 @@ static THREE: [u8; 1] = [0x03];
 /// Generate ecvrf proof from ed25519 key pair
 /// Returns the proof if success
 /// Returns error if any single step failed
-pub fn vrf_prove(sk: &[u8; 64], message: &[u8]) -> Result<[u8; 80], ()> {
-    let (x_scalar, truncated_hashed_sk_string, y_point) = vrf_expand_sk(sk)?;
+pub fn prove(sk: &[u8; 64], message: &[u8]) -> Result<[u8; 80], ()> {
+    let (x_scalar, truncated_hashed_sk_string, y_point) = expand_sk(sk)?;
 
-    let h_string: [u8; 32] = vrf_ietfdraft03_hash_to_curve_elligator2_25519(&y_point, message)?;
+    let h_string: [u8; 32] = hash_to_curve_elligator2(&y_point, message)?;
     let h_point: GeP3 = gep3_from_bytes(&h_string)?;
 
     let gamma_point: GeP3 = ge_scalarmult(&x_scalar, h_point);
-    let k_scalar: [u8; 32] = vrf_nonce_generation(&truncated_hashed_sk_string, &h_string);
+    let k_scalar: [u8; 32] = generate_nonce(&truncated_hashed_sk_string, &h_string);
     let kb_point: GeP3 = ge_scalarmult_base(&k_scalar);
     let kh_point: GeP3 = ge_scalarmult(&k_scalar, h_point);
 
@@ -47,10 +47,9 @@ pub fn vrf_prove(sk: &[u8; 64], message: &[u8]) -> Result<[u8; 80], ()> {
     debug!(target: "ecvrf", "kb_point: {:?}", kb_point.to_bytes().to_hex());
     debug!(target: "ecvrf", "kh_point: {:?}", kh_point.to_bytes().to_hex());
 
-    /* c = ECVRF_hash_points(h, gamma, k*B, k*H)
+    /* c = EChash_points(h, gamma, k*B, k*H)
      * (writes only to the first 16 bytes of c_scalar */
-    let c_scalar: [u8; 32] =
-        vrf_ietfdraft03_hash_points(&h_point, &gamma_point, &kb_point, &kh_point);
+    let c_scalar: [u8; 32] = hash_points(&h_point, &gamma_point, &kb_point, &kh_point);
     debug!(target: "ecvrf", "c_scalar: {:?}", c_scalar.to_hex());
 
     let mut pi: [u8; 80] = [0; 80];
@@ -76,13 +75,13 @@ pub fn vrf_prove(sk: &[u8; 64], message: &[u8]) -> Result<[u8; 80], ()> {
 /// Verify ecvrf proof
 /// Returns the output hash of the proof if success
 /// Returns error if the proof is verified invalid.
-pub fn vrf_verify(pk: &[u8; 32], proof: &[u8; 80], message: &[u8]) -> Result<[u8; 64], ()> {
+pub fn verify(pk: &[u8; 32], proof: &[u8; 80], message: &[u8]) -> Result<[u8; 64], ()> {
     let y_point: GeP3 = gep3_from_bytes(pk)?;
-    let (gamma_point, c_scalar, mut s_scalar) = vrf_ietfdraft03_decode_proof(proof)?;
+    let (gamma_point, c_scalar, mut s_scalar) = decode_proof(proof)?;
 
     sc_reduce(&mut s_scalar);
 
-    let h_string: [u8; 32] = vrf_ietfdraft03_hash_to_curve_elligator2_25519(&y_point, message)?;
+    let h_string: [u8; 32] = hash_to_curve_elligator2(&y_point, message)?;
     let h_point: GeP3 = gep3_from_bytes(&h_string)?;
 
     /* calculate U = s*B - c*Y */
@@ -99,17 +98,36 @@ pub fn vrf_verify(pk: &[u8; 32], proof: &[u8; 80], message: &[u8]) -> Result<[u8
     tmp_p1p1_point = tmp_p3_point - tmp_cached_point;
     let v_point: GeP3 = tmp_p1p1_point.to_p3();
 
-    let cprime: [u8; 32] = vrf_ietfdraft03_hash_points(&h_point, &gamma_point, &u_point, &v_point);
+    let cprime: [u8; 32] = hash_points(&h_point, &gamma_point, &u_point, &v_point);
 
     if cprime == c_scalar {
-        Ok(vrf_ietfdraft03_proof_to_hash(proof)?)
+        Ok(proof_to_hash(proof)?)
     } else {
         Err(())
     }
 }
 
+/// Calculate beta_string from the proof
+pub fn proof_to_hash(proof: &[u8; 80]) -> Result<[u8; 64], ()> {
+    let (mut gamma_point, _, _) = decode_proof(proof)?;
+    gamma_point = gamma_point.multiply_by_cofactor();
+    let gamma_string: [u8; 32] = gamma_point.to_bytes();
+
+    let hash: [u8; 64] = {
+        let mut hash_output: [u8; 64] = [0; 64];
+        let mut hasher = Sha512::new();
+        hasher.input(&SUITE);
+        hasher.input(&THREE);
+        hasher.input(&gamma_string);
+        hasher.result(&mut hash_output);
+        hash_output
+    };
+
+    Ok(hash)
+}
+
 /// Expand the ed25519 key pair into x_scalar, truncated_hashed_sk_string and y_point
-fn vrf_expand_sk(sk: &[u8; 64]) -> Result<([u8; 32], [u8; 32], GeP3), ()> {
+fn expand_sk(sk: &[u8; 64]) -> Result<([u8; 32], [u8; 32], GeP3), ()> {
     let seed = &sk[0..32];
     let pk = &sk[32..64];
     let hash: [u8; 64] = {
@@ -146,11 +164,7 @@ fn vrf_expand_sk(sk: &[u8; 64]) -> Result<([u8; 32], [u8; 32], GeP3), ()> {
 }
 
 /// Hash to curve function of suite elligator2
-fn vrf_ietfdraft03_hash_to_curve_elligator2_25519(
-    y_point: &GeP3,
-    message: &[u8],
-) -> Result<[u8; 32], ()>
-{
+fn hash_to_curve_elligator2(y_point: &GeP3, message: &[u8]) -> Result<[u8; 32], ()> {
     let y_string: [u8; 32] = y_point.to_bytes();
     debug!(target: "ecvrf", "y_string {:?}", y_string.to_hex());
 
@@ -180,7 +194,7 @@ fn vrf_ietfdraft03_hash_to_curve_elligator2_25519(
 }
 
 /// Generate vrf nonce
-fn vrf_nonce_generation(truncated_hashed_sk_string: &[u8; 32], h_string: &[u8; 32]) -> [u8; 32] {
+fn generate_nonce(truncated_hashed_sk_string: &[u8; 32], h_string: &[u8; 32]) -> [u8; 32] {
     let mut hash: [u8; 64] = {
         let mut hash_output: [u8; 64] = [0; 64];
         let mut hasher = Sha512::new();
@@ -200,7 +214,7 @@ fn vrf_nonce_generation(truncated_hashed_sk_string: &[u8; 32], h_string: &[u8; 3
     k_scalar
 }
 
-fn vrf_ietfdraft03_hash_points(p1: &GeP3, p2: &GeP3, p3: &GeP3, p4: &GeP3) -> [u8; 32] {
+fn hash_points(p1: &GeP3, p2: &GeP3, p3: &GeP3, p4: &GeP3) -> [u8; 32] {
     let p1_bytes: [u8; 32] = p1.to_bytes();
     let p2_bytes: [u8; 32] = p2.to_bytes();
     let p3_bytes: [u8; 32] = p3.to_bytes();
@@ -227,7 +241,7 @@ fn vrf_ietfdraft03_hash_points(p1: &GeP3, p2: &GeP3, p3: &GeP3, p4: &GeP3) -> [u
     c
 }
 
-fn vrf_ietfdraft03_decode_proof(proof: &[u8; 80]) -> Result<(GeP3, [u8; 32], [u8; 64]), ()> {
+fn decode_proof(proof: &[u8; 80]) -> Result<(GeP3, [u8; 32], [u8; 64]), ()> {
     let gamma_point: GeP3 = gep3_from_bytes(&proof[0..32])?;
     let mut c_scalar: [u8; 32] = [0; 32];
     let mut s_scalar: [u8; 64] = [0; 64];
@@ -237,25 +251,8 @@ fn vrf_ietfdraft03_decode_proof(proof: &[u8; 80]) -> Result<(GeP3, [u8; 32], [u8
     for (dest, src) in (&mut s_scalar[0..32]).iter_mut().zip(proof[48..80].iter()) {
         *dest = *src;
     }
+
     Ok((gamma_point, c_scalar, s_scalar))
-}
-
-fn vrf_ietfdraft03_proof_to_hash(proof: &[u8; 80]) -> Result<[u8; 64], ()> {
-    let (mut gamma_point, _, _) = vrf_ietfdraft03_decode_proof(proof)?;
-    gamma_point = gamma_point.multiply_by_cofactor();
-    let gamma_string: [u8; 32] = gamma_point.to_bytes();
-
-    let hash: [u8; 64] = {
-        let mut hash_output: [u8; 64] = [0; 64];
-        let mut hasher = Sha512::new();
-        hasher.input(&SUITE);
-        hasher.input(&THREE);
-        hasher.input(&gamma_string);
-        hasher.result(&mut hash_output);
-        hash_output
-    };
-
-    Ok(hash)
 }
 
 fn gep3_from_bytes(bytes: &[u8]) -> Result<GeP3, ()> { GeP3::from_bytes(bytes).ok_or(()) }
@@ -263,7 +260,7 @@ fn gep3_from_bytes(bytes: &[u8]) -> Result<GeP3, ()> { GeP3::from_bytes(bytes).o
 #[cfg(test)]
 mod tests {
     use ed25519::{keypair};
-    use vrf::{vrf_prove, vrf_verify};
+    use ecvrf::{prove, verify};
     use rustc_hex::ToHex;
 
     struct TestData {
@@ -275,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    fn ecvrf_prove_and_verify() {
+    fn ecprove_and_verify() {
         let test_cases: [TestData; 31] = [
             TestData {
                 seed: [
@@ -1251,32 +1248,32 @@ mod tests {
             assert_eq!(pk, expected_pk);
 
             // Generate proof
-            let mut proof: [u8; 80] = vrf_prove(&sk, message).unwrap();
+            let mut proof: [u8; 80] = prove(&sk, message).unwrap();
             assert_eq!(proof.to_hex(), expected_proof.to_hex());
 
             // Verify proof
-            let verify_result = vrf_verify(&expected_pk, &proof, message);
+            let verify_result = verify(&expected_pk, &proof, message);
             assert!(verify_result.is_ok());
             assert_eq!(verify_result.unwrap().to_hex(), expected_output.to_hex());
 
             // The verification should fail if the proof is altered.
             proof[0] ^= 0x01;
-            assert!(vrf_verify(&expected_pk, &proof, message).is_err());
+            assert!(verify(&expected_pk, &proof, message).is_err());
 
             proof[0] ^= 0x01;
             proof[32] ^= 0x01;
-            assert!(vrf_verify(&expected_pk, &proof, message).is_err());
+            assert!(verify(&expected_pk, &proof, message).is_err());
 
             proof[32] ^= 0x01;
             proof[48] ^= 0x01;
-            assert!(vrf_verify(&expected_pk, &proof, message).is_err());
+            assert!(verify(&expected_pk, &proof, message).is_err());
 
             proof[48] ^= 0x01;
             proof[79] ^= 0x80;
-            assert!(vrf_verify(&expected_pk, &proof, message).is_err());
+            assert!(verify(&expected_pk, &proof, message).is_err());
 
             proof[79] ^= 0x80;
-            assert!(vrf_verify(&expected_pk, &proof, message).is_ok());
+            assert!(verify(&expected_pk, &proof, message).is_ok());
         }
     }
 

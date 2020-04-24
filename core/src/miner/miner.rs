@@ -29,7 +29,7 @@ use std::hash::{Hash, Hasher};
 
 use rustc_hex::FromHex;
 use account_provider::AccountProvider;
-use acore_bytes::Bytes;
+use acore_bytes::{Bytes, slice_to_array_80};
 use aion_types::{Address, H256, U256};
 use block::{Block, ClosedBlock, IsBlock, SealedBlock};
 use client::{BlockId, MiningBlockChainClient, TransactionId};
@@ -56,7 +56,7 @@ use transaction::transaction_queue::{
     AccountDetails, PrioritizationStrategy, RemovalReason, TransactionOrigin, TransactionQueue,
 };
 use using_queue::{GetAction, UsingQueue};
-use rcrypto::ed25519;
+use rcrypto::{ed25519, ecvrf};
 use key::Ed25519KeyPair;
 use num::Zero;
 use num_bigint::BigUint;
@@ -378,11 +378,24 @@ impl Miner {
         );
 
         // 5. Calcualte timestamp for the new PoS block
-        // U30-22 New hybrid seed
-        let new_seed = if self.unity_hybrid_seed_update(client) {
+        // Unity-3 ecvrf seed
+        let mut proof: Option<[u8; 80]> = None;
+        let new_seed: [u8; 64] = if self.unity_ecvrf_seed_update(client) {
+            match Self::generate_ecvrf_seed(&seed, &sk) {
+                Ok((ecvrf_proof, ecvrf_seed)) => {
+                    proof = Some(ecvrf_proof);
+                    ecvrf_seed
+                }
+                Err(_) => {
+                    return;
+                }
+            }
+        }
+        // Unity-2 hybrid seed
+        else if self.unity_hybrid_seed_update(client) {
             Self::generate_hybrid_seed(&seed, &pk, &best_block_header.decode())
         }
-        // Normal unity seed
+        // Unity-1 signature seed
         else {
             ed25519::signature(&seed, &sk)
         };
@@ -409,6 +422,7 @@ impl Miner {
                     grand_parant.map(|header| header.decode()).as_ref(),
                     stake,
                     coinbase,
+                    proof,
                 )
                 .err()
             {
@@ -431,6 +445,7 @@ impl Miner {
         grand_parant: Option<&Header>,
         stake: BigUint,
         coinbase: Address,
+        proof: Option<[u8; 80]>,
     ) -> Result<(), Error>
     {
         trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
@@ -451,7 +466,12 @@ impl Miner {
 
         // 2. Generate signature
         let mut preseal = Vec::with_capacity(3);
-        preseal.push(seed.to_vec());
+        // Unity-3: ecvrf seal
+        if let Some(proof) = proof {
+            preseal.push(proof.to_vec());
+        } else {
+            preseal.push(seed.to_vec());
+        }
         preseal.push(vec![0u8; 64]);
         preseal.push(pk.to_vec());
         let presealed_block = raw_block.pre_seal(preseal);
@@ -460,7 +480,12 @@ impl Miner {
 
         // 3. Seal the block
         let mut seal: Vec<Bytes> = Vec::with_capacity(3);
-        seal.push(seed.to_vec());
+        // Unity-3: ecvrf seal
+        if let Some(proof) = proof {
+            seal.push(proof.to_vec());
+        } else {
+            seal.push(seed.to_vec());
+        }
         seal.push(signature.to_vec());
         seal.push(pk.to_vec());
         let sealed_block: SealedBlock = presealed_block
@@ -1063,7 +1088,7 @@ impl Miner {
         self.sealing_work_pow.lock().queue.reset();
     }
 
-    // U30-22
+    // Unity-2
     // Generate hybrid seed for pos block
     fn generate_hybrid_seed(
         grand_parent_seed: &[u8],
@@ -1101,6 +1126,24 @@ impl Miner {
         let mut seed: [u8; 64] = [0u8; 64];
         seed.copy_from_slice(&new_seed.as_slice()[..64]);
         seed
+    }
+
+    // Unity-3
+    // Generate ecvrf seed for pos block
+    fn generate_ecvrf_seed(
+        grand_parent_seed: &[u8],
+        sk: &[u8; 64],
+    ) -> Result<([u8; 80], [u8; 64]), ()>
+    {
+        let proof: [u8; 80] = if let Some(parent_proof) = slice_to_array_80(grand_parent_seed) {
+            ecvrf::prove(sk, &ecvrf::proof_to_hash(parent_proof)?)?
+        } else if grand_parent_seed.len() == 64 {
+            ecvrf::prove(sk, grand_parent_seed)?
+        } else {
+            return Err(());
+        };
+        let new_seed: [u8; 64] = ecvrf::proof_to_hash(&proof)?;
+        Ok((proof, new_seed))
     }
 
     #[cfg(test)]
@@ -1783,6 +1826,18 @@ impl MinerService for Miner {
             .machine()
             .params()
             .unity_hybrid_seed_update
+            .map_or(false, |fork_number| {
+                client.chain_info().best_block_number >= fork_number
+            })
+    }
+
+    // AION Unity exvrf seed update
+    // Check if the next block is on the unity ecvrf seed hard fork
+    fn unity_ecvrf_seed_update(&self, client: &MiningBlockChainClient) -> bool {
+        self.engine
+            .machine()
+            .params()
+            .unity_ecvrf_seed_update
             .map_or(false, |fork_number| {
                 client.chain_info().best_block_number >= fork_number
             })
