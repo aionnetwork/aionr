@@ -1119,8 +1119,8 @@ impl Miner {
         let mut new_seed: Vec<u8> = Vec::new();
         new_seed.extend(&seed_left.to_vec());
         new_seed.extend(&seed_right.to_vec());
-        debug!(target: "miner", "block {:?}, hybrid_left {:?}, hybrid_right {:?}, seed_left {:?}, 
-            seed_right {:?}, new_seed {:?}", 
+        debug!(target: "miner", "block {:?}, hybrid_left {:?}, hybrid_right {:?}, seed_left {:?},
+            seed_right {:?}, new_seed {:?}",
             parent_header.number() + 1, hybrid_left, hybrid_right, seed_left,
             seed_right, new_seed);
         let mut seed: [u8; 64] = [0u8; 64];
@@ -2342,6 +2342,25 @@ mod tests {
         assert_eq!(miner.pending_transactions_hashes(best_block).len(), 0);
         assert_eq!(miner.ready_transactions(best_block, 0).len(), 0);
         assert_eq!(miner.pending_receipts(best_block).len(), 0);
+    }
+
+    #[test]
+    fn should_not_import_fvm_create_transaction() {
+        // given
+        let client = TestBlockChainClient::new_with_spec(Spec::new_ecvrf());
+        let miner = miner_with_spec(&Spec::new_ecvrf());
+        let transaction = transaction().into();
+        // when
+        let res = miner
+            .import_external_transactions(&client, vec![transaction])
+            .pop()
+            .unwrap();
+        // then
+        if let Error::Transaction(e) = res.unwrap_err() {
+            assert_eq!(e, TransactionError::FvmDeprecated);
+        } else {
+            panic!("not expected error!");
+        }
     }
 
     #[test]

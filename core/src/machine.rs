@@ -212,7 +212,12 @@ impl EthereumMachine {
     ) -> Result<(), Error>
     {
         if block_num.is_some() {
-            t.is_allowed_type(self.params().monetary_policy_update, block_num.unwrap())?;
+            let params = self.params();
+            t.fork_check(
+                params.monetary_policy_update,
+                params.unity_ecvrf_seed_update,
+                block_num.unwrap(),
+            )?;
         }
         t.verify_basic(None)?;
 

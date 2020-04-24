@@ -197,8 +197,8 @@ impl PoSValidator {
             let mut new_seed: Vec<u8> = Vec::new();
             new_seed.extend(&seed_left.to_vec());
             new_seed.extend(&seed_right.to_vec());
-            debug!(target: "pos", "block {:?}, hybrid_left {:?}, hybrid_right {:?}, seed_left {:?}, 
-                seed_right {:?}, new_seed {:?}, seed {:?}", 
+            debug!(target: "pos", "block {:?}, hybrid_left {:?}, hybrid_right {:?}, seed_left {:?},
+                seed_right {:?}, new_seed {:?}, seed {:?}",
                 parent_header.number() + 1, hybrid_left, hybrid_right, seed_left,
                 seed_right, new_seed, seed);
             seed == new_seed.as_slice()
@@ -231,6 +231,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             false,
+            false,
         );
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSSealType),
@@ -251,6 +252,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             false,
+            false,
         );
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::NullStake),
@@ -270,6 +272,7 @@ mod tests {
             &parent_header,
             Some(&grand_parent_header),
             stake,
+            false,
             false,
         );
         match result.err().unwrap() {
@@ -294,6 +297,7 @@ mod tests {
             &parent_header,
             Some(&grand_parent_header),
             stake,
+            false,
             false,
         );
         match result.err().unwrap() {
@@ -330,6 +334,7 @@ mod tests {
             &parent_header,
             Some(&grand_parent_header),
             stake,
+            false,
             false,
         );
         match result.err().unwrap() {
@@ -435,6 +440,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             false,
+            false,
         );
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSTimestamp(15, 1, 15)),
@@ -477,6 +483,7 @@ mod tests {
             &parent_header,
             Some(&grand_parent_header),
             stake,
+            false,
             false,
         );
         assert!(result.is_ok());
@@ -531,6 +538,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             false,
+            false,
         );
         assert!(result.is_ok());
     }
@@ -584,6 +592,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             true,
+            false,
         );
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSSeed),
@@ -644,6 +653,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             true,
+            false,
         );
         assert!(result.is_ok());
     }
