@@ -41,8 +41,7 @@ pub use fvm::{
     ExecStatus,
     ActionParams,
     ActionValue,
-    LastHashes,
-    ParamsType
+    LastHashes
 };
 pub use avm::{ExecutionResult as AvmExecutionResult, AvmStatusCode};
 pub use types::*;

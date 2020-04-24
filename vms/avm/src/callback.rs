@@ -393,7 +393,7 @@ pub extern fn avm_send_signal(handle: *const c_void, sig_num: i32) -> avm_bytes 
     }
 }
 
-fn contract_address(sender: &Address, nonce: &U256) -> (Address, Option<H256>) {
+fn contract_address(sender: &Address, nonce: &U256) -> Address {
     use rlp::RlpStream;
     let mut stream = RlpStream::new_list(2);
     stream.append(sender);
@@ -401,7 +401,7 @@ fn contract_address(sender: &Address, nonce: &U256) -> (Address, Option<H256>) {
     let origin: [u8; 32] = blake2b(stream.as_raw()).into();
     let mut buffer = [0xa0u8; 32];
     &mut buffer[1..].copy_from_slice(&origin[1..]);
-    (buffer.into(), None)
+    buffer.into()
 }
 
 #[no_mangle]
@@ -415,7 +415,7 @@ pub extern fn avm_contract_address(
 
     debug!(target: "vm", "avm new contract: sender = {:?}, nonce = {:?}", addr, n);
 
-    let (new_contract, _) = contract_address(addr, &n.into());
+    let new_contract = contract_address(addr, &n.into());
 
     unsafe {
         let ret = new_fixed_bytes(32);

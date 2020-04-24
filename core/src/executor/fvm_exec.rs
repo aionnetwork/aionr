@@ -26,7 +26,7 @@ use std::collections::HashSet;
 
 use blake2b::{blake2b};
 use aion_types::{H256, U256, U512, Address};
-use vms::{ActionParams, ActionValue, CallType, EnvInfo, FvmExecutionResult as ExecutionResult, ExecStatus, ReturnData, ParamsType};
+use vms::{ActionParams, ActionValue, CallType, EnvInfo, FvmExecutionResult as ExecutionResult, ExecStatus, ReturnData};
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use types::error::ExecutionError;
@@ -44,7 +44,7 @@ lazy_static! {
 }
 
 /// Returns new address created from address, nonce
-pub fn contract_address(sender: &Address, nonce: &U256) -> (Address, Option<H256>) {
+pub fn contract_address(sender: &Address, nonce: &U256) -> Address {
     use rlp::RlpStream;
     let mut stream = RlpStream::new_list(2);
     stream.append(sender);
@@ -52,7 +52,7 @@ pub fn contract_address(sender: &Address, nonce: &U256) -> (Address, Option<H256
     let origin: [u8; 32] = blake2b(stream.as_raw()).into();
     let mut buffer = [0xa0u8; 32];
     &mut buffer[1..].copy_from_slice(&origin[1..]);
-    (buffer.into(), None)
+    buffer.into()
 }
 
 /// Transaction executor.
@@ -233,10 +233,9 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
 
         let result = match t.action {
             Action::Create => {
-                let (new_address, code_hash) = contract_address(&sender, &nonce);
+                let new_address = contract_address(&sender, &nonce);
                 let params = ActionParams {
                     code_address: new_address.clone(),
-                    code_hash,
                     address: new_address,
                     sender: sender.clone(),
                     origin: sender.clone(),
@@ -247,7 +246,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     data: None,
                     call_type: CallType::None,
                     static_flag: false,
-                    params_type: ParamsType::Embedded,
                     transaction_hash: t.hash().clone(),
                     original_transaction_hash: t.hash().clone(),
                     nonce: t.nonce.low_u64(),
@@ -264,11 +262,9 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                     gas_price: t.gas_price,
                     value: ActionValue::Transfer(t.value),
                     code: self.state.code(address)?,
-                    code_hash: Some(self.state.code_hash(address)?),
                     data: Some(t.data.clone()),
                     call_type: CallType::Call,
                     static_flag: false,
-                    params_type: ParamsType::Separate,
                     transaction_hash: t.hash().clone(),
                     original_transaction_hash: t.hash().clone(),
                     nonce: t.nonce.low_u64(),

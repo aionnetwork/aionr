@@ -1941,7 +1941,7 @@ fn transaction_receipt(
         gas_used: receipt.gas_used,
         contract_address: match tx.action {
             Action::Call(_) => None,
-            Action::Create => Some(contract_address(&sender, &tx.nonce).0),
+            Action::Create => Some(contract_address(&sender, &tx.nonce)),
         },
         logs: receipt
             .logs()

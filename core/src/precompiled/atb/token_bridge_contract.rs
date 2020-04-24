@@ -1054,7 +1054,7 @@ mod test {
         let _res = ext.add_balance(&my_contract_address, &U256::from(10));
 
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-        let address = contract_address(&sender, &U256::zero()).0;
+        let address = contract_address(&sender, &U256::zero());
 
         let mut submit_bundle_params = builtin_params.clone();
         submit_bundle_params.owner_address = Some(address);
@@ -1062,11 +1062,11 @@ mod test {
         let contract = TokenBridgeContract::new(submit_bundle_params);
         let block_hash = blake2b("blockHash".as_bytes());
         let receipts: [H256; 5] = [
-            contract_address(&sender, &U256::from(0)).0,
-            contract_address(&sender, &U256::from(1)).0,
-            contract_address(&sender, &U256::from(2)).0,
-            contract_address(&sender, &U256::from(3)).0,
-            contract_address(&sender, &U256::from(4)).0,
+            contract_address(&sender, &U256::from(0)),
+            contract_address(&sender, &U256::from(1)),
+            contract_address(&sender, &U256::from(2)),
+            contract_address(&sender, &U256::from(3)),
+            contract_address(&sender, &U256::from(4)),
         ];
         let tx_hashes: [H256; 5] = [
             H256::from(0),
@@ -1148,7 +1148,7 @@ mod test {
         let _res = ext.add_balance(&my_contract_address, &U256::from(10));
 
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-        let address = contract_address(&sender, &U256::zero()).0;
+        let address = contract_address(&sender, &U256::zero());
 
         let mut submit_bundle_params = builtin_params.clone();
         submit_bundle_params.owner_address = Some(address);
@@ -1157,16 +1157,16 @@ mod test {
         let block_hash = blake2b("blockHash".as_bytes());
 
         let receipts: [H256; 10] = [
-            contract_address(&sender, &U256::from(0)).0,
-            contract_address(&sender, &U256::from(1)).0,
-            contract_address(&sender, &U256::from(2)).0,
-            contract_address(&sender, &U256::from(3)).0,
-            contract_address(&sender, &U256::from(4)).0,
-            contract_address(&sender, &U256::from(5)).0,
-            contract_address(&sender, &U256::from(6)).0,
-            contract_address(&sender, &U256::from(7)).0,
-            contract_address(&sender, &U256::from(8)).0,
-            contract_address(&sender, &U256::from(9)).0,
+            contract_address(&sender, &U256::from(0)),
+            contract_address(&sender, &U256::from(1)),
+            contract_address(&sender, &U256::from(2)),
+            contract_address(&sender, &U256::from(3)),
+            contract_address(&sender, &U256::from(4)),
+            contract_address(&sender, &U256::from(5)),
+            contract_address(&sender, &U256::from(6)),
+            contract_address(&sender, &U256::from(7)),
+            contract_address(&sender, &U256::from(8)),
+            contract_address(&sender, &U256::from(9)),
         ];
         let tx_hashes: [H256; 10] = [
             H256::from(0),
@@ -1265,7 +1265,7 @@ mod test {
         let _res = ext.add_balance(&my_contract_address, &U256::from(10));
 
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-        let address = contract_address(&sender, &U256::zero()).0;
+        let address = contract_address(&sender, &U256::zero());
 
         let mut submit_bundle_params = builtin_params.clone();
         submit_bundle_params.owner_address = Some(address);
@@ -1273,11 +1273,11 @@ mod test {
         let contract = TokenBridgeContract::new(submit_bundle_params);
         let block_hash = blake2b("blockHash".as_bytes());
         let receipts: [H256; 5] = [
-            contract_address(&sender, &U256::from(0)).0,
-            contract_address(&sender, &U256::from(1)).0,
-            contract_address(&sender, &U256::from(2)).0,
-            contract_address(&sender, &U256::from(3)).0,
-            contract_address(&sender, &U256::from(4)).0,
+            contract_address(&sender, &U256::from(0)),
+            contract_address(&sender, &U256::from(1)),
+            contract_address(&sender, &U256::from(2)),
+            contract_address(&sender, &U256::from(3)),
+            contract_address(&sender, &U256::from(4)),
         ];
         let tx_hashes: [H256; 5] = [
             H256::from(0),
@@ -1365,7 +1365,7 @@ mod test {
         let _res = ext.add_balance(&my_contract_address, &U256::from(10));
 
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-        let address = contract_address(&sender, &U256::zero()).0;
+        let address = contract_address(&sender, &U256::zero());
 
         let mut submit_bundle_params = builtin_params.clone();
         submit_bundle_params.owner_address = Some(address);
@@ -1373,11 +1373,11 @@ mod test {
         let contract = TokenBridgeContract::new(submit_bundle_params);
         let block_hash = blake2b("blockHash".as_bytes());
         let receipts: [H256; 5] = [
-            contract_address(&sender, &U256::from(0)).0,
-            contract_address(&sender, &U256::from(1)).0,
-            contract_address(&sender, &U256::from(2)).0,
-            contract_address(&sender, &U256::from(3)).0,
-            contract_address(&sender, &U256::from(4)).0,
+            contract_address(&sender, &U256::from(0)),
+            contract_address(&sender, &U256::from(1)),
+            contract_address(&sender, &U256::from(2)),
+            contract_address(&sender, &U256::from(3)),
+            contract_address(&sender, &U256::from(4)),
         ];
         let tx_hashes: [H256; 5] = [
             H256::from(0),
@@ -1465,7 +1465,7 @@ mod test {
         let _res = ext.add_balance(&my_contract_address, &U256::from(10));
 
         let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-        let address = contract_address(&sender, &U256::zero()).0;
+        let address = contract_address(&sender, &U256::zero());
 
         let mut submit_bundle_params = builtin_params.clone();
         submit_bundle_params.owner_address = Some(address);
@@ -1473,11 +1473,11 @@ mod test {
         let contract = TokenBridgeContract::new(submit_bundle_params);
         let block_hash = blake2b("blockHash".as_bytes());
         let receipts: [H256; 5] = [
-            contract_address(&sender, &U256::from(0)).0,
-            contract_address(&sender, &U256::from(1)).0,
-            contract_address(&sender, &U256::from(2)).0,
-            contract_address(&sender, &U256::from(3)).0,
-            contract_address(&sender, &U256::from(4)).0,
+            contract_address(&sender, &U256::from(0)),
+            contract_address(&sender, &U256::from(1)),
+            contract_address(&sender, &U256::from(2)),
+            contract_address(&sender, &U256::from(3)),
+            contract_address(&sender, &U256::from(4)),
         ];
         let tx_hashes: [H256; 5] = [
             H256::from(0),

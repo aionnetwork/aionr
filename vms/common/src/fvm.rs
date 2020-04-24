@@ -194,21 +194,10 @@ impl ActionValue {
     }
 }
 
-/// Type of the way parameters encoded
-#[derive(Clone, Debug)]
-pub enum ParamsType {
-    /// Parameters are included in code
-    Embedded,
-    /// Parameters are passed in data section
-    Separate,
-}
-
 #[derive(Debug, Clone)]
 pub struct ActionParams {
     /// Address of currently executed code.
     pub code_address: Address,
-    /// Hash of currently executed code.
-    pub code_hash: Option<H256>,
     /// Receive address. Usually equal to code_address,
     /// except when called using CALLCODE.
     pub address: Address,
@@ -230,8 +219,6 @@ pub struct ActionParams {
     pub call_type: CallType,
     /// Flag to indicate if the call is static
     pub static_flag: bool,
-    /// Param types encoding
-    pub params_type: ParamsType,
     /// transaction hash
     pub transaction_hash: H256,
     /// original transaction hash
@@ -244,7 +231,6 @@ impl Default for ActionParams {
     fn default() -> Self {
         ActionParams {
             code_address: Address::default(),
-            code_hash: None,
             address: Address::default(),
             sender: Address::default(),
             origin: Address::default(),
@@ -255,7 +241,6 @@ impl Default for ActionParams {
             data: None,
             call_type: CallType::None,
             static_flag: false,
-            params_type: ParamsType::Embedded,
             transaction_hash: H256::default(),
             original_transaction_hash: H256::default(),
             nonce: 0,

@@ -28,7 +28,7 @@ use std::collections::{HashSet, HashMap};
 use std::time::SystemTime;
 
 use aion_types::{H256, U256, Address};
-use vms::{ActionParams, ActionValue, CallType, EnvInfo, AvmExecutionResult as ExecutionResult, ParamsType, AvmStatusCode};
+use vms::{ActionParams, ActionValue, CallType, EnvInfo, AvmExecutionResult as ExecutionResult, AvmStatusCode};
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
 use machine::EthereumMachine as Machine;
 use types::error::ExecutionError;
@@ -143,7 +143,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                 Action::Create => {
                     ActionParams {
                         code_address: Address::default(),
-                        code_hash: None,
                         address: Address::default(),
                         sender: sender.clone(),
                         origin: sender.clone(),
@@ -157,7 +156,6 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         original_transaction_hash: t.hash().to_owned(),
                         nonce: nonce.low_u64(),
                         static_flag: false,
-                        params_type: ParamsType::Embedded,
                     }
                 }
                 Action::Call(ref address) => {
@@ -175,13 +173,11 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
                         gas_price: t.gas_price,
                         value: ActionValue::Transfer(t.value),
                         code: self.state.code(address).unwrap(),
-                        code_hash: Some(self.state.code_hash(address).unwrap()),
                         data: Some(t.data.clone()),
                         call_type,
                         transaction_hash: t.hash().to_owned(),
                         original_transaction_hash: t.hash().to_owned(),
                         nonce: nonce.low_u64(),
-                        params_type: ParamsType::Embedded,
                         static_flag: false,
                     }
                 }

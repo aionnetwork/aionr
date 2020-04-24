@@ -1414,7 +1414,7 @@ impl MinerService for Miner {
     //                                Action::Call(_) => None,
     //                                Action::Create => {
     //                                    let sender = tx.sender();
-    //                                    Some(contract_address(&sender, &tx.nonce).0)
+    //                                    Some(contract_address(&sender, &tx.nonce))
     //                                }
     //                            },
     //                            logs: receipt.logs().clone(),

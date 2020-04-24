@@ -35,7 +35,7 @@ use spec::CommonParams;
 use state::{CleanupMode, Substate};
 use transaction::{SYSTEM_ADDRESS, UnverifiedTransaction, SignedTransaction};
 use aion_types::{U256, H256, Address};
-use vms::{ActionParams, ActionValue, CallType, ParamsType};
+use vms::{ActionParams, ActionValue, CallType};
 
 /// An ethereum-like state machine.
 #[cfg_attr(test, derive(Default))]
@@ -87,11 +87,9 @@ impl EthereumMachine {
             gas_price: 0.into(),
             value: ActionValue::Transfer(0.into()),
             code: state.code(&contract_address)?,
-            code_hash: Some(state.code_hash(&contract_address)?),
             data,
             call_type: CallType::Call,
             static_flag: false,
-            params_type: ParamsType::Separate,
             transaction_hash: H256::default(),
             original_transaction_hash: H256::default(),
             nonce: 0,

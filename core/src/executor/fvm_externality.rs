@@ -24,7 +24,7 @@
 use std::cmp;
 use std::sync::Arc;
 use aion_types::{H256, U256, H128, Address};
-use vms::{ActionParams, ActionValue, EnvInfo, CallType, FvmExecutionResult as ExecutionResult, ExecStatus, ReturnData, ParamsType};
+use vms::{ActionParams, ActionValue, EnvInfo, CallType, FvmExecutionResult as ExecutionResult, ExecStatus, ReturnData};
 use vms::traits::Ext;
 use acore_bytes::Bytes;
 use state::{Backend as StateBackend, State, Substate, CleanupMode};
@@ -238,7 +238,7 @@ where B: StateBackend
     /// Create new contract account
     fn create(&mut self, gas: &U256, value: &U256, code: &[u8]) -> ExecutionResult {
         // create new contract address
-        let (address, code_hash) = match self.state.nonce(&self.origin_info[0].address) {
+        let address = match self.state.nonce(&self.origin_info[0].address) {
             Ok(nonce) => contract_address(&self.origin_info[0].address, &nonce),
             Err(e) => {
                 debug!(target: "ext", "Database corruption encountered: {:?}", e);
@@ -266,11 +266,9 @@ where B: StateBackend
             gas_price: self.origin_info[0].gas_price,
             value: ActionValue::Transfer(*value),
             code: Some(Arc::new(code.to_vec())),
-            code_hash: code_hash,
             data: None,
             call_type: CallType::None,
             static_flag: false,
-            params_type: ParamsType::Embedded,
             transaction_hash: H256::default(),
             original_transaction_hash: self.origin_info[0].origin_tx_hash.clone(),
             // this field is just for avm;
@@ -341,12 +339,9 @@ where B: StateBackend
         trace!(target: "ext", "call");
 
         // Get code from the called account
-        let code_res = self
-            .state
-            .code(code_address)
-            .and_then(|code| self.state.code_hash(code_address).map(|hash| (code, hash)));
-        let (code, code_hash) = match code_res {
-            Ok((code, hash)) => (code, hash),
+        let code_res = self.state.code(code_address);
+        let code = match code_res {
+            Ok(code) => code,
             Err(_) => {
                 return ExecutionResult {
                     gas_left: 0.into(),
@@ -380,11 +375,9 @@ where B: StateBackend
             gas: *gas,
             gas_price: self.origin_info[0].gas_price,
             code: code,
-            code_hash: Some(code_hash),
             data: Some(data.to_vec()),
             call_type: call_type,
             static_flag: static_flag,
-            params_type: ParamsType::Separate,
             transaction_hash: H256::default(),
             original_transaction_hash: self.origin_info[0].origin_tx_hash,
             // call fastvm here, nonce has no usage
