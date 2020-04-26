@@ -21,6 +21,7 @@
 
 use std::sync::Arc;
 use std::time::SystemTime;
+use std::collections::HashMap;
 
 use block::Block;
 use client::{BlockId, BlockChainClient};
@@ -34,7 +35,12 @@ use sync::wrappers::{HeadersWrapper, BlocksWrapper};
 use header::Header;
 use engine::UnityEngine;
 
+use parking_lot::RwLock;
+
 use super::{channel_buffer_template,channel_buffer_template_with_version};
+use super::super::node_info::NodeInfo;
+use header::Seal;
+use sync::node_info::Mode;
 
 const HASH_LEN: usize = 32;
 
@@ -133,7 +139,15 @@ pub fn receive_req(p2p: Mgr, hash: u64, client: Arc<BlockChainClient>, cb_in: Ch
     p2p.send(hash, res);
 }
 
-pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<SyncStorage>) {
+pub fn receive_res(
+    p2p: Mgr,
+    node_hash: u64,
+    cb_in: ChannelBuffer,
+    storage: Arc<SyncStorage>,
+    node_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
+    best_num: &u64,
+)
+{
     trace!(target: "sync_res", "bodies/receive_res");
 
     // end if no body
@@ -218,10 +232,34 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
     }
 
     // Save blocks
-    let mut blocks_wrapper = BlocksWrapper::new();
-    blocks_wrapper.node_hash = node_hash;
-    blocks_wrapper.blocks.extend(blocks);
-    storage.insert_downloaded_blocks(blocks_wrapper);
+    if let Some(info) = node_info.read().get(&node_hash) {
+        if info.read().mode == Mode::Lightning {
+            let header = &blocks[0].header;
+            let parent_hash = header.parent_hash();
+            let num = header.number();
+            let blocks_bytes: Vec<Vec<u8>> =
+                blocks.iter().map(|b| b.rlp_bytes(Seal::With)).collect();
+            let len = blocks_bytes.len();
+            if storage.stage_blocks(*parent_hash, num - 1, blocks_bytes) {
+                debug!(target: "sync_import", "Node: {}, {} blocks staged for future import.", &node_hash, len);
+            } else {
+                info.write()
+                    .switch_mode(Mode::Thunder, best_num, &node_hash);
+            }
+            let hashes = blocks.iter().map(|b| b.header.hash()).collect();
+            storage.remove_recorded_blocks_hashes(&hashes)
+        } else {
+            let mut blocks_wrapper = BlocksWrapper::new();
+            blocks_wrapper.node_hash = node_hash;
+            blocks_wrapper.blocks.extend(blocks);
+            storage.insert_downloaded_blocks(blocks_wrapper);
+        }
+    } else {
+        let mut blocks_wrapper = BlocksWrapper::new();
+        blocks_wrapper.node_hash = node_hash;
+        blocks_wrapper.blocks.extend(blocks);
+        storage.insert_downloaded_blocks(blocks_wrapper);
+    }
 
     // TODO: maybe we should consider reset the header request cooldown here
 

@@ -160,6 +160,7 @@ impl Sync {
                     debug!(target: "sync_statics", "recorded cache size/capacity {}/{}", recorded_blocks_size, recorded_blocks_capacity);
                     debug!(target: "sync_statics", "staged cache size/capacity {}/{}", staged_blocks_size, staged_blocks_capacity);
                     debug!(target: "sync_statics", "lightning syncing height: {}", storage_statics.lightning_base());
+                    debug!(target: "sync_staged", "keys of staged cache: {:#?}",{storage_statics.staged_blocks().lock().keys()});
                     info!(target: "sync_statics", "{:-^130}", "");
                     info!(target: "sync_statics", "                                 td         bn          bh                    addr                 rev      conn  seed       mode");
                     info!(target: "sync_statics", "{:-^130}", "");
@@ -390,8 +391,14 @@ impl ChainNotify for Sync {
                 let block_id = BlockId::Hash(*hash);
                 if let Some(block_number) = client.block_number(block_id) {
                     debug!(target: "sync_notify", "New block #{}, hash: {}.", block_number, hash);
+                    import::import_staged_blocks(
+                        &(*hash, block_number),
+                        client,
+                        self.storage.clone(),
+                    );
+                } else {
+                    warn!(target: "sync_notify", "cannot get block number");
                 }
-                import::import_staged_blocks(hash, client, self.storage.clone());
             }
         }
 
@@ -479,7 +486,17 @@ impl Callable for Sync {
                 let client = self.client.clone();
                 bodies::receive_req(p2p, hash, client, cb)
             }
-            Action::BODIESRES => bodies::receive_res(p2p, hash, cb, self.storage.clone()),
+            Action::BODIESRES => {
+                let best_num = &self.client.chain_info().best_block_number;
+                bodies::receive_res(
+                    p2p,
+                    hash,
+                    cb,
+                    self.storage.clone(),
+                    self.node_info.clone(),
+                    best_num,
+                )
+            }
             Action::BROADCASTTX => {
                 let client = self.client.clone();
                 broadcast::handle_broadcast_tx(

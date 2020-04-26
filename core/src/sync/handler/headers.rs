@@ -62,8 +62,14 @@ pub fn sync_headers(
 {
     let active_nodes = p2p.get_active_nodes();
     // Filter nodes. Only sync from nodes with higher total difficulty and with a cooldown restriction.
-    let candidates: Vec<Node> =
-        filter_nodes_to_sync_headers(active_nodes, nodes_info.clone(), local_total_diff);
+    let staged_is_full = storage.staged_is_full();
+
+    let candidates: Vec<Node> = filter_nodes_to_sync_headers(
+        active_nodes,
+        nodes_info.clone(),
+        local_total_diff,
+        staged_is_full,
+    );
     // Pick a random node among all candidates
     if let Some(candidate) = pick_random_node(&candidates) {
         let candidate_hash = candidate.hash;
@@ -132,13 +138,14 @@ fn prepare_send(
             size = LARGE_REQUEST_SIZE;
         }
         Mode::Lightning => {
-            let lightning_base = storage.lightning_base();
-            if local_best_number + LARGE_REQUEST_SIZE as u64 * 5 > lightning_base {
-                from = local_best_number + JUMP_SIZE
+            let mut lightning_base = storage.get_lightning_base_lock().write();
+            if local_best_number + LARGE_REQUEST_SIZE as u64 * 5 > *lightning_base {
+                from = local_best_number + JUMP_SIZE;
             } else {
-                from = lightning_base;
+                from = *lightning_base;
             }
             size = LIGHTNING_REQUEST_SIZE;
+            *lightning_base = from + LIGHTNING_REQUEST_SIZE as u64;
         }
         Mode::Backward => {
             if sync_base_number > LARGE_REQUEST_SIZE as u64 {
@@ -295,6 +302,7 @@ fn filter_nodes_to_sync_headers(
     nodes: Vec<Node>,
     nodes_info: Arc<RwLock<HashMap<u64, RwLock<NodeInfo>>>>,
     local_total_diff: &U256,
+    staged_is_full: bool,
 ) -> Vec<Node>
 {
     let time_now = SystemTime::now();
@@ -311,6 +319,7 @@ fn filter_nodes_to_sync_headers(
                         && node_info.last_headers_request_time
                             + Duration::from_millis(REQUEST_COOLDOWN)
                             <= time_now
+                        && (!staged_is_full || node_info.mode != Mode::Lightning)
                 })
         })
         .collect()
