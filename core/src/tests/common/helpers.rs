@@ -225,6 +225,7 @@ where
             Arc::new(MockDbRepository::init(vec![String::new()])),
             None,
             &dummy_client,
+            true,
         )
         .unwrap();
         b.set_difficulty(U256::from(0x20000));
