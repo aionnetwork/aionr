@@ -235,6 +235,7 @@ impl<'x> OpenBlock<'x> {
         kvdb: Arc<KeyValueDB>,
         timestamp: Option<u64>,
         client: &BlockChainClient,
+        is_building: bool,
     ) -> Result<Self, Error>
     {
         let number = parent.number() + 1;
@@ -271,17 +272,19 @@ impl<'x> OpenBlock<'x> {
         r.set_extra_data(extra_data);
         r.block.header.note_dirty();
 
-        let gas_floor_target =
-            cmp::max(gas_range_target.0, engine.machine().params().min_gas_limit);
-        let gas_ceil_target = cmp::max(gas_range_target.1, gas_floor_target);
+        if is_building {
+            let gas_floor_target =
+                cmp::max(gas_range_target.0, engine.machine().params().min_gas_limit);
+            let gas_ceil_target = cmp::max(gas_range_target.1, gas_floor_target);
 
-        // Set gas_limit
-        engine.machine().set_gas_limit_from_parent(
-            &mut r.block.header,
-            parent,
-            gas_floor_target,
-            gas_ceil_target,
-        );
+            // Set gas_limit
+            engine.machine().set_gas_limit_from_parent(
+                &mut r.block.header,
+                parent,
+                gas_floor_target,
+                gas_ceil_target,
+            );
+        }
         // Set difficulty
         engine.set_difficulty_from_parent(
             &mut r.block.header,
@@ -784,6 +787,7 @@ fn enact(
         kvdb,
         None,
         client,
+        false,
     )?;
 
     b.populate_from(header);
