@@ -22,27 +22,36 @@
 
 use trie::TrieFactory;
 use db::Factory as AccountFactory;
-use vms::{VMType, Factory, FastVMFactory, AVMFactory};
+use vms::{FastVMFactory, AVMFactory};
 
 /// Virtual machine factory
 #[derive(Clone)]
 pub struct VmFactory {
-    fastvm: FastVMFactory,
-    avm: AVMFactory,
+    fastvm: Option<FastVMFactory>,
+    avm: Option<AVMFactory>,
 }
 
 impl VmFactory {
-    pub fn create(&mut self, vm: VMType) -> &mut Factory {
-        match vm {
-            VMType::FastVM => &mut self.fastvm,
-            VMType::AVM => &mut self.avm,
+    pub fn create_avm(&mut self) -> AVMFactory {
+        match self.avm {
+            None => self.avm = Some(AVMFactory::new()),
+            _ => {}
         }
+        self.avm.clone().unwrap()
+    }
+
+    pub fn create_fvm(&mut self) -> FastVMFactory {
+        match self.fastvm {
+            None => self.fastvm = Some(FastVMFactory::new()),
+            _ => {}
+        }
+        self.fastvm.clone().unwrap()
     }
 
     pub fn new() -> Self {
         VmFactory {
-            fastvm: FastVMFactory::new(),
-            avm: AVMFactory::new(),
+            avm: Some(AVMFactory::new()),
+            fastvm: Some(FastVMFactory::new()),
         }
     }
 }

@@ -391,4 +391,9 @@ public class Substate implements IExternalState {
     public byte[] getTransformedCode(AionAddress address) {
         return parent.getTransformedCode(address);
     }
+
+    @Override
+    public boolean hasStorage(AionAddress address) {
+        return parent.hasStorage(address);
+    }
 }

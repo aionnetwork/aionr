@@ -40,7 +40,7 @@ use fastvm::context::{execution_kind, TransactionResult, ExecutionContext};
 use fastvm::ffi::EvmJit;
 use aion_types::{Address, H128, U256, H256};
 use vm_common::traits::Ext;
-use vm_common::{ExecutionResult, CallType, EnvInfo};
+use vm_common::{FvmExecutionResult, CallType, EnvInfo};
 
 type Bytes = Vec<u8>;
 
@@ -169,6 +169,8 @@ impl<'a> Ext for TestEnv<'a> {
 
     fn remove_storage(&mut self, _a: &Address, _key: Vec<u8>) {}
 
+    fn has_storage(&mut self, _a: &Address) -> bool { unimplemented!() }
+
     /// Determine whether an account exists.
     fn exists(&self, address: &Address) -> bool { return *self.accounts.get(address).unwrap(); }
 
@@ -190,8 +192,8 @@ impl<'a> Ext for TestEnv<'a> {
     /// Creates new contract.
     ///
     /// Returns gas_left and contract address if contract creation was succesfull.
-    fn create(&mut self, _gas: &U256, _value: &U256, _code: &[u8]) -> ExecutionResult {
-        ExecutionResult::default()
+    fn create(&mut self, _gas: &U256, _value: &U256, _code: &[u8]) -> FvmExecutionResult {
+        FvmExecutionResult::default()
     }
 
     /// Message call.
@@ -209,9 +211,9 @@ impl<'a> Ext for TestEnv<'a> {
         _code_address: &Address,
         _call_type: CallType,
         _static_flag: bool,
-    ) -> ExecutionResult
+    ) -> FvmExecutionResult
     {
-        ExecutionResult::default()
+        FvmExecutionResult::default()
     }
 
     /// Returns code at given address

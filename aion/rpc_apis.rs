@@ -36,6 +36,7 @@ use jsonrpc_core::{self as core, MetaIoHandler};
 use parking_lot::Mutex;
 use tokio::runtime::TaskExecutor;
 
+/// rpc api enum
 #[derive(Debug, PartialEq, Clone, Eq, Hash)]
 pub enum Api {
     /// Web3 (Safe)
@@ -73,6 +74,7 @@ impl FromStr for Api {
     }
 }
 
+/// rpc apiset enum
 #[derive(Debug, Clone)]
 pub enum ApiSet {
     // Public context (like public jsonrpc over http)
@@ -120,6 +122,7 @@ impl FromStr for ApiSet {
     }
 }
 
+/// list api versions
 fn to_modules(apis: &HashSet<Api>) -> BTreeMap<String, String> {
     let mut modules = BTreeMap::new();
     for api in apis {
@@ -151,16 +154,24 @@ pub trait Dependencies {
 
 /// RPC dependencies for a full node.
 pub struct FullDependencies {
+    /// client
     pub client: Arc<Client>,
+    /// sync provider
     pub sync: Arc<SyncProvider>,
+    /// account provider
     pub account_store: Option<Arc<AccountProvider>>,
+    /// PoW block producer
     pub miner: Arc<Miner>,
+    /// external miner hashrate tracker
     pub external_miner: Arc<ExternalMiner>,
+    /// params for Automatically adjusted gas price
     pub dynamic_gas_price: Option<DynamicGasPrice>,
+    /// task executor
     pub executor: TaskExecutor,
 }
 
 impl FullDependencies {
+    /// register api methods to handler
     fn extend_api<S>(
         &self,
         handler: &mut MetaIoHandler<Metadata, S>,
@@ -270,6 +281,7 @@ impl Dependencies for FullDependencies {
 }
 
 impl ApiSet {
+    /// list all enabled apis
     pub fn list_apis(&self) -> HashSet<Api> {
         let all = [
             Api::Web3,

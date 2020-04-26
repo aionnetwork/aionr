@@ -109,6 +109,7 @@ pub struct avm_callbacks {
             -> bool,
     pub remove_storage:
         extern fn(handle: *const c_void, addr: *const avm_address, data: *const avm_bytes),
+    pub has_storage: extern fn(handle: *const c_void, addr: *const avm_address) -> bool,
 }
 
 impl fmt::Display for avm_address {
@@ -631,6 +632,15 @@ pub extern fn avm_remove_storage(
     ext.remove_storage(addr, key);
 }
 
+#[no_mangle]
+pub extern fn avm_has_storage(handle: *const c_void, address: *const avm_address) -> bool {
+    let ext: &mut Box<Ext> = unsafe { mem::transmute(handle) };
+    let addr: &Address = unsafe { mem::transmute(address) };
+    debug!(target: "vm", "avm has storage at address: {:?}", addr);
+    ext.has_storage(addr)
+}
+
+/// assign all these callback functions to outer callback struct (see avmloader.so)
 pub fn register_callbacks() {
     unsafe {
         callbacks.create_account = avm_create_account;
@@ -659,6 +669,7 @@ pub fn register_callbacks() {
         callbacks.keccak256 = avm_keccak256;
         callbacks.verify_ed25519 = avm_vediryEdDSA;
         callbacks.remove_storage = avm_remove_storage;
+        callbacks.has_storage = avm_has_storage;
     }
 }
 

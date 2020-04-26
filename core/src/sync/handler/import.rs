@@ -59,7 +59,7 @@ pub fn import_staged_blocks(hash: &H256, client: Arc<BlockChainClient>, storage:
             Err(e) => {
                 debug!(target: "sync_import", "Failed to import staged block #{}, due to {:?}", block_number, e);
                 // Remove records so that they can be downloaded again.
-                storage.remove_downloaded_blocks_hashes(
+                storage.remove_recorded_blocks_hashes(
                     &blocks_to_import
                         .iter()
                         .map(|block| BlockView::new(block).header_view().hash())
@@ -192,11 +192,11 @@ pub fn import_blocks(
                     // and try to download them again later.
                     else {
                         info.switch_mode(Mode::Thunder, &local_best_block, &node_hash);
-                        storage.remove_downloaded_blocks_hashes(&unknown_blocks_hashes);
+                        storage.remove_recorded_blocks_hashes(&unknown_blocks_hashes);
                     }
                 } else {
                     // Remove hashes that are not imported due to unknown parent, so that they can be downloaded again.
-                    storage.remove_downloaded_blocks_hashes(&unknown_blocks_hashes);
+                    storage.remove_recorded_blocks_hashes(&unknown_blocks_hashes);
                     // If known parent blocks are fork blocks, we need to sync backward
                     if unknown_number <= local_best_block {
                         info.switch_mode(Mode::Backward, &local_best_block, &node_hash);

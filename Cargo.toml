@@ -2,7 +2,7 @@
 description = "aion network rust implementation"
 name = "aionr"
 # NOTE Make sure to update util/version/Cargo.toml as well
-version = "1.2.0"
+version = "1.3.0"
 license = "GPL-3.0"
 authors = ["aion foundation <admin@aion.network>"]
 
@@ -24,11 +24,9 @@ fdlimit = "0.1"
 tokio = "0.1.13"
 ctrlc =             { git = "https://github.com/paritytech/rust-ctrlc.git" }
 jsonrpc-core =      { git = "https://github.com/paritytech/jsonrpc.git", branch = "parity-2.2" }
-acore =             { path = "core" }
+acore =             { path = "core", version = "0.1" }
 acore-bytes =       { path = "util/bytes" }
 acore-io =          { path = "util/io" }
-blake2b =           { path = "util/blake2b" }
-equihash =          { path = "util/equihash" }
 logger =            { path = "util/logger" }
 aion-types =        { path = "util/aion-types" }
 aion-version =      { path = "util/version" }
@@ -36,7 +34,6 @@ dir =               { path = "util/dir" }
 rlp =               { path = "util/rlp" }
 panic_hook =        { path = "util/panic_hook" }
 journaldb =         { path = "db/journaldb" }
-db =                { path = "db/core" }
 key =               { path = "keystore/key" }
 keychain =          { path = "keystore/keychain" }
 aion-rpc =          { path = "rpc" }
@@ -79,7 +76,6 @@ members = [
 "util/rlp_compress",
 "util/rlp_derive",
 "util/stats",
-"util/stop-guard",
 "util/table",
 "util/trace-time",
 "util/trie-standardmap",

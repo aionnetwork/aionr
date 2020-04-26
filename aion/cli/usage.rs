@@ -104,6 +104,8 @@ macro_rules! underscore_to_hyphen {
     };
 }
 
+/// main macro to generate a config parameters struct with given params in cli mod, and do CMD args
+/// and config file contents parsing
 macro_rules! usage {
     (
         {

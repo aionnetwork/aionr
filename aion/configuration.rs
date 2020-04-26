@@ -45,6 +45,7 @@ use blockchain::{
 };
 use account::{AccountCmd, NewAccount, ListAccounts, ImportAccounts, ImportAccount, ExportAccount};
 
+/// Command enum
 #[derive(Debug, PartialEq)]
 pub enum Cmd {
     Run(RunCmd),
@@ -53,17 +54,21 @@ pub enum Cmd {
     Blockchain(BlockchainCmd),
 }
 
+/// params for executing
 pub struct Execute {
     pub logger: LogConfig,
     pub cmd: Cmd,
 }
 
+/// overall configration
 #[derive(Debug, PartialEq)]
 pub struct Configuration {
+    /// all config params
     pub args: Args,
 }
 
 impl Configuration {
+    /// convert config params to Args
     pub fn parse<S: AsRef<str>>(command: &[S]) -> Result<Self, ArgsError> {
         let args = Args::parse(command)?;
 
@@ -74,6 +79,7 @@ impl Configuration {
         Ok(config)
     }
 
+    /// convert Args to Cmd
     pub fn into_command(self) -> Result<Execute, String> {
         let dirs = self.directories();
         let pruning = self.args.arg_pruning.parse()?;
@@ -166,6 +172,7 @@ impl Configuration {
                 vm_type,
                 // with_color: logger_config.color,
                 verifier_settings: self.verifier_settings(),
+                stake_conf: self.stake_config()?,
             };
             Cmd::Blockchain(BlockchainCmd::Import(import_cmd))
         } else if self.args.cmd_export {
@@ -233,6 +240,7 @@ impl Configuration {
         })
     }
 
+    /// parse miner startup parameters
     fn miner_extras(&self) -> Result<MinerExtras, String> {
         let extras = MinerExtras {
             author: self.author()?,
@@ -244,8 +252,10 @@ impl Configuration {
         Ok(extras)
     }
 
+    /// parse miner author
     fn author(&self) -> Result<Address, String> { to_address(self.args.arg_author.clone()) }
 
+    /// parse import/export blockchain data format
     fn format(&self) -> Result<Option<DataFormat>, String> {
         match self
             .args
@@ -258,6 +268,7 @@ impl Configuration {
         }
     }
 
+    /// parse cache sizes.
     fn cache_config(&self) -> CacheConfig {
         match self.args.arg_cache_size {
             Some(size) => CacheConfig::new_with_total_cache_size(size),
@@ -272,6 +283,7 @@ impl Configuration {
         }
     }
 
+    /// parse logger config params
     fn logger_config(&self) -> LogConfig {
         // let level = validate_log_level(self.args.arg_log_level.clone(), "total");
         // let targets = parse_log_target(self.args.arg_log_targets.clone());
@@ -290,6 +302,7 @@ impl Configuration {
         }
     }
 
+    /// parse genesis spec
     fn chain(&self) -> Result<SpecType, String> {
         let name = self.args.arg_chain.clone();
 
@@ -303,11 +316,13 @@ impl Configuration {
         Ok(name.parse()?)
     }
 
+    /// parse max peers
     fn max_peers(&self) -> u32 {
         let peers = self.args.arg_max_peers;
         peers
     }
 
+    /// parse stake config
     fn stake_config(&self) -> Result<StakeConfig, String> {
         let stake_contract = &self.args.arg_stake_contract;
         let cfg = StakeConfig {
@@ -317,6 +332,7 @@ impl Configuration {
         Ok(cfg)
     }
 
+    /// parse account config
     fn accounts_config(&self) -> Result<AccountsConfig, String> {
         let cfg = AccountsConfig {
             iterations: self.args.arg_keys_iterations,
@@ -334,6 +350,7 @@ impl Configuration {
         Ok(cfg)
     }
 
+    /// parse miner behaviours
     fn miner_options(&self) -> Result<MinerOptions, String> {
         let options = MinerOptions {
             force_sealing: self.args.flag_force_sealing,
@@ -372,6 +389,7 @@ impl Configuration {
         Ok(options)
     }
 
+    /// parse auto-adjusted gas price params
     fn dynamic_gas_price(&self) -> Result<Option<DynamicGasPrice>, String> {
         if !self.args.flag_dynamic_gas_price {
             return Ok(None);
@@ -385,6 +403,7 @@ impl Configuration {
         Ok(Some(dynamic))
     }
 
+    /// parse extra data
     fn extra_data(&self) -> Result<Bytes, String> {
         match self.args.arg_extra_data.as_ref() {
             Some(x) if x.len() <= 32 => Ok(x.as_bytes().to_owned()),
@@ -393,6 +412,7 @@ impl Configuration {
         }
     }
 
+    /// parse network config params
     fn net_config(&self) -> Result<Config, String> {
         let mut ret = Config::new();
         ret.max_peers = self.max_peers();
@@ -404,8 +424,10 @@ impl Configuration {
         Ok(ret)
     }
 
+    /// parse rpc http apis
     fn rpc_apis(&self) -> String { self.args.arg_http_apis.clone().join(",") }
 
+    /// parse rpc http cors
     fn cors(cors: &str) -> Option<Vec<String>> {
         match cors {
             "none" => return Some(Vec::new()),
@@ -416,11 +438,13 @@ impl Configuration {
         Some(cors.split(',').map(Into::into).collect())
     }
 
+    /// parse rpc http cors
     fn rpc_cors(&self) -> Option<Vec<String>> {
         let cors = self.args.arg_http_cors.to_owned().join(",");
         Self::cors(&cors)
     }
 
+    /// parse hosts
     fn hosts(&self, hosts: &str, interface: &str) -> Option<Vec<String>> {
         if interface == "0.0.0.0" && hosts == "none" {
             return None;
@@ -429,6 +453,7 @@ impl Configuration {
         Self::parse_hosts(hosts)
     }
 
+    /// parse hosts
     fn parse_hosts(hosts: &str) -> Option<Vec<String>> {
         match hosts {
             "none" => return Some(Vec::new()),
@@ -439,6 +464,7 @@ impl Configuration {
         Some(hosts)
     }
 
+    /// parse http hosts
     fn rpc_hosts(&self) -> Option<Vec<String>> {
         self.hosts(
             &self.args.arg_http_hosts.clone().join(","),
@@ -446,14 +472,17 @@ impl Configuration {
         )
     }
 
+    /// parse web socket hosts
     fn ws_hosts(&self) -> Option<Vec<String>> {
         self.hosts(&self.args.arg_ws_hosts.join(","), &self.ws_interface())
     }
 
+    /// parse websocket origins
     fn ws_origins(&self) -> Option<Vec<String>> {
         Self::parse_hosts(&self.args.arg_ws_origins.join(","))
     }
 
+    /// parse ipc config params
     fn ipc_config(&self) -> Result<IpcConfiguration, String> {
         let conf = IpcConfiguration {
             enabled: !self.args.flag_no_ipc,
@@ -464,6 +493,7 @@ impl Configuration {
         Ok(conf)
     }
 
+    /// parse http config params
     fn http_config(&self) -> Result<HttpConfiguration, String> {
         let conf = HttpConfiguration {
             enabled: self.rpc_enabled(),
@@ -485,6 +515,7 @@ impl Configuration {
         Ok(conf)
     }
 
+    /// parse websocket config params
     fn ws_config(&self) -> Result<WsConfiguration, String> {
         let conf = WsConfiguration {
             enabled: self.ws_enabled(),
@@ -499,6 +530,7 @@ impl Configuration {
         Ok(conf)
     }
 
+    /// parse directories
     fn directories(&self) -> Directories {
         let local_path = default_local_path();
         let base_path = self
@@ -560,10 +592,12 @@ impl Configuration {
         }
     }
 
+    /// parse ipc path
     fn ipc_path(&self) -> String {
         aion_ipc_path(&self.directories().base, &self.args.arg_ipc_path.clone())
     }
 
+    /// parse interface
     fn interface(&self, interface: &str) -> String {
         match interface {
             "all" => "0.0.0.0",
@@ -573,17 +607,22 @@ impl Configuration {
         .into()
     }
 
+    /// parse rpc interface
     fn rpc_interface(&self) -> String {
         let rpc_interface = self.args.arg_http_interface.clone();
         self.interface(&rpc_interface)
     }
 
+    /// parse websocket interface
     fn ws_interface(&self) -> String { self.interface(&self.args.arg_ws_interface) }
 
+    /// parse whether http apis are enabled
     fn rpc_enabled(&self) -> bool { !self.args.flag_no_http }
 
+    /// parse whether web socket apis are enabled
     fn ws_enabled(&self) -> bool { !self.args.flag_no_ws }
 
+    /// parse verifier settings
     fn verifier_settings(&self) -> VerifierSettings {
         let mut settings = VerifierSettings::default();
         settings.scale_verifiers = self.args.flag_scale_verifiers;
@@ -704,6 +743,7 @@ mod tests {
                 fat_db: Default::default(),
                 vm_type: Default::default(),
                 verifier_settings: Default::default(),
+                stake_conf: Default::default()
             }))
         );
     }

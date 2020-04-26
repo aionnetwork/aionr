@@ -186,7 +186,7 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
     }
     {
         // Get the lock before iteration to keep the operation atomic, so that the downloaded blocks in the batch will be consecutive
-        let mut downloaded_blocks_hashes = storage.downloaded_blocks_hashes().lock();
+        let mut recorded_blocks_hashes = storage.recorded_blocks_hashes().lock();
         for i in 0..::std::cmp::min(headers.len(), bodies.len()) {
             match UnityEngine::validate_block_body(&headers[i], &bodies[i]) {
                 Ok(_) => {
@@ -195,9 +195,9 @@ pub fn receive_res(p2p: Mgr, node_hash: u64, cb_in: ChannelBuffer, storage: Arc<
                         transactions: bodies[i].clone(),
                     };
                     let hash = block.header.hash();
-                    if !downloaded_blocks_hashes.contains_key(&hash) {
+                    if !recorded_blocks_hashes.contains_key(&hash) {
                         blocks.push(block);
-                        downloaded_blocks_hashes.insert(hash, 0);
+                        recorded_blocks_hashes.insert(hash, 0);
                         debug!(target: "sync_res", "downloaded block hash: {}.", hash);
                     }
                 }

@@ -21,7 +21,7 @@
 
 use super::builtin::{BuiltinContract, BuiltinExt, BuiltinParams};
 use aion_types::{U256, H256, Address};
-use vms::{ExecutionResult, ExecStatus, ReturnData};
+use vms::{FvmExecutionResult as ExecutionResult, ExecStatus, ReturnData};
 use rcrypto::ed25519::verify;
 
 /// A pre-copmiled contract for ed25519 verification.

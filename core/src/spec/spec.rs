@@ -38,7 +38,7 @@ use types::BlockNumber;
 use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
 use engine::{Engine, UnityEngine};
 use types::error::Error;
-use executive::Executive;
+use executor::fvm_exec::Executive;
 use factory::Factories;
 use header::{Header, SealType};
 use machine::EthereumMachine;
