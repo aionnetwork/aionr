@@ -394,7 +394,7 @@ where
     }
 
     /// PoS get seed
-    fn pos_get_seed(&self) -> Result<H512> {
+    fn pos_get_seed(&self) -> Result<Bytes> {
         // seal map:
         // 64 bytes signature + 64 bytes seed + 32 public key
         if !self
@@ -403,31 +403,36 @@ where
         {
             return Err(errors::pos_not_allowed());
         }
+
+        // Get the latest seed/proof from the last pos block
         let best_block = self.client.best_block_header();
         let grand_parent = self.client.block_header_data(&best_block.parent_hash());
-        match grand_parent {
+        let mut latest_seed: Vec<u8> = match grand_parent {
             Some(ref header) if header.seal_type() == Some(SealType::PoS) => {
-                // seal length must be 3, since it is already validated
-                let seal = header.seal();
-                let mut s = [0u8; 64];
-                debug!(target: "miner", "seal = {:?}, len = {}", seal, seal.len());
-                s.copy_from_slice(seal[0].as_slice());
-                Ok(s.into())
+                // header.seal()[0] is guaranteed since the block is already in chain
+                header.seal()[0].clone()
             }
-            _ => Ok(H512::zero()),
+            _ => vec![0; 64],
+        };
+
+        // For the fist ecvrf pos block, add an extra byte as a flag
+        if self.miner.unity_ecvrf_seed_update(&*self.client) && latest_seed.len() == 64 {
+            latest_seed.extend(&[0u8; 1]);
         }
+
+        Ok(Bytes(latest_seed))
     }
 
     /// PoS submit seed
     /// seed: signed seed by staker
-    /// psk: public key of staker
+    /// pk: public key of staker
     /// coinbase: the account who receives block reward
-    fn pos_submit_seed(&self, seed: H512, psk: H256, coinbase: H256) -> Result<H256> {
+    fn pos_submit_seed(&self, seed: Bytes, pk: H256, coinbase: H256) -> Result<H256> {
         // try to get block hash
-        debug!(target: "miner", "submit seed: {:?} - {:?}", seed, psk);
+        debug!(target: "miner", "submit seed: {:?} - {:?}", seed, pk);
         let template = self
             .miner
-            .get_pos_template(&*self.client, seed.into(), psk, coinbase);
+            .get_pos_template(&*self.client, seed.into(), pk, coinbase);
         if template.is_some() {
             return Ok(template.unwrap().into());
         } else {
