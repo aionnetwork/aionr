@@ -576,7 +576,7 @@ impl Engine for Arc<UnityEngine> {
                 .machine
                 .params()
                 .unity_ecvrf_seed_update
-                .map_or(false, |fork_number| header.number() > fork_number);
+                .map_or(false, |fork_number| header.number() >= fork_number);
 
             PoSValidator::validate(
                 header,

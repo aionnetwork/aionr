@@ -152,7 +152,7 @@ pub trait MinerService: Send + Sync {
     fn get_pos_template(
         &self,
         client: &MiningBlockChainClient,
-        seed: [u8; 64],
+        seed: Vec<u8>,
         public_key: H256,
         coinbase: H256,
     ) -> Option<H256>;
@@ -184,6 +184,10 @@ pub trait MinerService: Send + Sync {
         client: &MiningBlockChainClient,
         seal_type: &SealType,
     ) -> bool;
+
+    // Unity
+    /// Get the latest seed from the last pos block
+    fn latest_seed(&self, client: &MiningBlockChainClient) -> Result<Vec<u8>, ()>;
 
     /// Get the sealing work package and if `Some`, apply some transform.
     fn map_sealing_work<F, T>(&self, chain: &MiningBlockChainClient, f: F) -> Option<T>

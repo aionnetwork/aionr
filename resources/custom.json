@@ -16,7 +16,7 @@
     "monetaryPolicyUpdate": "0",
     "unityUpdate": "10",
     "unityHybridSeedUpdate": "10",
-    "unityECVRFSeedUpdate": "20"
+    "unityECVRFSeedUpdate": "21"
   },
   "genesis": {
     "seal": {
