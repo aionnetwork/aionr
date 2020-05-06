@@ -435,7 +435,7 @@ impl UnverifiedTransaction {
         }
     }
 
-    ///    Reference to unsigned part of this transaction.
+    /// Reference to unsigned part of this transaction.
     pub fn as_unsigned(&self) -> &Transaction { &self.unsigned }
 
     pub fn standard_v(&self) -> u8 { 0 }
@@ -454,7 +454,8 @@ impl UnverifiedTransaction {
         recover_ed25519(&self.signature(), &self.unsigned.hash(&self.timestamp))
     }
 
-    pub fn fork_check(
+    /// Check if the transaction type is allowed
+    pub fn is_allowed_type(
         &self,
         monetary_policy_update: Option<u64>,
         unity_ecvrf_seed_update: Option<u64>,
@@ -462,14 +463,14 @@ impl UnverifiedTransaction {
     ) -> Result<(), error::Error>
     {
         if let Some(ref fork) = monetary_policy_update {
-            if *fork < current_blk && !(self.transaction_type == AVM_CREATION_TYPE
+            if fork < &current_blk && !(self.transaction_type == AVM_CREATION_TYPE
                 || self.transaction_type == DEFAULT_TRANSACTION_TYPE)
             {
                 return Err(error::Error::InvalidTransactionType);
             }
         }
         if let Some(ref fork) = unity_ecvrf_seed_update {
-            if *fork < current_blk
+            if fork <= &current_blk
                 && self.transaction_type == DEFAULT_TRANSACTION_TYPE
                 && self.action == Action::Create
             {
