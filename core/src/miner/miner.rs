@@ -2413,7 +2413,7 @@ mod tests {
         // 2. submit seed
         let seed: H512 = "d1c02f4679b4a022f2d843bd750c34c94cd08a2b6fc2def298653b81b88245a345d8d3e2d8bbce3fdb3ab2918459633f4496d5609ac13d9710ddcede8957cc0c".
             from_hex().unwrap().as_slice().into();
-        let template = miner.get_pos_template(&client, seed.into(), staker, staker);
+        let template = miner.get_pos_template(&client, seed.to_vec(), staker, staker);
 
         assert!(template.is_some());
         println!("new block = {:?}, staker = {:?}", template.unwrap(), staker);
@@ -2445,12 +2445,12 @@ mod tests {
         // 2. submit seed
         let seed: H512 = "d1c02f4679b4a022f2d843bd750c34c94cd08a2b6fc2def298653b81b88245a345d8d3e2d8bbce3fdb3ab2918459633f4496d5609ac13d9710ddcede8957cc0c".
             from_hex().unwrap().as_slice().into();
-        let template = miner.get_pos_template(&client, seed.into(), staker, staker);
+        let template = miner.get_pos_template(&client, seed.to_vec(), staker, staker);
 
         assert!(template.is_some());
         println!("new block = {:?}, staker = {:?}", template.unwrap(), staker);
         ::std::thread::sleep(Duration::from_secs(1));
-        let template_1 = miner.get_pos_template(&client, seed.into(), staker, staker);
+        let template_1 = miner.get_pos_template(&client, seed.to_vec(), staker, staker);
         assert_eq!(template, template_1);
 
         // 3. submit signature

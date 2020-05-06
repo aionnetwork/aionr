@@ -231,6 +231,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             false,
+            false,
         );
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSSealType),
@@ -251,6 +252,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             false,
+            false,
         );
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::NullStake),
@@ -270,6 +272,7 @@ mod tests {
             &parent_header,
             Some(&grand_parent_header),
             stake,
+            false,
             false,
         );
         match result.err().unwrap() {
@@ -294,6 +297,7 @@ mod tests {
             &parent_header,
             Some(&grand_parent_header),
             stake,
+            false,
             false,
         );
         match result.err().unwrap() {
@@ -330,6 +334,7 @@ mod tests {
             &parent_header,
             Some(&grand_parent_header),
             stake,
+            false,
             false,
         );
         match result.err().unwrap() {
@@ -435,6 +440,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             false,
+            false,
         );
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSTimestamp(15, 1, 15)),
@@ -477,6 +483,7 @@ mod tests {
             &parent_header,
             Some(&grand_parent_header),
             stake,
+            false,
             false,
         );
         assert!(result.is_ok());
@@ -531,6 +538,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             false,
+            false,
         );
         assert!(result.is_ok());
     }
@@ -584,6 +592,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             true,
+            false,
         );
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSSeed),
@@ -644,6 +653,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             true,
+            false,
         );
         assert!(result.is_ok());
     }
