@@ -197,8 +197,8 @@ impl PoSValidator {
             let mut new_seed: Vec<u8> = Vec::new();
             new_seed.extend(&seed_left.to_vec());
             new_seed.extend(&seed_right.to_vec());
-            debug!(target: "pos", "block {:?}, hybrid_left {:?}, hybrid_right {:?}, seed_left {:?}, 
-                seed_right {:?}, new_seed {:?}, seed {:?}", 
+            debug!(target: "pos", "block {:?}, hybrid_left {:?}, hybrid_right {:?}, seed_left {:?},
+                seed_right {:?}, new_seed {:?}, seed {:?}",
                 parent_header.number() + 1, hybrid_left, hybrid_right, seed_left,
                 seed_right, new_seed, seed);
             seed == new_seed.as_slice()

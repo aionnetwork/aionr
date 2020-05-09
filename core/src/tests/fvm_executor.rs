@@ -808,7 +808,7 @@ fn test_internal_transactions() {
 #[test]
 fn error_cases_rejected() {
     let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-    let machine = make_aion_machine();
+    let mut machine = make_aion_machine();
     let mut info = EnvInfo::default();
     info.gas_limit = U256::from(3_000_000);
     let mut state = get_temp_state();
@@ -994,6 +994,31 @@ fn error_cases_rejected() {
             expected: U256::zero(),
             got: U256::from(4),
         }
+    );
+
+    // 0. Transaction type
+    machine.set_unity_ecvrf_seed(0u64);
+    let data = "605060405234156100105760006000fd5b610015565b610199806100246000396000f30060506040526000356c01000000000000000000000000900463ffffffff1680632d7df21a146100335761002d565b60006000fd5b341561003f5760006000fd5b6100666004808080601001359035909160200190919290803590601001909190505061007c565b6040518082815260100191505060405180910390f35b6000600060007f66fa32225b641331dff20698cd66d310b3149e86d875926af7ea2f2a9079e80b856040518082815260100191505060405180910390a18585915091506001841115156100d55783925061016456610163565b60018282632d7df21a898960018a036000604051601001526040518463ffffffff166c010000000000000000000000000281526004018084848252816010015260200182815260100193505050506010604051808303816000888881813b151561013f5760006000fd5b5af1151561014d5760006000fd5b5050505060405180519060100150019250610164565b5b505093925050505600a165627a7a72305820c4755a8b960e01280a2c8d85fae255d08e1be318b2c2685a948e7b42660c2f5c0029".from_hex().unwrap();
+    let transaction: Transaction = Transaction::new(
+        U256::zero(),
+        U256::zero(),
+        U256::from(500_000),
+        Action::Create,
+        0.into(),
+        data,
+        DEFAULT_TRANSACTION_TYPE,
+        None,
+    );
+    let signed_transaction: SignedTransaction = transaction.fake_sign(sender);
+    let result = {
+        let mut ex = Executive::new(&mut state, &info, &machine);
+        ex.transact(&signed_transaction, true, false, true)
+    };
+    assert_eq!(
+        result.unwrap_err(),
+        ExecutionError::InvalidTransactionType(
+            "Transaction error (Fvm Create is no longer allowed.)".to_string()
+        )
     );
 }
 

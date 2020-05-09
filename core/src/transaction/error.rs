@@ -113,6 +113,8 @@ pub enum Error {
     InvalidBeaconHash(H256),
     /// beacon hash is banned
     BeaconBanned,
+    /// forbid fvm create after ecvrf seed update
+    FvmDeprecated,
 }
 
 impl From<key::Error> for Error {
@@ -200,6 +202,7 @@ impl fmt::Display for Error {
                 )
             }
             BeaconBanned => "Not yet forked, Beacon hash is banned.".into(),
+            FvmDeprecated => "Fvm Create is no longer allowed.".into(),
         };
 
         f.write_fmt(format_args!("Transaction error ({})", msg))
