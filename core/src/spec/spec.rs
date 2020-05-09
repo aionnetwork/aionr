@@ -35,7 +35,7 @@ use kvdb::{MemoryDB, MockDbRepository};
 use parking_lot::RwLock;
 use rlp::{Rlp, RlpStream};
 use types::BlockNumber;
-use vms::{ActionParams, ActionValue, CallType, EnvInfo, ParamsType};
+use vms::{ActionParams, ActionValue, CallType, EnvInfo};
 use engine::{Engine, UnityEngine};
 use types::error::Error;
 use executor::fvm_exec::Executive;
@@ -397,7 +397,6 @@ impl Spec {
                 trace!(target: "spec", "  .. root before = {}", state.root());
                 let params = ActionParams {
                     code_address: address.clone(),
-                    code_hash: Some(blake2b(constructor)),
                     address: address.clone(),
                     sender: from.clone(),
                     origin: from.clone(),
@@ -408,7 +407,6 @@ impl Spec {
                     data: None,
                     call_type: CallType::None,
                     static_flag: false,
-                    params_type: ParamsType::Embedded,
                     transaction_hash: H256::default(),
                     original_transaction_hash: H256::default(),
                     nonce: 0,

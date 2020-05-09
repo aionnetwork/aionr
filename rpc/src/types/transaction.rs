@@ -154,7 +154,7 @@ impl Transaction {
             gas: t.gas,
             input: Bytes::new(t.data.clone()),
             creates: match t.action {
-                Action::Create => Some(contract_address(&t.sender(), &t.nonce).0),
+                Action::Create => Some(contract_address(&t.sender(), &t.nonce)),
                 Action::Call(_) => None,
             },
             raw: ::rlp::encode(&t.signed).into_vec().into(),
@@ -190,7 +190,7 @@ impl Transaction {
             gas: t.gas,
             input: Bytes::new(t.data.clone()),
             creates: match t.action {
-                Action::Create => Some(contract_address(&t.sender(), &t.nonce).0),
+                Action::Create => Some(contract_address(&t.sender(), &t.nonce)),
                 Action::Call(_) => None,
             },
             raw: ::rlp::encode(&t).into_vec().into(),

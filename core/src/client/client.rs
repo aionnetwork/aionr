@@ -1839,9 +1839,10 @@ impl MiningBlockChainClient for Client {
 
             let route = self.commit_block(block, &header, &block_data);
             trace!(target: "client", "Imported sealed block #{} ({})", number, hash);
-            self.state_db
-                .write()
-                .sync_cache(&route.enacted, &route.retracted, false);
+            // has synced cache in commit_block
+            // self.state_db
+            //     .write()
+            //     .sync_cache(&route.enacted, &route.retracted, false);
             route
         };
         let (enacted, retracted) = self.calculate_enacted_retracted(&[route]);
@@ -1941,7 +1942,7 @@ fn transaction_receipt(
         gas_used: receipt.gas_used,
         contract_address: match tx.action {
             Action::Call(_) => None,
-            Action::Create => Some(contract_address(&sender, &tx.nonce).0),
+            Action::Create => Some(contract_address(&sender, &tx.nonce)),
         },
         logs: receipt
             .logs()

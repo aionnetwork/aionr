@@ -1226,7 +1226,6 @@ impl MinerService for Miner {
     ) -> Vec<Result<(), Error>>
     {
         trace!(target: "client", "Importing external transactions");
-        let mut is_imported: bool = false;
 
         let results = transactions
             .into_iter()
@@ -1239,9 +1238,6 @@ impl MinerService for Miner {
                             TransactionOrigin::External,
                             None,
                         );
-                        if !is_imported && import_result.is_ok() {
-                            is_imported = true;
-                        }
                         import_result
                     })
             })
@@ -1447,7 +1443,7 @@ impl MinerService for Miner {
     //                                Action::Call(_) => None,
     //                                Action::Create => {
     //                                    let sender = tx.sender();
-    //                                    Some(contract_address(&sender, &tx.nonce).0)
+    //                                    Some(contract_address(&sender, &tx.nonce))
     //                                }
     //                            },
     //                            logs: receipt.logs().clone(),

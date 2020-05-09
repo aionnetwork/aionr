@@ -61,7 +61,7 @@ fn avm_recursive() {
     let file_str = file.to_str().expect("Failed to locate the demo.jar");
     let mut code = read_file(file_str).expect("unable to open avm dapp");
     let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-    let address = contract_address(&sender, &U256::zero()).0;
+    let address = contract_address(&sender, &U256::zero());
     let mut params = ActionParams::default();
     params.address = address.clone();
     params.sender = sender.clone();
@@ -151,7 +151,7 @@ fn get_vote() {
         .expect("Failed to locate the unity-staking.jar");
     let mut code = read_file(file_str).expect("unable to open avm dapp");
     let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-    let address = contract_address(&sender, &U256::zero()).0;
+    let address = contract_address(&sender, &U256::zero());
     let mut params = ActionParams::default();
     params.address = address.clone();
     params.sender = sender.clone();
@@ -291,7 +291,7 @@ fn avm_create_non_empty() {
     let file_str = file.to_str().expect("Failed to locate the demo.jar");
     let mut code = read_file(file_str).expect("unable to open avm dapp");
     let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-    let address = contract_address(&sender, &U256::zero()).0;
+    let address = contract_address(&sender, &U256::zero());
     let mut params = ActionParams::default();
     params.address = address.clone();
     params.sender = sender.clone();
@@ -512,7 +512,7 @@ fn avm_create_non_empty_internal_avm1() {
         .expect("Failed to locate the CreateInternal.jar");
     let mut code = read_file(file_str).expect("unable to open avm dapp");
     let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-    let address = contract_address(&sender, &U256::zero()).0;
+    let address = contract_address(&sender, &U256::zero());
     let mut params = ActionParams::default();
     params.address = address.clone();
     params.sender = sender.clone();
@@ -1673,7 +1673,7 @@ fn avm_create_non_empty_internal_avm2() {
         .expect("Failed to locate the CreateInternal.jar");
     let mut code = read_file(file_str).expect("unable to open avm dapp");
     let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
-    let address = contract_address(&sender, &U256::zero()).0;
+    let address = contract_address(&sender, &U256::zero());
     let mut params = ActionParams::default();
     params.address = address.clone();
     params.sender = sender.clone();
@@ -2945,7 +2945,7 @@ fn avm_balance_transfer() {
     let mut state = get_temp_state();
     let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
     let mut params = ActionParams::default();
-    let address = contract_address(&sender, &U256::zero()).0;
+    let address = contract_address(&sender, &U256::zero());
     params.address = address.clone();
     params.sender = sender.clone();
     params.origin = sender.clone();
@@ -2961,7 +2961,7 @@ fn avm_balance_transfer() {
     let machine = make_aion_machine();
     let substate = Substate::new();
     let mut params2 = params.clone();
-    params2.address = contract_address(&sender, &U256::one()).0;
+    params2.address = contract_address(&sender, &U256::one());
     params2.value = ActionValue::Transfer(99.into());
     params2.nonce = params.nonce + 1;
     let results = {
