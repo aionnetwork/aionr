@@ -451,6 +451,7 @@ impl MiningBlockChainClient for TestBlockChainClient {
             self.db.clone(),
             None,
             self,
+            true,
         )
         .expect("Opening block for tests will not fail.");
         // TODO [todr] Override timestamp for predictability (set_timestamp_now kind of sucks)

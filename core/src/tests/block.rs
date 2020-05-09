@@ -92,6 +92,7 @@ fn enact_bytes(
         Arc::new(MockDbRepository::init(vec![])),
         None,
         client,
+        false,
     )?;
 
     b.populate_from(&header);
@@ -152,6 +153,7 @@ fn open_block() {
         Arc::new(MockDbRepository::init(vec![])),
         None,
         &client,
+        true,
     )
     .unwrap();
     let b = b.close_and_lock();
@@ -186,6 +188,7 @@ fn enact_block() {
         Arc::new(MockDbRepository::init(vec![])),
         None,
         &client,
+        true,
     )
     .unwrap()
     .close_and_lock()

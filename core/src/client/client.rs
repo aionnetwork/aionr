@@ -1784,6 +1784,7 @@ impl MiningBlockChainClient for Client {
             self.db.read().clone(),
             timestamp,
             self,
+            true,
         )
         .expect(
             "OpenBlock::new only fails if parent state root invalid; state root of best block's \
