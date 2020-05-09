@@ -436,7 +436,7 @@ impl UnverifiedTransaction {
         }
     }
 
-    ///    Reference to unsigned part of this transaction.
+    /// Reference to unsigned part of this transaction.
     pub fn as_unsigned(&self) -> &Transaction { &self.unsigned }
 
     pub fn standard_v(&self) -> u8 { 0 }
@@ -455,21 +455,31 @@ impl UnverifiedTransaction {
         recover_ed25519(&self.signature(), &self.unsigned.hash(&self.timestamp))
     }
 
+    /// Check if the transaction type is allowed
     pub fn is_allowed_type(
         &self,
-        has_fork: Option<u64>,
+        monetary_policy_update: Option<u64>,
+        unity_ecvrf_seed_update: Option<u64>,
         current_blk: BlockNumber,
     ) -> Result<(), TxError>
     {
-        match has_fork {
-            Some(ref fork)
-                if *fork < current_blk && !(self.transaction_type == AVM_CREATION_TYPE
-                    || self.transaction_type == DEFAULT_TRANSACTION_TYPE) =>
+        if let Some(ref fork) = monetary_policy_update {
+            if fork < &current_blk && !(self.transaction_type == AVM_CREATION_TYPE
+                || self.transaction_type == DEFAULT_TRANSACTION_TYPE)
             {
-                Err(TxError::InvalidTransactionType)
+                return Err(TxError::InvalidTransactionType);
             }
-            _ => Ok(()),
         }
+        if let Some(ref fork) = unity_ecvrf_seed_update {
+            if fork <= &current_blk
+                && self.transaction_type == DEFAULT_TRANSACTION_TYPE
+                && self.action == Action::Create
+            {
+                return Err(TxError::FvmDeprecated);
+            }
+        }
+
+        Ok(())
     }
 
     /// Verify basic signature params. Does not attempt sender recovery.

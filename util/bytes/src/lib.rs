@@ -20,7 +20,7 @@
  *
  ******************************************************************************/
 
-#![warn(unused_extern_crates)]
+extern crate rustc_hex;
 
 use std::fmt;
 use std::cmp::min;
@@ -192,9 +192,34 @@ pub fn bytes_to_i32s(input: &[u8], output: &mut [i32], big_endian: bool) {
     }
 }
 
+pub fn slice_to_array_32<T>(slice: &[T]) -> Option<&[T; 32]> {
+    if slice.len() == 32 {
+        Some(unsafe { &*(slice as *const [T] as *const [T; 32]) })
+    } else {
+        None
+    }
+}
+
+pub fn slice_to_array_64<T>(slice: &[T]) -> Option<&[T; 64]> {
+    if slice.len() == 64 {
+        Some(unsafe { &*(slice as *const [T] as *const [T; 64]) })
+    } else {
+        None
+    }
+}
+
+pub fn slice_to_array_80<T>(slice: &[T]) -> Option<&[T; 80]> {
+    if slice.len() == 80 {
+        Some(unsafe { &*(slice as *const [T] as *const [T; 80]) })
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::BytesRef;
+    use super::{BytesRef, slice_to_array_32, slice_to_array_64, slice_to_array_80};
+    use rustc_hex::ToHex;
 
     #[test]
     fn should_write_bytes_to_fixed_bytesref() {
@@ -270,5 +295,38 @@ mod tests {
         super::bytes_to_i32s(&input, &mut output, false);
         assert_eq!(67305985, output[0]);
         assert_eq!(134678021, output[1]);
+    }
+
+    #[test]
+    fn test_slice_to_array_32() {
+        let slice: &[u8] = &[0; 32];
+        let array_32 = slice_to_array_32(slice);
+        assert_eq!(array_32, Some(&[0; 32]));
+
+        let slice: &[u8] = &[0; 31];
+        let array_32 = slice_to_array_32(slice);
+        assert_eq!(array_32, None);
+    }
+
+    #[test]
+    fn test_slice_to_array_64() {
+        let slice: &[u8] = &[1; 64];
+        let array_64 = slice_to_array_64(slice);
+        assert_eq!(array_64.unwrap().to_hex(), [1; 64].to_hex());
+
+        let slice: &[u8] = &[1; 31];
+        let array_64 = slice_to_array_64(slice);
+        assert!(array_64.is_none());
+    }
+
+    #[test]
+    fn test_slice_to_array_80() {
+        let slice: &[u8] = &[2; 80];
+        let array_80 = slice_to_array_80(slice);
+        assert_eq!(array_80.unwrap().to_hex(), [2; 80].to_hex());
+
+        let slice: &[u8] = &[2; 31];
+        let array_80 = slice_to_array_80(slice);
+        assert!(array_80.is_none());
     }
 }

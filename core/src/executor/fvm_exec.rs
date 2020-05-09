@@ -143,6 +143,17 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         let sender = t.sender();
         let nonce = self.state.nonce(&sender)?;
 
+        // 0. Check transaction type
+        if let Err(error) = t.is_allowed_type(
+            self.machine.params().monetary_policy_update,
+            self.machine.params().unity_ecvrf_seed_update,
+            self.info.number,
+        ) {
+            return Err(From::from(ExecutionError::InvalidTransactionType(
+                error.to_string(),
+            )));
+        }
+
         // 1. Check transaction nonce
         if check_nonce && t.nonce != nonce {
             return Err(From::from(ExecutionError::InvalidNonce {
@@ -571,6 +582,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         let res = self.exec_vm(params, &mut unconfirmed_substate);
 
         self.enact_result(&res, substate, unconfirmed_substate);
+
+        if self.depth >= 1 {
+            println!("Internal CREATION");
+        } else {
+            println!("External CREATION");
+        }
         debug!(target: "vm", "create res = {:?}", res);
         res
     }

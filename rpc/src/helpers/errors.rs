@@ -423,6 +423,7 @@ pub fn transaction_message(error: TransactionError) -> String {
             )
         }
         BeaconBanned => "Not yet forked, Beacon hash is banned.".into(),
+        FvmDeprecated => "Fvm Create is no longer allowed.".into(),
     }
 }
 

@@ -73,6 +73,8 @@ pub struct CommonParams {
     pub unity_update: Option<BlockNumber>,
     /// unity hybrid seed update block number,
     pub unity_hybrid_seed_update: Option<BlockNumber>,
+    /// unity ecvrf seed update block number,
+    pub unity_ecvrf_seed_update: Option<BlockNumber>,
 }
 
 impl From<ajson::spec::Params> for CommonParams {
@@ -86,6 +88,7 @@ impl From<ajson::spec::Params> for CommonParams {
             transaction_permission_contract: p.transaction_permission_contract.map(Into::into),
             unity_update: p.unity_update.map(Into::into),
             unity_hybrid_seed_update: p.unity_hybrid_seed_update.map(Into::into),
+            unity_ecvrf_seed_update: p.unity_ecvrf_seed_update.map(Into::into),
         }
     }
 }
@@ -230,7 +233,6 @@ fn load_from(s: ajson::spec::Spec) -> Result<Spec, Error> {
 }
 
 #[cfg(test)]
-/// Load from JSON object.
 fn load_from_with_unity_update(s: ajson::spec::Spec, unity_update: u64) -> Result<Spec, Error> {
     let builtins = s
         .accounts
@@ -298,6 +300,10 @@ impl Spec {
             load_bundled!("null_unity")
         }
     }
+
+    #[cfg(test)]
+    /// Create a new Spec which is a UnityEngine consensus
+    pub fn new_ecvrf() -> Spec { load_bundled!("null_ecvrf") }
 
     /// Create a new Foundation Mainnet chain spec.
     pub fn new_foundation() -> Spec {
@@ -507,8 +513,6 @@ impl Spec {
             .and_then(|x| load_from(x).map_err(fmt_err))
     }
 
-    /// Loads spec from json file. Provide factories for executing contracts and ensuring
-    /// storage goes to the right place.
     #[cfg(test)]
     pub fn load_with_unity_update<'a, R>(reader: R, update_unity: u64) -> Result<Self, String>
     where R: Read {
