@@ -152,7 +152,7 @@ pub trait MinerService: Send + Sync {
     fn get_pos_template(
         &self,
         client: &MiningBlockChainClient,
-        seed: [u8; 64],
+        seed: Vec<u8>,
         public_key: H256,
         coinbase: H256,
     ) -> Option<H256>;
@@ -172,6 +172,10 @@ pub trait MinerService: Send + Sync {
     // Check if the next block is on the unity hybrid seed hard fork
     fn unity_hybrid_seed_update(&self, client: &MiningBlockChainClient) -> bool;
 
+    // AION Unity ecvrf seed update
+    // Check if the next block is on the unity ecvrf seed hard fork
+    fn unity_ecvrf_seed_update(&self, client: &MiningBlockChainClient) -> bool;
+
     // AION 2.0
     // Check if it's allowed to produce a new block with given seal type.
     // A block's seal type must be different than its parent's seal type.
@@ -180,6 +184,10 @@ pub trait MinerService: Send + Sync {
         client: &MiningBlockChainClient,
         seal_type: &SealType,
     ) -> bool;
+
+    // Unity
+    /// Get the latest seed from the last pos block
+    fn latest_seed(&self, client: &MiningBlockChainClient) -> Result<Vec<u8>, ()>;
 
     /// Get the sealing work package and if `Some`, apply some transform.
     fn map_sealing_work<F, T>(&self, chain: &MiningBlockChainClient, f: F) -> Option<T>

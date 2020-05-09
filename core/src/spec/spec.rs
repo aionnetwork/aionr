@@ -73,6 +73,8 @@ pub struct CommonParams {
     pub unity_update: Option<BlockNumber>,
     /// unity hybrid seed update block number,
     pub unity_hybrid_seed_update: Option<BlockNumber>,
+    /// unity ecvrf seed update block number,
+    pub unity_ecvrf_seed_update: Option<BlockNumber>,
 }
 
 impl From<ajson::spec::Params> for CommonParams {
@@ -86,6 +88,7 @@ impl From<ajson::spec::Params> for CommonParams {
             transaction_permission_contract: p.transaction_permission_contract.map(Into::into),
             unity_update: p.unity_update.map(Into::into),
             unity_hybrid_seed_update: p.unity_hybrid_seed_update.map(Into::into),
+            unity_ecvrf_seed_update: p.unity_ecvrf_seed_update.map(Into::into),
         }
     }
 }

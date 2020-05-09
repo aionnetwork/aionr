@@ -571,6 +571,12 @@ impl<'a, B: 'a + StateBackend> Executive<'a, B> {
         let res = self.exec_vm(params, &mut unconfirmed_substate);
 
         self.enact_result(&res, substate, unconfirmed_substate);
+
+        if self.depth >= 1 {
+            println!("Internal CREATION");
+        } else {
+            println!("External CREATION");
+        }
         debug!(target: "vm", "create res = {:?}", res);
         res
     }

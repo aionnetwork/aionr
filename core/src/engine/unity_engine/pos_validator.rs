@@ -22,7 +22,8 @@
 use header::{Header, SealType};
 use types::error::{BlockError, Error};
 use unexpected::Mismatch;
-use rcrypto::ed25519::verify;
+use rcrypto::{ed25519, ecvrf};
+use acore_bytes::{slice_to_array_80, slice_to_array_32};
 use num::Zero;
 use num_bigint::BigUint;
 use delta_calc::calculate_delta;
@@ -38,6 +39,7 @@ impl PoSValidator {
         grand_parent_header: Option<&Header>,
         stake: Option<BigUint>,
         unity_hybrid_seed_update: bool,
+        unity_ecvrf_seed_update: bool,
     ) -> Result<(), Error>
     {
         // Return error if seal type is not PoS
@@ -64,10 +66,20 @@ impl PoSValidator {
             .into());
         }
 
-        // Get seed and signature
-        let seed = &seal[0];
+        // Get seed, signature and public key, and check their length
+        let mut seed = seal[0].clone();
+        if seed.len() != if unity_ecvrf_seed_update { 80 } else { 64 } {
+            return Err(BlockError::InvalidPoSSeed.into());
+        }
         let signature = &seal[1];
-        let pk = &seal[2];
+        if signature.len() != 64 {
+            return Err(BlockError::InvalidPoSSignature.into());
+        }
+        let pk: &[u8; 32] = match slice_to_array_32(&seal[2]) {
+            Some(pk) => pk,
+            None => return Err(BlockError::InvalidPoSPublicKey.into()),
+        };
+
         let parent_seed = grand_parent_header.map_or(vec![0u8; 64], |h| {
             if h.seal_type() == &Some(SealType::PoS) {
                 h.seal()
@@ -82,7 +94,8 @@ impl PoSValidator {
         // Verify seed
         if !Self::validate_seed(
             unity_hybrid_seed_update,
-            seed,
+            unity_ecvrf_seed_update,
+            &seed,
             &parent_seed,
             pk,
             parent_header,
@@ -90,8 +103,18 @@ impl PoSValidator {
             return Err(BlockError::InvalidPoSSeed.into());
         }
 
+        // Unity-3: calculate the real seed from the proof
+        if unity_ecvrf_seed_update {
+            if let Some(proof) = slice_to_array_80(&seed.clone()) {
+                seed = match ecvrf::proof_to_hash(proof) {
+                    Ok(output) => output.to_vec(),
+                    Err(_) => return Err(BlockError::InvalidPoSSeed.into()),
+                }
+            }
+        }
+
         // Verify block signature
-        if !verify(&header.mine_hash().0, pk, signature) {
+        if !ed25519::verify(&header.mine_hash().0, pk, signature) {
             return Err(BlockError::InvalidPoSSignature.into());
         }
 
@@ -119,16 +142,35 @@ impl PoSValidator {
     // Validate the seed of the pos seal
     fn validate_seed(
         unity_hybrid_seed_update: bool,
+        unity_ecvrf_seed_update: bool,
         seed: &[u8],
         grand_parent_seed: &[u8],
-        pk: &[u8],
+        pk: &[u8; 32],
         parent_header: &Header,
     ) -> bool
     {
-        // U30-22: validate the new hybrid seed
-        if unity_hybrid_seed_update {
+        // Unity-3: ecvrf seed is generated from the proof which needs to be validated
+        if unity_ecvrf_seed_update {
+            if let Some(proof) = slice_to_array_80(&seed) {
+                if let Some(parent_proof) = slice_to_array_80(&grand_parent_seed) {
+                    match ecvrf::proof_to_hash(parent_proof) {
+                        Ok(ref previous_seed) => ecvrf::verify(pk, proof, previous_seed).is_ok(),
+                        Err(_) => false,
+                    }
+                } else if grand_parent_seed.len() == 64 {
+                    // First block after ecvrf hard fork
+                    ecvrf::verify(pk, proof, grand_parent_seed).is_ok()
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        }
+        // Unity-2: validate the new hybrid seed
+        else if unity_hybrid_seed_update {
             let mut hybrid_seed: Vec<u8> = Vec::new();
-            let signing_address: Address = public_to_address_ed25519(&H256::from(pk));
+            let signing_address: Address = public_to_address_ed25519(&H256::from(pk.as_ref()));
             let parent_mine_hash: H256 = parent_header.mine_hash();
             let parent_seal = parent_header.seal();
             if parent_seal.len() != 2 {
@@ -163,7 +205,7 @@ impl PoSValidator {
         }
         // Old unity seed
         else {
-            verify(grand_parent_seed, pk, seed)
+            ed25519::verify(grand_parent_seed, pk, seed)
         }
     }
 }
@@ -189,6 +231,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             false,
+            false,
         );
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSSealType),
@@ -209,6 +252,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             false,
+            false,
         );
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::NullStake),
@@ -228,6 +272,7 @@ mod tests {
             &parent_header,
             Some(&grand_parent_header),
             stake,
+            false,
             false,
         );
         match result.err().unwrap() {
@@ -252,6 +297,7 @@ mod tests {
             &parent_header,
             Some(&grand_parent_header),
             stake,
+            false,
             false,
         );
         match result.err().unwrap() {
@@ -288,6 +334,7 @@ mod tests {
             &parent_header,
             Some(&grand_parent_header),
             stake,
+            false,
             false,
         );
         match result.err().unwrap() {
@@ -393,6 +440,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             false,
+            false,
         );
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSTimestamp(15, 1, 15)),
@@ -435,6 +483,7 @@ mod tests {
             &parent_header,
             Some(&grand_parent_header),
             stake,
+            false,
             false,
         );
         assert!(result.is_ok());
@@ -489,6 +538,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             false,
+            false,
         );
         assert!(result.is_ok());
     }
@@ -542,6 +592,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             true,
+            false,
         );
         match result.err().unwrap() {
             Error::Block(error) => assert_eq!(error, BlockError::InvalidPoSSeed),
@@ -602,6 +653,7 @@ mod tests {
             Some(&grand_parent_header),
             stake,
             true,
+            false,
         );
         assert!(result.is_ok());
     }

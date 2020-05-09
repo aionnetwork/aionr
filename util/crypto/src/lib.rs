@@ -3,6 +3,9 @@
 extern crate rand;
 extern crate rustc_serialize as serialize;
 extern crate libc;
+extern crate rustc_hex;
+#[macro_use]
+extern crate log;
 
 pub mod aessafe;
 pub mod bcrypt;
@@ -27,6 +30,7 @@ mod simd;
 mod step_by;
 pub mod symmetriccipher;
 pub mod util;
+pub mod ecvrf;
 
 use std::fmt;
 use pbkdf2::pbkdf2;

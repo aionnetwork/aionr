@@ -29,7 +29,7 @@ use std::hash::{Hash, Hasher};
 
 use rustc_hex::FromHex;
 use account_provider::AccountProvider;
-use acore_bytes::Bytes;
+use acore_bytes::{Bytes, slice_to_array_80, slice_to_array_64};
 use aion_types::{Address, H256, U256};
 use block::{Block, ClosedBlock, IsBlock, SealedBlock};
 use client::{BlockId, MiningBlockChainClient, TransactionId};
@@ -56,7 +56,7 @@ use transaction::transaction_queue::{
     AccountDetails, PrioritizationStrategy, RemovalReason, TransactionOrigin, TransactionQueue,
 };
 use using_queue::{GetAction, UsingQueue};
-use rcrypto::ed25519;
+use rcrypto::{ed25519, ecvrf};
 use key::Ed25519KeyPair;
 use num::Zero;
 use num_bigint::BigUint;
@@ -354,20 +354,12 @@ impl Miner {
         // 3. Get the previous seed; Get the timestamp, the grand / great grand parents of the best block
         let timestamp = best_block_header.timestamp();
         let grand_parant = client.block_header_data(&best_block_header.parent_hash());
-        let (great_grand_parent, seed) = match &grand_parant {
-            Some(header) => {
-                let seed = if header.seal_type() == Some(SealType::PoS) {
-                    header
-                        .seal()
-                        .get(0)
-                        .expect("A pos block has to contain a seed")
-                        .to_owned()
-                } else {
-                    vec![0u8; 64]
-                };
-                (client.block_header_data(&header.parent_hash()), seed)
-            }
-            None => (None, vec![0u8; 64]),
+        let great_grand_parent = grand_parant.clone().map_or(None, |header| {
+            client.block_header_data(&header.parent_hash())
+        });
+        let latest_seed: Vec<u8> = match self.latest_seed(client) {
+            Ok(result) => result,
+            Err(_) => return,
         };
 
         // 4. Calculate difficulty
@@ -378,13 +370,26 @@ impl Miner {
         );
 
         // 5. Calcualte timestamp for the new PoS block
-        // U30-22 New hybrid seed
-        let new_seed = if self.unity_hybrid_seed_update(client) {
-            Self::generate_hybrid_seed(&seed, &pk, &best_block_header.decode())
+        // Unity-3 ecvrf seed
+        let mut proof: Option<[u8; 80]> = None;
+        let new_seed: [u8; 64] = if self.unity_ecvrf_seed_update(client) {
+            match Self::generate_ecvrf_seed(&latest_seed, &sk) {
+                Ok((ecvrf_proof, ecvrf_seed)) => {
+                    proof = Some(ecvrf_proof);
+                    ecvrf_seed
+                }
+                Err(_) => {
+                    return;
+                }
+            }
         }
-        // Normal unity seed
+        // Unity-2 hybrid seed
+        else if self.unity_hybrid_seed_update(client) {
+            Self::generate_hybrid_seed(&latest_seed, &pk, &best_block_header.decode())
+        }
+        // Unity-1 signature seed
         else {
-            ed25519::signature(&seed, &sk)
+            ed25519::signature(&latest_seed, &sk)
         };
 
         let delta_uint = calculate_delta(difficulty, &new_seed, stake.clone());
@@ -409,6 +414,7 @@ impl Miner {
                     grand_parant.map(|header| header.decode()).as_ref(),
                     stake,
                     coinbase,
+                    proof,
                 )
                 .err()
             {
@@ -431,6 +437,7 @@ impl Miner {
         grand_parant: Option<&Header>,
         stake: BigUint,
         coinbase: Address,
+        proof: Option<[u8; 80]>,
     ) -> Result<(), Error>
     {
         trace!(target: "block", "Generating pos block. Current best block: {:?}", client.chain_info().best_block_number);
@@ -451,7 +458,12 @@ impl Miner {
 
         // 2. Generate signature
         let mut preseal = Vec::with_capacity(3);
-        preseal.push(seed.to_vec());
+        // Unity-3: ecvrf seal
+        if let Some(proof) = proof {
+            preseal.push(proof.to_vec());
+        } else {
+            preseal.push(seed.to_vec());
+        }
         preseal.push(vec![0u8; 64]);
         preseal.push(pk.to_vec());
         let presealed_block = raw_block.pre_seal(preseal);
@@ -460,7 +472,12 @@ impl Miner {
 
         // 3. Seal the block
         let mut seal: Vec<Bytes> = Vec::with_capacity(3);
-        seal.push(seed.to_vec());
+        // Unity-3: ecvrf seal
+        if let Some(proof) = proof {
+            seal.push(proof.to_vec());
+        } else {
+            seal.push(seed.to_vec());
+        }
         seal.push(signature.to_vec());
         seal.push(pk.to_vec());
         let sealed_block: SealedBlock = presealed_block
@@ -1063,7 +1080,7 @@ impl Miner {
         self.sealing_work_pow.lock().queue.reset();
     }
 
-    // U30-22
+    // Unity-2
     // Generate hybrid seed for pos block
     fn generate_hybrid_seed(
         grand_parent_seed: &[u8],
@@ -1101,6 +1118,18 @@ impl Miner {
         let mut seed: [u8; 64] = [0u8; 64];
         seed.copy_from_slice(&new_seed.as_slice()[..64]);
         seed
+    }
+
+    // Unity-3
+    // Generate ecvrf seed for pos block
+    fn generate_ecvrf_seed(
+        grand_parent_seed: &[u8],
+        sk: &[u8; 64],
+    ) -> Result<([u8; 80], [u8; 64]), ()>
+    {
+        let proof: [u8; 80] = ecvrf::prove(sk, grand_parent_seed)?;
+        let new_seed: [u8; 64] = ecvrf::proof_to_hash(&proof)?;
+        Ok((proof, new_seed))
     }
 
     #[cfg(test)]
@@ -1480,7 +1509,7 @@ impl MinerService for Miner {
     fn get_pos_template(
         &self,
         client: &MiningBlockChainClient,
-        seed: [u8; 64],
+        seed_or_proof: Vec<u8>,
         pk: H256,
         coinbase: H256,
     ) -> Option<H256>
@@ -1498,24 +1527,16 @@ impl MinerService for Miner {
         }
 
         let best_block_header = client.best_block_header();
-
         let timestamp = best_block_header.timestamp();
         let grand_parent = client.block_header_data(&best_block_header.parent_hash());
-        let (great_grand_parent, parent_seed) = match &grand_parent {
-            Some(header) => {
-                let seed = if header.seal_type() == Some(SealType::PoS) {
-                    header
-                        .seal()
-                        .get(0)
-                        .expect("A pos block has to contain a seed")
-                        .to_owned()
-                } else {
-                    vec![0u8; 64]
-                };
-                (client.block_header_data(&header.parent_hash()), seed)
-            }
-            None => (None, vec![0u8; 64]),
+        let great_grand_parent = grand_parent.clone().map_or(None, |header| {
+            client.block_header_data(&header.parent_hash())
+        });
+        let latest_seed: Vec<u8> = match self.latest_seed(client) {
+            Ok(result) => result,
+            Err(()) => return None,
         };
+
         let difficulty = client.calculate_difficulty(
             &best_block_header.decode(),
             grand_parent.map(|header| header.decode()).as_ref(),
@@ -1524,14 +1545,35 @@ impl MinerService for Miner {
 
         debug!(target: "miner", "new block difficulty = {:?}", difficulty);
 
-        // U30-22
-        let seed = if self.unity_hybrid_seed_update(client) {
-            Self::generate_hybrid_seed(&parent_seed, &pk.to_vec(), &best_block_header.decode())
-        } else {
-            seed
+        // Unity-3 ECVRF
+        let new_seed: [u8; 64] = if self.unity_ecvrf_seed_update(client) {
+            match slice_to_array_80(seed_or_proof.as_slice()) {
+                Some(proof) => {
+                    match ecvrf::proof_to_hash(proof) {
+                        Ok(result) => result,
+                        Err(_) => return None,
+                    }
+                }
+                None => return None,
+            }
+        }
+        // Unity-2 Hybrid seed
+        else if self.unity_hybrid_seed_update(client) {
+            if seed_or_proof.len() == 64 {
+                Self::generate_hybrid_seed(&latest_seed, &pk.to_vec(), &best_block_header.decode())
+            } else {
+                return None;
+            }
+        }
+        // Unity-1
+        else {
+            match slice_to_array_64(seed_or_proof.as_slice()) {
+                Some(result) => *result,
+                None => return None,
+            }
         };
 
-        let delta_uint = calculate_delta(difficulty, &seed, stake.clone());
+        let delta_uint = calculate_delta(difficulty, &new_seed, stake.clone());
 
         let new_timestamp = timestamp + delta_uint;
 
@@ -1540,10 +1582,16 @@ impl MinerService for Miner {
             &Some(SealType::PoS),
             Some(new_timestamp),
             Some(coinbase),
-            Some(&seed),
+            Some(&new_seed),
         ) {
             let mut seal = Vec::with_capacity(3);
-            seal.push(seed.to_vec());
+            // Unity-3 ECVRF seed
+            // Store proof instead of seed in the pos seal
+            if self.unity_ecvrf_seed_update(client) {
+                seal.push(seed_or_proof);
+            } else {
+                seal.push(new_seed.to_vec());
+            }
             seal.push(vec![0u8; 64]);
             seal.push(pk.to_vec());
 
@@ -1554,7 +1602,7 @@ impl MinerService for Miner {
                 .duration_since(UNIX_EPOCH)
                 .unwrap()
                 .as_secs();
-            match self.add_sealing_pos(&hash, block, seed, timestamp_now, client) {
+            match self.add_sealing_pos(&hash, block, new_seed, timestamp_now, client) {
                 Ok(_) => Some(hash),
                 _ => None,
             }
@@ -1788,6 +1836,18 @@ impl MinerService for Miner {
             })
     }
 
+    // AION Unity exvrf seed update
+    // Check if the next block is on the unity ecvrf seed hard fork
+    fn unity_ecvrf_seed_update(&self, client: &MiningBlockChainClient) -> bool {
+        self.engine
+            .machine()
+            .params()
+            .unity_ecvrf_seed_update
+            .map_or(false, |fork_number| {
+                client.chain_info().best_block_number + 1 >= fork_number
+            })
+    }
+
     // AION 2.0
     // Check if it's allowed to produce a new block with given seal type.
     // A block's seal type must be different than its parent's seal type.
@@ -1806,6 +1866,33 @@ impl MinerService for Miner {
             }
         } else {
             seal_type != &client.best_block_header().seal_type().unwrap_or_default()
+        }
+    }
+
+    // Unity
+    /// Get the latest seed from the last pos block
+    fn latest_seed(&self, client: &MiningBlockChainClient) -> Result<Vec<u8>, ()> {
+        if self.unity_update(client) {
+            let best_block = client.best_block_header();
+            let grand_parent = client.block_header_data(&best_block.parent_hash());
+            let latest_seed: Vec<u8> = match grand_parent {
+                Some(ref header) if header.seal_type() == Some(SealType::PoS) => {
+                    // header.seal()[0] is guaranteed since it's already in chain
+                    header.seal()[0].clone()
+                }
+                _ => vec![0; 64], // Empty previous seed for the first pos block
+            };
+
+            // ecvrf seed
+            if self.unity_ecvrf_seed_update(client) {
+                if let Some(latest_proof) = slice_to_array_80(&latest_seed) {
+                    return Ok(ecvrf::proof_to_hash(latest_proof)?.to_vec());
+                }
+            }
+
+            Ok(latest_seed)
+        } else {
+            Err(())
         }
     }
 }
@@ -2326,7 +2413,7 @@ mod tests {
         // 2. submit seed
         let seed: H512 = "d1c02f4679b4a022f2d843bd750c34c94cd08a2b6fc2def298653b81b88245a345d8d3e2d8bbce3fdb3ab2918459633f4496d5609ac13d9710ddcede8957cc0c".
             from_hex().unwrap().as_slice().into();
-        let template = miner.get_pos_template(&client, seed.into(), staker, staker);
+        let template = miner.get_pos_template(&client, seed.to_vec(), staker, staker);
 
         assert!(template.is_some());
         println!("new block = {:?}, staker = {:?}", template.unwrap(), staker);
@@ -2358,12 +2445,12 @@ mod tests {
         // 2. submit seed
         let seed: H512 = "d1c02f4679b4a022f2d843bd750c34c94cd08a2b6fc2def298653b81b88245a345d8d3e2d8bbce3fdb3ab2918459633f4496d5609ac13d9710ddcede8957cc0c".
             from_hex().unwrap().as_slice().into();
-        let template = miner.get_pos_template(&client, seed.into(), staker, staker);
+        let template = miner.get_pos_template(&client, seed.to_vec(), staker, staker);
 
         assert!(template.is_some());
         println!("new block = {:?}, staker = {:?}", template.unwrap(), staker);
         ::std::thread::sleep(Duration::from_secs(1));
-        let template_1 = miner.get_pos_template(&client, seed.into(), staker, staker);
+        let template_1 = miner.get_pos_template(&client, seed.to_vec(), staker, staker);
         assert_eq!(template, template_1);
 
         // 3. submit signature
