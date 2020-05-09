@@ -22,7 +22,7 @@
 
 //! Transaction data structure.
 
-use super::error;
+use super::error::Error as TxError;
 use aion_types::{to_u256, Address, Ed25519Public, H256, U256};
 use blake2b::blake2b;
 use heapsize::HeapSizeOf;
@@ -388,6 +388,7 @@ impl UnverifiedTransaction {
     }
 
     /// Checks is signature is empty.
+    /// unused
     pub fn is_unsigned(&self) -> bool {
         for i in &self.sig {
             if *i != 0 {
@@ -460,13 +461,13 @@ impl UnverifiedTransaction {
         monetary_policy_update: Option<u64>,
         unity_ecvrf_seed_update: Option<u64>,
         current_blk: BlockNumber,
-    ) -> Result<(), error::Error>
+    ) -> Result<(), TxError>
     {
         if let Some(ref fork) = monetary_policy_update {
             if fork < &current_blk && !(self.transaction_type == AVM_CREATION_TYPE
                 || self.transaction_type == DEFAULT_TRANSACTION_TYPE)
             {
-                return Err(error::Error::InvalidTransactionType);
+                return Err(TxError::InvalidTransactionType);
             }
         }
         if let Some(ref fork) = unity_ecvrf_seed_update {
@@ -474,7 +475,7 @@ impl UnverifiedTransaction {
                 && self.transaction_type == DEFAULT_TRANSACTION_TYPE
                 && self.action == Action::Create
             {
-                return Err(error::Error::FvmDeprecated);
+                return Err(TxError::FvmDeprecated);
             }
         }
 
@@ -482,25 +483,25 @@ impl UnverifiedTransaction {
     }
 
     /// Verify basic signature params. Does not attempt sender recovery.
-    pub fn verify_basic(&self, _chain_id: Option<u64>) -> Result<(), error::Error> {
+    pub fn verify_basic(&self, _chain_id: Option<u64>) -> Result<(), TxError> {
         // verify nonce length
         if self.unsigned.nonce.leading_zeros() / 8 < 16 {
-            return Err(error::Error::InvalidNonceLength);
+            return Err(TxError::InvalidNonceLength);
         }
 
         // verify timestamp length
         if self.timestamp.len() > 8 {
-            return Err(error::Error::InvalidTimestampLength);
+            return Err(TxError::InvalidTimestampLength);
         }
 
         // verify value length
         if self.unsigned.value.leading_zeros() / 8 < 16 {
-            return Err(error::Error::InvalidValueLength);
+            return Err(TxError::InvalidValueLength);
         }
 
         // verify energy
         if !self.is_gas_limit_valid() {
-            return Err(error::Error::InvalidTransactionGas {
+            return Err(TxError::InvalidTransactionGas {
                 minimal: self.gas_required(),
                 maximal: self.max_gas_limit(),
                 got: self.gas,
@@ -509,12 +510,12 @@ impl UnverifiedTransaction {
 
         // verify energy price
         if self.gas_price < U256::zero() || self.gas_price.leading_zeros() / 8 < 16 {
-            return Err(error::Error::InvalidGasPrice);
+            return Err(TxError::InvalidGasPrice);
         }
 
         // verify sig length
         if self.sig.len() != 96 {
-            return Err(error::Error::InvalidSignature(format!(
+            return Err(TxError::InvalidSignature(format!(
                 "signature length is invalid: {}",
                 self.sig.len()
             )));
@@ -551,22 +552,14 @@ impl From<SignedTransaction> for UnverifiedTransaction {
 
 impl SignedTransaction {
     /// Try to verify transaction and recover sender.
-    pub fn new(transaction: UnverifiedTransaction) -> Result<Self, key::Error> {
-        if transaction.is_unsigned() {
-            Ok(SignedTransaction {
-                transaction: transaction,
-                sender: UNSIGNED_SENDER,
-                public: None,
-            })
-        } else {
-            let public = transaction.recover_public()?;
-            let sender = public_to_address_ed25519(&public);
-            Ok(SignedTransaction {
-                transaction: transaction,
-                sender: sender,
-                public: Some(H256::from_slice(&public.0)),
-            })
-        }
+    pub fn new(transaction: UnverifiedTransaction) -> Result<Self, TxError> {
+        let public = transaction.recover_public()?;
+        let sender = public_to_address_ed25519(&public);
+        Ok(SignedTransaction {
+            transaction: transaction,
+            sender: sender,
+            public: Some(H256::from_slice(&public.0)),
+        })
     }
 
     /// Returns transaction type.
@@ -579,6 +572,7 @@ impl SignedTransaction {
     pub fn public_key(&self) -> Option<Ed25519Public> { self.public }
 
     /// Checks is signature is empty.
+    /// unused
     pub fn is_unsigned(&self) -> bool { self.transaction.is_unsigned() }
 }
 
@@ -737,7 +731,7 @@ mod tests {
         assert!(r.is_err());
         let e = r.err().unwrap();
         match e {
-            error::Error::InvalidSignature(_) => {}
+            TxError::InvalidSignature(_) => {}
             _ => assert!(false),
         }
         println!("test_verify_basic_invalid_signature error={}", e);
@@ -769,7 +763,7 @@ mod tests {
         let r = ut.verify_basic(Some(0));
         assert!(r.is_err());
         let e = r.err().unwrap();
-        assert_eq!(e, error::Error::InvalidGasPrice);
+        assert_eq!(e, TxError::InvalidGasPrice);
         println!("test_verify_basic_gas_price_min error={}", e);
     }
 
@@ -803,7 +797,7 @@ mod tests {
         let e = r.err().unwrap();
         assert_eq!(
             e,
-            error::Error::InvalidTransactionGas {
+            TxError::InvalidTransactionGas {
                 minimal: U256::from(21256),
                 maximal: U256::from(2000000),
                 got: t.gas,
@@ -841,7 +835,7 @@ mod tests {
         let e = r.err().unwrap();
         assert_eq!(
             e,
-            error::Error::InvalidTransactionGas {
+            TxError::InvalidTransactionGas {
                 minimal: U256::from(21256),
                 maximal: U256::from(2000000),
                 got: t.gas,
@@ -881,7 +875,7 @@ mod tests {
         let e = r.err().unwrap();
         assert_eq!(
             e,
-            error::Error::InvalidTransactionGas {
+            TxError::InvalidTransactionGas {
                 minimal: U256::from(221256),
                 maximal: U256::from(5000000),
                 got: t.gas,
@@ -921,7 +915,7 @@ mod tests {
         let e = r.err().unwrap();
         assert_eq!(
             e,
-            error::Error::InvalidTransactionGas {
+            TxError::InvalidTransactionGas {
                 minimal: U256::from(221256),
                 maximal: U256::from(5000000),
                 got: t.gas,
@@ -936,7 +930,7 @@ mod tests {
         let r = t.verify_basic(Some(0));
         assert!(r.is_err());
         let e = r.err().unwrap();
-        assert_eq!(e, error::Error::InvalidTimestampLength);
+        assert_eq!(e, TxError::InvalidTimestampLength);
         println!("test_verify_basic_timestamp_fail error={}", e);
     }
 
@@ -967,7 +961,7 @@ mod tests {
         let r = t.verify_basic(None);
         assert!(r.is_err());
         let e = r.err().unwrap();
-        assert_eq!(e, error::Error::InvalidNonceLength);
+        assert_eq!(e, TxError::InvalidNonceLength);
         println!("test_verify_basic_invalid_nonce error={}", e);
     }
 
@@ -998,7 +992,7 @@ mod tests {
         let r = t.verify_basic(None);
         assert!(r.is_err());
         let e = r.err().unwrap();
-        assert_eq!(e, error::Error::InvalidValueLength);
+        assert_eq!(e, TxError::InvalidValueLength);
         println!("test_verify_basic_invalid_value error={}", e);
     }
 
