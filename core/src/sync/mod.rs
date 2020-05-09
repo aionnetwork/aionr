@@ -37,15 +37,13 @@ mod storage;
 mod sync_provider;
 
 use std::sync::{Arc,Weak};
-use std::time::Duration;
-use std::time::Instant;
+use std::time::{Duration,Instant};
 use itertools::Itertools;
-use std::collections::{HashMap};
+use std::collections::HashMap;
 use client::{BlockId, BlockChainClient, ChainNotify};
 use transaction::UnverifiedTransaction;
 use aion_types::{H256,U256};
-use futures::Future;
-use futures::Stream;
+use futures::{Future,Stream};
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
 use futures::sync::oneshot;
@@ -53,17 +51,13 @@ use futures::sync::oneshot::Sender;
 use parking_lot::{Mutex, RwLock};
 
 use p2p::{ ChannelBuffer, Config, Mgr, Callable, PROTOCAL_VERSION, Module};
-use sync::action::Action;
-use sync::handler::status;
-use sync::handler::bodies;
-use sync::handler::headers;
-use sync::handler::broadcast;
-use sync::handler::import;
-use sync::node_info::{NodeInfo, Mode};
-use sync::storage::SyncStorage;
-use sync::sync_provider::SyncStatus;
+use self::action::Action;
+use self::handler::{status,bodies,headers,broadcast,import};
+use self::node_info::{NodeInfo, Mode};
+use self::storage::SyncStorage;
+use self::sync_provider::SyncStatus;
 
-pub use sync::sync_provider::SyncProvider;
+pub use self::sync_provider::SyncProvider;
 
 const INTERVAL_TRANSACTIONS_BROADCAST: u64 = 50;
 const INTERVAL_STATUS: u64 = 5000;
@@ -166,6 +160,7 @@ impl Sync {
                     debug!(target: "sync_statics", "recorded cache size/capacity {}/{}", recorded_blocks_size, recorded_blocks_capacity);
                     debug!(target: "sync_statics", "staged cache size/capacity {}/{}", staged_blocks_size, staged_blocks_capacity);
                     debug!(target: "sync_statics", "lightning syncing height: {}", storage_statics.lightning_base());
+                    debug!(target: "sync_staged", "keys of staged cache: {:#?}",{storage_statics.staged_blocks().lock().keys()});
                     info!(target: "sync_statics", "{:-^130}", "");
                     info!(target: "sync_statics", "                                 td         bn          bh                    addr                 rev      conn  seed       mode");
                     info!(target: "sync_statics", "{:-^130}", "");
@@ -396,8 +391,14 @@ impl ChainNotify for Sync {
                 let block_id = BlockId::Hash(*hash);
                 if let Some(block_number) = client.block_number(block_id) {
                     debug!(target: "sync_notify", "New block #{}, hash: {}.", block_number, hash);
+                    import::import_staged_blocks(
+                        &(*hash, block_number),
+                        client,
+                        self.storage.clone(),
+                    );
+                } else {
+                    warn!(target: "sync_notify", "cannot get block number");
                 }
-                import::import_staged_blocks(hash, client, self.storage.clone());
             }
         }
 
@@ -485,7 +486,17 @@ impl Callable for Sync {
                 let client = self.client.clone();
                 bodies::receive_req(p2p, hash, client, cb)
             }
-            Action::BODIESRES => bodies::receive_res(p2p, hash, cb, self.storage.clone()),
+            Action::BODIESRES => {
+                let best_num = &self.client.chain_info().best_block_number;
+                bodies::receive_res(
+                    p2p,
+                    hash,
+                    cb,
+                    self.storage.clone(),
+                    self.node_info.clone(),
+                    best_num,
+                )
+            }
             Action::BROADCASTTX => {
                 let client = self.client.clone();
                 broadcast::handle_broadcast_tx(

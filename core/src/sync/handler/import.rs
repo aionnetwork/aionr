@@ -31,13 +31,20 @@ use sync::storage::SyncStorage;
 use sync::node_info::{NodeInfo, Mode};
 use aion_types::H256;
 
-pub fn import_staged_blocks(hash: &H256, client: Arc<BlockChainClient>, storage: Arc<SyncStorage>) {
+pub fn import_staged_blocks(
+    key: &(H256, u64),
+    client: Arc<BlockChainClient>,
+    storage: Arc<SyncStorage>,
+)
+{
     let mut blocks_to_import = Vec::new();
     let mut staged_blocks = storage.staged_blocks().lock();
-    if staged_blocks.contains_key(&hash) {
-        if let Some(blocks_staged) = staged_blocks.remove(hash) {
+    if staged_blocks.contains_key(&key) {
+        if let Some(blocks_staged) = staged_blocks.remove(key) {
             blocks_to_import.extend(blocks_staged);
         }
+        let retain_num = if key.1 > 100 { key.1 - 100 } else { 0 };
+        staged_blocks.retain(|(_, n), _| retain_num < *n)
     }
     drop(staged_blocks);
 
@@ -110,7 +117,7 @@ pub fn import_blocks(
         let mut first_imported_number = 0u64;
         let mut last_imported_number = 0u64;
         let mut unknown_number = 0u64;
-        let mut unknown_parent_hash = H256::new();
+        // let mut unknown_parent_hash = H256::new();
 
         for block in &blocks_to_import {
             let block_view = BlockView::new(&block);
@@ -132,7 +139,7 @@ pub fn import_blocks(
                         error!(target: "sync_import", "Can't import inconsistent blocks");
                     }
                     unknown_number = block_number;
-                    unknown_parent_hash = block_view.header_view().parent_hash();
+                    // unknown_parent_hash = block_view.header_view().parent_hash();
                     break;
                 }
                 Err(_e) => {
@@ -172,37 +179,37 @@ pub fn import_blocks(
                 for block in &unknown_blocks {
                     unknown_blocks_hashes.push(BlockView::new(&block).header_view().hash());
                 }
-                // In lightning mode, unknown parent blocks are far-away blocks that need to be staged and imported later
-                if info.mode == Mode::Lightning {
-                    // Try to stage blocks if not staged yet
-                    if storage.stage_blocks(unknown_parent_hash, unknown_blocks) {
-                        debug!(target: "sync_import", "Node: {}, {} blocks staged for future import.", &node_hash, blocks_to_import.len());
-                        // Get last block number
-                        let last_block = blocks_to_import.last().expect(
-                            "checked collection is not empty. Should be able to get the last",
-                        );
-                        let next_block_number =
-                            BlockView::new(&last_block).header_view().number() + 1;
-                        // Set next step
-                        if next_block_number > storage.lightning_base() {
-                            storage.set_lightning_base(next_block_number);
-                        }
-                    }
-                    // If we cannot stage these blocks (staged blocks cache full), we need to remove downloaded records
-                    // and try to download them again later.
-                    else {
-                        info.switch_mode(Mode::Thunder, &local_best_block, &node_hash);
-                        storage.remove_recorded_blocks_hashes(&unknown_blocks_hashes);
-                    }
-                } else {
-                    // Remove hashes that are not imported due to unknown parent, so that they can be downloaded again.
-                    storage.remove_recorded_blocks_hashes(&unknown_blocks_hashes);
-                    // If known parent blocks are fork blocks, we need to sync backward
-                    if unknown_number <= local_best_block {
-                        info.switch_mode(Mode::Backward, &local_best_block, &node_hash);
-                        info.sync_base_number = unknown_number;
-                    }
+                // // In lightning mode, unknown parent blocks are far-away blocks that need to be staged and imported later
+                // if info.mode == Mode::Lightning {
+                //     // Try to stage blocks if not staged yet
+                //     if storage.stage_blocks(unknown_parent_hash, unknown_number - 1, unknown_blocks) {
+                //         debug!(target: "sync_import", "Node: {}, {} blocks staged for future import.", &node_hash, blocks_to_import.len());
+                //     // Get last block number
+                //     // let last_block = blocks_to_import.last().expect(
+                //     //     "checked collection is not empty. Should be able to get the last",
+                //     // );
+                //     // let next_block_number =
+                //     //     BlockView::new(&last_block).header_view().number() + 1;
+                //     // // Set next step
+                //     // if next_block_number > storage.lightning_base() {
+                //     //     storage.set_lightning_base(next_block_number);
+                //     // }
+                //     }
+                //     // If we cannot stage these blocks (staged blocks cache full), we need to remove downloaded records
+                //     // and try to download them again later.
+                //     else {
+                //         info.switch_mode(Mode::Thunder, &local_best_block, &node_hash);
+                //         storage.remove_recorded_blocks_hashes(&unknown_blocks_hashes);
+                //     }
+                // } else {
+                // Remove hashes that are not imported due to unknown parent, so that they can be downloaded again.
+                storage.remove_recorded_blocks_hashes(&unknown_blocks_hashes);
+                // If known parent blocks are fork blocks, we need to sync backward
+                if unknown_number <= local_best_block {
+                    info.switch_mode(Mode::Backward, &local_best_block, &node_hash);
+                    info.sync_base_number = unknown_number;
                 }
+                // }
 
                 continue;
             }
@@ -232,9 +239,12 @@ pub fn import_blocks(
                         // If the target height is far away and there are already enough normal and thunder nodes, jump to lightning
                         if last_imported_number + 500 < node_best_number
                             && thunder_nodes >= 1
-                            && lightning_nodes < (normal_nodes + thunder_nodes) / 2
+                            && lightning_nodes < normal_nodes + thunder_nodes
+                            && !storage.staged_is_full()
                         {
-                            storage.set_lightning_base(last_imported_number + 1);
+                            // if storage.lightning_base() < last_imported_number +1 {
+                            //     storage.set_lightning_base(last_imported_number + 1);
+                            // }
                             mode = Mode::Lightning;
                         } else {
                             mode = Mode::Thunder;

@@ -158,6 +158,7 @@ pub struct VerificationQueue<K: Kind> {
     verifier_handles: Vec<JoinHandle<()>>,
     state: Arc<(Mutex<State>, Condvar)>,
     total_difficulty: RwLock<U256>,
+    import_lock: Mutex<()>,
 }
 
 struct QueueSignal {
@@ -293,6 +294,7 @@ impl<K: Kind> VerificationQueue<K> {
             verifier_handles,
             state,
             total_difficulty: RwLock::new(0.into()),
+            import_lock: Mutex::new(()),
         }
     }
 
@@ -531,6 +533,7 @@ impl<K: Kind> VerificationQueue<K> {
 
         match K::create(input, &*self.engine) {
             Ok(item) => {
+                let _lock = self.import_lock.lock();
                 self.verification
                     .sizes
                     .unverified

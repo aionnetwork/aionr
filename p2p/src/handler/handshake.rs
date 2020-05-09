@@ -30,9 +30,9 @@ use node::MAX_REVISION_LENGTH;
 use node::IP_LENGTH;
 use node::NODE_ID_LENGTH;
 use node::REVISION_PREFIX;
-use node::convert_ip_string;
 use route::Action;
 use state::STATE;
+use super::super::util::convert_ip_string;
 use super::super::Mgr;
 
 use super::{channel_buffer_template,channel_buffer_template_with_version};

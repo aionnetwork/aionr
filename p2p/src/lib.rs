@@ -48,8 +48,6 @@ extern crate bytes;
 extern crate byteorder;
 extern crate parking_lot;
 
-#[cfg(test)]
-mod test;
 mod config;
 mod route;
 mod msg;
@@ -58,6 +56,7 @@ mod codec;
 mod state;
 mod handler;
 mod callable;
+mod util;
 
 use std::io;
 use std::sync::{Arc,Weak};
@@ -76,11 +75,8 @@ use futures::sync::oneshot;
 use futures::sync::oneshot::Sender;
 use tokio::net::TcpListener;
 use tokio::net::TcpStream;
-use tokio::prelude::*;
 use tokio::runtime::TaskExecutor;
 use tokio::timer::Interval;
-use tokio_codec::{Decoder,Framed};
-use codec::Codec;
 use route::Version;
 use route::Action;
 use state::STATE;
@@ -93,6 +89,7 @@ pub use msg::ChannelBuffer;
 pub use node::Node;
 pub use config::Config;
 pub use callable::Callable;
+use util::{split_frame,config_stream};
 
 const INTERVAL_OUTBOUND_CONNECT: u64 = 1;
 const INTERVAL_TIMEOUT: u64 = 5;
@@ -843,24 +840,6 @@ impl Mgr {
             debug!(target: "p2p_handle", "not pass token check: hash/ver/ctrl/action {}/{}/{}/{}", &hash, cb.head.ver, cb.head.ctrl, cb.head.action);
         }
     }
-}
-
-/// helper function for setting inbound & outbound stream
-fn config_stream(stream: &TcpStream) -> Result<(), io::Error> {
-    stream.set_recv_buffer_size(1 << 24)?;
-    stream.set_keepalive(Some(Duration::from_secs(TIMEOUT_MAX)))?;
-
-    Ok(())
-}
-
-/// helper function for tokio io frame
-fn split_frame(
-    socket: TcpStream,
-) -> (
-    stream::SplitSink<Framed<TcpStream, Codec>>,
-    stream::SplitStream<Framed<TcpStream, Codec>>,
-) {
-    Codec.framed(socket).split()
 }
 
 #[cfg(test)]

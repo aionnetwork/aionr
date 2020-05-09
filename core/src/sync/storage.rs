@@ -46,7 +46,7 @@ pub struct SyncStorage {
     headers_with_bodies_requested: Mutex<HashMap<u64, HeadersWrapper>>,
 
     /// Staged blocks to be imported later
-    staged_blocks: Mutex<LruCache<H256, Vec<Vec<u8>>>>,
+    staged_blocks: Mutex<HashMap<(H256, u64), Vec<Vec<u8>>>>,
 
     /// Recorded tx hashes
     recorded_transaction_hashes: Mutex<LruCache<H256, u8>>,
@@ -65,7 +65,7 @@ impl SyncStorage {
             downloaded_blocks: Mutex::new(VecDeque::new()),
             recorded_blocks_hashes: Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHES * 40)),
             headers_with_bodies_requested: Mutex::new(HashMap::new()),
-            staged_blocks: Mutex::new(LruCache::new(MAX_CACHED_BLOCK_HASHES)),
+            staged_blocks: Mutex::new(HashMap::new()),
             recorded_transaction_hashes: Mutex::new(LruCache::new(MAX_CACHED_TRANSACTION_HASHES)),
             received_transactions: Mutex::new(VecDeque::new()),
             lightning_base: RwLock::new(0u64),
@@ -129,23 +129,24 @@ impl SyncStorage {
         headers_with_bodies_requested.remove(node_hash)
     }
 
-    pub fn staged_blocks(&self) -> &Mutex<LruCache<H256, Vec<Vec<u8>>>> { &self.staged_blocks }
+    pub fn staged_blocks(&self) -> &Mutex<HashMap<(H256, u64), Vec<Vec<u8>>>> {
+        &self.staged_blocks
+    }
 
-    pub fn stage_blocks(&self, parent_hash: H256, blocks: Vec<Vec<u8>>) -> bool {
+    pub fn stage_blocks(&self, parent_hash: H256, parent_num: u64, blocks: Vec<Vec<u8>>) -> bool {
         let mut staged_blocks = self.staged_blocks.lock();
-        if staged_blocks.len() < staged_blocks.capacity()
-            && !staged_blocks.contains_key(&parent_hash)
-        {
-            staged_blocks.insert(parent_hash, blocks);
-            true
-        } else {
-            false
-        }
+        staged_blocks.insert((parent_hash, parent_num), blocks);
+        staged_blocks.len() <= MAX_CACHED_BLOCK_HASHES * 4
     }
 
     pub fn staged_blocks_statics(&self) -> (usize, usize) {
         let staged_blocks = self.staged_blocks.lock();
         (staged_blocks.len(), staged_blocks.capacity())
+    }
+
+    pub fn staged_is_full(&self) -> bool {
+        let staged_blocks = self.staged_blocks.lock();
+        staged_blocks.len() > MAX_CACHED_BLOCK_HASHES * 4
     }
 
     pub fn recorded_transaction_hashes(&self) -> &Mutex<LruCache<H256, u8>> {
@@ -161,7 +162,9 @@ impl SyncStorage {
         }
     }
 
+    pub fn get_lightning_base_lock(&self) -> &RwLock<u64> { &self.lightning_base }
+
     pub fn lightning_base(&self) -> u64 { *self.lightning_base.read() }
 
-    pub fn set_lightning_base(&self, base: u64) { *self.lightning_base.write() = base; }
+    // pub fn set_lightning_base(&self, base: u64) { *self.lightning_base.write() = base; }
 }
