@@ -27,13 +27,11 @@
 //! should become general over time to the point where not even a
 //! merkle trie is strictly necessary.
 
-use std::collections::{HashSet, HashMap};
 use std::sync::Arc;
 
 use state::{AionVMAccount};
-use parking_lot::Mutex;
 use aion_types::{Address, H256};
-use kvdb::{AsHashStore, HashStore, DBValue, MemoryDB};
+use kvdb::{AsHashStore, HashStore};
 
 /// State backend. See module docs for more details.
 pub trait Backend: Send {
@@ -51,6 +49,9 @@ pub trait Backend: Send {
     /// hash collisions.
     fn cache_code(&self, hash: H256, code: Arc<Vec<u8>>);
 
+    /// Add a global transformed code cache entry.
+    fn cache_transformed_code(&self, hash: H256, code: Arc<Vec<u8>>);
+
     /// Get basic copy of the cached account. Not required to include storage.
     /// Returns 'None' if cache is disabled or if the account is not cached.
     fn get_cached_account(&self, addr: &Address) -> Option<Option<AionVMAccount>>;
@@ -65,6 +66,9 @@ pub trait Backend: Send {
     /// Get cached code based on hash.
     fn get_cached_code(&self, hash: &H256) -> Option<Arc<Vec<u8>>>;
 
+    /// Get transformed cached code based on hash.
+    fn get_transformed_cached_code(&self, hash: &H256) -> Option<Arc<Vec<u8>>>;
+
     /// Note that an account with the given address is non-null.
     fn note_non_null_account(&self, address: &Address);
 
@@ -73,137 +77,6 @@ pub trait Backend: Send {
     fn is_known_null(&self, address: &Address) -> bool;
 
     fn force_update(&mut self, address: &Address, account: &AionVMAccount);
-}
-
-/// A raw backend used to check proofs of execution.
-///
-/// This doesn't delete anything since execution proofs won't have mangled keys
-/// and we want to avoid collisions.
-// TODO: when account lookup moved into backends, this won't rely as tenuously on intended
-// usage.
-#[derive(Clone, PartialEq)]
-pub struct ProofCheck(MemoryDB);
-//
-//impl ProofCheck {
-//    /// Create a new `ProofCheck` backend from the given state items.
-//    #[cfg(test)]
-//    pub fn new(proof: &[DBValue]) -> Self {
-//        let mut db = MemoryDB::new();
-//        for item in proof {
-//            db.insert(item);
-//        }
-//        ProofCheck(db)
-//    }
-//}
-
-impl HashStore for ProofCheck {
-    fn keys(&self) -> HashMap<H256, i32> { self.0.keys() }
-    fn get(&self, key: &H256) -> Option<DBValue> { self.0.get(key) }
-
-    fn contains(&self, key: &H256) -> bool { self.0.contains(key) }
-
-    fn insert(&mut self, value: &[u8]) -> H256 { self.0.insert(value) }
-
-    fn emplace(&mut self, key: H256, value: DBValue) { self.0.emplace(key, value) }
-
-    fn remove(&mut self, _key: &H256) {}
-}
-
-impl Backend for ProofCheck {
-    fn as_hashstore(&self) -> &HashStore { self }
-    fn as_hashstore_mut(&mut self) -> &mut HashStore { self }
-    fn add_to_account_cache(
-        &mut self,
-        _addr: Address,
-        _data: Option<AionVMAccount>,
-        _modified: bool,
-    )
-    {
-    }
-    fn cache_code(&self, _hash: H256, _code: Arc<Vec<u8>>) {}
-    fn get_cached_account(&self, _addr: &Address) -> Option<Option<AionVMAccount>> { None }
-    fn get_cached<F, U>(&self, _a: &Address, _f: F) -> Option<U>
-    where F: FnOnce(Option<&mut AionVMAccount>) -> U {
-        None
-    }
-    fn get_cached_code(&self, _hash: &H256) -> Option<Arc<Vec<u8>>> { None }
-    fn note_non_null_account(&self, _address: &Address) {}
-    fn is_known_null(&self, _address: &Address) -> bool { false }
-    fn force_update(&mut self, _addr: &Address, _account: &AionVMAccount) {}
-}
-
-/// Proving state backend.
-/// This keeps track of all state values loaded during usage of this backend.
-/// The proof-of-execution can be extracted with `extract_proof`.
-///
-/// This doesn't cache anything or rely on the canonical state caches.
-pub struct Proving<H: AsHashStore> {
-    base: H,           // state we're proving values from.
-    changed: MemoryDB, // changed state via insertions.
-    proof: Mutex<HashSet<DBValue>>,
-}
-
-impl<H: AsHashStore + Send + Sync> HashStore for Proving<H> {
-    fn keys(&self) -> HashMap<H256, i32> {
-        let mut keys = self.base.as_hashstore().keys();
-        keys.extend(self.changed.keys());
-        keys
-    }
-
-    fn get(&self, key: &H256) -> Option<DBValue> {
-        match self.base.as_hashstore().get(key) {
-            Some(val) => {
-                self.proof.lock().insert(val.clone());
-                Some(val)
-            }
-            None => self.changed.get(key),
-        }
-    }
-
-    fn contains(&self, key: &H256) -> bool { self.get(key).is_some() }
-
-    fn insert(&mut self, value: &[u8]) -> H256 { self.changed.insert(value) }
-
-    fn emplace(&mut self, key: H256, value: DBValue) { self.changed.emplace(key, value) }
-
-    fn remove(&mut self, key: &H256) {
-        // only remove from `changed`
-        if self.changed.contains(key) {
-            self.changed.remove(key)
-        }
-    }
-}
-
-impl<H: AsHashStore + Send + Sync> Backend for Proving<H> {
-    fn as_hashstore(&self) -> &HashStore { self }
-
-    fn as_hashstore_mut(&mut self) -> &mut HashStore { self }
-
-    fn add_to_account_cache(&mut self, _: Address, _: Option<AionVMAccount>, _: bool) {}
-
-    fn cache_code(&self, _: H256, _: Arc<Vec<u8>>) {}
-
-    fn get_cached_account(&self, _: &Address) -> Option<Option<AionVMAccount>> { None }
-
-    fn get_cached<F, U>(&self, _: &Address, _: F) -> Option<U>
-    where F: FnOnce(Option<&mut AionVMAccount>) -> U {
-        None
-    }
-
-    fn get_cached_code(&self, _: &H256) -> Option<Arc<Vec<u8>>> { None }
-    fn note_non_null_account(&self, _: &Address) {}
-    fn is_known_null(&self, _: &Address) -> bool { false }
-    fn force_update(&mut self, _addr: &Address, _account: &AionVMAccount) {}
-}
-
-impl<H: AsHashStore + Clone> Clone for Proving<H> {
-    fn clone(&self) -> Self {
-        Proving {
-            base: self.base.clone(),
-            changed: self.changed.clone(),
-            proof: Mutex::new(self.proof.lock().clone()),
-        }
-    }
 }
 
 /// A basic backend. Just wraps the given database, directly inserting into and deleting from
@@ -219,6 +92,8 @@ impl<H: AsHashStore + Send + Sync> Backend for Basic<H> {
 
     fn cache_code(&self, _: H256, _: Arc<Vec<u8>>) {}
 
+    fn cache_transformed_code(&self, _hash: H256, _code: Arc<Vec<u8>>) {}
+
     fn get_cached_account(&self, _: &Address) -> Option<Option<AionVMAccount>> { None }
 
     fn get_cached<F, U>(&self, _: &Address, _: F) -> Option<U>
@@ -227,6 +102,9 @@ impl<H: AsHashStore + Send + Sync> Backend for Basic<H> {
     }
 
     fn get_cached_code(&self, _: &H256) -> Option<Arc<Vec<u8>>> { None }
+
+    fn get_transformed_cached_code(&self, _hash: &H256) -> Option<Arc<Vec<u8>>> { None }
+
     fn note_non_null_account(&self, _: &Address) {}
     fn is_known_null(&self, _: &Address) -> bool { false }
     fn force_update(&mut self, _addr: &Address, _account: &AionVMAccount) {}

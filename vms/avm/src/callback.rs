@@ -507,7 +507,7 @@ pub extern fn avm_put_transformed_code(
     transformed_code.extend_from_slice(AVM_VERSION_MAGIC);
     transformed_code.push(version);
     transformed_code.extend_from_slice(ext_code);
-    ext.save_transformed_code(addr, ext_code.to_vec());
+    ext.save_transformed_code(addr, transformed_code);
 }
 
 #[no_mangle]
