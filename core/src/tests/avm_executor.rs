@@ -2979,6 +2979,129 @@ fn avm_balance_transfer() {
 }
 
 #[test]
+fn avm_version_for_transformed_code() {
+    let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // NOTE: tested with avm v1.3
+    file.push("src/tests/avmjars/demo-0.2.0.jar");
+    let file_str = file.to_str().expect("Failed to locate the demo.jar");
+    let mut code = read_file(file_str).expect("unable to open avm dapp");
+    let sender = Address::from_slice(b"cd1722f3947def4cf144679da39c4c32bdc35681");
+    let address = contract_address(&sender, &U256::zero());
+    let mut params = ActionParams::default();
+    params.address = address.clone();
+    params.sender = sender.clone();
+    params.origin = sender.clone();
+    params.gas = U256::from(5_000_000);
+    let mut avm_code: Vec<u8> = (code.len() as u32).to_vm_bytes();
+    println!("code of hello_avm = {:?}", code.len());
+    avm_code.append(&mut code);
+    params.code = Some(Arc::new(avm_code.clone()));
+    params.value = ActionValue::Transfer(0.into());
+    params.call_type = CallType::None;
+    params.gas_price = 1.into();
+    let mut info = EnvInfo::default();
+    info.number = 1;
+    let machine = make_aion_machine();
+    let mut state = get_temp_state();
+    state
+        .add_balance(&sender, &U256::from(200_000_000), CleanupMode::NoEmpty)
+        .unwrap();
+    state.commit().unwrap();
+    let substate = Substate::new();
+    let execution_results = {
+        let mut ex = AvmExecutive::new(&mut state, &info, &machine);
+        ex.call_vm(vec![params.clone()], &mut [substate], None)
+    };
+    for r in execution_results {
+        let AvmExecutionResult {
+            status_code,
+            gas_left: _,
+            return_data,
+            exception: _,
+            state_root: _,
+            invokable_hashes: _,
+        } = r;
+        assert_eq!(status_code, AvmStatusCode::Success);
+        params.address = (*return_data).into();
+    }
+
+    // Hello avm is deployed
+    assert!(state.code(&params.address).unwrap().is_some());
+
+    // v1
+    params.call_type = CallType::Call;
+    let call_data = AbiToken::STRING(String::from("callExt")).encode();
+    params.data = Some(call_data);
+    params.nonce += 1;
+    params.gas = U256::from(2_000_000);
+    println!("call data = {:?}", params.data);
+    let substate = Substate::new();
+    let execution_results = {
+        let mut ex = AvmExecutive::new(&mut state, &info, &machine);
+        ex.call_vm(vec![params.clone()], &mut [substate.clone()], None)
+    };
+
+    for r in execution_results {
+        let AvmExecutionResult {
+            status_code,
+            gas_left,
+            return_data: _,
+            exception: _,
+            state_root: _,
+            invokable_hashes: _,
+        } = r;
+
+        println!("gas left = {:?}", gas_left);
+        assert_eq!(status_code, AvmStatusCode::Success);
+    }
+    state.commit().unwrap();
+
+    // V2
+    params.nonce += 1;
+    println!("call data = {:?}", params.data);
+    let substate = Substate::new();
+    let execution_results = {
+        let mut ex = AvmExecutive::new(&mut state, &info, &machine);
+        ex.call_vm(vec![params.clone()], &mut [substate.clone()], Some(0))
+    };
+
+    for r in execution_results {
+        let AvmExecutionResult {
+            status_code,
+            gas_left,
+            return_data: _,
+            exception: _,
+            state_root: _,
+            invokable_hashes: _,
+        } = r;
+        println!("gas left = {:?}", gas_left);
+        assert_eq!(status_code, AvmStatusCode::Success);
+    }
+    state.commit().unwrap();
+
+    // V1 again
+    params.nonce += 1;
+    let substate = Substate::new();
+    let execution_results = {
+        let mut ex = AvmExecutive::new(&mut state, &info, &machine);
+        ex.call_vm(vec![params.clone()], &mut [substate.clone()], None)
+    };
+
+    for r in execution_results {
+        let AvmExecutionResult {
+            status_code,
+            gas_left,
+            return_data: _,
+            exception: _,
+            state_root: _,
+            invokable_hashes: _,
+        } = r;
+        println!("gas left = {:?}", gas_left);
+        assert_eq!(status_code, AvmStatusCode::Success);
+    }
+}
+
+#[test]
 fn avm_status_rejected() {
     let mut file = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     // NOTE: tested with avm v1.3
