@@ -17,8 +17,6 @@ fi
 
 MAINT="package/$PACKAGE_NAME/mainnet/mainnet.toml"
 MAINJ="package/$PACKAGE_NAME/mainnet/mainnet.json"
-MASTT="package/$PACKAGE_NAME/mastery/mastery.toml"
-MASTJ="package/$PACKAGE_NAME/mastery/mastery.json"
 CUSTT="package/$PACKAGE_NAME/custom/custom.toml"
 CUSTJ="package/$PACKAGE_NAME/custom/custom.json"
 AMITYT="package/$PACKAGE_NAME/amity/amity.toml"
@@ -29,7 +27,6 @@ LOG_CONFIG="package/$PACKAGE_NAME/log_config.yaml"
 rm -rf package/$PACKAGE_NAME
 
 mkdir -p package/$PACKAGE_NAME/mainnet
-mkdir package/$PACKAGE_NAME/mastery
 mkdir package/$PACKAGE_NAME/custom
 mkdir package/$PACKAGE_NAME/amity
 mkdir package/$PACKAGE_NAME/libs
@@ -45,11 +42,6 @@ cp resources/config_mainnet.toml $MAINT
 cp resources/mainnet.json $MAINJ
 echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mainnet/mainnet.toml $*'>package/$PACKAGE_NAME/mainnet.sh
 chmod +x package/$PACKAGE_NAME/mainnet.sh
-
-cp resources/config_mastery.toml $MASTT
-cp resources/mastery.json $MASTJ
-echo -e '#!/bin/bash \n./env\nsource custom.env\nexport AIONR_HOME=.\nexport LD_LIBRARY_PATH=$LD_LIBRARY_PATH:$AIONR_HOME/libs\n./aion --config=mastery/mastery.toml $*'>package/$PACKAGE_NAME/mastery.sh
-chmod +x package/$PACKAGE_NAME/mastery.sh
 
 cp resources/config_custom.toml $CUSTT
 cp resources/custom.json $CUSTJ

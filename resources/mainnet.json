@@ -15,7 +15,8 @@
 		"minGasLimit": "0x100590",
 		"monetaryPolicyUpdate": "3346000",
 		"unityUpdate": "4721900",
-		"unityHybridSeedUpdate": "5371168"
+		"unityHybridSeedUpdate": "5371168",
+		"unityECVRFSeedUpdate": "6235961"
 	},
 	"genesis": {
 		"seal": {
