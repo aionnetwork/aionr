@@ -68,7 +68,7 @@ public class NativeTransactionExecutor {
             AvmImpl avm = CommonAvmFactory.buildAvmInstanceForConfiguration(cap, config);
 
             // Workaround: special case solution for AKI-638 and AKI-644
-            ExecutionType executionType = blockNumber == 4966823 ? ExecutionType.ASSUME_MAINCHAIN : ExecutionType.MINING;
+            ExecutionType executionType = blockNumber == 4966823 || blockNumber == 5109941 ? ExecutionType.ASSUME_MAINCHAIN : ExecutionType.MINING;
             FutureResult[] futures = avm.run(substate, contexts, executionType, blockNumber-1);
 
             // wait for the transaction results and serialize them into bytes
