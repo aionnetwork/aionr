@@ -461,12 +461,12 @@ pub extern fn avm_get_transformed_code(
             } else {
                 match code.as_slice().starts_with(AVM_VERSION_MAGIC) {
                     true if code[AVM_VERSION_MAGIC.len()] == version => unsafe {
-                        let ret =
-                            new_fixed_bytes((code.len() - AVM_VERSION_MAGIC.len() - 1) as u32);
+                        let len = code.len() - AVM_VERSION_MAGIC.len() - 1;
+                        let ret = new_fixed_bytes(len as u32);
                         ptr::copy(
                             &code.as_slice()[AVM_VERSION_MAGIC.len() + 1],
                             ret.pointer,
-                            code.len(),
+                            len,
                         );
                         ret
                     },
