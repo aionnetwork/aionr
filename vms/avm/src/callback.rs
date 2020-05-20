@@ -32,7 +32,7 @@ use crypto::{sha2::Sha256, digest::Digest, ed25519};
 use tiny_keccak::keccak256;
 
 const AVM_VERSION_MAGIC: &[u8] = b"avm-version-";
-const AVM_V1: u8 = 1;
+// const AVM_V1: u8 = 1;
 
 #[derive(Debug)]
 #[repr(C)]
@@ -459,30 +459,18 @@ pub extern fn avm_get_transformed_code(
             if code.len() == 0 {
                 unsafe { new_null_bytes() }
             } else {
-                match (version, code.as_slice().starts_with(AVM_VERSION_MAGIC)) {
-                    (expected_version, true) => {
-                        if code[AVM_VERSION_MAGIC.len()] != expected_version {
-                            unsafe { new_null_bytes() }
-                        } else {
-                            unsafe {
-                                let ret = new_fixed_bytes(
-                                    (code.len() - AVM_VERSION_MAGIC.len() - 1) as u32,
-                                );
-                                ptr::copy(
-                                    &code.as_slice()[AVM_VERSION_MAGIC.len() + 1],
-                                    ret.pointer,
-                                    code.len(),
-                                );
-                                ret
-                            }
-                        }
-                    }
-                    (AVM_V1, false) => unsafe {
-                        let ret = new_fixed_bytes(code.len() as u32);
-                        ptr::copy(&code.as_slice()[0], ret.pointer, code.len());
+                match code.as_slice().starts_with(AVM_VERSION_MAGIC) {
+                    true if code[AVM_VERSION_MAGIC.len()] == version => unsafe {
+                        let len = code.len() - AVM_VERSION_MAGIC.len() - 1;
+                        let ret = new_fixed_bytes(len as u32);
+                        ptr::copy(
+                            &code.as_slice()[AVM_VERSION_MAGIC.len() + 1],
+                            ret.pointer,
+                            len,
+                        );
                         ret
                     },
-                    (_, false) => unsafe { new_null_bytes() },
+                    _ => unsafe { new_null_bytes() },
                 }
             }
         }
@@ -507,7 +495,7 @@ pub extern fn avm_put_transformed_code(
     transformed_code.extend_from_slice(AVM_VERSION_MAGIC);
     transformed_code.push(version);
     transformed_code.extend_from_slice(ext_code);
-    ext.save_transformed_code(addr, ext_code.to_vec());
+    ext.save_transformed_code(addr, transformed_code);
 }
 
 #[no_mangle]

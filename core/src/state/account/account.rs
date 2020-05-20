@@ -733,7 +733,7 @@ impl VMAccount for AionVMAccount {
         if self.account_type == AccType::AVM && !self.is_transformed_cached() {
             // update transformed code cache
             let hash = blake2b(self.address_hash(a));
-            match state_db.get_cached_code(&hash) {
+            match state_db.get_transformed_cached_code(&hash) {
                 Some(code) => self.cache_given_transformed_code(code),
                 None => {
                     match require {
@@ -742,7 +742,7 @@ impl VMAccount for AionVMAccount {
                             if let Some(code) = self.cache_transformed_code(db) {
                                 // propagate code loaded from the database to
                                 // the global code cache.
-                                state_db.cache_code(hash, code)
+                                state_db.cache_transformed_code(hash, code)
                             }
                         }
                         RequireCache::CodeSize => {

@@ -111,6 +111,13 @@ mod tests {
         assert!(cache.get_mut(&"hello").is_none());
         assert!(cache.get_mut(&"world").is_some());
 
+        let val3 = vec![1u8; 210];
+        {
+            let v = cache.get_mut(&"world").unwrap();
+            v.clone_from(&val3);
+        }
+
         assert_eq!(cache.current_size(), size2);
+        assert_eq!(cache.get_mut(&"world"), Some(&mut vec![1u8; 210]));
     }
 }

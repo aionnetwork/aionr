@@ -66,7 +66,10 @@ public class NativeTransactionExecutor {
             }
             AionCapabilitiesV2 cap = new AionCapabilitiesV2();
             AvmImpl avm = CommonAvmFactory.buildAvmInstanceForConfiguration(cap, config);
-            FutureResult[] futures = avm.run(substate, contexts, ExecutionType.ASSUME_MAINCHAIN, blockNumber-1);
+
+            // Workaround: special case solution for AKI-638 and AKI-644
+            ExecutionType executionType = blockNumber == 4966823 ? ExecutionType.ASSUME_MAINCHAIN : ExecutionType.MINING;
+            FutureResult[] futures = avm.run(substate, contexts, executionType, blockNumber-1);
 
             // wait for the transaction results and serialize them into bytes
             NativeEncoder encoder = new NativeEncoder();

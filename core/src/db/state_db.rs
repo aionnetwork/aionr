@@ -29,10 +29,10 @@ use memory_cache::MemoryLruCache;
 use journaldb::JournalDB;
 use kvdb::{KeyValueDB, DBTransaction, HashStore};
 use aion_types::{H256, Address};
-use state::{self, AionVMAccount};
+use state::{self, AionVMAccount, VMAccount};
 use header::BlockNumber;
 use blake2b::blake2b;
-use parking_lot::Mutex;
+use parking_lot::{Mutex,MutexGuard};
 use util_error::UtilError;
 use bloom_journal::{Bloom, BloomJournal};
 use db::COL_ACCOUNT_BLOOM;
@@ -110,6 +110,8 @@ pub struct StateDB {
     account_cache: Arc<Mutex<AccountCache>>,
     /// DB Code cache. Maps code hashes to shared bytes.
     code_cache: Arc<Mutex<MemoryLruCache<H256, Arc<Vec<u8>>>>>,
+    /// DB Code cache. Maps code hashes to shared bytes.
+    transformed_code_cache: Arc<Mutex<MemoryLruCache<H256, Arc<Vec<u8>>>>>,
     /// Local dirty cache.
     local_cache: Vec<CacheQueueItem>,
     /// Shared account bloom. Does not handle chain reorganizations.
@@ -142,6 +144,7 @@ impl StateDB {
                 modifications: VecDeque::new(),
             })),
             code_cache: Arc::new(Mutex::new(MemoryLruCache::new(code_cache_size))),
+            transformed_code_cache: Arc::new(Mutex::new(MemoryLruCache::new(code_cache_size))),
             local_cache: Vec::new(),
             account_bloom: Arc::new(Mutex::new(bloom)),
             cache_size: cache_size,
@@ -246,6 +249,27 @@ impl StateDB {
             self.parent_hash,
             is_best
         );
+
+        // update globle transformed code cache
+        // code won't change so do not update code cache
+        let update_code_cache =
+            |code_cache: &mut MutexGuard<MemoryLruCache<H256, Arc<Vec<u8>>>>,
+             addr: &H256,
+             new: &AionVMAccount| {
+                let key = blake2b(&new.address_hash(&addr));
+                if let Some(code) = code_cache.get_mut(&key) {
+                    if new.is_transformed_cached() {
+                        let code_hash = blake2b(code.as_ref());
+                        let new_code_hash = blake2b(new.transformed_code_cache.as_ref());
+                        if new_code_hash != code_hash {
+                            if let Some(new_code) = new.transformed_code() {
+                                code.clone_from(&new_code);
+                            }
+                        }
+                    }
+                }
+            };
+
         let mut cache = self.account_cache.lock();
         let cache = &mut *cache;
 
@@ -315,10 +339,18 @@ impl StateDB {
                     {
                         if let Some(new) = acc {
                             if account.modified {
+                                {
+                                    let mut code_cache = self.transformed_code_cache.lock();
+                                    update_code_cache(&mut code_cache, &account.address, &new);
+                                }
                                 existing.overwrite_with(new);
                             }
                             continue;
                         }
+                    }
+                    if let Some(ref new) = acc {
+                        let mut code_cache = self.transformed_code_cache.lock();
+                        update_code_cache(&mut code_cache, &account.address, &new);
                     }
                     cache.accounts.insert(account.address, acc);
                 }
@@ -359,6 +391,7 @@ impl StateDB {
             db: self.db.boxed_clone(),
             account_cache: self.account_cache.clone(),
             code_cache: self.code_cache.clone(),
+            transformed_code_cache: self.transformed_code_cache.clone(),
             local_cache: Vec::new(),
             account_bloom: self.account_bloom.clone(),
             cache_size: self.cache_size,
@@ -374,6 +407,7 @@ impl StateDB {
             db: self.db.boxed_clone(),
             account_cache: self.account_cache.clone(),
             code_cache: self.code_cache.clone(),
+            transformed_code_cache: self.transformed_code_cache.clone(),
             local_cache: Vec::new(),
             account_bloom: self.account_bloom.clone(),
             cache_size: self.cache_size,
@@ -392,7 +426,10 @@ impl StateDB {
         self.db.mem_used() + {
             let accounts = self.account_cache.lock().accounts.len();
             let code_size = self.code_cache.lock().current_size();
-            code_size + accounts * ::std::mem::size_of::<Option<AionVMAccount>>()
+            let transformed_code_size = self.transformed_code_cache.lock().current_size();
+            code_size
+                + transformed_code_size
+                + accounts * ::std::mem::size_of::<Option<AionVMAccount>>()
         }
     }
 
@@ -469,6 +506,12 @@ impl state::Backend for StateDB {
         cache.insert(hash, code);
     }
 
+    fn cache_transformed_code(&self, hash: H256, code: Arc<Vec<u8>>) {
+        let mut cache = self.transformed_code_cache.lock();
+
+        cache.insert(hash, code);
+    }
+
     fn get_cached_account(&self, addr: &Address) -> Option<Option<AionVMAccount>> {
         let mut cache = self.account_cache.lock();
         if !Self::is_allowed(addr, &self.parent_hash, &cache.modifications) {
@@ -490,6 +533,12 @@ impl state::Backend for StateDB {
 
     fn get_cached_code(&self, hash: &H256) -> Option<Arc<Vec<u8>>> {
         let mut cache = self.code_cache.lock();
+
+        cache.get_mut(hash).map(|code| code.clone())
+    }
+
+    fn get_transformed_cached_code(&self, hash: &H256) -> Option<Arc<Vec<u8>>> {
+        let mut cache = self.transformed_code_cache.lock();
 
         cache.get_mut(hash).map(|code| code.clone())
     }
