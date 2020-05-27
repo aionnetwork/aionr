@@ -60,6 +60,10 @@ public class NativeTransactionExecutor {
             }
 
             AvmConfiguration config = new AvmConfiguration();
+            // special case for AKI-638 and AKI-644
+            if (blockNumber != 4966823 && blockNumber != 5109941) {
+                config.enableCoinbaseLocking = true;
+            }
             if (Constants.DEBUG) {
                 config.enableVerboseContractErrors = true;
                 config.enableVerboseConcurrentExecutor = true;
@@ -67,9 +71,7 @@ public class NativeTransactionExecutor {
             AionCapabilitiesV2 cap = new AionCapabilitiesV2();
             AvmImpl avm = CommonAvmFactory.buildAvmInstanceForConfiguration(cap, config);
 
-            // Workaround: special case solution for AKI-638 and AKI-644
-            ExecutionType executionType = blockNumber == 4966823 ? ExecutionType.ASSUME_MAINCHAIN : ExecutionType.MINING;
-            FutureResult[] futures = avm.run(substate, contexts, executionType, blockNumber-1);
+            FutureResult[] futures = avm.run(substate, contexts, ExecutionType.ASSUME_MAINCHAIN , blockNumber-1);
 
             // wait for the transaction results and serialize them into bytes
             NativeEncoder encoder = new NativeEncoder();
