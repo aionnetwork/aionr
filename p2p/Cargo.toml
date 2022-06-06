@@ -13,7 +13,7 @@ uuid = { version = "0.6.5", features = ["v4"] }
 serde = "1.0.80"
 serde_derive = "1.0.92"
 futures = "0.1.26"
-tokio = "0.1.11"
+tokio = "1.8.4"
 tokio-codec = "0.1.1"
 parking_lot = "0.5"
 acore-bytes =  { path = "../util/bytes" }
