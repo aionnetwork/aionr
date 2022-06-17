@@ -10,7 +10,7 @@ authors = ["Aion Foundation <admin@aion.network>"]
 bloomchain = { path = "../util/bloomchain" }
 byteorder = "1.0"
 bytes = "0.4"
-crossbeam = "0.3"
+crossbeam = "0.8"
 acore-bloom-journal = { path = "../util/bloom" }
 acore-bytes = { path = "../util/bytes" }
 patricia-trie = { path = "../util/patricia_trie" }
