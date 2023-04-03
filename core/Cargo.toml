@@ -40,7 +40,7 @@ util-error = { path = "../util/error" }
 fixed-point = { path = "../util/fixed_point" }
 rustc-hex = "1.0"
 stats = { path = "../util/stats" }
-time = "0.1"
+time = "0.2"
 trace-time = { path = "../util/trace-time" }
 using_queue = { path = "../util/using_queue" }
 table = { path = "../util/table" }
