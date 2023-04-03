@@ -6,7 +6,7 @@ build = "build.rs"
 
 [dependencies]
 libc = "0.2.0"
-time = "0.1"
+time = "0.2"
 serde_derive = "1.0.0"
 serde_json = "*"
 bincode = "1.0.0"
